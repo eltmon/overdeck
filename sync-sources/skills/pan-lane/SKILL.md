@@ -1,6 +1,6 @@
 ---
 name: pan-lane
-description: "pan lane start|list|wait|report|stop|reap — launch gauntlet lanes (builder, critic, verifier, play, orchestrator conversations) from any harness, wait on their reports, and reap them. Lanes nest under the conversation that launched them."
+description: "pan lane start|list|wait|report|stop|reap|disk-check — launch gauntlet lanes (builder, critic, verifier, play, orchestrator conversations) from any harness, wait on their reports, reap them, and check the disk floor. Lanes nest under the conversation that launched them."
 triggers:
   - pan lane
   - launch a lane
@@ -50,9 +50,13 @@ pan lane start --run hotel --key cold-1 --role play --brief briefs/play.md
 
 # watch
 pan lane list --run hotel
+pan lane list --run hotel --reapable                    # superseded, inactive lanes: reap candidates
 pan lane wait --run hotel --timeout 540                 # next report of any lane in the run
 pan lane wait --run hotel --after <cursor> --timeout 540
 pan lane wait conv-<name> --timeout 540                 # one lane
+
+# before a launch wave or a worktree you create yourself (git worktree add, Agent-tool isolation)
+pan lane disk-check --project <key>
 
 # inside a lane, at the end of its brief
 pan lane report --file result.md
@@ -101,6 +105,9 @@ exits 1. A remote lane prints `Lane <run>/<key> <role> i<n>: <name> on <label> i
   commit it judges.
 - `pan lane reap` never kills a process and never discards work: it refuses while a process runs in
   the lane directory, and refuses a dirty tree unless `--park`.
+- A launch is refused below the 10 GiB disk floor at the project's lanes root, with
+  `Disk low — new workspace starts are held …` text (HTTP 507, `disk-low`); `--force` does not
+  bypass it. A lane on another machine is checked by its owner, against the owner's own lanes root.
 
 ## How to wait from each harness
 
@@ -117,5 +124,7 @@ cursor; pass that cursor with `--after` so you never read a report twice.
 ## Close-out
 
 Reap each lane when its work is merged or abandoned; reap builders before the orchestrator lane that
-launched them. At run end, `pan lane list --run <key>` shows every lane `archived` or `stopped`.
-Archived lanes stay in the list, so the run's ledger (iterations, reports, cost) stays complete.
+launched them. Reap a lane as soon as `pan lane list --reapable` lists it, and run
+`pan lane disk-check` before creating any worktree yourself. At run end, `pan lane list --run <key>`
+shows every lane `archived` or `stopped`. Archived lanes stay in the list, so the run's ledger
+(iterations, reports, cost) stays complete.

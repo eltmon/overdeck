@@ -423,6 +423,12 @@ describe('Muse transcript adapter', () => {
   });
 });
 
+describe('Grok Build transcript adapter (PAN-5078)', () => {
+  it('reads grok transcripts with the ACP adapter', () => {
+    expect(getTranscriptAdapter('grok')).toBe(getTranscriptAdapter('acp'));
+  });
+});
+
 describe('Prime Agent transcript adapter (PAN-3668 WI-18)', () => {
   it('resolves the recorded session file and serializes it like pi', async () => {
     const adapter = getTranscriptAdapter('prime-agent');

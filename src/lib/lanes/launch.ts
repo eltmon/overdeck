@@ -49,6 +49,7 @@ import {
 import type { RuntimeName } from '../runtimes/types.js';
 import { resolveLaneConfig, type LaneConfig } from './config.js';
 import { laneContract, type LaneAnswering } from './contract.js';
+import { admitLaneDisk, holdLaneDisk, type LaneDiskDeps } from './disk.js';
 import { distinctLaneCwds, laneIterations } from './iteration.js';
 import { listAllLaneRows, type LaneRow } from './lane-rows.js';
 import { pairBuilder, type PairingRow } from './pairing.js';
@@ -143,6 +144,8 @@ export interface LaneLaunchDeps {
   tmpRoot?: string;
   /** PAN-4311: the stateless CPU pressure check. Default `assessCpuPressure`. */
   cpuPressure?: () => Promise<CpuPressureVerdict>;
+  /** PAN-5094: disk-floor seams. Default: the real ledger, statfs and estimate. */
+  disk?: LaneDiskDeps;
 }
 
 const remoteOf = (target: RemoteLaneTarget | LocalLanePlacement | null): RemoteLaneTarget | undefined =>
@@ -366,7 +369,7 @@ const REMOTE_LIVE_ACTIVITIES: ReadonlySet<string> = new Set(['working', 'idle', 
 /** D-4638-2: how many times a remote launch retries after the owner answers `name-taken`. */
 const NAME_TAKEN_RETRIES = 3;
 const NAME_ATTEMPTS = 5;
-const OWNER_STATUSES: ReadonlySet<number> = new Set([400, 403, 404, 409, 429, 503]);
+const OWNER_STATUSES: ReadonlySet<number> = new Set([400, 403, 404, 409, 429, 503, 507]);
 
 /** FR-6 for a remote lane, judged from home's stand-in: no mirror yet within the starting grace, or a running mirror, or an unreachable owner. */
 function remoteOccupies(
@@ -475,6 +478,12 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
   if (remote?.isFly && !getHarnessBehavior(harness).capabilities.runsOnFlyMachine) {
     throw new LaneLaunchError(400, `${harness} does not run on Fly machines (#4296)`);
   }
+
+  // PAN-5094: a lane's worktree counts against the disk floor like a workspace
+  // start (PAN-4961). --force does not bypass it; a remote lane is admitted by its owner.
+  const disk = remote
+    ? null
+    : await admitLaneDisk({ config, lanesRoot: lanesRoot!, role, reuse: request.reuse === true, label: `lane:${run}/${key}/${role}` }, deps.disk);
 
   // 6. Serialize the rest per project (NFR-4).
   return withProjectLock(config.projectKey, async () => {
@@ -676,7 +685,16 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
       await undoCreate();
       throw error;
     }
-  });
+  }).then(
+    (result) => {
+      if (disk) holdLaneDisk(disk);
+      return result;
+    },
+    async (error: unknown) => {
+      await disk?.release().catch(() => undefined);
+      throw error;
+    },
+  );
 }
 
 interface OwnerLaunchPlan {

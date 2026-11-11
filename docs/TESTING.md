@@ -148,6 +148,27 @@ fake timers are installed, both `setTimeout` and the deadline's own
 `Date.now()` calls can freeze, so the ordering — real fixture first, fake
 clock after — is what keeps the poll live.
 
+### Wall-clock tests (*.slow.test.ts)
+
+A case whose result depends on real wall-clock time (a real child-process
+sleep, a watchdog deadline, a retry loop with real sleeps) goes in a sibling
+file named `<name>.slow.test.ts`, because fake timers cannot control real
+child processes.
+
+`vitest.config.ts` excludes `**/*.slow.test.ts` unless `VITEST_INCLUDE_SLOW=1`,
+so the default run and the CI test shards never run it.
+
+Run one with `VITEST_INCLUDE_SLOW=1 npx vitest run <file>`.
+
+Give each case an explicit per-test timeout (`it(name, { timeout: 20_000 },
+fn)`).
+
+CI runs a slow file only when a workflow step names it (today only
+`tests/integration/anywhere/two-machine-ac1.slow.test.ts`, in the `test-e2e`
+job).
+
+Example: `tests/scripts/pan-hook-lib-guards.slow.test.ts` (PAN-5117).
+
 ### Signals and fixture PIDs
 
 Code under test that calls `process.kill` with a PID it read from a fixture

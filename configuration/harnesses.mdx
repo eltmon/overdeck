@@ -13,7 +13,7 @@ that runs in a terminal-backend pane (Herdr by default; see
 independently per spawn.
 
 <Info>
-**Supported today:** `claude-code` (default), `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, `muse`, and `prime-agent`. For the wider
+**Supported today:** `claude-code` (default), `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, `muse`, `prime-agent`, and `grok`. For the wider
 field of coding-agent harnesses Overdeck could adopt next — and how each one handles
 skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-landscape).
 </Info>
@@ -26,8 +26,9 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 | `acp` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Opt-in Kimi work | Uses the open Agent Client Protocol over a persistent authenticated host; Kimi is the first wired ACP agent. |
 | `kimi-code` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Kimi models (built-in default) | Drives Kimi's own native terminal UI directly — no ACP host, no Anthropic-compatibility endpoint. Kimi models only. Set `providerHarnesses.kimi` to `acp` or `claude-code` to opt back out. |
 | `opencode` | [OpenCode](https://opencode.ai) (`opencode`) | OpenCode Go and Zen | Persistent ACP sessions, native credentials, and model discovery; verified with 1.18.31. |
-| `muse` | Muse Code (`muse`) | Meta Muse Spark models | Persistent native terminal sessions with separate Standard and Contributor model choices. |
+| `muse` | Muse Code (`muse`) | Meta Muse models (Wonder, Spark, Ember) | Persistent native terminal sessions with separate Standard and Contributor model choices. |
 | `prime-agent` | [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) (`prime-agent`) | Opt-in multi-provider work | RPC mode behind an Overdeck host, with one private Prime daemon per agent; supports 0.8.x. |
+| `grok` | [Grok Build](https://x.ai/cli) (`grok`) | Grok Build sign-in (SuperGrok) | Persistent ACP sessions, sign-in reuse, reported cost; verified with 1.0.77. |
 
 ## Composer commands across harnesses
 
@@ -46,7 +47,7 @@ Pressing **Enter** in the dashboard composer queues your message while the agent
 | Claude Code | Auto, Steer | Interrupts the running turn and sends the message at once, like the TUI's Ctrl+Enter. Under the hood Overdeck types the message and presses Claude Code's send-now chord, Ctrl+X Ctrl+S. An idle agent just receives the message. |
 | Pi (`ohmypi`) | Auto, Steer, Follow-up | Steers over the Pi control channel. Conversations only. |
 | Codex | Auto | Not yet; see [PAN-4303](https://github.com/eltmon/overdeck/issues/4303). |
-| ACP, OpenCode, Kimi Code, Muse Code, Prime Agent | Auto | None. |
+| ACP, OpenCode, Grok Build, Kimi Code, Muse Code, Prime Agent | Auto | None. |
 
 A steer never falls back silently to a queued message. A harness without steer answers `steer-unsupported` and delivers nothing. A Claude Code agent launched before steer support has a PTY supervisor that presses Enter instead, and the delivery reports that it went out as a normal submit.
 
@@ -64,6 +65,12 @@ A steer never falls back silently to a queued message. A harness without steer a
   [Local models (Ollama)](/configuration/local-models).
 - Works with both subscription auth (Claude Code OAuth) and API-key auth.
 - All role runs (`plan`, `work`, `review`, `test`, `ship`) default here.
+- The model picker includes Claude Fable 5.2 (`claude-fable-5-2`): 1M context,
+  128K maximum output, always-on adaptive thinking, and low through max effort.
+  API pricing is &#36;8/M input, &#36;40/M output and &#36;0.20/M cache reads, which
+  is cheaper than Fable 5.1 (&#36;10/M and &#36;50/M). It requires Claude Code
+  2.1.321 or newer; older versions treat it as an unrecognized model. Fable 5.1
+  stays selectable as the previous Fable. No default uses Fable 5.2.
 - The model picker includes Claude Opus 5.5 (`claude-opus-5-5`): 1M context,
   128K maximum output, always-on adaptive thinking, and low through max effort.
   API pricing is &#36;4/M input and &#36;20/M output; subscription availability depends
@@ -142,6 +149,7 @@ before every `claude-code` launch:
 
 | Model | Minimum Claude Code |
 | --- | --- |
+| Claude Fable 5.2 (`claude-fable-5-2`) | 2.1.321 |
 | Claude Fable 5.1 (`claude-fable-5-1`) | 2.1.255 |
 | Claude Sonnet 5.5 (`claude-sonnet-5-5`) | 2.1.284 |
 | Claude Haiku 5.5 (`claude-haiku-5-5`) | 2.1.293 |
@@ -158,6 +166,42 @@ with `npm install -g --prefix /usr/local @anthropic-ai/claude-code@latest`
 Running sessions keep their current Claude Code. No terminal session was
 created.
 ```
+
+#### Automatic updates
+
+Overdeck keeps npm-installed coding-agent CLIs (Claude Code, Codex CLI and
+OpenCode) up to date by default. It checks 2 minutes after the dashboard
+starts and then once a day. It checks one CLI at a time, and it updates a CLI
+only when npm has a newer version.
+
+When a launch needs a newer Claude Code, Overdeck first runs the Claude Code
+update once (for an npm or a native install), checks the version again, and
+continues the launch if the new version is enough. If the update fails, the
+launch error ends with a sentence that says what failed. Overdeck then waits
+15 minutes before it tries that update again for a launch.
+
+The daily check does not update CLIs that were installed another way (native
+`claude`, Kimi, Homebrew, a root-owned npm prefix, or Windows). The dashboard
+log names the command to run for each of them.
+
+Running agents and conversations keep the version they started with. New
+launches use the new version.
+
+A failed daily update shows in **Needs you** with the error and the command to
+run by hand. Overdeck tries it again at the next daily check.
+
+To turn automatic updates off, open **Settings**, go to **Coding Agents**, and
+switch off **Keep coding-agent CLIs up to date automatically**. Or set it in
+`~/.overdeck/config.yaml`:
+
+```yaml
+harnesses:
+  auto_update: false
+```
+
+The setting applies to the whole machine. A project `.pan.yaml` cannot set it.
+With it off, Overdeck behaves as before: the launch is refused and the
+dashboard shows the **Upgrade Claude Code** banner.
 
 The dashboard shows the same check as a banner in the system notices row
 while any configured model's minimum is unmet. A user-writable npm, native
@@ -178,24 +222,40 @@ could confuse a shell running `claude` directly.
 Install Muse Code and sign in with `muse login`. For API-key authentication,
 use `muse auth set --api-key-stdin`; Muse owns its credentials. Overdeck uses
 the installed `muse` binary and does not route these models through CLIProxy.
-The integration is verified with Muse Code 1.0.2.
+The integration is verified with Muse Code 1.0.2; Muse Ember was checked with
+Muse Code 1.4.15.
 
 Enable **Meta (Muse)** in Settings → Providers, then choose a model in the
-model picker. All three use a 1,048,576-token context window:
+model picker. All five use a 1,048,576-token context window:
 
 | Model ID | Input / million tokens | Cached input / million tokens | Output / million tokens |
 | --- | --- | --- | --- |
 | `muse-wonder-1.0` | &#36;4.00 | &#36;0.20 | &#36;20.00 |
 | `muse-spark-1.3` | &#36;1.25 | &#36;0.15 | &#36;4.25 |
 | `muse-spark-1.3-contributor` | &#36;0.10 | &#36;0.002 | &#36;0.20 |
+| `muse-ember-1.0` | &#36;0.10 | &#36;0.004 | &#36;0.50 |
+| `muse-wonder-full-1.0` | Subscription | Subscription | Subscription |
 
-Muse Wonder and Muse Spark 1.3 accept `max` effort and Contributor stops at
-`xhigh`; Overdeck still sends at most `xhigh` (see the effort table).
+Muse Ember bills a request with more than 200K input tokens (cached tokens
+included) at &#36;0.30 / &#36;0.012 / &#36;1.50 per million tokens, and
+Overdeck's cost tracking applies that rate per request.
+
+Muse Wonder, Muse Spark 1.3, Muse Ember and Muse Wonder Full accept `max`
+effort and Contributor stops at `xhigh`; Overdeck still sends at most `xhigh`
+(see the effort table).
 
 Muse Wonder (`muse-wonder-1.0`) is Meta's frontier model, released on
-2026-10-12. Muse Wonder Full is not in the picker yet: Meta offers it only on
-the Muse Code Power Usage and Maximum Usage plans and has not published its
-model ID.
+2026-10-12.
+
+Muse Ember (`muse-ember-1.0`), released on 2026-11-09, is Meta's low-cost
+Standard model. It has no Contributor tier, and Meta's docs support only the
+full ID, not a bare `muse-ember` alias.
+
+Muse Wonder Full (`muse-wonder-full-1.0`) is available only on the Muse Code
+Power Usage (&#36;50/mo) and Maximum Usage (&#36;200/mo) plans. It is not served by
+the Meta Model API, so it has no per-token price; the picker and cost tables
+mark it as a subscription model. Real acceptance against those plans has not
+been verified in this repository.
 
 The Contributor tier requires contributing prompts and completions for model
 training. Choose it explicitly when that data use fits your work. Standard
@@ -635,6 +695,73 @@ the terminal backend's environment) to change the timeout, in milliseconds. `0` 
 the OpenCode status check still runs. Each prompt gets at most one
 `prompt_stalled` entry.
 
+### Grok Build CLI
+
+Overdeck runs xAI's Grok Build CLI as the `grok` harness. The integration was
+verified against `grok 1.0.77`. Install the CLI with
+`curl -fsSL https://x.ai/cli/install.sh | bash` (it also installs into
+`~/.grok/bin`, which Overdeck searches), and update it with `grok update`.
+`pan doctor` reports it as not installed, signed out, or `<version>, signed in`.
+
+**Sign-in.** Run `grok login` on the host. Grok Build saves the sign-in in
+`~/.grok/auth.json`, and Overdeck reuses it: the ACP host authenticates with
+the `cached_token` method. If you are signed out, the launch fails with
+`Grok sign-in is required. Run grok login, then retry.` Grok Build prefers an
+API key over the sign-in, so Overdeck removes `XAI_API_KEY` from a Grok agent's
+environment; the turn is billed to your Grok Build sign-in, never to an API key.
+
+**Models.** The `grok` provider has four fixed model IDs:
+`grok/grok-4.7`, `grok/grok-4.7-build-fast`, `grok/grok-4.6` and
+`grok/grok-4.5`. They run only on the `grok` harness, and the `grok` harness
+runs only these IDs; any other combination fails before launch. The bare
+`grok-4.7` ID still belongs to the `xai` provider (an xAI API key routed through
+Claude Code). The pickers list the four models only when the CLI is installed
+and signed in. Every Grok launch needs an explicit model; there is no fallback.
+
+```yaml
+models:
+  providers:
+    grok:
+      enabled: true
+      harness: grok
+```
+
+**Effort.** Grok Build offers `low`, `medium`, `high` and `xhigh`. Overdeck sets
+the ACP `reasoning_effort` option right after the model, defaults to `high`, and
+clamps `max` to `xhigh`. A dashboard effort change on a live Grok conversation
+applies to subsequent turns.
+
+**Launch.** Overdeck runs one persistent
+`grok agent --always-approve --no-leader stdio` process per agent behind its ACP
+host. `--no-leader` keeps a dedicated process even when `~/.grok/config.toml`
+turns on leader mode, which would share one process across clients.
+`--always-approve` approves tool calls inside Grok, including Grok subagents
+whose permission requests never reach the ACP client. Restart and resume pass
+the recorded `acp-session-id`, and the host reopens it with `session/load`.
+
+**Context and tools.** Grok receives Overdeck's rendered context at session
+start; use `harness:grok` blocks for Grok-specific instructions. The managed
+per-agent `overdeck` MCP server reaches Grok through the ACP `session/new` and
+`session/load` requests.
+
+**Cost.** Grok reports token usage and the turn cost (`costUsdTicks`, units of
+10⁻¹⁰ USD) with each prompt result. The ACP host records it on the transcript's
+`turn_completed` entry, and the `grok` cost reconcile source imports one cost
+event per turn (provider `custom`, model `grok/<id>`). The vendor figure
+includes the double rate for prompts of 200K tokens or more; Overdeck's
+pricing table is used only when a turn reports no cost. The Cloister tick
+imports a running Grok work agent's turns. Grok conversations write no agent
+state, so their turns are imported when `POST /api/costs/reconcile` runs (the
+dashboard's five-minute sweep covers only Pi and Codex).
+
+**Known behavior.** Grok Build loads the operator's own `~/.grok` MCP servers,
+plugins, hooks and skills into every session, alongside Overdeck's. MCP servers
+that fail to authenticate print noise in the agent pane. If the Overdeck Grok
+Build bot plugin is enabled in `~/.grok/config.toml`, its `overdeck` server is
+the outside-client plugin; the harness agent already gets its own per-agent
+`overdeck` server. In the live check (bot plugin enabled), the agent's
+`overdeck__list_conversations` call was answered by the per-agent server. Plain transcript forks are unavailable; use a summary fork.
+
 ### Prime Agent
 
 [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) is Prime
@@ -913,6 +1040,10 @@ runtime name, so adding a harness without a policy entry is a type error. A
 harness the gate does not recognise is denied, never allowed by default, and a
 raw legacy `pi` value gets the `ohmypi` rules.
 
+Grok Build has no gate: it is xAI's own CLI running xAI models on your xAI
+sign-in, and its documentation describes ACP mode for automation tools. The
+gate only pins `grok/*` models to the `grok` harness and back.
+
 The same gate enforces Kimi id-space correctness: a `kimi-code/*`
 native-catalog id is blocked on every harness except `kimi-code` and `acp`, so
 a stale role pin fails loudly instead of launching a session whose first turn
@@ -996,7 +1127,9 @@ A `claude-code` launch was refused because the configured model's minimum
 Claude Code version is newer than the launch binary. See
 [Claude Code version requirements](#claude-code-version-requirements) — run
 the upgrade command the error names, or click **Upgrade Claude Code** in the
-dashboard banner, then launch again.
+dashboard banner, then launch again. With
+[automatic updates](#automatic-updates) on, Overdeck has already tried the
+update, and the end of the error says what failed.
 
 ## Tradeoffs
 
@@ -1091,7 +1224,7 @@ other harness gets "Overdeck commands" with the `pan` equivalents instead (see
 
 | Harness | At launch it gets |
 | --- | --- |
-| `claude-code`, `codex`, `acp`, `opencode` | The `overdeck` MCP server and the "Overdeck tools" block |
+| `claude-code`, `codex`, `acp`, `opencode`, `grok` | The `overdeck` MCP server and the "Overdeck tools" block |
 | `kimi-code`, `ohmypi`, `muse`, `prime-agent` | The "Overdeck commands" block, with the `pan` command for each tool |
 
 Any harness gets the "Overdeck commands" block instead of the server when it
@@ -1243,7 +1376,7 @@ Model pickers show the configured session context beside each model. This budget
 
 Astra and GPT 5.6 Sol, Terra, and Luna default to **272K**. The explicit GPT 5.6 **372K** variants opt into a larger budget. Managed Codex sessions pass this budget and default to **High** reasoning effort. A dashboard effort change on Codex app-server or Kimi ACP applies after the runtime accepts it, starting with subsequent turns. Terminal-only routes use their launch setting and native terminal controls.
 
-Fable 5.1 supports **1M** context and requires **Claude Code 2.1.255 or newer**. Model availability and extended-context access still depend on your provider and subscription. Kimi K3 offers separate **256K** and **1M** choices; K2.7 Code uses **256K** and does not offer adjustable reasoning effort; K2.8 Preview (`kimi-code/kimi-for-coding`) uses **1M** and offers low/high/max.
+Fable 5.2 supports **1M** context and requires **Claude Code 2.1.321 or newer**; Fable 5.1 requires **2.1.255 or newer**. Model availability and extended-context access still depend on your provider and subscription. Kimi K3 offers separate **256K** and **1M** choices; K2.7 Code uses **256K** and does not offer adjustable reasoning effort; K2.8 Preview (`kimi-code/kimi-for-coding`) uses **1M** and offers low/high/max.
 
 Subscription usage allowances are not API token prices. A larger window can consume more of your allowance, but API long-input multipliers should not be read as subscription-credit multipliers.
 
@@ -1255,6 +1388,7 @@ Subscription usage allowances are not API token prices. A larger window can cons
 | Codex (TUI) | `model_reasoning_effort` in the agent's `CODEX_HOME/config.toml` | low | medium | high | xhigh | max on models that advertise it |
 | Codex (app-server) | host `--effort` at launch, per-turn `effort`, live `set-effort` | same as Codex TUI | | | | |
 | OpenCode | ACP `setConfigOption("effort", …)`; model variants pass through | low | medium | high | xhigh | max (only levels/variants the model exposes) |
+| Grok Build | ACP `setConfigOption("reasoning_effort", …)`; live `set-effort` | low | medium | high | xhigh | xhigh |
 | Kimi K3 / K3.1 / K2.8 Preview (ACP) | ACP `thinking` option | low | high | high | max | max |
 | Kimi K3 / K3.1 / K2.8 Preview (native) | `KIMI_MODEL_THINKING_EFFORT` env per process | low | high | high | max | max |
 | Pi (`omp`) | `--thinking <level>`; live `set_thinking_level` | low | medium | high | xhigh | xhigh |

@@ -125,6 +125,14 @@ file. The key is never shown in the Settings UI.
   and which Overdeck MCP tools each client family called (a connector that
   restarts during the day can send a combination again). Client names,
   versions, tokens and tool arguments are never sent.
+- Failed requests from the dashboard and the phone app: the route template
+  (for example `/api/conversations/:id`), the route area, the HTTP method,
+  and the HTTP status (exact for common codes, otherwise a status class) —
+  at most one per route, area, and status per minute per page load
+- The phone app's link to the machine it is viewing: whether a dial failed and
+  why, whether the link dropped and recovered (with a bucketed recovery
+  time), and whether the link's direct/relay route changed — only for the
+  phone's currently open machine
 
 The overdeck.ai hosted services (account, directory and share) send no telemetry.
 
@@ -146,6 +154,7 @@ backend you configured with `pan vault setup`.
 - Repository, branch, workspace, or file-path names
 - Email addresses, account IDs, GitHub logins, or credentials
 - Session replay recordings
+- Response bodies, conversation names and IDs, or full request URLs
 
 <Info>
 Feature-flag support currently exposes a read door for future rollouts, but no

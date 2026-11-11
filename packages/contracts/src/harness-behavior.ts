@@ -7,6 +7,7 @@ import {
   KIMI_CODE_CAPABILITIES,
   MUSE_CAPABILITIES,
   OHMYPI_CAPABILITIES,
+  GROK_CAPABILITIES,
   OPENCODE_CAPABILITIES,
   PRIME_AGENT_CAPABILITIES,
   type HarnessCapabilities,
@@ -35,7 +36,7 @@ export type HarnessReadinessKind =
   | "prime-agent-host-ready"
 export type HarnessTranscriptKind = "claude-jsonl" | "ohmypi-jsonl" | "codex-rollout-jsonl" | "acp-jsonl" | "kimi-wire-jsonl" | "muse-jsonl" | "prime-agent-jsonl"
 export type HarnessSessionIdSource = "launcher-session-id" | "transcript-jsonl" | "codex-thread-id" | "acp-session-id" | "kimi-session-newest" | "muse-session-log" | "prime-agent-session-id"
-export type HarnessContextLayerKind = "claude" | "pi" | "codex" | "acp" | "kimi-code" | "opencode" | "muse" | "prime-agent"
+export type HarnessContextLayerKind = "claude" | "pi" | "codex" | "acp" | "kimi-code" | "opencode" | "muse" | "prime-agent" | "grok"
 /** How Overdeck can steer a running turn (PAN-4292): Claude Code send-now keys, the Pi control channel, or null = no steer. */
 export type HarnessSteerKind = "send-now-keys" | "control-channel" | null
 export type HarnessFeedKind = "claude_code" | "pi" | "codex" | "acp" | "kimi_code" | "muse" | "prime_agent"
@@ -227,6 +228,16 @@ export const OPENCODE_BEHAVIOR: HarnessBehavior = {
   processNames: ["acp-host", "opencode"],
 }
 
+export const GROK_BEHAVIOR: HarnessBehavior = {
+  ...ACP_BEHAVIOR,
+  displayName: "Grok Build",
+  capabilities: GROK_CAPABILITIES,
+  contextLayerKind: "grok",
+  executableName: "grok",
+  processNames: ["acp-host", "grok", "grok-native"],
+  effortLevels: ["low", "medium", "high", "xhigh"],
+}
+
 export const MUSE_BEHAVIOR: HarnessBehavior = {
   displayName: "Muse Code",
   capabilities: MUSE_CAPABILITIES,
@@ -287,6 +298,7 @@ const BEHAVIORS: Record<RuntimeName, HarnessBehavior> = {
   "kimi-code": KIMI_CODE_BEHAVIOR,
   muse: MUSE_BEHAVIOR,
   "prime-agent": PRIME_AGENT_BEHAVIOR,
+  grok: GROK_BEHAVIOR,
 }
 
 const LEGACY_PI_HARNESS = "pi"

@@ -177,6 +177,16 @@ export class AcpHost {
           throw new Error(`The selected OpenCode model does not expose an effort setting (${this.options.effort} requested).`);
         }
       }
+      const support = resolveAcpProviderSupport(this.options.provider);
+      if (support.effortConfigId) {
+        const configOptions = await Effect.runPromise(this.options.runtime.getConfigOptions);
+        if (configOptions.some((option) => option.id === support.effortConfigId)) {
+          if (!this.options.effort) throw new Error("Grok Build launch requires --effort.");
+          await Effect.runPromise(this.options.runtime.setConfigOption(support.effortConfigId, this.options.effort));
+        } else if (this.options.effort && this.options.effort !== "high") {
+          throw new Error(`The selected model does not expose a reasoning effort setting (${this.options.effort} requested).`);
+        }
+      }
       if (this.options.provider === "kimi" && this.options.model) {
         const effort = resolveKimiNativeEffort(this.options.model, this.options.effort);
         if (effort) {
@@ -193,14 +203,16 @@ export class AcpHost {
       await writeFile(this.sessionIdPath(), `${started.sessionId}\n`, { mode: FILE_MODE });
       await chmod(this.sessionIdPath(), FILE_MODE);
       appendSessionIdToHistory(this.options.agentId, started.sessionId, "acp-host", {
-        harness: "acp",
+        harness: support.harness ?? "acp",
         model: this.options.model,
         path: this.transcriptPath(),
       });
     } catch (error) {
       const launchError = this.options.provider === "kimi" && isAuthenticationFailure(error)
         ? "Kimi authentication is required. Run `kimi`, then /login, and retry."
-        : errorMessage(error);
+        : this.options.provider === "grok" && isAuthenticationFailure(error)
+          ? "Grok sign-in is required. Run grok login, then retry."
+          : errorMessage(error);
       this.writePaneLine(`[error] ${launchError}`);
       await writeFile(this.errorPath(), `${launchError}\n`, { mode: FILE_MODE });
       await chmod(this.errorPath(), FILE_MODE);
@@ -311,6 +323,7 @@ export class AcpHost {
           promptId,
           event: "turn_completed",
           stopReason: promptResult.stopReason,
+          usage: resolveAcpProviderSupport(this.options.provider).extractTurnUsage?.(promptResult),
         });
       } catch (error) {
         const message = errorMessage(error);
@@ -353,6 +366,12 @@ export class AcpHost {
     if (this.options.provider === "opencode" || this.options.provider === "opencode-go") {
       const effort = op.effort.trim();
       await Effect.runPromise(this.options.runtime.setConfigOption("effort", effort));
+      return { status: 200, body: { ok: true, effort } };
+    }
+    const effortConfigId = resolveAcpProviderSupport(this.options.provider).effortConfigId;
+    if (effortConfigId) {
+      const effort = op.effort.trim();
+      await Effect.runPromise(this.options.runtime.setConfigOption(effortConfigId, effort));
       return { status: 200, body: { ok: true, effort } };
     }
     if (this.options.provider !== "kimi" || !this.options.model) {

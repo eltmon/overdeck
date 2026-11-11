@@ -147,3 +147,27 @@ The deacon log (`~/.overdeck/logs/deacon.log`) gets one `cpu-pressure sample`
 line every 5 minutes with PSI some avg10/avg60 and load per core, so you can
 calibrate the hold threshold for your host. New weights and nice levels apply
 to units and agents started after the change.
+
+## Disk alert
+
+Separate from this page's memory and CPU guardrails: the disk alert
+(PAN-5093) watches free space on the filesystem holding the Overdeck home
+and raises a Needs-you item plus a phone push when it drops too low. It
+runs in the primary dashboard process (`src/dashboard/server/services/disk-alert-service.ts`),
+polling every 30 seconds — see
+[Disk alert (PAN-5093)](../docs/PIPELINE-GATES.md#disk-alert-pan-5093) for
+the full design.
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `resources.disk_warn_gb` | `5` | Needs-you item + phone push when free disk on the Overdeck home's filesystem drops below this (GiB). |
+| `resources.disk_critical_gb` | `2` | Second, blocking alert below this (GiB). Must be lower than `disk_warn_gb`, or both fall back to the defaults with a warning. |
+
+```yaml
+resources:
+  disk_warn_gb: 5      # default 5; Needs-you item + phone push below this
+  disk_critical_gb: 2  # default 2; second, blocking alert; must be lower
+```
+
+Both values must be finite numbers greater than 0 and at most 1024; any
+other value is ignored and the previous value stays.

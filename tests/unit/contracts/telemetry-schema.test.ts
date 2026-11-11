@@ -49,10 +49,12 @@ const EXPECTED_EVENTS = [
   'relay_usage_sampled',
   'mcp_session_seen',
   'mcp_tool_called',
+  'client_request_failed',
+  'phone_link_state',
 ] as const satisfies readonly TelemetryEventName[];
 
 describe('telemetry event schema', () => {
-  it('exports all twenty-seven telemetry event names', () => {
+  it('exports all twenty-nine telemetry event names', () => {
     expect(TELEMETRY_EVENT_NAMES).toEqual(EXPECTED_EVENTS);
   });
 

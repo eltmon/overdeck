@@ -26,6 +26,13 @@ vi.mock('../../../../lib/config-yaml.js', async (importOriginal) => {
   };
 });
 
+const getPushHistoryView = vi.hoisted(() => vi.fn(async () => [] as unknown[]));
+vi.mock('../../services/needs-you-push-service.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../services/needs-you-push-service.js')>()),
+  getPushHistoryView,
+}));
+
+const { requiredScopeFor } = await import('../../route-scopes.js');
 const { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } = await import('../../../../lib/internal-token.js');
 const { _resetDashboardSessionTokenForTests } = await import('../dashboard-auth.js');
 const { pushRouteLayer } = await import('../push.js');
@@ -133,5 +140,15 @@ describe('/api/push routes (PAN-2354)', () => {
     const res = await call('GET', '/api/push/vapid-public-key');
     expect(res.status).toBe(200);
     expect(Buffer.from(res.json.publicKey, 'base64url')).toHaveLength(65);
+  });
+
+  it('serves the push history uncached under read:conversations (PAN-5111)', async () => {
+    const entry = { id: 'e1', key: 'auq:t1', title: 'Question', state: 'open' };
+    getPushHistoryView.mockResolvedValueOnce([entry]);
+    const res = await call('GET', '/api/push/history');
+    expect(res.status).toBe(200);
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(res.json).toEqual({ entries: [entry] });
+    expect(requiredScopeFor('GET', '/api/push/history')).toBe('read:conversations');
   });
 });

@@ -87,6 +87,7 @@ function harness(remoteOverrides: Partial<Remote> = {}) {
     homeDir: () => TEST_HOME,
     tmpRoot: join(TEST_HOME, 'tmp'),
     cpuPressure: vi.fn(async () => CPU_SATURATED),
+    disk: { read: vi.fn(async () => 1024 ** 4), estimate: vi.fn(async () => 0) },
   } satisfies Deps;
   return { deps, remote, git, live };
 }
@@ -326,5 +327,17 @@ describe('launchLane on another machine (PAN-4638 WI-4)', () => {
     expect(result.machine).toBeNull();
     expect(result.placement).toEqual({ label: 'home', reason: 'Auto → home (CPU pressure 3%, 41 GB free, 2 agents)', rejections });
     expect(getConversationByName(result.conversation.name)).not.toBeNull();
+  });
+
+  it('home-door-disk.ac4: never checks disk here; maps the owner\'s 507 disk-low refusal with the machine label', async () => {
+    const { deps } = harness({
+      launch: vi.fn(async () => ({ status: 507, body: { error: 'Disk low — only 5.0 GiB free …', code: 'disk-low' } })),
+    });
+    const error = await rejection(launchLane(request(root(), { key: 'b11', machine: 'desk' }), deps));
+
+    expect(deps.disk.read).not.toHaveBeenCalled();
+    expect(error.status).toBe(507);
+    expect(error.code).toBe('disk-low');
+    expect(error.message.startsWith('desk: Disk low')).toBe(true);
   });
 });

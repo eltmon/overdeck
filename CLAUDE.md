@@ -48,7 +48,7 @@
 
 | Topic | Doc |
 | --- | --- |
-| Harnesses (claude-code, ohmypi, codex, acp, kimi-code), ToS gate | [configuration/harnesses.mdx](configuration/harnesses.mdx), [reference/harness-landscape.mdx](reference/harness-landscape.mdx) |
+| Harnesses (claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, grok), ToS gate | [configuration/harnesses.mdx](configuration/harnesses.mdx), [reference/harness-landscape.mdx](reference/harness-landscape.mdx) |
 | Roles, sub-roles, agent taxonomy, review architecture | [docs/ROLES.md](docs/ROLES.md), [docs/REVIEW-AGENT-ARCHITECTURE.md](docs/REVIEW-AGENT-ARCHITECTURE.md) |
 | Dashboard server architecture, WS endpoints, terminal protocol | [docs/DASHBOARD-ARCHITECTURE.md](docs/DASHBOARD-ARCHITECTURE.md) |
 | Terminal backends (Herdr default, tmux supported) | [docs/TERMINAL-BACKENDS.md](docs/TERMINAL-BACKENDS.md) |

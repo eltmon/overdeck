@@ -68,6 +68,7 @@ import {
   getOhmypiLauncherFields,
   getRoleRuntimeBaseCommand,
 } from '../runtime-command.js';
+import { getProviderForModel } from '../../providers.js';
 
 describe('getRoleRuntimeBaseCommand --effort (PAN-3077)', () => {
   beforeEach(() => {
@@ -183,6 +184,19 @@ describe('getAcpLauncherFields --effort (PAN-4260)', () => {
   it('passes an OpenCode variant through unchanged', async () => {
     const fields = await getAcpLauncherFields('agent-x', 'opencode/some-model', '/tmp/ws', '/bin/acp-host', undefined, 'custom-variant');
     expect(fields.acpEffort).toBe('custom-variant');
+  });
+
+  it('derives the grok harness and provider for a Grok Build model (PAN-5078)', async () => {
+    vi.mocked(getProviderForModel).mockReturnValueOnce({ name: 'grok' } as never);
+    const fields = await getAcpLauncherFields('agent-x', 'grok/grok-4.6', '/tmp/ws', '/bin/acp-host');
+    expect(fields.harness).toBe('grok');
+    expect(fields.acpProvider).toBe('grok');
+    expect(fields.acpEffort).toBe('high');
+  });
+
+  it('clamps max to xhigh for a Grok Build model (PAN-5078)', async () => {
+    const fields = await getAcpLauncherFields('agent-x', 'grok/grok-4.6', '/tmp/ws', '/bin/acp-host', undefined, 'max');
+    expect(fields.acpEffort).toBe('xhigh');
   });
 
   it('defaults to high for a Kimi ACP model with no effort', async () => {

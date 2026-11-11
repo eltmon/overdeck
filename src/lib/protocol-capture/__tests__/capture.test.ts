@@ -83,6 +83,14 @@ describe('scrubValue', () => {
     });
   });
 
+  it('redacts account fields from an authenticate result (PAN-5078)', () => {
+    const message = { result: { _meta: { email: 'x', user_id: 'u1', team_id: 't1', principalId: 'p1', first_name: 'F', subscription_tier: 'tier', subscription_tier_display: 'Tier', team_name: 'n', subscription_watch_interval_secs: 60 } } };
+    expect(scrubValue(message, context)).toEqual({ result: { _meta: {
+      email: '<REDACTED>', user_id: '<REDACTED>', team_id: '<REDACTED>', principalId: '<REDACTED>', first_name: '<REDACTED>', subscription_tier: '<REDACTED>',
+      subscription_tier_display: '<REDACTED>', team_name: '<REDACTED>', subscription_watch_interval_secs: 60,
+    } } });
+  });
+
   it('redacts secret-shaped values and emails inside strings', () => {
     const apiKey = 'sk-' + 'a'.repeat(24);
     const githubToken = 'gh' + 'p_' + 'b'.repeat(30);

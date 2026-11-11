@@ -6,6 +6,9 @@ const posthogMock = vi.hoisted(() => ({
   unregister: vi.fn(),
   capture: vi.fn(),
   captureException: vi.fn(),
+  opt_out_capturing: vi.fn(),
+  opt_in_capturing: vi.fn(),
+  has_opted_out_capturing: vi.fn(() => false),
 }));
 
 vi.mock('posthog-js', () => ({ default: posthogMock }));
@@ -14,10 +17,12 @@ describe('frontend telemetry wrapper', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    posthogMock.has_opted_out_capturing.mockReturnValue(false);
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it('does not capture events before initialization', async () => {
@@ -202,5 +207,223 @@ describe('frontend telemetry wrapper', () => {
     expect(JSON.stringify(sanitized)).not.toContain('PAN-2599');
     expect(JSON.stringify(sanitized)).not.toContain('/home/alice');
     expect(JSON.stringify(sanitized)).not.toContain('ghp_secret');
+  });
+
+  // PAN-5100 WI-4
+  describe('initTelemetryFromConfig', () => {
+    it('registers client desktop and platform web with no bootstrap or memory persistence', async () => {
+      const { initTelemetryFromConfig } = await import('../telemetry');
+
+      const ok = initTelemetryFromConfig({ enabled: true }, {
+        client: 'desktop',
+        platform: 'web',
+        posthogKey: 'phc_test',
+        posthogHost: 'https://us.i.posthog.com',
+      });
+
+      expect(ok).toBe(true);
+      expect(posthogMock.register).toHaveBeenCalledWith({ client: 'desktop', platform: 'web' });
+      const initOptions = posthogMock.init.mock.calls[0]?.[1] as Record<string, unknown>;
+      expect(initOptions.persistence).toBeUndefined();
+      expect(initOptions.bootstrap).toBeUndefined();
+    });
+
+    it('passes memory persistence and bootstrap.distinctID for a phone with machineIdentity', async () => {
+      const { initTelemetryFromConfig } = await import('../telemetry');
+
+      const ok = initTelemetryFromConfig({ enabled: true, installId: 'id-1' }, {
+        client: 'phone',
+        platform: 'ios',
+        posthogKey: 'phc_test',
+        posthogHost: 'https://us.i.posthog.com',
+        machineIdentity: true,
+      });
+
+      expect(ok).toBe(true);
+      const initOptions = posthogMock.init.mock.calls[0]?.[1] as Record<string, unknown>;
+      expect(initOptions.persistence).toBe('memory');
+      expect(initOptions.bootstrap).toEqual({ distinctID: 'id-1' });
+      expect(posthogMock.register).toHaveBeenCalledWith({ client: 'phone', platform: 'ios' });
+    });
+
+    it('registers build_commit only when the config has one', async () => {
+      const { initTelemetryFromConfig } = await import('../telemetry');
+
+      initTelemetryFromConfig({ enabled: true, buildCommit: 'abc1234' }, {
+        client: 'desktop',
+        platform: 'web',
+        posthogKey: 'phc_test',
+        posthogHost: 'https://us.i.posthog.com',
+      });
+
+      expect(posthogMock.register).toHaveBeenCalledWith({ build_commit: 'abc1234' });
+    });
+
+    it('never registers a build_commit key when the config has none', async () => {
+      const { initTelemetryFromConfig } = await import('../telemetry');
+
+      initTelemetryFromConfig({ enabled: true }, {
+        client: 'desktop',
+        platform: 'web',
+        posthogKey: 'phc_test',
+        posthogHost: 'https://us.i.posthog.com',
+      });
+
+      expect(posthogMock.register).not.toHaveBeenCalledWith(
+        expect.objectContaining({ build_commit: expect.anything() }),
+      );
+    });
+
+    it('returns false and never calls posthog.init when effectiveEnabled is false', async () => {
+      const { initTelemetryFromConfig } = await import('../telemetry');
+
+      const ok = initTelemetryFromConfig({ effectiveEnabled: false }, {
+        client: 'desktop',
+        platform: 'web',
+        posthogKey: 'phc_test',
+        posthogHost: 'https://us.i.posthog.com',
+      });
+
+      expect(ok).toBe(false);
+      expect(posthogMock.init).not.toHaveBeenCalled();
+      expect(posthogMock.register).not.toHaveBeenCalled();
+    });
+
+    it('is idempotent: a second call while initialized returns true without a second posthog.init', async () => {
+      const { initTelemetryFromConfig } = await import('../telemetry');
+      const context = {
+        client: 'desktop' as const,
+        platform: 'web' as const,
+        posthogKey: 'phc_test',
+        posthogHost: 'https://us.i.posthog.com',
+      };
+
+      const first = initTelemetryFromConfig({ enabled: true }, context);
+      const second = initTelemetryFromConfig({ enabled: true }, context);
+
+      expect(first).toBe(true);
+      expect(second).toBe(true);
+      expect(posthogMock.init).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // PAN-5100 WI-4b
+  describe('consent lifecycle', () => {
+    const CONTEXT = {
+      client: 'desktop' as const,
+      platform: 'web' as const,
+      posthogKey: 'phc_test',
+      posthogHost: 'https://us.i.posthog.com',
+    };
+
+    it('on -> disableTelemetry() -> on: opts out then back in without a second posthog.init', async () => {
+      const { initTelemetryFromConfig, disableTelemetry, capture } = await import('../telemetry');
+      vi.stubEnv('MODE', 'production');
+
+      initTelemetryFromConfig({ enabled: true }, CONTEXT);
+      disableTelemetry();
+      initTelemetryFromConfig({ enabled: true }, CONTEXT);
+      capture('project_created', { mode: 'new' });
+
+      expect(posthogMock.opt_out_capturing).toHaveBeenCalledTimes(1);
+      expect(posthogMock.opt_in_capturing).toHaveBeenCalledWith({ captureEventName: false });
+      expect(posthogMock.init).toHaveBeenCalledTimes(1);
+      expect(posthogMock.capture).toHaveBeenCalledWith('project_created', { mode: 'new' });
+    });
+
+    it('opts back in at first init when the machine had previously opted out', async () => {
+      posthogMock.has_opted_out_capturing.mockReturnValue(true);
+      const { initTelemetryFromConfig } = await import('../telemetry');
+
+      initTelemetryFromConfig({ enabled: true }, CONTEXT);
+
+      expect(posthogMock.opt_in_capturing).toHaveBeenCalledWith({ captureEventName: false });
+    });
+
+    it('sends exactly one queued captureException on an "on" init and none on an "off" init', async () => {
+      const onModule = await import('../telemetry');
+      vi.stubEnv('MODE', 'production');
+      onModule.captureException(new Error('boom'), { action: 'merge' });
+      onModule.initTelemetryFromConfig({ enabled: true }, CONTEXT);
+      expect(posthogMock.captureException).toHaveBeenCalledTimes(1);
+
+      vi.resetModules();
+      vi.clearAllMocks();
+      posthogMock.has_opted_out_capturing.mockReturnValue(false);
+      const offModule = await import('../telemetry');
+      vi.stubEnv('MODE', 'production');
+      offModule.captureException(new Error('boom'), { action: 'merge' });
+      offModule.initTelemetryFromConfig({ effectiveEnabled: false }, CONTEXT);
+      expect(posthogMock.captureException).not.toHaveBeenCalled();
+    });
+
+    it('sends at most PENDING_EXCEPTION_LIMIT of seven pre-init exceptions', async () => {
+      const { initTelemetryFromConfig, captureException, PENDING_EXCEPTION_LIMIT } = await import('../telemetry');
+      vi.stubEnv('MODE', 'production');
+      expect(PENDING_EXCEPTION_LIMIT).toBe(5);
+
+      for (let i = 0; i < 7; i++) {
+        captureException(new Error(`boom-${i}`), { action: 'merge' });
+      }
+      initTelemetryFromConfig({ enabled: true }, CONTEXT);
+
+      expect(posthogMock.captureException).toHaveBeenCalledTimes(5);
+    });
+
+    it('drops an exception raised while off instead of queuing it for a later on', async () => {
+      const { initTelemetryFromConfig, captureException } = await import('../telemetry');
+      vi.stubEnv('MODE', 'production');
+
+      initTelemetryFromConfig({ effectiveEnabled: false }, CONTEXT);
+      captureException(new Error('boom'), { action: 'merge' });
+      initTelemetryFromConfig({ enabled: true }, CONTEXT);
+
+      expect(posthogMock.captureException).not.toHaveBeenCalled();
+    });
+
+    it('drops an exception raised after disableTelemetry() before any load, instead of sending it on a later on', async () => {
+      const { initTelemetryFromConfig, disableTelemetry, captureException } = await import('../telemetry');
+      vi.stubEnv('MODE', 'production');
+
+      disableTelemetry();
+      captureException(new Error('boom'), { action: 'merge' });
+      initTelemetryFromConfig({ enabled: true }, CONTEXT);
+
+      expect(posthogMock.captureException).not.toHaveBeenCalled();
+    });
+
+    it('unregisters operatorHash on a loaded door given an "on" config without one', async () => {
+      const { initTelemetryFromConfig } = await import('../telemetry');
+      initTelemetryFromConfig({ enabled: true, operatorHash: 'deadbeefdeadbeef' }, CONTEXT);
+      posthogMock.register.mockClear();
+
+      initTelemetryFromConfig({ enabled: true }, CONTEXT);
+
+      expect(posthogMock.unregister).toHaveBeenCalledWith('operatorHash');
+    });
+
+    it('opts out and returns false when a loaded door is given a different installId', async () => {
+      const { initTelemetryFromConfig, capture } = await import('../telemetry');
+      vi.stubEnv('MODE', 'production');
+      initTelemetryFromConfig({ enabled: true, installId: 'id-1' }, CONTEXT);
+
+      const ok = initTelemetryFromConfig({ enabled: true, installId: 'id-2' }, CONTEXT);
+      capture('project_created', { mode: 'new' });
+
+      expect(ok).toBe(false);
+      expect(posthogMock.opt_out_capturing).toHaveBeenCalledTimes(1);
+      expect(posthogMock.capture).not.toHaveBeenCalled();
+    });
+
+    it('returns from capture() and captureException() when the SDK throws', async () => {
+      posthogMock.capture.mockImplementation(() => { throw new Error('sdk failure'); });
+      posthogMock.captureException.mockImplementation(() => { throw new Error('sdk failure'); });
+      const { initTelemetryFromConfig, capture, captureException } = await import('../telemetry');
+      vi.stubEnv('MODE', 'production');
+      initTelemetryFromConfig({ enabled: true }, CONTEXT);
+
+      expect(() => capture('project_created', { mode: 'new' })).not.toThrow();
+      expect(() => captureException(new Error('boom'), { action: 'merge' })).not.toThrow();
+    });
   });
 });

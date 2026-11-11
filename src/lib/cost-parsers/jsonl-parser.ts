@@ -144,8 +144,10 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
     // Map full model IDs to pricing model names
     // Order matters - check more specific patterns first
 
-    // Fable models (Mythos-class flagship)
-    if (model.includes('fable-5-1') || model.includes('fable-5.1')) {
+    // Fable models (Mythos-class flagship): 5.2 and 5.1 before the bare 'fable' catch-all
+    if (model.includes('fable-5-2') || model.includes('fable-5.2') || model.includes('fable.5.2')) {
+      normalizedModel = 'claude-fable-5-2';
+    } else if (model.includes('fable-5-1') || model.includes('fable-5.1')) {
       normalizedModel = 'claude-fable-5-1';
     } else if (model.includes('fable-5') || model.includes('fable.5') || model.includes('fable')) {
       normalizedModel = 'claude-fable-5';

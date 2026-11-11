@@ -32,6 +32,8 @@ export interface HarnessUpdatePlan {
   display: string;
   /** Why `argv` is null, or null. */
   reason: string | null;
+  /** The npm package when this is the npm branch's plan (D-7), else null (PAN-5108). */
+  npmPackage: string | null;
 }
 
 /** An installed CLI with the parts the update job needs; the wire view drops `binaryPath` and `plan`. */
@@ -131,7 +133,7 @@ export async function harnessUpdatePlan(
   const ownCommand = updateArgs ? [binary, ...updateArgs].join(' ') : null;
 
   if (deps.platform === 'win32') {
-    return { argv: null, display: ownCommand ?? installHint ?? '', reason: 'Overdeck does not update CLIs on Windows' };
+    return { argv: null, display: ownCommand ?? installHint ?? '', reason: 'Overdeck does not update CLIs on Windows', npmPackage: null };
   }
 
   const marker = npmPackage ? `/lib/node_modules/${npmPackage}/` : null;
@@ -141,21 +143,22 @@ export async function harnessUpdatePlan(
     const npmBinPath = join(prefix, 'bin', 'npm');
     const npmBin = (await deps.isExecutable(npmBinPath)) ? npmBinPath : 'npm';
     const argv = [npmBin, 'install', '-g', '--prefix', prefix, `${npmPackage}@latest`];
-    if (await deps.canWrite(join(prefix, 'lib', 'node_modules'))) return { argv, display: argv.join(' '), reason: null };
+    if (await deps.canWrite(join(prefix, 'lib', 'node_modules'))) return { argv, display: argv.join(' '), reason: null, npmPackage };
     return {
       argv: null,
       display: `sudo npm install -g --prefix ${prefix} ${npmPackage}@latest`,
       reason: `${join(prefix, 'lib', 'node_modules')} is not writable`,
+      npmPackage,
     };
   }
 
   if (realPath.includes('/Caskroom/') || realPath.includes('/Cellar/')) {
-    return { argv: null, display: `brew upgrade ${binary}`, reason: 'installed with Homebrew' };
+    return { argv: null, display: `brew upgrade ${binary}`, reason: 'installed with Homebrew', npmPackage: null };
   }
 
-  if (updateArgs && ownCommand) return { argv: [binaryPath, ...updateArgs], display: ownCommand, reason: null };
+  if (updateArgs && ownCommand) return { argv: [binaryPath, ...updateArgs], display: ownCommand, reason: null, npmPackage: null };
 
-  return { argv: null, display: installHint ?? '', reason: `Overdeck does not update ${binaryLabel}` };
+  return { argv: null, display: installHint ?? '', reason: `Overdeck does not update ${binaryLabel}`, npmPackage: null };
 }
 
 /** Every installed harness CLI, one entry per binary, ordered per D-16. */

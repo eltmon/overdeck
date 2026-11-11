@@ -1,0 +1,939 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-06T17:40:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5094: Lane launches ignore the disk floor and superseded lanes are never reaped (31 lanes / ~45 GiB in one morning)",
+    "updated": "2026-11-06T17:37:09.830Z"
+  },
+  "plan": {
+    "id": "pan-5094",
+    "title": "Lane launches ignore the disk floor and superseded lanes are never reaped (31 lanes / ~45 GiB in one morning)",
+    "status": "running",
+    "uid": "b4c9998e-173c-4cb6-9617-e0057dd3e883",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-06T17:40:00Z",
+    "updated": "2026-11-06T17:37:09.830Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5094",
+        "label": "PAN-5094",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5094.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "lanes",
+      "gauntlet",
+      "disk-floor",
+      "cli",
+      "skills"
+    ],
+    "narratives": {
+      "Problem": "A gauntlet run created 31 lane folders (~45 GiB) in one morning and reaped none; free space hit 17 MB. The lane doors (launchLane, launchOwnedLane) never call the PAN-4961 disk floor, nothing tells an orchestrator which lanes a newer iteration superseded, and 24 of the 29 folders were worktrees the orchestrator created itself with git worktree add, which no door sees.",
+      "Proposal": "Both lane doors admit the disk floor through a new src/lib/lanes/disk.ts (reserveDiskFloor at the lanes root, new-worktree bytes from the workspace host estimate, 0 for --reuse/play, HTTP 507 code disk-low, --force no bypass, the owner checks remote lanes). A pure rule (src/lib/lanes/reapable.ts) gives every LaneView reapable/supersededBy; pan lane list shows a REAPABLE column and --reapable filter, and pan lane wait prints the reapable lanes after a report. A local pan lane disk-check verb previews the floor and lists non-lane directories under the lanes root. The pan-lane and pan-gauntlet-loop skills and reference/lanes.mdx teach: check the disk before every wave and self-made worktree, reap superseded lanes before the next iteration, remove self-made worktrees.",
+      "NonGoals": "- No change to src/lib/disk-floor.ts (threshold, refusal text, ledger).\n- No low-disk operator alert or phone push (PAN-5093 owns that backstop).\n- No server-side automatic reaping and no bulk pan lane reap verb.\n- No change to reapLane semantics (it never kills and never discards work).\n- Overdeck never removes unregistered directories; disk-check only lists them.\n- No interception of raw git worktree add or Agent-tool worktree isolation.\n- No dashboard UI for reapable; the Awareness rail card is unchanged.\n- No reapable hint in MCP lane_wait; MCP lane_status returns the new view fields as-is.\n- No new HTTP route and no no-loss-matrix row.\n- --force must not bypass the disk floor."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Refuse a lane below the floor with HTTP 507 and code 'disk-low'",
+        "rationale": "container-ops.ts already answers 507 for the same disk-floor refusal; a code gives the skill a machine-readable signal. Only the LaneLaunchError union and OWNER_STATUSES need 507."
+      },
+      {
+        "summary": "Reuse reserveDiskFloor's refusal text unchanged",
+        "rationale": "The issue asks for the same 'Disk low' message and free GiB; disk-floor.ts stays untouched."
+      },
+      {
+        "summary": "Estimate a new lane worktree as estimateWorkspaceDiskCost(project).hostBytes",
+        "rationale": "Builder lanes install dependencies in their own worktree, so tracked bytes plus an unshared node_modules matches the ~1.4 GiB incident lanes; it shares the workspace memo and overestimates sparse lanes, the safe direction."
+      },
+      {
+        "summary": "--reuse and play launches reserve 0 bytes but are still floor-checked",
+        "rationale": "They create no worktree, yet a new agent writes to disk; nothing new should start below the floor."
+      },
+      {
+        "summary": "--force never bypasses the disk floor",
+        "rationale": "CPU saturation is recoverable; ENOSPC zero-fills files (PAN-1674). lane_start over MCP strips force anyway."
+      },
+      {
+        "summary": "Reapable is decided per iteration group, excludes orchestrator lanes, and judges wait for a newer judge iteration",
+        "rationale": "--reuse rows share a directory; an archived orchestrator orphans its lanes; a builder of the next iteration reads the critic's verdict file inside the critic's worktree."
+      },
+      {
+        "summary": "Nudge through pan lane list --reapable and a stderr hint after pan lane wait reports, not server-side auto-reap or a bulk reap verb",
+        "rationale": "Reaping stays explicit and safe (reapLane never discards work); the orchestrator sees the hint on every loop turn."
+      },
+      {
+        "summary": "Cover self-made worktrees with a local `pan lane disk-check` verb plus gauntlet-skill rules, with PAN-5093 as the backstop",
+        "rationale": "The issue comment names this path: 24 of 29 folders were raw git worktree add, which no door can intercept. A local verb needs no new route or no-loss-matrix row."
+      },
+      {
+        "summary": "disk-check lists unregistered directories under the lanes root but never removes them",
+        "rationale": "Overdeck cannot know whether a directory it did not create holds unpushed work; git worktree remove refuses a dirty tree."
+      },
+      {
+        "summary": "Leave the codebase map out of this plan's files",
+        "rationale": "Adding it would make a seventh subsystem and fail the projected-surface lint; the map is refreshed by /pan-map and nothing in it is stale."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-06-PAN-5094-lane-launches-ignore-the-disk-floor-and-superseded-lanes-are-never-reaped-31-lanes-45-gib-in-one-morning.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "lane-disk-module",
+        "title": "Add the lane disk admission module (src/lib/lanes/disk.ts) and status 507",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T17:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-5094",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "foundationFor": [
+            "home-door-disk",
+            "owner-door-disk",
+            "disk-check-verb"
+          ],
+          "files_scope": [
+            "src/lib/lanes/disk.ts",
+            "src/lib/lanes/types.ts",
+            "src/lib/lanes/__tests__/disk.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/disk.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "disk.test.ts passes with every case green",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Add 507 to the LaneLaunchError status union (src/lib/lanes/types.ts:74). Create src/lib/lanes/disk.ts exactly as the PRD snippet: LANE_DISK_LOW_CODE='disk-low', LaneDiskDeps {read?, ledgerDir?, estimate?}, laneWorktreeBytes(config) = estimateWorkspaceDiskCost(project).hostBytes with the project found via listProjectsAsync (never getProjectSync), laneLaunchBytes (0 for reuse or play), admitLaneDisk -> reserveDiskFloor at input.lanesRoot, throwing LaneLaunchError(507, admission.error, 'disk-low') on refusal. Do not edit src/lib/disk-floor.ts. Write src/lib/lanes/__tests__/disk.test.ts with a temp OVERDECK_HOME, explicit ledgerDir, fake read and fake estimate. Run npm run lint:circular after (disk.ts imports workspace/disk-cost.ts)."
+        },
+        "items": [
+          {
+            "id": "lane-disk-module.ac1",
+            "title": "Given a fake read of 5 GiB, when admitLaneDisk runs for a builder, then it rejects with a LaneLaunchError whose status is 507, code is 'disk-low', and message starts with DISK_LOW_HELD_PREFIX and contains '5.0 GiB free'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-disk-module.ac2",
+            "title": "Given a fake read of 100 GiB and an estimate of 2 GiB, when admitLaneDisk resolves, then the ledger directory contains one .json lease with bytes 2 GiB and the input label, and after release() it contains no .json file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-disk-module.ac3",
+            "title": "Given a fake read of 10.5 GiB and an estimate of 1 GiB, a builder launch is refused while the same launch with reuse: true resolves, and estimate is never called for reuse: true or role play",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-disk-module.ac4",
+            "title": "LaneLaunchError accepts status 507 and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-door-disk",
+        "title": "Admit the disk floor in the home lane door (launchLane)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T17:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-5094",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "files_scope": [
+            "src/lib/lanes/launch.ts",
+            "src/lib/lanes/__tests__/launch.test.ts",
+            "src/lib/lanes/__tests__/launch-remote.test.ts",
+            "src/lib/lanes/__tests__/launch-critic-link.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/launch.test.ts src/lib/lanes/__tests__/launch-remote.test.ts src/lib/lanes/__tests__/launch-critic-link.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three launch test files pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/lib/lanes/launch.ts: add `disk?: LaneDiskDeps` to LaneLaunchDeps; add 507 to OWNER_STATUSES (line 369); immediately before the '// 6. Serialize the rest per project (NFR-4).' comment, compute `const disk = remote ? null : await admitLaneDisk({ config, lanesRoot: lanesRoot!, role, reuse: request.reuse === true, label: `lane:${run}/${key}/${role}` }, deps.disk);` and change the closing `  });` of the withProjectLock callback (line 679) to `  }).finally(() => disk?.release().catch(() => undefined));` without re-indenting the body (a failed lease release must never fail a launch that already created its row). --force must not skip admission. Add `disk: { read: vi.fn(async () => 1024 ** 4), estimate: vi.fn(async () => 0) }` to the default deps of launch.test.ts, launch-remote.test.ts and launch-critic-link.test.ts, then add the refusal, force, lease-release and remote cases from the PRD."
+        },
+        "items": [
+          {
+            "id": "home-door-disk.ac1",
+            "title": "Given disk.read returns 5 GiB, when launchLane runs a local builder launch, then it rejects with status 507 and code 'disk-low', git.addBranchWorktree is never called, no conversation row exists for that run and key, and the target directory is not created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-door-disk.ac2",
+            "title": "Given disk.read returns 5 GiB and the request sets force: true, launchLane still rejects with status 507 after calling cpuPressure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-door-disk.ac3",
+            "title": "When a local launch succeeds, and when a launch fails inside git.addBranchWorktree, then <OVERDECK_HOME>/disk-reservations contains no .json lease afterwards; given a reservation whose release() rejects, launchLane still resolves with the launch result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-door-disk.ac4",
+            "title": "Given a remote target, launchLane never calls disk.read, and an owner answer of status 507 with code 'disk-low' rejects with status 507, code 'disk-low' and a message starting '<label>: Disk low'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "owner-door-disk",
+        "title": "Admit the disk floor in the owner lane door (launchOwnedLane)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T17:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-5094",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "files_scope": [
+            "src/lib/lanes/owner-launch.ts",
+            "src/lib/lanes/__tests__/owner-launch.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/owner-launch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "owner-launch.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In src/lib/lanes/owner-launch.ts: change OwnerLaneDeps' tail to `& { git?: OwnerLaneGit; disk?: LaneDiskDeps }` (do not add 'disk' to the Pick, so this item does not depend on home-door-disk); after `const lanesRoot = await prepareLanesRoot(...)` (line 142) add `const disk = await admitLaneDisk({ config, lanesRoot, role, reuse: spec.reuseCwd !== null, label: `lane:${run}/${key}/${role}` }, deps.disk);` and change the closing `  });` of withProjectLock (line 277) to `  }).finally(() => disk.release().catch(() => undefined));`. spec.force must not skip admission. In owner-launch.test.ts add the calm disk fake to the default deps and the refusal, force and lease-release cases."
+        },
+        "items": [
+          {
+            "id": "owner-door-disk.ac1",
+            "title": "Given disk.read returns 5 GiB, when launchOwnedLane runs a builder spec, then it rejects with status 507 and code 'disk-low', creates no worktree and creates no conversation row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "owner-door-disk.ac2",
+            "title": "Given disk.read returns 5 GiB and spec.force is true, launchOwnedLane still rejects with status 507",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "owner-door-disk.ac3",
+            "title": "When launchOwnedLane succeeds, then <OVERDECK_HOME>/disk-reservations contains no .json lease afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reapable-rule",
+        "title": "Add the pure superseded-lane rule (src/lib/lanes/reapable.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T17:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-5094",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "foundationFor": [
+            "view-reapable",
+            "list-reapable",
+            "wait-reapable-hint",
+            "skill-gauntlet-loop"
+          ],
+          "files_scope": [
+            "src/lib/lanes/reapable.ts",
+            "src/lib/lanes/__tests__/reapable.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/reapable.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "reapable.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Create src/lib/lanes/reapable.ts with ReapableRow and supersededLanes(rows) exactly as the PRD snippet: group by (run, key, role), skip orchestrator, and for every iteration below the group's highest, flag all non-archived rows when none is working/needs-you/starting and either some row of the iteration reported or no non-archived row is idle; map each to the name of the newest (latest createdAt) row of the highest iteration. Write src/lib/lanes/__tests__/reapable.test.ts with one case per bullet in the PRD."
+        },
+        "items": [
+          {
+            "id": "reapable-rule.ac1",
+            "title": "Given builder i1 idle and reported and builder i2 working, supersededLanes returns a map with i1 -> i2's name and no entry for i2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reapable-rule.ac2",
+            "title": "Given i1 working (reported), or i1 idle without a report, plus i2, supersededLanes returns no entry for i1; given i1 stopped without a report plus i2, it returns i1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reapable-rule.ac3",
+            "title": "Given two --reuse rows in i1 (one stopped and reported, one working) plus i2, it returns neither; when both are stopped it returns both mapped to i2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reapable-rule.ac4",
+            "title": "Given critic i1 reported and builder i2 but no critic i2, it returns nothing; after critic i2 exists it returns critic i1; orchestrator i1 with orchestrator i2 never appears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reapable-rule.ac5",
+            "title": "Given archived rows, a single iteration, or groups of different run or key, supersededLanes returns no entry for them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "view-reapable",
+        "title": "Expose reapable and supersededBy on lane views",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T17:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-5094",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "files_scope": [
+            "src/lib/lanes/views.ts",
+            "src/lib/lanes/__tests__/views.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/views.test.ts src/lib/lanes/__tests__/views-pairing.test.ts src/lib/lanes/__tests__/views-remote.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three views test files pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In src/lib/lanes/views.ts add `reapable: boolean` and `supersededBy: string | null` to LaneView after `archived`; in buildLaneViews, after pairingByName, compute `superseded = supersededLanes(context.map(...))` with iteration from iterations, archived from archivedAt, activity from activityOf(row) and reported from reports; set `reapable: superseded.has(row.name), supersededBy: superseded.get(row.name) ?? null`. Add the views.test.ts case from the PRD. Before finishing, grep src (including src/dashboard/frontend) for `: LaneView`, `as LaneView` and `satisfies LaneView` and add the two fields wherever a non-test object literal is built (frontend strict tsc runs in CI)."
+        },
+        "items": [
+          {
+            "id": "view-reapable.ac1",
+            "title": "Given builder lanes i1 (ended, with a worker report) and i2 of one run and key in different cwds, listLaneViews({ run }) returns i1 with reapable: true and supersededBy equal to i2's name, and i2 with reapable: false and supersededBy: null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "view-reapable.ac2",
+            "title": "Given i1 launched under parent A and i2 under parent B, listLaneViews({ parentName: A }) returns only i1 and still marks it reapable with supersededBy equal to i2's name, because the rule runs over every row of the (run, key)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "view-reapable.ac3",
+            "title": "An archived lane's view returns reapable: false and supersededBy: null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "list-reapable",
+        "title": "Show and filter reapable lanes in pan lane list",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T17:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-5094",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "files_scope": [
+            "src/cli/commands/lane.ts",
+            "src/cli/commands/__tests__/lane.test.ts",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/lane.test.ts",
+            "npm run typecheck",
+            "npm run build:cli && npm run lint:slash-commands"
+          ],
+          "expected_outputs": [
+            "lane.test.ts passes",
+            "typecheck completes without errors",
+            "lint:slash-commands reports no manifest drift"
+          ],
+          "traces": [
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In src/cli/commands/lane.ts: laneTable inserts a 'REAPABLE' header after 'ACTIVITY' and the cell `lane.reapable ? 'yes' : '-'`; laneListCommand takes `reapable?: boolean`, filters `lanes.filter((lane) => lane.reapable)` for both the table and --json, and prints 'No reapable lanes.' on stderr with exit 0 when the filter leaves none; register `.option('--reapable', 'Only lanes a newer iteration superseded that pan lane reap can remove now')`. Update any existing lane.test.ts assertion on the exact header string. Then run `npm run build:cli && npm run generate:slash-commands` and commit packages/contracts/src/composer-commands.generated.ts. Add the lane.test.ts cases."
+        },
+        "items": [
+          {
+            "id": "list-reapable.ac1",
+            "title": "When pan lane list prints a table, the header contains REAPABLE after ACTIVITY and a reapable lane's row contains 'yes'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-reapable.ac2",
+            "title": "When pan lane list --reapable runs, it prints only lanes whose view has reapable: true, and --reapable --json prints a JSON array holding only those lanes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-reapable.ac3",
+            "title": "Given no reapable lane, pan lane list --reapable prints 'No reapable lanes.' on stderr and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-reapable.ac4",
+            "title": "npm run lint:slash-commands exits 0 with the regenerated manifest committed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wait-reapable-hint",
+        "title": "Print reapable lanes after pan lane wait returns a report",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T17:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-5094",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "files_scope": [
+            "src/cli/commands/lane.ts",
+            "src/cli/commands/__tests__/lane.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/lane.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lane.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In src/cli/commands/lane.ts add printReapableHint(deps, { run } | { parent }) exactly as the PRD snippet (GET /api/lanes?run= or ?parent=, best effort, stderr line 'reapable: <names> (superseded by a newer iteration); reap each with pan lane reap <name> before launching more lanes'). Call it only after a report outcome and before the existing status line: single-lane form with { run: ref.run } when ref.run is set; set form with options.run or options.parent. Exit codes and the status line text stay unchanged. Add the lane.test.ts cases."
+        },
+        "items": [
+          {
+            "id": "wait-reapable-hint.ac1",
+            "title": "Given a run wait that returns a report and GET /api/lanes answering one reapable lane, pan lane wait prints a stderr line starting 'reapable: <name>' and its last stderr line is still the 'next: pan lane wait --run …' status line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wait-reapable-hint.ac2",
+            "title": "Given GET /api/lanes answers 500 or the fetch throws, pan lane wait prints no 'reapable:' line and exits with the same code as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wait-reapable-hint.ac3",
+            "title": "When the wait times out, pan lane wait sends no GET /api/lanes request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "disk-check-verb",
+        "title": "Add pan lane disk-check with the unregistered-directory listing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T17:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-5094",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "files_scope": [
+            "src/lib/lanes/disk.ts",
+            "src/lib/lanes/__tests__/disk.test.ts",
+            "src/cli/commands/lane.ts",
+            "src/cli/commands/__tests__/lane.test.ts",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/disk.test.ts src/cli/commands/__tests__/lane.test.ts",
+            "npm run typecheck",
+            "npm run build:cli && npm run lint:slash-commands",
+            "node dist/cli/index.js lane disk-check --help"
+          ],
+          "expected_outputs": [
+            "disk.test.ts and lane.test.ts pass",
+            "typecheck completes without errors",
+            "lint:slash-commands reports no manifest drift",
+            "help output lists --project and --path"
+          ],
+          "traces": [
+            "FR-9",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Extend src/lib/lanes/disk.ts with LaneDiskCheck, LaneDiskCheckDeps and checkLaneDisk({ project?, path? }, deps) per the PRD: with project -> resolveLaneConfig, path = lanes root if it exists else project path, bytes = estimate, unregistered = directories under the lanes root whose realpath is not a local lane row cwd (listAllLaneRows({}), archived included); without project -> path ?? process.cwd(), bytes 0, unregistered []; refusal = previewDiskFloor({ path, bytes }); availableBytes = read(path) or null. In src/cli/commands/lane.ts add optional LaneCliDeps.checkDisk (default dynamic import of checkLaneDisk), laneDiskCheckCommand (both flags -> exit 1; error -> exit 1; refusal -> stderr + exit 4; ok -> 'Disk ok: …' + exit 0; 'Not lanes (…)' line when unregistered is non-empty) and register `lane disk-check` with --project and --path exactly as the PRD. Update the lane group description and file header. Regenerate and commit the composer manifest."
+        },
+        "items": [
+          {
+            "id": "disk-check-verb.ac1",
+            "title": "Given a fake config whose lanes root holds directories a and b, laneCwds [<root>/a], read 100 GiB and estimate 1 GiB, checkLaneDisk({ project }) returns refusal null, bytes 1 GiB and unregistered ['<root>/b']; with read 5 GiB it returns a refusal starting with DISK_LOW_HELD_PREFIX",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disk-check-verb.ac2",
+            "title": "Given no project and a path that does not exist, checkLaneDisk returns availableBytes null and refusal null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disk-check-verb.ac3",
+            "title": "When the check refuses, pan lane disk-check prints the refusal on stderr and exits 4; when there is room it prints a 'Disk ok:' line on stdout and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disk-check-verb.ac4",
+            "title": "When unregistered is non-empty, pan lane disk-check prints a 'Not lanes (no lane row, so pan lane reap cannot remove them)' line naming each directory; when both --project and --path are passed it exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disk-check-verb.ac5",
+            "title": "node dist/cli/index.js lane disk-check --help prints --project and --path, and npm run lint:slash-commands exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-lanes-reference",
+        "title": "Document the lane disk floor, reapable lanes and disk-check in reference/lanes.mdx and the disk-floor developer doc",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T17:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-5094",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "docs",
+          "files_scope": [
+            "reference/lanes.mdx",
+            "docs/WORKSPACES-AND-PROJECTS.md"
+          ],
+          "verify_commands": [
+            "grep -n 'disk-check' reference/lanes.mdx",
+            "grep -n '## Disk floor' reference/lanes.mdx",
+            "grep -n 'admitLaneDisk' docs/WORKSPACES-AND-PROJECTS.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line",
+            "lint:docs exits 0"
+          ],
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. reference/lanes.mdx: add [--reapable] to the list synopsis and a `pan lane disk-check [--project <key> | --path <dir>]` line; extend the Commands table (list names REAPABLE and --reapable; wait --run/--parent mentions the 'reapable: …' line before the status line; new disk-check row); add disk-check exits 0/4/1 to Exit codes; add a '## Disk floor' section after '## Reap' covering the 10 GiB floor at the lanes root, the new-worktree estimate, 0 bytes for --reuse/play, HTTP 507 with code disk-low and the 'Disk low — new workspace starts are held' text, --force not bypassing it, owner-side checking for remote lanes, and self-made worktrees needing pan lane disk-check; add a reapable paragraph and the list --reapable -> reap loop to '## Reap'. docs/WORKSPACES-AND-PROJECTS.md 'Disk floor and in-flight reservations (PAN-4961)': add the lane phase bullet naming admitLaneDisk in src/lib/lanes/disk.ts, launchLane and launchOwnedLane, the bytes rule and the label lane:<run>/<key>/<role>."
+        },
+        "items": [
+          {
+            "id": "docs-lanes-reference.ac1",
+            "title": "reference/lanes.mdx contains a '## Disk floor' section that states lane launches are refused below 10 GiB with HTTP 507 and code disk-low, and that --force does not bypass it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-lanes-reference.ac2",
+            "title": "reference/lanes.mdx shows `pan lane disk-check` in the Commands block, its exit codes 0, 4 and 1, and `--reapable` on pan lane list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-lanes-reference.ac3",
+            "title": "The Reap section of reference/lanes.mdx contains the reapable rule (a newer iteration exists, no row working, needs-you or starting, and a report filed or no row idle; orchestrator lanes excluded)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-lanes-reference.ac4",
+            "title": "docs/WORKSPACES-AND-PROJECTS.md contains admitLaneDisk, launchLane and launchOwnedLane in its 'Disk floor and in-flight reservations' section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-pan-lane",
+        "title": "Teach the pan-lane skill about disk-check, the disk floor and --reapable",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T17:40:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-5094",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "docs",
+          "files_scope": [
+            "sync-sources/skills/pan-lane/SKILL.md"
+          ],
+          "verify_commands": [
+            "grep -n 'disk-check' sync-sources/skills/pan-lane/SKILL.md",
+            "npm run lint:skills"
+          ],
+          "expected_outputs": [
+            "grep prints the new lines",
+            "lint:skills exits 0"
+          ],
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. sync-sources/skills/pan-lane/SKILL.md: description lists start|list|wait|report|stop|reap|disk-check; Commands block gains `pan lane list --run hotel --reapable` and `pan lane disk-check --project <key>`; 'Rules the door enforces' gains the disk-floor bullet (refused below 10 GiB with 'Disk low — …', HTTP 507 disk-low, --force does not bypass, remote lanes checked on their machine); 'Close-out' gains: reap a lane as soon as pan lane list --reapable lists it, and run pan lane disk-check before creating any worktree yourself. Requires the built CLI from list-reapable and disk-check-verb for lint:skills."
+        },
+        "items": [
+          {
+            "id": "skill-pan-lane.ac1",
+            "title": "sync-sources/skills/pan-lane/SKILL.md contains `pan lane disk-check --project <key>` and `pan lane list --run hotel --reapable` in its Commands block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-pan-lane.ac2",
+            "title": "The skill's 'Rules the door enforces' section contains a bullet saying the door refuses a launch below the 10 GiB floor with HTTP 507 disk-low and that --force does not bypass it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-pan-lane.ac3",
+            "title": "npm run lint:skills exits 0 against the built CLI",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-gauntlet-loop",
+        "title": "Make the gauntlet-loop skill check the disk floor and reap superseded lanes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T17:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-5094",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "docs",
+          "files_scope": [
+            "sync-sources/skills/pan-gauntlet-loop/SKILL.md",
+            "sync-sources/skills/pan-gauntlet-loop/references/lanes.md"
+          ],
+          "verify_commands": [
+            "grep -n 'pan lane disk-check' sync-sources/skills/pan-gauntlet-loop/SKILL.md",
+            "grep -n -- '--reapable' sync-sources/skills/pan-gauntlet-loop/SKILL.md",
+            "grep -n 'git worktree remove' sync-sources/skills/pan-gauntlet-loop/SKILL.md",
+            "npm run lint:skills"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line",
+            "lint:skills exits 0"
+          ],
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. sync-sources/skills/pan-gauntlet-loop/SKILL.md: Phase 2 step 2 runs `pan lane disk-check --project <key>` before a launch (exit 4 -> do not launch) and reaps `pan lane list --run <run> --reapable` lanes (`pan lane reap <name>`, `--park` on a dirty tree) before the next iteration; Phase 1 step 1 states that a worktree the orchestrator creates itself (git worktree add or sub-agent worktree isolation) is not a lane, needs `pan lane disk-check --project <key>` first and must be removed with `git worktree remove <dir>` once its area lands; the lane recipe gains both commands; Close-out says disk-check lists non-lane directories under the lanes root. sync-sources/skills/pan-gauntlet-loop/references/lanes.md gains a V-rule row (next free V number) for the disk check and superseded reaping. Requires the built CLI from list-reapable and disk-check-verb for lint:skills."
+        },
+        "items": [
+          {
+            "id": "skill-gauntlet-loop.ac1",
+            "title": "The gauntlet-loop skill's Build step tells the orchestrator to run `pan lane disk-check --project <key>` before launching and not to launch when it exits 4",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-gauntlet-loop.ac2",
+            "title": "The skill contains the instruction to run `pan lane list --run <run> --reapable` and `pan lane reap <name>` for each listed lane before launching the next iteration",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-gauntlet-loop.ac3",
+            "title": "The skill contains the rule that a self-made worktree (git worktree add or sub-agent worktree isolation) needs pan lane disk-check first and that the orchestrator deletes it with `git worktree remove <dir>` once its area lands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-gauntlet-loop.ac4",
+            "title": "references/lanes.md contains a V-rule row for the disk check and superseded reaping, and npm run lint:skills exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "lane-disk-module",
+        "to": "home-door-disk",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-disk-module",
+        "to": "owner-door-disk",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-disk-module",
+        "to": "disk-check-verb",
+        "type": "blocks"
+      },
+      {
+        "from": "reapable-rule",
+        "to": "view-reapable",
+        "type": "blocks"
+      },
+      {
+        "from": "view-reapable",
+        "to": "list-reapable",
+        "type": "blocks"
+      },
+      {
+        "from": "view-reapable",
+        "to": "wait-reapable-hint",
+        "type": "blocks"
+      },
+      {
+        "from": "disk-check-verb",
+        "to": "list-reapable",
+        "type": "blocks"
+      },
+      {
+        "from": "disk-check-verb",
+        "to": "wait-reapable-hint",
+        "type": "blocks"
+      },
+      {
+        "from": "list-reapable",
+        "to": "wait-reapable-hint",
+        "type": "blocks"
+      },
+      {
+        "from": "list-reapable",
+        "to": "skill-pan-lane",
+        "type": "blocks"
+      },
+      {
+        "from": "disk-check-verb",
+        "to": "skill-pan-lane",
+        "type": "blocks"
+      },
+      {
+        "from": "list-reapable",
+        "to": "skill-gauntlet-loop",
+        "type": "blocks"
+      },
+      {
+        "from": "disk-check-verb",
+        "to": "skill-gauntlet-loop",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

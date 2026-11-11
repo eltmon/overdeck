@@ -87,10 +87,12 @@ them.
 | `acp` | **Supported** (Kimi first) | `src/lib/runtimes/acp.ts` + vendored `packages/effect-acp/` |
 | `kimi-code` | **Supported** (native, Kimi-only) | `src/lib/runtimes/kimi-code.ts` |
 | `opencode` | **Supported** (Go and Zen) | `src/lib/acp/opencode.ts` + shared ACP runtime |
+| `grok` | **Supported** (Grok Build sign-in) | `src/lib/acp/grok.ts` + shared ACP runtime |
 
 The native `acp` harness is a reusable protocol integration, but version one
 uses the `acp` harness name for Kimi Code CLI. OpenCode Go and Zen use the
-`opencode` harness name with the shared ACP transport. `kimi-code` is a
+`opencode` harness name with the shared ACP transport, and xAI's Grok Build
+CLI uses the `grok` harness name with the same transport. `kimi-code` is a
 separate, capability-layer harness: it drives Kimi's own terminal UI and wire
 protocol directly, reaching Kimi-specific behavior the ACP lowest-common-
 denominator surface can't. The remaining profiles are surveyed for planning
@@ -110,7 +112,7 @@ compatibility as automatic support.
 | **Kimi Code CLI** | **Wired now** through `kimi acp` | None for version one; run interactive `/login` once before use. |
 | **OpenCode** | **Wired now** through `opencode acp` | Go and Zen; sign in with `opencode auth login`. |
 | **Cursor CLI** | ACP-reachable next | Register its executable, launch arguments, and authentication mapping. |
-| **Grok CLI** | ACP-reachable next | Register its executable, launch arguments, and authentication mapping. |
+| **Grok Build CLI** | **Wired now** through `grok agent stdio` | Four `grok/*` models; sign in with `grok login`. |
 | **Google Gemini CLI** | ACP-reachable next | Register its executable, launch arguments, and authentication mapping. |
 
 Kimi K3 and K3.1 Pro (`k3.1-pro`, `k3.1-pro-highspeed`) support Low, High, and
@@ -402,6 +404,29 @@ model discovery, resume behavior, and current transport limitations.
   Runtime log.
 - **Provider scope:** Go and Zen. Other OpenCode providers are outside this integration.
 
+### Grok Build — Supported through ACP
+
+Overdeck supports xAI's Grok Build CLI as the `grok` harness, with persistent
+ACP sessions on the operator's Grok Build sign-in. Verified version: 1.0.77.
+See [Grok Build CLI setup](/configuration/harnesses#grok-build-cli) for sign-in,
+models, effort, cost and known behavior.
+
+- **Vendor / model:** xAI. Grok models only: `grok/grok-4.7`,
+  `grok/grok-4.7-build-fast`, `grok/grok-4.6` and `grok/grok-4.5`.
+- **Distribution:** `curl -fsSL https://x.ai/cli/install.sh | bash`, or the npm
+  package `@xai-official/grok`; `grok update` updates it.
+- **Auth:** the sign-in `grok login` saves in `~/.grok/auth.json` (SuperGrok).
+  An `XAI_API_KEY` would take precedence, so Overdeck removes it from the agent
+  environment.
+- **Extensibility:** loads the operator's `~/.grok` MCP servers, plugins, hooks
+  and skills, plus `CLAUDE.md`/`AGENTS.md` files; **MCP — yes**, including MCP
+  servers passed over ACP.
+- **Transport:** persistent `grok agent --always-approve --no-leader stdio`,
+  verified with session creation, model and reasoning-effort options, message
+  delivery, `session/load` resume, and per-turn usage with the turn cost.
+- **Cost:** each prompt result reports usage and `costUsdTicks`; Overdeck
+  imports one cost event per turn.
+
 ### Goose (Block) — Not supported (strongest "bundle" primitive)
 
 - **Vendor / model:** Block. 15+ providers (Anthropic, OpenAI, Google, Ollama,
@@ -514,6 +539,7 @@ model discovery, resume behavior, and current transport limitations.
 | **Warp / Oz** | ⚠ AGPL-3.0? | Rust | ✅ | ✅ (+all dirs) | ✅ | ✅ (imports) | ✅ | Oz `--profile` | No |
 | **Amp** | Proprietary | — | ✅ | ❌ | ✅ | ✅ | ✅ | TS plugins | No |
 | **OpenCode** | OSS ⚠ | TS | ✅ | ✅ | ✅ | ✅ | ✅ | ⭐ Custom Agents | Go and Zen via ACP |
+| **Grok Build** | Proprietary ⚠ | — | ✅ | ⚠ | ✅ | ✅ | ✅ (ACP) | Plugins | **Supported** via ACP |
 | **Goose** | Apache-2.0 | Rust | ✅ | ✅ | ✅ | ✅ (=ext) | ✅ | ⭐⭐ Recipes | Candidate |
 | **Crush** | FSL-1.1-MIT | Go | ✅ | ⚠ | ✅ | ✅ | ⚠ | — | No |
 | **Aider** | Apache-2.0 | Python | ❌ | ❌ | ❌ | ❌ | ❌ | — | No (poor fit) |

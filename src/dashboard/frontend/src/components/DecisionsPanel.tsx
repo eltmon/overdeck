@@ -16,6 +16,9 @@ import { useDecisions, type Decision } from '../lib/useDecisions';
 import { describePendingInput } from '../lib/pendingInput';
 import { getPendingQuestionTitle } from '../lib/pipeline-state';
 import { AgentRequestCard } from './AgentRequestCard';
+import { DiskAlertCard } from './DiskAlertCard';
+import { UnreachableMachineCard } from './UnreachableMachineCard';
+import { HarnessUpdateCard } from './HarnessUpdateCard';
 import { McpSignInCard } from './McpSignInCard';
 import { AwaitingInputIndicator } from './AwaitingInputIndicator';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
@@ -143,8 +146,18 @@ function Group({ title, hint, decisions, onOpenSubject }: { title: string; hint:
         <span className={styles.groupHint}>{hint}</span>
       </header>
       {decisions.map((d) => (
-        // PAN-4946 — an MCP sign-in has its own card, checked before agentRequest.
-        d.mcpSignIn
+        // PAN-5093 — the disk alert has its own card, checked first: it is
+        // never an agent waiting on an answer.
+        d.diskAlert
+          ? <DiskAlertCard key="disk-alert" decision={d} />
+          // PAN-5111 — a linked machine this machine cannot reach; nothing to answer here.
+          : d.unreachableMachine
+          ? <UnreachableMachineCard key={`unreachable:${d.id}`} decision={d} />
+          // PAN-5108 — a failed harness update has its own card: nothing to answer or open.
+          : d.harnessUpdate
+          ? <HarnessUpdateCard key={`harness-update:${d.id}`} decision={d} />
+          // PAN-4946 — an MCP sign-in has its own card, checked before agentRequest.
+          : d.mcpSignIn
           ? <McpSignInCard key={`mcp-sign-in:${d.id}`} decision={d} />
           // PAN-4941 (D-9) — a secret request has its own card and never the generic Answer button.
           : d.agentRequest
@@ -157,8 +170,14 @@ function Group({ title, hint, decisions, onOpenSubject }: { title: string; hint:
 
 export function DecisionsPanel({ onOpenSubject }: { onOpenSubject?: (d: Decision) => void } = {}) {
   const decisions = useDecisions();
-  const blocking = decisions.filter((d) => d.blocking);
-  const waiting = decisions.filter((d) => !d.blocking);
+  // PAN-5093 — the disk alert is never an agent waiting on an answer, so it
+  // gets its own group and never "Blocking work"'s hint, even at critical.
+  // PAN-5108 — a failed harness update is machine state too.
+  // PAN-5111 — so is an unreachable linked machine.
+  const isSystem = (d: Decision) => Boolean(d.diskAlert || d.harnessUpdate || d.unreachableMachine);
+  const system = decisions.filter(isSystem);
+  const blocking = decisions.filter((d) => d.blocking && !isSystem(d));
+  const waiting = decisions.filter((d) => !d.blocking && !isSystem(d));
 
   if (decisions.length === 0) {
     return (
@@ -173,6 +192,7 @@ export function DecisionsPanel({ onOpenSubject }: { onOpenSubject?: (d: Decision
 
   return (
     <div className={styles.panel} data-testid="decisions-panel">
+      <Group title="System" hint="Overdeck's machine needs attention" decisions={system} onOpenSubject={onOpenSubject} />
       <Group title="Blocking work" hint="An agent has stopped until you answer" decisions={blocking} onOpenSubject={onOpenSubject} />
       <Group title="Waiting" hint="Work continues; these can wait" decisions={waiting} onOpenSubject={onOpenSubject} />
       <DeftExternalNotes />

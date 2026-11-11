@@ -105,9 +105,19 @@ const OpenCodeHarnessIcon = (props: IconProps) => (
   </svg>
 );
 
+// Original geometric mark (a ring cut by a diagonal stroke); no xAI logo artwork.
+const GrokHarnessIcon = (props: IconProps) => (
+  <svg viewBox="0 0 24 24" role="img" aria-label="Grok Build harness mark" {...props}>
+    <rect width="24" height="24" rx="5" fill="currentColor" />
+    <circle cx="12" cy="12" r="6" fill="none" stroke="white" strokeWidth="1.5" />
+    <path d="M7 17 17 7" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+  </svg>
+);
+
 export const PROVIDER_BRANDS: Record<Provider, BrandDef> = {
   opencode: { id: 'opencode', label: 'OpenCode Zen', color: '#475569', Icon: OpenCodeHarnessIcon },
   'opencode-go': { id: 'opencode-go', label: 'OpenCode Go', color: '#475569', Icon: OpenCodeHarnessIcon },
+  grok: { id: 'grok', label: 'Grok Build', color: '#475569', Icon: GrokHarnessIcon },
   meta: { id: 'meta', label: 'Meta (Muse)', color: '#0866ff', Icon: Sparkles },
   anthropic: { id: 'anthropic', label: 'Anthropic', color: '#d97757', Icon: AnthropicIcon },
   openai: { id: 'openai', label: 'OpenAI', color: '#10a37f', Icon: OpenAIIcon },
@@ -130,6 +140,7 @@ export const HARNESS_BRANDS: Record<Harness, BrandDef> = {
   acp: { id: 'acp', label: 'ACP', color: '#475569', Icon: AcpHarnessIcon },
   'kimi-code': { id: 'kimi-code', label: 'Kimi Code', color: PROVIDER_BRANDS.kimi.color, Icon: KimiIcon },
   'prime-agent': { id: 'prime-agent', label: 'Prime Agent', color: '#475569', Icon: Cpu },
+  grok: { id: 'grok', label: 'Grok Build', color: '#475569', Icon: GrokHarnessIcon },
 };
 
 export const PROVIDER_COLORS: Record<Provider, string> = Object.fromEntries(

@@ -14,7 +14,6 @@
  * `boot()` finishes a job left in `restarting` and fails one a crash or a
  * restart interrupted.
  */
-import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -30,6 +29,7 @@ import {
 } from '@overdeck/contracts';
 
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
+import { runQueuedUpdateCommand } from '../../../lib/fleet/harness-update-runner.js';
 import { detectHarnessClis, type InstalledHarnessCli, readCliVersion } from '../../../lib/fleet/harness-versions.js';
 import { getOverdeckHome } from '../../../lib/paths.js';
 import { getOverdeckVersion } from '../routes/misc/shared.js';
@@ -83,30 +83,6 @@ const decodeJob = Schema.decodeUnknownOption(FleetUpdateJobSchema);
 
 function tail(text: string): string {
   return text.length > OUTPUT_TAIL_CHARS ? text.slice(-OUTPUT_TAIL_CHARS) : text;
-}
-
-/** Runs one update argv with stdin closed and a 10-minute cap; keeps only the output tail (NFR-4). */
-export function runUpdateCommand(argv: string[], timeoutMs = UPDATE_TIMEOUT_MS): Promise<{ code: number; output: string }> {
-  return new Promise((resolve) => {
-    let output = '';
-    let settled = false;
-    const finish = (code: number, extra = ''): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve({ code, output: tail(output + extra) });
-    };
-    const child = spawn(argv[0]!, argv.slice(1), { stdio: ['ignore', 'pipe', 'pipe'] });
-    const collect = (chunk: Buffer): void => { output = tail(output + chunk.toString('utf8')); };
-    child.stdout?.on('data', collect);
-    child.stderr?.on('data', collect);
-    const timer = setTimeout(() => {
-      child.kill('SIGTERM');
-      finish(-1, `\ntimed out after ${Math.round(timeoutMs / 60_000)} minutes`);
-    }, timeoutMs);
-    child.on('error', (error) => finish(-1, `\n${error.message}`));
-    child.on('close', (code) => finish(code ?? -1));
-  });
 }
 
 export class FleetUpdateService {
@@ -400,7 +376,8 @@ export function fleetUpdateService(): FleetUpdateService {
     rename: (from, to) => rename(from, to),
     detectClis: (opts) => detectHarnessClis(opts),
     readVersion: (binaryPath) => readCliVersion(binaryPath, { refresh: true }),
-    runCommand: (argv) => runUpdateCommand(argv),
+    // PAN-5108 D8: one process-wide update queue shared with the background updater and update on refusal.
+    runCommand: (argv) => runQueuedUpdateCommand(argv, { timeoutMs: UPDATE_TIMEOUT_MS }),
     countWorkingTurns,
     overdeck: { installMode: currentInstallMode, version: getOverdeckVersion, manager: getUpdateManager },
     restart: restartDashboardDetached,

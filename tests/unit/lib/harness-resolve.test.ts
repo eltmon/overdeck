@@ -69,6 +69,12 @@ describe('resolveHarness', () => {
     warnSpy.mockRestore();
   });
 
+  it('resolves grok/* models to the grok harness by provider default (PAN-5078)', async () => {
+    const { resolveHarness } = await loadSubject();
+    await expect(resolveHarness({ model: 'grok/grok-4.6' })).resolves.toBe('grok');
+    expect(mocks.canUseHarness.mock.calls.at(-1)?.slice(0, 2)).toEqual(['grok', 'grok/grok-4.6']);
+  });
+
   it('uses an explicit pick before provider defaults while ignoring the role harness', async () => {
     const { resolveHarness } = await loadSubject();
 

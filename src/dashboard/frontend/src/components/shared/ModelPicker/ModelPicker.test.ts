@@ -80,6 +80,18 @@ it('distinguishes unavailable pricing from a free model', () => {
   expect(formatCost(0)).toBe('FREE');
 });
 
+it('lists Claude Fable 5.2 first in the offline fallback catalog, before Fable 5.1', () => {
+  const anthropic = FALLBACK_GROUPS.find(group => group.provider === 'anthropic');
+  expect(anthropic?.models).toContainEqual(expect.objectContaining({
+    id: 'claude-fable-5-2',
+    costPer1MTokens: 24,
+  }));
+  const fable52Index = anthropic!.models.findIndex(m => m.id === 'claude-fable-5-2');
+  const fable51Index = anthropic!.models.findIndex(m => m.id === 'claude-fable-5-1');
+  expect(fable52Index).toBe(0);
+  expect(fable52Index).toBeLessThan(fable51Index);
+});
+
 it('includes Claude Opus 5.5 in the offline fallback catalog', () => {
   const anthropic = FALLBACK_GROUPS.find(group => group.provider === 'anthropic');
   expect(anthropic?.models).toContainEqual(expect.objectContaining({

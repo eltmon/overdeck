@@ -256,6 +256,8 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     governorCpuPsiRecoveryAvg60: 25,
     governorCpuHoldDispatch: false,
     qualityGateSlots: 2,
+    diskWarnGb: 5,
+    diskCriticalGb: 2,
   },
   issues: {
     closedWindowDays: 14,
@@ -290,6 +292,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     permissionMode: 'auto',
   },
   kimiCode: {},
+  harnesses: { autoUpdate: true },
 };
 
 /**

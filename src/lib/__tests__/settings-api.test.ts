@@ -71,6 +71,7 @@ vi.mock('../model-capabilities.js', () => ({
     'gpt-5.5-mini': { provider: 'openai', displayName: 'GPT-5.5 Mini', costPer1MTokens: 1 },
     'minimax-m2.7-highspeed': { provider: 'minimax', displayName: 'MiniMax M2.7', costPer1MTokens: 1 },
     'qwen3-coder-plus': { provider: 'dashscope', displayName: 'Qwen3 Coder Plus', costPer1MTokens: 1 },
+    'grok/grok-4.6': { provider: 'grok', displayName: 'Grok 4.6', costPer1MTokens: 4 },
   },
   MODEL_DEPRECATIONS: {
     'claude-opus-4-6': 'claude-opus-4-7',
@@ -84,6 +85,7 @@ vi.mock('../model-capabilities.js', () => ({
     'gpt-5.5-mini',
     'minimax-m2.7-highspeed',
     'qwen3-coder-plus',
+    'grok/grok-4.6',
   ].includes(modelId),
   resolveModelId: (modelId: string) => mockResolveModelId(modelId),
   getModelEffortLevels: (modelId: string) => (({
@@ -254,6 +256,19 @@ describe('loadSettingsApi', () => {
     expect(loadSettingsApi().dashboard).toEqual({ require_token_mint: true });
   });
 
+  it('reports harnesses.auto_update true when the config has no harnesses block (PAN-5108)', async () => {
+    const { loadSettingsApi } = await import('../settings-api.js');
+
+    expect(loadSettingsApi().harnesses).toEqual({ auto_update: true });
+  });
+
+  it('reports harnesses.auto_update false from the config (PAN-5108)', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({ harnesses: { autoUpdate: false } }));
+    const { loadSettingsApi } = await import('../settings-api.js');
+
+    expect(loadSettingsApi().harnesses).toEqual({ auto_update: false });
+  });
+
   it('returns seeded workhorses and roles without legacy overrides', async () => {
     const { loadSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
@@ -303,6 +318,7 @@ describe('loadSettingsApi', () => {
       dashscope: 'ohmypi',
       opencode: 'opencode',
       'opencode-go': 'opencode',
+      grok: 'grok',
       meta: 'muse',
     });
   });
@@ -457,6 +473,27 @@ describe('saveSettingsApi', () => {
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('require_token_mint: true');
+  });
+
+  it('writes harnesses.auto_update: false (PAN-5108 FR-2)', async () => {
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await saveSettingsApi({ ...settings, harnesses: { auto_update: false } });
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('harnesses:\n  auto_update: false');
+  });
+
+  it('never deletes the harnesses block when a save omits it (PAN-5108 D17)', async () => {
+    mockReadFile.mockResolvedValue('harnesses:\n  auto_update: false\n');
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await saveSettingsApi({ ...settings, harnesses: undefined });
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('harnesses:\n  auto_update: false');
   });
 
   it('round-trips config.yaml comments while writing roles, memory settings, and dropping overrides', async () => {
@@ -971,6 +1008,14 @@ describe('validateSettingsApi', () => {
     expect(result).toEqual({ valid: true, errors: [], warnings: [] });
   });
 
+  it('accepts a Grok Build role with the grok harness (PAN-5078)', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+    const result = validateSettingsApi({ ...validSettings,
+      roles: { ...validSettings.roles, work: { model: 'grok/grok-4.6', harness: 'grok', effort: 'high' } },
+    });
+    expect(result).toEqual({ valid: true, errors: [], warnings: [] });
+  });
+
   it('accepts role and workhorse model references', async () => {
     const { validateSettingsApi } = await import('../settings-api.js');
 
@@ -1067,7 +1112,7 @@ describe('validateSettingsApi', () => {
     });
 
     expect(result.valid).toBe(false);
-    expect(result.errors).toContain('roles.flywheel.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, null, or empty string');
+    expect(result.errors).toContain('roles.flywheel.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, grok, null, or empty string');
     expect(result.errors).toContain('roles.flywheel.effort must be one of low, medium, high, xhigh, max');
     expect(result.errors).toContain('roles.flywheel.maxAgents must be a positive integer');
     expect(result.errors).toContain('roles.flywheel.scope must be pan-only or all-tracked-projects');
@@ -1288,6 +1333,18 @@ describe('validateSettingsApi', () => {
     });
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('dashboard.require_token_mint must be a boolean');
+  });
+
+  it('rejects a non-boolean harnesses.auto_update (PAN-5108 FR-2)', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+
+    const result = validateSettingsApi({
+      ...validSettings,
+      harnesses: { auto_update: 'yes' as unknown as boolean },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('harnesses.auto_update must be a boolean');
+    expect(validateSettingsApi({ ...validSettings, harnesses: { auto_update: false } }).valid).toBe(true);
   });
 
   describe('validateSettingsApi Jev toggles (PAN-4508)', () => {

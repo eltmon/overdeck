@@ -26,7 +26,7 @@ describe('waitForConversationRuntimeReady — ACP conversations', () => {
   // default probe asks the selected terminal backend, which on a Herdr host
   // never sees a tmux session, so every opencode/acp start and resume failed
   // as "exited before readiness". The conversation path must probe tmux.
-  it.each(['opencode', 'acp'] as const)('%s probes the tmux session, not the selected backend', async (harness) => {
+  it.each(['opencode', 'acp', 'grok'] as const)('%s probes the tmux session, not the selected backend', async (harness) => {
     await waitForConversationRuntimeReady('conv-acp-ready', harness, 'respawn');
 
     expect(waitForHostReady).toHaveBeenCalledTimes(1);

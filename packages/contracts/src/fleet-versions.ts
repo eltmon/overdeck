@@ -96,7 +96,7 @@ export interface FleetUpdateResponse {
 }
 
 /** Fleet-table column order (D-16): these binaries first, then any other binary alphabetically. */
-export const FLEET_BINARY_ORDER: readonly string[] = ["claude", "codex", "kimi", "opencode", "muse", "prime-agent", "omp"]
+export const FLEET_BINARY_ORDER: readonly string[] = ["claude", "codex", "kimi", "opencode", "grok", "muse", "prime-agent", "omp"]
 
 /** Sort comparator for harness binary names in D-16 order. */
 export function compareFleetBinaries(a: string, b: string): number {

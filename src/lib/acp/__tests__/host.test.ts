@@ -47,6 +47,7 @@ interface StubRuntimeOptions {
   readonly configOptions?: EffectAcpSchema.SessionConfigOption[];
   readonly configError?: Error;
   readonly assistantResponse?: string;
+  readonly promptMeta?: Record<string, unknown>;
   /** Streamed as ACP `agent_thought_chunk` updates before the assistant response. */
   readonly thoughtResponse?: ReadonlyArray<string>;
   readonly updateDuringStart?: string;
@@ -162,7 +163,7 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
             rawPayload: {},
           });
         }
-        return { stopReason: "end_turn" as const };
+        return { stopReason: "end_turn" as const, ...(options.promptMeta ? { _meta: options.promptMeta } : {}) };
       }),
     cancel: Effect.void,
     getConfigOptions: Effect.succeed(options.configOptions ?? []),
@@ -596,6 +597,88 @@ describe("AcpHost", () => {
       overdeckHome: await makeHome(), runtime: stub.runtime });
     hosts.push(host);
     await expect(host.start()).rejects.toThrow("OpenCode launch requires --effort");
+  });
+
+  it("sets Grok reasoning effort after the model and records the grok harness (PAN-5078)", async () => {
+    const overdeckHome = await makeHome();
+    process.env.OVERDECK_HOME = overdeckHome;
+    const stub = await makeStubRuntime({ configOptions: [{
+      id: "reasoning_effort", name: "Reasoning effort", type: "select", currentValue: "high",
+      options: [{ value: "low", name: "Low" }, { value: "medium", name: "Medium" }, { value: "high", name: "High" }, { value: "xhigh", name: "XHigh" }],
+    }] });
+    const host = new AcpHost({ agentId: "agent-grok-effort", provider: "grok",
+      workspace: process.cwd(), model: "grok/grok-4.6", effort: "high",
+      overdeckHome, runtime: stub.runtime });
+    hosts.push(host);
+    await host.start();
+    expect(stub.setModels).toEqual(["grok-4.6"]);
+    expect(stub.order.slice(-2)).toEqual(["set-model", "config:reasoning_effort:high"]);
+    expect(readSessionIndex("agent-grok-effort")).toEqual([
+      expect.objectContaining({ harness: "grok", model: "grok/grok-4.6" }),
+    ]);
+    await expect(host.handleOp({ op: "set-effort", effort: "xhigh" })).resolves.toEqual({
+      status: 200, body: { ok: true, effort: "xhigh" },
+    });
+    expect(stub.order.at(-1)).toBe("config:reasoning_effort:xhigh");
+  });
+
+  it.each([["grok", true], ["kimi", false]] as const)("records turn usage on turn_completed for %s: %s (PAN-5078)", async (provider, recorded) => {
+    const overdeckHome = await makeHome();
+    const promptMeta = { modelId: "grok-4.6", usage: { inputTokens: 1640, outputTokens: 32, cachedReadTokens: 640, cacheCreationTokens: 0, costUsdTicks: 21520000 } };
+    const stub = await makeStubRuntime({ promptMeta, configOptions: [{
+      id: "reasoning_effort", name: "Reasoning effort", type: "select", currentValue: "high",
+      options: [{ value: "high", name: "High" }],
+    }] });
+    const host = new AcpHost({ agentId: `agent-usage-${provider}`, provider,
+      workspace: process.cwd(), model: provider === "grok" ? "grok/grok-4.6" : "kimi-k2.6", effort: "high",
+      overdeckHome, runtime: stub.runtime });
+    hosts.push(host);
+    await host.start();
+    await host.handleOp({ op: "message", content: "hello" });
+    await host.waitForIdle();
+
+    const entries = await readTranscriptEntries(join(overdeckHome, "agents", `agent-usage-${provider}`, "acp-session.jsonl"));
+    const completed = entries.find((entry) => entry.event === "turn_completed");
+    if (recorded) {
+      expect(completed?.usage).toMatchObject({ model: "grok/grok-4.6", inputTokens: 1000, outputTokens: 32, cacheReadTokens: 640, cacheWriteTokens: 0 });
+    } else {
+      expect(completed).toBeDefined();
+      expect(completed).not.toHaveProperty("usage");
+    }
+  });
+
+  it("rejects a Grok launch without an effort (PAN-5078)", async () => {
+    const stub = await makeStubRuntime({ configOptions: [{
+      id: "reasoning_effort", name: "Reasoning effort", type: "select", currentValue: "high",
+      options: [{ value: "low", name: "Low" }, { value: "medium", name: "Medium" }, { value: "high", name: "High" }, { value: "xhigh", name: "XHigh" }],
+    }] });
+    const host = new AcpHost({ agentId: "agent-grok-no-effort", provider: "grok",
+      workspace: process.cwd(), model: "grok/grok-4.6",
+      overdeckHome: await makeHome(), runtime: stub.runtime });
+    hosts.push(host);
+    await expect(host.start()).rejects.toThrow("Grok Build launch requires --effort.");
+  });
+
+  it("rejects a non-default Grok effort when the model has no reasoning effort option (PAN-5078)", async () => {
+    const stub = await makeStubRuntime();
+    const host = new AcpHost({ agentId: "agent-grok-no-option", provider: "grok",
+      workspace: process.cwd(), model: "grok/grok-4.6", effort: "low",
+      overdeckHome: await makeHome(), runtime: stub.runtime });
+    hosts.push(host);
+    await expect(host.start()).rejects.toThrow("The selected model does not expose a reasoning effort setting (low requested).");
+  });
+
+  it("prints Grok sign-in remediation on an authentication failure (PAN-5078)", async () => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime({ startError: new Error("authentication required") });
+    const output = makeOutput();
+    const host = new AcpHost({ agentId: "agent-grok-auth", provider: "grok",
+      workspace: process.cwd(), model: "grok/grok-4.6", effort: "high",
+      overdeckHome, runtime: stub.runtime, stdout: output.writable });
+    await expect(host.start()).rejects.toThrow("authentication required");
+    expect(output.text()).toContain("Grok sign-in is required. Run grok login, then retry.");
+    await expect(readFile(join(overdeckHome, "agents", "agent-grok-auth", "acp-launch-error"), "utf-8"))
+      .resolves.toContain("grok login");
   });
 
   it("authenticates delivery, forwards prompts, and records both sides of the turn", async () => {

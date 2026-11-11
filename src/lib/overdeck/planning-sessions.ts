@@ -176,7 +176,7 @@ export function startPlanningForIssue(options: {
     if (effort !== undefined && effort !== null && effort !== '' && !isEffortLevel(effort)) {
       return jsonResponse({ error: `Invalid effort "${effort}". Expected one of: ${EFFORT_LEVELS.join(', ')}.` }, { status: 400 });
     }
-    const requestedHarness = harness === 'ohmypi' || harness === 'claude-code' || harness === 'codex' || harness === 'acp' || harness === 'kimi-code' || harness === 'opencode' || harness === 'muse' || harness === 'prime-agent' ? harness : 'claude-code';
+    const requestedHarness = harness === 'ohmypi' || harness === 'claude-code' || harness === 'codex' || harness === 'acp' || harness === 'kimi-code' || harness === 'opencode' || harness === 'muse' || harness === 'prime-agent' || harness === 'grok' ? harness : 'claude-code';
 
     // PAN-1837 review fix: validate the explicit harness/model pair BEFORE any
     // mutation below (the workModel issue-record write, the preliminary

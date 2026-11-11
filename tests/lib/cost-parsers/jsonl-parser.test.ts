@@ -603,6 +603,16 @@ describe('normalizeModelName (Sonnet 5.5, PAN-4327)', () => {
   });
 });
 
+describe('normalizeModelName (Fable 5.2)', () => {
+  it('keeps claude-fable-5-2 distinct from claude-fable-5-1 and claude-fable-5', () => {
+    expect(normalizeModelName('claude-fable-5-2').model).toBe('claude-fable-5-2');
+    expect(normalizeModelName('anthropic.claude-fable-5-2').model).toBe('claude-fable-5-2');
+    expect(normalizeModelName('claude-fable-5.2').model).toBe('claude-fable-5-2');
+    expect(normalizeModelName('claude-fable-5-1').model).toBe('claude-fable-5-1');
+    expect(normalizeModelName('claude-fable-5').model).toBe('claude-fable-5');
+  });
+});
+
 describe('normalizeModelName (Haiku 5.5)', () => {
   it('keeps claude-haiku-5-5 distinct from the bare haiku default', () => {
     expect(normalizeModelName('claude-haiku-5-5').model).toBe('claude-haiku-5-5');

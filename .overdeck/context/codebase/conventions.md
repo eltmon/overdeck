@@ -77,6 +77,9 @@
   store there, seed `localStorage['pan-snapshot-cache-v1']` with `addInitScript` and close
   `/ws/rpc` (`pan-4523-river-bands.spec.ts`); never add a production store hook.
 
+- Wall-clock tests (real child-process sleeps or deadlines) go in `<name>.slow.test.ts`;
+  `vitest.config.ts` excludes them unless `VITEST_INCLUDE_SLOW=1`, and CI runs only the slow files
+  a workflow step names (`docs/TESTING.md`, PAN-5117).
 - Issue IDs are `LETTERS-NUMBER`: `parseIssueId` (`src/lib/issue-id.ts`) and dozens of path/session regexes assume a letters-only prefix, so project issue prefixes must be letters only; use `issue_pattern` for other ID shapes (PAN-4860).
 - Root `setupFiles` (`vitest.config.ts`) run in order: `tests/setup/overdeck-home.ts`,
   `tests/setup/no-real-home-writes.ts`, `tests/setup/no-worker-signals.ts`, `tests/setup.ts`; the

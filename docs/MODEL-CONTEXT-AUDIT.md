@@ -6,7 +6,7 @@ Picker context labels describe the configured session budget. They are not a cla
 | --- | ---: | --- |
 | GPT-6 Astra, Sol, Luna, Rosalind, Astra for Law; GPT-6.1 Sol, Terra; GPT-5.6 Sol, Terra, Luna | 272,000 | Installed Codex catalog default (GPT-6 Sol/Luna: Codex 0.157.1 catalog, 272,000 default / 872,000 max; GPT-6.1 Sol: Codex 0.159.0 catalog, 272,000 default / 872,000 max; GPT-6.1 Terra: Codex 0.159.0 catalog, 500,000 default / 872,000 max, pinned to 272,000); explicit managed `model_context_window` pin. GPT-6 Rosalind / Astra for Law: model pages unpublished (404, 2026-11-02); 272,000 is the Codex harness pin. |
 | GPT-5.6 `[372k]` choices | 372,000 | Explicit opt-in; launch strips the Overdeck suffix while retaining the larger configuration. |
-| Fable 5.1, Fable 5, Opus 5.5/5/4.8/4.7, Sonnet 5.5/5, Haiku 5.5 | 1,000,000 | Native 1M models. Claude account restrictions or a disabled-1M setting can reduce this. |
+| Fable 5.2, Fable 5.1, Fable 5, Opus 5.5/5/4.8/4.7, Sonnet 5.5/5, Haiku 5.5 | 1,000,000 | Native 1M models. Claude account restrictions or a disabled-1M setting can reduce this. |
 | Opus 4.6, Sonnet 4.6, Haiku 4.5 | 200,000 | Claude Code runs bare Opus 4.6 and Sonnet 4.6 at 200K; their 1M API window needs the plan-gated [1m] variant (Sonnet 4.6 [1m] uses usage credits on every subscription plan). Haiku 4.5 is 200K natively. |
 | Gemini 4 Argon | 1,048,576 | Window shared by input, thinking and output; 65,536 max output per stream (32,768 non-streaming). Provisioned into the omp registry; Pi passes the id through its google provider. |
 | Gemini 3.8 Flash, 3.5 Flash Lite | 1,048,576 | Google input limit; 65,536 max output. New models provisioned into the omp registry. |
@@ -23,6 +23,7 @@ Picker context labels describe the configured session budget. They are not a cla
 | Grok 4.3, Mistral Large 4 | 1,000,000 | Official xAI and Mistral model pages (PAN-4825). |
 | Grok 4.7 | 500,000 | Official xAI models page (PAN-4825). |
 | GPT OSS 120B / 20B (Groq), GPT OSS 120B (Cerebras) | 131,072 | Groq models page; Cerebras paid tier (65K on its free tier) (PAN-4825). |
+| Muse Wonder 1.0, Spark 1.3, Spark 1.3 Contributor, Ember 1.0 | 1,048,576 | Meta models page. The Muse Code 1.4.15 catalog reports a 1,007,997-token context limit and a 128,000-token output limit for all four; Meta documents 524,288 max output for Ember (PAN-5106). |
 
 Other retained entries show their existing configured budget. This audit does not silently raise every older model to its largest advertised API window. Known non-Anthropic models routed through Claude Code receive both `CLAUDE_CODE_AUTO_COMPACT_WINDOW` and `CLAUDE_CODE_MAX_CONTEXT_TOKENS`; supplying only the first can leave Claude's unknown-model 200K ceiling in place.
 
@@ -60,6 +61,7 @@ Kimi's bare Overdeck `k3` historically denotes the smaller window. It now transl
 - [Claude Opus 5.5](https://platform.claude.com/docs/en/models/opus-5-5/overview): `claude-opus-5-5`, 1M context, 128K maximum output, $4/M input, $20/M output, and $0.20/M cache reads.
 - [Claude Sonnet 5.5](https://platform.claude.com/docs/en/models/sonnet-5-5/overview): `claude-sonnet-5-5`, 1M context, 128K maximum output, $2/M input, $10/M output, $0.10/M cache reads (cut from $0.20/M on 2026-10-07); requires Claude Code 2.1.284 or newer.
 - [Claude Haiku 5.5](https://platform.claude.com/docs/en/models/haiku-5-5/overview): `claude-haiku-5-5`, released 2026-10-07, 1M context, 128K maximum output; prompts up to 100K tokens $0.10/M input, $0.50/M output, $0.01/M cache reads, and prompts over 100K tokens $0.50/M, $2.50/M and $0.05/M; adaptive thinking on by default at medium effort; `budget_tokens` and non-default sampling parameters return 400; its tokenizer counts about 30% more tokens than Haiku 4.5; requires Claude Code 2.1.293 or newer.
+- [Claude Fable 5.2](https://platform.claude.com/docs/en/models/fable-5-2/overview): `claude-fable-5-2`, released 2026-11-09, 1M context, 128K maximum output, $8/M input, $40/M output, $0.20/M cache reads, $10/M 5-minute and $16/M 1-hour cache writes; requires Claude Code 2.1.321 or newer.
 - [Fable 5.1](https://platform.claude.com/docs/en/models/fable-5-1/overview) and [pricing changes](https://platform.claude.com/docs/en/models/fable-5-1/whats-new-fable-5-1): $10/M input, $50/M output, $0.25/M cache reads.
 - [Gemini 4 Argon](https://ai.google.dev/gemini-api/docs/generate-content/latest-model): `gemini-4-argon`, GA 2026-10-13; introductory $2/M input, $10/M output, $0.10/M cached input through 2026-11-30, then $4/M, $20/M and $0.20/M; thinking levels low/medium/high; sampling parameters ignored; explicit context caching removed.
 - [Gemini model catalog](https://ai.google.dev/gemini-api/docs/models), [3.8 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash), [3.5 Flash Lite](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite), [3.6 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.6-flash), [3.1 Flash Lite](https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite), [pricing](https://ai.google.dev/gemini-api/docs/pricing), [deprecations](https://ai.google.dev/gemini-api/docs/deprecations).
@@ -111,3 +113,24 @@ Every fact below was re-read from the official source on 2026-11-02 before the c
 - Muse `minimal` effort: not an Overdeck effort level.
 - Groq's own replacements for QwQ (`qwen/qwen3-32b`) and Gemma (`llama-3.1-8b-instant`, itself shut down) are not used, because this refresh adds no third Groq model and a migration target must be live.
 - omp/pi launches of the Groq slash ids: omp reads `openai/` as its own provider prefix, so qualifying them as `groq/openai/...` is out of scope.
+
+## November 2026 Muse refresh (PAN-5106)
+
+**Verified**
+
+- Meta's [models](https://dev.meta.ai/docs/models), [pricing and rate limits](https://dev.meta.ai/docs/pricing-rate-limits) and [reasoning](https://dev.meta.ai/docs/reasoning) pages, plus the [Muse Ember model page](https://dev.meta.ai/models/muse-ember/) and [Meta's Muse Ember announcement](https://research.meta.ai/blog/muse-ember), read 2026-11-10: Muse Ember (`muse-ember-1.0`, released 2026-11-09) is Meta's low-cost Standard model, 1,048,576 context, 524,288 max output, no Contributor variant. Up to 200,000 input tokens: $0.10 input / $0.004 cached input / $0.50 output per million tokens. Above 200,000 input tokens (cached included), Meta bills the whole request at 3x every rate ($0.30 / $0.012 / $1.50). Meta's reasoning docs list `minimal` through `max` with an API default of `max`; Meta's docs support only the full `muse-ember-1.0` id, not a bare `muse-ember` alias.
+- The same pages, re-read for the three existing Muse models: Wonder ($4.00 / $0.20 / $20.00, effort `minimal`-`max`, default `max`), Spark 1.3 ($1.25 / $0.15 / $4.25, effort up to `max`, default `high`), Spark 1.3 Contributor ($0.10 / $0.002 / $0.20, default `high`, no `max`). None has a long-context premium.
+- Muse Code 1.4.15's locally-fetched model catalog (`source: provider_catalog`) lists `muse-ember-1.0` and accepts it on the installed TUI, with the session log's `runtime.session.metadata` record carrying `model_id: muse-ember-1.0`.
+- Operator scope addition (issue comment, 2026-11-10): `muse-wonder-full-1.0` runs only inside Muse Code on the Power Usage ($50/mo) and Maximum Usage ($200/mo) plans, is not on the Meta Model API, has no per-token price, 1,048,576 context, and supports `max` effort in Muse Code. It is absent from this host's Muse Code 1.4.15 catalog (no Power/Maximum plan is configured here, and `muse usage` reports `no_allowance`), so real acceptance could not be verified and no minimum Muse Code version is recorded.
+
+**Changed**
+
+- Added `muse-ember-1.0` with the per-request long-context tier. `calculateCost()` gains a Muse Ember branch (3x every component above 200,000 total input tokens, cached included), and the Muse cost parser (`summarizeMuseRecords()`) now prices each `model_completed` event as its own request through `calculateCost()` instead of pricing the session aggregate by hand, so the tier applies per request rather than per session.
+- Added `muse-wonder-full-1.0`, capability class `frontier`, as a Muse-harness-only subscription model: no `cost.ts` pricing row, so `getPricing()` returns `null` and cost tracking records $0.
+
+**Not changed**
+
+- The existing three Muse models' prices, effort lists and context windows match Meta's pages; no drift found, so no no-loss exception row was needed.
+- Muse Code's catalog reports `max` for `muse-spark-1.3-contributor`, but Meta's reasoning page says `max` is "not available with `muse-spark-1.3-contributor`", so Overdeck keeps it excluded.
+- Muse `minimal` effort and Meta's `max` API default are not represented as an Overdeck effort level or a default-effort field; the Muse harness row still caps launches at `xhigh`.
+- `muse-spark-1.2` is not added.

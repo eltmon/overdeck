@@ -36,6 +36,7 @@ import {
 import type { RuntimeName } from '../runtimes/types.js';
 import { resolveLaneConfig } from './config.js';
 import { laneContract } from './contract.js';
+import { admitLaneDisk, holdLaneDisk, type LaneDiskDeps } from './disk.js';
 import {
   gitFailure,
   isValidLaneEffort,
@@ -73,7 +74,7 @@ export interface OwnerLaneGit extends LaneGit {
 export type OwnerLaneDeps = Pick<
   LaneLaunchDeps,
   'resolveConfig' | 'resolveHarness' | 'isAlive' | 'start' | 'emitCreated' | 'now' | 'homeDir' | 'tmpRoot' | 'cpuPressure'
-> & { git?: OwnerLaneGit };
+> & { git?: OwnerLaneGit; disk?: LaneDiskDeps };
 
 function validateSpec(spec: OwnerLaneSpec): void {
   if (!(LANE_ROLES as readonly string[]).includes(spec.role)) {
@@ -140,6 +141,9 @@ export async function launchOwnedLane(spec: OwnerLaneSpec, context: OwnerLaneCon
 
   const config = await (deps.resolveConfig ?? resolveLaneConfig)(context.projectKey);
   const lanesRoot = await prepareLanesRoot(config.lanesRoot, config.projectPath, (deps.homeDir ?? homedir)(), deps.tmpRoot ?? '/tmp');
+
+  // PAN-5094: the disk floor is checked where the lane's directory is created (FR-2).
+  const disk = await admitLaneDisk({ config, lanesRoot, role, reuse: spec.reuseCwd !== null, label: `lane:${run}/${key}/${role}` }, deps.disk);
 
   return withProjectLock(config.projectKey, async () => {
     const warnings: string[] = [];
@@ -274,5 +278,14 @@ export async function launchOwnedLane(spec: OwnerLaneSpec, context: OwnerLaneCon
       await undoCreate();
       throw error;
     }
-  });
+  }).then(
+    (result) => {
+      holdLaneDisk(disk);
+      return result;
+    },
+    async (error: unknown) => {
+      await disk.release().catch(() => undefined);
+      throw error;
+    },
+  );
 }

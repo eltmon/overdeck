@@ -70,7 +70,7 @@ agent tokens.
 | --- | --- | --- |
 | `wait_job` | Waits up to 50 s for a job another tool started. Answers `done` with the exit code and output, or `running` with `next`, the call to make again. Never poll or sleep; jobs are forgotten when the dashboard restarts. | `read:state` (agent tokens only) |
 | `task_claim` | Claims a checklist item of the agent's issue (`pan task claim`). | `tell` (agent tokens only) |
-| `task_done` | Marks a checklist item done once its `Item:` commit is pushed (`pan task done`). | `tell` (agent tokens only) |
+| `task_done` | Marks checklist items done once their `Item:` commit is pushed (`pan task done`). Pass `itemId` for one item or `itemIds` (up to 500) to close an item and its acceptance criteria in one call; if any id lacks its line, nothing is recorded. | `tell` (agent tokens only) |
 | `task_block` | Marks a checklist item blocked, optionally on issues or PRs (`on`), and wakes the agent when they merge (`pan task block`). | `tell` (agent tokens only) |
 | `done` | Signals the issue's work is complete: push, PR, tracker In Review, review started (`pan done`). | `operate` (agent tokens only) |
 | `handoff` | Hands the conversation off to a new one with a `focus` and optional `title` (`pan handoff self`). Not for work agents, which have no conversation. | `tell` (agent tokens only) |

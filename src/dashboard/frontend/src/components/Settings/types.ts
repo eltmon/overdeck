@@ -6,7 +6,7 @@ import type { ConfigurableProvider } from '../../../../../lib/configurable-provi
 export type Provider = ConfigurableProvider;
 
 export type ModelId = string;
-export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'opencode' | 'prime-agent';
+export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'opencode' | 'prime-agent' | 'grok';
 export type HarnessOverride = Harness | '';
 export type XBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
 export type XBriefItemKind = 'docs' | 'api' | 'backend' | 'frontend' | 'infra' | 'test' | 'refactor' | 'design' | 'spike';
@@ -24,6 +24,7 @@ export interface ProvidersConfig {
   dashscope: boolean;
   opencode?: boolean;
   "opencode-go"?: boolean;
+  grok?: boolean;
   meta?: boolean;
 }
 
@@ -341,5 +342,7 @@ export interface SettingsConfig {
     max_concurrent_agents?: number;
   };
   dashboard?: { require_token_mint?: boolean };
+  /** PAN-5108: machine-wide automatic coding-agent CLI updates (default true). */
+  harnesses?: { auto_update?: boolean };
   tiered_execution?: TieredExecutionConfig;
 }

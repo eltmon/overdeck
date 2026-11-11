@@ -22,7 +22,7 @@ afterEach(() => {
 });
 
 describe('ACP transcript discovery', () => {
-  it.each(['acp', 'opencode'])('discovers the direct agent transcript as the %s harness', async (harness) => {
+  it.each(['acp', 'opencode', 'grok'])('discovers the direct agent transcript as the %s harness', async (harness) => {
     tempHome = mkdtempSync(join(tmpdir(), 'overdeck-acp-discovery-'));
     savedHome = process.env.HOME;
     process.env.HOME = tempHome;

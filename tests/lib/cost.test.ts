@@ -73,6 +73,26 @@ describe('cost module', () => {
       expect(cacheCost).toBe(0.1);
     });
 
+    it('should price claude-fable-5-2 at its 2026-11-09 launch rates, distinct from claude-fable-5-1', () => {
+      const pricing = getPricing('anthropic', 'claude-fable-5-2');
+      expect(pricing).toBeDefined();
+      expect(pricing?.model).toBe('claude-fable-5-2');
+
+      const cost = calculateCost({ inputTokens: 1_000_000, outputTokens: 1_000_000 }, pricing!);
+      expect(cost).toBeCloseTo(48, 6);
+
+      const cacheReadCost = calculateCost({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 1_000_000 }, pricing!);
+      expect(cacheReadCost).toBeCloseTo(0.2, 6);
+
+      const cacheWrite5mCost = calculateCost({ inputTokens: 0, outputTokens: 0, cacheWriteTokens: 1_000_000, cacheTTL: '5m' }, pricing!);
+      expect(cacheWrite5mCost).toBeCloseTo(10, 6);
+
+      const cacheWrite1hCost = calculateCost({ inputTokens: 0, outputTokens: 0, cacheWriteTokens: 1_000_000, cacheTTL: '1h' }, pricing!);
+      expect(cacheWrite1hCost).toBeCloseTo(16, 6);
+
+      expect(getPricing('anthropic', 'claude-fable-5-1')?.model).toBe('claude-fable-5-1');
+    });
+
     it('should price claude-haiku-5-5 at its prompts-up-to-100K rates', () => {
       const pricing = getPricing('anthropic', 'claude-haiku-5-5');
       expect(pricing).toBeDefined();
@@ -484,6 +504,22 @@ describe('cost module', () => {
           .toBeCloseTo(0.2, 6);
       });
     });
+
+    describe('muse-ember-1.0 prompt-size tiers', () => {
+      const ember = () => getPricing('custom', 'muse-ember-1.0')!;
+
+      it('charges base rates at exactly 200K total input tokens', () => {
+        const usage: TokenUsage = { inputTokens: 150_000, outputTokens: 10_000, cacheReadTokens: 50_000 };
+        // 150 * 0.0001 + 10 * 0.0005 + 50 * 0.000004 = 0.015 + 0.005 + 0.0002 = 0.0202
+        expect(calculateCost(usage, ember())).toBeCloseTo(0.0202, 6);
+      });
+
+      it('charges 3x on input, output and cache reads above 200K', () => {
+        const usage: TokenUsage = { inputTokens: 150_001, outputTokens: 10_000, cacheReadTokens: 50_000 };
+        // 3 * (150.001 * 0.0001 + 10 * 0.0005 + 50 * 0.000004) = 3 * 0.0202001 = 0.0606003, rounds to 0.0606.
+        expect(calculateCost(usage, ember())).toBeCloseTo(0.0606, 6);
+      });
+    });
   });
 
   describe('summarizeCosts', () => {
@@ -693,5 +729,24 @@ describe('cost module', () => {
       // 0.002 + 0.006 + (4000/1000 * 0.0002) + (2000/1000 * 0.0025) = 0.008 + 0.0008 + 0.005 = 0.0138
       expect(cost).toBeCloseTo(0.0138, 10);
     });
+  });
+});
+
+describe('Grok Build CLI pricing (PAN-5078)', () => {
+  it('matches grok-4.7-build-fast before the grok-4.7 prefix', () => {
+    expect(getPricing('custom', 'grok-4.7-build-fast')?.inputPer1k).toBe(0.004);
+    expect(getPricing('custom', 'grok-4.7-build-fast')?.outputPer1k).toBe(0.012);
+    expect(getPricing('custom', 'grok-4.7')?.inputPer1k).toBe(0.002);
+  });
+
+  it('reproduces the costUsdTicks Grok reported for a grok-4.6 turn', () => {
+    // 628180000 ticks × 1e-10 USD = $0.062818 for 31153 uncached / 640 cached / 32 output tokens.
+    const pricing = getPricing('custom', 'grok-4.6');
+    expect(pricing).not.toBeNull();
+    expect(calculateCost({ inputTokens: 31153, cacheReadTokens: 640, outputTokens: 32 }, pricing!)).toBeCloseTo(0.062818, 6);
+  });
+
+  it('prices grok-4.5 at the grok-4.6 rates', () => {
+    expect(getPricing('custom', 'grok-4.5')).toMatchObject({ inputPer1k: 0.002, outputPer1k: 0.006, cacheReadPer1k: 0.0005 });
   });
 });

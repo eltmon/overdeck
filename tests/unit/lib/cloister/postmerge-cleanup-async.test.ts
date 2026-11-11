@@ -24,13 +24,24 @@ const mockRunRelease = vi.hoisted(() =>
 
 // ── Track cleanup side effects ────────────────────────────────────────────────
 const mockCleanupMergedLabels = vi.hoisted(() => vi.fn(() => Effect.succeed({ success: true, skipped: true, details: ['skipped'] })));
-const mockSetAgentPaused = vi.hoisted(() => vi.fn((agentId: string) => Effect.succeed(
-  agentId === 'strike-pan-399' ? { id: agentId, paused: true } : null,
-)));
-const mockGetAgentState = vi.hoisted(() => vi.fn((agentId: string) =>
-  agentId === 'strike-pan-399' ? { id: agentId, paused: true } : null,
-));
-const mockSessionExists = vi.hoisted(() => vi.fn((agentId: string) => Effect.succeed(agentId === 'strike-pan-399')));
+// PAN-5112: a small state.json store. The work and strike agents have state
+// and a live terminal; the planning agent has neither.
+const agentStore = vi.hoisted(() => new Map<string, Record<string, unknown>>());
+const mockSetAgentPaused = vi.hoisted(() => vi.fn((agentId: string, reason?: string) => {
+  const state = agentStore.get(agentId);
+  if (!state) return Effect.succeed(null);
+  Object.assign(state, { paused: true, pausedReason: reason, stoppedByPause: true });
+  return Effect.succeed({ ...state });
+}));
+const mockGetAgentState = vi.hoisted(() => vi.fn((agentId: string) => {
+  const state = agentStore.get(agentId);
+  return state ? { ...state } : null;
+}));
+const mockSaveAgentState = vi.hoisted(() => vi.fn((state: Record<string, unknown>) => {
+  agentStore.set(state.id as string, { ...state });
+  return Effect.void;
+}));
+const mockSessionExists = vi.hoisted(() => vi.fn((agentId: string) => Effect.succeed(agentStore.has(agentId))));
 const mockKillSession = vi.hoisted(() => vi.fn(() => Effect.void));
 const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
 const mockSetReviewStatusSync = vi.hoisted(() => vi.fn());
@@ -211,6 +222,9 @@ vi.mock('../../../../src/lib/workspace-manager/docker.js', () => ({
 vi.mock('../../../../src/lib/agents.js', () => ({
   setAgentPaused: mockSetAgentPaused,
   getAgentState: mockGetAgentState,
+  saveAgentState: mockSaveAgentState,
+  // The real stop write, so the test proves it keeps the pause.
+  markAgentStoppedState: (...args: Parameters<typeof markAgentStoppedState>) => markAgentStoppedState(...args),
 }));
 
 vi.mock('../../../../src/lib/cloister/review-agent.js', () => ({
@@ -234,6 +248,7 @@ vi.mock('../../../../src/lib/cloister/specialists.js', () => ({
 }));
 
 // ── Subject ───────────────────────────────────────────────────────────────────
+import { markAgentStoppedState } from '../../../../src/lib/agents/agent-state.js';
 import { postMergeLifecycle, resetPostMergeState } from '../../../../src/lib/cloister/merge-agent.js';
 
 const ISSUE_ID = 'PAN-399';
@@ -247,6 +262,10 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     releaseResolve = null;
     releaseStarted = false;
     mockTransitionState.shouldFail = false;
+    agentStore.clear();
+    for (const id of ['agent-pan-399', 'strike-pan-399']) {
+      agentStore.set(id, { id, issueId: ISSUE_ID, role: id.startsWith('agent-') ? 'work' : 'strike', status: 'running' });
+    }
     mockTeardownWorkspaceDockerByNamePromise.mockResolvedValue({ networkRemoved: true, steps: ['Removed network'] });
   });
 
@@ -285,6 +304,33 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
 
     await lifecyclePromise;
   }, 30_000);
+
+  it('records the merged work agent as stopped and still paused after closing its terminal (PAN-5112)', async () => {
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    expect(mockKillSession).toHaveBeenCalledWith('agent-pan-399');
+    for (const id of ['agent-pan-399', 'strike-pan-399']) {
+      expect(agentStore.get(id)).toMatchObject({
+        status: 'stopped',
+        paused: true,
+        pausedReason: 'awaiting close-out (verify on main)',
+        stoppedAt: expect.any(String),
+      });
+      expect(agentStore.get(id)).not.toHaveProperty('stoppedByUser');
+    }
+    expect(agentStore.has('planning-pan-399')).toBe(false);
+  });
+
+  it('leaves the agent running when its terminal could not be closed', async () => {
+    mockSessionExists.mockImplementation((agentId: string) => Effect.succeed(agentId === 'strike-pan-399'));
+    try {
+      await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+      expect(agentStore.get('agent-pan-399')).toMatchObject({ status: 'running', paused: true });
+      expect(agentStore.get('strike-pan-399')).toMatchObject({ status: 'stopped', paused: true });
+    } finally {
+      mockSessionExists.mockImplementation((agentId: string) => Effect.succeed(agentStore.has(agentId)));
+    }
+  });
 
   it('runs name-based teardown before a verifying-on-main tracker transition fails', async () => {
     mockTransitionState.shouldFail = true;

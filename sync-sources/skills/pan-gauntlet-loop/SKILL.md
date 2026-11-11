@@ -70,6 +70,11 @@ REFERENCE is the load-bearing slot. Before accepting it, verify it is:
    `pan lane start`; never two builders in one worktree. The primary checkout
    is the orchestrator's merge desk only. Work in the current checkout
    instead only when the operator explicitly asked to enhance in place.
+   A worktree you create yourself — `git worktree add`, or a sub-agent with
+   worktree isolation — is not a lane: the lane door never checks its disk
+   floor and `pan lane reap` cannot remove it. Run
+   `pan lane disk-check --project <key>` before creating one, and remove it
+   with `git worktree remove <dir>` as soon as its area lands.
 2. **Scaffold `gauntlet/` in the worktree:**
    - `gauntlet/index.html` — copy `{baseDir}/assets/gauntlet-index.html`
      **verbatim** (it renders from status.json; never edit per project).
@@ -145,13 +150,20 @@ metadata: a critic brief still names no builder.
    disjoint, and run everything disjoint **concurrently**. Films and
    critics for different areas are read-only-ish and parallelize freely.
    Keep the orchestrator thin; the fan-out does the work.
-2. **Build.** Launch a builder for the area with its ownership map, the
-   mission prompt, and the current defect list as its work order. Builders
-   commit and push their own lane branch as they go; the orchestrator audits
-   the diff and merges. A branch that has reported `done` is frozen; a
-   rework goes on a new iteration branch. Builders never judge their own
-   work. The orchestrator's own merge commits still use path-scoped
-   `git add` — `git add -A` would scoop another in-flight agent's work.
+2. **Build.** Before every launch wave, run `pan lane disk-check --project <key>`;
+   on exit 4, do not launch — free disk space or reap first. Reap superseded
+   lanes before the next iteration: `pan lane list --run <run> --reapable`,
+   then `pan lane reap <name>` for each (`--park` on a dirty tree). A reapable
+   lane is a candidate, not a promise: when the reap refuses because a
+   process still runs in the directory, leave that lane, name it in the run
+   report, and continue. Launch a builder for the area with its ownership
+   map, the mission prompt, and the current defect list as its work order.
+   Builders commit and push their own lane branch as they go; the
+   orchestrator audits the diff and merges. A branch that has reported
+   `done` is frozen; a rework goes on a new iteration branch. Builders never
+   judge their own work. The orchestrator's own merge commits still use
+   path-scoped `git add` — `git add -A` would scoop another in-flight
+   agent's work.
 3. **Capture evidence at presentation quality.** Launch the real thing and
    drive it — Playwright for UI, the CLI at its command, the benchmark at
    its load. Screenshots at 1920×1080 with realistic in-fiction data (a
@@ -237,6 +249,8 @@ or the critic lane's conversation id.
 **The lane recipe:**
 
 ```bash
+pan lane disk-check --project <key>                          # before every launch wave; exit 4 = do not launch
+pan lane list --run hotel --reapable                         # reap each before the next iteration
 pan lane start --run hotel --key 663 --role builder --brief briefs/663.md --model <builder model>
 pan lane wait --run hotel --after <cursor> --timeout 540     # repeat while exit 3
 pan lane start --run hotel --role critic --for 663 --brief briefs/663-critic.md --model <critic model>   # checks out the builder's reported head
@@ -325,6 +339,9 @@ pushed head, so builders push before they report done (the door already requires
 - An orchestrator that hands itself off keeps its lanes: they stay nested
   under it, its successor nests beside them, and the successor continues
   with the same `--run`.
+- `pan lane disk-check --project <key>` lists directories under the lanes
+  root that no lane row claims — not lanes, so `pan lane reap` cannot remove
+  them; remove each yourself with `git worktree remove <dir>` once checked.
 
 ## References
 

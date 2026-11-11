@@ -1,0 +1,77 @@
+{
+  "version": "1",
+  "issueId": "PAN-5117",
+  "created": "2026-11-10T17:52:40.588Z",
+  "updated": "2026-11-10T19:07:45.526Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "fix-watchdog-trap": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5117",
+      "claimedAt": "2026-11-10T17:52:40.588Z",
+      "doneAt": "2026-11-10T18:10:40.458Z"
+    },
+    "move-wall-clock-cases": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5117",
+      "claimedAt": "2026-11-10T18:10:46.539Z",
+      "doneAt": "2026-11-10T18:48:50.789Z"
+    },
+    "docs-slow-test-convention": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5117",
+      "claimedAt": "2026-11-10T18:48:55.219Z",
+      "doneAt": "2026-11-10T19:01:49.982Z"
+    },
+    "add-fast-fallback-case": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5117",
+      "claimedAt": "2026-11-10T18:50:03.031Z",
+      "doneAt": "2026-11-10T18:50:32.801Z"
+    },
+    "fix-watchdog-trap.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:04:22.743Z"
+    },
+    "fix-watchdog-trap.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:05:00.126Z"
+    },
+    "fix-watchdog-trap.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:05:26.102Z"
+    },
+    "move-wall-clock-cases.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:05:51.730Z"
+    },
+    "move-wall-clock-cases.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:06:11.529Z"
+    },
+    "move-wall-clock-cases.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:06:29.258Z"
+    },
+    "add-fast-fallback-case.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:06:50.519Z"
+    },
+    "add-fast-fallback-case.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:07:08.542Z"
+    },
+    "docs-slow-test-convention.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:07:28.156Z"
+    },
+    "docs-slow-test-convention.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:07:45.526Z"
+    }
+  }
+}

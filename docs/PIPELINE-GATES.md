@@ -1561,6 +1561,60 @@ disk is still low then, deacon-lite records `planning.failed
 stage=auto-handoff` and a warn activity asking for `pan start <id>`, and the
 work agent starts only when someone runs it.
 
+### Disk alert (PAN-5093)
+
+Separate from the 10 GiB workspace floor above and the BuildKit prune patrol
+(`src/lib/cloister/disk-pressure-patrol.ts`, PAN-3809): those two guard new
+workspace setups and reclaim Docker build cache, but neither tells the
+operator anything. The disk alert exists because free space on `/` once fell
+7.5 GiB → 17 MB within an hour with no warning.
+
+**Placement.** The disk alert service
+(`src/dashboard/server/services/disk-alert-service.ts`) runs in the primary
+dashboard process only (`main.ts`, beside `startNeedsYouPushService`) — a
+peer dashboard would push every crossing twice — and it is not behind the
+Deacon freeze: `deacon.globally_paused` silences deacon-lite routines, and a
+frozen Deacon is exactly when nobody is watching disk space either. It polls
+`statfs` on the filesystem holding the Overdeck home every 30 seconds
+(`DISK_ALERT_POLL_MS`).
+
+**Levels and the recovery margin.** Free bytes are compared against
+`resources.disk_warn_gb` (default 5) and `resources.disk_critical_gb`
+(default 2) — see [memory-governor.mdx](../configuration/memory-governor.mdx)
+"Disk alert". A level raises the instant free space drops below its
+threshold, but lowers only once free space clears that threshold **plus**
+a 0.5 GiB margin (`DISK_ALERT_RECOVERY_MARGIN_BYTES`), so free space
+hovering at a threshold does not push on every poll. The pure state machine
+lives in `src/lib/disk-alert.ts` (`nextDiskAlertLevel`, `isDiskAlertCrossing`).
+
+**The push.** Each crossing (`ok → warning`, `ok → critical`,
+`warning → critical`) sends exactly one notification through the same
+needs-you dispatcher as every other push, kind and category `failed`, title
+`Disk low · <x> GiB free` or `Disk critical · <x> GiB free`
+(`diskAlertPush`, `src/lib/disk-alert.ts`). A downward step
+(`critical → warning`) pushes nothing. A phone with the **Failures** push
+type muted or paused gets no disk push, same as any other `failed` kind; the
+Needs-you item still shows.
+
+**The Needs-you item.** One item, id `disk-alert`, kind `diskLow` at warning
+or `diskCritical` at critical; `diskCritical` is a blocking kind, `diskLow`
+is not. It renders its own card (never the generic row with an **Answer**
+button) in its own "System" group on the desktop, and a read-only line on
+the phone.
+
+**Holders are read-only.** On a crossing, the service measures the biggest
+space holders on the same filesystem — every child of the Overdeck home,
+`~/.claude/projects`, the opencode db, the conversation search index (in use
+and any stale copy), the known caches, and Docker's reclaimable bytes
+(`collectDiskHolders`, `src/lib/disk-alert-holders.ts`) — at most once per
+crossing, never per poll, with a 120-second timeout per path and at most 4
+`du` processes at a time, one scan in flight for the whole service. Nothing
+is deleted, pruned or moved; the operator judges from the list.
+
+**`GET /api/disk-alert`** (`src/dashboard/server/routes/disk-alert.ts`)
+serves the current `DiskAlertSnapshot`, scoped `read:state`, so a paired
+phone's Needs-you can read it.
+
 ## GitHub quota policy (PAN-4264)
 
 GitHub limits each identity to 5,000 points per hour per bucket (GraphQL and

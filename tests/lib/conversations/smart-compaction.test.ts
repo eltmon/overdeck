@@ -101,4 +101,8 @@ describe('getChunkBudgetChars (PAN-4327)', () => {
   it('falls back to the default budget for an unmodeled or missing model', () => {
     expect(getChunkBudgetChars(undefined)).toBe(300_000);
   });
+
+  it('gives Fable 5.2 the 1M-window budget', () => {
+    expect(getChunkBudgetChars('claude-fable-5-2')).toBe(1_200_000);
+  });
 });

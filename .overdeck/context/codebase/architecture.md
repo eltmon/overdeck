@@ -43,7 +43,9 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   `tests/unit/telemetry-docs.test.ts`); `service.ts` (`AnalyticsService`) is the only Node module
   that imports `posthog-node` and applies the opt-out; the browser door is
   `src/dashboard/frontend/src/lib/telemetry.ts`. PAN-5016 adds `anywhere.ts` for Anywhere events;
-  the phone app and the `services/` Workers send nothing (phone: PAN-5021).
+  `requestFailures.ts` reports failed `/api/`/`/events/` requests on both clients, and the phone
+  app boots telemetry from `GET /api/telemetry/client-config` and reports `phone_link_state`
+  (PAN-5100). The `services/` Workers send nothing.
   `config.ts`'s `resolveTelemetryState()` is the one door for effective
   on/off/`disabledBy`, combining the env override, config, and
   `environment.ts`'s CI/temporary-home auto-exclusion with `install-kind.ts`'s
@@ -56,8 +58,8 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   `delivery.ts`, `health.ts`, `resume.ts`, `termination.ts`. Harness resolution lives in
   `src/lib/harness-resolve.ts`.
 - `runtimes/` — harness adapters: `claude-code.ts`, `ohmypi.ts` (+ `ohmypi-fifo.ts`),
-  `codex.ts`, `acp.ts`, `kimi-code.ts`, `muse.ts`, plus OpenCode via ACP. `RuntimeName =
-  'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse'` (`pi` is a
+  `codex.ts`, `acp.ts`, `kimi-code.ts`, `muse.ts`, `prime-agent.ts`, plus OpenCode and Grok Build via ACP. `RuntimeName =
+  'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok'` (`pi` is a
   legacy alias). Per-harness behavior table: `packages/contracts/src/harness-behavior.ts`;
   its `HarnessBehavior.capabilities` (`packages/contracts/src/harness-capabilities.ts`)
   declares every per-harness behavior decision, and the `lint:harness-branches` ratchet
@@ -369,5 +371,7 @@ Model and built-ins (`overdeck-dark`, `overdeck-light`; read-only, full terminal
 ## Shared Sessions in the dashboard (PAN-4473, PAN-4474, PAN-4475, PAN-4476, PAN-4477)
 
 Host: `src/dashboard/server/services/share-host.ts` (`ShareManager`: rooms, host socket, the 0600 record door `src/lib/sharing/share-record.ts`) and `routes/shares.ts` (`/api/shares*`); one `PeerHub` per live share in `src/dashboard/server/sharing/peer-hub.ts` (werift peers, five channels, the host-admitted content gate) with `conversation-bridge.ts` (Claude JSONL → `SharedMessage`) and `channel-writer.ts` (backpressure); slice 5 (PAN-4476) adds `draft-board.ts` (per-author LWW drafts, 200 ms relay) and `submit-queue.ts` (strict-FIFO prompts, one per agent turn, through the `handleConversationMessage` door); `POST /api/shares/:code/prompts` queues host sends. Slice 6 (PAN-4477) adds `terminal-bridge.ts` (a watching viewer's read-only terminal from a Herdr observe stream or a tmux PTY hub listener, via `pty-hub-attach.ts`). Viewer: `services/share-join.ts` + `routes/joins.ts` (join socket, SSE to the browser); browser peer and page in `frontend/src/components/chat/sharing/` (`webrtc-viewer.ts`, `useSharedJoin.ts`, `SharedConversationView.tsx`, `ShareDialog.tsx`, `SharingLobbyPanel.tsx`, `SuggestionList.tsx`, `SharedTerminalView.tsx`). Wire types in `packages/contracts/src/sharing.ts` (type-only, import-free), runtime helpers in `sharing-wire.ts`. Docs: `docs/SHARED-SESSIONS.md`, `configuration/shared-sessions.mdx`.
+
+Needs-you push (PAN-2354): the pure classifier `src/lib/push/classify.ts` (keys `auq:`/`plan:`/`perm:`), the rising-edge dispatcher `src/lib/push/dispatcher.ts` (in-memory dedup, 6-per-minute limit, providers `webpush-provider.ts`, `ntfy-provider.ts`, `native-provider.ts`), run only in the primary dashboard by `services/needs-you-push-service.ts`; routes in `routes/push.ts`; Settings UI `Settings/anywhere/PushPanel.tsx` (Settings → Anywhere → Phone notifications). PAN-5111: delivered pushes and resolutions append to `~/.overdeck/logs/push-sent.jsonl` through `src/lib/push/push-history.ts`; answer doors write in-memory notes (`src/lib/push/operator-answers.ts`) that resolve a departed key `answered`; `GET /api/push/history` feeds `Settings/anywhere/RecentNotifications.tsx`. Fleet Needs-You adds `unreachable` from `linked-needs-you-sync.ts` `failureFor`, shown by `UnreachableMachineCard.tsx` and the phone row. Docs: `configuration/push-notifications.mdx`.
 
 <!-- last-verified: 2026-11-04 -->

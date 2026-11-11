@@ -131,6 +131,7 @@ vi.mock('child_process', async (importOriginal) => {
 });
 
 import { runVerificationForIssue, runVerificationForIssueInProcess } from '../../../../src/lib/cloister/verification-runner.js';
+import { writeFeedbackFile } from '../../../../src/lib/cloister/feedback-writer.js';
 import { checkIncompletePlanItems } from '../../../../src/lib/work/done-preflight.js';
 
 let root: string;
@@ -264,5 +265,19 @@ describe('the verification worker re-decides the adopted checklist skip (PAN-481
 
     expect(checkIncompletePlanItems).toHaveBeenCalledWith(workspacePath, 'PAN-9001');
     expect(result).toMatchObject({ outcome: 'failed', failedCheck: 'incomplete-plan-items' });
+  });
+
+  it('gives one copy-ready pan task done command listing every incomplete id (PAN-5118)', async () => {
+    vi.mocked(checkIncompletePlanItems).mockResolvedValue([
+      '  Incomplete plan items (2):',
+      '    - item-a A (pending)',
+      '    - item-a.ac1 B (pending)',
+    ]);
+    await writeJournal([{ at: '2026-11-02T04:22:00.000Z', type: 'review.requested', issueId: 'PAN-9001', source: 'pan-done' }]);
+
+    await runVerificationForIssueInProcess('PAN-9001', workspacePath, { isRemote: false }, 'request-review', noSync);
+
+    const body = vi.mocked(writeFeedbackFile).mock.calls[0]?.[0]?.markdownBody;
+    expect(body).toContain('pan task done PAN-9001 item-a item-a.ac1');
   });
 });

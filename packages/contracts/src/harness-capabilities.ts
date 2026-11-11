@@ -245,6 +245,14 @@ export const OPENCODE_CAPABILITIES: HarnessCapabilities = {
   overdeckMcp: true,
 }
 
+export const GROK_CAPABILITIES: HarnessCapabilities = {
+  ...OPENCODE_CAPABILITIES,
+  binaryLabel: "Grok Build",
+  installHint: "curl -fsSL https://x.ai/cli/install.sh | bash",
+  updateArgs: ["update"],
+  npmPackage: "@xai-official/grok",
+}
+
 export const MUSE_CAPABILITIES: HarnessCapabilities = {
   contextChannel: "append-system-prompt-file",
   initialPromptMustLand: false,

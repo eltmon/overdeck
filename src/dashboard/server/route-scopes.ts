@@ -33,8 +33,14 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/agent-directory', scope: 'read:state' },
   { method: 'GET', path: '/api/flywheel/status', scope: 'read:state' },
   { method: 'GET', path: '/api/pipeline/membership', scope: 'read:state' },
+  // PAN-5093: the phone's Needs-you shows the disk alert.
+  { method: 'GET', path: '/api/disk-alert', scope: 'read:state' },
+  // PAN-5108: the phone's Needs-you shows harness update failures.
+  { method: 'GET', path: '/api/harness-auto-update', scope: 'read:state' },
   // PAN-5045: the phone groups its conversation list by project with the desktop's resolver.
   { method: 'GET', path: '/api/registered-projects', scope: 'read:state' },
+  // PAN-5100: the phone reads the machine's telemetry setting.
+  { method: 'GET', path: '/api/telemetry/client-config', scope: 'read:state' },
   { method: 'GET', path: '/api/conversations', scope: 'read:conversations' },
   // PAN-4835: the Needs-you feed, explicit so it never depends on the `:id` pattern below.
   { method: 'GET', path: '/api/conversations/pending-input', scope: 'read:conversations' },
@@ -116,6 +122,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/fleet/needs-you', scope: 'read:conversations' },
   // PAN-4944 (PAN-4927 W-APPR1): this machine's Needs-You for list_pending_input.
   { method: 'GET', path: '/api/needs-you', scope: 'read:conversations' },
+  // PAN-5111: the last 50 pushes sent, for Settings and paired phones.
+  { method: 'GET', path: '/api/push/history', scope: 'read:conversations' },
   // PAN-4651 WI-21: palette search across linked machines.
   { method: 'GET', path: '/api/fleet/search', scope: 'read:conversations' },
   // PAN-4651 WI-22: which machine is working on an issue.

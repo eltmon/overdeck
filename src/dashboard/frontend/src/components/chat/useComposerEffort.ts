@@ -42,12 +42,13 @@ export interface ComposerEffort {
   onChange: (level: EffortLevel) => void;
 }
 
-/** kimi-code and ACP expose fewer tiers; show the tier they actually run. */
+/** kimi-code and ACP expose fewer tiers, and Grok Build tops out at xhigh; show the tier they actually run. */
 function mapForHarness(harness: Conversation['harness'], effort: string): string {
   if (harness === 'kimi-code' || harness === 'acp') {
     if (effort === 'medium') return 'high';
     if (effort === 'xhigh') return 'max';
   }
+  if (harness === 'grok' && effort === 'max') return 'xhigh';
   return effort;
 }
 
@@ -70,7 +71,7 @@ export function resolveComposerEffort(conversation: Conversation): EffortLevel {
 
 function supportsLiveChange(harness: string, piConversation: boolean, agentId: string | undefined): boolean {
   if (agentId) return harness === 'claude-code';
-  return harness === 'claude-code' || piConversation || harness === 'codex' || harness === 'acp' || harness === 'opencode';
+  return harness === 'claude-code' || piConversation || harness === 'codex' || harness === 'acp' || harness === 'opencode' || harness === 'grok';
 }
 
 export function useComposerEffort({

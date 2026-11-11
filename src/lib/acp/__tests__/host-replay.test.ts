@@ -1,13 +1,16 @@
 /**
- * PAN-4563 — replay-backed protocol tests for the ACP host (Kimi).
+ * PAN-4563 — replay-backed protocol tests for the ACP host (Kimi; Grok Build
+ * since PAN-5078).
  *
- * Each case plays a fixture recorded from a live `kimi acp` (see
- * docs/PROTOCOL-REPLAY-TESTS.md) to the real effect-acp client,
- * AcpSessionRuntime, Kimi runtime factory, and AcpHost. Expected values come
+ * Each case plays a fixture recorded from a live `kimi acp` or `grok agent
+ * stdio` (see docs/PROTOCOL-REPLAY-TESTS.md) to the real effect-acp client,
+ * AcpSessionRuntime, provider runtime factory, and AcpHost. Expected values come
  * from the fixture, never from literals, so a re-recording needs no test edits.
  *
- * Timers stay real: these fixtures never exercise session/load, whose
- * replay-idle gap is the only ACP delay. A fixture that does must fake timers.
+ * Timers stay real. The grok-resume fixture exercises session/load, whose
+ * replay-idle gap (2 s) is the only ACP delay, but its recorded response
+ * arrives before the gap and wins the race. A fixture whose load response
+ * lags the gap must fake timers.
  */
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -209,6 +212,65 @@ describe("kimi acp case: interrupt", () => {
 
     await host.stop();
     active = undefined;
+    expect(replay.unmatchedClientLines()).toEqual([]);
+  });
+});
+
+/** The client's session/set_config_option frames as configId=value, in recorded order. */
+function configFrames(fixture: ProtocolFixture): string[] {
+  return fixture.frames
+    .filter((frame) => frame.dir === "out" && frame.message?.method === "session/set_config_option")
+    .map((frame) => {
+      const params = record(frame.message?.params);
+      return `${String(params.configId)}=${String(params.value)}`;
+    });
+}
+
+describe("grok acp case: turn completion (PAN-5078)", () => {
+  it("sets the model before reasoning effort and records the turn's Grok usage", async () => {
+    const { host, replay } = await start("grok-turn-completion");
+    const hostOptions = replay.fixture.header.hostOptions ?? {};
+    const cliModel = String(hostOptions.model).replace(/^grok\//, "");
+    expect(configFrames(replay.fixture)).toEqual([`model=${cliModel}`, `reasoning_effort=${String(hostOptions.effort)}`]);
+
+    await host.start();
+    expect(await host.handleOp({ op: "message", content: String(hostOptions.prompt) })).toMatchObject({ status: 202 });
+    await host.waitForIdle();
+
+    const records = await readTranscript() as Array<TranscriptRecord & { usage?: { model?: string; costUsd?: number } }>;
+    expect(lifecycle(records)).toEqual(["prompt_queued", "user", "assistant", "turn_completed"]);
+    const completed = records.find((entry) => entry.event === "turn_completed");
+    expect(completed?.usage?.model).toBe(String(hostOptions.model));
+    expect(Number.isFinite(completed?.usage?.costUsd)).toBe(true);
+
+    await host.stop();
+    active = undefined;
+    await replay.done;
+    expect(replay.unmatchedClientLines()).toEqual([]);
+  });
+});
+
+describe("grok acp case: resume (PAN-5078)", () => {
+  it("loads the recorded session instead of creating one and completes a turn on it", async () => {
+    const { host, replay } = await start("grok-resume");
+    const hostOptions = replay.fixture.header.hostOptions ?? {};
+    const firstSessionFrame = replay.fixture.frames.find((frame) =>
+      frame.dir === "out" && typeof frame.message?.method === "string" && frame.message.method.startsWith("session/"));
+    expect(firstSessionFrame?.message?.method).toBe("session/load");
+    expect(record(firstSessionFrame?.message?.params).sessionId).toBe(hostOptions.resumeSessionId);
+
+    await host.start();
+    expect(host.status()).toMatchObject({ state: "ready", sessionId: hostOptions.resumeSessionId });
+    expect(await host.handleOp({ op: "message", content: String(hostOptions.prompt) })).toMatchObject({ status: 202 });
+    await host.waitForIdle();
+
+    const records = await readTranscript();
+    expect(records.filter((entry) => entry.event === "turn_completed")).toHaveLength(1);
+    expect(records.some((entry) => entry.event === "prompt_failed")).toBe(false);
+
+    await host.stop();
+    active = undefined;
+    await replay.done;
     expect(replay.unmatchedClientLines()).toEqual([]);
   });
 });

@@ -1,7 +1,7 @@
-/** Muse Code 1.0.2 session envelopes. Only committed run events contribute usage. */
+/** Muse Code 1.0.2 session envelopes. Only committed run events contribute usage; each one is priced as its own request. */
 import { basename, dirname } from 'node:path';
 import { readFileSync } from 'node:fs';
-import { getPricing } from '../cost.js';
+import { calculateCost, getPricing, type TokenUsage } from '../cost.js';
 import type { SessionUsage } from './jsonl-parser.js';
 
 export interface MuseEvent {
@@ -52,6 +52,7 @@ export function summarizeMuseRecords(records: MuseRecord[], sessionFile: string)
   let output = 0;
   let cached = 0;
   let reported = false;
+  const requests: TokenUsage[] = [];
   const seen = new Set<string>();
   for (const record of records) {
     if (record.id && seen.has(record.id)) continue;
@@ -67,13 +68,17 @@ export function summarizeMuseRecords(records: MuseRecord[], sessionFile: string)
     const usage = event.usage;
     reported = true;
     const cache = Math.max(0, usage.cached_tokens ?? 0);
+    const uncached = Math.max(0, (usage.input_tokens ?? 0) - cache);
+    const produced = Math.max(0, usage.output_tokens ?? 0);
     cached += cache;
-    input += Math.max(0, (usage.input_tokens ?? 0) - cache);
-    output += Math.max(0, usage.output_tokens ?? 0);
+    input += uncached;
+    output += produced;
+    requests.push({ inputTokens: uncached, outputTokens: produced, cacheReadTokens: cache });
   }
   if (!reported || !model) return null;
   const pricing = getPricing('custom', model);
-  const cost = (input * (pricing?.inputPer1k ?? 0) + output * (pricing?.outputPer1k ?? 0) + cached * (pricing?.cacheReadPer1k ?? 0)) / 1000;
+  // Price each request separately: long-context tiers (Muse Ember >200K) are set per request.
+  const cost = pricing ? requests.reduce((sum, request) => sum + calculateCost(request, pricing), 0) : 0;
   return {
     sessionId: basename(dirname(sessionFile)), sessionFile, model, cwd,
     startTime: museTimestamp(records[0] ?? {}), endTime: museTimestamp(records.at(-1) ?? {}),

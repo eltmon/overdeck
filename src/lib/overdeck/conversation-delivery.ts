@@ -36,6 +36,7 @@ import { deliverAgentMessage } from '../agents.js';
 import { tmuxSessionExists } from './conversation-runtime.js';
 import { answerPiAskModal, type PiAskModalDeps } from '../pi-ask-modal.js';
 import type { PendingAskUserQuestionSnapshot, PendingInputKind } from '../agent-enrichment.js';
+import { noteOperatorAnswer } from '../push/operator-answers.js';
 import { getOverdeckHome } from '../paths.js';
 import { BRIDGE_TOKEN_HEADER } from '../bridge-token.js';
 
@@ -213,6 +214,8 @@ export async function handleConversationCodexApproval(
         return jsonResponse({ error: 'optionNumber out of range (1-2)' }, { status: 400 });
       }
       await postCodexAppServerOp(conv.tmuxSession, { op: 'approval', requestId: pending.id, decision });
+      // PAN-5111: the id was checked against the live approval, so the push history may credit it.
+      noteOperatorAnswer(`auq:${expectedToolUseId}`);
       return jsonResponse({ ok: true, optionNumber, decision });
     }
     // Re-detect uncached so we only send keystrokes when the menu is still

@@ -61,7 +61,7 @@ Fixtures come from the recorder only. Do not hand-edit them.
 
 ```bash
 node --import tsx src/lib/protocol-capture/record.ts \
-  --harness <codex|acp> --scenario <name> --out <path> \
+  --harness <codex|acp|grok> --scenario <name> --out <path> \
   [--model <id>] [--effort <level>] [--note <text>]
 ```
 
@@ -80,15 +80,40 @@ boundary stay in the fixture. A failed run deletes its partial fixture.
 | codex | `user-input` | ask me one question with `request_user_input` (red or blue) | answer each question with its first option | `…/replay/user-input.jsonl` |
 | acp | `turn-completion` | `Reply with exactly OK.` | none | `src/lib/acp/__tests__/fixtures/replay/kimi-turn-completion.jsonl` |
 | acp | `interrupt` | count from 1 to 400 | interrupt on the first `[assistant]` pane line | `…/replay/kimi-interrupt.jsonl` |
+| grok | `grok-turn-completion` | `Reply with exactly OK.` | none | `src/lib/acp/__tests__/fixtures/replay/grok-turn-completion.jsonl` |
+| grok | `grok-resume` | `Reply with exactly OK.` | prime one uncaptured turn, then capture a host resumed with its session id (`session/load`) | `src/lib/acp/__tests__/fixtures/replay/grok-resume.jsonl` |
 
 Defaults: Codex `gpt-5.6-luna`, effort `low`; ACP (Kimi) `k3`, effort `low`
-(K3 refuses to launch without an effort level).
+(K3 refuses to launch without an effort level); Grok `grok/grok-4.6`, effort
+`low` (Grok Build requires an explicit model and effort). The `grok` harness
+records the ACP host with provider `grok`; its fixture header says
+`harness: acp, provider: grok`, and the replay spawner builds the Grok runtime
+for it. `grok-resume` primes its session in the same temp working directory,
+because Grok keeps sessions per directory.
 
 **Prerequisites.** Codex needs `~/.codex/auth.json`; the recorder builds a temp
 `CODEX_HOME` with `initCodexHome`, which links it. The `user-input` scenario
 turns on `[features] default_mode_request_user_input = true` in that temp home.
 Kimi needs a working `kimi` login, or a Kimi home whose model backend is
-reachable (see the provenance note below).
+reachable (see the provenance note below). Grok needs a signed-in `grok login`
+(SuperGrok); each scenario runs one or two real `grok-4.6` turns (about $0.03
+each). Record Grok with an isolated `HOME` that holds only the sign-in and the
+CLI's bundled tools, so the operator's Grok skills, plugins, MCP servers and
+hooks stay out of the fixture (with them, `available_commands_update` frames
+alone run to about 100 KB each):
+
+```bash
+GROK_HOME_DIR=<scratch dir>/grok-home
+mkdir -p "$GROK_HOME_DIR/.grok"
+ln -s ~/.grok/auth.json "$GROK_HOME_DIR/.grok/auth.json"
+ln -s ~/.grok/bundled "$GROK_HOME_DIR/.grok/bundled"
+ln -s ~/.grok/vendor "$GROK_HOME_DIR/.grok/vendor"
+HOME="$GROK_HOME_DIR" node --import tsx src/lib/protocol-capture/record.ts \
+  --harness grok --scenario grok-turn-completion --out src/lib/acp/__tests__/fixtures/replay/grok-turn-completion.jsonl
+```
+
+Grok's `authenticate` result `_meta` carries account fields (email, team id,
+subscription tier); the scrubber redacts them by key.
 
 **Approval prompt.** The planned prompt was a network `curl`, but in the
 `workspace-write` sandbox it fails at DNS without asking for approval
@@ -290,3 +315,5 @@ codex-cli 0.159.0.
 | Codex sends the host name and a stable `installationId` in `remoteControl/status/changed` | all Codex fixtures | Scrubbed (`<HOSTNAME>`, `installationId` redacted) |
 | With an invalid OAuth grant, `kimi acp` answered `session/prompt` with `stopReason: end_turn` and no error, so a failed turn looks like a successful empty one | not committed (failed recording) | Recorded here; outside Overdeck's control |
 | A network `curl` in the `workspace-write` sandbox fails without asking for approval (codex-cli 0.159.0) | `approval.jsonl` | Recorder uses a `$HOME` write instead |
+| Grok (1.0.77) returns turn usage and `costUsdTicks` in the `session/prompt` result's `_meta.usage`, streams many `_x.ai/*` vendor notifications the runtime ignores, and on `session/load` keeps the session's model and effort, so the resumed host sends no `session/set_config_option` | `grok-turn-completion.jsonl`, `grok-resume.jsonl` | Observed; turn usage feeds Grok cost events ([PAN-5078](https://github.com/eltmon/overdeck/issues/5078)) |
+| Grok's `authenticate` result `_meta` carries the account email, team id and subscription tier | both Grok fixtures | Scrubbed by key (`<REDACTED>`) |

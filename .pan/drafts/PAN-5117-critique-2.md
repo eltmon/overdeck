@@ -1,0 +1,5 @@
+plan-digest: 7f3583c81a27fe94a2f5118596b442abf8c5a3f693a69fb3e71b7f938865d728
+
+## sharpens-framing: Slow-test guidance conflicts with the planned boundary
+
+The PRD's D4 moves cases only when real waiting is about 1 s or more (.pan/drafts/PAN-5117.md, lines 84-88), and it deliberately keeps the lock-holder cases that poll with `/bin/sleep 0.01` (tests/scripts/pan-hook-lib-guards.test.ts, lines 82, 110, 142). WI-4 instead directs *any* case whose result depends on a real child-process sleep into a slow file (.pan/drafts/PAN-5117.md, line 248). Its proposed general rule also tells every slow test to use a 20 s per-test timeout (line 251), although the existing CI slow file uses a 120 s setup timeout and no per-test timeout (tests/integration/anywhere/two-machine-ac1.slow.test.ts, lines 117-126). This would document a different convention from the one the implementation follows. Make WI-4 say that cases with roughly 1 s or more of unavoidable real waiting belong in a slow file, while short bounded process polling can stay in the default suite; choose each slow case's timeout from its actual budget, using 20 s for these three cases.

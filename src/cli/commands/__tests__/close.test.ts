@@ -71,8 +71,11 @@ function answerConfirmation(answer: string) {
 }
 
 describe('closeOutCommand', () => {
+  const originalIsTTY = process.stdin.isTTY;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    process.stdin.isTTY = true;
     vi.stubEnv('OVERDECK_AGENT_ID', '');
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -86,6 +89,7 @@ describe('closeOutCommand', () => {
   });
 
   afterEach(() => {
+    process.stdin.isTTY = originalIsTTY;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -102,6 +106,29 @@ describe('closeOutCommand', () => {
       projectPath: '/repo',
       github: { owner: 'eltmon', repo: 'overdeck', number: 1190 },
     }, { dodAcceptedRows: [], dodAcceptedBy: expect.any(String) });
+  });
+
+  it('resolves a custom-prefix GitHub project for the tracker close (PAN-2628)', async () => {
+    mocks.readFileSync.mockReturnValue('GITHUB_REPOS=eltmon/overdeck:PAN,drewmama/puzzdom:PUZ\n');
+
+    await expect(closeOutCommand('PUZ-1', { force: true })).rejects.toThrow('process.exit unexpectedly called with "0"');
+
+    expect(mocks.closeOut).toHaveBeenCalledWith({
+      issueId: 'PUZ-1',
+      projectPath: '/repo',
+      github: { owner: 'drewmama', repo: 'puzzdom', number: 1 },
+    }, { dodAcceptedRows: [], dodAcceptedBy: expect.any(String) });
+  });
+
+  it('refuses clearly instead of prompting when stdin is not a TTY (PAN-2628)', async () => {
+    process.stdin.isTTY = false;
+
+    await expect(closeOutCommand('PAN-1190', {})).rejects.toThrow('process.exit unexpectedly called with "1"');
+
+    expect(mocks.createInterface).not.toHaveBeenCalled();
+    expect(mocks.closeOut).not.toHaveBeenCalled();
+    const errors = vi.mocked(console.error).mock.calls.map((c) => String(c[0])).join('\n');
+    expect(errors).toContain('pass --force');
   });
 
   it('skips the confirmation prompt when --force is used', async () => {

@@ -3,9 +3,12 @@ import { renderHook } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { DiskAlertSnapshot, HarnessAutoUpdateSnapshot } from '@overdeck/contracts';
 import { useDashboardStore } from '../store';
 import { describePendingInput } from '../pendingInput';
-import { type AgentRequestRow, isBlockingDecision, useDecisions } from '../useDecisions';
+import { DISK_ALERT_QUERY_KEY } from '../diskAlert';
+import { HARNESS_AUTO_UPDATE_QUERY_KEY } from '../harnessAutoUpdate';
+import { type AgentRequestRow, diskAlertDecisions, harnessUpdateDecisions, isBlockingDecision, useDecisions } from '../useDecisions';
 import type { McpSignInApproval } from '../../components/Settings/anywhere/anywhereApi';
 
 interface RenderDecisionsOptions {
@@ -14,6 +17,10 @@ interface RenderDecisionsOptions {
   mcpApprovals?: McpSignInApproval[];
   /** PAN-4946 review: the raw `['anywhere-status']` body, overriding `viewerKind` — for a malformed/partial status. */
   anywhereStatus?: unknown;
+  /** PAN-5093: the cached `/api/disk-alert` snapshot. */
+  diskAlert?: DiskAlertSnapshot | null;
+  /** PAN-5108: the cached `/api/harness-auto-update` snapshot. */
+  harnessAutoUpdate?: HarnessAutoUpdateSnapshot | null;
 }
 
 function renderDecisions(
@@ -25,10 +32,12 @@ function renderDecisions(
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
   queryClient.setQueryData(['conv-ask-user-question'], convRows);
-  queryClient.setQueryData(['fleet-needs-you'], []); // PAN-4651: no linked machines
+  queryClient.setQueryData(['fleet-needs-you'], { machines: [], unreachable: [] }); // PAN-4651: no linked machines
   queryClient.setQueryData(['agent-requests'], agentRequestRows); // PAN-4941
   queryClient.setQueryData(['anywhere-status'], options.anywhereStatus ?? { viewer: { kind: options.viewerKind ?? 'root-session' } }); // PAN-4946
   queryClient.setQueryData(['mcp-oauth-approvals'], options.mcpApprovals ?? []); // PAN-4946
+  queryClient.setQueryData(DISK_ALERT_QUERY_KEY, options.diskAlert ?? null); // PAN-5093
+  queryClient.setQueryData(HARNESS_AUTO_UPDATE_QUERY_KEY, options.harnessAutoUpdate ?? null); // PAN-5108
 
   return renderHook(() => useDecisions(), {
     wrapper: ({ children }: { children: ReactNode }) =>
@@ -315,5 +324,108 @@ describe('isBlockingDecision', () => {
 
   it('is not blocking with no kinds', () => {
     expect(isBlockingDecision([])).toBe(false);
+  });
+});
+
+function diskSnapshot(overrides: Partial<DiskAlertSnapshot> = {}): DiskAlertSnapshot {
+  return {
+    level: 'warning',
+    path: '/home/op/.overdeck',
+    availableBytes: 4.1 * 1024 ** 3,
+    totalBytes: 100 * 1024 ** 3,
+    warningBytes: 5 * 1024 ** 3,
+    criticalBytes: 2 * 1024 ** 3,
+    since: '2026-11-06T17:00:00.000Z',
+    checkedAt: '2026-11-06T17:00:30.000Z',
+    measuring: false,
+    holders: null,
+    ...overrides,
+  };
+}
+
+describe('diskAlertDecisions (PAN-5093)', () => {
+  it('returns no decision for null or level ok', () => {
+    expect(diskAlertDecisions(null)).toEqual([]);
+    expect(diskAlertDecisions(diskSnapshot({ level: 'ok' }))).toEqual([]);
+  });
+
+  it('returns one non-blocking diskLow decision at warning', () => {
+    const [decision] = diskAlertDecisions(diskSnapshot({ level: 'warning' }));
+    expect(decision).toMatchObject({ id: 'disk-alert', kinds: ['diskLow'], blocking: false });
+  });
+
+  it('returns one blocking diskCritical decision at critical', () => {
+    const [decision] = diskAlertDecisions(diskSnapshot({ level: 'critical' }));
+    expect(decision).toMatchObject({ id: 'disk-alert', kinds: ['diskCritical'], blocking: true });
+  });
+});
+
+function harnessSnapshot(failures: HarnessAutoUpdateSnapshot['failures']): HarnessAutoUpdateSnapshot {
+  return { enabled: true, running: false, lastRunAt: '2026-11-10T12:02:00.000Z', nextRunAt: '2026-11-11T12:02:00.000Z', failures };
+}
+
+const CLAUDE_FAILURE = {
+  binary: 'claude',
+  label: 'Claude Code',
+  error: 'npm ERR! code E404',
+  command: 'npm install -g --prefix /p @anthropic-ai/claude-code@latest',
+  failedAt: '2026-11-10T12:01:00.000Z',
+};
+const CODEX_FAILURE = { ...CLAUDE_FAILURE, binary: 'codex', label: 'Codex CLI', command: 'npm install -g --prefix /p @openai/codex@latest' };
+
+describe('harnessUpdateDecisions (PAN-5108)', () => {
+  it('returns no decision for a null snapshot or one without failures', () => {
+    expect(harnessUpdateDecisions(null)).toEqual([]);
+    expect(harnessUpdateDecisions(harnessSnapshot([]))).toEqual([]);
+  });
+
+  it('returns no decision, without throwing, for a response in another shape (e2e catch-all, older peer)', () => {
+    expect(harnessUpdateDecisions({} as unknown as HarnessAutoUpdateSnapshot)).toEqual([]);
+    expect(harnessUpdateDecisions({ failures: null } as unknown as HarnessAutoUpdateSnapshot)).toEqual([]);
+  });
+
+  it('returns one non-blocking decision per failing binary', () => {
+    const decisions = harnessUpdateDecisions(harnessSnapshot([CLAUDE_FAILURE, CODEX_FAILURE]));
+    expect(decisions.map((d) => d.id)).toEqual(['harness-update:claude', 'harness-update:codex']);
+    expect(decisions[0]).toMatchObject({
+      label: 'Claude Code update failed',
+      kinds: ['harnessUpdateFailed'],
+      blocking: false,
+      since: CLAUDE_FAILURE.failedAt,
+      harnessUpdate: CLAUDE_FAILURE,
+    });
+    expect(decisions[1]!.blocking).toBe(false);
+  });
+
+  it('surfaces the failures from the cached snapshot through useDecisions', () => {
+    const { result } = renderDecisions([], [], { harnessAutoUpdate: harnessSnapshot([CLAUDE_FAILURE]) });
+    expect(result.current.some((d) => d.kinds.includes('harnessUpdateFailed'))).toBe(true);
+  });
+});
+
+describe('useDecisions disk alert integration (PAN-5093)', () => {
+  it('surfaces the disk alert decision from the cached snapshot', () => {
+    const { result } = renderDecisions([], [], { diskAlert: diskSnapshot({ level: 'warning' }) });
+    expect(result.current.some((d) => d.kinds.includes('diskLow'))).toBe(true);
+  });
+
+  it('keeps the diskLow decision after a rejected refetch (WI-6 critique response)', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    queryClient.setQueryData(['conv-ask-user-question'], []);
+    queryClient.setQueryData(['fleet-needs-you'], { machines: [], unreachable: [] });
+    queryClient.setQueryData(['agent-requests'], []);
+    queryClient.setQueryData(['anywhere-status'], { viewer: { kind: 'root-session' } });
+    queryClient.setQueryData(['mcp-oauth-approvals'], []);
+    queryClient.setQueryData(DISK_ALERT_QUERY_KEY, diskSnapshot({ level: 'warning' }));
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network down'));
+    const { result } = renderHook(() => useDecisions(), {
+      wrapper: ({ children }: { children: ReactNode }) =>
+        createElement(QueryClientProvider, { client: queryClient }, children),
+    });
+
+    await queryClient.refetchQueries({ queryKey: DISK_ALERT_QUERY_KEY }).catch(() => {});
+    expect(result.current.some((d) => d.kinds.includes('diskLow'))).toBe(true);
+    fetchSpy.mockRestore();
   });
 });

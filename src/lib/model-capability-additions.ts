@@ -7,6 +7,8 @@ export const AUDITED_MODEL_ADDITIONS = {
   'muse-wonder-1.0': { model: 'muse-wonder-1.0', provider: 'meta', displayName: 'Muse Wonder 1.0', costPer1MTokens: 12, contextWindow: 1048576, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 100 }, notes: 'Standard data terms; released 2026-10-12. Capability scores are unranked pending evaluation. Meta reasoning docs (dev.meta.ai/docs/reasoning) list max for this model; the Muse harness row still caps launches at xhigh.' },
   'muse-spark-1.3': { model: 'muse-spark-1.3', provider: 'meta', displayName: 'Muse Spark 1.3 Standard', costPer1MTokens: 2.75, contextWindow: 1048576, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 100 }, notes: 'Standard data terms. Capability scores are unranked pending evaluation. Meta reasoning docs (dev.meta.ai/docs/reasoning) list max for this model; the Muse harness row still caps launches at xhigh.' },
   'muse-spark-1.3-contributor': { model: 'muse-spark-1.3-contributor', provider: 'meta', displayName: 'Muse Spark 1.3 Contributor (training data)', costPer1MTokens: 0.15, contextWindow: 1048576, effortLevels: ['low', 'medium', 'high', 'xhigh'], skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 100 }, notes: 'Discounted tier: prompts and completions may train Meta models. Capability scores are unranked pending evaluation.' },
+  'muse-ember-1.0': { model: 'muse-ember-1.0', provider: 'meta', displayName: 'Muse Ember 1.0', costPer1MTokens: 0.3, contextWindow: 1048576, maxOutputTokens: 524288, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 100 }, notes: 'Standard data terms; released 2026-11-09; no Contributor variant. $0.10/M input, $0.004/M cached, $0.50/M output up to 200K input tokens; above 200K input tokens (cached included) Meta bills the whole request at $0.30/$0.012/$1.50, and Overdeck applies that tier per request. Capability scores are unranked pending evaluation. Meta reasoning docs list minimal (not an Overdeck effort level) through max with an API default of max; the Muse harness row still caps launches at xhigh. Muse Code 1.4.15 catalog reports a 1,007,997-token context limit and 128,000-token output limit.' },
+  'muse-wonder-full-1.0': { model: 'muse-wonder-full-1.0', provider: 'meta', displayName: 'Muse Wonder Full 1.0', costPer1MTokens: 0, contextWindow: 1048576, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 100 }, notes: 'Operator addition (issue comment, 2026-11-10). Muse Code-only: not served by the Meta Model API, so it has no per-token price; billed as part of the Power Usage ($50/mo) or Maximum Usage ($200/mo) Muse Code plan. Not present in this host\'s Muse Code 1.4.15 model catalog (fetched from Meta); this host has no subscription allowance (muse usage reports no_allowance), so real acceptance could not be verified and no minimum Muse Code version is recorded. Capability scores are unranked pending evaluation.' },
 
   // Xiaomi MiMo V2.6 (replaces V2.5, retired 2026-10-21). Skills inherit the V2.5 line.
   'mimo-v2.6-pro': { model: 'mimo-v2.6-pro', provider: 'mimo', displayName: 'MiMo V2.6 Pro', costPer1MTokens: 0.6525, contextWindow: 1048576, maxOutputTokens: 128000, skills: { 'code-generation': 88, 'code-review': 86, debugging: 86, planning: 84, documentation: 84, testing: 84, security: 80, performance: 82, synthesis: 88, speed: 78, 'context-length': 100 }, notes: 'Xiaomi MiMo V2.6 flagship. 1M context, 128K max output. $0.435/M in, $0.0036/M cached, $0.87/M out. Source: https://mimo.mi.com/docs/en-US/price/pay-as-you-go (V2.5 Pro and V2.5 retired 2026-10-21).' },
@@ -26,6 +28,12 @@ export const AUDITED_MODEL_ADDITIONS = {
   'grok-4.7': { model: 'grok-4.7', provider: 'xai', displayName: 'Grok 4.7', costPer1MTokens: 4, contextWindow: 500000, skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 98 }, notes: 'Flagship. $2/M in, $0.50/M cached, $6/M out; a request whose prompt reaches 200K tokens bills every token at double ($4 / $1 / $12). 500K context. Capability scores are unranked pending evaluation.' },
   'grok-4.3': { model: 'grok-4.3', provider: 'xai', displayName: 'Grok 4.3', costPer1MTokens: 1.875, contextWindow: 1000000, skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 100 }, notes: '$1.25/M in, $0.20/M cached, $2.50/M out; a request whose prompt reaches 200K tokens bills every token at double ($2.50 / $0.40 / $5.00). 1M context. Capability scores are unranked pending evaluation.' },
 
+  // Grok Build CLI models (grok harness). Rates from turn usage costUsdTicks probed against grok 1.0.77 (PAN-5078 D10).
+  'grok/grok-4.7': { model: 'grok/grok-4.7', provider: 'grok', displayName: 'Grok 4.7', costPer1MTokens: 4, contextWindow: 256000, effortLevels: ['low', 'medium', 'high', 'xhigh'], skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 98 }, notes: '$2/M in, $0.50/M cached, $6/M out; a prompt that reaches 200K tokens bills every token at double. 256K context in the CLI. Runs through the Grok Build harness on the grok sign-in. Capability scores are unranked pending evaluation.' },
+  'grok/grok-4.7-build-fast': { model: 'grok/grok-4.7-build-fast', provider: 'grok', displayName: 'Grok 4.7 Fast', costPer1MTokens: 8, contextWindow: 256000, effortLevels: ['low', 'medium', 'high', 'xhigh'], skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 98 }, notes: '$4/M in, $1/M cached, $12/M out (verified against costUsdTicks). 256K context in the CLI. Runs through the Grok Build harness on the grok sign-in. Capability scores are unranked pending evaluation.' },
+  'grok/grok-4.6': { model: 'grok/grok-4.6', provider: 'grok', displayName: 'Grok 4.6', costPer1MTokens: 4, contextWindow: 256000, effortLevels: ['low', 'medium', 'high', 'xhigh'], skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 98 }, notes: '$2/M in, $0.50/M cached, $6/M out (verified against costUsdTicks). 256K context in the CLI. Runs through the Grok Build harness on the grok sign-in. Capability scores are unranked pending evaluation.' },
+  'grok/grok-4.5': { model: 'grok/grok-4.5', provider: 'grok', displayName: 'Grok 4.5', costPer1MTokens: 4, contextWindow: 256000, effortLevels: ['low', 'medium', 'high', 'xhigh'], skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 98 }, notes: '$2/M in, $0.50/M cached, $6/M out (approximate: within 0.3% of costUsdTicks). 256K context in the CLI. Runs through the Grok Build harness on the grok sign-in. Capability scores are unranked pending evaluation.' },
+
   // MiniMax M3.1 Flash. Skills inherit MiniMax-M3. Source: https://platform.minimax.io/docs/guides/pricing
   'MiniMax-M3.1-Flash': { model: 'MiniMax-M3.1-Flash', provider: 'minimax', displayName: 'MiniMax M3.1 Flash', costPer1MTokens: 0.375, contextWindow: 1000000, skills: { 'code-generation': 93, 'code-review': 90, debugging: 90, planning: 88, documentation: 88, testing: 88, security: 82, performance: 85, synthesis: 92, speed: 80, 'context-length': 100 }, notes: 'Frontier multimodal coding model, 1M context. $0.15/M in, $0.60/M out, $0.015/M cache read at every input length (no long-context tier). Tunable thinking depth; effort levels are unverified, so none are listed.' },
 
@@ -33,6 +41,33 @@ export const AUDITED_MODEL_ADDITIONS = {
   'k3.1-pro-highspeed': { model: 'k3.1-pro-highspeed', provider: 'kimi', displayName: 'Kimi K3.1 Pro Highspeed (1M)', costPer1MTokens: 12, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], contextWindow: 1048576, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 88, 'context-length': 100 }, notes: 'Kimi K3.1 Pro Highspeed (Oct 2026) on the Claude Code route; coding endpoint id k3.1-pro-highspeed, platform id kimi-k3.1-pro-highspeed. 2-3x the inference speed of K3.1 Pro at 2x the price; requires the Allegretto (Pro) plan or higher. Always-thinking, 1,048,576-token context, native effort low/high/max. Skill scores inherit K3 until benchmarked. Source: https://www.kimi.ai/blog/kimi-k3-1-pro' },
   'kimi-code/k3.1-pro': { model: 'kimi-code/k3.1-pro', provider: 'kimi', displayName: 'Kimi K3.1 Pro (1M)', costPer1MTokens: 6, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], contextWindow: 1048576, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 100 }, notes: 'Native kimi-code harness alias (maxContextSize=1048576, supportEfforts low/high/max per `kimi provider list --json`, kimi 2.0.2, 2026-11-02). Canonical effort levels; src/lib/kimi-effort.ts translates to native low/high/max.' },
   'kimi-code/k3.1-pro-highspeed': { model: 'kimi-code/k3.1-pro-highspeed', provider: 'kimi', displayName: 'Kimi K3.1 Pro Highspeed (1M)', costPer1MTokens: 12, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], contextWindow: 1048576, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 88, 'context-length': 100 }, notes: 'Native kimi-code harness alias (maxContextSize=1048576, supportEfforts low/high/max per `kimi provider list --json`, kimi 2.0.2, 2026-11-02). Canonical effort levels; src/lib/kimi-effort.ts translates to native low/high/max.' },
+
+  'claude-fable-5-2': {
+    model: 'claude-fable-5-2',
+    provider: 'anthropic',
+    displayName: 'Claude Fable 5.2',
+    // Equal input/output blend of $8/M in, $40/M out; exact cache rates live in cost.ts.
+    costPer1MTokens: 24,
+    contextWindow: 1000000,
+    maxOutputTokens: 128000,
+    skills: {
+      'code-generation': 99,
+      'code-review': 99,
+      debugging: 99,
+      planning: 99,
+      documentation: 97,
+      testing: 96,
+      security: 99,
+      performance: 95,
+      synthesis: 99,
+      speed: 42,
+      'context-length': 95,
+    },
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    supportsSamplingParams: false,
+    minClaudeCodeVersion: '2.1.321',
+    notes: 'Released 2026-11-09. Requires Claude Code 2.1.321 or newer (2.1.319 and older treat it as an unrecognized model). Native 1M context, 128K max output. Adaptive thinking always on; API default effort high, Claude Code default medium. Forced tool_choice and non-default temperature/top_p/top_k return 400. API $8/M input, $40/M output, $0.20/M cache read, $10/M 5m and $16/M 1h cache write. Fast mode is the request field speed: "fast" at $16/$80 (not modeled here). Skill scores inherit the Fable 5.1 baseline until benchmarked.',
+  },
 
   'claude-fable-5-1': {
     model: 'claude-fable-5-1',
@@ -57,7 +92,7 @@ export const AUDITED_MODEL_ADDITIONS = {
     effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
     supportsSamplingParams: false,
     minClaudeCodeVersion: '2.1.255',
-    notes: 'Fable 5.1 requires Claude Code 2.1.255 or newer. Native 1M context; always-adaptive thinking, High default. API input $10/M, output $50/M, cache read $0.25/M.',
+    notes: 'Previous Fable generation; superseded by Fable 5.2 (2026-11-09). Requires Claude Code 2.1.255 or newer. Native 1M context; always-adaptive thinking, High default. API input $10/M, output $50/M, cache read $0.25/M.',
   },
 
   'claude-sonnet-5-5': {

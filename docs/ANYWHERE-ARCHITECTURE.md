@@ -1267,6 +1267,20 @@ online links. "Add this project" uses the project-creation core in both directio
 1 MiB (`projects/ignored-files.ts`), cross only an operator-level link for the operator,
 are written 0600 and never overwrite.
 
+PAN-5111: `linked-needs-you-sync.ts` also remembers each link's last failed Needs-You
+fetch (`failureFor(environmentId)` → `{ since, lastAttemptAt, reason }`): a thrown fetch,
+a status other than 200 or 404, or a malformed body. A later success, a 404 (the peer
+predates the route) or `prune` clears it. `GET /api/fleet/needs-you` answers
+`{ machines, unreachable }`: `unreachable` lists links that are not revoked or hidden, whose
+supervisor state is not `revoked`, and whose failure's `lastAttemptAt` is at most one hour
+old (`UNREACHABLE_FRESH_MS`). It deliberately does not filter on `offline`, so a flapping
+link's row does not blink; a machine that is switched off stops producing failed attempts
+and its row expires. A machine that goes offline without a failed fetch still adds no rows
+and no error. The route refuses every channel caller except a paired phone (credential
+`kind: 'phone'`), which gets `{ machines: [], unreachable }`: the phone cannot open other
+machines' rows (the linked-conversation proxy refuses channel callers), and the list holds
+only this machine's link labels and failure reasons.
+
 `GET /api/needs-you` (`read:conversations`, PAN-4944) serves this machine's feed to any
 token, with agent question and permission-request ids; `GET /api/machines/needs-you` stays
 machine-credential only and unchanged.

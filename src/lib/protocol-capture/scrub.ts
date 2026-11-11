@@ -9,6 +9,8 @@
  * 2. Secret keys: a value under an anchored secret key name becomes `<REDACTED>`
  *    (anchored so `tokenUsage` and `inputTokens` survive). `installationId`, a
  *    stable device id codex reports in `remoteControl/status/changed`, counts.
+ *    So do account fields (email, user/team/principal ids, names, subscription
+ *    tier) that Grok returns in its `authenticate` result `_meta` (PAN-5078).
  * 3. Secret values: API keys, GitHub/Slack tokens, JWTs, and Bearer headers
  *    inside any string become `<REDACTED>`.
  * 4. Emails become `<EMAIL>`.
@@ -24,7 +26,7 @@ export const SCRUB_MAX_STRING_LENGTH = 8192;
 export const REDACTED = '<REDACTED>';
 export const EMAIL_PLACEHOLDER = '<EMAIL>';
 
-const SECRET_KEY = /^(access_?token|refresh_?token|id_?token|api_?key|authorization|cookie|password|secret|client_?secret|bearer|auth_?token|installation_?id)$/i;
+const SECRET_KEY = /^(access_?token|refresh_?token|id_?token|api_?key|authorization|cookie|password|secret|client_?secret|bearer|auth_?token|installation_?id|e_?mail|user_?id|team_?id|principal_?id|account_?id|first_?name|last_?name|full_?name|display_?name|user_?name|team_?(name|role)|subscription_?(tier|plan)(_?display)?)$/i;
 
 /** Shorter host names are skipped: replacing them would rewrite ordinary text. */
 const MIN_HOSTNAME_LENGTH = 4;

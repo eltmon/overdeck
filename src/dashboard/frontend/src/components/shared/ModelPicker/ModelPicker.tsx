@@ -12,7 +12,7 @@ import styles from './ModelPicker.module.css';
 export const FALLBACK_COMPACTION_MODEL = 'claude-haiku-4-5-20251001';
 
 
-export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent';
+export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok';
 export type AuthMode = 'api-key' | 'subscription';
 
 export const HARNESS_OPTIONS: Array<{ id: Harness; label: string; description: string }> = [
@@ -20,8 +20,9 @@ export const HARNESS_OPTIONS: Array<{ id: Harness; label: string; description: s
   { id: 'ohmypi', label: 'oh-my-pi', description: 'Alternative harness for non-Anthropic models (omp binary)' },
   { id: 'codex', label: 'Codex', description: 'OpenAI Codex CLI harness' },
   { id: 'opencode', label: 'OpenCode', description: 'OpenCode with Go and Zen providers' },
+  { id: 'grok', label: 'Grok Build', description: 'xAI Grok Build CLI over ACP' },
   { id: 'acp', label: 'ACP', description: 'Agent Client Protocol harness' },
-  { id: 'muse', label: 'Muse Code', description: 'Meta Muse Code with Standard or Contributor models' },
+  { id: 'muse', label: 'Muse Code', description: 'Meta Muse Code with Wonder, Spark, Ember and Wonder Full models' },
   { id: 'kimi-code', label: 'Kimi Code', description: 'Moonshot Kimi Code CLI (native, Kimi models only)' },
   { id: 'prime-agent', label: 'Prime Agent', description: 'Prime Intellect coding agent (RPC)' },
 ];
@@ -78,6 +79,7 @@ export const FALLBACK_GROUPS: ModelGroup[] = [
     provider: 'anthropic',
     label: 'Anthropic',
     models: [
+      { id: 'claude-fable-5-2', label: 'Claude Fable 5.2 (1M context)', provider: 'anthropic', costDisplay: '$24/1M', costPer1MTokens: 24 },
       { id: 'claude-fable-5-1', label: 'Claude Fable 5.1 (1M context)', provider: 'anthropic', costDisplay: '$30/1M', costPer1MTokens: 30 },
       { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5 (1M context)', provider: 'anthropic', costDisplay: '$6/1M', costPer1MTokens: 6 },
       { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 (1M context)', provider: 'anthropic', costDisplay: '$6/1M', costPer1MTokens: 6 },

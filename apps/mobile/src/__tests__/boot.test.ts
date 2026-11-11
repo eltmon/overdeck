@@ -15,12 +15,15 @@ vi.mock('../shell/ShellApp', () => {
 });
 vi.mock('../shell/session', () => ({ currentMachine: () => null }));
 vi.mock('../../../../src/dashboard/frontend/src/index.css', () => ({}));
+vi.mock('../../../../src/dashboard/frontend/src/lib/requestFailures', () => ({
+  installRequestFailureObserver: vi.fn(() => { order.push('observer'); }),
+}));
 
 describe('main.tsx boot order', () => {
-  it('installs the shims and sets the native flag before the shell module evaluates', async () => {
+  it('installs the shims, the request-failure observer, then the shell, in order', async () => {
     document.body.innerHTML = '<div id="root"></div>';
     await import('../main');
-    await vi.waitFor(() => expect(order).toEqual(['shims', 'shell']));
+    await vi.waitFor(() => expect(order).toEqual(['shims', 'observer', 'shell']));
     expect((globalThis as { __OVERDECK_NATIVE__?: boolean }).__OVERDECK_NATIVE__).toBe(true);
   });
 });

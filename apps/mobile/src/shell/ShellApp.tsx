@@ -6,13 +6,15 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { type DeviceIdentity, loadIdentity } from '../native/keys';
 import { type LiveActivityStatus, OverdeckLiveActivity } from '../native/liveActivity';
 import { type PushController, pushSupported, startPush, unregisterPush, usePushState } from '../native/push';
+import { clearSignedOutNotice, deleteAccount, openAccountPage, readSignedOutNotice } from './accountDeletion';
 import { defaultAppearanceDeps, installAppearance, useAppearance, writeAppearance } from './appearance';
 import { type Connection, createConnection } from './connection';
 import { createDirectory, type ShellDirectory } from './directory';
 import { resetTransport } from '../../../../src/dashboard/frontend/src/lib/wsTransport';
 import { deriveConnectionPhase, useConnectionState } from '../../../../src/dashboard/frontend/src/lib/connectionState';
-import { installResumeHandler } from './lifecycle';
+import { installResumeHandler, lastResumedAt } from './lifecycle';
 import { installLinkRecovery } from './linkRecovery';
+import { installLinkTelemetry } from './linkTelemetry';
 import { createLiveActivityController, type LiveActivityController, liveActivityEnabled, setLiveActivityEnabled } from './liveActivity';
 import { MachinesScreen } from './MachinesScreen';
 import { MachineView } from './MachineView';
@@ -29,7 +31,7 @@ import { lastDialError, onSessionChange, setSession } from './session';
 import { SettingsScreen } from './SettingsScreen';
 import { SignInScreen } from './SignInScreen';
 import { completeSignIn, isSignInCallback, startSignIn } from './signIn';
-import { deleteAccountDevice, removeSelfOver, resetAllKeys, signOut } from './signOut';
+import { deleteAccountDevice, removeSelfOver, resetAllKeys, signOut, type SignOutDeps } from './signOut';
 import { currentMachineId, readAccount, readMachines, setCurrentMachineId, useShellStore, writeMachines } from './store';
 import type { PairedMachine } from './types';
 
@@ -114,6 +116,9 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
   /** iOS only (PAN-4839): read once for the Settings row. */
   const [liveActivityStatus, setLiveActivityStatus] = useState<LiveActivityStatus | null>(null);
   const [liveActivityOn, setLiveActivityOn] = useState(liveActivityEnabled);
+  /** Set by a deletion's sign-out reload, read once for the sign-in screen (PAN-5107). */
+  const [signedOutNotice] = useState(readSignedOutNotice);
+  useEffect(() => clearSignedOutNotice(), []);
 
   const handleUrl = useCallback(
     async (url: string) => {
@@ -224,7 +229,19 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
       platform: shellPlatform(),
     });
     const meter = createRelayMeter((bytes) => directory.client.send({ type: 'relay-usage', bytes }));
-    const connection = createConnection({ directory, meter });
+    const linkTelemetry = installLinkTelemetry({
+      currentEnvironmentId: currentMachineId,
+      onSessionChange,
+      lastDialError,
+      subscribePhase: (listener) => useConnectionState.subscribe((s) => listener(deriveConnectionPhase(s))),
+      currentPhase: () => deriveConnectionPhase(useConnectionState.getState()),
+      lastResumedAt,
+    });
+    const connection = createConnection({
+      directory,
+      meter,
+      onLinkOpened: (id, route) => linkTelemetry.routeOpened(id, route),
+    });
     const platform = shellPlatform();
     const push = pushSupported() ? startPush({ directory: directory.client, platform }) : null;
     const prefsSync = pushSupported()
@@ -265,6 +282,7 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     return () => {
       uninstallResume();
       uninstallLinkRecovery();
+      linkTelemetry.uninstall();
       push?.stop();
       prefsSync?.stop();
       liveActivity.dispose();
@@ -363,22 +381,22 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     [paired, setMachines, leaveMachine],
   );
 
-  const runSignOut = useCallback(
-    () =>
-      signOut({
-        machines: paired,
-        account,
-        removeSelf: services ? removeSelfOver(services.connection) : () => Promise.reject(new Error('no connection')),
-        directory: services?.directory.client ?? null,
-        deleteDevice: (record) => deleteAccountDevice(record),
-        unregisterPush: shellPlatform() === 'android' ? () => unregisterPush('android') : undefined,
-        endLiveActivity: shellPlatform() === 'ios' ? () => OverdeckLiveActivity.end() : undefined,
-        resetKeys: resetAllKeys,
-        clearStorage: () => localStorage.clear(),
-        reload: () => navigate('/'),
-      }),
+  const cleanupDeps = useCallback(
+    (): SignOutDeps => ({
+      machines: paired,
+      account,
+      removeSelf: services ? removeSelfOver(services.connection) : () => Promise.reject(new Error('no connection')),
+      directory: services?.directory.client ?? null,
+      deleteDevice: (record) => deleteAccountDevice(record),
+      unregisterPush: shellPlatform() === 'android' ? () => unregisterPush('android') : undefined,
+      endLiveActivity: shellPlatform() === 'ios' ? () => OverdeckLiveActivity.end() : undefined,
+      resetKeys: resetAllKeys,
+      clearStorage: () => localStorage.clear(),
+      reload: () => navigate('/'),
+    }),
     [paired, account, services, navigate],
   );
+  const runSignOut = useCallback(() => signOut(cleanupDeps()), [cleanupDeps]);
 
   const liveActivitySetting = liveActivityStatus && services
     ? {
@@ -408,7 +426,12 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
           {boot.message}
         </p>
       ) : account === null ? (
-        <SignInScreen error={signInError} onSignIn={() => startSignIn(boot.identity, shellPlatform())} />
+        <SignInScreen
+          error={signInError}
+          onSignIn={() => startSignIn(boot.identity, shellPlatform())}
+          notice={signedOutNotice}
+          onOpenAccountPage={() => void openAccountPage()}
+        />
       ) : services === null ? null : inMachineView && current ? (
         dialError?.kind === 'removed' ? (
           <RemovedScreen
@@ -463,6 +486,8 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
           onBack={() => setView({ kind: 'machines' })}
           appearance={appearance}
           onAppearanceChange={writeAppearance}
+          onDeleteAccount={() => deleteAccount({ account, cleanup: cleanupDeps() })}
+          onOpenAccountPage={() => void openAccountPage()}
           notifications={
             push && pushState
               ? {

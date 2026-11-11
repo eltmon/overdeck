@@ -1,0 +1,497 @@
+{
+  "version": "1",
+  "issueId": "PAN-5078",
+  "created": "2026-11-10T14:48:32.729Z",
+  "updated": "2026-11-10T18:12:31.420Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "contracts-harness": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T14:48:32.729Z",
+      "doneAt": "2026-11-10T15:07:39.953Z"
+    },
+    "grok-provider-models": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T15:08:01.260Z",
+      "doneAt": "2026-11-10T15:24:31.256Z"
+    },
+    "runtime-policy-binary": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T15:24:36.647Z",
+      "doneAt": "2026-11-10T15:26:14.493Z"
+    },
+    "grok-pricing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T15:26:19.647Z",
+      "doneAt": "2026-11-10T15:27:16.348Z"
+    },
+    "grok-acp-module": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T15:27:20.995Z",
+      "doneAt": "2026-11-10T15:39:47.584Z"
+    },
+    "host-grok-launch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T15:39:53.296Z",
+      "doneAt": "2026-11-10T15:41:47.568Z"
+    },
+    "runtime-registration": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T15:41:53.162Z",
+      "doneAt": "2026-11-10T15:44:40.730Z"
+    },
+    "config-validation-lists": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T15:44:47.064Z",
+      "doneAt": "2026-11-10T15:47:40.481Z"
+    },
+    "conversation-lists": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T15:47:46.131Z",
+      "doneAt": "2026-11-10T15:49:52.484Z"
+    },
+    "agent-launch-lists": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T15:49:57.359Z",
+      "doneAt": "2026-11-10T15:51:48.266Z"
+    },
+    "server-route-lists": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T15:51:53.547Z",
+      "doneAt": "2026-11-10T15:54:03.828Z"
+    },
+    "cli-harness-lists": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T15:54:09.847Z",
+      "doneAt": "2026-11-10T16:07:35.359Z"
+    },
+    "grok-sign-in-status": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T16:07:42.205Z",
+      "doneAt": "2026-11-10T16:08:55.718Z"
+    },
+    "picker-availability": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T16:09:01.548Z",
+      "doneAt": "2026-11-10T16:11:10.427Z"
+    },
+    "doctor-grok": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T16:11:15.572Z",
+      "doneAt": "2026-11-10T16:13:29.621Z"
+    },
+    "frontend-pickers-settings": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T16:13:40.220Z",
+      "doneAt": "2026-11-10T16:19:40.175Z"
+    },
+    "frontend-branding": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T16:19:45.317Z",
+      "doneAt": "2026-11-10T16:21:03.037Z"
+    },
+    "frontend-conversation-surfaces": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T16:21:09.318Z",
+      "doneAt": "2026-11-10T16:23:46.042Z"
+    },
+    "turn-usage-transcript": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T16:23:51.409Z",
+      "doneAt": "2026-11-10T16:26:18.759Z"
+    },
+    "grok-cost-collector": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T16:26:24.245Z",
+      "doneAt": "2026-11-10T16:30:59.177Z"
+    },
+    "grok-no-loss-audit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T16:31:05.443Z",
+      "doneAt": "2026-11-10T16:32:20.238Z"
+    },
+    "grok-replay-fixtures": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T16:32:26.488Z",
+      "doneAt": "2026-11-10T16:39:15.587Z"
+    },
+    "grok-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T16:39:22.718Z",
+      "doneAt": "2026-11-10T16:41:05.391Z"
+    },
+    "grok-live-verification": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T16:43:35.888Z",
+      "doneAt": "2026-11-10T17:23:06.200Z"
+    },
+    "contracts-harness.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:45:09.877Z"
+    },
+    "contracts-harness.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:45:27.192Z"
+    },
+    "contracts-harness.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:45:45.228Z"
+    },
+    "contracts-harness.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:46:03.336Z"
+    },
+    "grok-provider-models.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:46:20.281Z"
+    },
+    "grok-provider-models.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:46:37.618Z"
+    },
+    "grok-provider-models.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:46:55.538Z"
+    },
+    "grok-provider-models.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:47:13.600Z"
+    },
+    "runtime-policy-binary.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:47:31.644Z"
+    },
+    "runtime-policy-binary.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:47:50.590Z"
+    },
+    "runtime-policy-binary.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:48:08.132Z"
+    },
+    "runtime-policy-binary.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:48:25.625Z"
+    },
+    "grok-pricing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:48:43.429Z"
+    },
+    "grok-pricing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:49:01.494Z"
+    },
+    "grok-pricing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:49:18.889Z"
+    },
+    "grok-acp-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:49:37.056Z"
+    },
+    "grok-acp-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:49:56.620Z"
+    },
+    "grok-acp-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:50:20.924Z"
+    },
+    "grok-acp-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:50:42.755Z"
+    },
+    "host-grok-launch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:51:03.175Z"
+    },
+    "host-grok-launch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:51:21.923Z"
+    },
+    "host-grok-launch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:51:39.268Z"
+    },
+    "host-grok-launch.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:51:57.829Z"
+    },
+    "runtime-registration.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:52:16.743Z"
+    },
+    "runtime-registration.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:52:34.423Z"
+    },
+    "runtime-registration.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:52:52.173Z"
+    },
+    "runtime-registration.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:53:10.614Z"
+    },
+    "config-validation-lists.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:53:29.556Z"
+    },
+    "config-validation-lists.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:53:48.862Z"
+    },
+    "config-validation-lists.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:54:08.173Z"
+    },
+    "config-validation-lists.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:54:28.694Z"
+    },
+    "conversation-lists.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:54:47.973Z"
+    },
+    "conversation-lists.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:55:06.949Z"
+    },
+    "conversation-lists.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:55:25.622Z"
+    },
+    "conversation-lists.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:55:45.175Z"
+    },
+    "agent-launch-lists.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:56:04.014Z"
+    },
+    "agent-launch-lists.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:56:21.707Z"
+    },
+    "agent-launch-lists.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:56:40.207Z"
+    },
+    "server-route-lists.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:56:58.295Z"
+    },
+    "server-route-lists.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:57:17.407Z"
+    },
+    "server-route-lists.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:57:36.518Z"
+    },
+    "cli-harness-lists.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:57:54.745Z"
+    },
+    "cli-harness-lists.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:58:15.455Z"
+    },
+    "cli-harness-lists.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:58:34.653Z"
+    },
+    "grok-sign-in-status.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:58:54.484Z"
+    },
+    "grok-sign-in-status.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:59:15.092Z"
+    },
+    "grok-sign-in-status.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:59:34.723Z"
+    },
+    "grok-sign-in-status.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:59:53.390Z"
+    },
+    "picker-availability.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:00:14.749Z"
+    },
+    "picker-availability.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:00:34.302Z"
+    },
+    "picker-availability.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:00:53.200Z"
+    },
+    "doctor-grok.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:01:10.862Z"
+    },
+    "doctor-grok.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:01:30.592Z"
+    },
+    "doctor-grok.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:01:49.210Z"
+    },
+    "frontend-pickers-settings.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:02:07.639Z"
+    },
+    "frontend-pickers-settings.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:02:26.320Z"
+    },
+    "frontend-pickers-settings.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:02:44.219Z"
+    },
+    "frontend-branding.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:03:02.273Z"
+    },
+    "frontend-branding.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:03:21.596Z"
+    },
+    "frontend-conversation-surfaces.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:03:39.214Z"
+    },
+    "frontend-conversation-surfaces.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:03:57.698Z"
+    },
+    "frontend-conversation-surfaces.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:04:19.000Z"
+    },
+    "turn-usage-transcript.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:04:39.294Z"
+    },
+    "turn-usage-transcript.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:05:03.824Z"
+    },
+    "turn-usage-transcript.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:05:27.319Z"
+    },
+    "turn-usage-transcript.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:05:47.661Z"
+    },
+    "grok-cost-collector.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:06:10.336Z"
+    },
+    "grok-cost-collector.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:06:31.533Z"
+    },
+    "grok-cost-collector.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:06:50.897Z"
+    },
+    "grok-cost-collector.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:07:11.011Z"
+    },
+    "grok-no-loss-audit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:07:31.239Z"
+    },
+    "grok-no-loss-audit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:07:57.723Z"
+    },
+    "grok-replay-fixtures.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:08:30.807Z"
+    },
+    "grok-replay-fixtures.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:09:00.096Z"
+    },
+    "grok-replay-fixtures.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:09:19.913Z"
+    },
+    "grok-replay-fixtures.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:09:38.261Z"
+    },
+    "grok-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:10:00.766Z"
+    },
+    "grok-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:10:19.565Z"
+    },
+    "grok-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:10:37.973Z"
+    },
+    "grok-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:10:59.297Z"
+    },
+    "grok-live-verification.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:11:17.995Z"
+    },
+    "grok-live-verification.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:11:35.620Z"
+    },
+    "grok-live-verification.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:11:53.595Z"
+    },
+    "grok-live-verification.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:12:11.323Z"
+    },
+    "grok-live-verification.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:12:31.420Z"
+    }
+  }
+}

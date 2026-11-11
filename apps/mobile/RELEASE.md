@@ -152,13 +152,26 @@ The launcher icons and splash images are generated from the Overdeck mark
 
 - **Collected:** the GitHub account id and login used to sign in, the device label and platform, a
   random install id, the APNs or FCM push token, and relay byte counts for relay-plan accounts.
-- **Not collected:** conversation content, notification text, analytics, ads data, location and
-  contacts. The app contains no analytics, crash-reporting or ads SDK.
+- **Collected (anonymous, only when the opened machine's telemetry is on):** failed API routes and
+  their HTTP status (exact for common codes, otherwise the status class), link failures and
+  recoveries, crash events without messages. Sent to PostHog (us.i.posthog.com). When operator
+  grouping is on, these events also carry `operatorHash`, so they are linked to the operator's
+  GitHub account like the other data below.
+- **Not collected:** conversation content, notification text, ads data, location and contacts. The
+  app contains no ads SDK.
 - **Encrypted in transit:** yes. Conversation content and notification text are end-to-end
   encrypted between the phone and the operator's machines; Apple, Google, Cloudflare and Overdeck
   see only ciphertext.
-- **Deletion:** account.overdeck.ai → Delete account. Signing out on the phone removes its push
-  token.
+- **Deletion:** in the app, Settings → Delete account, or on the web, account.overdeck.ai → Delete
+  account. Signing out on the phone removes its push token.
+
+Before uploading the first build containing this telemetry change:
+
+- [ ] Update App Store Connect App Privacy: Other Diagnostic Data and Crash Data, linked to the
+      user, not tracking, purpose Analytics.
+- [ ] Update the Play Console Data safety form: App activity and Crash logs, not shared, optional
+      per machine setting.
+- [ ] Update `overdeck.ai/privacy/app` in `eltmon/overdeck-landing`.
 
 ### Export compliance (step A6)
 
@@ -170,6 +183,9 @@ in `Info.plist`, so App Store Connect asks on the first build.
 
 ### App Store review
 
-TestFlight internal testing works today. Submitting to the App Store itself (beyond TestFlight)
-needs in-app account deletion (App Review Guideline 5.1.1(v)), because signing in creates an
-overdeck.ai account. The app does not have it yet.
+TestFlight internal testing works today. Settings → Delete account deletes the overdeck.ai
+account in the app (`DELETE /v1/account` with the device token, then sign-out), satisfying App
+Review Guideline 5.1.1(v) and Google Play's account-deletion policy.
+
+- App Review notes: "Settings → Delete account deletes the overdeck.ai account in the app."
+- Play Console: Policy → App content → Data deletion → https://account.overdeck.ai/account

@@ -261,7 +261,7 @@ api_keys:
             openai: { enabled: true, harness: 'bad' as never },
           },
         },
-      })).toThrow('models.providers.openai.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, or prime-agent');
+      })).toThrow('models.providers.openai.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, or grok');
     });
 
     it('accepts prime-agent as a provider default harness (PAN-3668)', () => {
@@ -274,6 +274,23 @@ api_keys:
       });
 
       expect(config.providerHarnesses.openai).toBe('prime-agent');
+    });
+
+    it('enables the grok provider with the grok harness (PAN-5078)', () => {
+      const { config } = mergeConfigs({
+        models: {
+          providers: {
+            grok: { enabled: true, harness: 'grok' },
+          },
+        },
+      });
+
+      expect(config.enabledProviders.has('grok')).toBe(true);
+      expect(config.providerHarnesses.grok).toBe('grok');
+    });
+
+    it('accepts grok as a role harness (PAN-5078)', () => {
+      expect(() => mergeConfigs({ roles: { work: { model: 'grok/grok-4.6', harness: 'grok' } } })).not.toThrow();
     });
 
     it('normalizes legacy DashScope API keys without re-enabling an explicitly disabled provider', () => {
