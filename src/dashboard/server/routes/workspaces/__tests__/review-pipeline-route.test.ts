@@ -33,6 +33,7 @@ const routeMocks = vi.hoisted(() => ({
   refreshIssuePullRequestStateNow: vi.fn(),
   resolveEffort: vi.fn(),
   answerMissingWorkspace: vi.fn(),
+  answerAdoptionInFlight: vi.fn(),
   isDeftPipelineIssue: vi.fn(),
 }));
 
@@ -98,6 +99,7 @@ vi.mock('../../../../../lib/review-artifacts.js', () => ({
 
 vi.mock('../../../../../lib/cloister/pr-adoption-review.js', () => ({
   answerMissingWorkspace: routeMocks.answerMissingWorkspace,
+  answerAdoptionInFlight: routeMocks.answerAdoptionInFlight,
 }));
 
 vi.mock('../../../services/issue-pr-refresh.js', () => ({
@@ -169,6 +171,7 @@ beforeEach(() => {
   routeMocks.pushLocalReviewBranches.mockImplementation(() => new Promise<void>(() => {}));
   routeMocks.resolveEffort.mockReturnValue({ effort: 'high', source: 'default', requested: 'high', clamped: false });
   routeMocks.answerMissingWorkspace.mockResolvedValue(null);
+  routeMocks.answerAdoptionInFlight.mockReturnValue(null);
   routeMocks.isDeftPipelineIssue.mockResolvedValue(false);
 });
 
@@ -499,6 +502,57 @@ describe('POST /api/review/:issueId/request — PR state refresh (PAN-4457)', ()
     expect(routeMocks.refreshIssuePullRequestStateNow).not.toHaveBeenCalled();
 
     isInFlightSpy.mockRestore();
+  });
+});
+
+// PAN-4995: the worktree is on disk before adoption checks its head, so a
+// request that arrives mid-adoption must not verify (and merge main into) it.
+describe('POST /api/review/:issueId/request — adoption in flight (PAN-4995)', () => {
+  it('answers 202 adopting and starts no verification while adoption owns the workspace', async () => {
+    routeMocks.answerAdoptionInFlight.mockReturnValue({
+      status: 202,
+      body: { success: true, queued: true, adopting: true, message: 'Adoption of PR #7 is in progress; verification starts when it is ready.' },
+    });
+
+    const result = await post('/api/review/PAN-3340/request', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ source: 'pan-review-request' }),
+    });
+
+    expect(result.status).toBe(202);
+    expect(result.body).toMatchObject({ success: true, queued: true, adopting: true });
+    expect(routeMocks.answerAdoptionInFlight).toHaveBeenCalledWith('PAN-3340');
+    expect(routeMocks.answerMissingWorkspace).not.toHaveBeenCalled();
+    expect(routeMocks.runVerificationForIssue).not.toHaveBeenCalled();
+    expect(routeMocks.setPendingOperation).not.toHaveBeenCalled();
+    expect(routeMocks.refreshIssuePullRequestStateNow).not.toHaveBeenCalled();
+  });
+
+  it('verifies as before when no adoption is in flight', async () => {
+    routeMocks.getDerivedIssueState.mockResolvedValue(derived({ issueId: 'PAN-3342' }));
+    routeMocks.getWorkspaceInfoForIssue.mockReturnValue({
+      exists: true,
+      isRemote: false,
+      localPath: '/repo/workspaces/feature-pan-3342',
+    });
+    routeMocks.pushLocalReviewBranches.mockResolvedValue(undefined);
+    routeMocks.runVerificationForIssue.mockReturnValue(Effect.succeed({ outcome: 'passed' }));
+    routeMocks.spawnReviewRoleForIssue.mockReturnValue(Effect.succeed({ success: true, message: 'spawned' }));
+
+    const result = await post('/api/review/PAN-3342/request', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ source: 'pan-review-request' }),
+    });
+
+    expect(result.status).toBe(202);
+    expect(result.body).not.toHaveProperty('adopting');
+    expect(routeMocks.answerAdoptionInFlight).toHaveBeenCalledWith('PAN-3342');
+    await vi.waitFor(() => {
+      expect(routeMocks.spawnReviewRoleForIssue).toHaveBeenCalledOnce();
+    });
+    expect(routeMocks.runVerificationForIssue).toHaveBeenCalledOnce();
   });
 });
 

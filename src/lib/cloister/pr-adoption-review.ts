@@ -16,6 +16,10 @@
  *   - `findOpenPipelinePr` is a fresh, branch-targeted `gh pr list --head`,
  *     never the cached repo listing, and reports a forge failure as an error,
  *     never as "no PR".
+ *   - `answerAdoptionInFlight` is the `/request` route's first answer
+ *     (PAN-4995): while an adoption for the issue is in flight it answers 202
+ *     and starts nothing, so no second verification runs on a half-adopted
+ *     worktree. The adoption starts the review itself.
  *   - `answerMissingWorkspace` is the `/request` route's pre-guard: with no
  *     workspace and an open pipeline-branch PR it runs the network-free
  *     adoption preflight (PAN-4785) and answers 409 with the refusal and its
@@ -65,7 +69,7 @@ export interface AdoptAndReviewOptions {
   comment?: (repo: string, prNumber: number, body: string) => Promise<void>;
 }
 
-const inFlight = new Map<string, Promise<AdoptAndReviewOutcome>>();
+const inFlight = new Map<string, { prNumber: number; outcome: Promise<AdoptAndReviewOutcome> }>();
 /** PAN-4785: `<ISSUE>:<reason>:<head>` refusals already commented on the PR by this process. */
 const refusalsCommented = new Set<string>();
 
@@ -97,12 +101,32 @@ function errorMessage(err: unknown): string {
 export function adoptPrAndStartReview(pr: AdoptablePr, options: AdoptAndReviewOptions): Promise<AdoptAndReviewOutcome> {
   const key = pr.issueId.toUpperCase();
   const existing = inFlight.get(key);
-  if (existing) return existing;
+  if (existing) return existing.outcome;
   const run = runAdoptAndReview({ ...pr, issueId: key }, options).finally(() => {
     inFlight.delete(key);
   });
-  inFlight.set(key, run);
+  inFlight.set(key, { prNumber: pr.number, outcome: run });
   return run;
+}
+
+/**
+ * PAN-4995: the `/request` route's answer while an adoption for the issue is
+ * in flight, or null. The worktree appears on disk before adoption checks its
+ * head, so "the workspace exists" does not mean "ready to verify". This starts
+ * nothing: the adoption starts the review when it finishes.
+ */
+export function answerAdoptionInFlight(issueId: string): { status: number; body: Record<string, unknown> } | null {
+  const running = inFlight.get(issueId.toUpperCase());
+  if (!running) return null;
+  return {
+    status: 202,
+    body: {
+      success: true,
+      queued: true,
+      adopting: true,
+      message: `Adoption of PR #${running.prNumber} is in progress; verification starts when it is ready.`,
+    },
+  };
 }
 
 async function runAdoptAndReview(pr: AdoptablePr, options: AdoptAndReviewOptions): Promise<AdoptAndReviewOutcome> {

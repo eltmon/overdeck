@@ -769,9 +769,12 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
     const derived = yield* Effect.promise(() => getDerivedIssueState(canonicalIssueId));
 
+    const { answerAdoptionInFlight, answerMissingWorkspace } = yield* Effect.promise(() => import('../../../../lib/cloister/pr-adoption-review.js'));
+    // PAN-4995: never verify a worktree an in-flight adoption still owns; adoption starts the review.
+    const adopting = answerAdoptionInFlight(canonicalIssueId);
+    if (adopting) return jsonResponse(adopting.body, { status: adopting.status });
     // PAN-4605: no workspace ⇒ adopt the open pipeline-branch PR before the
     // approved-head, nudge and circuit-breaker shortcuts below can answer.
-    const { answerMissingWorkspace } = yield* Effect.promise(() => import('../../../../lib/cloister/pr-adoption-review.js'));
     const missingWorkspace = yield* Effect.promise(() => answerMissingWorkspace(canonicalIssueId, requestSource, {
       derivedState: derived.state,
       workspaceExists: getWorkspaceInfoForIssue(canonicalIssueId).exists,

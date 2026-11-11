@@ -1880,6 +1880,15 @@ refused before any fetch. A forge failure answers 503, never "no PR". With
 no PR it answers 400 with a hint to run `pan start` or
 `pan workspace create`. A merged issue skips the check.
 
+The route asks `answerAdoptionInFlight` first (PAN-4995). While an adoption
+for the issue is in flight, the route answers 202 with `adopting: true` and
+starts nothing; the adoption starts the review itself when it finishes.
+"The worktree exists" does not mean "ready to verify": adoption creates the
+worktree before its final head check, and a verification started in that
+window merges `origin/main` into the workspace, moves its head and makes
+adoption refuse with `workspace-head-mismatch`. Adoption's head check stays
+exact.
+
 Command Deck groups the attention into Needs you with the subline
 "review never started — <fix>" and the state badge "Review never started",
 whose tooltip is the fix. `pan show <id>` prints the fix on a `fix` line, and
