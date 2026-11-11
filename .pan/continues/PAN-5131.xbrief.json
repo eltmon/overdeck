@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5131",
   "created": "2026-11-11T08:19:14.972Z",
-  "updated": "2026-11-11T08:58:23.323Z",
+  "updated": "2026-11-11T08:58:25.454Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -326,6 +326,11 @@
     "model-glyphs.ac4": {
       "status": "completed",
       "doneAt": "2026-11-11T08:58:23.322Z"
+    },
+    "single-ticker": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:58:25.453Z"
     }
   }
 }
