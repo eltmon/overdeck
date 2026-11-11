@@ -1,0 +1,9 @@
+plan-digest: ddff0af6459ccd951f529bb2d7efa90a57bcd4fd99e6afd5ed91e7e1b2096880
+
+## blocks-the-design: Indented fences split the two validators
+
+The PRD says fenced code is impossible, but it allows any line starting with two spaces to continue a bullet ([PRD](/home/eltmon/Projects/overdeck/workspaces/feature-pan-5137/.pan/drafts/PAN-5137.md), lines 53-59 and 139). Thus `  ```bash`, `  $2`, `  ``` ` is a valid continuation sequence under the specified parser. The release parser checks `$2` on each continuation line and rejects it; the planned lint validator calls `findMdxProblems(content)`, which treats the indented backticks as a fence and skips `$2` ([lint-docs.js](/home/eltmon/Projects/overdeck/workspaces/feature-pan-5137/scripts/lint-docs.js), lines 49-58). I reran that check with `findMdxProblems('#### Fixed\n\n- a bullet\n  ```bash\n  $2\n  ```\n')`; it returned `[]`. This lets a PR pass `lint:docs` and then stop the stable release, contrary to FR-7. Smallest fix: explicitly reject indented fence openers in both entry validators and test that case in both suites.
+
+## blocks-the-design: Issue names can collide across PRs
+
+Decision 1 assigns `changelog.d/pan-<issue>.md` to every PR for an issue ([PRD](/home/eltmon/Projects/overdeck/workspaces/feature-pan-5137/.pan/drafts/PAN-5137.md), line 46), while FR-1 and the proposed README claim one file per PR prevents concurrent PR conflicts (lines 93 and 291). Two concurrent PRs for the same issue would both add the same path, producing the same add/add conflict this design is meant to remove. The merge test only uses two *different* names (`pan-1.md` and `pan-2.md`, lines 269-274), so it cannot catch this. Smallest fix: make entry names unique per PR, for example by allowing an issue ID plus a PR-specific suffix, and add a same-issue two-branch merge case.

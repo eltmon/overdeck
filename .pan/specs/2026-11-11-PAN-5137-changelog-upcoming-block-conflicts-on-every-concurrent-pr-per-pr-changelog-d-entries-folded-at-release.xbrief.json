@@ -1,0 +1,593 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-11T18:31:18Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5137: Changelog Upcoming block conflicts on every concurrent PR: per-PR changelog.d entries folded at release",
+    "updated": "2026-11-11T18:40:12.388Z"
+  },
+  "plan": {
+    "id": "pan-5137",
+    "title": "Changelog Upcoming block conflicts on every concurrent PR: per-PR changelog.d entries folded at release",
+    "status": "proposed",
+    "uid": "0c28f9c0-dca6-4ad8-a981-7acd8a6ef698",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-11T18:31:18Z",
+    "updated": "2026-11-11T18:40:12.388Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5137",
+        "label": "PAN-5137",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "release",
+      "changelog",
+      "merge-conflicts",
+      "docs"
+    ],
+    "narratives": {
+      "Problem": "Every PR appends a bullet to the single Upcoming <Update> block at the top of changelog.mdx, so any two PRs in flight conflict there. A changelog-only conflict still blocks the merge and needs an agent; PAN-5091 (#5134) escalated as unreachable because its supervised-handoff PR had no work agent.",
+      "Proposal": "Each PR writes its bullets to its own changelog.d/<issue>.md file under #### New / #### Improved / #### Fixed headings. pan release stable validates the entries before preflight, folds them into a dated <Update label=\"vX.Y.Z\"> block (New, Improved, Fixed; compare link from the previous block's label) and deletes them in the release commit. lint:docs rejects an Upcoming block and malformed entries at PR time. The current Upcoming block is migrated, and the release docs, pan-release skill, RELEASE STEP comment, CLAUDE.md, conventions.md and .gitattributes point at changelog.d.",
+      "NonGoals": "- No merge=union on changelog.mdx\n- No change to CHANGELOG.md (the internal Unreleased log)\n- No change to pan release notes or the GitHub release body\n- No new pan release flag, subcommand or help-text change\n- No folding in pan release canary\n- No edit to roles/*.md or sync-sources/rules/\n- No rewrite of historical PRDs, specs or apps/mobile/acceptance/PAN-5107.md\n- No public preview of unreleased changes on /changelog\n- No changelog entry for PAN-5137 itself"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use option 1 from the issue: per-PR changelog.d/<issue>.md files folded by pan release stable",
+        "rationale": "The issue names it as preferred and rejects merge=union; it matches the one-file-per-issue pattern already used for apps/mobile/acceptance (PAN-5054)."
+      },
+      {
+        "summary": "Entry files use #### New / #### Improved / #### Fixed headings inside the file, not frontmatter",
+        "rationale": "One PR can carry bullets in several sections (#5159 had New and Fixed), and the headings match the block, so the fold copies lines verbatim."
+      },
+      {
+        "summary": "No roles/*.md edit and no Prompt-Change trailer",
+        "rationale": "git grep -n Upcoming roles/ sync-sources/ returns nothing; roles ship to every project while changelog.d exists only here, so the pointers go in repo-local files plus a lint guard."
+      },
+      {
+        "summary": "Validate and build the fold before preflight; stable only; zero entries is a no-op",
+        "rationale": "A bad entry fails in seconds, not after the build and tests; canary must not consume entries meant for the next stable; the idempotent retag path has no entries left."
+      },
+      {
+        "summary": "Compare link takes the previous version from the first existing block's label, not getLatestTag",
+        "rationale": "getLatestTag uses git describe and can return a canary tag; the top block is always the previous stable release."
+      },
+      {
+        "summary": "Duplicate the small entry validator in scripts/lint-docs.js",
+        "rationale": "No scripts/lint-* file imports from src/, and a vitest test that reads the real changelog.d would be a source-reading test that lint rejects; both copies are tested on the same rule cases."
+      },
+      {
+        "summary": "Accept losing the public unreleased preview on /changelog",
+        "rationale": "It is the direct cost of removing the shared block; merged PRs remain visible on GitHub."
+      },
+      {
+        "summary": "No new CLI flags and no help-text change",
+        "rationale": "A help change forces skill and composer-commands.generated.ts lockstep edits for no user benefit."
+      },
+      {
+        "summary": "A retag whose version block already exists skips the fold and leaves new entries for the next release, with a yellow message",
+        "rationale": "Refusing would dead-end a retry after a failed release whenever a PR with an entry merged in between; skipping keeps the idempotent retag path working and loses nothing."
+      },
+      {
+        "summary": "Every name in changelog.d/ except README.md must match ^[a-z0-9][a-z0-9-]*\\.md$, with no .md pre-filter",
+        "rationale": "A pre-filter would silently drop pan-123.mdx from both validation and the fold, and .mintignore would not hide it."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "15 files: one pure module, its CLI wiring, the docs lint, and the docs and pointer files that describe the one new convention. The subsystem count is high because the convention has to be documented where agents read it (CLAUDE.md, conventions.md, .gitattributes, the pan-release skill, RELEASING.md, changelog.mdx). Shipping the docs or the migration without the fold, or the fold without the lint guard, would leave the repo in an inconsistent state, so the work is one issue.",
+      "canonicalFilename": "2026-11-11-PAN-5137-changelog-upcoming-block-conflicts-on-every-concurrent-pr-per-pr-changelog-d-entries-folded-at-release.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "fold-module",
+        "title": "Add the pure changelog.d parser and block builder in src/lib/release/changelog-fold.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T18:31:18Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5137",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/release/changelog-fold.ts",
+            "src/lib/release/__tests__/changelog-fold.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/release/__tests__/changelog-fold.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "changelog-fold.test.ts passes with the golden fold test and every rejection test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "release-wiring",
+            "migrate-upcoming",
+            "lint-guard"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5137.md WI-1 and Decisions 1-5, 9. Create src/lib/release/changelog-fold.ts exporting ChangelogSection, CHANGELOG_SECTIONS, ChangelogEntryFile, ParsedChangelogEntry, ChangelogEntryError, CHANGELOG_ENTRY_FILE_NAME, parseChangelogEntry, formatReleaseDate and foldChangelogEntries with the exact signatures in WI-1. Pure functions only: no fs, no child_process, no Effect. Entry format: headings exactly '#### New' / '#### Improved' / '#### Fixed' (each at most once, each with at least one bullet); first non-blank line is a heading; '- ' starts a bullet; a line starting with two or more spaces continues it; anything else throws ChangelogEntryError naming changelog.d/<file>:<line>. Fold: refuse tags={[\"Upcoming\"]} and an existing label=\"v<version>\" block; insert before the first line starting with '<Update ' followed by one blank line; previous version for the compare link is that line's label; sort entries by fileName with localeCompare(b,'en',{numeric:true}); sections New, Improved, Fixed, empty ones omitted; every copied line indented two spaces; block shape exactly as Decision 4. formatReleaseDate uses local getFullYear/getMonth()+1/getDate zero-padded, never toISOString. Write the tests listed in WI-1. Also export stripInlineCode (TS port of scripts/lint-docs.js) and hasUpcomingBlock (tags={[\"Upcoming\"]} or description=\"Unreleased\"); parseChangelogEntry rejects a $ or a /<\\d/ in a bullet or continuation line after stripInlineCode, with file name and line, because release preflight never runs lint:docs."
+        },
+        "items": [
+          {
+            "id": "fold-module.ac1",
+            "title": "Given entries pan-2.md (Fixed), pan-10.md (New and Fixed) and pan-1.md (Improved), foldChangelogEntries returns a changelog whose new top block equals the golden text: label v0.80.0, the given date, sections New, Improved, Fixed in that order, pan-2 before pan-10 in Fixed, and a compare link v0.79.0...v0.80.0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fold-module.ac2",
+            "title": "foldChangelogEntries throws when the changelog contains tags={[\"Upcoming\"]} and throws when a block labelled v<version> already exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fold-module.ac3",
+            "title": "parseChangelogEntry rejects an unknown heading, a bullet before any heading, a stray non-bullet line, an empty heading, a duplicate heading, a file with no bullets, a bullet containing $2 and a bullet containing <3, and each thrown message contains changelog.d/<fileName>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fold-module.ac4",
+            "title": "formatReleaseDate(new Date(2026, 0, 5, 23, 30)) returns 2026-01-05",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fold-module.ac5",
+            "title": "parseChangelogEntry accepts `$HOME` and `<3` inside inline code and accepts &#36;2 and &lt;3 in prose",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "release-wiring",
+        "title": "Fold changelog.d entries into changelog.mdx inside pan release stable",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T18:31:18Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5137",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/release.ts",
+            "tests/unit/cli/release-changelog-fold.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/release-changelog-fold.test.ts tests/cli/commands/release-notes-grouping.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "release-changelog-fold.test.ts and release-notes-grouping.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5137.md WI-2 and Decisions 6-11, 14. In src/cli/commands/release.ts export the ChangelogFoldPlan and ChangelogFoldOutcome types, planChangelogFold(repoRoot, channel, version, now) and applyChangelogFold(plan) exactly as written in WI-2 (sync fs is fine in this CLI-only file; add existsSync and readdirSync to the fs import). planChangelogFold returns {kind:'skip', reason:'canary'} for any non-stable channel without reading anything; then reads changelog.mdx and throws when hasUpcomingBlock(changelog), before either skip below; rejects every name in changelog.d/ except README.md that does not match CHANGELOG_ENTRY_FILE_NAME (no .md pre-filter) by throwing ChangelogEntryError(name, null, ...); returns reason 'no-entries' when there are none; parses every entry; returns reason 'block-exists' with the message from Decision 8 when changelog.mdx already has <Update label=\"v<version>\"; otherwise returns {kind:'fold', plan}. It writes nothing. In releaseCreateCommand: call planChangelogFold right after ensureTagDoesNotExist(repoRoot, tagName), before runPreflight; inside the try, after writeTextFile(releaseNotesPath, releaseNotes), apply the fold and print the dim fold message, or print the no-entries message dim and the block-exists message yellow; after the existing git add, run 'git add -A -- changelog.mdx changelog.d' only on a fold; in the catch (not committed), after the existing package restore try/catch, run a separate best-effort 'git restore --source=HEAD --staged --worktree -- changelog.mdx changelog.d' only on a fold. Add no CLI flag and change no help text. Keep the file under 1000 lines. Write the tests listed in WI-2 in tests/unit/cli/release-changelog-fold.test.ts using a mkdtemp directory."
+        },
+        "items": [
+          {
+            "id": "release-wiring.ac1",
+            "title": "Given a temp repo root whose changelog.d holds only README.md (or no changelog.d at all) and no Upcoming block, planChangelogFold for stable returns {kind:'skip', reason:'no-entries'} and changelog.mdx bytes are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "release-wiring.ac2",
+            "title": "Given two valid entries plus README.md, planChangelogFold followed by applyChangelogFold writes the dated block to changelog.mdx, deletes both entry files and preserves README.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "release-wiring.ac3",
+            "title": "Given a file named Pan-1.md or pan-2.mdx, or an entry containing $2, planChangelogFold throws an error naming that file and leaves changelog.mdx and the file unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "release-wiring.ac4",
+            "title": "Given a changelog.mdx with an Upcoming block, planChangelogFold for stable throws both with no entries and on a retag with entries, while for canary it returns reason 'canary'; with an existing v0.80.0 block and no Upcoming block it returns reason 'block-exists' and leaves the entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "release-wiring.ac5",
+            "title": "git diff origin/main -- src/cli/commands/release.ts shows (contains) a planChangelogFold call before runPreflight, 'git add -A -- changelog.mdx changelog.d' on a fold, and a changelog git restore in its own try/catch after the package restore",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lint-guard",
+        "title": "Make lint:docs reject an Upcoming block and malformed changelog.d entries",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T18:31:18Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-5137",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-docs.js",
+            "tests/unit/scripts/lint-docs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/lint-docs.test.ts"
+          ],
+          "expected_outputs": [
+            "lint-docs.test.ts passes including the new changelog cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5137.md WI-3 and Decisions 12-13. In scripts/lint-docs.js add and export findChangelogEntryProblems(fileName, content) returning {line, message}[] that implements the same rules as parseChangelogEntry (file-name regex ^[a-z0-9][a-z0-9-]*\\.md$ reported at line 0, the heading/bullet/continuation rules, then findMdxProblems). Add a comment naming src/lib/release/changelog-fold.ts as the mirrored authority. Add checkChangelog(root): flag tags={[\"Upcoming\"]} or description=\"Unreleased\" in changelog.mdx with the exact message from WI-3 that names changelog.d/<issue>.md, and validate every name in changelog.d/ except README.md with no .md pre-filter, so pan-1.mdx is reported. Wire it into the isMain block so any problem exits 1, and add the entry count to the success line. Extend tests/unit/scripts/lint-docs.test.ts with unit cases and --root temp-dir script cases."
+        },
+        "items": [
+          {
+            "id": "lint-guard.ac1",
+            "title": "Given a --root whose changelog.mdx contains tags={[\"Upcoming\"]}, node scripts/lint-docs.js exits 1 and prints a line containing 'Upcoming/Unreleased block found' and 'changelog.d/<issue>.md'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-guard.ac2",
+            "title": "Given a --root with changelog.d/pan-1.md containing '#### Changed', or a file named changelog.d/pan-2.mdx, the script exits 1 and prints the offending file name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-guard.ac3",
+            "title": "findChangelogEntryProblems returns [] for a valid two-section entry and returns the dollar-sign message for a bullet containing $2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-guard.ac4",
+            "title": "Given a --root with a valid entry and changelog.d/README.md, the script exits 0 and README.md is not validated as an entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-test",
+        "title": "Prove two branches that each add a changelog.d entry merge without conflict",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T18:31:18Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5137",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/scripts/changelog-d-merge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/changelog-d-merge.test.ts"
+          ],
+          "expected_outputs": [
+            "changelog-d-merge.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5137.md WI-4. New test with a real git repo in mkdtempSync(join(tmpdir(),'pan-5137-merge-')): git init -b main with -c user.name/-c user.email per call; commit changelog.d/README.md and changelog.mdx; branch a adds changelog.d/pan-1.md, branch b from the same base adds changelog.d/pan-2.md; merge a then b into main with --no-edit. Assert neither merge throws, git diff --name-only --diff-filter=U prints nothing, and both files exist with their original content. Clean up the temp dir in afterEach. Do not read repo source files."
+        },
+        "items": [
+          {
+            "id": "merge-test.ac1",
+            "title": "Given branches a and b that each add a different changelog.d/<name>.md from the same base, merging both into main exits 0 and git diff --name-only --diff-filter=U returns an empty list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-test.ac2",
+            "title": "After both merges, the test reads changelog.d/pan-1.md and changelog.d/pan-2.md on main and each returns its original content",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-upcoming",
+        "title": "Move the Upcoming block's bullets into changelog.d files and remove the block",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T18:31:18Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5137",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "changelog.mdx",
+            "changelog.d/README.md",
+            "changelog.d/*.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "grep -c 'tags={\\[\"Upcoming\"\\]}' changelog.mdx"
+          ],
+          "expected_outputs": [
+            "docs lint passed with the changelog entry count",
+            "grep prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5137.md WI-5. Re-run this after every main merge until the PR lands, because new bullets may land in the Upcoming block meanwhile. 1) Create changelog.d/README.md with the exact content in WI-5. 2) For every bullet in the <Update ... tags={[\"Upcoming\"]}> block, write it (two-space block indent removed, text unchanged) under its section heading in changelog.d/<name>.md: issues/<n> link -> pan-<n>.md; pull/<n> link -> the PR's issue as pan-<id>.md via gh pr view <n> --json title, else pr-<n>.md. 3) Delete the whole Upcoming block through its </Update> and the blank line after. 4) Replace the RELEASE STEP comment with the exact text in WI-5. At planning time the block held one bullet (PAN-5151, Improved), giving changelog.d/pan-5151.md; create one file per issue found at work time. No em dashes in the README or the new RELEASE STEP comment (migrated bullets are copied verbatim and are exempt)."
+        },
+        "items": [
+          {
+            "id": "migrate-upcoming.ac1",
+            "title": "grep -c 'tags={\\[\"Upcoming\"\\]}' changelog.mdx prints 0 and the first line starting with '<Update ' in changelog.mdx carries a YYYY-MM-DD description",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-upcoming.ac2",
+            "title": "Every bullet that was in the Upcoming block at work time appears verbatim (minus the two-space indent) under the same heading in a changelog.d/<name>.md file, and node scripts/lint-docs.js exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-upcoming.ac3",
+            "title": "ls changelog.d prints README.md, and the RELEASE STEP comment in changelog.mdx contains the text changelog.d/<issue>.md and pan release stable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-upcoming.ac4",
+            "title": "grep -cP '\\x{2014}' changelog.d/README.md prints 0 and the new RELEASE STEP comment line contains no U+2014 em dash",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-release",
+        "title": "Rewrite the release docs and pan-release skill for the changelog.d fold",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T18:31:18Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5137",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/RELEASING.md",
+            "sync-sources/skills/pan-release/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'changelog.d' docs/RELEASING.md sync-sources/skills/pan-release/SKILL.md",
+            "npm run lint:skills"
+          ],
+          "expected_outputs": [
+            "grep prints at least one line per file",
+            "lint:skills completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5137.md WI-6. Replace the four manual steps under '## Update the public changelog' in docs/RELEASING.md with the entry-file workflow and the fold behavior listed in WI-6 (format pointer to changelog.d/README.md, review and edit pending entries in a normal commit before releasing, what pan release stable writes and deletes, its three refusals before preflight, canary does not fold, no entries leaves the page unchanged, keep the &#36;/&lt; paragraph pointing at entry files). Rewrite step 1 of 'Preferred operator flow' in sync-sources/skills/pan-release/SKILL.md the same way. Remove every claim that pan release does not edit the changelog. No em dashes in added lines."
+        },
+        "items": [
+          {
+            "id": "docs-release.ac1",
+            "title": "grep -n 'changelog.d' docs/RELEASING.md sync-sources/skills/pan-release/SKILL.md prints at least one line for each file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-release.ac2",
+            "title": "grep -n 'does not edit' docs/RELEASING.md sync-sources/skills/pan-release/SKILL.md prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-release.ac3",
+            "title": "The RELEASING.md section states that pan release stable refuses a malformed entry, a misnamed file and a leftover Upcoming block, skips the fold on a retag whose version block exists, and that pan release canary does not fold",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-release.ac4",
+            "title": "git diff origin/main -U0 -- docs/RELEASING.md sync-sources/skills/pan-release/SKILL.md | grep '^+' | grep -cP '\\x{2014}' prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-agent-pointers",
+        "title": "Point agents in this repo at changelog.d from CLAUDE.md, conventions.md and .gitattributes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T18:31:18Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5137",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "CLAUDE.md",
+            ".overdeck/context/codebase/conventions.md",
+            ".gitattributes"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'changelog.d' CLAUDE.md .overdeck/context/codebase/conventions.md .gitattributes",
+            "npm run lint:last-verified"
+          ],
+          "expected_outputs": [
+            "grep prints at least one line per file",
+            "lint:last-verified completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5137.md WI-7. Add the exact CLAUDE.md bullet under '## Small But Sharp' after the OKF line, the exact conventions.md bullet after the phone-app acceptance bullet (leave the <!-- last-verified --> line unchanged), and the exact .gitattributes comment after the apps/mobile/ACCEPTANCE.md comment block (comment only, no new attribute). No roles/*.md edit. No em dashes in added lines."
+        },
+        "items": [
+          {
+            "id": "docs-agent-pointers.ac1",
+            "title": "grep -n 'changelog.d' CLAUDE.md .overdeck/context/codebase/conventions.md .gitattributes prints at least one line for each file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-agent-pointers.ac2",
+            "title": "git diff origin/main -- .gitattributes contains only added comment lines and grep -n 'changelog.mdx merge=' .gitattributes prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-agent-pointers.ac3",
+            "title": "git diff origin/main -- .overdeck/context/codebase/conventions.md contains no change to the <!-- last-verified --> line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-agent-pointers.ac4",
+            "title": "git diff origin/main -U0 -- CLAUDE.md .overdeck/context/codebase/conventions.md .gitattributes | grep '^+' | grep -cP '\\x{2014}' prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fold-module",
+        "to": "release-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "fold-module",
+        "to": "lint-guard",
+        "type": "informs"
+      },
+      {
+        "from": "lint-guard",
+        "to": "migrate-upcoming",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
