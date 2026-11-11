@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T15:10:57.609Z",
+  "updated": "2026-11-11T15:19:37.195Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,30 @@
     "wi7-jira-status-mapping.ac5": {
       "status": "completed",
       "doneAt": "2026-11-11T15:10:57.608Z"
+    },
+    "wi8-jira-adapter": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:19:37.195Z"
+    },
+    "wi8-jira-adapter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:19:37.195Z"
+    },
+    "wi8-jira-adapter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:19:37.195Z"
+    },
+    "wi8-jira-adapter.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:19:37.195Z"
+    },
+    "wi8-jira-adapter.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:19:37.195Z"
+    },
+    "wi8-jira-adapter.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:19:37.195Z"
     }
   }
 }
