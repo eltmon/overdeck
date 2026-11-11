@@ -54,6 +54,13 @@ vi.mock('../../../../../src/lib/tracker-utils.js', () => ({
   resolveTrackerType: vi.fn(() => 'github'),
 }));
 
+// PAN-5153: no repository is covered, matching isGitHubAppConfigured() === false,
+// so no test sends a real installation lookup.
+vi.mock('../../../../../src/lib/github-app-installations.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../../src/lib/github-app-installations.js')>();
+  return { ...actual, appCoversRepo: vi.fn(async () => false) };
+});
+
 vi.mock('../../../../../src/lib/github-app.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../../src/lib/github-app.js')>();
   return {
