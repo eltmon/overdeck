@@ -21,9 +21,17 @@ const { mockFindProject, mockRunQualityGates, mockGateBody, mockGetPrFacts, mock
   mockEvaluateTestSkipGate: vi.fn(async () => ({ failed: false, evidence: '' })),
 }));
 
+// PAN-4624: the issue-to-project lookup is null (standalone layout) except in
+// the polyrepo describe, which points it at a two-repo project.
+const { mockResolveProjectFromIssue, mockGetProjectSync } = vi.hoisted(() => ({
+  mockResolveProjectFromIssue: vi.fn((): unknown => null),
+  mockGetProjectSync: vi.fn((): unknown => null),
+}));
+
 vi.mock('../../../../src/lib/projects.js', () => ({
   findProjectByPath: mockFindProject,
-  resolveProjectFromIssueSync: vi.fn(() => null),
+  resolveProjectFromIssueSync: mockResolveProjectFromIssue,
+  getProjectSync: mockGetProjectSync,
 }));
 
 vi.mock('../../../../src/lib/cloister/validation.js', () => ({
@@ -86,6 +94,8 @@ vi.mock('../../../../src/lib/xbrief/acceptance-criteria.js', () => ({ getXBriefA
 vi.mock('../../../../src/lib/work/done-preflight.js', () => ({ checkIncompletePlanItems: vi.fn(async () => []) }));
 
 import { runVerificationForIssueInProcess } from '../../../../src/lib/cloister/verification-runner.js';
+import { ciVerdictHead8 } from '../../../../src/lib/cloister/verified-head.js';
+import type { HeadAnchor } from '../../../../src/lib/git-utils.js';
 import { readVerificationArtifact, writeVerificationArtifact } from '../../../../src/lib/cloister/verification-artifact.js';
 import { readPipelineJournal } from '../../../../src/lib/cloister/pipeline-journal.js';
 import {
@@ -436,6 +446,99 @@ describe('a red head whose verification merges the target branch in (PAN-4527)',
     expect(outcome).toMatchObject({ outcome: 'deferred', superseded: { to: execFileSync('git', ['rev-parse', '--short=8', 'HEAD'], { cwd: workspacePath, encoding: 'utf-8' }).trim() } });
     expect(mockGateBody.mock.calls.map(([name]) => name)).toEqual(['typecheck']);
     expect(readPipelineJournal(workspacePath).map((entry) => entry.type)).toEqual(['verification.started']);
+  });
+});
+
+describe('a polyrepo workspace whose member repo CI test job is red (PAN-4624)', () => {
+  const commit = (cwd: string, message: string) =>
+    execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', message], { cwd });
+  const head8 = (cwd: string) => execFileSync('git', ['rev-parse', '--short=8', 'HEAD'], { cwd, encoding: 'utf-8' }).trim();
+  const redCi = (head: string) =>
+    writeVerificationArtifact(workspacePath, 'PAN-3965', [{ name: 'test', passed: false, required: true, output: 'CI red', durationMs: 0 }], {
+      ranAt: '2026-09-23T00:00:00.000Z', head8: head, via: 'ci',
+    });
+  let fe: string;
+
+  function polyrepoProject() {
+    return {
+      ...project({ tests: 'ci' }),
+      workspace: { type: 'polyrepo', default_branch: 'main', repos: [{ name: 'fe', path: 'fe' }, { name: 'api', path: 'api' }] },
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // A real polyrepo layout: the wrapper repo with two member repos inside it.
+    workspacePath = mkdtempSync(join(tmpdir(), 'pan-4624-verify-poly-'));
+    fe = join(workspacePath, 'fe');
+    const api = join(workspacePath, 'api');
+    execFileSync('git', ['init', '-q'], { cwd: workspacePath });
+    commit(workspacePath, 'wrapper');
+    for (const dir of [fe, api]) {
+      mkdirSync(dir);
+      execFileSync('git', ['init', '-q'], { cwd: dir });
+      commit(dir, `init ${dir}`);
+    }
+    mockFindProject.mockReturnValue(polyrepoProject());
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'poly', projectPath: workspacePath });
+    mockGetProjectSync.mockReturnValue(polyrepoProject());
+  });
+
+  afterEach(() => {
+    mockResolveProjectFromIssue.mockReturnValue(null);
+    mockGetProjectSync.mockReturnValue(null);
+    rmSync(workspacePath, { recursive: true, force: true });
+  });
+
+  it('fails test on the launch head: the verdict is read for the primary member repo head, not the wrapper head', async () => {
+    const memberHead = head8(fe);
+    expect(memberHead).not.toBe(head8(workspacePath));
+    redCi(memberHead);
+
+    const outcome = await verify();
+
+    expect(outcome).toMatchObject({ outcome: 'failed', failedCheck: 'test' });
+    expect(mockRunQualityGates).not.toHaveBeenCalled();
+    expect(readVerificationArtifact(workspacePath)?.gates.find((gate) => gate.name === 'test')?.output)
+      .toBe(`The CI test job already failed on this head (${memberHead}). Fix it and push a new commit; see .pan/feedback/ for the CI failure details.`);
+  });
+
+  it('fails test on a moved head: an agent commit in the member repo is the head whose CI verdict counts', async () => {
+    mockGateBody.mockImplementationOnce(() => {
+      commit(fe, 'agent fix');
+      redCi(head8(fe));
+    });
+
+    const outcome = await verify();
+
+    expect(outcome).toMatchObject({ outcome: 'failed', failedCheck: 'test' });
+    expect(mockGateBody.mock.calls.map(([name]) => name)).toEqual(['typecheck']);
+    expect(readVerificationArtifact(workspacePath)?.gates.find((gate) => gate.name === 'test')?.output)
+      .toContain(`(${head8(fe)})`);
+  });
+
+  it('passes when only the wrapper head has a red CI result', async () => {
+    redCi(head8(workspacePath));
+
+    expect(await verify()).toEqual({ outcome: 'passed' });
+  });
+});
+
+describe('ciVerdictHead8 (PAN-4624)', () => {
+  const sha = (c: string) => c.repeat(40);
+  const root = (repoKey: string, isPolyrepo: boolean) => ({ repoKey, dir: `/w/${repoKey}`, sourceBranch: 'feature/x', targetBranch: 'main', isPolyrepo });
+
+  it('keeps the workspace HEAD for a standalone workspace', () => {
+    expect(ciVerdictHead8([root('overdeck', false)], sha('a') as HeadAnchor, 'wsheadxx')).toBe('wsheadxx');
+  });
+
+  it('reads the primary member repo sha out of a polyrepo anchor', () => {
+    const anchor = `fe@${sha('b')} api@${sha('c')}` as HeadAnchor;
+    expect(ciVerdictHead8([root('fe', true), root('api', true)], anchor, 'wrapperx')).toBe('bbbbbbbb');
+  });
+
+  it('falls back to the workspace HEAD when a polyrepo has no snapshot', () => {
+    expect(ciVerdictHead8([root('fe', true), root('api', true)], undefined, 'wrapperx')).toBe('wrapperx');
   });
 });
 
