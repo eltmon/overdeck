@@ -27,6 +27,8 @@ const mockExec = vi.fn();
 const mockResolveGitHubIssue = vi.fn();
 const mockResolveTrackerType = vi.fn();
 const mockGetGitHubConfig = vi.fn();
+const mockResolveGitHubPullRequestRepo = vi.fn();
+const mockCreateJiraTrackerForIssue = vi.fn();
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
@@ -62,8 +64,13 @@ vi.mock('../../../../../src/lib/tracker-utils.js', async (importOriginal) => {
     ...actual,
     resolveGitHubIssue: (...args: unknown[]) => mockResolveGitHubIssue(...args),
     resolveTrackerType: (...args: unknown[]) => mockResolveTrackerType(...args),
+    resolveGitHubPullRequestRepo: (...args: unknown[]) => mockResolveGitHubPullRequestRepo(...args),
   };
 });
+
+vi.mock('../../../../../src/lib/tracker/factory.js', () => ({
+  createJiraTrackerForIssue: (...args: unknown[]) => mockCreateJiraTrackerForIssue(...args),
+}));
 
 vi.mock('../../../../../src/dashboard/server/services/tracker-config.js', () => ({
   getGitHubConfig: () => mockGetGitHubConfig(),
@@ -103,6 +110,11 @@ beforeEach(() => {
   mockResolveTrackerType.mockReturnValue('github');
   mockResolveGitHubIssue.mockReturnValue({ isGitHub: false });
   mockGetGitHubConfig.mockReturnValue(null);
+  // Same answer as the real resolver for non-Jira issues: the GitHub issue's repo.
+  mockResolveGitHubPullRequestRepo.mockImplementation((id: string) => {
+    const resolved = mockResolveGitHubIssue(id);
+    return resolved?.isGitHub ? { owner: resolved.owner, repo: resolved.repo } : null;
+  });
 });
 
 describe('fetchIssueDiscussions — GET /api/issues/:id/discussions', () => {
@@ -276,3 +288,61 @@ describe('fetchIssueDiscussions — GET /api/issues/:id/discussions', () => {
     expect(mockExec).not.toHaveBeenCalled();
   });
 });
+
+describe('fetchIssueDiscussions for Jira issues (PAN-5152)', () => {
+  // Built at runtime so push protection never sees a token-shaped literal (NFR-3).
+  const fakeToken = ['fake', 'jira', 'token'].join('-');
+
+  async function stubJiraTracker() {
+    const { JiraTracker } = await import('../../../../../src/lib/tracker/jira.js');
+    const adfText = (text: string, marks?: Array<{ type: string }>) => ({
+      type: 'doc', version: 1, content: [{ type: 'paragraph', content: [{ type: 'text', text, ...(marks ? { marks } : {}) }] }],
+    });
+    const fetchImpl: typeof fetch = async () => new Response(JSON.stringify({ comments: [
+      { id: 'c1', author: { displayName: 'Ada' }, created: '2026-11-01T00:00:00Z', body: adfText('needs **care**') },
+      { id: 'c2', author: { displayName: 'Grace' }, created: '2026-11-02T00:00:00Z', body: adfText('shipped', [{ type: 'strong' }]) },
+    ] }));
+    return new JiraTracker({
+      credentials: { token: fakeToken, email: 'dev@example.com', site: 'https://acme.atlassian.net' },
+      projectKey: 'PROJ',
+      project: { deployment: 'cloud' },
+      fetchImpl,
+    });
+  }
+
+  it('returns Jira comments as Markdown items with source jira', async () => {
+    mockResolveTrackerType.mockReturnValue('jira');
+    mockCreateJiraTrackerForIssue.mockReturnValue(await stubJiraTracker());
+
+    const result = await fetchIssueDiscussions('PROJ-4');
+
+    const jira = result.items.filter((item) => item.source === 'jira');
+    expect(jira.map((item) => [item.author, item.body])).toEqual([
+      ['Ada', 'needs **care**'],
+      ['Grace', '**shipped**'],
+    ]);
+    expect(jira[0]?.id).toBe('jira-PROJ-4-0');
+    expect(mockExec).not.toHaveBeenCalled();
+  });
+
+  it('still loads PR threads from a Jira project github_repo', async () => {
+    mockResolveTrackerType.mockReturnValue('jira');
+    mockResolveGitHubPullRequestRepo.mockReturnValue({ owner: 'o', repo: 'acme' });
+    mockCreateJiraTrackerForIssue.mockReturnValue(await stubJiraTracker());
+
+    mockExec
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ number: 77, state: 'OPEN', mergedAt: null }]), stderr: '' })
+      .mockResolvedValueOnce({ stdout: JSON.stringify([
+        { id: 9, user: { login: 'bob' }, body: 'pr conv', created_at: '2026-11-03T00:00:00Z', html_url: 'u9' },
+      ]), stderr: '' })
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' });
+
+    const result = await fetchIssueDiscussions('PROJ-4');
+
+    expect(result.prNumber).toBe(77);
+    expect(result.items.map((item) => item.source)).toEqual(['jira', 'jira', 'github-pr-conversation']);
+    expect(String(mockExec.mock.calls[0]?.[0])).toContain('o/acme');
+  });
+});
+
