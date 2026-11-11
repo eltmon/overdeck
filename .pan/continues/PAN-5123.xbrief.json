@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5123",
   "created": "2026-11-11T11:14:57.280Z",
-  "updated": "2026-11-11T11:16:08.097Z",
+  "updated": "2026-11-11T11:16:19.304Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "guide-list-section.ac4": {
       "status": "completed",
       "doneAt": "2026-11-11T11:16:08.097Z"
+    },
+    "guide-switch-note": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5123",
+      "claimedAt": "2026-11-11T11:16:19.304Z"
     }
   }
 }
