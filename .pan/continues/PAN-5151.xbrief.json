@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5151",
   "created": "2026-11-11T14:34:32.001Z",
-  "updated": "2026-11-11T15:02:26.502Z",
+  "updated": "2026-11-11T15:06:28.355Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -142,9 +142,26 @@
       "doneAt": "2026-11-11T15:02:15.473Z"
     },
     "guard-agent-builders": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5151",
-      "claimedAt": "2026-11-11T15:02:26.502Z"
+      "claimedAt": "2026-11-11T15:02:26.502Z",
+      "doneAt": "2026-11-11T15:06:28.355Z"
+    },
+    "guard-agent-builders.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:06:28.355Z"
+    },
+    "guard-agent-builders.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:06:28.355Z"
+    },
+    "guard-agent-builders.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:06:28.355Z"
+    },
+    "guard-agent-builders.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:06:28.355Z"
     }
   }
 }
