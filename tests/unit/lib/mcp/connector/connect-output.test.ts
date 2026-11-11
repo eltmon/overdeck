@@ -142,6 +142,7 @@ describe('openclawRegistrationCommand and registrationLines("openclaw", …) (FR
   it('escapes a single quote in the connector home so the command still parses', () => {
     const withQuote = registrationFor({ version: '0.75.0', env: { OVERDECK_CONNECTOR_HOME: "/data/it's" } });
     const command = openclawRegistrationCommand(withQuote);
+    expect(command).toContain("'\\''");
     const inner = command.slice("openclaw mcp set overdeck '".length, -1);
     const unescaped = inner.split("'\\''").join("'");
     expect(JSON.parse(unescaped)).toEqual({ command: 'npx', args: withQuote.args, env: { OVERDECK_CONNECTOR_HOME: "/data/it's" } });
