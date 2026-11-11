@@ -16,6 +16,7 @@ import {
   type NormalizedConfig,
 } from '../config-yaml.js';
 import type { Role } from '../agents.js';
+import { DEFAULT_CONFIG } from '../config-yaml/defaults.js';
 import type { YamlConfig } from '../config-yaml/schema.js';
 
 const WORKHORSES = {
@@ -87,6 +88,25 @@ describe('role model configuration', () => {
 
     expect(derefWorkhorse(DEFAULT_MODEL_REFS.work, config, 'roles.work.model')).toBe('claude-sonnet-5-5');
     expect(resolveModel('work', undefined, config)).toBe('claude-sonnet-5-5');
+  });
+
+  it('defaults the cheap workhorse and background config to Haiku 5.5 (PAN-5124)', () => {
+    expect(DEFAULT_WORKHORSES.cheap).toBe('claude-haiku-5-5');
+    expect(DEFAULT_CONFIG.conversations.compactionModel).toBe('claude-haiku-5-5');
+    expect(DEFAULT_CONFIG.conversations.titleModel).toBe('claude-haiku-5-5');
+    expect(DEFAULT_CONFIG.docs.classifier.model).toBe('claude-haiku-5-5');
+
+    const { config } = mergeConfigs({});
+    expect(derefWorkhorse('workhorse:cheap', config, 'roles.work.model')).toBe('claude-haiku-5-5');
+    expect(config.conversations.compactionModel).toBe('claude-haiku-5-5');
+    expect(config.conversations.titleModel).toBe('claude-haiku-5-5');
+    expect(config.docs.classifier.model).toBe('claude-haiku-5-5');
+  });
+
+  it('keeps a configured conversations.title_model over the Haiku 5.5 default (PAN-5124)', () => {
+    const { config } = mergeConfigs({ conversations: { title_model: 'claude-haiku-4-5' } } as YamlConfig);
+
+    expect(config.conversations.titleModel).toBe('claude-haiku-4-5');
   });
 
   it('honors configured roles.plan.model through the configured expensive workhorse', () => {

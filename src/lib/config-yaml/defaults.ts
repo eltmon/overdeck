@@ -80,10 +80,10 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   geminiThinkingLevel: 3,
   trackerKeys: {},
   conversations: {
-    compactionModel: 'claude-haiku-4-5',
+    compactionModel: 'claude-haiku-5-5',
     manualCompactMode: 'claude-code',
     richCompaction: true,
-    titleModel: 'claude-haiku-4-5',
+    titleModel: 'claude-haiku-5-5',
     // PAN-4160: the one documented default for fork summaries (replaces two
     // disagreeing literals in conversation-forks.ts and summary-fork.ts). A
     // fork summary serializes the whole conversation in one shot, so it needs
@@ -140,7 +140,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     classifier: {
       enabled: false,
       provider: 'anthropic',
-      model: 'claude-haiku-4-5',
+      model: 'claude-haiku-5-5',
       threshold: 0.85,
       timeoutMs: 1500,
     },

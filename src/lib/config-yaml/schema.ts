@@ -180,7 +180,7 @@ export interface ConversationsConfig {
   manual_compact_mode?: ManualCompactMode;
   /** Whether to use the richer 9-section summary format (more tokens, less efficient incremental updates) */
   rich_compaction?: boolean;
-  /** Model used for AI-generated conversation titles (default: claude-haiku-4-5) */
+  /** Model used for AI-generated conversation titles (default: claude-haiku-5-5) */
   title_model?: ModelId;
   /** Model that writes the one-shot summary seeding a summary or handoff fork when the request names none (default: claude-sonnet-5-5, PAN-4160). */
   fork_summary_model?: ModelId;
