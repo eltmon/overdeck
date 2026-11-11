@@ -32,6 +32,7 @@ let resolveHarnessMock: ReturnType<typeof vi.fn>;
 let prepareHarnessLaunchMock: ReturnType<typeof vi.fn>;
 let emitAgentEventMock: ReturnType<typeof vi.fn>;
 let ensureLifecycleHooksMock: ReturnType<typeof vi.fn>;
+let ensureAutoApproveHookReadyMock: ReturnType<typeof vi.fn>;
 let deliverAgentMessageMock: ReturnType<typeof vi.fn>;
 let waitForPromptReadyMock: ReturnType<typeof vi.fn>;
 let stopAgentMock: ReturnType<typeof vi.fn>;
@@ -103,6 +104,7 @@ function mockSpawnDependencies(): void {
   sendRawKeystrokeMock = vi.fn(() => Effect.void);
   emitAgentEventMock = vi.fn(() => Effect.succeed(true));
   ensureLifecycleHooksMock = vi.fn(async () => undefined);
+  ensureAutoApproveHookReadyMock = vi.fn(async () => undefined);
   deliverAgentMessageMock = vi.fn(async () => ({ ok: true, path: 'acp' }));
   waitForPromptReadyMock = vi.fn(async () => true);
   stopAgentMock = vi.fn(() => Effect.void);
@@ -128,6 +130,9 @@ function mockSpawnDependencies(): void {
   }));
   vi.doMock('../agents/hook-readiness.js', () => ({
     ensureLifecycleHooksBeforeLaunch: ensureLifecycleHooksMock,
+    // PAN-5151: runtime-command.js (partially mocked below, real
+    // getRoleRuntimeBaseCommand/getAgentRuntimeBaseCommand) imports this.
+    ensureAutoApproveHookReady: ensureAutoApproveHookReadyMock,
   }));
   vi.doMock('../agents/delivery.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../agents/delivery.js')),

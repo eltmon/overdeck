@@ -12,6 +12,7 @@ import type { MemoryIdentity } from '@overdeck/contracts';
 import { isEffortLevel } from '@overdeck/contracts';
 import { getClaudePermissionFlagsString } from '../claude-permissions.js';
 import { loadConfigSync as loadYamlConfig, type RoleEffort } from '../config-yaml.js';
+import { ensureAutoApproveHookReady } from './hook-readiness.js';
 import { resolveEffort } from './resolve-effort.js';
 import { getClaudeAuthStatus } from '../claude-auth.js';
 import { materializeAcpContextFile } from '../acp/context.js';
@@ -756,6 +757,7 @@ export async function getAgentRuntimeBaseCommand(
   // comes from the global permission flags; the role's hooks fire globally via
   // ~/.claude/settings.json. roleInject folds in effort when a role file is
   // present; otherwise --effort is passed directly.
+  await ensureAutoApproveHookReady(); // PAN-5151
   const permissionFlags = getClaudePermissionFlagsString();
   const roleInject = defIsRoleFile ? roleSystemPromptInjection(agentDefinition as string, effort) : '';
   const effortFlag = (!defIsRoleFile && effort) ? ` --effort ${effort}` : '';
@@ -945,6 +947,7 @@ export async function getRoleRuntimeBaseCommand(
   // permissionMode now comes from the global permission flags for EVERY role
   // (the old --agent path relied on role frontmatter, which Claude Code no longer
   // applies). This honors the user's bypass/auto setting uniformly.
+  await ensureAutoApproveHookReady(); // PAN-5151
   const permissionFlags = ` ${getClaudePermissionFlagsString()}`;
 
   // PAN-1557: convoy sub-reviewers now run as interactive, attachable sessions

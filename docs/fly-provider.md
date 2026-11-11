@@ -365,6 +365,11 @@ the one-shot "Make auto mode your default permission mode?" dialog
 (`hasSeenAutoDefaultNudge`), which otherwise took focus on every fresh VM and swallowed
 the first message (PAN-4738).
 
+The Fly VM carries no Overdeck auto-approve hook, so a remote agent launch under
+resolved mode `auto` is refused (PAN-5151): `auto` there would prompt on every tool
+call with nobody watching the VM. Set `claude.permissionMode: bypass` in Settings →
+Permissions, or start with `PAN_YOLO=true`, before launching a remote agent.
+
 If Claude auth fails on the remote agent, re-authenticate locally (`claude`) then sync:
 
 ```bash

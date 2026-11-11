@@ -10,6 +10,18 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.80.0" description="Unreleased" tags={["Upcoming"]}>
+  ## Upcoming release
+
+  Drafted from the changes merged to `main` since v0.79.0. The date is set when the release is tagged.
+
+  #### Improved
+
+  - **New installations start in Auto permission mode:** a new install launches Claude Code with `--permission-mode default` and Overdeck's auto-approve hook instead of bypass; installs that existed before this release keep bypass, written once into `~/.overdeck/config.yaml`; `pan doctor` reports a missing hook, and a launch is refused rather than prompting on every tool call. ([#5151](https://github.com/eltmon/overdeck/issues/5151))
+
+  [Compare v0.79.0...v0.80.0](https://github.com/eltmon/overdeck/compare/v0.79.0...v0.80.0)
+</Update>
+
 <Update label="v0.79.0" description="2026-11-11">
   #### New
 

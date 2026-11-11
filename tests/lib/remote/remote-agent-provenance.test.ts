@@ -75,6 +75,7 @@ vi.mock('../../../src/lib/remote/remote-tmux.js', async (importOriginal) => {
 describe('remote agent provenance', () => {
   let home: string;
   let previousHome: string | undefined;
+  let previousYolo: string | undefined;
 
   beforeEach(() => {
     vi.resetModules();
@@ -89,11 +90,19 @@ describe('remote agent provenance', () => {
     home = mkdtempSync(join(tmpdir(), 'remote-agent-provenance-'));
     previousHome = process.env.HOME;
     process.env.HOME = home;
+    // PAN-5151: these tests exercise provenance/consent plumbing, not
+    // permission mode. The flipped default now resolves 'auto' here (no
+    // config.claude in mocks.effortConfig), which spawnRemoteAgent refuses
+    // for remote Fly agents — force 'bypass' so that refusal never fires.
+    previousYolo = process.env.PAN_YOLO;
+    process.env.PAN_YOLO = 'true';
   });
 
   afterEach(() => {
     if (previousHome === undefined) delete process.env.HOME;
     else process.env.HOME = previousHome;
+    if (previousYolo === undefined) delete process.env.PAN_YOLO;
+    else process.env.PAN_YOLO = previousYolo;
     rmSync(home, { recursive: true, force: true });
   });
 

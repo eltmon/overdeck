@@ -757,7 +757,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
     claude: {
       // Defensive — older test mocks of loadConfig may not include `claude`;
       // production loader always populates it via DEFAULT_CONFIG.
-      permissionMode: config.claude?.permissionMode ?? 'bypass',
+      permissionMode: config.claude?.permissionMode ?? DEFAULT_CONFIG.claude.permissionMode,
     },
     codex: {
       permissionMode: (config.codex?.permissionMode ?? 'auto-review') as 'read-only' | 'workspace' | 'auto-review' | 'full-access',
