@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5071",
   "created": "2026-11-11T07:17:20.918Z",
-  "updated": "2026-11-11T07:32:20.152Z",
+  "updated": "2026-11-11T07:34:54.016Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,9 +80,18 @@
       "doneAt": "2026-11-11T07:32:10.553Z"
     },
     "miniflare-link-flow": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5071",
-      "claimedAt": "2026-11-11T07:32:20.152Z"
+      "claimedAt": "2026-11-11T07:32:20.152Z",
+      "doneAt": "2026-11-11T07:34:54.015Z"
+    },
+    "miniflare-link-flow.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:34:54.015Z"
+    },
+    "miniflare-link-flow.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:34:54.015Z"
     }
   }
 }
