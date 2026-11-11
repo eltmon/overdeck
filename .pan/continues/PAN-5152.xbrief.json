@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T15:33:38.399Z",
+  "updated": "2026-11-11T15:33:40.189Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -266,6 +266,11 @@
     "wi13-close-out-jira.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T15:33:38.398Z"
+    },
+    "wi14-reopen-reset-jira": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T15:33:40.189Z"
     }
   }
 }
