@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5123",
   "created": "2026-11-11T11:14:57.280Z",
-  "updated": "2026-11-11T11:18:17.958Z",
+  "updated": "2026-11-11T11:20:26.659Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,9 +60,26 @@
       "doneAt": "2026-11-11T11:18:10.858Z"
     },
     "skill-named-classes": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5123",
-      "claimedAt": "2026-11-11T11:18:17.958Z"
+      "claimedAt": "2026-11-11T11:18:17.958Z",
+      "doneAt": "2026-11-11T11:20:26.659Z"
+    },
+    "skill-named-classes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T11:20:26.659Z"
+    },
+    "skill-named-classes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T11:20:26.659Z"
+    },
+    "skill-named-classes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T11:20:26.659Z"
+    },
+    "skill-named-classes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T11:20:26.659Z"
     }
   }
 }
