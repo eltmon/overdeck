@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5153",
   "created": "2026-11-11T14:43:19.840Z",
-  "updated": "2026-11-11T15:45:24.017Z",
+  "updated": "2026-11-11T15:47:58.571Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -350,9 +350,22 @@
       "doneAt": "2026-11-11T15:45:17.302Z"
     },
     "identity-chip": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5153",
-      "claimedAt": "2026-11-11T15:45:24.017Z"
+      "claimedAt": "2026-11-11T15:45:24.017Z",
+      "doneAt": "2026-11-11T15:47:58.570Z"
+    },
+    "identity-chip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:47:58.570Z"
+    },
+    "identity-chip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:47:58.570Z"
+    },
+    "identity-chip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:47:58.570Z"
     }
   }
 }
