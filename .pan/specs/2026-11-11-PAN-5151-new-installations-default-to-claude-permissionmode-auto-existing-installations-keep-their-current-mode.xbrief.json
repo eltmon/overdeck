@@ -4,17 +4,17 @@
     "created": "2026-11-11T14:24:12Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5151: New installations default to claude.permissionMode auto; existing installations keep their current mode",
-    "updated": "2026-11-11T14:31:56.896Z"
+    "updated": "2026-11-11T14:33:21.306Z"
   },
   "plan": {
     "id": "pan-5151",
     "title": "New installations default to claude.permissionMode auto; existing installations keep their current mode",
-    "status": "proposed",
+    "status": "running",
     "uid": "0700f5ea-4b39-464a-8642-72f52936a0c5",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-11T14:24:12Z",
-    "updated": "2026-11-11T14:31:56.896Z",
+    "updated": "2026-11-11T14:33:21.306Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5151",
@@ -884,5 +884,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
