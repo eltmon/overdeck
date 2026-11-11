@@ -107,15 +107,20 @@ function getGitHubLocalPaths(): Record<string, string> {
  * Jira issue never falls through to Linear.
  */
 function loadJiraPlanningIssue(id: string) {
+  const fail = (cause: unknown) => new TrackerApiError({
+    tracker: 'jira',
+    message: `could not fetch ${id.toUpperCase()} from Jira: ${(cause as { message?: string } | null)?.message ?? String(cause)}`,
+    cause,
+  });
   return Effect.gen(function* () {
-    const resolved = yield* resolveProjectFromIssue(id);
-    const { projects } = yield* loadProjectsConfig();
+    const resolved = yield* resolveProjectFromIssue(id).pipe(Effect.mapError(fail));
+    const { projects } = yield* loadProjectsConfig().pipe(Effect.mapError(fail));
     const project = resolved ? projects[resolved.projectKey] : undefined;
     if (!resolved || project?.tracker !== 'jira') {
-      return yield* Effect.fail(new Error('no tracker: jira project owns this issue prefix'));
+      return yield* Effect.fail(fail({ message: 'no tracker: jira project owns this issue prefix' }));
     }
-    const tracker = yield* Effect.try({ try: () => createJiraTrackerForProject(resolved.projectKey, project), catch: error => error });
-    const jiraIssue = yield* tracker.getIssue(id);
+    const tracker = yield* Effect.try({ try: () => createJiraTrackerForProject(resolved.projectKey, project), catch: fail });
+    const jiraIssue = yield* tracker.getIssue(id).pipe(Effect.mapError(fail));
     const comments = yield* tracker.getComments(id).pipe(Effect.catch(() => Effect.succeed([])));
     const children = jiraIssue.artifactType === 'Epic'
       ? yield* tracker.getChildIssues(id).pipe(Effect.catch(() => Effect.succeed([])))
@@ -133,13 +138,7 @@ function loadJiraPlanningIssue(id: string) {
         ? children.map(child => ({ ref: child.ref, title: child.title, status: child.rawState ?? '', description: child.description }))
         : undefined,
     };
-  }).pipe(
-    Effect.mapError(err => new TrackerApiError({
-      tracker: 'jira',
-      message: `could not fetch ${id.toUpperCase()} from Jira: ${(err as { message?: string })?.message ?? String(err)}`,
-      cause: err,
-    })),
-  );
+  });
 }
 
 function getProjectPath(linearProjectId?: string, issuePrefix?: string): string {
