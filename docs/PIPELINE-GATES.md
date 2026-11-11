@@ -328,7 +328,14 @@ the **CI test job on the PR head is the test gate**:
   needs-you. CI results are per-run
   records only; `verification-latest.json` stays the local gate run's record.
   Re-requesting review on a head whose CI test job is already red fails the
-  `test` gate again instead of passing on typecheck+lint alone.
+  `test` gate again instead of passing on typecheck+lint alone. The runner
+  looks the CI verdict up under the eight-character PR head the relay
+  recorded it for. In a polyrepo workspace that is the primary member repo's
+  head (the first required repo in `workspace.repos`), never the wrapper
+  repo's HEAD, which no PR points at (PAN-4624, `ciVerdictHead8` in
+  `cloister/verified-head.ts`). This holds for the launch head and for a head
+  an agent commit moved to during the run. A standalone workspace reads the
+  verdict for its own HEAD, as before.
 - The verification artifact lists only the gates that ran on the host and
   names the handed-off gate in `deferredToCi: ["test"]`. The `overdeck/test`
   status still posts (branch protection requires the context) with the

@@ -28,6 +28,7 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
   #### Fixed
 
   - **`pan review request` no longer races PR adoption:** when a PR opened outside a pipeline workspace is still being adopted into one, `pan review request` now answers that adoption is in progress and starts nothing. Before, it could start a second verification on the half-built workspace, which made adoption refuse with `workspace-head-mismatch` and showed a false Needs you. ([#4995](https://github.com/eltmon/overdeck/issues/4995))
+  - **Polyrepo CI test verdicts are read for the member repo's head:** in a polyrepo project with `verification.tests: ci`, the verification gate looked up the CI test result under the wrapper repo's HEAD, which no PR points at, so a red CI test job never failed the `test` gate and verification passed on typecheck and lint alone. It now reads the verdict for the primary member repo's head, both at the start of the run and after an agent commit moves it. Standalone projects are unchanged. ([#4624](https://github.com/eltmon/overdeck/issues/4624))
 
   [Compare v0.77.0...v0.78.0](https://github.com/eltmon/overdeck/compare/v0.77.0...v0.78.0)
 </Update>
