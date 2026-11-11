@@ -149,13 +149,6 @@ function confirmStep(grant: DeviceGrantRow, normalized: string): string {
   );
 }
 
-/** GET /activate[?user_code=…] */
-export const activatePage: Handler = async (req, _rc) => {
-  const raw = new URL(req.url).searchParams.get('user_code') ?? '';
-  const normalized = normalizeUserCode(raw);
-  return html(activateForm(normalized.length === 8 ? formatUserCode(normalized) : raw, null));
-};
-
 async function findPendingGrantByUserCode(rc: RequestContext, rawCode: string): Promise<DeviceGrantRow | null> {
   const normalized = normalizeUserCode(rawCode);
   if (normalized.length !== 8) return null;
@@ -163,6 +156,24 @@ async function findPendingGrantByUserCode(rc: RequestContext, rawCode: string): 
     .bind(await sha256Hex(normalized), rc.deps.now())
     .first<DeviceGrantRow>();
 }
+
+/**
+ * GET /activate[?user_code=…]: a code of a pending grant renders the confirm step directly (PAN-5071 FR-18), so the
+ * device-flow link is one Authorize click. A code that does not resolve counts against `activate-fail` like POST /activate
+ * (FR-20). A GET never writes device_grants (FR-29): a link previewer's fetch approves nothing.
+ */
+export const activatePage: Handler = async (req, rc) => {
+  const raw = (new URL(req.url).searchParams.get('user_code') ?? '').trim();
+  if (raw === '') return html(activateForm('', null));
+  const exhausted = await peek(rc, 'activate-fail');
+  if (!exhausted.ok) return rateLimitedPage(exhausted.retryAfterS, TOO_MANY_WRONG_CODES_MESSAGE);
+  const grant = await findPendingGrantByUserCode(rc, raw);
+  if (grant) return html(confirmStep(grant, normalizeUserCode(raw)));
+  const verdict = await hit(rc, 'activate-fail');
+  if (!verdict.ok) return rateLimitedPage(verdict.retryAfterS, TOO_MANY_WRONG_CODES_MESSAGE);
+  const normalized = normalizeUserCode(raw);
+  return html(activateForm(normalized.length === 8 ? formatUserCode(normalized) : raw, INVALID_CODE_MESSAGE), 400);
+};
 
 /** POST /activate: look the code up; wrong codes count against `activate-fail` (D-12), and an exhausted window refuses before any lookup. */
 export const activateSubmit: Handler = async (req, rc) => {
