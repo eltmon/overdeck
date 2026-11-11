@@ -54,6 +54,7 @@ import {
   resolveAppBotLogin,
   verifyAppCanMerge,
 } from '../../../src/lib/github-app.js';
+import { getInstallationAccessToken } from '../../../src/lib/github-app-auth.js';
 
 // PAN-4264: installation tokens are memoized per process; every test starts
 // without one so its fetch mock sees the mint it expects.
@@ -806,5 +807,59 @@ describe('installation token cache (PAN-4264)', () => {
     await vi.advanceTimersByTimeAsync(2 * 60_000);
     await getIssueState('eltmon', 'overdeck', 3);
     expect(mintCount()).toBe(2);
+  });
+});
+
+// PAN-5153 W1: one App, many installations. A token is minted and memoized
+// per installation id; no id means the home installation (67890 here).
+describe('per-installation tokens (PAN-5153)', () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.UTC(2026, 10, 11, 15, 0));
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockReset();
+    fetchMock.mockImplementation(async (url: string) => {
+      const id = /\/app\/installations\/(\d+)\/access_tokens$/.exec(url)?.[1] ?? 'unknown';
+      const expiresAt = new Date(Date.now() + 60 * 60_000).toISOString();
+      return new Response(JSON.stringify({ token: `token-${id}`, expires_at: expiresAt }), { status: 201 });
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  function mintUrls(): string[] {
+    return fetchMock.mock.calls.map((call) => String(call[0])).filter((url) => url.endsWith('/access_tokens'));
+  }
+
+  it('mints for the named installation, not the home one', async () => {
+    await expect(getInstallationAccessToken('222')).resolves.toBe('token-222');
+    expect(mintUrls()).toEqual(['https://api.github.com/app/installations/222/access_tokens']);
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'POST' });
+  });
+
+  it('mints one token per distinct installation id', async () => {
+    await getInstallationAccessToken('222');
+    await getInstallationAccessToken('333');
+    expect(mintUrls()).toEqual([
+      'https://api.github.com/app/installations/222/access_tokens',
+      'https://api.github.com/app/installations/333/access_tokens',
+    ]);
+  });
+
+  it('reuses the memoized token for a repeated installation id', async () => {
+    const first = await getInstallationAccessToken('222');
+    const second = await getInstallationAccessToken('222');
+    expect(second).toBe(first);
+    expect(mintUrls()).toHaveLength(1);
+  });
+
+  it('mints for the home installation when no id is given', async () => {
+    await expect(getInstallationAccessToken()).resolves.toBe('token-67890');
+    expect(mintUrls()).toEqual(['https://api.github.com/app/installations/67890/access_tokens']);
   });
 });
