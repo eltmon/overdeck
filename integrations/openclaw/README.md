@@ -10,6 +10,48 @@ plugin adds a needs-you summary, two chat tools and the `overdeck` skill.
 catalog. The checks against OpenClaw are recorded in
 [`docs/verification.md`](docs/verification.md).
 
+## Connect in one paste
+
+In Overdeck, open Settings → Anywhere → Bots → Connect a bot, pick
+OpenClaw and its access, and click **Copy for OpenClaw**. Paste the copied
+message into a chat with an OpenClaw agent that has a shell. It looks like
+this, with your machine, version and a one-time pairing string filled in:
+
+```text
+Please connect yourself to my Overdeck machine "<machine>" as "OpenClaw bot".
+
+Run this command in your shell. You can run it again at any time; each run continues where the last one stopped:
+
+npx -y @overdeck/core@<version> mcp connector connect '<pairing string>' --name 'OpenClaw bot' --platform openclaw
+
+Then act on the last line it prints. That line starts with OVERDECK_CONNECT and holds JSON:
+- If "status" is "authorize", show me the "url" link. I will open it and click Authorize. When I tell you I did, run the same command again.
+- If "status" is "retry", do what "next" says, then run the same command again.
+- If "status" is "error", tell me the "code" and do what "next" says.
+- If "status" is "ready", register exactly the MCP server in "registration", call list_conversations once, and tell me the result.
+
+The pairing code in the command works once and expires soon. Do not save it anywhere. If it is refused, ask me to copy a new message from Overdeck.
+```
+
+The agent runs the command and shows you one link. Open it, click
+**Authorize**, and tell the agent you did. It runs the command again,
+pairs with your machine, and registers the connector with OpenClaw:
+
+```bash
+openclaw mcp set overdeck '{"command":"npx","args":["-y","@overdeck/core@<version>","mcp","connector","serve","--stdio"]}'
+```
+
+OpenClaw applies changes under `mcp.servers` without a restart, so the
+`overdeck__*` tools appear on the next turn. The plugin's needs-you
+summary and its `overdeck_pending` and `overdeck_answer` tools talk to the
+connector over HTTP, so they still need the
+[connector route by hand](#connector-route-by-hand) (`serve` and
+`localToken`).
+
+The pairing code works once and expires within 30 minutes. If it is
+refused, click **Copy again** under Settings → Anywhere → Bots and paste
+the new message.
+
 ## What it includes
 
 - `openclaw.plugin.json`, the plugin manifest (plugin id `overdeck`).
@@ -48,7 +90,7 @@ confirm in, pass `--force --accept-capabilities`.
 The plugin has no runtime dependencies and does not need the `openclaw`
 package installed next to it.
 
-## Connector route (default)
+## Connector route by hand
 
 The Overdeck connector runs next to OpenClaw and serves the paired machine's
 tools on `http://127.0.0.1:7466/mcp`, with no Tailscale and no public address.

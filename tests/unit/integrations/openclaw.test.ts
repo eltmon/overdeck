@@ -4,11 +4,14 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import plugin from '../../../integrations/openclaw/src/index';
 import type { PluginTool } from '../../../integrations/openclaw/src/openclaw-api';
+import { connectMessage } from '../../../src/dashboard/frontend/src/components/Settings/anywhere/connectMessage';
 import {
   CONNECTOR_LOCAL_URL,
+  defaultBotName,
   openclawConfig,
   TAILSCALE_PLACEHOLDER_ORIGIN,
 } from '../../../src/dashboard/frontend/src/components/Settings/anywhere/botSnippets';
+import { openclawRegistrationCommand, registrationFor } from '../../../src/lib/mcp/connector/connect-output.js';
 
 // PAN-4954 (PAN-4927 W-INT2) WI-10, AC-10: the OpenClaw plugin's manifest, package.json, entry,
 // README snippets, LICENSE and a package-wide secret scan, in the root suite that CI runs.
@@ -71,6 +74,15 @@ describe('integrations/openclaw README', () => {
     const readme = readFileSync(readmePath, 'utf-8');
     expect(readme).toContain(openclawConfig({ reach: 'connector', url: CONNECTOR_LOCAL_URL }));
     expect(readme).toContain(openclawConfig({ reach: 'tailscale', url: `${TAILSCALE_PLACEHOLDER_ORIGIN}/mcp` }));
+  });
+
+  it('leads with the one-paste flow, its Copy message and the mcp set command', () => {
+    const readme = readFileSync(readmePath, 'utf-8');
+    expect(readme.match(/^## .*/m)?.[0]).toBe('## Connect in one paste');
+    expect(readme).toContain(
+      connectMessage({ platform: 'openclaw', botName: defaultBotName('openclaw'), machineLabel: '<machine>', version: '<version>', pairingString: '<pairing string>' }),
+    );
+    expect(readme).toContain(openclawRegistrationCommand(registrationFor({ version: '<version>', env: {} })));
   });
 });
 
