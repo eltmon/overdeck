@@ -58,6 +58,15 @@ export interface PackManifest {
   pluginName: string | null;
   /** Top-level skills the adapter never mounts, with the reason (gstack-runtime). */
   excluded?: Array<{ name: string; reason: string }>;
+  /** Applied MCP servers (PAN-5165 D-2/D-3): `claude-plugin` packs only, https `type: "http"` entries only. */
+  mcpServers?: Record<string, PackMcpServer>;
+}
+
+/** An MCP server a pack declares that Overdeck applies (PAN-5165 D-2): remote https only, no ${} references. */
+export interface PackMcpServer {
+  type: 'http';
+  url: string;
+  headers: Record<string, string>;
 }
 
 export interface KnownPack {
@@ -323,6 +332,91 @@ async function listExecutables(root: string, skillDir: string, skipTopLevel: Rea
   return found;
 }
 
+const MCP_SERVER_NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+/** Parsed JSON's `mcpServers` key as an object, or null when the text is unreadable, invalid, or lacks one. */
+function parseMcpServersMap(text: string | null): Record<string, unknown> | null {
+  if (text === null) return null;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const mcpServers = (parsed as Record<string, unknown>)['mcpServers'];
+    if (!mcpServers || typeof mcpServers !== 'object' || Array.isArray(mcpServers)) return null;
+    return mcpServers as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/** True when `value` is an entry this issue applies (PAN-5165 D-2): remote https, no `${}` references. */
+function isAppliedMcpServerEntry(
+  name: string,
+  value: unknown,
+): value is { type: 'http'; url: string; headers?: Record<string, string> } {
+  if (!MCP_SERVER_NAME_PATTERN.test(name) || name === 'overdeck') return false;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const entry = value as Record<string, unknown>;
+  if (entry['type'] !== 'http') return false;
+  const url = entry['url'];
+  if (typeof url !== 'string' || !url.startsWith('https://') || url.includes('${')) return false;
+  const headers = entry['headers'];
+  if (headers === undefined) return true;
+  if (!headers || typeof headers !== 'object' || Array.isArray(headers)) return false;
+  for (const headerValue of Object.values(headers as Record<string, unknown>)) {
+    if (typeof headerValue !== 'string' || headerValue.includes('${')) return false;
+  }
+  return true;
+}
+
+/** Applied servers by name, plus how many declared entries were not applied. */
+export async function readPackMcpServers(
+  base: string,
+  plugin: Record<string, unknown> | null,
+): Promise<{ applied: Record<string, PackMcpServer>; notApplied: number; declared: boolean }> {
+  const declaredValue = plugin?.['mcpServers'];
+  let declared = false;
+  let serversMap: Record<string, unknown> | null = null;
+
+  if (typeof declaredValue === 'string') {
+    declared = true;
+    const rel = toRepoRelative(declaredValue);
+    serversMap = rel ? parseMcpServersMap(await readTextOrNull(join(base, rel))) : null;
+  } else if (declaredValue && typeof declaredValue === 'object' && !Array.isArray(declaredValue)) {
+    declared = true;
+    const obj = declaredValue as Record<string, unknown>;
+    const nested = obj['mcpServers'];
+    serversMap = nested && typeof nested === 'object' && !Array.isArray(nested) ? (nested as Record<string, unknown>) : obj;
+  } else {
+    const mcpJsonPath = join(base, '.mcp.json');
+    if (await isFile(mcpJsonPath)) {
+      declared = true;
+      serversMap = parseMcpServersMap(await readTextOrNull(mcpJsonPath));
+    }
+  }
+
+  if (!declared) return { applied: {}, notApplied: 0, declared: false };
+  if (serversMap === null) return { applied: {}, notApplied: 1, declared: true };
+
+  const applied: Record<string, PackMcpServer> = {};
+  let notApplied = 0;
+  for (const [name, value] of Object.entries(serversMap)) {
+    if (isAppliedMcpServerEntry(name, value)) {
+      applied[name] = { type: 'http', url: value.url, headers: value.headers ?? {} };
+    } else {
+      notApplied += 1;
+    }
+  }
+  return { applied, notApplied, declared: true };
+}
+
+/** `MCP server <name> (<url>)` for each applied server, sorted by name; empty when the manifest has none. */
+export function mcpServerLabels(manifest: PackManifest): string[] {
+  if (!manifest.mcpServers) return [];
+  return Object.entries(manifest.mcpServers)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, server]) => `MCP server ${name} (${server.url})`);
+}
+
 async function readLicense(root: string, plugin: Record<string, unknown> | null): Promise<string | null> {
   const declared = plugin?.['license'];
   if (typeof declared === 'string' && declared.trim()) return declared.trim();
@@ -349,6 +443,7 @@ export async function readPackManifest(
   }
   const base = prefix ? join(root, prefix) : root;
   const plugin = await readPluginJson(base, adapter === 'claude-plugin');
+  const mcp = adapter === 'claude-plugin' ? await readPackMcpServers(base, plugin) : null;
   const deft = adapter === 'deft-readonly';
   const gstack = adapter === 'gstack-runtime' ? await gstackSkillDirs(base, opts.browser === true) : null;
   const skillDirs =
@@ -394,7 +489,8 @@ export async function readPackManifest(
   // Deft always carries agent hooks, an AGENTS.md section, and .githooks, and its skills call the directive CLI.
   const capabilities: PackCapabilities = {
     hooks: deft || gstack !== null || (await isFile(join(base, 'hooks', 'hooks.json'))) || plugin?.['hooks'] !== undefined,
-    mcpServers: (await isFile(join(base, '.mcp.json'))) || plugin?.['mcpServers'] !== undefined,
+    // PAN-5165: claude-plugin packs apply their https MCP servers; anything else they declare stays Not applied.
+    mcpServers: mcp ? mcp.notApplied > 0 : (await isFile(join(base, '.mcp.json'))) || plugin?.['mcpServers'] !== undefined,
     commands: await isDir(join(base, 'commands')),
     agents: await isDir(join(base, 'agents')),
     contextInjection: deft,
@@ -405,7 +501,13 @@ export async function readPackManifest(
     ...(gstack ? { runtime: true } : {}),
   };
   const pluginName = typeof plugin?.['name'] === 'string' ? plugin['name'] : null;
-  const manifest: PackManifest = { skills, capabilities, license: await readLicense(base, plugin), pluginName };
+  const manifest: PackManifest = {
+    skills,
+    capabilities,
+    license: await readLicense(base, plugin),
+    pluginName,
+    ...(mcp && Object.keys(mcp.applied).length > 0 ? { mcpServers: mcp.applied } : {}),
+  };
   return gstack ? { ...manifest, excluded: gstack.excluded } : manifest;
 }
 

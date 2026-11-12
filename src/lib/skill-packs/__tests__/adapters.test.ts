@@ -129,6 +129,114 @@ describe('claude-plugin adapter', () => {
   });
 });
 
+describe('pack MCP servers (PAN-5165)', () => {
+  it('applies a single https http server declared in .mcp.json', async () => {
+    const root = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({ name: 'atlassian' }),
+      '.mcp.json': JSON.stringify({
+        mcpServers: { atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp' } },
+      }),
+    });
+    const manifest = await readPackManifest(root, 'claude-plugin');
+    expect(manifest.mcpServers).toEqual({
+      atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp', headers: {} },
+    });
+    expect(manifest.capabilities.mcpServers).toBe(false);
+    expect(notAppliedLabels(manifest.capabilities)).not.toContain('MCP servers');
+  });
+
+  it('applies only the http entry alongside a stdio entry, and still reports Not applied', async () => {
+    const root = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({ name: 'mixed' }),
+      '.mcp.json': JSON.stringify({
+        mcpServers: {
+          stdioServer: { type: 'stdio', command: 'run-me' },
+          httpServer: { type: 'http', url: 'https://example.com/mcp' },
+        },
+      }),
+    });
+    const manifest = await readPackManifest(root, 'claude-plugin');
+    expect(manifest.mcpServers).toEqual({
+      httpServer: { type: 'http', url: 'https://example.com/mcp', headers: {} },
+    });
+    expect(manifest.capabilities.mcpServers).toBe(true);
+    expect(notAppliedLabels(manifest.capabilities)).toContain('MCP servers');
+  });
+
+  it('applies none of: a plain http:// url, a ${} header, an sse server, or the name overdeck', async () => {
+    const root = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({ name: 'rejected' }),
+      '.mcp.json': JSON.stringify({
+        mcpServers: {
+          plainHttp: { type: 'http', url: 'http://insecure.example/mcp' },
+          templated: { type: 'http', url: 'https://example.com/mcp', headers: { Authorization: 'Bearer ${TOKEN}' } },
+          sseServer: { type: 'sse', url: 'https://example.com/sse' },
+          overdeck: { type: 'http', url: 'https://example.com/mcp' },
+        },
+      }),
+    });
+    const manifest = await readPackManifest(root, 'claude-plugin');
+    expect(manifest.mcpServers).toBeUndefined();
+    expect(manifest.capabilities.mcpServers).toBe(true);
+  });
+
+  it('resolves servers from a plugin.json string path, and from inline object forms', async () => {
+    const pathRoot = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({ name: 'path', mcpServers: './mcp/servers.json' }),
+      'mcp/servers.json': JSON.stringify({
+        mcpServers: { atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp' } },
+      }),
+    });
+    const pathManifest = await readPackManifest(pathRoot, 'claude-plugin');
+    expect(pathManifest.mcpServers).toEqual({
+      atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp', headers: {} },
+    });
+
+    const directRoot = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({
+        name: 'direct',
+        mcpServers: { atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp' } },
+      }),
+    });
+    const directManifest = await readPackManifest(directRoot, 'claude-plugin');
+    expect(directManifest.mcpServers).toEqual({
+      atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp', headers: {} },
+    });
+
+    const nestedRoot = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({
+        name: 'nested',
+        mcpServers: { mcpServers: { atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp' } } },
+      }),
+    });
+    const nestedManifest = await readPackManifest(nestedRoot, 'claude-plugin');
+    expect(nestedManifest.mcpServers).toEqual({
+      atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp', headers: {} },
+    });
+  });
+
+  it('never applies MCP servers for a plain adapter pack, but still reports Not applied', async () => {
+    const root = fixture({
+      '.mcp.json': JSON.stringify({
+        mcpServers: { atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp' } },
+      }),
+    });
+    const manifest = await readPackManifest(root, 'plain');
+    expect(manifest.mcpServers).toBeUndefined();
+    expect(manifest.capabilities.mcpServers).toBe(true);
+  });
+
+  it('applies nothing on invalid JSON, and still reports Not applied', async () => {
+    const root = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({ name: 'broken' }),
+      '.mcp.json': '{not json',
+    });
+    const manifest = await readPackManifest(root, 'claude-plugin');
+    expect(manifest.mcpServers).toBeUndefined();
+    expect(manifest.capabilities.mcpServers).toBe(true);
+  });
+});
+
 describe('plugin root', () => {
   it('reads a claude-plugin pack from pluginRoot and returns repo-relative dirs', async () => {
     const root = fixture({
