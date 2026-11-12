@@ -93,6 +93,8 @@ export interface PackCatalogEntry {
   manifest: PackManifest | null;
   /** gstack-runtime: 'off' (no consent), 'ready', or 'missing' (consent recorded, runtime not built). PAN-4730. */
   browser?: 'off' | 'ready' | 'missing';
+  /** The operator confirmed a preview that listed this pack's MCP servers (PAN-5165). */
+  mcp?: true;
 }
 
 async function isDirectory(path: string): Promise<boolean> {
@@ -147,6 +149,7 @@ export async function listPackCatalog(): Promise<PackCatalogEntry[]> {
         cached,
         manifest,
         ...(browser ? { browser } : {}),
+        ...(entry.mcp === true ? { mcp: true as const } : {}),
       };
     }),
   );

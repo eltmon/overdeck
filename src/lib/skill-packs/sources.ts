@@ -20,6 +20,7 @@ import { runSettingsWriteSerialized } from '../settings-api.js';
 import {
   detectAdapter,
   KNOWN_PACKS,
+  mcpServerLabels,
   notAppliedLabels,
   readPackManifest,
   type PackAdapterId,
@@ -51,6 +52,8 @@ export interface PackRegistryEntry {
   adapter?: PackAdapterId;
   /** gstack-runtime only: the operator trusted the browser runtime (PAN-4730). */
   browser?: true;
+  /** The operator confirmed a preview that listed this pack's MCP servers (PAN-5165). */
+  mcp?: true;
 }
 
 function assertPackId(id: string): void {
@@ -111,11 +114,11 @@ async function readTextOrEmpty(path: string): Promise<string> {
 
 function toEntry(id: string, raw: unknown): PackRegistryEntry | null {
   if (!PACK_ID_PATTERN.test(id) || !raw || typeof raw !== 'object') return null;
-  const { url, ref, commit, adapter, browser } = raw as Record<string, unknown>;
+  const { url, ref, commit, adapter, browser, mcp } = raw as Record<string, unknown>;
   if (typeof url !== 'string' || !url || typeof ref !== 'string' || !ref) return null;
   if (typeof commit !== 'string' || !COMMIT_PATTERN.test(commit)) return null;
   if (adapter !== undefined && !ADAPTERS.includes(adapter as PackAdapterId)) return null;
-  // Only `browser: true` records consent; any other value is ignored, not a malformed entry.
+  // Only `browser: true`/`mcp: true` record consent; any other value is ignored, not a malformed entry.
   return {
     id,
     url,
@@ -123,6 +126,7 @@ function toEntry(id: string, raw: unknown): PackRegistryEntry | null {
     commit,
     ...(adapter ? { adapter: adapter as PackAdapterId } : {}),
     ...(browser === true ? { browser: true as const } : {}),
+    ...(mcp === true ? { mcp: true as const } : {}),
   };
 }
 
@@ -203,6 +207,7 @@ export async function writePackEntry(entry: PackRegistryEntry): Promise<void> {
     commit: entry.commit,
     ...(entry.adapter ? { adapter: entry.adapter } : {}),
     ...(entry.browser === true ? { browser: true } : {}),
+    ...(entry.mcp === true ? { mcp: true } : {}),
   };
   await editGlobalConfig((doc) => {
     doc.setIn(['skills', 'packs', entry.id], doc.createNode(value));
@@ -549,7 +554,14 @@ export async function addPack(
   if (!(await confirm(preview))) return { written: false, preview };
   if (runtime) await renderPack(id, dir, commit);
   if (buildsOx(id)) await buildPackOx(id, dir, commit);
-  await writePackEntry({ id, url, ref, commit, ...(input.adapter ? { adapter: input.adapter } : {}) });
+  await writePackEntry({
+    id,
+    url,
+    ref,
+    commit,
+    ...(input.adapter ? { adapter: input.adapter } : {}),
+    ...(preview.manifest.mcpServers ? { mcp: true as const } : {}),
+  });
   return { written: true, preview };
 }
 
@@ -589,6 +601,8 @@ export async function updatePack(
     if (oldHash !== newHash) changed.push(skill.name);
   }
   const oldLabels = new Set(notAppliedLabels(oldManifest.capabilities));
+  const oldMcpLabels = new Set(mcpServerLabels(oldManifest));
+  const wantsMcp = manifest.mcpServers !== undefined;
   const preview: PackPreview = {
     id,
     url: entry.url,
@@ -602,10 +616,15 @@ export async function updatePack(
       added: manifest.skills.map((skill) => skill.name).filter((name) => !oldByName.has(name)),
       removed: oldManifest.skills.map((skill) => skill.name).filter((name) => !newNames.has(name)),
       changed,
-      newCapabilities: notAppliedLabels(manifest.capabilities).filter((label) => !oldLabels.has(label)),
+      newCapabilities: [
+        ...notAppliedLabels(manifest.capabilities).filter((label) => !oldLabels.has(label)),
+        ...mcpServerLabels(manifest).filter((label) => !oldMcpLabels.has(label)),
+      ],
     },
   };
-  if (commit === entry.commit && ref === entry.ref) return { written: false, preview };
+  if (commit === entry.commit && ref === entry.ref && (entry.mcp === true) === wantsMcp) {
+    return { written: false, preview };
+  }
   // Checked only when there is something to move to, so an up-to-date pack needs no bun.
   const runtime = adapter === 'gstack-runtime' ? await runtimePreview(id, dir, commit) : undefined;
   if (runtime) preview.runtime = runtime;
@@ -616,7 +635,15 @@ export async function updatePack(
   if (runtime) await renderPack(id, dir, commit);
   if (browser && !(await isBrowserReady(packRenderDir(id, commit)))) await buildPackBrowser(id, dir, commit);
   if (buildsOx(id)) await buildPackOx(id, dir, commit);
-  await writePackEntry({ ...entry, ref, commit });
+  await writePackEntry({
+    id: entry.id,
+    url: entry.url,
+    ref,
+    commit,
+    ...(entry.adapter ? { adapter: entry.adapter } : {}),
+    ...(entry.browser === true ? { browser: true as const } : {}),
+    ...(wantsMcp ? { mcp: true as const } : {}),
+  });
   return { written: true, preview };
 }
 
@@ -672,7 +699,14 @@ export async function disablePackBrowser(id: string): Promise<{ changed: boolean
   const changed = entry.browser === true || (await isBrowserReady(renderDir));
   if (entry.browser) {
     const { url, ref, commit, adapter } = entry;
-    await writePackEntry({ id, url, ref, commit, ...(adapter ? { adapter } : {}) });
+    await writePackEntry({
+      id,
+      url,
+      ref,
+      commit,
+      ...(adapter ? { adapter } : {}),
+      ...(entry.mcp ? { mcp: true as const } : {}),
+    });
   }
   const dir = await gitStep(id, () => extractCommit(id, entry.commit, pluginRootOf(id)));
   await rm(renderDir, { recursive: true, force: true });
