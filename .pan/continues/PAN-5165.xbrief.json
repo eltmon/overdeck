@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5165",
   "created": "2026-11-12T13:45:52.140Z",
-  "updated": "2026-11-12T13:45:52.140Z",
+  "updated": "2026-11-12T14:06:34.544Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,30 @@
   "sessionHistory": [],
   "items": {
     "pack-mcp-reader": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5165",
-      "claimedAt": "2026-11-12T13:45:52.140Z"
+      "claimedAt": "2026-11-12T13:45:52.140Z",
+      "doneAt": "2026-11-12T14:06:34.543Z"
+    },
+    "pack-mcp-reader.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-12T14:06:34.543Z"
+    },
+    "pack-mcp-reader.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-12T14:06:34.543Z"
+    },
+    "pack-mcp-reader.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-12T14:06:34.543Z"
+    },
+    "pack-mcp-reader.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-12T14:06:34.543Z"
+    },
+    "pack-mcp-reader.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-12T14:06:34.543Z"
     }
   }
 }
