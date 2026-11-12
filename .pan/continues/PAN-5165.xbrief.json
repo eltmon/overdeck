@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5165",
   "created": "2026-11-12T13:45:52.140Z",
-  "updated": "2026-11-12T14:55:28.011Z",
+  "updated": "2026-11-12T14:55:34.837Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,11 @@
     "launch-pack-mcp-resolver.ac5": {
       "status": "completed",
       "doneAt": "2026-11-12T14:55:28.010Z"
+    },
+    "atlassian-auth-header": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5165",
+      "claimedAt": "2026-11-12T14:55:34.837Z"
     }
   }
 }
