@@ -15,6 +15,7 @@ import {
   type PackCapabilities,
 } from '../adapters.js';
 import { SAGEOX_DISCLOSURE } from '../../sageox/disclosure.js';
+import { ATLASSIAN_DISCLOSURE, ATLASSIAN_OPT_IN_SKILLS } from '../atlassian.js';
 import { DEFT_SKILL_MAP } from '../deft.js';
 import { GSTACK_BROWSER_NEEDED, GSTACK_DISCLOSURE, GSTACK_OPT_IN_SKILLS, GSTACK_SKILL_MAP } from '../gstack.js';
 
@@ -489,6 +490,66 @@ describe('KNOWN_PACKS', () => {
         'setup-pstack',
       ],
     });
+  });
+
+  it('points atlassian at the upstream repo, pinned, excluding archived v1 skills', () => {
+    expect(KNOWN_PACKS['atlassian']).toEqual({
+      id: 'atlassian',
+      url: 'https://github.com/atlassian/atlassian-mcp-server',
+      adapter: 'claude-plugin',
+      ref: '3be55622453304b905f0c0fd5ef96fa4d638627c',
+      skillsExclude: ['skills/v1'],
+      optIn: ATLASSIAN_OPT_IN_SKILLS,
+      disclosure: ATLASSIAN_DISCLOSURE,
+    });
+  });
+});
+
+describe('atlassian fixture (PAN-5165)', () => {
+  const atlassianFiles = (): Record<string, string> => ({
+    '.claude-plugin/plugin.json': JSON.stringify({ name: 'atlassian', skills: './skills/', mcpServers: './.mcp.json' }),
+    '.mcp.json': JSON.stringify({ mcpServers: { atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp' } } }),
+    'LICENSE': 'Apache License\nVersion 2.0\n',
+    'skills/atlassian-mcp-code-search/SKILL.md': skillMd('atlassian-mcp-code-search', 'Code search.'),
+    'skills/capture-tasks-from-meeting-notes/SKILL.md': skillMd('capture-tasks-from-meeting-notes', 'Capture tasks.'),
+    'skills/generate-status-report/SKILL.md': skillMd('generate-status-report', 'Status report.'),
+    'skills/jira-sprint-dashboard/SKILL.md': skillMd('jira-sprint-dashboard', 'Sprint dashboard.'),
+    'skills/search-company-knowledge/SKILL.md': skillMd('search-company-knowledge', 'Search knowledge.'),
+    'skills/spec-to-backlog/SKILL.md': skillMd('spec-to-backlog', 'Spec to backlog.'),
+    'skills/triage-issue/SKILL.md': skillMd('triage-issue', 'Triage.'),
+    'skills/v1/atlassian-mcp-code-search/SKILL.md': skillMd('atlassian-mcp-code-search', 'V1 code search.'),
+    'skills/v1/capture-tasks-from-meeting-notes/SKILL.md': skillMd('capture-tasks-from-meeting-notes', 'V1 capture.'),
+    'skills/v1/old-only/SKILL.md': skillMd('old-only', 'Archived v1 skill with no v2 counterpart.'),
+  });
+
+  it('excludes skills/v1 when skillsExclude is given', async () => {
+    const root = fixture(atlassianFiles());
+    const manifest = await readPackManifest(root, 'claude-plugin', {
+      optIn: ATLASSIAN_OPT_IN_SKILLS,
+      skillsExclude: ['skills/v1'],
+    });
+    expect(manifest.skills.map((skill) => skill.name)).toEqual([
+      'atlassian-mcp-code-search',
+      'capture-tasks-from-meeting-notes',
+      'generate-status-report',
+      'jira-sprint-dashboard',
+      'search-company-knowledge',
+      'spec-to-backlog',
+      'triage-issue',
+    ]);
+    expect(manifest.skills.some((skill) => skill.dir.startsWith('skills/v1'))).toBe(false);
+    expect(manifest.capabilities.projectMutatingSkills).toHaveLength(4);
+    expect(manifest.license).toBe('Apache');
+    expect(manifest.mcpServers).toEqual({
+      atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp', headers: {} },
+    });
+    expect(notAppliedLabels(manifest.capabilities)).toEqual(['project-mutating skills (4)']);
+  });
+
+  it('includes the v1-only skill without skillsExclude (proves exclusion, not dedupe, removes v1)', async () => {
+    const root = fixture(atlassianFiles());
+    const manifest = await readPackManifest(root, 'claude-plugin', { optIn: ATLASSIAN_OPT_IN_SKILLS });
+    expect(manifest.skills.map((skill) => skill.name)).toContain('old-only');
   });
 });
 

@@ -11,6 +11,7 @@ import { lstat, readdir, readFile } from 'node:fs/promises';
 import { basename, isAbsolute, join, posix } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { SAGEOX_DISCLOSURE } from '../sageox/disclosure.js';
+import { ATLASSIAN_DISCLOSURE, ATLASSIAN_OPT_IN_SKILLS, ATLASSIAN_PACK_COMMIT, ATLASSIAN_PACK_ID, ATLASSIAN_PACK_URL } from './atlassian.js';
 import { DEFT_READONLY_SKILLS, DEFT_SKILL_PREFIX, DEFT_SKILLS_DIR } from './deft.js';
 import {
   GSTACK_BROWSER_NEEDED,
@@ -84,6 +85,8 @@ export interface KnownPack {
   optIn?: readonly string[];
   /** One-line statement of what leaves the machine, shown on the pack row. */
   disclosure?: string;
+  /** Plugin-root-relative dirs the skill scan skips (archived copies). */
+  skillsExclude?: readonly string[];
 }
 
 export const KNOWN_PACKS: Readonly<Record<string, KnownPack>> = {
@@ -138,6 +141,16 @@ export const KNOWN_PACKS: Readonly<Record<string, KnownPack>> = {
       'reflect',
       'setup-pstack',
     ],
+  },
+  // Atlassian's official Rovo MCP plugin, upstream and commit-pinned (PAN-5165); skills/v1 holds archived v1 skills.
+  atlassian: {
+    id: ATLASSIAN_PACK_ID,
+    url: ATLASSIAN_PACK_URL,
+    adapter: 'claude-plugin',
+    ref: ATLASSIAN_PACK_COMMIT,
+    skillsExclude: ['skills/v1'],
+    optIn: ATLASSIAN_OPT_IN_SKILLS,
+    disclosure: ATLASSIAN_DISCLOSURE,
   },
 };
 
@@ -230,7 +243,7 @@ function toRepoRelative(path: string): string | null {
 }
 
 /** Skill dirs (repo-relative) under `start`: a dir holding SKILL.md is a skill and is not descended into. */
-async function scanSkillDirs(root: string, start: string): Promise<string[]> {
+async function scanSkillDirs(root: string, start: string, exclude: ReadonlySet<string> = new Set()): Promise<string[]> {
   const found: string[] = [];
   const walk = async (rel: string, depth: number): Promise<void> => {
     let dirents;
@@ -242,6 +255,7 @@ async function scanSkillDirs(root: string, start: string): Promise<string[]> {
     for (const dirent of [...dirents].sort((a, b) => a.name.localeCompare(b.name))) {
       if (!dirent.isDirectory()) continue;
       const child = posix.join(rel, dirent.name);
+      if (exclude.has(child)) continue;
       if (await isFile(join(root, child, 'SKILL.md'))) found.push(child);
       else if (depth < PLAIN_MAX_DEPTH) await walk(child, depth + 1);
     }
@@ -250,18 +264,22 @@ async function scanSkillDirs(root: string, start: string): Promise<string[]> {
   return found;
 }
 
-async function claudePluginSkillDirs(root: string, plugin: Record<string, unknown>): Promise<string[]> {
+async function claudePluginSkillDirs(
+  root: string,
+  plugin: Record<string, unknown>,
+  exclude: ReadonlySet<string> = new Set(),
+): Promise<string[]> {
   const skills = plugin['skills'];
   if (typeof skills === 'string') {
     const start = toRepoRelative(skills);
-    return start ? scanSkillDirs(root, start) : [];
+    return start ? scanSkillDirs(root, start, exclude) : [];
   }
-  if (!Array.isArray(skills)) return scanSkillDirs(root, 'skills');
+  if (!Array.isArray(skills)) return scanSkillDirs(root, 'skills', exclude);
   const dirs: string[] = [];
   for (const entry of skills) {
     if (typeof entry !== 'string') continue;
     const dir = toRepoRelative(entry);
-    if (dir && (await isDir(join(root, dir)))) dirs.push(dir);
+    if (dir && !exclude.has(dir) && (await isDir(join(root, dir)))) dirs.push(dir);
   }
   return dirs;
 }
@@ -433,7 +451,13 @@ async function readLicense(root: string, plugin: Record<string, unknown> | null)
 export async function readPackManifest(
   root: string,
   adapter: PackAdapterId,
-  opts: { optIn?: readonly string[]; skillsRoot?: string; pluginRoot?: string; browser?: boolean } = {},
+  opts: {
+    optIn?: readonly string[];
+    skillsRoot?: string;
+    pluginRoot?: string;
+    browser?: boolean;
+    skillsExclude?: readonly string[];
+  } = {},
 ): Promise<PackManifest> {
   let prefix = '';
   if (opts.pluginRoot !== undefined) {
@@ -446,14 +470,15 @@ export async function readPackManifest(
   const mcp = adapter === 'claude-plugin' ? await readPackMcpServers(base, plugin) : null;
   const deft = adapter === 'deft-readonly';
   const gstack = adapter === 'gstack-runtime' ? await gstackSkillDirs(base, opts.browser === true) : null;
+  const excludeDirs = new Set((opts.skillsExclude ?? []).map(toRepoRelative).filter((dir): dir is string => dir !== null));
   const skillDirs =
     adapter === 'claude-plugin'
-      ? await claudePluginSkillDirs(base, plugin ?? {})
+      ? await claudePluginSkillDirs(base, plugin ?? {}, excludeDirs)
       : deft
         ? await deftReadonlySkillDirs(base)
         : gstack
           ? gstack.dirs
-          : await scanSkillDirs(base, opts.skillsRoot ?? 'skills');
+          : await scanSkillDirs(base, opts.skillsRoot ?? 'skills', excludeDirs);
   // gstack opt-in comes from the skill map, so a stale registry entry cannot turn an opt-in skill into a default one.
   // A browser-opt-in skill is only present when the browser runtime is mounted.
   const optIn = new Set(gstack ? [...GSTACK_OPT_IN_SKILLS, ...GSTACK_BROWSER_OPT_IN_SKILLS] : (opts.optIn ?? []));

@@ -348,6 +348,47 @@ describe('plugin root packs', () => {
   });
 });
 
+describe('atlassian known pack skillsExclude threading (PAN-5165)', () => {
+  let up: Upstream;
+  let commit = '';
+
+  beforeAll(() => {
+    up = createUpstream();
+    up.commitFile(
+      '.claude-plugin/plugin.json',
+      JSON.stringify({ name: 'atlassian', skills: './skills/', mcpServers: './.mcp.json' }),
+      'plugin',
+    );
+    up.commitFile(
+      '.mcp.json',
+      JSON.stringify({ mcpServers: { atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp' } } }),
+      'mcp',
+    );
+    up.commitFile('skills/triage-issue/SKILL.md', skillMd('triage-issue'), 'triage-issue');
+    commit = up.commitFile('skills/v1/old-only/SKILL.md', skillMd('old-only'), 'v1 old-only');
+  });
+
+  afterAll(() => {
+    rmSync(up.scratch, { recursive: true, force: true });
+  });
+
+  beforeEach(() => {
+    rmSync(packsHome(), { recursive: true, force: true });
+  });
+
+  it('excludes skills/v1 from the preview and from listPackCatalog', async () => {
+    writeFileSync(configPath(), '# keep me\n');
+    const result = await addPack({ id: 'atlassian', url: up.url, ref: commit }, vi.fn(async () => true));
+    expect(result.preview.manifest.skills.map((skill) => skill.name)).toEqual(['triage-issue']);
+    expect(result.preview.manifest.skills.some((skill) => skill.name === 'old-only')).toBe(false);
+
+    const { listPackCatalog } = await import('../../skill-overrides/catalog.js');
+    const catalog = await listPackCatalog();
+    const atlassian = catalog.find((entry) => entry.id === 'atlassian');
+    expect(atlassian?.manifest?.skills.some((skill) => skill.name === 'old-only')).toBe(false);
+  });
+});
+
 describe('pack lifecycle', () => {
   let up: Upstream;
   let first = '';

@@ -132,6 +132,7 @@ export async function listPackCatalog(): Promise<PackCatalogEntry[]> {
             skillsRoot: known?.skillsRoot,
             pluginRoot: known?.pluginRoot,
             browser: browser === 'ready',
+            skillsExclude: known?.skillsExclude,
           });
         } catch {
           manifest = null;

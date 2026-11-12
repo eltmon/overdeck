@@ -429,6 +429,7 @@ async function manifestAt(id: string, dir: string, adapter: PackAdapterId, brows
       skillsRoot: KNOWN_PACKS[id]?.skillsRoot,
       pluginRoot: pluginRootOf(id),
       browser,
+      skillsExclude: KNOWN_PACKS[id]?.skillsExclude,
     }),
   );
 }
