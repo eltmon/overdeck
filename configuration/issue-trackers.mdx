@@ -375,6 +375,10 @@ A Jira write never blocks a merge, a close-out or `pan done`: network, authentic
 
 `pan done` attaches each pull request to the Jira issue as a remote link and moves the issue to In Review. With `--comment`, it also posts the same agent-completed comment Linear gets. Close-out links the merged pull request again (the link is keyed by its URL, so it is not duplicated), moves the issue to Done, and comments `Closed by Overdeck after merge of <PR URL>.`
 
+### Atlassian Rovo MCP for agents
+
+The same Jira email and API token that authenticate the tracker also sign agents into the [`atlassian` skill pack](/features/skill-packs#atlassian)'s Rovo MCP server, so Jira and Confluence tools reach Claude Code and Codex agents once you add the pack and confirm its MCP server. See [Pack MCP servers](/configuration/mcp#pack-mcp-servers).
+
 ### Limits
 
 - Jira issues are polled every 120 seconds, on the same cadence as Rally. There are no Jira webhooks yet.

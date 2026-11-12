@@ -36,6 +36,7 @@ Changes apply at the next launch; a running agent keeps the skills it launched w
 | gstack browser runtime | `garrytan/gstack` | the same render | part of `gstack-runtime` | 9 / 9 (browser / browser-opt-in) | Yes: `bun install`, five compiled binaries, Chromium download (about 1 GB on disk) | second consent: `pan skills pack browser gstack` |
 | `deft` | `deftai/directive` | fork `eltmon/directive`, `--ref <ref>` (default branch `master`) | `deft-readonly` | 7 / 0 | No | host notice in every mounted skill |
 | `sageox` | `sageox/ox` | fork `eltmon/ox` at `0e6c7e2` (default ref, branch `overdeck/host-managed-v0.25.0`) | `plain`, skills root `extensions/skills` | 17 / 9 | Overdeck builds `ox` (and the Claude Code and Codex adapters) from the pinned commit; Overdeck-added hooks run it | needs Go; Claude Code and Codex; uploads are a second opt-in |
+| `atlassian` | `atlassian/atlassian-mcp-server` | upstream, `3be5562` (default ref) | `claude-plugin` | 3 / 4 | No | Applies its `atlassian` MCP server (consented); `skills/v1` excluded |
 | any git repo (example `impeccable`) | `pbakaus/impeccable` | the url you pass, `--ref skill-v4.7.0` | detected: `claude-plugin` (has `.claude-plugin/plugin.json`), else `plain` | 1 / 0 | No | `pan skills pack add impeccable https://github.com/pbakaus/impeccable --ref skill-v4.7.0` |
 
 Counts are at the commit in the Source column. The add and update preview shows the counts for your commit. Each pack has its own section under [Packs](#packs).
@@ -106,11 +107,13 @@ Adding a pack trusts this commit and enables nothing. Turn it on with: pan skill
 
 Adding a pack trusts the resolved commit and turns nothing on. In a terminal, Overdeck asks `Trust this commit? [y/N]`. Without a terminal, pass `--yes`; otherwise nothing is written. The pack id must match `[a-z0-9][a-z0-9-]*` and cannot be a core skill name. Overdeck picks the adapter itself (the known-pack default, else `claude-plugin` when the repo has `.claude-plugin/plugin.json`, otherwise `plain`); pass `--adapter plain|claude-plugin|deft-readonly|gstack-runtime` to choose. See [Authoring a skill pack](/guides/skill-pack-authoring) for what makes a repository a valid pack. A repository cannot register a pack by committing a file; only `pan skills pack add` can.
 
-For a known pack (`mattpocock`, `pstack`, `gstack`, `deft`, `sageox`) the url is optional. `pstack` and `sageox` also have a default ref, so `pan skills pack add pstack` and `pan skills pack add sageox` are enough; the others need `--ref`.
+For a known pack (`mattpocock`, `pstack`, `gstack`, `deft`, `sageox`, `atlassian`) the url is optional. `pstack`, `sageox` and `atlassian` also have a default ref, so `pan skills pack add pstack`, `pan skills pack add sageox` and `pan skills pack add atlassian` are enough; the others need `--ref`.
 
 ### What is not applied
 
-Overdeck mounts skill directories only. If a pack also carries hooks, MCP servers, commands, agents, context injection, git hooks, or scripts, the preview and the dashboard list them as **Not applied**, and none of them reach the agent. Scripts inside a skill directory are copied with the skill but never run by Overdeck.
+Overdeck mounts skill directories only. If a pack also carries hooks, commands, agents, context injection, git hooks, or scripts, the preview and the dashboard list them as **Not applied**, and none of them reach the agent. Scripts inside a skill directory are copied with the skill but never run by Overdeck.
+
+MCP servers are the one exception: a `claude-plugin` pack's `https` `type: "http"` servers reach agents once you confirm an add or update preview that lists them (consent, stored as `mcp: true` on the registry entry). A `stdio` or `sse` server is never applied, whatever the adapter. See [Pack MCP servers](/configuration/mcp#pack-mcp-servers).
 
 Runtime packs (gstack) are the exception: their scripts are mounted and run when you invoke a skill, after you trusted them at `add`.
 
@@ -119,16 +122,17 @@ Runtime packs (gstack) are the exception: their scripts are mounted and run when
 - Adding a pack trusts one commit and turns nothing on. Without a terminal, `--yes` is required, else nothing is registered (the fetch and commit extraction still write to the pack cache before you confirm). See [Adding a pack](#adding-a-pack).
 - Every launch mounts exactly the trusted commit; `update` shows the preview again and moves the commit only after you confirm. See [Pinning, updates and forks](#pinning-updates-and-forks).
 - A repository cannot register itself; only `pan skills pack add` can.
-- Overdeck mounts skill directories only. Hooks, MCP servers, commands, agents, context injection, git hooks and scripts are **Not applied**; scripts inside a skill directory are copied but never run by Overdeck. See [What is not applied](#what-is-not-applied).
+- Overdeck mounts skill directories only. Hooks, commands, agents, context injection, git hooks and scripts are **Not applied**; scripts inside a skill directory are copied but never run by Overdeck. A `claude-plugin` pack's `https` MCP servers are the one exception, and only once you confirm a preview that lists them. See [What is not applied](#what-is-not-applied).
 - Runtime packs are the exception: gstack runs its pack-mode setup once per trusted commit (at add, update or sync) and its scripts when you invoke a skill; the preview lists every script before you trust it. See [gstack](#gstack).
 - SageOx is the other exception: Overdeck runs `go build` on the trusted commit (at add, update or sync) and runs the built `ox` from hooks it adds itself; the preview lists the build commands, the paths they write, and the downloads. See [SageOx](#sageox).
 - The gstack browser runtime is a second, separate consent that lists every download and path it writes.
 - Opt-in skills change files Overdeck owns or reach paid, cloud or push actions; the pack toggle never turns them on. See [How packs turn on and off](#how-packs-turn-on-and-off).
 - A launch never touches the network: it mounts from the cache or skips the pack with a warning.
 - Pack skills never land in `~/.claude/skills` or `~/.agents/skills`, so they cannot reach sessions you start outside Overdeck.
-- Disclosures: the `sageox` and `gstack` pack rows show what leaves the machine.
+- Disclosures: the `sageox`, `gstack` and `atlassian` pack rows show what leaves the machine.
   - SageOx: "SageOx records agent sessions on this machine. With uploads off (the default) Overdeck runs `ox` with the network off: nothing is sent. With uploads on for a project, redacted session transcripts and session metadata are uploaded to the SageOx cloud ledger for that repo, and `ox` may fetch team context. Overdeck builds ox from the eltmon/ox fork; see `pan doctor`."
   - gstack: "Runs gstack's bash and bun scripts from ~/.overdeck/packs/gstack; telemetry and update checks are off. Opt-in skills can send code to OpenAI (codex) or call paid or cloud APIs. The optional browser runtime downloads npm packages and Chromium into ~/.overdeck/packs/gstack/browser."
+  - atlassian: "Agents call the Atlassian Rovo MCP server at mcp.atlassian.com, which reads and changes your Jira and Confluence data. When Jira tracker credentials are set, the Jira account email and API token are sent to it as the Authorization header."
 - Deft skills carry a host notice, and outside a Directive project Claude Code launches deny Deft's CLIs. See [Deft Directive](#deft-directive).
 - `pan skills pack remove <id>` deletes the cache, every mount that holds the pack, dangling launch links, and Codex plugin caches.
 
@@ -147,7 +151,7 @@ pan skills pack update mattpocock --ref v1.3.0
 
 ### Fork-first policy
 
-Known packs come from operator-controlled forks under `github.com/eltmon/`. A fork lets the operator decide when upstream changes arrive, and it is the only place Overdeck-specific changes land (gstack pack mode, the `ox` host-managed mode). No agent opens issues, pull requests or comments on an upstream repository, or pushes to one; upstreaming fork changes is the operator's call. `eltmon/plugins` is identical to `cursor/plugins` and exists only for pinning control. `eltmon/gstack` carries pack mode and drifts from upstream quickly.
+Known packs come from operator-controlled forks under `github.com/eltmon/`. A fork lets the operator decide when upstream changes arrive, and it is the only place Overdeck-specific changes land (gstack pack mode, the `ox` host-managed mode). No agent opens issues, pull requests or comments on an upstream repository, or pushes to one; upstreaming fork changes is the operator's call. `eltmon/plugins` is identical to `cursor/plugins` and exists only for pinning control. `eltmon/gstack` carries pack mode and drifts from upstream quickly. `atlassian` is the one exception: it comes straight from upstream `atlassian/atlassian-mcp-server`, pinned to a reviewed commit, because the pack carries no Overdeck-specific changes and the 40-character pin already controls when it moves.
 
 ### Syncing a fork
 
@@ -656,6 +660,29 @@ When the `sageox` pack is registered, `pan doctor` adds a **SageOx (ox)** row. I
 #### Removing SageOx
 
 `pan skills pack remove sageox` deletes the build and the cache but keeps the stored links, because recreating one needs `ox login`, the network, and a second `ox init` registration. It prints `kept SageOx link files in <packdir>/bindings/ (delete them by hand to forget every project's SageOx link)`.
+
+### atlassian
+
+[Atlassian's official Rovo MCP plugin](https://github.com/atlassian/atlassian-mcp-server) carries Jira and Confluence skills plus the hosted Rovo MCP server. Overdeck mounts it straight from upstream, pinned to the reviewed commit `3be5562`, and once you confirm, it also passes agents the pack's `atlassian` MCP server at `https://mcp.atlassian.com/v2/mcp` (see [Pack MCP servers](/configuration/mcp#pack-mcp-servers)). `skills/v1`, the plugin's archived v1 skills, is excluded.
+
+```bash
+pan skills pack add atlassian               # preview (lists the MCP server), then: Trust this commit? [y/N]
+pan skills set --pack atlassian on           # global: on
+pan skills set --pack atlassian on --project <key>
+pan skills set --pack atlassian on --issue <id>
+```
+
+**Skills.** Three are on with the pack toggle: `atlassian-mcp-code-search`, `jira-sprint-dashboard` (read-only unless you ask it to write), and `search-company-knowledge`. Four are opt-in, because they create or edit Jira or Confluence content, so the pack toggle never turns them on: `capture-tasks-from-meeting-notes`, `generate-status-report`, `spec-to-backlog`, and `triage-issue`.
+
+**Auth.** When your Jira email and API token are set (Settings → Tracker Keys, or `JIRA_EMAIL`/`JIRA_API_TOKEN` in `~/.overdeck.env`), Overdeck sends them to the server as `Authorization: Basic base64(email:token)`. An org admin must have enabled API token auth for the Rovo MCP server, and the token needs MCP scopes.
+
+Without those keys, a Claude Code agent reuses your own sign-in: run `claude mcp add --transport http atlassian https://mcp.atlassian.com/v2/mcp` and `/mcp` once, from your own Claude Code session, with the same server name and URL the launch file uses. Agents cannot complete that interactive sign-in themselves. Codex agents have no such session to reuse, so without the Jira email and API token a Codex launch gets no `atlassian` server at all.
+
+For OAuth with Jira credentials also set, or for a Bearer service-account key, declare a project `mcp_servers` entry named `atlassian` (see [MCP servers](/configuration/mcp)); a project server with that name overrides the pack's.
+
+**Harnesses.** Claude Code and Codex agents get the server (Codex with `defaultToolsApprovalMode: "approve"`, and only when it has an Authorization header). `acp` and `opencode` get no server: the ACP host drops non-`stdio` entries. `ohmypi`, `kimi-code`, `muse` and `prime-agent` provision no MCP at all.
+
+**`pan doctor`** adds an **Atlassian MCP** row only once the pack is registered; there is no row at all before that. Registered but off everywhere, it reports `ok` with no network request. Otherwise it probes the endpoint and reports whether your token was accepted, whether you are signed in at all, or that the endpoint is unreachable. See [Pack MCP servers](/configuration/mcp#pack-mcp-servers) for consent, precedence, and the full auth rule.
 
 ## Where state lives and when changes apply
 

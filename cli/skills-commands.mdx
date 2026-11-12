@@ -80,10 +80,14 @@ pan skills pack add <id> [url] [--ref <ref>] [--adapter <adapter>] [--browser] [
 
 Registers a git skill pack at the commit a ref resolves to and trusts it;
 enables nothing. Known packs (`mattpocock`, `pstack`, `gstack`, `deft`,
-`sageox`) default the url and, for `pstack` and `sageox`, the ref. For
-`sageox`, the preview also lists the `go build` commands, the paths they
-write and the downloads, and trusting the commit builds `ox` and its two
-adapters before the pack is registered.
+`sageox`, `atlassian`) default the url and, for `pstack`, `sageox` and
+`atlassian`, the ref. For `sageox`, the preview also lists the `go build`
+commands, the paths they write and the downloads, and trusting the commit
+builds `ox` and its two adapters before the pack is registered. When a
+`claude-plugin` pack declares applied MCP servers (see
+[Pack MCP servers](/configuration/mcp#pack-mcp-servers)), the preview adds
+an `MCP servers` row, `<name> (<url>)` for each one, and trusting the
+commit records your consent to them.
 
 | Flag | Effect |
 | --- | --- |
