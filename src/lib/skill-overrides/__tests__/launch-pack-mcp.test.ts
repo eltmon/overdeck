@@ -4,11 +4,12 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 
-const { loadSkillOverrideLayers, listPackCatalog, getSupervisedConversationByTmuxSession, readIssuePipeline } = vi.hoisted(() => ({
+const { loadSkillOverrideLayers, listPackCatalog, getSupervisedConversationByTmuxSession, readIssuePipeline, loadConfigNoMigration } = vi.hoisted(() => ({
   loadSkillOverrideLayers: vi.fn(),
   listPackCatalog: vi.fn(),
   getSupervisedConversationByTmuxSession: vi.fn(),
   readIssuePipeline: vi.fn(async () => 'overdeck'),
+  loadConfigNoMigration: vi.fn(async () => ({ config: { trackerKeys: {} } })),
 }));
 
 vi.mock('../store.js', () => ({ loadSkillOverrideLayers }));
@@ -16,8 +17,10 @@ vi.mock('../catalog.js', () => ({ listPackCatalog }));
 vi.mock('../../deft/issue-pipeline.js', () => ({ readIssuePipeline }));
 vi.mock('../../overdeck/conversations.js', () => ({ getSupervisedConversationByTmuxSession }));
 vi.mock('../../projects.js', () => ({ resolveProjectKeyForCwdAsync: vi.fn(async () => 'proj') }));
+vi.mock('../../config-yaml.js', () => ({ loadConfigNoMigration }));
 
 import { resolveLaunchPackMcpServers } from '../launch-pack-mcp.js';
+import { atlassianBasicAuth, atlassianNeedsInteractiveAuth, withAtlassianAuth } from '../../skill-packs/atlassian.js';
 
 const COMMIT = 'e'.repeat(40);
 const ctx = { cwd: '/repo/workspaces/feature-pan-1' };
@@ -161,5 +164,91 @@ describe('resolveLaunchPackMcpServers (PAN-5165)', () => {
     const result = await resolveLaunchPackMcpServers({ ...ctx, conversation: 'conv-x', reservedNames: [], warn });
     expect(getSupervisedConversationByTmuxSession).toHaveBeenCalledWith('conv-x');
     expect(result).toEqual({ atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp', headers: {} } });
+  });
+
+  it('attaches the Jira Basic header to the atlassian server when tracker keys are set (PAN-5165 WI-5)', async () => {
+    reset();
+    listPackCatalog.mockResolvedValue([atlassianCatalogEntry()]);
+    loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { global: { atlassian: true } } });
+    loadConfigNoMigration.mockResolvedValueOnce({ config: { trackerKeys: { jira: 't0k', jiraEmail: 'a@b.com' } } });
+    const warn = vi.fn();
+    const result = await resolveLaunchPackMcpServers({ ...ctx, reservedNames: [], warn });
+    expect(result).toEqual({
+      atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp', headers: { Authorization: 'Basic YUBiLmNvbTp0MGs=' } },
+    });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('attaches no header when the Jira email is missing', async () => {
+    reset();
+    listPackCatalog.mockResolvedValue([atlassianCatalogEntry()]);
+    loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { global: { atlassian: true } } });
+    loadConfigNoMigration.mockResolvedValueOnce({ config: { trackerKeys: { jira: 't0k' } } });
+    const result = await resolveLaunchPackMcpServers({ ...ctx, reservedNames: [], warn: vi.fn() });
+    expect(result.atlassian?.headers).toEqual({});
+  });
+});
+
+describe('atlassianBasicAuth / withAtlassianAuth / atlassianNeedsInteractiveAuth (PAN-5165 WI-5)', () => {
+  const server = (url: string, headers: Record<string, string> = {}) => ({ url, headers });
+
+  it('builds a Basic header from the Jira email and token', () => {
+    expect(atlassianBasicAuth({ jira: 't0k', jiraEmail: 'a@b.com' })).toBe('Basic YUBiLmNvbTp0MGs=');
+  });
+
+  it('returns null when the token or the email is missing', () => {
+    expect(atlassianBasicAuth({ jira: 't0k' })).toBeNull();
+    expect(atlassianBasicAuth({ jiraEmail: 'a@b.com' })).toBeNull();
+    expect(atlassianBasicAuth(undefined)).toBeNull();
+  });
+
+  it('returns null for a Data Center site and a header for a Cloud site', () => {
+    expect(atlassianBasicAuth({ jira: 't0k', jiraEmail: 'a@b.com', jiraBaseUrl: 'https://jira.corp.example' })).toBeNull();
+    expect(atlassianBasicAuth({ jira: 't0k', jiraEmail: 'a@b.com', jiraBaseUrl: 'https://acme.atlassian.net' })).toBe(
+      'Basic YUBiLmNvbTp0MGs=',
+    );
+  });
+
+  it('adds the header only to an https mcp.atlassian.com server, never to a look-alike host or plain http', () => {
+    const keys = { jira: 't0k', jiraEmail: 'a@b.com' };
+    const servers = withAtlassianAuth(
+      {
+        atlassian: server('https://mcp.atlassian.com/v2/mcp'),
+        evil: server('https://mcp.atlassian.com.evil.example/v2/mcp'),
+        plain: server('http://mcp.atlassian.com/v2/mcp'),
+      },
+      keys,
+    );
+    expect(servers.atlassian?.headers).toEqual({ Authorization: 'Basic YUBiLmNvbTp0MGs=' });
+    expect(servers.evil?.headers).toEqual({});
+    expect(servers.plain?.headers).toEqual({});
+  });
+
+  it('keeps an existing authorization header unchanged and never mutates the input', () => {
+    const keys = { jira: 't0k', jiraEmail: 'a@b.com' };
+    const input = { atlassian: server('https://mcp.atlassian.com/v2/mcp', { authorization: 'Bearer existing' }) };
+    const servers = withAtlassianAuth(input, keys);
+    expect(servers.atlassian?.headers).toEqual({ authorization: 'Bearer existing' });
+    expect(input.atlassian.headers).toEqual({ authorization: 'Bearer existing' });
+    expect(servers.atlassian).not.toBe(input.atlassian);
+  });
+
+  it('atlassianNeedsInteractiveAuth is true only for a header-less https mcp.atlassian.com server', () => {
+    expect(atlassianNeedsInteractiveAuth(server('https://mcp.atlassian.com/v2/mcp'))).toBe(true);
+    expect(atlassianNeedsInteractiveAuth(server('https://mcp.atlassian.com/v2/mcp', { Authorization: 'Bearer x' }))).toBe(false);
+    expect(atlassianNeedsInteractiveAuth(server('https://mcp.other.example/v2/mcp'))).toBe(false);
+  });
+
+  it('never leaks the token or the Basic header value to a warn callback', async () => {
+    reset();
+    listPackCatalog.mockResolvedValue([atlassianCatalogEntry()]);
+    loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { global: { atlassian: true } } });
+    loadConfigNoMigration.mockResolvedValueOnce({ config: { trackerKeys: { jira: 't0k', jiraEmail: 'a@b.com' } } });
+    const warn = vi.fn();
+    await resolveLaunchPackMcpServers({ ...ctx, reservedNames: ['atlassian'], warn });
+    for (const call of warn.mock.calls) {
+      expect(call[0]).not.toContain('t0k');
+      expect(call[0]).not.toContain('YUBiLmNvbTp0MGs=');
+    }
   });
 });

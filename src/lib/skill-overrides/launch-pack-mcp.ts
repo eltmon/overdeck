@@ -4,6 +4,7 @@
  * skipped with one warning each. Reads only the pack cache and config; never throws.
  */
 import type { PackMcpServer } from '../skill-packs/adapters.js';
+import { ATLASSIAN_PACK_ID, withAtlassianAuth } from '../skill-packs/atlassian.js';
 import { resolveLaunchPackSelection } from './launch.js';
 
 export async function resolveLaunchPackMcpServers(input: {
@@ -28,7 +29,11 @@ export async function resolveLaunchPackMcpServers(input: {
         warn(`[pack-mcp] ${pack.packId}: MCP servers not applied: run pan skills pack update ${pack.packId} to review them`);
         continue;
       }
-      for (const [name, server] of Object.entries(pack.servers)) {
+      const packServers =
+        pack.packId === ATLASSIAN_PACK_ID
+          ? withAtlassianAuth(pack.servers, (await (await import('../config-yaml.js')).loadConfigNoMigration()).config.trackerKeys)
+          : pack.servers;
+      for (const [name, server] of Object.entries(packServers)) {
         if (reserved.has(name)) {
           warn(`[pack-mcp] ${pack.packId}: server ${name} skipped: the name is already used by overdeck, the role or the project`);
           continue;
