@@ -29,6 +29,7 @@ every config key, see
 | `gstack.ts` | `GSTACK_SKILL_MAP`, `classifyGstackSkill`, `GSTACK_DISCLOSURE` |
 | `deft.ts` | `DEFT_SKILL_MAP`, `DEFT_READONLY_SKILLS`, `applyDeftHostNotice` |
 | `ox-build.ts` | `buildOx`, `isOxBuildReady`, `assertGoAvailable`, `oxBuildCommands`, `oxBuildDownloads`, `oxBuildEnv`, `OX_BINARIES`, `OX_BUILD_MARKER`: the `sageox` pack's `go build` of `ox` and its two adapters (PAN-4852) |
+| `atlassian.ts` | `ATLASSIAN_PACK_ID`, `ATLASSIAN_PACK_URL`, `ATLASSIAN_PACK_COMMIT`, `ATLASSIAN_MCP_HOST`, `ATLASSIAN_MCP_URL`, `ATLASSIAN_OPT_IN_SKILLS`, `ATLASSIAN_DISCLOSURE`, `atlassianBasicAuth`, `withAtlassianAuth`, `atlassianNeedsInteractiveAuth`: the `atlassian` known pack's constants and its Jira Basic auth header (PAN-5165). Leaf: imports nothing from `skill-overrides/`, `projects/` or `mcp/`. |
 
 ### `src/lib/skill-overrides/`
 
@@ -39,6 +40,7 @@ every config key, see
 | `issue-file.ts` | Reads of the issue file (`skills:`, `packs:`, `pipeline:`): `readIssueOverrides`, `readIssuePipelineField`; split from `store.ts` so `deft/issue-pipeline.ts` avoids the store's write-side imports |
 | `catalog.ts` | `listSkillCatalog`, `listPackCatalog`, `readInstalledClaudePluginNames` |
 | `launch.ts` | `resolveLaunchPackSelection`, `applyClaudePacks`, `applyCodexPacks`, `applyDeftForLaunch`, `claudeSkillSettingsJson` |
+| `launch-pack-mcp.ts` | `resolveLaunchPackMcpServers`: one launch's pack MCP servers, after consent and the collision rules against reserved names (PAN-5165) |
 | `launcher-lines.ts` | `launcherSkillOverrideLines`, `deftEnvReadLine`, `skillPackLinkPath`, `claudeSkillOverrideLaunch`, `codexSkillOverrideLines` (leaf module) |
 | `conversation-flags.ts` | `expandConversationSkillFlags`, `resolveConversationSkillFlags` |
 
@@ -213,6 +215,22 @@ fields each adapter fills in — see their type definitions in `adapters.ts`.
   (`resolveLaunchPackSelection` sets `root` to `packRenderDir` for
   `gstack-runtime`), and its mount transform applies there.
 
+**Pack MCP servers (PAN-5165, `claude-plugin` only).** `readPackManifest` also
+calls `readPackMcpServers(base, plugin)`: the source is `plugin.mcpServers` as
+a string path (resolved through `toRepoRelative` against the plugin root),
+else as an inline object (the servers map itself, or `{ mcpServers: {...} }`),
+else `<plugin root>/.mcp.json` when it is a file. An entry applies only when
+it is `type: "http"`, its `url` starts with `https://`, its name matches
+`^[A-Za-z0-9_-]+$` and is not `overdeck`, its headers are all strings, and
+neither the url nor a header contains `${`; anything else (a `stdio` or `sse`
+entry, a bad name, an unresolved variable) is **not applied**. Applied
+servers land in `manifest.mcpServers`. `capabilities.mcpServers` changes
+meaning for `claude-plugin`: it is `true` when the pack **declares servers
+Overdeck does not apply**, not merely when it declares any, so a pack whose
+only MCP server is fully applied shows no `MCP servers` row under Not
+applied. `mcpServerLabels(manifest)` renders each applied server as
+`` MCP server <name> (<url>) `` for the add/update preview.
+
 ## `KnownPack` fields
 
 | Field | Meaning | Packs that use it |
@@ -222,10 +240,11 @@ fields each adapter fills in — see their type definitions in `adapters.ts`.
 | `adapter` | Default adapter | all known packs |
 | `skillsRoot` | Directory the `plain` adapter scans instead of `skills/`, relative to the plugin root | `sageox` |
 | `pluginRoot` | Repo-relative directory holding the plugin (manifest, skills, agents, hooks, license); default the repo root | `pstack` |
-| `ref` | Ref `pan skills pack add <id>` pins when `--ref` is omitted (a tag, branch, or 40-hex commit) | `pstack`, `sageox` |
+| `ref` | Ref `pan skills pack add <id>` pins when `--ref` is omitted (a tag, branch, or 40-hex commit) | `pstack`, `sageox`, `atlassian` |
 | `mountExtras` | Plugin-root-relative files or directories the mount copies next to `skills/` | `pstack` |
-| `optIn` | Skill names that are opt-in: the pack toggle never turns them on | `mattpocock`, `sageox`, `pstack` |
-| `disclosure` | One-line statement of what leaves the machine, shown on the pack row | `sageox`, `gstack` |
+| `skillsExclude` | Plugin-root-relative dirs the skill scan skips entirely, before the `SKILL.md` check (PAN-5165) | `atlassian` (`skills/v1`) |
+| `optIn` | Skill names that are opt-in: the pack toggle never turns them on | `mattpocock`, `sageox`, `pstack`, `atlassian` |
+| `disclosure` | One-line statement of what leaves the machine, shown on the pack row | `sageox`, `gstack`, `atlassian` |
 
 `gstack` ignores the `optIn` field: `readPackManifest` takes its opt-ins from
 `GSTACK_OPT_IN_SKILLS` and `GSTACK_BROWSER_OPT_IN_SKILLS` (`gstack.ts`)
@@ -287,6 +306,17 @@ instead.
 - `launcher-lines.ts` is a leaf module (imports nothing from
   `src/lib/skill-overrides/store.ts`), so `src/lib/launcher-generator.ts`
   never reaches the override store through it.
+- A pack's MCP servers reach an agent only when the registry entry carries
+  `mcp: true` (the operator confirmed a preview that listed them) and the
+  pack is selected for that launch; a launch never asks or writes consent
+  (PAN-5165 D-4).
+- Name precedence for MCP servers at one launch is `overdeck`, then the
+  launching role's own servers, then the project's `mcp_servers`, then pack
+  servers in ascending pack id order; a later source's server with an
+  already-claimed name is skipped with one warning (PAN-5165 D-6).
+- `atlassian.ts` is a leaf: it imports nothing from `skill-overrides/`,
+  `projects/` or `mcp/` (its header comment), so `adapters.ts` can import it
+  without creating a cycle.
 
 ## Hidden launch step
 
@@ -302,8 +332,8 @@ and handled by `skillsLaunchSettingsCommand` in
 | Part | Test file |
 |---|---|
 | Pack adapters, sources, browser sources, mount, render, browser, gstack, Deft, the `ox` build | `src/lib/skill-packs/__tests__/{adapters,sources,sources-browser,sources-sageox,mount,render,browser,gstack,deft,ox-build}.test.ts` |
-| Skill override resolution, store, launch, conversation flags | `src/lib/skill-overrides/__tests__/{resolve,store,launch,conversation-flags}.test.ts` |
-| CLI: skills, pack browser, SageOx doctor check | `src/cli/commands/__tests__/{skills,skills-pack-browser,doctor-sageox}.test.ts` |
+| Skill override resolution, store, launch, pack MCP server resolution, conversation flags | `src/lib/skill-overrides/__tests__/{resolve,store,launch,launch-pack-mcp,conversation-flags}.test.ts` |
+| CLI: skills, pack browser, SageOx doctor check, Atlassian MCP doctor check | `src/cli/commands/__tests__/{skills,skills-pack-browser,doctor-sageox,doctor-atlassian}.test.ts` |
 | Dashboard skill-overrides route | `src/dashboard/server/routes/__tests__/skill-overrides-route.test.ts` |
 | Dashboard skill packs UI | `src/dashboard/frontend/src/components/skills/SkillPacksSection.test.tsx` |
 | SageOx (binary, binding, placement, launch, Codex hooks, link, commit, merge guard, config, probe) | `src/lib/sageox/__tests__/*.test.ts` |

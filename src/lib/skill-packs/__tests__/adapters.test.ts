@@ -15,6 +15,7 @@ import {
   type PackCapabilities,
 } from '../adapters.js';
 import { SAGEOX_DISCLOSURE } from '../../sageox/disclosure.js';
+import { ATLASSIAN_DISCLOSURE, ATLASSIAN_OPT_IN_SKILLS } from '../atlassian.js';
 import { DEFT_SKILL_MAP } from '../deft.js';
 import { GSTACK_BROWSER_NEEDED, GSTACK_DISCLOSURE, GSTACK_OPT_IN_SKILLS, GSTACK_SKILL_MAP } from '../gstack.js';
 
@@ -126,6 +127,130 @@ describe('claude-plugin adapter', () => {
   it('throws on an invalid plugin.json', async () => {
     const root = fixture({ '.claude-plugin/plugin.json': '{not json' });
     await expect(readPackManifest(root, 'claude-plugin')).rejects.toThrow(/invalid .*plugin\.json/);
+  });
+});
+
+describe('pack MCP servers (PAN-5165)', () => {
+  it('applies a single https http server declared in .mcp.json', async () => {
+    const root = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({ name: 'atlassian' }),
+      '.mcp.json': JSON.stringify({
+        mcpServers: { atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp' } },
+      }),
+    });
+    const manifest = await readPackManifest(root, 'claude-plugin');
+    expect(manifest.mcpServers).toEqual({
+      atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp', headers: {} },
+    });
+    expect(manifest.capabilities.mcpServers).toBe(false);
+    expect(notAppliedLabels(manifest.capabilities)).not.toContain('MCP servers');
+  });
+
+  it('applies only the http entry alongside a stdio entry, and still reports Not applied', async () => {
+    const root = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({ name: 'mixed' }),
+      '.mcp.json': JSON.stringify({
+        mcpServers: {
+          stdioServer: { type: 'stdio', command: 'run-me' },
+          httpServer: { type: 'http', url: 'https://example.com/mcp' },
+        },
+      }),
+    });
+    const manifest = await readPackManifest(root, 'claude-plugin');
+    expect(manifest.mcpServers).toEqual({
+      httpServer: { type: 'http', url: 'https://example.com/mcp', headers: {} },
+    });
+    expect(manifest.capabilities.mcpServers).toBe(true);
+    expect(notAppliedLabels(manifest.capabilities)).toContain('MCP servers');
+  });
+
+  it('applies none of: a plain http:// url, a ${} header, an sse server, or the name overdeck', async () => {
+    const root = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({ name: 'rejected' }),
+      '.mcp.json': JSON.stringify({
+        mcpServers: {
+          plainHttp: { type: 'http', url: 'http://insecure.example/mcp' },
+          templated: { type: 'http', url: 'https://example.com/mcp', headers: { Authorization: 'Bearer ${TOKEN}' } },
+          sseServer: { type: 'sse', url: 'https://example.com/sse' },
+          overdeck: { type: 'http', url: 'https://example.com/mcp' },
+        },
+      }),
+    });
+    const manifest = await readPackManifest(root, 'claude-plugin');
+    expect(manifest.mcpServers).toBeUndefined();
+    expect(manifest.capabilities.mcpServers).toBe(true);
+  });
+
+  it('rejects a malformed https url, and normalizes an applied url through URL (review PAN-5165)', async () => {
+    const root = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({ name: 'malformed' }),
+      '.mcp.json': JSON.stringify({
+        mcpServers: {
+          // "https://" prefix but not a parseable URL (embedded control char breaks the host).
+          broken: { type: 'http', url: 'https://exa\u0007mple.com/mcp' },
+          good: { type: 'http', url: 'https://example.com/mcp' },
+        },
+      }),
+    });
+    const manifest = await readPackManifest(root, 'claude-plugin');
+    expect(manifest.mcpServers).toEqual({ good: { type: 'http', url: 'https://example.com/mcp', headers: {} } });
+    expect(manifest.capabilities.mcpServers).toBe(true);
+  });
+
+  it('resolves servers from a plugin.json string path, and from inline object forms', async () => {
+    const pathRoot = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({ name: 'path', mcpServers: './mcp/servers.json' }),
+      'mcp/servers.json': JSON.stringify({
+        mcpServers: { atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp' } },
+      }),
+    });
+    const pathManifest = await readPackManifest(pathRoot, 'claude-plugin');
+    expect(pathManifest.mcpServers).toEqual({
+      atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp', headers: {} },
+    });
+
+    const directRoot = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({
+        name: 'direct',
+        mcpServers: { atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp' } },
+      }),
+    });
+    const directManifest = await readPackManifest(directRoot, 'claude-plugin');
+    expect(directManifest.mcpServers).toEqual({
+      atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp', headers: {} },
+    });
+
+    const nestedRoot = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({
+        name: 'nested',
+        mcpServers: { mcpServers: { atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp' } } },
+      }),
+    });
+    const nestedManifest = await readPackManifest(nestedRoot, 'claude-plugin');
+    expect(nestedManifest.mcpServers).toEqual({
+      atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp', headers: {} },
+    });
+  });
+
+  it('never applies MCP servers for a plain adapter pack, but still reports Not applied', async () => {
+    const root = fixture({
+      '.mcp.json': JSON.stringify({
+        mcpServers: { atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp' } },
+      }),
+    });
+    const manifest = await readPackManifest(root, 'plain');
+    expect(manifest.mcpServers).toBeUndefined();
+    expect(manifest.capabilities.mcpServers).toBe(true);
+  });
+
+  it('applies nothing on invalid JSON, and still reports Not applied', async () => {
+    const root = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({ name: 'broken' }),
+      '.mcp.json': '{not json',
+    });
+    const manifest = await readPackManifest(root, 'claude-plugin');
+    expect(manifest.mcpServers).toBeUndefined();
+    expect(manifest.capabilities.mcpServers).toBe(true);
   });
 });
 
@@ -381,6 +506,76 @@ describe('KNOWN_PACKS', () => {
         'setup-pstack',
       ],
     });
+  });
+
+  it('points atlassian at the upstream repo, pinned, excluding archived v1 skills', () => {
+    expect(KNOWN_PACKS['atlassian']).toEqual({
+      id: 'atlassian',
+      url: 'https://github.com/atlassian/atlassian-mcp-server',
+      adapter: 'claude-plugin',
+      ref: '3be55622453304b905f0c0fd5ef96fa4d638627c',
+      skillsExclude: ['skills/v1'],
+      optIn: ATLASSIAN_OPT_IN_SKILLS,
+      disclosure: ATLASSIAN_DISCLOSURE,
+    });
+  });
+});
+
+describe('atlassian fixture (PAN-5165)', () => {
+  const atlassianFiles = (): Record<string, string> => ({
+    '.claude-plugin/plugin.json': JSON.stringify({ name: 'atlassian', skills: './skills/', mcpServers: './.mcp.json' }),
+    '.mcp.json': JSON.stringify({ mcpServers: { atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp' } } }),
+    'LICENSE': 'Apache License\nVersion 2.0\n',
+    'skills/atlassian-mcp-code-search/SKILL.md': skillMd('atlassian-mcp-code-search', 'Code search.'),
+    'skills/capture-tasks-from-meeting-notes/SKILL.md': skillMd('capture-tasks-from-meeting-notes', 'Capture tasks.'),
+    'skills/generate-status-report/SKILL.md': skillMd('generate-status-report', 'Status report.'),
+    'skills/jira-sprint-dashboard/SKILL.md': skillMd('jira-sprint-dashboard', 'Sprint dashboard.'),
+    'skills/search-company-knowledge/SKILL.md': skillMd('search-company-knowledge', 'Search knowledge.'),
+    'skills/spec-to-backlog/SKILL.md': skillMd('spec-to-backlog', 'Spec to backlog.'),
+    'skills/triage-issue/SKILL.md': skillMd('triage-issue', 'Triage.'),
+    'skills/v1/atlassian-mcp-code-search/SKILL.md': skillMd('atlassian-mcp-code-search', 'V1 code search.'),
+    'skills/v1/capture-tasks-from-meeting-notes/SKILL.md': skillMd('capture-tasks-from-meeting-notes', 'V1 capture.'),
+    'skills/v1/old-only/SKILL.md': skillMd('old-only', 'Archived v1 skill with no v2 counterpart.'),
+  });
+
+  it('excludes skills/v1 when skillsExclude is given', async () => {
+    const root = fixture(atlassianFiles());
+    const manifest = await readPackManifest(root, 'claude-plugin', {
+      optIn: ATLASSIAN_OPT_IN_SKILLS,
+      skillsExclude: ['skills/v1'],
+    });
+    expect(manifest.skills.map((skill) => skill.name)).toEqual([
+      'atlassian-mcp-code-search',
+      'capture-tasks-from-meeting-notes',
+      'generate-status-report',
+      'jira-sprint-dashboard',
+      'search-company-knowledge',
+      'spec-to-backlog',
+      'triage-issue',
+    ]);
+    expect(manifest.skills.some((skill) => skill.dir.startsWith('skills/v1'))).toBe(false);
+    expect(manifest.capabilities.projectMutatingSkills).toHaveLength(4);
+    expect(manifest.license).toBe('Apache');
+    expect(manifest.mcpServers).toEqual({
+      atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp', headers: {} },
+    });
+    expect(notAppliedLabels(manifest.capabilities)).toEqual(['project-mutating skills (4)']);
+  });
+
+  it('includes the v1-only skill without skillsExclude (proves exclusion, not dedupe, removes v1)', async () => {
+    const root = fixture(atlassianFiles());
+    const manifest = await readPackManifest(root, 'claude-plugin', { optIn: ATLASSIAN_OPT_IN_SKILLS });
+    expect(manifest.skills.map((skill) => skill.name)).toContain('old-only');
+  });
+
+  it('excludes a descendant of skillsExclude even when plugin.json lists it explicitly (review PAN-5165)', async () => {
+    const root = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({ name: 'explicit', skills: ['./skills/keep', './skills/v1/old-only'] }),
+      'skills/keep/SKILL.md': skillMd('keep', 'Kept.'),
+      'skills/v1/old-only/SKILL.md': skillMd('old-only', 'Archived.'),
+    });
+    const manifest = await readPackManifest(root, 'claude-plugin', { skillsExclude: ['skills/v1'] });
+    expect(manifest.skills.map((skill) => skill.name)).toEqual(['keep']);
   });
 });
 

@@ -21,6 +21,7 @@ import { getMainDivergence, type MainDivergence } from '../../lib/state-plane.js
 import { checkKimi } from './doctor-kimi.js';
 import { checkGrok } from './doctor-grok.js';
 import { checkSageox } from './doctor-sageox.js';
+import { checkAtlassianMcp } from './doctor-atlassian.js';
 import { checkDeployedHooksDrift } from './doctor-hooks-drift.js';
 import { checkSyncSourceCheckout } from './doctor-sync-source-freshness.js';
 import { checkCliGenerationLink } from './doctor-cli-generation.js';
@@ -735,6 +736,7 @@ export async function collectDoctorChecks(options: DoctorOptions = {}): Promise<
   for (const c of await checkKimi()) checks.push(c);
   for (const c of await checkGrok()) checks.push(c); // PAN-5078: optional ACP harness + sign-in
   for (const c of await checkSageox()) checks.push(c); // PAN-2444: ox host contract + pack commit
+  for (const c of await checkAtlassianMcp()) checks.push(c); // PAN-5165: Rovo MCP endpoint + credentials
   for (const c of await checkPrimeAgent()) checks.push(c); // PAN-3668: version pin + orphaned daemons
   for (const c of await checkClaudeCode()) checks.push(c); // PAN-4359: version vs model minimums + shadows
 

@@ -269,6 +269,9 @@ function printPackPreview(preview: PackPreview, notAppliedLabels: NotAppliedLabe
   } else {
     rows.push(['Executables', executables.length > 3 ? `${executables.slice(0, 3).join(', ')}, …` : listOrNone(executables)]);
   }
+  if (manifest.mcpServers) {
+    rows.push(['MCP servers', Object.entries(manifest.mcpServers).map(([n, s]) => `${n} (${s.url})`).join(', ')]);
+  }
   rows.push(['Not applied', listOrNone(notAppliedLabels(manifest.capabilities))]);
   if (runtime) rows.push(['Requires', listOrNone(manifest.capabilities.requiresCli)]);
   if (preview.diff && preview.previousCommit) {

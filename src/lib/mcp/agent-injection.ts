@@ -28,6 +28,8 @@ import { FLYWHEEL_CONVERSATION_SESSION } from '../flywheel/constants.js';
 import { ensureAgentMcpToken, type AgentTokenRole } from './agent-token.js';
 import { overdeckMcpEnabledFor } from './overdeck-mcp-gate.js';
 import { resolveProjectMcpServers, type ProjectMcpServer } from '../projects/project-mcp.js';
+import { atlassianNeedsInteractiveAuth } from '../skill-packs/atlassian.js';
+import type { PackMcpServer } from '../skill-packs/adapters.js';
 import { CLAUDE_OVERDECK_MCP_CONFIG_FILE, OVERDECK_MCP_SERVER_NAME } from './overdeck-mcp-args.js';
 
 export { harnessGetsOverdeckMcp, overdeckMcpEnabledFor } from './overdeck-mcp-gate.js';
@@ -82,6 +84,8 @@ export interface OverdeckMcpLaunchOwner {
   cwd: string;
   /** PAN-5061: the launch's issue, when it has one; resolves the launch project first. */
   issueId?: string;
+  /** PAN-5165: the conversation tmux session whose skill layer selects packs. */
+  skillConversation?: string;
 }
 
 /** The launching role's own MCP server names; a project server with one of these names is dropped (D-4). */
@@ -99,6 +103,17 @@ async function roleServerNames(role: AgentTokenRole): Promise<string[]> {
 async function launchProjectServers(owner: OverdeckMcpLaunchOwner) {
   const reservedNames = [OVERDECK_MCP_SERVER_NAME, ...(await roleServerNames(owner.role))];
   return resolveProjectMcpServers({ issueId: owner.issueId, cwd: owner.cwd, reservedNames });
+}
+
+/** PAN-5165: the launch's pack MCP servers; names used by overdeck, the role or the project are reserved. */
+async function launchPackServers(owner: OverdeckMcpLaunchOwner, takenNames: readonly string[]): Promise<Record<string, PackMcpServer>> {
+  const { resolveLaunchPackMcpServers } = await import('../skill-overrides/launch-pack-mcp.js');
+  return resolveLaunchPackMcpServers({
+    cwd: owner.cwd,
+    issueId: owner.issueId,
+    conversation: owner.skillConversation,
+    reservedNames: takenNames,
+  });
 }
 
 /** The owner's dir for the launch MCP file: `owner.dir`, else an agent's agent dir. */
@@ -148,6 +163,13 @@ export async function prepareClaudeOverdeckMcp(
     console.warn(`[agent-injection] project MCP skipped for ${owner.agentId}: ${(error as Error).message}`);
   }
   Object.assign(servers, project.servers);
+  let pack: Record<string, PackMcpServer> = {};
+  try {
+    pack = await launchPackServers(owner, [OVERDECK_MCP_SERVER_NAME, ...(await roleServerNames(owner.role)), ...Object.keys(project.servers)]);
+  } catch (error) {
+    console.warn(`[agent-injection] pack MCP skipped for ${owner.agentId}: ${(error as Error).message}`);
+  }
+  Object.assign(servers, pack);
   if (Object.keys(servers).length === 0) return {};
   try {
     dir ??= launchDir(owner);
@@ -155,7 +177,7 @@ export async function prepareClaudeOverdeckMcp(
     return {
       overdeckMcpConfig: await writeLaunchMcpConfig(dir, servers),
       // An overdeck-only file keeps the pre-PAN-5061 result; the launcher defaults to mcp__overdeck (NFR-1).
-      ...(Object.keys(project.servers).length > 0 ? { overdeckMcpServerNames: Object.keys(servers) } : {}),
+      ...(Object.keys(project.servers).length + Object.keys(pack).length > 0 ? { overdeckMcpServerNames: Object.keys(servers) } : {}),
       ...(project.strict ? { mcpStrict: true } : {}),
     };
   } catch (error) {
@@ -164,16 +186,28 @@ export async function prepareClaudeOverdeckMcp(
   }
 }
 
-/** FR-8: a harness that provisions no MCP logs one warning naming the project servers it cannot use. */
+/** FR-8: a harness that provisions no MCP logs one warning naming the project and pack servers it cannot use. */
 async function warnUnprovisionedProjectServers(owner: OverdeckMcpLaunchOwner): Promise<void> {
+  let projectKey: string | null = null;
+  let names: string[] = [];
   try {
-    const { projectKey, servers } = await launchProjectServers(owner);
-    const names = Object.keys(servers);
-    if (names.length === 0) return;
-    console.warn(`[project-mcp] ${projectKey}: harness ${owner.harness} does not provision MCP; servers unavailable: ${names.join(', ')}`);
+    const project = await launchProjectServers(owner);
+    projectKey = project.projectKey;
+    names = Object.keys(project.servers);
   } catch {
-    // Best effort: the warning never blocks a launch.
+    // Best effort: a project-resolution failure still lets pack names warn below.
   }
+  let packNames: string[] = [];
+  try {
+    packNames = Object.keys(
+      await launchPackServers(owner, [OVERDECK_MCP_SERVER_NAME, ...(await roleServerNames(owner.role)), ...names]),
+    );
+  } catch {
+    // Best effort: pack names are a bonus, never required for the warning.
+  }
+  const allNames = [...names, ...packNames];
+  if (allNames.length === 0) return;
+  console.warn(`[project-mcp] ${projectKey}: harness ${owner.harness} does not provision MCP; servers unavailable: ${allNames.join(', ')}`);
 }
 
 /** A `[mcp_servers.<name>]` table entry a Codex launch merges into its server map: `overdeck` or a project server. */
@@ -196,12 +230,29 @@ export async function prepareCodexOverdeckMcp(owner: OverdeckMcpLaunchOwner): Pr
   } catch (error) {
     console.warn(`[agent-injection] overdeck MCP skipped for ${owner.agentId}: ${(error as Error).message}`);
   }
+  let projectServerNames: string[] = [];
   try {
-    for (const [name, server] of Object.entries((await launchProjectServers(owner)).servers)) {
+    const projectServers = (await launchProjectServers(owner)).servers;
+    projectServerNames = Object.keys(projectServers);
+    for (const [name, server] of Object.entries(projectServers)) {
       servers[name] = { ...server, defaultToolsApprovalMode: 'approve' };
     }
   } catch (error) {
     console.warn(`[agent-injection] project MCP skipped for ${owner.agentId}: ${(error as Error).message}`);
+  }
+  try {
+    const takenNames = [OVERDECK_MCP_SERVER_NAME, ...(await roleServerNames(owner.role)), ...projectServerNames];
+    for (const [name, server] of Object.entries(await launchPackServers(owner, takenNames))) {
+      // D-7b: Codex agents cannot reuse the operator's Claude Code /mcp sign-in, so a header-less atlassian server is unusable.
+      if (atlassianNeedsInteractiveAuth(server)) {
+        // No pack id is attached to a resolved server here, so name the server, not a pack (review PAN-5165).
+        console.warn(`[pack-mcp] server ${name} skipped for codex: set the Jira email and API token (Codex agents cannot reuse an /mcp sign-in)`);
+        continue;
+      }
+      servers[name] = { ...server, defaultToolsApprovalMode: 'approve' };
+    }
+  } catch (error) {
+    console.warn(`[agent-injection] pack MCP skipped for ${owner.agentId}: ${(error as Error).message}`);
   }
   return servers;
 }

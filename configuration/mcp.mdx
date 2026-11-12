@@ -627,6 +627,62 @@ reuses that login. A server under a new name or URL has no login, and an agent
 cannot complete an interactive sign-in, so send a token header from
 `secrets_file` instead, as `linear-myn` does above.
 
+## Pack MCP servers
+
+A [skill pack](/features/skill-packs) can carry its own MCP servers. Overdeck
+applies only remote, `claude-plugin` pack entries: `type: "http"`, a `url`
+starting `https://`, a name matching `^[A-Za-z0-9_-]+$` other than `overdeck`,
+and string header values with no `${...}` reference in the url or a header. A
+`stdio` or `sse` entry is never applied, because that would run pack code at
+every launch; the add and update preview and the Skills page list it under
+**Not applied** instead.
+
+**Consent.** A pack's MCP servers reach agents only after you confirm an add
+or update preview that lists them (`pan skills pack add <id>` or
+`pan skills pack update <id>`). Overdeck records this as `mcp: true` on the
+pack's registry entry. The **Not applied** label means "this pack declares
+something Overdeck does not apply," not "consent is missing": a pack you
+trusted before this consent model, whose https server is otherwise valid,
+shows no `MCP servers` row under Not applied, but its server still does not
+reach agents, and each launch for a selected pack without `mcp: true` logs
+one warning naming `pan skills pack update <id>` instead of using it. Run
+that command and confirm the preview to record consent.
+
+**When a pack contributes.** A pack's servers join a launch exactly when the
+pack is in that launch's selection, the same rule as its skills: at least one
+of its skills resolves on for that launch, including the conversation layer.
+A pack that is off contributes nothing, consented or not.
+
+**Precedence.** Names are claimed in this order: `overdeck`, then the
+launching role's own servers, then the project's `mcp_servers`, then pack
+servers, lowest pack id first. A later source's server with a name an earlier
+source already claimed is skipped with one warning,
+`[pack-mcp] <pack>: server <name> skipped: <reason>`. A project `mcp_servers`
+entry named `atlassian` therefore overrides the `atlassian` pack's own server,
+which is the escape for an OAuth-only or Bearer-key setup (see
+[Atlassian auth](#atlassian-auth) below).
+
+**What each harness gets:**
+
+| Harness | Pack servers |
+| --- | --- |
+| `claude-code` | the same `overdeck-mcp.json` as `overdeck` and project servers, after them; `--allowedTools=` gains each pack server name |
+| `codex` | `codex-home-v2/config.toml`, each with `default_tools_approval_mode = "approve"` |
+| `acp`, `opencode` | none: the ACP host drops http entries |
+| `ohmypi`, `kimi-code`, `muse`, `prime-agent` | not provisioned |
+
+### Atlassian auth
+
+The `atlassian` pack's server needs no configuration to be useful in Claude
+Code, but Codex agents need Jira credentials because they cannot sign in
+interactively. When the Jira tracker keys are both set (email and API token,
+from Settings → Tracker Keys or `~/.overdeck.env`), and the site is Jira Cloud
+or unset, Overdeck adds `Authorization: Basic base64(email:token)` to the
+`atlassian` server for every harness. Without both keys, a Claude Code agent
+reuses your own `/mcp` sign-in for that server's name and URL; a Codex launch
+gets no `atlassian` server at all, with one warning naming it. See
+[the atlassian pack](/features/skill-packs#atlassian) for the full setup.
+
 ## Scopes and the approve scope
 
 An MCP token is an ordinary access token. Copy MCP URL gives it `read:state`,

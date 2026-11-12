@@ -55,10 +55,11 @@ skills:
 | Field | Type | Default | Writer |
 | --- | --- | --- | --- |
 | `url` | non-empty string | none; required unless the pack id is known | `pan skills pack add` |
-| `ref` | non-empty string (tag, branch, or SHA) | none; `pstack` and `sageox` default it | `pan skills pack add\|update` |
+| `ref` | non-empty string (tag, branch, or SHA) | none; `pstack`, `sageox` and `atlassian` default it | `pan skills pack add\|update` |
 | `commit` | 40 lowercase hex characters | the commit the ref resolved to | `pan skills pack add\|update` |
 | `adapter` | one of `plain`, `claude-plugin`, `deft-readonly`, `gstack-runtime` | unset — resolved from `KNOWN_PACKS` or detection when absent | `pan skills pack add --adapter` only |
 | `browser` | `true` only | unset (no consent recorded) | `pan skills pack browser <id> on\|off` |
+| `mcp` | `true` only | unset | `pan skills pack add\|update` (written when the confirmed preview listed MCP servers) |
 
 A malformed entry is ignored, and a `config.yaml` that fails to parse
 yields no packs at all. `pan skills pack sync` re-fetches a pack but never

@@ -30,7 +30,7 @@ import {
   type DesignLanguage,
 } from './config-yaml.js';
 import { ModelId } from './settings.js';
-import type { Role } from './agents.js';
+import type { Role } from './agents/role.js';
 import { tieredExecutionConfigForSave, validateTieredExecutionSettings, type ApiTieredExecutionConfig } from './settings-api-tiered-execution.js';
 import { validateHarnessesSettings, type ApiHarnessesConfig } from './settings-api-harnesses.js';
 import { mergeApiTelemetrySettings, telemetrySettingsFromConfig, validateApiTelemetryConfig, type ApiTelemetryConfig } from './settings-api-telemetry.js';

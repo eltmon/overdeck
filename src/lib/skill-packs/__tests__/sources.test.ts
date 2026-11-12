@@ -90,6 +90,14 @@ describe('pack registry', () => {
     expect(await getPack('gstack')).toEqual({ id: 'gstack', url: 'u', ref: 'r', commit: COMMIT });
   });
 
+  it('round-trips mcp: true and stores it only when set (PAN-5165)', async () => {
+    await writePackEntry({ id: 'mcpdemo', url: 'u', ref: 'main', commit: COMMIT, mcp: true });
+    expect(readConfig().skills?.packs?.['mcpdemo']).toEqual({ url: 'u', ref: 'main', commit: COMMIT, mcp: true });
+    expect(await getPack('mcpdemo')).toEqual({ id: 'mcpdemo', url: 'u', ref: 'main', commit: COMMIT, mcp: true });
+    await writePackEntry({ id: 'mcpdemo', url: 'u', ref: 'main', commit: COMMIT });
+    expect(readConfig().skills?.packs?.['mcpdemo']).toEqual({ url: 'u', ref: 'main', commit: COMMIT });
+  });
+
   it('preserves comments and unrelated keys', async () => {
     writeFileSync(configPath(), '# keep me\nmodels:\n  default: sonnet\n');
     await writePackEntry({ id: 'mattpocock', url: 'u', ref: 'v1', commit: COMMIT });
@@ -345,6 +353,125 @@ describe('plugin root packs', () => {
     const result = await updatePack('pstack', { ref: 'main' }, vi.fn(async () => true));
     expect(result.preview.commit).toBe(next);
     expect(result.preview.diff).toEqual({ added: [], removed: [], changed: ['alpha'], newCapabilities: [] });
+  });
+});
+
+describe('atlassian known pack skillsExclude threading (PAN-5165)', () => {
+  let up: Upstream;
+  let commit = '';
+
+  beforeAll(() => {
+    up = createUpstream();
+    up.commitFile(
+      '.claude-plugin/plugin.json',
+      JSON.stringify({ name: 'atlassian', skills: './skills/', mcpServers: './.mcp.json' }),
+      'plugin',
+    );
+    up.commitFile(
+      '.mcp.json',
+      JSON.stringify({ mcpServers: { atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp' } } }),
+      'mcp',
+    );
+    up.commitFile('skills/triage-issue/SKILL.md', skillMd('triage-issue'), 'triage-issue');
+    commit = up.commitFile('skills/v1/old-only/SKILL.md', skillMd('old-only'), 'v1 old-only');
+  });
+
+  afterAll(() => {
+    rmSync(up.scratch, { recursive: true, force: true });
+  });
+
+  beforeEach(() => {
+    rmSync(packsHome(), { recursive: true, force: true });
+  });
+
+  it('excludes skills/v1 from the preview and from listPackCatalog', async () => {
+    writeFileSync(configPath(), '# keep me\n');
+    const result = await addPack({ id: 'atlassian', url: up.url, ref: commit }, vi.fn(async () => true));
+    expect(result.preview.manifest.skills.map((skill) => skill.name)).toEqual(['triage-issue']);
+    expect(result.preview.manifest.skills.some((skill) => skill.name === 'old-only')).toBe(false);
+
+    const { listPackCatalog } = await import('../../skill-overrides/catalog.js');
+    const catalog = await listPackCatalog();
+    const atlassian = catalog.find((entry) => entry.id === 'atlassian');
+    expect(atlassian?.manifest?.skills.some((skill) => skill.name === 'old-only')).toBe(false);
+  });
+});
+
+describe('pack MCP consent (PAN-5165)', () => {
+  let up: Upstream;
+  let noMcp = '';
+  let withMcp = '';
+  const accept = vi.fn(async () => true);
+  const decline = vi.fn(async () => false);
+
+  beforeAll(() => {
+    up = createUpstream();
+    up.commitFile('.claude-plugin/plugin.json', JSON.stringify({ name: 'mcpdemo', skills: ['./skills/a'] }), 'plugin');
+    noMcp = up.commitFile('skills/a/SKILL.md', skillMd('a'), 'skill a');
+    up.tag('nomcp', noMcp);
+    withMcp = up.commitFile(
+      '.mcp.json',
+      JSON.stringify({ mcpServers: { srv: { type: 'http', url: 'https://example.com/mcp' } } }),
+      'mcp',
+    );
+    up.tag('v1', withMcp);
+  });
+
+  afterAll(() => {
+    rmSync(up.scratch, { recursive: true, force: true });
+  });
+
+  beforeEach(() => {
+    rmSync(packsHome(), { recursive: true, force: true });
+    accept.mockClear();
+    decline.mockClear();
+  });
+
+  it('addPack writes mcp: true only when the confirmed preview has applied MCP servers', async () => {
+    writeFileSync(configPath(), '# keep me\n');
+    const withServers = await addPack({ id: 'mcpdemo', url: up.url, ref: 'v1' }, accept);
+    expect(withServers.written).toBe(true);
+    expect(withServers.preview.manifest.mcpServers).toEqual({
+      srv: { type: 'http', url: 'https://example.com/mcp', headers: {} },
+    });
+    expect(await getPack('mcpdemo')).toMatchObject({ mcp: true });
+    expect((await listPacks()).find((entry) => entry.id === 'mcpdemo')?.mcp).toBe(true);
+
+    const noServers = await addPack({ id: 'nomcpdemo', url: up.url, ref: 'nomcp' }, accept);
+    expect(noServers.written).toBe(true);
+    expect(noServers.preview.manifest.mcpServers).toBeUndefined();
+    expect(await getPack('nomcpdemo')).not.toHaveProperty('mcp');
+  });
+
+  it('asks for confirmation again when consent is missing though the commit is unchanged', async () => {
+    await writePackEntry({ id: 'mcpdemo', url: up.url, ref: 'v1', commit: withMcp });
+    const result = await updatePack('mcpdemo', {}, accept);
+    expect(accept).toHaveBeenCalledOnce();
+    expect(result.written).toBe(true);
+    expect(await getPack('mcpdemo')).toMatchObject({ commit: withMcp, mcp: true });
+  });
+
+  it('skips confirmation once consent and the manifest already agree', async () => {
+    await writePackEntry({ id: 'mcpdemo', url: up.url, ref: 'v1', commit: withMcp, mcp: true });
+    const result = await updatePack('mcpdemo', {}, accept);
+    expect(result.written).toBe(false);
+    expect(accept).not.toHaveBeenCalled();
+  });
+
+  it('lists a newly applied MCP server in diff.newCapabilities and records consent', async () => {
+    await writePackEntry({ id: 'mcpdemo', url: up.url, ref: 'nomcp', commit: noMcp });
+    const result = await updatePack('mcpdemo', { ref: 'v1' }, accept);
+    expect(result.preview.diff?.newCapabilities).toContain('MCP server srv (https://example.com/mcp)');
+    expect(result.written).toBe(true);
+    expect(await getPack('mcpdemo')).toMatchObject({ commit: withMcp, mcp: true });
+  });
+
+  it('a declined update records no consent', async () => {
+    await writePackEntry({ id: 'mcpdemo', url: up.url, ref: 'nomcp', commit: noMcp });
+    const result = await updatePack('mcpdemo', { ref: 'v1' }, decline);
+    expect(result.written).toBe(false);
+    expect(await getPack('mcpdemo')).toMatchObject({ commit: noMcp });
+    expect(await getPack('mcpdemo')).not.toHaveProperty('mcp');
   });
 });
 

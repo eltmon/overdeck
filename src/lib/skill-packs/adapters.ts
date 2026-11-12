@@ -11,6 +11,7 @@ import { lstat, readdir, readFile } from 'node:fs/promises';
 import { basename, isAbsolute, join, posix } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { SAGEOX_DISCLOSURE } from '../sageox/disclosure.js';
+import { ATLASSIAN_DISCLOSURE, ATLASSIAN_OPT_IN_SKILLS, ATLASSIAN_PACK_COMMIT, ATLASSIAN_PACK_ID, ATLASSIAN_PACK_URL } from './atlassian.js';
 import { DEFT_READONLY_SKILLS, DEFT_SKILL_PREFIX, DEFT_SKILLS_DIR } from './deft.js';
 import {
   GSTACK_BROWSER_NEEDED,
@@ -58,6 +59,15 @@ export interface PackManifest {
   pluginName: string | null;
   /** Top-level skills the adapter never mounts, with the reason (gstack-runtime). */
   excluded?: Array<{ name: string; reason: string }>;
+  /** Applied MCP servers (PAN-5165 D-2/D-3): `claude-plugin` packs only, https `type: "http"` entries only. */
+  mcpServers?: Record<string, PackMcpServer>;
+}
+
+/** An MCP server a pack declares that Overdeck applies (PAN-5165 D-2): remote https only, no ${} references. */
+export interface PackMcpServer {
+  type: 'http';
+  url: string;
+  headers: Record<string, string>;
 }
 
 export interface KnownPack {
@@ -75,6 +85,8 @@ export interface KnownPack {
   optIn?: readonly string[];
   /** One-line statement of what leaves the machine, shown on the pack row. */
   disclosure?: string;
+  /** Plugin-root-relative dirs the skill scan skips (archived copies). */
+  skillsExclude?: readonly string[];
 }
 
 export const KNOWN_PACKS: Readonly<Record<string, KnownPack>> = {
@@ -129,6 +141,16 @@ export const KNOWN_PACKS: Readonly<Record<string, KnownPack>> = {
       'reflect',
       'setup-pstack',
     ],
+  },
+  // Atlassian's official Rovo MCP plugin, upstream and commit-pinned (PAN-5165); skills/v1 holds archived v1 skills.
+  atlassian: {
+    id: ATLASSIAN_PACK_ID,
+    url: ATLASSIAN_PACK_URL,
+    adapter: 'claude-plugin',
+    ref: ATLASSIAN_PACK_COMMIT,
+    skillsExclude: ['skills/v1'],
+    optIn: ATLASSIAN_OPT_IN_SKILLS,
+    disclosure: ATLASSIAN_DISCLOSURE,
   },
 };
 
@@ -220,8 +242,17 @@ function toRepoRelative(path: string): string | null {
   return normalized;
 }
 
+/** True when `dir` is excluded directly, or is a descendant of an excluded directory. */
+function isUnderExcluded(dir: string, exclude: ReadonlySet<string>): boolean {
+  if (exclude.has(dir)) return true;
+  for (const excluded of exclude) {
+    if (dir.startsWith(`${excluded}/`)) return true;
+  }
+  return false;
+}
+
 /** Skill dirs (repo-relative) under `start`: a dir holding SKILL.md is a skill and is not descended into. */
-async function scanSkillDirs(root: string, start: string): Promise<string[]> {
+async function scanSkillDirs(root: string, start: string, exclude: ReadonlySet<string> = new Set()): Promise<string[]> {
   const found: string[] = [];
   const walk = async (rel: string, depth: number): Promise<void> => {
     let dirents;
@@ -233,6 +264,7 @@ async function scanSkillDirs(root: string, start: string): Promise<string[]> {
     for (const dirent of [...dirents].sort((a, b) => a.name.localeCompare(b.name))) {
       if (!dirent.isDirectory()) continue;
       const child = posix.join(rel, dirent.name);
+      if (isUnderExcluded(child, exclude)) continue;
       if (await isFile(join(root, child, 'SKILL.md'))) found.push(child);
       else if (depth < PLAIN_MAX_DEPTH) await walk(child, depth + 1);
     }
@@ -241,18 +273,22 @@ async function scanSkillDirs(root: string, start: string): Promise<string[]> {
   return found;
 }
 
-async function claudePluginSkillDirs(root: string, plugin: Record<string, unknown>): Promise<string[]> {
+async function claudePluginSkillDirs(
+  root: string,
+  plugin: Record<string, unknown>,
+  exclude: ReadonlySet<string> = new Set(),
+): Promise<string[]> {
   const skills = plugin['skills'];
   if (typeof skills === 'string') {
     const start = toRepoRelative(skills);
-    return start ? scanSkillDirs(root, start) : [];
+    return start ? scanSkillDirs(root, start, exclude) : [];
   }
-  if (!Array.isArray(skills)) return scanSkillDirs(root, 'skills');
+  if (!Array.isArray(skills)) return scanSkillDirs(root, 'skills', exclude);
   const dirs: string[] = [];
   for (const entry of skills) {
     if (typeof entry !== 'string') continue;
     const dir = toRepoRelative(entry);
-    if (dir && (await isDir(join(root, dir)))) dirs.push(dir);
+    if (dir && !isUnderExcluded(dir, exclude) && (await isDir(join(root, dir)))) dirs.push(dir);
   }
   return dirs;
 }
@@ -323,6 +359,97 @@ async function listExecutables(root: string, skillDir: string, skipTopLevel: Rea
   return found;
 }
 
+const MCP_SERVER_NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+/** Parsed JSON's `mcpServers` key as an object, or null when the text is unreadable, invalid, or lacks one. */
+function parseMcpServersMap(text: string | null): Record<string, unknown> | null {
+  if (text === null) return null;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const mcpServers = (parsed as Record<string, unknown>)['mcpServers'];
+    if (!mcpServers || typeof mcpServers !== 'object' || Array.isArray(mcpServers)) return null;
+    return mcpServers as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/** True when `value` is an entry this issue applies (PAN-5165 D-2): remote https, no `${}` references. */
+function isAppliedMcpServerEntry(
+  name: string,
+  value: unknown,
+): value is { type: 'http'; url: string; headers?: Record<string, string> } {
+  if (!MCP_SERVER_NAME_PATTERN.test(name) || name === 'overdeck') return false;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const entry = value as Record<string, unknown>;
+  if (entry['type'] !== 'http') return false;
+  const url = entry['url'];
+  if (typeof url !== 'string' || url.includes('${')) return false;
+  try {
+    if (new URL(url).protocol !== 'https:') return false;
+  } catch {
+    return false;
+  }
+  const headers = entry['headers'];
+  if (headers === undefined) return true;
+  if (!headers || typeof headers !== 'object' || Array.isArray(headers)) return false;
+  for (const headerValue of Object.values(headers as Record<string, unknown>)) {
+    if (typeof headerValue !== 'string' || headerValue.includes('${')) return false;
+  }
+  return true;
+}
+
+/** Applied servers by name, plus how many declared entries were not applied. */
+export async function readPackMcpServers(
+  base: string,
+  plugin: Record<string, unknown> | null,
+): Promise<{ applied: Record<string, PackMcpServer>; notApplied: number; declared: boolean }> {
+  const declaredValue = plugin?.['mcpServers'];
+  let declared = false;
+  let serversMap: Record<string, unknown> | null = null;
+
+  if (typeof declaredValue === 'string') {
+    declared = true;
+    const rel = toRepoRelative(declaredValue);
+    serversMap = rel ? parseMcpServersMap(await readTextOrNull(join(base, rel))) : null;
+  } else if (declaredValue && typeof declaredValue === 'object' && !Array.isArray(declaredValue)) {
+    declared = true;
+    const obj = declaredValue as Record<string, unknown>;
+    const nested = obj['mcpServers'];
+    serversMap = nested && typeof nested === 'object' && !Array.isArray(nested) ? (nested as Record<string, unknown>) : obj;
+  } else {
+    const mcpJsonPath = join(base, '.mcp.json');
+    if (await isFile(mcpJsonPath)) {
+      declared = true;
+      serversMap = parseMcpServersMap(await readTextOrNull(mcpJsonPath));
+    }
+  }
+
+  if (!declared) return { applied: {}, notApplied: 0, declared: false };
+  if (serversMap === null) return { applied: {}, notApplied: 1, declared: true };
+
+  const applied: Record<string, PackMcpServer> = {};
+  let notApplied = 0;
+  for (const [name, value] of Object.entries(serversMap)) {
+    if (isAppliedMcpServerEntry(name, value)) {
+      // Normalize through URL so no raw control character from the pack's JSON survives into a display row.
+      applied[name] = { type: 'http', url: new URL(value.url).href, headers: value.headers ?? {} };
+    } else {
+      notApplied += 1;
+    }
+  }
+  return { applied, notApplied, declared: true };
+}
+
+/** `MCP server <name> (<url>)` for each applied server, sorted by name; empty when the manifest has none. */
+export function mcpServerLabels(manifest: PackManifest): string[] {
+  if (!manifest.mcpServers) return [];
+  return Object.entries(manifest.mcpServers)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, server]) => `MCP server ${name} (${server.url})`);
+}
+
 async function readLicense(root: string, plugin: Record<string, unknown> | null): Promise<string | null> {
   const declared = plugin?.['license'];
   if (typeof declared === 'string' && declared.trim()) return declared.trim();
@@ -339,7 +466,13 @@ async function readLicense(root: string, plugin: Record<string, unknown> | null)
 export async function readPackManifest(
   root: string,
   adapter: PackAdapterId,
-  opts: { optIn?: readonly string[]; skillsRoot?: string; pluginRoot?: string; browser?: boolean } = {},
+  opts: {
+    optIn?: readonly string[];
+    skillsRoot?: string;
+    pluginRoot?: string;
+    browser?: boolean;
+    skillsExclude?: readonly string[];
+  } = {},
 ): Promise<PackManifest> {
   let prefix = '';
   if (opts.pluginRoot !== undefined) {
@@ -349,16 +482,18 @@ export async function readPackManifest(
   }
   const base = prefix ? join(root, prefix) : root;
   const plugin = await readPluginJson(base, adapter === 'claude-plugin');
+  const mcp = adapter === 'claude-plugin' ? await readPackMcpServers(base, plugin) : null;
   const deft = adapter === 'deft-readonly';
   const gstack = adapter === 'gstack-runtime' ? await gstackSkillDirs(base, opts.browser === true) : null;
+  const excludeDirs = new Set((opts.skillsExclude ?? []).map(toRepoRelative).filter((dir): dir is string => dir !== null));
   const skillDirs =
     adapter === 'claude-plugin'
-      ? await claudePluginSkillDirs(base, plugin ?? {})
+      ? await claudePluginSkillDirs(base, plugin ?? {}, excludeDirs)
       : deft
         ? await deftReadonlySkillDirs(base)
         : gstack
           ? gstack.dirs
-          : await scanSkillDirs(base, opts.skillsRoot ?? 'skills');
+          : await scanSkillDirs(base, opts.skillsRoot ?? 'skills', excludeDirs);
   // gstack opt-in comes from the skill map, so a stale registry entry cannot turn an opt-in skill into a default one.
   // A browser-opt-in skill is only present when the browser runtime is mounted.
   const optIn = new Set(gstack ? [...GSTACK_OPT_IN_SKILLS, ...GSTACK_BROWSER_OPT_IN_SKILLS] : (opts.optIn ?? []));
@@ -394,7 +529,8 @@ export async function readPackManifest(
   // Deft always carries agent hooks, an AGENTS.md section, and .githooks, and its skills call the directive CLI.
   const capabilities: PackCapabilities = {
     hooks: deft || gstack !== null || (await isFile(join(base, 'hooks', 'hooks.json'))) || plugin?.['hooks'] !== undefined,
-    mcpServers: (await isFile(join(base, '.mcp.json'))) || plugin?.['mcpServers'] !== undefined,
+    // PAN-5165: claude-plugin packs apply their https MCP servers; anything else they declare stays Not applied.
+    mcpServers: mcp ? mcp.notApplied > 0 : (await isFile(join(base, '.mcp.json'))) || plugin?.['mcpServers'] !== undefined,
     commands: await isDir(join(base, 'commands')),
     agents: await isDir(join(base, 'agents')),
     contextInjection: deft,
@@ -405,7 +541,13 @@ export async function readPackManifest(
     ...(gstack ? { runtime: true } : {}),
   };
   const pluginName = typeof plugin?.['name'] === 'string' ? plugin['name'] : null;
-  const manifest: PackManifest = { skills, capabilities, license: await readLicense(base, plugin), pluginName };
+  const manifest: PackManifest = {
+    skills,
+    capabilities,
+    license: await readLicense(base, plugin),
+    pluginName,
+    ...(mcp && Object.keys(mcp.applied).length > 0 ? { mcpServers: mcp.applied } : {}),
+  };
   return gstack ? { ...manifest, excluded: gstack.excluded } : manifest;
 }
 
