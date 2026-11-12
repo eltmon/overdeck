@@ -34,13 +34,47 @@ const NOT_SIGNED_IN_MESSAGE =
 const NOT_SIGNED_IN_FIX =
   'Set JIRA_EMAIL and JIRA_API_TOKEN (Settings → Tracker Keys), or run claude mcp add --transport http atlassian https://mcp.atlassian.com/v2/mcp and sign in with /mcp.';
 
+function anyOverrideTrue(prefix: string, overrides: Record<string, boolean>): boolean {
+  return Object.entries(overrides).some(([key, value]) => value === true && key.startsWith(prefix));
+}
+
+/**
+ * True when the pack toggle, or any of its skills, is on anywhere: global,
+ * a project, or an issue (D-5: a pack contributes once any one of its
+ * skills resolves on, including a per-skill override with no pack toggle).
+ */
 async function defaultPackOnSomewhere(id: string): Promise<boolean> {
-  const { listLowerLevelPackOverrides, readGlobalPackOverrides, readProjectPackOverrides } = await import('../../lib/skill-overrides/store.js');
+  const {
+    listLowerLevelOverrides,
+    listLowerLevelPackOverrides,
+    readGlobalPackOverrides,
+    readGlobalSkillOverrides,
+    readProjectPackOverrides,
+    readProjectSkillOverrides,
+  } = await import('../../lib/skill-overrides/store.js');
+  const { readIssueOverrides } = await import('../../lib/skill-overrides/issue-file.js');
+  const skillPrefix = `${id}/`;
+
   if ((await readGlobalPackOverrides())[id] === true) return true;
-  const lower = (await listLowerLevelPackOverrides())[id];
-  if (!lower) return false;
-  for (const projectKey of lower.projects) {
+  if (anyOverrideTrue(skillPrefix, await readGlobalSkillOverrides())) return true;
+
+  const packLower = (await listLowerLevelPackOverrides())[id];
+  for (const projectKey of packLower?.projects ?? []) {
     if ((await readProjectPackOverrides(projectKey))[id] === true) return true;
+  }
+  for (const issueId of packLower?.issues ?? []) {
+    if ((await readIssueOverrides(issueId)).packs[id] === true) return true;
+  }
+
+  const skillLower = await listLowerLevelOverrides();
+  for (const [skillId, { projects, issues }] of Object.entries(skillLower)) {
+    if (!skillId.startsWith(skillPrefix)) continue;
+    for (const projectKey of projects) {
+      if (anyOverrideTrue(skillPrefix, await readProjectSkillOverrides(projectKey))) return true;
+    }
+    for (const issueId of issues) {
+      if (anyOverrideTrue(skillPrefix, (await readIssueOverrides(issueId)).skills)) return true;
+    }
   }
   return false;
 }
@@ -55,42 +89,47 @@ const defaultDeps: AtlassianDoctorDeps = {
 
 export async function checkAtlassianMcp(deps: Partial<AtlassianDoctorDeps> = {}): Promise<CheckResult[]> {
   const { getPack, packOnSomewhere, trackerKeys, fetchImpl, timeoutMs } = { ...defaultDeps, ...deps };
-  if (!(await getPack(ATLASSIAN_PACK_ID))) return [];
-  if (!(await packOnSomewhere(ATLASSIAN_PACK_ID))) {
-    return [{ name: NAME, status: 'ok', message: 'atlassian pack registered and off everywhere; endpoint not checked' }];
-  }
-
-  const auth = atlassianBasicAuth(await trackerKeys());
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetchImpl(ATLASSIAN_MCP_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json, text/event-stream',
-        ...(auth ? { Authorization: auth } : {}),
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'initialize',
-        params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'overdeck-doctor', version: '1' } },
-      }),
-      signal: controller.signal,
-    });
-    if (auth && response.ok) return [{ name: NAME, status: 'ok', message: `Signed in with the Jira API token (HTTP ${response.status})` }];
-    if (auth && (response.status === 401 || response.status === 403)) {
-      return [{ name: NAME, status: 'error', message: `Atlassian rejected the Jira API token (HTTP ${response.status})`, fix: REJECTED_TOKEN_FIX }];
+    if (!(await getPack(ATLASSIAN_PACK_ID))) return [];
+    if (!(await packOnSomewhere(ATLASSIAN_PACK_ID))) {
+      return [{ name: NAME, status: 'ok', message: 'atlassian pack registered and off everywhere; endpoint not checked' }];
     }
-    if (!auth && response.status === 401) {
-      return [{ name: NAME, status: 'warn', message: NOT_SIGNED_IN_MESSAGE, fix: NOT_SIGNED_IN_FIX }];
+
+    const auth = atlassianBasicAuth(await trackerKeys());
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetchImpl(ATLASSIAN_MCP_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          ...(auth ? { Authorization: auth } : {}),
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'overdeck-doctor', version: '1' } },
+        }),
+        signal: controller.signal,
+      });
+      if (auth && response.ok) return [{ name: NAME, status: 'ok', message: `Signed in with the Jira API token (HTTP ${response.status})` }];
+      if (auth && (response.status === 401 || response.status === 403)) {
+        return [{ name: NAME, status: 'error', message: `Atlassian rejected the Jira API token (HTTP ${response.status})`, fix: REJECTED_TOKEN_FIX }];
+      }
+      if (!auth && response.status === 401) {
+        return [{ name: NAME, status: 'warn', message: NOT_SIGNED_IN_MESSAGE, fix: NOT_SIGNED_IN_FIX }];
+      }
+      if (!auth && response.ok) return [{ name: NAME, status: 'ok', message: `endpoint answered (HTTP ${response.status})` }];
+      return [{ name: NAME, status: 'warn', message: `Atlassian MCP endpoint answered HTTP ${response.status}` }];
+    } catch (error) {
+      return [{ name: NAME, status: 'warn', message: `Atlassian MCP endpoint unreachable: ${(error as Error).message}` }];
+    } finally {
+      clearTimeout(timer);
     }
-    if (!auth && response.ok) return [{ name: NAME, status: 'ok', message: `endpoint answered (HTTP ${response.status})` }];
-    return [{ name: NAME, status: 'warn', message: `Atlassian MCP endpoint answered HTTP ${response.status}` }];
   } catch (error) {
-    return [{ name: NAME, status: 'warn', message: `Atlassian MCP endpoint unreachable: ${(error as Error).message}` }];
-  } finally {
-    clearTimeout(timer);
+    // Config or override reads never crash the rest of pan doctor; degrade to one warn row.
+    return [{ name: NAME, status: 'warn', message: `Atlassian MCP check failed: ${(error as Error).message}` }];
   }
 }

@@ -377,7 +377,7 @@ A Jira write never blocks a merge, a close-out or `pan done`: network, authentic
 
 ### Atlassian Rovo MCP for agents
 
-The same Jira email and API token that authenticate the tracker also sign agents into the [`atlassian` skill pack](/features/skill-packs#atlassian)'s Rovo MCP server, so Jira and Confluence tools reach Claude Code and Codex agents once you add the pack and confirm its MCP server. See [Pack MCP servers](/configuration/mcp#pack-mcp-servers).
+The same Jira email and API token that authenticate the tracker also sign agents into the [`atlassian` skill pack](/features/skill-packs#atlassian)'s Rovo MCP server. Run `pan skills pack add atlassian` and confirm the preview that lists the MCP server, then `pan skills set --pack atlassian on` (or `--project`/`--issue`) to turn it on; Jira and Confluence tools then reach Claude Code and Codex agents. See [Pack MCP servers](/configuration/mcp#pack-mcp-servers).
 
 ### Limits
 

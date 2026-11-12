@@ -181,6 +181,22 @@ describe('pack MCP servers (PAN-5165)', () => {
     expect(manifest.capabilities.mcpServers).toBe(true);
   });
 
+  it('rejects a malformed https url, and normalizes an applied url through URL (review PAN-5165)', async () => {
+    const root = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({ name: 'malformed' }),
+      '.mcp.json': JSON.stringify({
+        mcpServers: {
+          // "https://" prefix but not a parseable URL (embedded control char breaks the host).
+          broken: { type: 'http', url: 'https://exa\u0007mple.com/mcp' },
+          good: { type: 'http', url: 'https://example.com/mcp' },
+        },
+      }),
+    });
+    const manifest = await readPackManifest(root, 'claude-plugin');
+    expect(manifest.mcpServers).toEqual({ good: { type: 'http', url: 'https://example.com/mcp', headers: {} } });
+    expect(manifest.capabilities.mcpServers).toBe(true);
+  });
+
   it('resolves servers from a plugin.json string path, and from inline object forms', async () => {
     const pathRoot = fixture({
       '.claude-plugin/plugin.json': JSON.stringify({ name: 'path', mcpServers: './mcp/servers.json' }),
@@ -550,6 +566,16 @@ describe('atlassian fixture (PAN-5165)', () => {
     const root = fixture(atlassianFiles());
     const manifest = await readPackManifest(root, 'claude-plugin', { optIn: ATLASSIAN_OPT_IN_SKILLS });
     expect(manifest.skills.map((skill) => skill.name)).toContain('old-only');
+  });
+
+  it('excludes a descendant of skillsExclude even when plugin.json lists it explicitly (review PAN-5165)', async () => {
+    const root = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({ name: 'explicit', skills: ['./skills/keep', './skills/v1/old-only'] }),
+      'skills/keep/SKILL.md': skillMd('keep', 'Kept.'),
+      'skills/v1/old-only/SKILL.md': skillMd('old-only', 'Archived.'),
+    });
+    const manifest = await readPackManifest(root, 'claude-plugin', { skillsExclude: ['skills/v1'] });
+    expect(manifest.skills.map((skill) => skill.name)).toEqual(['keep']);
   });
 });
 

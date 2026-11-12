@@ -188,23 +188,26 @@ export async function prepareClaudeOverdeckMcp(
 
 /** FR-8: a harness that provisions no MCP logs one warning naming the project and pack servers it cannot use. */
 async function warnUnprovisionedProjectServers(owner: OverdeckMcpLaunchOwner): Promise<void> {
+  let projectKey: string | null = null;
+  let names: string[] = [];
   try {
-    const { projectKey, servers } = await launchProjectServers(owner);
-    const names = Object.keys(servers);
-    let packNames: string[] = [];
-    try {
-      packNames = Object.keys(
-        await launchPackServers(owner, [OVERDECK_MCP_SERVER_NAME, ...(await roleServerNames(owner.role)), ...names]),
-      );
-    } catch {
-      // Best effort: pack names are a bonus, never required for the warning.
-    }
-    const allNames = [...names, ...packNames];
-    if (allNames.length === 0) return;
-    console.warn(`[project-mcp] ${projectKey}: harness ${owner.harness} does not provision MCP; servers unavailable: ${allNames.join(', ')}`);
+    const project = await launchProjectServers(owner);
+    projectKey = project.projectKey;
+    names = Object.keys(project.servers);
   } catch {
-    // Best effort: the warning never blocks a launch.
+    // Best effort: a project-resolution failure still lets pack names warn below.
   }
+  let packNames: string[] = [];
+  try {
+    packNames = Object.keys(
+      await launchPackServers(owner, [OVERDECK_MCP_SERVER_NAME, ...(await roleServerNames(owner.role)), ...names]),
+    );
+  } catch {
+    // Best effort: pack names are a bonus, never required for the warning.
+  }
+  const allNames = [...names, ...packNames];
+  if (allNames.length === 0) return;
+  console.warn(`[project-mcp] ${projectKey}: harness ${owner.harness} does not provision MCP; servers unavailable: ${allNames.join(', ')}`);
 }
 
 /** A `[mcp_servers.<name>]` table entry a Codex launch merges into its server map: `overdeck` or a project server. */
@@ -242,7 +245,8 @@ export async function prepareCodexOverdeckMcp(owner: OverdeckMcpLaunchOwner): Pr
     for (const [name, server] of Object.entries(await launchPackServers(owner, takenNames))) {
       // D-7b: Codex agents cannot reuse the operator's Claude Code /mcp sign-in, so a header-less atlassian server is unusable.
       if (atlassianNeedsInteractiveAuth(server)) {
-        console.warn(`[pack-mcp] atlassian: server ${name} skipped for codex: set the Jira email and API token (Codex agents cannot reuse an /mcp sign-in)`);
+        // No pack id is attached to a resolved server here, so name the server, not a pack (review PAN-5165).
+        console.warn(`[pack-mcp] server ${name} skipped for codex: set the Jira email and API token (Codex agents cannot reuse an /mcp sign-in)`);
         continue;
       }
       servers[name] = { ...server, defaultToolsApprovalMode: 'approve' };

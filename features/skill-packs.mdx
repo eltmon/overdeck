@@ -682,7 +682,7 @@ For OAuth with Jira credentials also set, or for a Bearer service-account key, d
 
 **Harnesses.** Claude Code and Codex agents get the server (Codex with `defaultToolsApprovalMode: "approve"`, and only when it has an Authorization header). `acp` and `opencode` get no server: the ACP host drops non-`stdio` entries. `ohmypi`, `kimi-code`, `muse` and `prime-agent` provision no MCP at all.
 
-**`pan doctor`** adds an **Atlassian MCP** row only once the pack is registered; there is no row at all before that. Registered but off everywhere, it reports `ok` with no network request. Otherwise it probes the endpoint and reports whether your token was accepted, whether you are signed in at all, or that the endpoint is unreachable. See [Pack MCP servers](/configuration/mcp#pack-mcp-servers) for consent, precedence, and the full auth rule.
+**`pan doctor`** adds an **Atlassian MCP** row only once the pack is registered; there is no row at all before that. Registered but off everywhere, it reports `ok` with no network request. Otherwise it probes the endpoint: with Jira credentials set, it reports whether the API token was accepted; without them, it reports that no Jira email and API token are configured (so Claude Code falls back to your own `/mcp` sign-in, which the probe cannot see); and either way, an unreachable endpoint reports as such. See [Pack MCP servers](/configuration/mcp#pack-mcp-servers) for consent, precedence, and the full auth rule.
 
 ## Where state lives and when changes apply
 

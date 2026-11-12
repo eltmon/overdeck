@@ -2,7 +2,36 @@
  * PAN-5165 WI-7: pan doctor's Atlassian MCP row, with injected deps and a fake
  * fetchImpl (no network, no real timers).
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const {
+  listLowerLevelOverrides,
+  listLowerLevelPackOverrides,
+  readGlobalPackOverrides,
+  readGlobalSkillOverrides,
+  readProjectPackOverrides,
+  readProjectSkillOverrides,
+} = vi.hoisted(() => ({
+  listLowerLevelOverrides: vi.fn(async () => ({}) as Promise<Record<string, { projects: string[]; issues: string[] }>>),
+  listLowerLevelPackOverrides: vi.fn(async () => ({}) as Promise<Record<string, { projects: string[]; issues: string[] }>>),
+  readGlobalPackOverrides: vi.fn(async () => ({}) as Promise<Record<string, boolean>>),
+  readGlobalSkillOverrides: vi.fn(async () => ({}) as Promise<Record<string, boolean>>),
+  readProjectPackOverrides: vi.fn(async () => ({}) as Promise<Record<string, boolean>>),
+  readProjectSkillOverrides: vi.fn(async () => ({}) as Promise<Record<string, boolean>>),
+}));
+const { readIssueOverrides } = vi.hoisted(() => ({
+  readIssueOverrides: vi.fn(async () => ({ skills: {}, packs: {} }) as Promise<{ skills: Record<string, boolean>; packs: Record<string, boolean> }>),
+}));
+
+vi.mock('../../../lib/skill-overrides/store.js', () => ({
+  listLowerLevelOverrides,
+  listLowerLevelPackOverrides,
+  readGlobalPackOverrides,
+  readGlobalSkillOverrides,
+  readProjectPackOverrides,
+  readProjectSkillOverrides,
+}));
+vi.mock('../../../lib/skill-overrides/issue-file.js', () => ({ readIssueOverrides }));
 
 import { checkAtlassianMcp } from '../doctor-atlassian.js';
 
@@ -138,5 +167,53 @@ describe('checkAtlassianMcp (PAN-5165)', () => {
     expect(checks[0]!.status).toBe('warn');
     expect(checks[0]!.message).toMatch(/^Atlassian MCP endpoint unreachable/);
     expect(JSON.stringify(checks[0])).not.toContain('t0k');
+  });
+});
+
+describe('checkAtlassianMcp default packOnSomewhere, and the outer guard (review PAN-5165)', () => {
+  beforeEach(() => {
+    listLowerLevelOverrides.mockReset().mockResolvedValue({});
+    listLowerLevelPackOverrides.mockReset().mockResolvedValue({});
+    readGlobalPackOverrides.mockReset().mockResolvedValue({});
+    readGlobalSkillOverrides.mockReset().mockResolvedValue({});
+    readProjectPackOverrides.mockReset().mockResolvedValue({});
+    readProjectSkillOverrides.mockReset().mockResolvedValue({});
+    readIssueOverrides.mockReset().mockResolvedValue({ skills: {}, packs: {} });
+  });
+
+  it('reports off everywhere, and never probes, when nothing overrides the pack or its skills', async () => {
+    const fetchImpl = vi.fn();
+    const checks = await checkAtlassianMcp({ getPack: async () => ({ commit: COMMIT }), fetchImpl: fetchImpl as unknown as typeof fetch });
+    expect(checks).toEqual([{ name: 'Atlassian MCP', status: 'ok', message: 'atlassian pack registered and off everywhere; endpoint not checked' }]);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('probes the endpoint when only a global per-skill override is on, with no pack toggle (D-5)', async () => {
+    readGlobalSkillOverrides.mockResolvedValue({ 'atlassian/triage-issue': true });
+    const checks = await checkAtlassianMcp({ getPack: async () => ({ commit: COMMIT }), trackerKeys: async () => undefined, fetchImpl: jsonFetch(200) });
+    expect(checks[0]!.status).toBe('ok');
+  });
+
+  it('probes the endpoint when an issue overrides the pack toggle', async () => {
+    listLowerLevelPackOverrides.mockResolvedValue({ atlassian: { projects: [], issues: ['PAN-1'] } });
+    readIssueOverrides.mockResolvedValue({ skills: {}, packs: { atlassian: true } });
+    const checks = await checkAtlassianMcp({ getPack: async () => ({ commit: COMMIT }), trackerKeys: async () => undefined, fetchImpl: jsonFetch(200) });
+    expect(checks[0]!.status).toBe('ok');
+  });
+
+  it('probes the endpoint when a project overrides a skill with no pack toggle (D-5)', async () => {
+    listLowerLevelOverrides.mockResolvedValue({ 'atlassian/triage-issue': { projects: ['acme'], issues: [] } });
+    readProjectSkillOverrides.mockResolvedValue({ 'atlassian/triage-issue': true });
+    const checks = await checkAtlassianMcp({ getPack: async () => ({ commit: COMMIT }), trackerKeys: async () => undefined, fetchImpl: jsonFetch(200) });
+    expect(checks[0]!.status).toBe('ok');
+  });
+
+  it('degrades to one warn row when getPack throws, never crashing the rest of pan doctor', async () => {
+    const checks = await checkAtlassianMcp({
+      getPack: async () => {
+        throw new Error('registry is corrupt');
+      },
+    });
+    expect(checks).toEqual([{ name: 'Atlassian MCP', status: 'warn', message: 'Atlassian MCP check failed: registry is corrupt' }]);
   });
 });

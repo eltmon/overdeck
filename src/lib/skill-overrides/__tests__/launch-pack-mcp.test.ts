@@ -187,6 +187,23 @@ describe('resolveLaunchPackMcpServers (PAN-5165)', () => {
     const result = await resolveLaunchPackMcpServers({ ...ctx, reservedNames: [], warn: vi.fn() });
     expect(result.atlassian?.headers).toEqual({});
   });
+
+  it('keeps an unrelated pack\'s server when the tracker-key read for atlassian fails (review PAN-5165)', async () => {
+    reset();
+    listPackCatalog.mockResolvedValue([
+      packCatalogEntry('a-pack', 'docs', 'https://a.example/docs'),
+      atlassianCatalogEntry(),
+    ]);
+    loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { global: { 'a-pack': true, atlassian: true } } });
+    loadConfigNoMigration.mockRejectedValueOnce(new Error('config.yaml is malformed'));
+    const warn = vi.fn();
+    const result = await resolveLaunchPackMcpServers({ ...ctx, reservedNames: [], warn });
+    expect(result).toEqual({
+      docs: { type: 'http', url: 'https://a.example/docs', headers: {} },
+      atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp', headers: {} },
+    });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('tracker keys unavailable'));
+  });
 });
 
 describe('atlassianBasicAuth / withAtlassianAuth / atlassianNeedsInteractiveAuth (PAN-5165 WI-5)', () => {

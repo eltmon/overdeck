@@ -242,6 +242,15 @@ function toRepoRelative(path: string): string | null {
   return normalized;
 }
 
+/** True when `dir` is excluded directly, or is a descendant of an excluded directory. */
+function isUnderExcluded(dir: string, exclude: ReadonlySet<string>): boolean {
+  if (exclude.has(dir)) return true;
+  for (const excluded of exclude) {
+    if (dir.startsWith(`${excluded}/`)) return true;
+  }
+  return false;
+}
+
 /** Skill dirs (repo-relative) under `start`: a dir holding SKILL.md is a skill and is not descended into. */
 async function scanSkillDirs(root: string, start: string, exclude: ReadonlySet<string> = new Set()): Promise<string[]> {
   const found: string[] = [];
@@ -255,7 +264,7 @@ async function scanSkillDirs(root: string, start: string, exclude: ReadonlySet<s
     for (const dirent of [...dirents].sort((a, b) => a.name.localeCompare(b.name))) {
       if (!dirent.isDirectory()) continue;
       const child = posix.join(rel, dirent.name);
-      if (exclude.has(child)) continue;
+      if (isUnderExcluded(child, exclude)) continue;
       if (await isFile(join(root, child, 'SKILL.md'))) found.push(child);
       else if (depth < PLAIN_MAX_DEPTH) await walk(child, depth + 1);
     }
@@ -279,7 +288,7 @@ async function claudePluginSkillDirs(
   for (const entry of skills) {
     if (typeof entry !== 'string') continue;
     const dir = toRepoRelative(entry);
-    if (dir && !exclude.has(dir) && (await isDir(join(root, dir)))) dirs.push(dir);
+    if (dir && !isUnderExcluded(dir, exclude) && (await isDir(join(root, dir)))) dirs.push(dir);
   }
   return dirs;
 }
@@ -376,7 +385,12 @@ function isAppliedMcpServerEntry(
   const entry = value as Record<string, unknown>;
   if (entry['type'] !== 'http') return false;
   const url = entry['url'];
-  if (typeof url !== 'string' || !url.startsWith('https://') || url.includes('${')) return false;
+  if (typeof url !== 'string' || url.includes('${')) return false;
+  try {
+    if (new URL(url).protocol !== 'https:') return false;
+  } catch {
+    return false;
+  }
   const headers = entry['headers'];
   if (headers === undefined) return true;
   if (!headers || typeof headers !== 'object' || Array.isArray(headers)) return false;
@@ -419,7 +433,8 @@ export async function readPackMcpServers(
   let notApplied = 0;
   for (const [name, value] of Object.entries(serversMap)) {
     if (isAppliedMcpServerEntry(name, value)) {
-      applied[name] = { type: 'http', url: value.url, headers: value.headers ?? {} };
+      // Normalize through URL so no raw control character from the pack's JSON survives into a display row.
+      applied[name] = { type: 'http', url: new URL(value.url).href, headers: value.headers ?? {} };
     } else {
       notApplied += 1;
     }
