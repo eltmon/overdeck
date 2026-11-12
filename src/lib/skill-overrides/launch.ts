@@ -26,8 +26,16 @@
  */
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { PackMcpServer } from '../skill-packs/adapters.js';
 import type { MountSelection } from '../skill-packs/mount.js';
 import type { SkillOverrideLayers } from './resolve.js';
+
+/** A selected `claude-plugin` pack's declared MCP servers and whether the operator consented to them (PAN-5165). */
+export interface LaunchPackMcp {
+  packId: string;
+  servers: Record<string, PackMcpServer>;
+  consented: boolean;
+}
 
 export interface LaunchSkillContext {
   cwd: string;
@@ -96,7 +104,7 @@ export async function resolveLaunchDisabledSkills(ctx: LaunchSkillContext): Prom
 export async function resolveLaunchPackSelection(
   ctx: LaunchSkillContext,
   exclude: ReadonlySet<string> = new Set(),
-): Promise<{ selection: MountSelection; warnings: string[] }> {
+): Promise<{ selection: MountSelection; warnings: string[]; mcp: LaunchPackMcp[] }> {
   const [
     { resolvePackSkill, resolvePackToggle },
     { listPackCatalog },
@@ -113,6 +121,7 @@ export async function resolveLaunchPackSelection(
   const [layers, packs, deftPipeline] = await Promise.all([loadLaunchLayers(ctx), listPackCatalog(), isDeftPipelineLaunch(ctx)]);
   const selection: MountSelection = { packs: [] };
   const warnings: string[] = [];
+  const mcp: LaunchPackMcp[] = [];
   for (const pack of packs) {
     if (exclude.has(pack.id)) continue;
     // PAN-4820: a Deft-pipeline issue runs Deft's own deposit, never the read-only deft pack.
@@ -147,9 +156,12 @@ export async function resolveLaunchPackSelection(
         ...(known?.pluginRoot ? { pluginRoot: known.pluginRoot } : {}),
         ...(known?.mountExtras?.length ? { extras: [...known.mountExtras] } : {}),
       });
+      if (pack.adapter === 'claude-plugin' && pack.manifest.mcpServers) {
+        mcp.push({ packId: pack.id, servers: pack.manifest.mcpServers, consented: pack.mcp === true });
+      }
     }
   }
-  return { selection, warnings };
+  return { selection, warnings, mcp };
 }
 
 /**

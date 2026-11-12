@@ -1,0 +1,50 @@
+/**
+ * Pack MCP servers for one launch (PAN-5165). A selected, consented claude-plugin pack contributes its
+ * applied https servers; names already taken by overdeck, the role, the project or a lower pack id are
+ * skipped with one warning each. Reads only the pack cache and config; never throws.
+ */
+import type { PackMcpServer } from '../skill-packs/adapters.js';
+import { resolveLaunchPackSelection } from './launch.js';
+
+export async function resolveLaunchPackMcpServers(input: {
+  cwd: string;
+  issueId?: string;
+  conversation?: string;
+  reservedNames: readonly string[];
+  warn?: (line: string) => void;
+}): Promise<Record<string, PackMcpServer>> {
+  const warn = input.warn ?? console.warn;
+  try {
+    const { mcp } = await resolveLaunchPackSelection({
+      cwd: input.cwd,
+      issueId: input.issueId,
+      conversation: input.conversation,
+    });
+    const reserved = new Set(input.reservedNames);
+    const takenBy = new Map<string, string>();
+    const servers: Record<string, PackMcpServer> = {};
+    for (const pack of mcp) {
+      if (!pack.consented) {
+        warn(`[pack-mcp] ${pack.packId}: MCP servers not applied: run pan skills pack update ${pack.packId} to review them`);
+        continue;
+      }
+      for (const [name, server] of Object.entries(pack.servers)) {
+        if (reserved.has(name)) {
+          warn(`[pack-mcp] ${pack.packId}: server ${name} skipped: the name is already used by overdeck, the role or the project`);
+          continue;
+        }
+        const earlier = takenBy.get(name);
+        if (earlier) {
+          warn(`[pack-mcp] ${pack.packId}: server ${name} skipped: pack ${earlier} already declares it`);
+          continue;
+        }
+        takenBy.set(name, pack.packId);
+        servers[name] = { ...server, headers: { ...server.headers } };
+      }
+    }
+    return servers;
+  } catch (error) {
+    warn(`[pack-mcp] pack MCP servers skipped: ${error instanceof Error ? error.message : String(error)}`);
+    return {};
+  }
+}
