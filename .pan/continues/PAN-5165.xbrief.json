@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5165",
   "created": "2026-11-12T13:45:52.140Z",
-  "updated": "2026-11-12T15:43:31.131Z",
+  "updated": "2026-11-12T15:43:37.919Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -182,6 +182,11 @@
     "doctor-atlassian.ac5": {
       "status": "completed",
       "doneAt": "2026-11-12T15:43:31.131Z"
+    },
+    "user-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5165",
+      "claimedAt": "2026-11-12T15:43:37.919Z"
     }
   }
 }
