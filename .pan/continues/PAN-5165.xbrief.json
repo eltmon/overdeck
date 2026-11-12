@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5165",
   "created": "2026-11-12T13:45:52.140Z",
-  "updated": "2026-11-12T14:41:01.752Z",
+  "updated": "2026-11-12T14:55:28.011Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,9 +80,30 @@
       "doneAt": "2026-11-12T14:40:55.176Z"
     },
     "launch-pack-mcp-resolver": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5165",
-      "claimedAt": "2026-11-12T14:41:01.752Z"
+      "claimedAt": "2026-11-12T14:41:01.752Z",
+      "doneAt": "2026-11-12T14:55:28.010Z"
+    },
+    "launch-pack-mcp-resolver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-12T14:55:28.010Z"
+    },
+    "launch-pack-mcp-resolver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-12T14:55:28.010Z"
+    },
+    "launch-pack-mcp-resolver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-12T14:55:28.010Z"
+    },
+    "launch-pack-mcp-resolver.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-12T14:55:28.010Z"
+    },
+    "launch-pack-mcp-resolver.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-12T14:55:28.010Z"
     }
   }
 }
