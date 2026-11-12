@@ -10,6 +10,21 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: do not edit this page for an unreleased change. Each PR adds its bullets to changelog.d/<issue>.md (format: changelog.d/README.md), and pan release stable folds them into a dated <Update> block here. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so in its entry and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.80.0" description="2026-11-12">
+  #### Improved
+
+  - **New installations start in Auto permission mode:** a new install launches Claude Code with `--permission-mode default` and Overdeck's auto-approve hook instead of bypass; installs that existed before this release keep bypass, written once into `~/.overdeck/config.yaml`; `pan doctor` reports a missing hook, and a launch is refused rather than prompting on every tool call. ([#5151](https://github.com/eltmon/overdeck/issues/5151))
+  - **Sidebar owner groups honor `owner` and GitLab:** a project's sidebar group is now its `projects.yaml` `owner`, else its GitHub owner, else its GitLab group, else Other, so a GitLab project can show beside its organization's GitHub projects. ([#5161](https://github.com/eltmon/overdeck/issues/5161))
+
+  #### Fixed
+
+  - **A stranded review request is re-requested again:** when a review was requested but never dispatched, and the review had no run state yet, the background patrol's recovery did nothing, so the review stayed stuck until someone requested it again. The patrol now re-requests it through the same guarded review route that `pan review request` uses, 15 minutes after the request. ([#4623](https://github.com/eltmon/overdeck/issues/4623))
+  - **Polyrepo CI test verdicts are read for the member repo's head:** in a polyrepo project with `verification.tests: ci`, the verification gate looked up the CI test result under the wrapper repo's HEAD, which no PR points at, so a red CI test job never failed the `test` gate and verification passed on typecheck and lint alone. It now reads the verdict for the primary member repo's head, both at the start of the run and after an agent commit moves it. Standalone projects are unchanged. ([#4624](https://github.com/eltmon/overdeck/issues/4624))
+  - **A check that fails later on the same commit now reaches the agent:** when `lint` failed first and a test shard failed a minute later on the same pull request head, the agent heard only about `lint`. The CI failure relay now sends a new feedback file that names each check that failed after the earlier feedback. Repeated reports for a check already delivered still send nothing. ([#4625](https://github.com/eltmon/overdeck/issues/4625))
+
+  [Compare v0.79.0...v0.80.0](https://github.com/eltmon/overdeck/compare/v0.79.0...v0.80.0)
+</Update>
+
 <Update label="v0.79.0" description="2026-11-11">
   #### New
 
