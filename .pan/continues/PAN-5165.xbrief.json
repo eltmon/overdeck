@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5165",
   "created": "2026-11-12T13:45:52.140Z",
-  "updated": "2026-11-12T15:18:53.632Z",
+  "updated": "2026-11-12T15:32:15.606Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,9 +132,30 @@
       "doneAt": "2026-11-12T15:18:47.575Z"
     },
     "agent-injection-pack-servers": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5165",
-      "claimedAt": "2026-11-12T15:18:53.632Z"
+      "claimedAt": "2026-11-12T15:18:53.632Z",
+      "doneAt": "2026-11-12T15:32:15.605Z"
+    },
+    "agent-injection-pack-servers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-12T15:32:15.605Z"
+    },
+    "agent-injection-pack-servers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-12T15:32:15.605Z"
+    },
+    "agent-injection-pack-servers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-12T15:32:15.605Z"
+    },
+    "agent-injection-pack-servers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-12T15:32:15.605Z"
+    },
+    "agent-injection-pack-servers.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-12T15:32:15.605Z"
     }
   }
 }
