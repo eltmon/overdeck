@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5165",
   "created": "2026-11-12T13:45:52.140Z",
-  "updated": "2026-11-12T14:40:55.177Z",
+  "updated": "2026-11-12T14:41:01.752Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,11 @@
     "pack-mcp-consent.ac4": {
       "status": "completed",
       "doneAt": "2026-11-12T14:40:55.176Z"
+    },
+    "launch-pack-mcp-resolver": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5165",
+      "claimedAt": "2026-11-12T14:41:01.752Z"
     }
   }
 }
