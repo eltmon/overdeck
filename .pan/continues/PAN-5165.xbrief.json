@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5165",
   "created": "2026-11-12T13:45:52.140Z",
-  "updated": "2026-11-12T15:32:21.791Z",
+  "updated": "2026-11-12T15:43:31.131Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,9 +158,30 @@
       "doneAt": "2026-11-12T15:32:15.605Z"
     },
     "doctor-atlassian": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5165",
-      "claimedAt": "2026-11-12T15:32:21.791Z"
+      "claimedAt": "2026-11-12T15:32:21.791Z",
+      "doneAt": "2026-11-12T15:43:31.131Z"
+    },
+    "doctor-atlassian.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-12T15:43:31.131Z"
+    },
+    "doctor-atlassian.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-12T15:43:31.131Z"
+    },
+    "doctor-atlassian.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-12T15:43:31.131Z"
+    },
+    "doctor-atlassian.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-12T15:43:31.131Z"
+    },
+    "doctor-atlassian.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-12T15:43:31.131Z"
     }
   }
 }
