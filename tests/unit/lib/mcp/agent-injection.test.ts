@@ -30,6 +30,28 @@ vi.mock('../../../../src/lib/projects/project-mcp.js', async (importOriginal) =>
   };
 });
 
+/** PAN-5165 WI-6: packMcp defaults to {} so pre-existing tests (no owner.cwd) see no extra pack-mcp warning. */
+type PackMcpResult = Awaited<ReturnType<typeof import('../../../../src/lib/skill-overrides/launch-pack-mcp.js').resolveLaunchPackMcpServers>>;
+const packMcp = vi.hoisted(() => ({
+  error: null as Error | null,
+  result: {} as PackMcpResult,
+  calls: [] as Array<{ issueId?: string; cwd?: string; conversation?: string; reservedNames: readonly string[] }>,
+}));
+
+vi.mock('../../../../src/lib/skill-overrides/launch-pack-mcp.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/skill-overrides/launch-pack-mcp.js')>();
+  return {
+    ...actual,
+    resolveLaunchPackMcpServers: vi.fn(
+      async (input: { issueId?: string; cwd?: string; conversation?: string; reservedNames: readonly string[] }) => {
+        packMcp.calls.push({ issueId: input.issueId, cwd: input.cwd, conversation: input.conversation, reservedNames: input.reservedNames });
+        if (packMcp.error) throw packMcp.error;
+        return packMcp.result;
+      },
+    ),
+  };
+});
+
 vi.mock('../../../../src/lib/config-yaml.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../src/lib/config-yaml.js')>();
   return {
@@ -71,6 +93,9 @@ beforeEach(async () => {
   projectMcp.error = null;
   projectMcp.result = { projectKey: null, servers: {}, strict: false };
   projectMcp.calls = [];
+  packMcp.error = null;
+  packMcp.result = {};
+  packMcp.calls = [];
 });
 
 afterEach(async () => {
@@ -358,5 +383,82 @@ describe('project MCP servers in the Codex server map (PAN-5061 WI-6)', () => {
     projectMcp.result = { projectKey: 'acme', servers: { linear: LINEAR_SERVER }, strict: false };
     const result = await prepareCodexOverdeckMcp({ agentId: 'agent-acme-c3', agentKind: 'agent', role: 'work', harness: 'codex', cwd: '/w/acme' });
     expect(Object.keys(result)).toEqual(['linear']);
+  });
+});
+
+const ATLASSIAN_SERVER = { type: 'http' as const, url: 'https://mcp.atlassian.com/v2/mcp', headers: {} };
+const ATLASSIAN_SERVER_WITH_AUTH = { type: 'http' as const, url: 'https://mcp.atlassian.com/v2/mcp', headers: { Authorization: 'Basic xyz' } };
+
+describe('pack MCP servers in the launch MCP file and the Codex server map (PAN-5165 WI-6)', () => {
+  it('writes the atlassian server after an unchanged overdeck entry and names it in overdeckMcpServerNames (ac1)', async () => {
+    const agentId = 'agent-pack-1';
+    const noPack = await prepareClaudeOverdeckMcp({ agentId, agentKind: 'agent', role: 'work', harness: 'claude-code', cwd: '/w/pack' });
+    const noPackServers = await readServers(noPack.overdeckMcpConfig!);
+
+    packMcp.result = { atlassian: ATLASSIAN_SERVER_WITH_AUTH };
+    const result = await prepareClaudeOverdeckMcp({ agentId, agentKind: 'agent', role: 'work', harness: 'claude-code', cwd: '/w/pack' });
+    expect(result.overdeckMcpServerNames).toEqual(['overdeck', 'atlassian']);
+    const servers = await readServers(result.overdeckMcpConfig!);
+    expect(servers.overdeck).toEqual(noPackServers.overdeck);
+    expect((servers.atlassian as typeof ATLASSIAN_SERVER_WITH_AUTH).url).toBe('https://mcp.atlassian.com/v2/mcp');
+  });
+
+  it('writes no atlassian key and no overdeckMcpServerNames when the pack resolver returns {} (ac2)', async () => {
+    packMcp.result = {};
+    const result = await prepareClaudeOverdeckMcp({ agentId: 'agent-pack-2', agentKind: 'agent', role: 'work', harness: 'claude-code', cwd: '/w/pack' });
+    expect(result.overdeckMcpServerNames).toBeUndefined();
+    const servers = await readServers(result.overdeckMcpConfig!);
+    expect(servers).not.toHaveProperty('atlassian');
+  });
+
+  it('passes reservedNames with overdeck and every project server name, and the conversation session (ac3)', async () => {
+    projectMcp.result = { projectKey: 'acme', servers: { linear: LINEAR_SERVER, sentry: SENTRY_SERVER }, strict: false };
+    await prepareClaudeOverdeckMcp({
+      agentId: 'conv-pack-1',
+      agentKind: 'conversation',
+      role: 'conversation',
+      harness: 'claude-code',
+      dir: join(home, 'conv-pack-1'),
+      cwd: '/w/acme',
+      skillConversation: 'conv-x',
+    });
+    expect(packMcp.calls[0]!.reservedNames).toEqual(expect.arrayContaining(['overdeck', 'linear', 'sentry']));
+    expect(packMcp.calls[0]!.conversation).toBe('conv-x');
+  });
+
+  it('returns atlassian with defaultToolsApprovalMode approve for a codex launch (ac4)', async () => {
+    packMcp.result = { atlassian: ATLASSIAN_SERVER_WITH_AUTH };
+    const result = await prepareCodexOverdeckMcp({ agentId: 'agent-pack-codex-1', agentKind: 'agent', role: 'work', harness: 'codex', cwd: '/w/pack' });
+    expect(result.atlassian).toEqual({ ...ATLASSIAN_SERVER_WITH_AUTH, defaultToolsApprovalMode: 'approve' });
+  });
+
+  it('still writes overdeck and project servers with one warning each when the pack resolver throws (ac4)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    packMcp.error = new Error('pack cache corrupt');
+    projectMcp.result = { projectKey: 'acme', servers: { linear: LINEAR_SERVER }, strict: false };
+
+    const claudeResult = await prepareClaudeOverdeckMcp({ agentId: 'agent-pack-4', agentKind: 'agent', role: 'work', harness: 'claude-code', cwd: '/w/acme' });
+    expect(Object.keys(await readServers(claudeResult.overdeckMcpConfig!))).toEqual(['overdeck', 'linear']);
+    expect(warn).toHaveBeenCalledTimes(1);
+
+    warn.mockClear();
+    const codexResult = await prepareCodexOverdeckMcp({ agentId: 'agent-pack-5', agentKind: 'agent', role: 'work', harness: 'codex', cwd: '/w/acme' });
+    expect(Object.keys(codexResult)).toEqual(['overdeck', 'linear']);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips a header-less atlassian server for codex but keeps it for a claude-format launch (ac5)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    packMcp.result = { atlassian: ATLASSIAN_SERVER };
+
+    const codexResult = await prepareCodexOverdeckMcp({ agentId: 'agent-pack-codex-2', agentKind: 'agent', role: 'work', harness: 'codex', cwd: '/w/pack' });
+    expect(codexResult).not.toHaveProperty('atlassian');
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]![0])).toContain('skipped for codex');
+
+    warn.mockClear();
+    const claudeResult = await prepareClaudeOverdeckMcp({ agentId: 'agent-pack-6', agentKind: 'agent', role: 'work', harness: 'claude-code', cwd: '/w/pack' });
+    const servers = await readServers(claudeResult.overdeckMcpConfig!);
+    expect(servers.atlassian).toEqual(ATLASSIAN_SERVER);
   });
 });
