@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5165",
   "created": "2026-11-12T13:45:52.140Z",
-  "updated": "2026-11-12T14:22:44.761Z",
+  "updated": "2026-11-12T14:22:53.320Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
     "known-pack-atlassian.ac4": {
       "status": "completed",
       "doneAt": "2026-11-12T14:22:44.760Z"
+    },
+    "pack-mcp-consent": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5165",
+      "claimedAt": "2026-11-12T14:22:53.319Z"
     }
   }
 }
