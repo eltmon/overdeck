@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5165",
   "created": "2026-11-12T13:45:52.140Z",
-  "updated": "2026-11-12T15:32:15.606Z",
+  "updated": "2026-11-12T15:32:21.791Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,11 @@
     "agent-injection-pack-servers.ac5": {
       "status": "completed",
       "doneAt": "2026-11-12T15:32:15.605Z"
+    },
+    "doctor-atlassian": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5165",
+      "claimedAt": "2026-11-12T15:32:21.791Z"
     }
   }
 }
