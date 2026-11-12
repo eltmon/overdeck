@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5165",
   "created": "2026-11-12T13:45:52.140Z",
-  "updated": "2026-11-12T14:55:34.837Z",
+  "updated": "2026-11-12T15:18:47.575Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,9 +106,30 @@
       "doneAt": "2026-11-12T14:55:28.010Z"
     },
     "atlassian-auth-header": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5165",
-      "claimedAt": "2026-11-12T14:55:34.837Z"
+      "claimedAt": "2026-11-12T14:55:34.837Z",
+      "doneAt": "2026-11-12T15:18:47.575Z"
+    },
+    "atlassian-auth-header.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-12T15:18:47.575Z"
+    },
+    "atlassian-auth-header.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-12T15:18:47.575Z"
+    },
+    "atlassian-auth-header.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-12T15:18:47.575Z"
+    },
+    "atlassian-auth-header.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-12T15:18:47.575Z"
+    },
+    "atlassian-auth-header.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-12T15:18:47.575Z"
     }
   }
 }
