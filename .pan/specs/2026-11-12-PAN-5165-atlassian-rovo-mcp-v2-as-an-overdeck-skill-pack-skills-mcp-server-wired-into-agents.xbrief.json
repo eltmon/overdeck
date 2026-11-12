@@ -1,0 +1,859 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-12T13:37:07Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5165: Atlassian Rovo MCP v2 as an Overdeck skill pack (skills + MCP server wired into agents)",
+    "updated": "2026-11-12T13:44:17.948Z"
+  },
+  "plan": {
+    "id": "pan-5165",
+    "title": "Atlassian Rovo MCP v2 as an Overdeck skill pack (skills + MCP server wired into agents)",
+    "status": "proposed",
+    "uid": "cd4144f5-b4fc-4f67-aa7d-efe0808058a3",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-12T13:37:07Z",
+    "updated": "2026-11-12T13:44:17.948Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5165",
+        "label": "PAN-5165",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5165.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "skill-packs",
+      "mcp",
+      "atlassian",
+      "jira",
+      "doctor"
+    ],
+    "narratives": {
+      "Problem": "Overdeck skill packs mount only skill directories, so a pack's MCP servers never reach agents. Atlassian's official Rovo MCP plugin (Jira and Confluence skills plus the https://mcp.atlassian.com/v2/mcp server) therefore cannot be used by Overdeck agents without hand setup, and its skills call tools the agent does not have.",
+      "Proposal": "Add an `atlassian` known pack pinned to upstream commit 3be5562 with skills/v1 excluded and the four write skills opt-in. Teach the claude-plugin adapter to read a pack's https `type: http` MCP servers into the manifest, gate them behind a recorded operator consent (`mcp: true` written by add/update), and merge the servers of every selected, consented pack into the launch MCP file and the Codex server map in src/lib/mcp/agent-injection.ts after overdeck, role and project servers. For the atlassian pack, attach `Authorization: Basic base64(email:token)` from the PAN-5152 Jira tracker keys. Add a `pan doctor` Atlassian MCP row and document everything. Full detail, file/line references and before/after snippets: .pan/drafts/PAN-5165.md.",
+      "NonGoals": "- Running pan release stable or publishing to npm.\n- Applying stdio or sse MCP servers from any pack, or expanding ${NAME} references in pack server definitions.\n- Pack MCP servers for adapters other than claude-plugin (plain, deft-readonly, gstack-runtime).\n- Delivering http MCP servers to the ACP host (acp, opencode) or provisioning MCP for ohmypi, kimi-code, muse, prime-agent.\n- Driving the OAuth 2.1 sign-in for agents, storing OAuth tokens, or reading Atlassian service-account Bearer keys from tracker keys.\n- Creating or using an eltmon/atlassian-mcp-server fork, or opening anything on the upstream repository.\n- Dashboard UI changes beyond existing pack-row fields.\n- Mounting skills/v1 or the repo's other client formats (mcp.json, gemini-extension.json, .cursor-plugin/).\n- Editing src/lib/agents/runtime-command.ts.\n- Showing a separate 'MCP servers (needs review)' Not-applied label for unconsented packs; the per-launch warning and the update preview cover it."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Merge pack MCP servers in src/lib/mcp/agent-injection.ts, not runtime-command.ts line 203.",
+        "rationale": "runtime-command.ts:203 is Codex-only and just spreads the map agent-injection returns; agent-injection already merges PAN-5061 project servers for every launch path (spawn, resume, recovery, planning, conversations), so one seam covers every harness that receives mcpServers."
+      },
+      {
+        "summary": "Take the API-token header path: Authorization: Basic base64(jiraEmail:jiraToken).",
+        "rationale": "Atlassian's 'Configuring authentication via API token' page and the upstream README at the pinned commit both document this exact header, so the implementation checkpoint is resolved and the fallback is not needed. Admin enablement and token scopes are surfaced by the doctor row."
+      },
+      {
+        "summary": "Apply only https type:http pack servers; stdio/sse stay Not applied; no ${} expansion.",
+        "rationale": "A stdio entry would execute pack code at every launch, which breaks the documented 'skill directories only' trust model; refusing ${} references means a pack can never pull an operator secret into a URL or header."
+      },
+      {
+        "summary": "Require recorded consent (registry mcp: true) before a pack's MCP servers reach agents.",
+        "rationale": "Operators trusted existing commits under the promise 'MCP servers: Not applied'; consent written only by a confirmed add/update preview that listed the servers keeps that promise for already-trusted packs."
+      },
+      {
+        "summary": "A pack contributes MCP servers when it is in the launch's pack selection (at least one skill on).",
+        "rationale": "It reuses resolveLaunchPackSelection, so the tools arrive exactly when the skills that call them are mounted, including per-skill and conversation layers."
+      },
+      {
+        "summary": "Precedence: overdeck, role, project mcp_servers, then pack servers, lower pack id first.",
+        "rationale": "The issue requires overdeck and role servers to win; putting explicit operator project config above pack defaults gives an override path for Bearer keys or OAuth-only setups."
+      },
+      {
+        "summary": "Mark capture-tasks-from-meeting-notes, generate-status-report, spec-to-backlog and triage-issue opt-in.",
+        "rationale": "docs/SKILL-PACKS.md step 3 requires opt-in for skills that reach cloud write actions; these four call createJiraIssue/editJiraIssue/createConfluencePage/updateConfluencePage. The three read-only skills stay default."
+      },
+      {
+        "summary": "Use the upstream atlassian/atlassian-mcp-server URL pinned to a 40-hex commit, with a documented fork-first exception.",
+        "rationale": "The issue names the upstream URL, no eltmon fork exists, the pack carries no Overdeck changes, and the commit pin already controls when upstream changes arrive."
+      },
+      {
+        "summary": "Exclude skills/v1 through a new KnownPack.skillsExclude field; set no skillsRoot.",
+        "rationale": "skillsRoot is read only by the plain adapter; the claude-plugin adapter follows plugin.json skills and descends into skills/v1, where the copies drop out only by name dedupe and sort order."
+      },
+      {
+        "summary": "Doctor row only when the atlassian pack is registered; endpoint probed only when its toggle is on at global or project level.",
+        "rationale": "Matches the SageOx doctor pattern and the issue's 'when the pack is enabled'; avoids a network call and a misleading warning for an unused pack."
+      },
+      {
+        "summary": "Attach the header only when jiraBaseUrl is unset or a Cloud site.",
+        "rationale": "Rovo MCP is Atlassian Cloud only; a Data Center personal access token would always be rejected."
+      },
+      {
+        "summary": "The header comes from the global Jira tracker keys (Settings / ~/.overdeck.env) for any project where the pack is on, not only tracker: jira projects.",
+        "rationale": "PAN-5152 stores Jira credentials globally (config.trackerKeys), not per project; the pack itself is the opt-in, and a project override (mcp_servers named atlassian) covers per-project accounts."
+      },
+      {
+        "summary": "Pack server tools join --allowedTools like project servers (mcp__atlassian).",
+        "rationale": "Matches PAN-5061 behavior so agent tool calls do not stop at permission prompts; opt-in gating applies to the workflow skills, and roles with a tools: allow-list keep their own list."
+      },
+      {
+        "summary": "Codex agents get the atlassian server only when the Basic header resolved; otherwise it is skipped with one warning.",
+        "rationale": "Codex uses a per-agent codex-home-v2, so the operator's OAuth sign-in is not available and a header-less server would fail every call; Claude Code reuses the operator's login by name and URL."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One vertical feature (pack MCP servers end to end plus the atlassian pack that exercises it). The 24 files span skill-packs, skill-overrides, mcp injection, one conversation call site, the doctor CLI and docs; splitting into sibling issues would ship a pack whose tools never reach agents, or an MCP path with no pack to test it, which the issue's acceptance forbids.",
+      "canonicalFilename": "2026-11-12-PAN-5165-atlassian-rovo-mcp-v2-as-an-overdeck-skill-pack-skills-mcp-server-wired-into-agents.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "pack-mcp-reader",
+        "title": "Read applied https MCP servers from claude-plugin packs into the manifest",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-12T13:37:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5165",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "pack-mcp-consent",
+            "launch-pack-mcp-resolver",
+            "agent-injection-pack-servers"
+          ],
+          "files_scope": [
+            "src/lib/skill-packs/adapters.ts",
+            "src/lib/skill-packs/__tests__/adapters.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/adapters.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "adapters.test.ts passes including the 'pack MCP servers (PAN-5165)' describe block",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/skill-packs/adapters.ts add the PackMcpServer type, readPackMcpServers(base, plugin) and mcpServerLabels(manifest) exactly as specified, add PackManifest.mcpServers?, and in readPackManifest (claude-plugin adapter only) set manifest.mcpServers to the applied servers and capabilities.mcpServers to 'declares servers Overdeck does not apply'. Applied = type 'http', url starting https://, valid non-'overdeck' name, string headers, no '${' in url or header values. Source order: plugin.json mcpServers string path (toRepoRelative), inline object (servers map or {mcpServers}), else <plugin root>/.mcp.json. No new imports outside node builtins; adapters.ts must not import skill-overrides/ or projects/. Add the six fixture tests from WI-1 step 5."
+        },
+        "items": [
+          {
+            "id": "pack-mcp-reader.ac1",
+            "title": "Given a claude-plugin fixture whose .mcp.json declares one https type:http server, readPackManifest returns it in manifest.mcpServers with headers {}, capabilities.mcpServers is false, and notAppliedLabels does not include 'MCP servers'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-mcp-reader.ac2",
+            "title": "Given entries that are stdio, sse, http:// urls, contain '${TOKEN}' in a header, or are named 'overdeck', readPackManifest applies none of them and capabilities.mcpServers is true so notAppliedLabels includes 'MCP servers'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-mcp-reader.ac3",
+            "title": "Given plugin.json mcpServers as a string path to a nested file and as an inline object, readPackManifest resolves the servers from that source; given invalid JSON it applies nothing and reports capabilities.mcpServers true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-mcp-reader.ac4",
+            "title": "Given a plain-adapter pack with a .mcp.json, readPackManifest returns no manifest.mcpServers and keeps capabilities.mcpServers true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-mcp-reader.ac5",
+            "title": "mcpServerLabels returns 'MCP server <name> (<url>)' for each applied server sorted by name, and an empty array when the manifest has none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "known-pack-atlassian",
+        "title": "Add the atlassian known pack with skills/v1 excluded",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-12T13:37:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5165",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/atlassian.ts",
+            "src/lib/skill-packs/adapters.ts",
+            "src/lib/skill-overrides/catalog.ts",
+            "src/lib/skill-packs/sources.ts",
+            "src/lib/skill-packs/__tests__/adapters.test.ts",
+            "src/lib/skill-packs/__tests__/sources.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/adapters.test.ts src/lib/skill-packs/__tests__/sources.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "adapters.test.ts and sources.test.ts pass including the atlassian tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/lib/skill-packs/atlassian.ts with ATLASSIAN_PACK_ID, ATLASSIAN_PACK_URL, ATLASSIAN_PACK_COMMIT ('3be55622453304b905f0c0fd5ef96fa4d638627c'), ATLASSIAN_MCP_HOST, ATLASSIAN_MCP_URL, ATLASSIAN_OPT_IN_SKILLS (capture-tasks-from-meeting-notes, generate-status-report, spec-to-backlog, triage-issue) and ATLASSIAN_DISCLOSURE (text in the PRD). Add KnownPack.skillsExclude, the KNOWN_PACKS.atlassian entry (adapter claude-plugin, ref = the commit, skillsExclude ['skills/v1'], optIn, disclosure; no skillsRoot), make scanSkillDirs/claudePluginSkillDirs skip excluded plugin-root-relative dirs, add readPackManifest opts.skillsExclude, and pass KNOWN_PACKS[id]?.skillsExclude from catalog.ts listPackCatalog and sources.ts manifestAt. Tests per WI-2 step 5. Add a sources.test.ts case using the existing createUpstream() helper (sources.test.ts line 192; commitFile(path, content, message) returns the commit): commit an upstream-layout fixture with a v1-only skill skills/v1/old-only, then addPack({ id: 'atlassian', url: up.url, ref: <commit> }, confirm) and assert preview.manifest.skills has no 'old-only', and listPackCatalog() (import from ../../skill-overrides/catalog.js) for that pack returns a manifest without 'old-only'."
+        },
+        "items": [
+          {
+            "id": "known-pack-atlassian.ac1",
+            "title": "KNOWN_PACKS['atlassian'] returns { id: 'atlassian', url: 'https://github.com/atlassian/atlassian-mcp-server', adapter: 'claude-plugin', ref: '3be55622453304b905f0c0fd5ef96fa4d638627c', skillsExclude: ['skills/v1'], optIn: the four write skills, disclosure: ATLASSIAN_DISCLOSURE } under a toEqual assertion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "known-pack-atlassian.ac2",
+            "title": "Given a fixture with the upstream layout read with skillsExclude ['skills/v1'], readPackManifest returns exactly the 7 top-level skill names, 4 of them opt-in, no skill dir starting with skills/v1, license 'Apache', and manifest.mcpServers.atlassian.url 'https://mcp.atlassian.com/v2/mcp'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "known-pack-atlassian.ac3",
+            "title": "Given the same fixture read without skillsExclude, the v1-only skill 'old-only' is present, proving the exclusion and not the name dedupe removes skills/v1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "known-pack-atlassian.ac4",
+            "title": "Given addPack with id 'atlassian' on a createUpstream fixture holding skills/v1/old-only, the returned preview manifest and the listPackCatalog() manifest for that pack contain no 'old-only' skill",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pack-mcp-consent",
+        "title": "Record MCP consent in the pack registry and show MCP servers in the preview",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-12T13:37:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5165",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/sources.ts",
+            "src/cli/commands/skills.ts",
+            "src/lib/skill-overrides/catalog.ts",
+            "src/lib/skill-packs/__tests__/sources.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/sources.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sources.test.ts passes including the PAN-5165 consent tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ],
+          "foundationFor": [
+            "launch-pack-mcp-resolver",
+            "user-docs"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add PackRegistryEntry.mcp?: true; toEntry reads mcp === true; writePackEntry writes it. addPack records mcp: true exactly when the confirmed preview manifest has mcpServers. updatePack: do not early-return on an unchanged commit/ref when (entry.mcp === true) !== (manifest.mcpServers !== undefined); append new mcpServerLabels to diff.newCapabilities; write mcp per the new manifest. disablePackBrowser (and every other field-by-field writePackEntry caller) preserves mcp. PackCatalogEntry gains mcp?: true from the registry. printPackPreview in src/cli/commands/skills.ts prints an 'MCP servers' row '<name> (<url>)' when manifest.mcpServers is set. Tests per WI-3 step 7."
+        },
+        "items": [
+          {
+            "id": "pack-mcp-consent.ac1",
+            "title": "Given a claude-plugin fixture with an https .mcp.json server, addPack with a confirming callback writes mcp: true and listPacks() returns the entry with mcp: true; a fixture without MCP servers writes no mcp key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-mcp-consent.ac2",
+            "title": "Given a registered entry without mcp whose unchanged commit declares servers, updatePack calls the confirm callback and, on confirm, writes mcp: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-mcp-consent.ac3",
+            "title": "Given an update whose new commit adds an applied server, preview.diff.newCapabilities contains 'MCP server <name> (<url>)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-mcp-consent.ac4",
+            "title": "Rewriting an entry through disablePackBrowser or a writePackEntry/toEntry round trip preserves mcp: true, and listPackCatalog returns mcp: true for that pack",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launch-pack-mcp-resolver",
+        "title": "Resolve the pack MCP servers for one launch with the collision rules",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-12T13:37:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5165",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/launch.ts",
+            "src/lib/skill-overrides/launch-pack-mcp.ts",
+            "src/lib/skill-overrides/__tests__/launch-pack-mcp.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/launch-pack-mcp.test.ts src/lib/skill-overrides/__tests__/launch.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "launch-pack-mcp.test.ts and launch.test.ts pass",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. resolveLaunchPackSelection gains an mcp list ({ packId, servers, consented }) for selected claude-plugin packs whose manifest has mcpServers. New src/lib/skill-overrides/launch-pack-mcp.ts exports resolveLaunchPackMcpServers({ cwd, issueId, conversation, reservedNames, warn }): skip unconsented packs with one '[pack-mcp] <pack>: MCP servers not applied: run pan skills pack update <pack> to review them' warning; skip reserved names and names a lower pack id already took, one '[pack-mcp] <pack>: server <name> skipped: <reason>' warning each; copy server objects; apply no auth header in this item (atlassian-auth-header adds the withAtlassianAuth call). Wrap the body so any failure warns once and returns {}. Tests per WI-4 step 3."
+        },
+        "items": [
+          {
+            "id": "launch-pack-mcp-resolver.ac1",
+            "title": "Given the atlassian pack toggled on globally and consented, resolveLaunchPackMcpServers returns { atlassian: { type: 'http', url: 'https://mcp.atlassian.com/v2/mcp', headers: {} } } when no tracker keys are set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-pack-mcp-resolver.ac2",
+            "title": "Given the pack toggle off and no pack skill on, or the pack on without consent, the resolver returns {}; the unconsented case emits exactly one warning naming 'pan skills pack update atlassian'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-pack-mcp-resolver.ac3",
+            "title": "Given reservedNames ['atlassian'] the resolver returns {} with one '[pack-mcp] atlassian: server atlassian skipped' warning; given packs a-pack and b-pack both declaring 'docs', a-pack's server is returned and one warning names b-pack",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-pack-mcp-resolver.ac4",
+            "title": "Given only the opt-in skill atlassian/triage-issue turned on per skill with no pack toggle, the resolver returns the atlassian server",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-pack-mcp-resolver.ac5",
+            "title": "Given listPackCatalog rejects, the resolver resolves to {} and emits one '[pack-mcp] pack MCP servers skipped' warning instead of throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "atlassian-auth-header",
+        "title": "Attach the Jira API-token Basic header to the atlassian server",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-12T13:37:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5165",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/atlassian.ts",
+            "src/lib/skill-overrides/launch-pack-mcp.ts",
+            "src/lib/skill-overrides/__tests__/launch-pack-mcp.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/launch-pack-mcp.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "launch-pack-mcp.test.ts passes including the auth header tests",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In src/lib/skill-packs/atlassian.ts add AtlassianTrackerKeys, atlassianBasicAuth(keys) (null unless trimmed jira token and jiraEmail are both non-empty; null when jiraBaseUrl is set and isCloudJiraSite is false; else 'Basic ' + base64(email:token)) and withAtlassianAuth(servers, keys) (adds Authorization only to https servers whose URL hostname is exactly mcp.atlassian.com and that have no header named authorization in any case; returns new objects). Import isCloudJiraSite from ../tracker/jira-config.js; if lint:circular reports a cycle, inline the 6-line function instead. Call withAtlassianAuth in launch-pack-mcp.ts for pack id atlassian with (await loadConfigNoMigration()).config.trackerKeys (lazy import of ../config-yaml.js). Never log the token or header. Tests per WI-5 step 3. Also export atlassianNeedsInteractiveAuth(server): true when the server URL is https with hostname exactly mcp.atlassian.com and it has no header named authorization in any case; agent-injection-pack-servers uses it for the Codex rule."
+        },
+        "items": [
+          {
+            "id": "atlassian-auth-header.ac1",
+            "title": "Given trackerKeys { jira: 't0k', jiraEmail: 'a@b.com' }, the resolved atlassian server carries headers { Authorization: 'Basic YUBiLmNvbTp0MGs=' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "atlassian-auth-header.ac2",
+            "title": "Given a token without an email, or jiraBaseUrl 'https://jira.corp.example' (Data Center), the server carries no Authorization header; given jiraBaseUrl 'https://acme.atlassian.net' it carries one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "atlassian-auth-header.ac3",
+            "title": "withAtlassianAuth adds no header to 'https://mcp.atlassian.com.evil.example/v2/mcp' or 'http://mcp.atlassian.com/v2/mcp', and preserves an existing 'authorization' header unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "atlassian-auth-header.ac4",
+            "title": "Across the auth tests, a warn spy never receives a string containing 't0k' or 'YUBiLmNvbTp0MGs='",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "atlassian-auth-header.ac5",
+            "title": "atlassianNeedsInteractiveAuth returns true for { url: 'https://mcp.atlassian.com/v2/mcp', headers: {} } and false once an Authorization header is present or the host differs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-injection-pack-servers",
+        "title": "Merge pack MCP servers into the launch MCP file and the Codex server map",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-12T13:37:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5165",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/agent-injection.ts",
+            "src/lib/overdeck/conversation-runtime.ts",
+            "tests/unit/lib/mcp/agent-injection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/mcp/agent-injection.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "agent-injection.test.ts passes including the PAN-5165 describe block",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle",
+            "lint:file-size passes (conversation-runtime.ts stays under its cap)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Add OverdeckMcpLaunchOwner.skillConversation and a launchPackServers(owner, takenNames) helper that lazily imports ../skill-overrides/launch-pack-mcp.js; takenNames = overdeck + role server names + project server names. In prepareClaudeOverdeckMcp assign pack servers after project servers (own try/catch, '[agent-injection] pack MCP skipped for <agentId>: <message>') and set overdeckMcpServerNames when project or pack servers exist. In prepareCodexOverdeckMcp add pack servers not already present with defaultToolsApprovalMode 'approve'. warnUnprovisionedProjectServers also names pack servers. In src/lib/overdeck/conversation-runtime.ts pass skillConversation: tmuxSession at both prepare call sites (lines 706, 780). Tests per WI-6 step 7, mocking launch-pack-mcp.js. Codex rule (D-7b): Codex agents use a per-agent codex-home-v2 and cannot reuse the operator's OAuth sign-in, so prepareCodexOverdeckMcp skips a pack server for which atlassianNeedsInteractiveAuth(server) is true (https mcp.atlassian.com URL with no Authorization header, helper exported from src/lib/skill-packs/atlassian.ts by atlassian-auth-header) and warns once '[pack-mcp] atlassian: server atlassian skipped for codex: set the Jira email and API token (Codex agents cannot reuse an /mcp sign-in)'. Claude-format launches keep the header-less server."
+        },
+        "items": [
+          {
+            "id": "agent-injection-pack-servers.ac1",
+            "title": "Given the pack resolver returns the atlassian server, prepareClaudeOverdeckMcp writes overdeck-mcp.json whose overdeck entry equals the no-pack case and whose atlassian entry has url 'https://mcp.atlassian.com/v2/mcp', and returns overdeckMcpServerNames ['overdeck', 'atlassian']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-injection-pack-servers.ac2",
+            "title": "Given the pack resolver returns {} (pack disabled), the written file has no atlassian key and the result has no overdeckMcpServerNames",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-injection-pack-servers.ac3",
+            "title": "The pack resolver receives reservedNames containing 'overdeck' and every project server name, and a conversation owner with skillConversation 'conv-x' passes conversation 'conv-x'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-injection-pack-servers.ac4",
+            "title": "prepareCodexOverdeckMcp returns atlassian with defaultToolsApprovalMode 'approve'; when the pack resolver throws, both helpers still return the overdeck and project servers and emit one warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-injection-pack-servers.ac5",
+            "title": "Given the pack resolver returns the atlassian server without an Authorization header, prepareCodexOverdeckMcp returns no atlassian key and logs one warning containing 'skipped for codex', while prepareClaudeOverdeckMcp still writes the server",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-atlassian",
+        "title": "Add the pan doctor Atlassian MCP row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-12T13:37:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5165",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-atlassian.ts",
+            "src/cli/commands/doctor.ts",
+            "src/cli/commands/__tests__/doctor-atlassian.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/doctor-atlassian.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "doctor-atlassian.test.ts passes",
+            "typecheck completes without errors",
+            "lint:file-size passes (doctor.ts stays under its cap)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. New src/cli/commands/doctor-atlassian.ts exporting checkAtlassianMcp(deps) with injectable getPack, packOnSomewhere, trackerKeys, fetchImpl and timeoutMs (default 10000). Row name 'Atlassian MCP'. No row without the registered pack; an ok 'off everywhere; endpoint not checked' row and no request when the toggle is off at global and every project; otherwise POST an MCP initialize to https://mcp.atlassian.com/v2/mcp with the atlassianBasicAuth header when available, aborted by AbortController + setTimeout (never AbortSignal.timeout), and map statuses exactly as the PRD table says. Wire it in doctor.ts directly after the checkSageox line. Tests use injected fetch and fake timers; no real network. The 401/403 fix text is exactly: 'An org admin must enable API token auth for the Rovo MCP server and the token needs MCP scopes; or declare a project mcp_servers entry named atlassian with url https://mcp.atlassian.com/v2/mcp and no headers (it overrides the pack's server) and sign in with /mcp.' Never tell the operator to remove JIRA_EMAIL/JIRA_API_TOKEN (that would break a tracker: jira project)."
+        },
+        "items": [
+          {
+            "id": "doctor-atlassian.ac1",
+            "title": "Given no registered atlassian pack, checkAtlassianMcp returns [] and calls fetchImpl zero times; given the pack registered but off everywhere, it returns one ok row and calls fetchImpl zero times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-atlassian.ac2",
+            "title": "Given credentials a@b.com/t0k, the request contains Authorization 'Basic YUBiLmNvbTp0MGs='; a 200 reply returns an ok row and a 401 or 403 reply returns an error row 'Atlassian rejected the Jira API token (HTTP <n>)' whose fix contains 'mcp_servers entry named atlassian' and does not contain 'remove JIRA'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-atlassian.ac3",
+            "title": "Given no credentials and a 401 reply, the row is warn 'Atlassian MCP not signed in…' with a fix naming JIRA_EMAIL, JIRA_API_TOKEN and /mcp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-atlassian.ac4",
+            "title": "Given a fetchImpl that never settles until aborted, advancing fake timers by 10000 ms produces a warn row starting 'Atlassian MCP endpoint unreachable'; no row text in any test contains 't0k'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-atlassian.ac5",
+            "title": "doctor.ts calls checkAtlassianMcp directly after checkSageox and pushes its rows into the doctor report",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "user-docs",
+        "title": "Document the atlassian pack, pack MCP servers and auth in the user docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-12T13:37:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5165",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx",
+            "configuration/mcp.mdx",
+            "configuration/issue-trackers.mdx",
+            "configuration/skills.mdx",
+            "cli/skills-commands.mdx",
+            "changelog.d/pan-5165.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c '—' changelog.d/pan-5165.md || true"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "the em-dash count in changelog.d/pan-5165.md is 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. features/skill-packs.mdx: catalog row, Not-applied and trust-bullet exception for consented https pack MCP servers, disclosure bullet, known-pack and default-ref list, fork-first exception sentence, and a new '### atlassian' section (commands, 3 default and 4 opt-in skills by name, MCP server URL, Basic header from Jira email + token, the /mcp OAuth path from the operator's own Claude Code session, admin/scopes caveat, per-harness availability, doctor row). configuration/mcp.mdx: new '## Pack MCP servers' section after Project MCP servers (applied entries, consent, enabled rule, precedence incl. project override, allowed tools, harness table, Atlassian auth). configuration/issue-trackers.mdx Jira section: '### Atlassian Rovo MCP for agents' pointer. configuration/skills.mdx: atlassian in the ref default sentence plus an 'mcp' registry field row. cli/skills-commands.mdx: atlassian in the known-pack and default-ref lists plus the MCP servers preview row. changelog.d/pan-5165.md: the #### New entry from the PRD. No em dashes in new prose. OAuth reuse applies to Claude Code only; say Codex agents need the Jira email and API token. Never advise removing JIRA_EMAIL/JIRA_API_TOKEN; the OAuth escape is a project mcp_servers entry named atlassian with no headers."
+        },
+        "items": [
+          {
+            "id": "user-docs.ac1",
+            "title": "features/skill-packs.mdx contains an 'atlassian' catalog row and a '### atlassian' section with the URL https://mcp.atlassian.com/v2/mcp, the 3 default and 4 opt-in skills, the 'Authorization: Basic' rule, the Claude Code /mcp sign-in path, and the project mcp_servers override for OAuth or Bearer keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "user-docs.ac2",
+            "title": "configuration/mcp.mdx contains a '## Pack MCP servers' section saying only https type: http servers apply, consent comes from a confirmed add/update preview, the precedence is overdeck, role, project, pack, and Codex agents skip the atlassian server without Jira credentials",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "user-docs.ac3",
+            "title": "configuration/issue-trackers.mdx Jira section contains a link to the atlassian pack, and configuration/skills.mdx contains the 'mcp' registry field row and atlassian among packs with a default ref",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "user-docs.ac4",
+            "title": "changelog.d/pan-5165.md has a single '#### New' heading with one bullet linking issue #5165, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dev-docs",
+        "title": "Update the skill-pack developer guide and CLI usage for pack MCP servers",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-12T13:37:07Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5165",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SKILL-PACKS.md",
+            "docs/USAGE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. docs/SKILL-PACKS.md: module map adds skill-packs/atlassian.ts and skill-overrides/launch-pack-mcp.ts; KnownPack table adds skillsExclude and atlassian in the url/adapter/ref/optIn/disclosure rows; Adapter contract states the pack MCP rules and the new capabilities.mcpServers meaning; Invariants add consent and precedence; Tests names launch-pack-mcp.test.ts and doctor-atlassian.test.ts. docs/USAGE.md line 417 comment: pstack, sageox and atlassian default the ref."
+        },
+        "items": [
+          {
+            "id": "dev-docs.ac1",
+            "title": "docs/SKILL-PACKS.md KnownPack fields table contains a 'skillsExclude' row naming atlassian, and the module map contains atlassian.ts and launch-pack-mcp.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dev-docs.ac2",
+            "title": "docs/SKILL-PACKS.md Invariants section contains the rule that pack MCP servers reach agents only with registry mcp: true and only after overdeck, role and project servers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dev-docs.ac3",
+            "title": "docs/USAGE.md line 417 comment contains 'atlassian' among the packs that default the ref",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pack-mcp-reader",
+        "to": "known-pack-atlassian",
+        "type": "blocks"
+      },
+      {
+        "from": "known-pack-atlassian",
+        "to": "pack-mcp-consent",
+        "type": "blocks"
+      },
+      {
+        "from": "pack-mcp-reader",
+        "to": "pack-mcp-consent",
+        "type": "blocks"
+      },
+      {
+        "from": "pack-mcp-consent",
+        "to": "launch-pack-mcp-resolver",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-pack-mcp-resolver",
+        "to": "atlassian-auth-header",
+        "type": "blocks"
+      },
+      {
+        "from": "known-pack-atlassian",
+        "to": "atlassian-auth-header",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-pack-mcp-resolver",
+        "to": "agent-injection-pack-servers",
+        "type": "blocks"
+      },
+      {
+        "from": "atlassian-auth-header",
+        "to": "doctor-atlassian",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-injection-pack-servers",
+        "to": "user-docs",
+        "type": "informs"
+      },
+      {
+        "from": "doctor-atlassian",
+        "to": "user-docs",
+        "type": "informs"
+      },
+      {
+        "from": "launch-pack-mcp-resolver",
+        "to": "dev-docs",
+        "type": "informs"
+      },
+      {
+        "from": "atlassian-auth-header",
+        "to": "agent-injection-pack-servers",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
