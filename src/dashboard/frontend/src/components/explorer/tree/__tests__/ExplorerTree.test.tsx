@@ -107,6 +107,19 @@ describe('ExplorerTree', () => {
     expect(props.onToggle).toHaveBeenCalledWith('lib')
   })
 
+  it('previews a file on a plain click, but not on a modifier click or a folder click', () => {
+    const onPreview = vi.fn()
+    const props = renderTree({ onPreview })
+    fireEvent.click(item('a.ts'))
+    expect(props.onSelect).toHaveBeenLastCalledWith('src/a.ts', 'replace')
+    expect(onPreview).toHaveBeenCalledWith('src/a.ts')
+    fireEvent.click(item('b.ts'), { ctrlKey: true })
+    fireEvent.click(item('b.ts'), { metaKey: true })
+    fireEvent.click(item('b.ts'), { shiftKey: true })
+    fireEvent.click(item('lib'))
+    expect(onPreview).toHaveBeenCalledTimes(1)
+  })
+
   it('opens a file on double click, and reports the row on right click', () => {
     const props = renderTree()
     fireEvent.doubleClick(item('a.ts'))

@@ -67,6 +67,8 @@ export interface WorkspacePane {
   // files (explorer) and code panes (PAN-5183, PAN-5186)
   explorerRootId?: string
   explorerPath?: string
+  // code pane: a reusable single-click tab, one per root; italic label (PAN-5187)
+  explorerPreview?: boolean
   // code pane reveal target, set by content search; the nonce re-triggers a
   // reveal of the same line (same pattern as targetMessageNonce)
   explorerRevealLine?: number

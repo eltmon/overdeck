@@ -207,8 +207,13 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
     },
     [deck, deckKey, paneId],
   )
-  // D-B2 seam: PAN-5187 changes this to open preview tabs.
+  // D-B2 seam: a double click, Enter or quick open opens a permanent pane; a
+  // single click opens the root's preview pane (PAN-5187, D-C22).
   const openFileFromTree = useCallback((path: string) => openFile({ rootId, path }), [openFile, rootId])
+  const previewFileFromTree = useCallback(
+    (path: string) => openFile({ rootId, path, preview: true }),
+    [openFile, rootId],
+  )
 
   const onQuickOpen = useCallback(() => setQuickOpen(true), [])
   const onContentSearch = useCallback(() => setContentSearchScope(''), [])
@@ -326,6 +331,7 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
           onToggle={onToggle}
           onSelect={onSelect}
           onOpen={openFileFromTree}
+          onPreview={previewFileFromTree}
           onFocus={onFocus}
           onContextMenuRow={onContextMenuRow}
         />

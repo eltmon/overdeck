@@ -200,7 +200,7 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
             <span className={styles.panetabIcon}>
               <Icon size={14} />
             </span>
-            <span>{pane.label}</span>
+            <span className={pane.paneType === 'code' && pane.explorerPreview ? 'italic' : undefined}>{pane.label}</span>
             {index < 9 && <span className={styles.kbd}>⌘{index + 1}</span>}
             {closable && (
               <button
