@@ -38,14 +38,21 @@ export function subscribeExplorerWatch(rootId: string, listener: WatchListener):
     const created: Channel = { listeners: new Set(), unsubscribe: () => {} }
     channels.set(rootId, created)
     channel = created
-    created.unsubscribe = subscribeWatchStream(
-      rootId,
-      (batch) => {
-        if (batch.events.some((e) => e.kind === 'overflow')) deliver(rootId, { kind: 'resync' })
-        else if (batch.events.length > 0) deliver(rootId, { kind: 'events', events: batch.events })
-      },
-      () => deliver(rootId, { kind: 'resync' }),
-    )
+    try {
+      created.unsubscribe = subscribeWatchStream(
+        rootId,
+        (batch) => {
+          if (batch.events.some((e) => e.kind === 'overflow')) deliver(rootId, { kind: 'resync' })
+          else if (batch.events.length > 0) deliver(rootId, { kind: 'events', events: batch.events })
+        },
+        () => deliver(rootId, { kind: 'resync' }),
+      )
+    } catch (error) {
+      // No stream opened: drop the channel so the next listener tries again
+      // instead of joining a channel that never delivers.
+      channels.delete(rootId)
+      throw error
+    }
   }
   const owned = channel
   owned.listeners.add(listener)

@@ -80,6 +80,17 @@ describe('subscribeExplorerWatch', () => {
     s2()
   })
 
+  it('lets the next listener retry when opening the stream throws', () => {
+    rpc.subscribeWatchStream.mockImplementationOnce(() => {
+      throw new Error('bad transport')
+    })
+    expect(() => subscribeExplorerWatch('issue:PAN-1', vi.fn())).toThrow('bad transport')
+    const stop = subscribeExplorerWatch('issue:PAN-1', vi.fn())
+    expect(rpc.subscribeWatchStream).toHaveBeenCalledTimes(2)
+    expect(rpc.streams).toHaveLength(1)
+    stop()
+  })
+
   it('opens a new subscription after the old one closed', () => {
     subscribeExplorerWatch('issue:PAN-1', vi.fn())()
     const stop = subscribeExplorerWatch('issue:PAN-1', vi.fn())
