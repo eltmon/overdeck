@@ -61,6 +61,8 @@ export interface PendingPermission {
 export interface ConversationPermissionDeps {
   read?: (agentId: string) => Promise<string>;
   now?: () => string;
+  /** PAN-5169: false for the polled read-model reads, so a Herdr host never reads them through tmux. Default keeps the fallback. */
+  legacyTmuxFallback?: boolean;
 }
 
 export interface ConversationPermissionRead {
@@ -180,7 +182,7 @@ export async function readConversationPermission(
     if (deps.read) {
       paneText = await deps.read(conv.tmuxSession);
     } else {
-      const io = await resolveAgentPaneIo(conv.tmuxSession);
+      const io = await resolveAgentPaneIo(conv.tmuxSession, undefined, { legacyTmuxFallback: deps.legacyTmuxFallback });
       backend = io.backend;
       paneText = await io.read(PANE_CAPTURE_LINES);
     }

@@ -427,7 +427,7 @@ export async function getConversationsPendingInputFeed(
         // is pane-only too. One pane read serves both checks on tmux; when a
         // permission is pending the pane-choice check is skipped so one
         // decision surface shows at a time.
-        const permission = await readConversationPermission(conv);
+        const permission = await readConversationPermission(conv, { legacyTmuxFallback: false }); // PAN-5169
         const pendingPermission = permission.pendingPermission;
         let paneChoice: PendingPaneChoice | null = null;
         if (!pending && !pendingPlan && !pendingPermission) {
@@ -527,7 +527,7 @@ export async function getConversationRead(
     // for one) blocks the conversation whatever else is pending.
     let pendingPermission: PendingPermission | null = null;
     if (sessionAlive) {
-      pendingPermission = await conversationPendingPermission(conv);
+      pendingPermission = await conversationPendingPermission(conv, { legacyTmuxFallback: false }); // PAN-5169
       if (pendingPermission) {
         pendingInputKinds = [...pendingInputKinds, 'permissionRequest'];
         pendingInputCount = pendingInputKinds.length;
