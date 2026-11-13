@@ -628,10 +628,20 @@ door that does not exist; a real record read door would be a separate change.
   into a running subagent instead of this conversation; PAN-4247), `held` ("Waiting:
   the agent needs a permission answer first"; see "Terminal permission prompts and held
   messages" below, PAN-4278), or `scheduled` (a server-held message waiting for a usage
-  limit to reset; see "Scheduled messages: send when limits reset" below, PAN-4641). Before pasting, the
+  limit to reset; see "Scheduled messages: send when limits reset" below, PAN-4641).
+  A prompt Send clears the composer and its `conv-draft:<name>` key at once; the bubble
+  carries the text (PAN-5184). The composer stays editable, so the operator can send again
+  while earlier sends are in flight. `lib/composerSendQueue.ts` runs a conversation's
+  composer POSTs, held-message resends and outbox retries one at a time in Send order; a
+  failed POST never blocks the ones behind it, and a queued prompt behind a `held` bubble
+  is held too. A queued bubble's `createdAt` restarts when its POST starts, so queue time
+  never counts toward `TURN_STALL_MS`. `/pan` commands, held-kickoff starts and
+  limit-reset schedules still block the composer until their round trip finishes. Before pasting, the
   composer route checks Claude Code's agent selector and switches input back to the main
   agent (PAN-4268); if that cannot be confirmed the route answers 409
-  `input-target-not-main`, the toast shows the reason, and the draft stays in the editor.
+  `input-target-not-main`, the toast shows the reason, and the message moves to the
+  outbox, whose Retry sends it again under a fresh `clientMessageId` because the
+  response proved nothing was delivered (PAN-5184).
   Conversation rows carry `inputTarget` (`'main' | { subagent } | 'unknown'`), which
   drives the composer's "Typed messages are going to subagent" notice. An `accepted` bubble
   that stays unmatched for `TURN_STALL_MS` (4 minutes) **while the conversation is not
