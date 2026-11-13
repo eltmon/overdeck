@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5187",
   "created": "2026-11-13T16:27:22.124Z",
-  "updated": "2026-11-13T18:52:08.551Z",
+  "updated": "2026-11-13T18:55:13.759Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,9 +152,10 @@
       "doneAt": "2026-11-13T18:37:49.737Z"
     },
     "f-external-change-wiring": {
-      "status": "pending",
+      "status": "completed",
       "claimedBy": "agent-pan-5187",
-      "claimedAt": "2026-11-13T18:52:08.551Z"
+      "claimedAt": "2026-11-13T18:52:08.551Z",
+      "doneAt": "2026-11-13T18:55:13.759Z"
     },
     "f-monaco-setup": {
       "status": "completed",
@@ -383,6 +384,18 @@
     "f-changes-view.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T18:52:07.311Z"
+    },
+    "f-external-change-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:55:13.759Z"
+    },
+    "f-external-change-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:55:13.759Z"
+    },
+    "f-external-change-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:55:13.759Z"
     }
   }
 }
