@@ -49,6 +49,7 @@ import { findActiveChannelTokenByKey } from '../../lib/access-tokens.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
 import { issuesRouteLayer } from './routes/issues.js'
 import { testRemovalWaiverRouteLayer } from './routes/test-removal-waiver.js'
+import { issueReadRouteLayer } from './routes/issue-read.js'
 import { deftRouteLayer } from './routes/deft.js'
 import { pipelineMembershipRouteLayer } from './routes/pipeline-membership.js'
 import { parkedRouteLayer } from './routes/parked.js'
@@ -385,6 +386,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   websocketRpcRouteLayer,
   issuesRouteLayer,
   testRemovalWaiverRouteLayer,
+  issueReadRouteLayer,
   deftRouteLayer,
   pipelineMembershipRouteLayer,
   parkedRouteLayer,

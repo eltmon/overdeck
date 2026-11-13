@@ -20,6 +20,7 @@ import { allowedRpcTags, requiredScopeFor, WS_RPC_UPGRADE_SCOPES } from '../rout
 
 const PHONE_SURFACE_HTTP: ReadonlyArray<[string, string]> = [
   ['GET', '/api/activity'],
+  ['GET', '/api/issues/PAN-1'],
   ['GET', '/api/conversations/pending-input'],
   ['POST', '/api/conversations/c1/codex-approval'],
   ['POST', '/api/agents/a1/answer-question'],
