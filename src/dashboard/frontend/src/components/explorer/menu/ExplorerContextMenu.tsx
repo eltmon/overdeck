@@ -83,7 +83,10 @@ export function ExplorerContextMenu({
   const single = targets.length === 1 ? targets[0] : null
   const paths = targets.map((t) => t.path)
   const changes = targets.flatMap((t) => workingChanges(t, decorations))
-  const canStage = changes.some((c) => !c.staged)
+  // `staged` is the index column only: a staged file can still have unstaged
+  // edits, which the contract cannot express. So Stage stays enabled for any
+  // working-tree change; `git add` on a fully staged file changes nothing.
+  const canStage = changes.length > 0
   const canUnstage = changes.some((c) => c.staged)
   const canDiscard = changes.length > 0
 

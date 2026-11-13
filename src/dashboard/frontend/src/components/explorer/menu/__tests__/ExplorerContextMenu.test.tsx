@@ -89,6 +89,12 @@ describe('ExplorerContextMenu', () => {
     await waitFor(() => expect(props.onGitChanged).toHaveBeenCalled())
   })
 
+  it('keeps Stage enabled for a staged file, which may still have unstaged edits', () => {
+    renderMenu({ decorations: buildDecorations({ entries: [{ path: 'src/a.ts', status: 'modified', staged: true }], committed: [] }) })
+    expect(item('Stage')).not.toHaveAttribute('data-disabled')
+    expect(item('Unstage')).not.toHaveAttribute('data-disabled')
+  })
+
   it('disables the git actions for an unchanged file', () => {
     renderMenu({ decorations: EMPTY_DECORATIONS })
     expect(item('Stage')).toHaveAttribute('data-disabled')
