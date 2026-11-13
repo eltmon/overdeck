@@ -1,0 +1,355 @@
+{
+  "version": "1",
+  "issueId": "PAN-5185",
+  "created": "2026-11-13T14:58:00.032Z",
+  "updated": "2026-11-13T15:55:25.535Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "contracts-surface": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T14:58:00.032Z",
+      "doneAt": "2026-11-13T15:12:48.369Z"
+    },
+    "contracts-surface.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:12:48.369Z"
+    },
+    "contracts-surface.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:12:48.369Z"
+    },
+    "contracts-surface.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:12:48.369Z"
+    },
+    "contracts-surface.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:12:48.369Z"
+    },
+    "git-runner": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T15:12:54.735Z",
+      "doneAt": "2026-11-13T15:14:45.200Z"
+    },
+    "roots-paths": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T15:14:52.257Z",
+      "doneAt": "2026-11-13T15:17:37.835Z"
+    },
+    "roots-paths.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:17:37.835Z"
+    },
+    "roots-paths.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:17:37.835Z"
+    },
+    "roots-paths.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:17:37.835Z"
+    },
+    "roots-paths.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:17:37.835Z"
+    },
+    "roots-paths.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:17:37.835Z"
+    },
+    "signature": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T15:17:39.531Z",
+      "doneAt": "2026-11-13T15:18:30.813Z"
+    },
+    "signature.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:18:30.813Z"
+    },
+    "signature.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:18:30.813Z"
+    },
+    "signature.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:18:30.813Z"
+    },
+    "signature.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:18:30.813Z"
+    },
+    "read-service": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T15:18:37.191Z",
+      "doneAt": "2026-11-13T15:20:22.708Z"
+    },
+    "read-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:20:22.708Z"
+    },
+    "read-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:20:22.708Z"
+    },
+    "read-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:20:22.708Z"
+    },
+    "read-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:20:22.708Z"
+    },
+    "read-service.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:20:22.708Z"
+    },
+    "git-service": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T15:20:28.644Z",
+      "doneAt": "2026-11-13T15:23:01.684Z"
+    },
+    "git-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:23:01.684Z"
+    },
+    "git-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:23:01.684Z"
+    },
+    "git-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:23:01.684Z"
+    },
+    "git-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:23:01.684Z"
+    },
+    "git-service.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:23:01.684Z"
+    },
+    "search-service": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T15:23:07.740Z",
+      "doneAt": "2026-11-13T15:24:52.202Z"
+    },
+    "search-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:24:52.202Z"
+    },
+    "search-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:24:52.202Z"
+    },
+    "search-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:24:52.202Z"
+    },
+    "search-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:24:52.202Z"
+    },
+    "watch-batch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T15:24:58.469Z",
+      "doneAt": "2026-11-13T15:26:23.268Z"
+    },
+    "watch-batch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:26:23.268Z"
+    },
+    "watch-batch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:26:23.268Z"
+    },
+    "watch-batch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:26:23.268Z"
+    },
+    "watch-batch.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:26:23.268Z"
+    },
+    "watch-ignore": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T15:26:25.157Z",
+      "doneAt": "2026-11-13T15:27:32.379Z"
+    },
+    "watch-ignore.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:27:32.379Z"
+    },
+    "watch-ignore.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:27:32.379Z"
+    },
+    "watch-ignore.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:27:32.379Z"
+    },
+    "watch-ignore.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:27:32.379Z"
+    },
+    "watch-child": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T15:27:39.102Z",
+      "doneAt": "2026-11-13T15:30:24.508Z"
+    },
+    "watch-child.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:30:24.508Z"
+    },
+    "watch-child.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:30:24.508Z"
+    },
+    "watch-child.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:30:24.508Z"
+    },
+    "watch-child.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:30:24.508Z"
+    },
+    "watch-child.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:30:24.508Z"
+    },
+    "watch-supervisor": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T15:30:33.223Z",
+      "doneAt": "2026-11-13T15:36:52.464Z"
+    },
+    "git-runner.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:33:30.424Z"
+    },
+    "git-runner.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:33:30.424Z"
+    },
+    "git-runner.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:33:30.424Z"
+    },
+    "git-runner.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:33:30.424Z"
+    },
+    "watch-supervisor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:36:52.464Z"
+    },
+    "watch-supervisor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:36:52.464Z"
+    },
+    "watch-supervisor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:36:52.464Z"
+    },
+    "watch-supervisor.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:36:52.464Z"
+    },
+    "watch-supervisor.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:36:52.464Z"
+    },
+    "watch-supervisor.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:36:52.464Z"
+    },
+    "rpc-handlers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T15:36:59.308Z",
+      "doneAt": "2026-11-13T15:40:55.578Z"
+    },
+    "rpc-handlers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:40:55.578Z"
+    },
+    "rpc-handlers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:40:55.578Z"
+    },
+    "rpc-handlers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:40:55.578Z"
+    },
+    "rpc-handlers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:40:55.578Z"
+    },
+    "port-diff-script": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T15:41:02.808Z",
+      "doneAt": "2026-11-13T15:53:21.217Z"
+    },
+    "port-diff-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:53:21.217Z"
+    },
+    "port-diff-script.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:53:21.217Z"
+    },
+    "port-diff-script.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:53:21.217Z"
+    },
+    "port-diff-script.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:53:21.217Z"
+    },
+    "port-records": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T15:53:32.697Z",
+      "doneAt": "2026-11-13T15:54:21.427Z"
+    },
+    "port-records.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:54:21.427Z"
+    },
+    "port-records.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:54:21.427Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T15:54:23.289Z",
+      "doneAt": "2026-11-13T15:55:25.534Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:55:25.534Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:55:25.534Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:55:25.534Z"
+    }
+  }
+}

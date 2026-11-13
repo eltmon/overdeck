@@ -698,12 +698,14 @@ describe('ComposerFooter attachments', () => {
     expect(deleteCalls).toHaveLength(0);
   });
 
-  it('keeps the Sending state across unmount/remount and never leaks it to another conversation', async () => {
+  it("keeps a /pan command's Sending state across unmount/remount and never leaks it to another conversation", async () => {
     // The user's report: send a message, switch away and back, and "Sending…"
     // is gone. PAN-1591 unmounts the composer on switch, so a component-local
     // flag could not survive. Sourcing it from the per-conversation composerStore
     // makes it survive a remount of the same conversation — and stay isolated
-    // from any other conversation.
+    // from any other conversation. PAN-5184: a prompt Send no longer sets
+    // `sending` (the composer stays editable while its POST is queued), so this
+    // now exercises the `/pan` command lane, which still blocks round-trip-first.
     const fetchMock = vi.mocked(fetch);
     let resolveSend: (() => void) | null = null;
     fetchMock.mockImplementation((input) => {
@@ -723,7 +725,7 @@ describe('ComposerFooter attachments', () => {
     });
 
     const view = render(<ComposerFooter conversation={conversation} />);
-    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hi there' } });
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: '/pan status' } });
     fireEvent.click(screen.getByTitle('Send message (Enter)'));
 
     // Send is in flight → the composer is disabled.

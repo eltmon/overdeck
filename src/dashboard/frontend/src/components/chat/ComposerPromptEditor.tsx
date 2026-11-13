@@ -28,35 +28,11 @@ import {
 import type { Harness } from '../shared/ModelPicker';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 import { getSlashCommands, SLASH_COMMANDS, type SlashCommand } from './slashCommands';
+import { loadDraft, saveDraft } from '../../lib/composerDraft';
 
 export { getSlashCommands, SLASH_COMMANDS };
 export type { SlashCommand };
-
-// ─── Draft persistence ────────────────────────────────────────────────────────
-
-function getDraftKey(conversationName: string): string {
-  return `conv-draft:${conversationName}`;
-}
-
-export function loadDraft(conversationName: string): string {
-  try {
-    return localStorage.getItem(getDraftKey(conversationName)) ?? '';
-  } catch {
-    return '';
-  }
-}
-
-function saveDraft(conversationName: string, text: string): void {
-  try {
-    if (text) {
-      localStorage.setItem(getDraftKey(conversationName), text);
-    } else {
-      localStorage.removeItem(getDraftKey(conversationName));
-    }
-  } catch {
-    // Storage full or unavailable
-  }
-}
+export { loadDraft } from '../../lib/composerDraft';
 
 // ─── Inner plugin: handles Enter/Shift+Enter and draft save ──────────────────
 
