@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5211",
   "created": "2026-11-13T22:53:14.172Z",
-  "updated": "2026-11-13T23:26:10.316Z",
+  "updated": "2026-11-13T23:26:16.553Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -276,6 +276,11 @@
     "wi15-window-bounded-flag.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T23:26:10.316Z"
+    },
+    "wi14-disk-paging": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5211",
+      "claimedAt": "2026-11-13T23:26:16.553Z"
     }
   }
 }
