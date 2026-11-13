@@ -28,5 +28,17 @@
     "upstream": "t3code",
     "path": "apps/server/src/workspace/WorkspaceFileSystem.ts",
     "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/code/save-queue.ts",
+    "upstream": "orca",
+    "path": "src/renderer/src/components/editor/save/queue/editor-save-queue.ts",
+    "commit": "73771e67d01"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/code/save-queue.ts",
+    "upstream": "orca",
+    "path": "src/renderer/src/components/editor/save/queue/editor-save-slots.ts",
+    "commit": "73771e67d01"
   }
 ]
