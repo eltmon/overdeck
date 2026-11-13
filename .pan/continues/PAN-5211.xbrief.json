@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5211",
   "created": "2026-11-13T22:53:14.172Z",
-  "updated": "2026-11-13T23:40:44.756Z",
+  "updated": "2026-11-13T23:42:14.841Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -376,9 +376,26 @@
       "doneAt": "2026-11-13T23:40:26.949Z"
     },
     "wi17-memory-guard-test": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5211",
-      "claimedAt": "2026-11-13T23:40:44.755Z"
+      "claimedAt": "2026-11-13T23:40:44.755Z",
+      "doneAt": "2026-11-13T23:42:14.840Z"
+    },
+    "wi17-memory-guard-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:42:14.840Z"
+    },
+    "wi17-memory-guard-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:42:14.840Z"
+    },
+    "wi17-memory-guard-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:42:14.840Z"
+    },
+    "wi17-memory-guard-test.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:42:14.840Z"
     }
   }
 }
