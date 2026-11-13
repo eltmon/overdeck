@@ -27,7 +27,8 @@ import { useConnectionState } from '../../lib/connectionState';
 import { isNativeShell } from '../../lib/nativeShell';
 import { MobileNeedsYou } from './MobileNeedsYou';
 import { MobileConversations } from './MobileConversations';
-import { MobileScreenHeader, OverdeckLockup } from './brand';
+import { LogoWatermark, MobileScreenHeader, OverdeckLockup } from './brand';
+import { LogoSting } from './LogoSting';
 import { MobileHintsBanner, MobileSettingsSheet, useInstallPrompt } from './MobileChrome';
 import { useMobileAppearance } from './useMobileAppearance';
 import { MobileIssueSheet } from './MobileIssueSheet';
@@ -108,6 +109,9 @@ export default function MobileApp({ headerSlot }: { headerSlot?: ReactNode } = {
   const native = isNativeShell();
   const route = useMobileRoute();
   const sessionAuthFailed = useConnectionState((s) => s.sessionAuthFailed);
+  const hasSnapshot = useConnectionState((s) => s.hasSnapshot);
+  // PAN-5208 D-10: a deep-link open (read once, from the first route) skips the logo sting.
+  const [initialDeepLink] = useState(() => route.subjectId !== null || route.conversationId !== null || route.issueId !== null);
   useServiceWorkerRegistration();
   // The /m web shell's System/Light/Dark (PAN-5208 D-6); a no-op in the phone app.
   useMobileAppearance();
@@ -163,21 +167,25 @@ export default function MobileApp({ headerSlot }: { headerSlot?: ReactNode } = {
             />
           )}
           {!native && !fullScreen && <MobileHintsBanner prompt={installPrompt} />}
-          <main className="min-h-0 flex-1 overflow-y-auto">
-            {route.tab === 'needs-you' ? (
-              <MobileNeedsYou subjectId={route.subjectId} />
-            ) : route.tab === 'conversations' ? (
-              <MobileConversations
-                conversationId={route.conversationId}
-                onOpen={openConversation}
-                onBack={closeConversation}
-              />
-            ) : route.issueId ? (
-              <MobileIssueSheet issueId={route.issueId} onBack={closeIssue} />
-            ) : (
-              <MobilePipeline onOpen={openIssue} />
-            )}
-          </main>
+          {/* D-14: the watermark sits behind the scroller; main stays the scroll container (MobileNeedsYou scrolls via closest('main')). */}
+          <div className="relative min-h-0 flex-1">
+            {!fullScreen && <LogoWatermark />}
+            <main className="relative h-full overflow-y-auto">
+              {route.tab === 'needs-you' ? (
+                <MobileNeedsYou subjectId={route.subjectId} />
+              ) : route.tab === 'conversations' ? (
+                <MobileConversations
+                  conversationId={route.conversationId}
+                  onOpen={openConversation}
+                  onBack={closeConversation}
+                />
+              ) : route.issueId ? (
+                <MobileIssueSheet issueId={route.issueId} onBack={closeIssue} />
+              ) : (
+                <MobilePipeline onOpen={openIssue} />
+              )}
+            </main>
+          </div>
           {!fullScreen && (
             <nav
               aria-label="Phone sections"
@@ -202,6 +210,8 @@ export default function MobileApp({ headerSlot }: { headerSlot?: ReactNode } = {
           {!native && <MobileSettingsSheet open={settingsOpen} onClose={closeSettings} prompt={installPrompt} />}
         </>
       )}
+      {/* PAN-5208 D-9: an overlay over the mounted app, never a gate. The phone app plays its own from ShellApp. */}
+      {!native && <LogoSting ready={sessionAuthFailed || hasSnapshot} skip={initialDeepLink} />}
     </div>
   );
 }
