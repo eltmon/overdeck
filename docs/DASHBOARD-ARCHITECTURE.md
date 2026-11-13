@@ -2036,3 +2036,41 @@ one per file, extension rows first:
 stay out of the entry bundle. Workers build as ES modules (`worker: { format:
 'es' }` in `vite.config.ts`), and the `pdfjs-dist-assets` alias points the
 pdf.js font, cmap and wasm globs at the real package folder.
+
+### Viewers tier 2: Office, notebooks and Mermaid (PAN-5189)
+
+Three more rows join `viewer-router.ts` `pickViewer(path, read)`, after the
+archive row and before the `read.kind === 'text'` row (notebooks and Mermaid
+files are text reads, so a row after it would never match): `docx`/`xlsx`/
+`pptx`/`odt`/`ods`/`odp` extensions choose `'office'`; `.ipynb` with a
+non-binary read chooses `'notebook'`; `.mmd`/`.mermaid` with a text read
+choose `'mermaid'`.
+
+- **Office.** `OpenXmlOfficeViewer.tsx` renders `.docx`, `.xlsx` and `.pptx`
+  with the betteroffice Word, spreadsheet and presentation engines, each in
+  its own Web Worker (`document.worker.ts`, `spreadsheet.worker.ts`,
+  `presentation.worker.ts`), so layout, recalculation and painting never
+  block the window. `OdfViewer.tsx` renders `.odt`/`.odp` as sanitized HTML
+  pages (`DocumentPages.tsx`) and `.ods` as a virtualized sheet table; both
+  kinds first pass through `officeArchive.ts`'s bounding (50 MB input,
+  bounded XML expansion and part counts) and a 30 s open timeout, falling
+  back on either limit.
+- **Notebooks.** `.ipynb` files parse on the main thread
+  (`notebookParse.ts`), not in a worker: notebook code is never executed,
+  only the cells' saved outputs are shown. Markdown cells render through
+  `NotebookMarkdown.tsx`'s inert `react-markdown` plugin, which drops images,
+  links and raw HTML. A cell's HTML output renders inside a sandboxed
+  `<iframe>` (`DocumentPages.tsx`, `sandbox=""`) with no `allow-scripts`.
+- **Mermaid.** `.mmd`/`.mermaid` files render through `MermaidViewer.tsx`,
+  which refuses resource URLs, markup, node metadata or custom configuration
+  with a lexical guard before Mermaid lays out any DOM, then calls
+  `mermaid.render` with `securityLevel: 'strict'` and shows the result as a
+  `data:image/svg+xml` `<img>`, never into the page DOM.
+- **Fallback.** Every tier-2 failure — bounds exceeded, a damaged file, the
+  open timeout, an engine error or a Mermaid parse error — falls back to the
+  shared `BinaryCard`, which shows the file's size and a Download link.
+- **Assets.** The betteroffice engines' WASM (`docx_edit_bg`, `docx_parse_bg`,
+  `docx_layout_bg`, `ooxml_opc_bg`, `xlsx_wasm_bg`, `pptx_wasm_bg`) and bundled
+  fonts (Latin faces plus the CJK set) are emitted build assets, fetched by
+  the browser only when an Office file actually opens; dashboard load time is
+  unaffected.
