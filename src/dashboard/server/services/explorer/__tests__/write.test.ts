@@ -1,10 +1,33 @@
-import { chmod, lstat, readdir, readFile, readlink, realpath, stat, symlink, writeFile as fsWriteFile } from 'node:fs/promises';
+import {
+  chmod,
+  cp,
+  lstat,
+  mkdir,
+  readdir,
+  readFile,
+  readlink,
+  realpath,
+  rename as fsRename,
+  rm,
+  stat,
+  symlink,
+  writeFile as fsWriteFile,
+} from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PanRpcError } from '@overdeck/contracts';
 import type { ExplorerRoot } from '../roots.js';
 import { diskSignature } from '../signature.js';
-import { create, MAX_EDITABLE_TEXT_BYTES, statEntry, WRITE_TEMP_MARKER, writeFile } from '../write.js';
+import {
+  create,
+  MAX_EDITABLE_TEXT_BYTES,
+  moveEntry,
+  type MoveOps,
+  rename,
+  statEntry,
+  WRITE_TEMP_MARKER,
+  writeFile,
+} from '../write.js';
 import { makeFixtureRepo, type FixtureRepo } from './fixture-repo.js';
 
 let repo: FixtureRepo;
@@ -199,5 +222,97 @@ describe('statEntry', () => {
   it('reports a symlink as a symlink, not as its target', async () => {
     await symlink('src', join(root.absPath, 'src-link'));
     expect(await statEntry(root, 'src-link')).toMatchObject({ name: 'src-link', path: 'src-link', kind: 'symlink' });
+  });
+});
+
+describe('rename', () => {
+  it('renames a file', async () => {
+    const { entry } = await rename(root, 'a.txt', 'b.txt');
+    expect(entry).toMatchObject({ name: 'b.txt', path: 'b.txt', kind: 'file' });
+    expect(await exists(join(root.absPath, 'a.txt'))).toBe(false);
+    expect(await readFile(join(root.absPath, 'b.txt'), 'utf8')).toBe('alpha\n');
+  });
+
+  it('moves a folder with its contents into another folder', async () => {
+    await mkdir(join(root.absPath, 'lib'));
+    const { entry } = await rename(root, 'src', 'lib/src');
+    expect(entry).toMatchObject({ name: 'src', path: 'lib/src', kind: 'dir' });
+    expect(await exists(join(root.absPath, 'src'))).toBe(false);
+    expect(await readFile(join(root.absPath, 'lib/src/x.ts'), 'utf8')).toBe('export {};\n');
+  });
+
+  it('renames a symlink, not its target', async () => {
+    await symlink('a.txt', join(root.absPath, 'link.txt'));
+    await rename(root, 'link.txt', 'link2.txt');
+    expect(await readlink(join(root.absPath, 'link2.txt'))).toBe('a.txt');
+    expect(await readFile(join(root.absPath, 'a.txt'), 'utf8')).toBe('alpha\n');
+  });
+
+  it('throws ALREADY_EXISTS for an occupied target and moves nothing', async () => {
+    expect(await codeOf(rename(root, 'a.txt', 'src/x.ts'))).toBe('ALREADY_EXISTS');
+    expect(await readFile(join(root.absPath, 'a.txt'), 'utf8')).toBe('alpha\n');
+    expect(await readFile(join(root.absPath, 'src/x.ts'), 'utf8')).toBe('export {};\n');
+  });
+
+  it('throws INVALID_TARGET for a folder moved into its own subfolder or onto itself', async () => {
+    expect(await codeOf(rename(root, 'src', 'src/inner/src'))).toBe('INVALID_TARGET');
+    expect(await codeOf(rename(root, 'src', 'src'))).toBe('INVALID_TARGET');
+    expect(await exists(join(root.absPath, 'src/x.ts'))).toBe(true);
+  });
+
+  it('throws NOT_FOUND for a missing source or a missing target folder', async () => {
+    expect(await codeOf(rename(root, 'nope.txt', 'b.txt'))).toBe('NOT_FOUND');
+    expect(await codeOf(rename(root, 'a.txt', 'missing/b.txt'))).toBe('NOT_FOUND');
+    expect(await exists(join(root.absPath, 'a.txt'))).toBe(true);
+  });
+
+  it('renames a.txt to A.txt by case only', async () => {
+    await rename(root, 'a.txt', 'A.txt');
+    expect(await exists(join(root.absPath, 'A.txt'))).toBe(true);
+  });
+
+  it('refuses a project root and a move into a git folder', async () => {
+    expect(await codeOf(rename(rootAt(root.absPath, 'project'), 'a.txt', 'b.txt'))).toBe('EDIT_WORKSPACE_REQUIRED');
+    expect(await codeOf(rename(root, 'a.txt', '.git/a.txt'))).toBe('PATH_IN_GIT_DIR');
+  });
+});
+
+describe('moveEntry', () => {
+  it('copies then removes the source when rename throws EXDEV', async () => {
+    const calls: string[] = [];
+    const ops: MoveOps = {
+      rename: (async () => {
+        calls.push('rename');
+        throw Object.assign(new Error('cross-device link'), { code: 'EXDEV' });
+      }) as unknown as MoveOps['rename'],
+      cp: (async (...args: Parameters<typeof cp>) => {
+        calls.push('cp');
+        return cp(...args);
+      }) as MoveOps['cp'],
+      rm: (async (...args: Parameters<typeof rm>) => {
+        calls.push('rm');
+        return rm(...args);
+      }) as MoveOps['rm'],
+    };
+    await moveEntry(join(root.absPath, 'src'), join(root.absPath, 'moved'), ops);
+    expect(calls).toEqual(['rename', 'cp', 'rm']);
+    expect(await exists(join(root.absPath, 'src'))).toBe(false);
+    expect(await readFile(join(root.absPath, 'moved/x.ts'), 'utf8')).toBe('export {};\n');
+  });
+
+  it('rethrows a rename error other than EXDEV without copying', async () => {
+    const ops: MoveOps = {
+      rename: (async () => {
+        throw Object.assign(new Error('denied'), { code: 'EACCES' });
+      }) as unknown as MoveOps['rename'],
+      cp: (async () => {
+        throw new Error('cp must not run');
+      }) as unknown as MoveOps['cp'],
+      rm: fsRename as unknown as MoveOps['rm'],
+    };
+    await expect(moveEntry(join(root.absPath, 'a.txt'), join(root.absPath, 'b.txt'), ops)).rejects.toMatchObject({
+      code: 'EACCES',
+    });
+    expect(await exists(join(root.absPath, 'a.txt'))).toBe(true);
   });
 });

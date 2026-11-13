@@ -8,7 +8,7 @@
  *
  * A method whose service has not shipped yet answers NOT_IMPLEMENTED with a
  * message naming the issue that owns it:
- *   - write methods (rename, copy, delete, restore): PAN-5187
+ *   - write methods (copy, delete, restore): PAN-5187
  *   - explorerBeginEdit: PAN-5191
  */
 import { Effect, Queue, Stream } from 'effect';
@@ -19,7 +19,7 @@ import { listDir, readFile } from './services/explorer/read.js';
 import { resolveExplorerRoot } from './services/explorer/roots.js';
 import { invalidateFileListCache, searchContent, searchFiles } from './services/explorer/search.js';
 import { getExplorerWatchSupervisor } from './services/explorer/watch-supervisor.js';
-import { create, writeFile } from './services/explorer/write.js';
+import { create, rename, writeFile } from './services/explorer/write.js';
 
 /** The 14 pan.explorer* method tags. */
 type ExplorerMethodTag = Extract<(typeof WS_METHODS)[keyof typeof WS_METHODS], `pan.explorer${string}`>;
@@ -50,7 +50,8 @@ export const explorerRpcHandlers = {
     ),
   [WS_METHODS.explorerCreate]: (input) =>
     run(async () => create(await resolveExplorerRoot(input.rootId), input.path, input.kind)),
-  [WS_METHODS.explorerRename]: () => notImplemented(WS_METHODS.explorerRename, WRITE_OWNER),
+  [WS_METHODS.explorerRename]: (input) =>
+    run(async () => rename(await resolveExplorerRoot(input.rootId), input.from, input.to)),
   [WS_METHODS.explorerCopy]: () => notImplemented(WS_METHODS.explorerCopy, WRITE_OWNER),
   [WS_METHODS.explorerDelete]: () => notImplemented(WS_METHODS.explorerDelete, WRITE_OWNER),
   [WS_METHODS.explorerRestore]: () => notImplemented(WS_METHODS.explorerRestore, WRITE_OWNER),

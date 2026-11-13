@@ -27,13 +27,14 @@
  * same window; closing it would need a lock no other editor honours.
  *
  * The tree's file actions use the entry operations below them: `create`
- * (empty file or folder) and `statEntry`. They resolve paths with
+ * (empty file or folder), `rename` (rename and move, through `moveEntry`,
+ * which falls back to copy-and-remove across filesystems) and `statEntry`. They resolve paths with
  * `resolveEntryInsideRoot`, which never follows a symlink in the last
  * segment, so they act on a link and not on its target.
  */
 import { randomBytes } from 'node:crypto';
 import type { Stats } from 'node:fs';
-import { lstat, mkdir, open, readFile, realpath, rename, rm, stat, writeFile as fsWriteFile } from 'node:fs/promises';
+import { cp, lstat, mkdir, open, readFile, realpath, rename as fsRename, rm, stat, writeFile as fsWriteFile } from 'node:fs/promises';
 import { basename, dirname, join, posix } from 'node:path';
 import { PanRpcError, type ExplorerEntry, type ExplorerEntryResult, type ExplorerWriteFileResult } from '@overdeck/contracts';
 import { explorerError } from './errors.js';
@@ -161,7 +162,7 @@ async function writeAtomically(target: string, text: string, mode: number | null
     } finally {
       await fh.close();
     }
-    await rename(tmp, target);
+    await fsRename(tmp, target);
   } catch (error) {
     await rm(tmp, { force: true });
     throw error;
@@ -221,4 +222,67 @@ export async function create(root: ExplorerRoot, rel: string, kind: 'file' | 'di
     throw error;
   }
   return { entry: await statEntry(root, rel) };
+}
+
+/** The filesystem calls `moveEntry` makes; tests inject them to simulate EXDEV. */
+export interface MoveOps {
+  rename: typeof fsRename;
+  cp: typeof cp;
+  rm: typeof rm;
+}
+
+const defaultMoveOps: MoveOps = { rename: fsRename, cp, rm };
+
+/**
+ * Move a file or folder (D-C9). `rename` cannot cross filesystems (EXDEV),
+ * so that case copies the entry, symlinks verbatim, then removes the source.
+ */
+export async function moveEntry(from: string, to: string, ops: MoveOps = defaultMoveOps): Promise<void> {
+  try {
+    await ops.rename(from, to);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error;
+    await ops.cp(from, to, { recursive: true, errorOnExist: true, force: false, verbatimSymlinks: true });
+    await ops.rm(from, { recursive: true, force: true });
+  }
+}
+
+/** True when `to` is `from` or lies inside it (D-C10). */
+function isSelfOrInside(from: string, to: string): boolean {
+  return to === from || to.startsWith(`${from}/`);
+}
+
+/** Missing source, or a source that is a parent of the target, throws before anything moves. */
+async function sourceAndTarget(
+  root: ExplorerRoot,
+  from: string,
+  to: string,
+  verb: string,
+): Promise<{ fromAbs: string; toAbs: string; source: Stats; target: Stats | null }> {
+  const fromAbs = await resolveEntryInsideRoot(root, from);
+  const toAbs = await resolveEntryInsideRoot(root, to);
+  const source = await lstatOrNull(fromAbs);
+  if (!source) throw explorerError('NOT_FOUND', `${JSON.stringify(from)} does not exist`);
+  if (isSelfOrInside(from, to)) {
+    throw explorerError('INVALID_TARGET', `Cannot ${verb} ${JSON.stringify(from)} into itself`);
+  }
+  return { fromAbs, toAbs, source, target: await lstatOrNull(toAbs) };
+}
+
+/**
+ * Rename or move `from` to `to`. The target folder must exist. A target
+ * that is the same inode as the source (a case-only rename on a
+ * case-insensitive filesystem) is not a collision.
+ */
+export async function rename(root: ExplorerRoot, from: string, to: string): Promise<ExplorerEntryResult> {
+  const { fromAbs, toAbs, source, target } = await sourceAndTarget(root, from, to, 'move');
+  if (target && (target.dev !== source.dev || target.ino !== source.ino)) {
+    throw explorerError('ALREADY_EXISTS', `${JSON.stringify(to)} already exists`);
+  }
+  const parent = await stat(dirname(toAbs)).catch(() => null);
+  if (!parent?.isDirectory()) {
+    throw explorerError('NOT_FOUND', `The folder for ${JSON.stringify(to)} does not exist`);
+  }
+  await moveEntry(fromAbs, toAbs);
+  return { entry: await statEntry(root, to) };
 }
