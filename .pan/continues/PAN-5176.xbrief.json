@@ -1,0 +1,298 @@
+{
+  "version": "1",
+  "issueId": "PAN-5176",
+  "created": "2026-11-13T05:00:59.712Z",
+  "updated": "2026-11-13T08:15:13.765Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-13T05:37Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-13T05:37:52.793Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-13T05:57Z] ci-monitor → FAILED — seq 2",
+      "timestamp": "2026-11-13T05:57:02.205Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-13T06:31Z] ci-monitor → FAILED — seq 3",
+      "timestamp": "2026-11-13T06:31:13.609Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-13T06:39Z] ci-monitor → FAILED — seq 4",
+      "timestamp": "2026-11-13T06:39:36.736Z"
+    }
+  ],
+  "items": {
+    "spawn-ledger-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5176",
+      "claimedAt": "2026-11-13T05:00:59.712Z",
+      "doneAt": "2026-11-13T05:03:30.534Z"
+    },
+    "spawn-ledger-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:03:30.534Z"
+    },
+    "spawn-ledger-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:03:30.534Z"
+    },
+    "spawn-ledger-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:03:30.534Z"
+    },
+    "spawn-ledger-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:03:30.534Z"
+    },
+    "spawn-ledger-helper.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:03:30.534Z"
+    },
+    "spawn-ledger-helper.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:03:30.534Z"
+    },
+    "idle-poller-budget-tests": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5176",
+      "claimedAt": "2026-11-13T05:03:41.839Z",
+      "doneAt": "2026-11-13T05:06:07.966Z"
+    },
+    "idle-poller-budget-tests.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:06:07.966Z"
+    },
+    "idle-poller-budget-tests.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:06:07.966Z"
+    },
+    "idle-poller-budget-tests.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:06:07.966Z"
+    },
+    "idle-poller-budget-tests.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:06:07.966Z"
+    },
+    "darwin-platform-tests": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5176",
+      "claimedAt": "2026-11-13T05:06:14.384Z",
+      "doneAt": "2026-11-13T05:07:35.932Z"
+    },
+    "darwin-platform-tests.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:07:35.932Z"
+    },
+    "darwin-platform-tests.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:07:35.932Z"
+    },
+    "darwin-platform-tests.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:07:35.932Z"
+    },
+    "herdr-conversation-poll-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5176",
+      "claimedAt": "2026-11-13T05:07:42.433Z",
+      "doneAt": "2026-11-13T05:14:41.415Z"
+    },
+    "herdr-conversation-poll-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:14:41.415Z"
+    },
+    "herdr-conversation-poll-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:14:41.415Z"
+    },
+    "herdr-conversation-poll-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:14:41.415Z"
+    },
+    "bare-host-smoke-script": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5176",
+      "claimedAt": "2026-11-13T05:14:47.694Z",
+      "doneAt": "2026-11-13T05:22:33.089Z"
+    },
+    "bare-host-smoke-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:22:33.089Z"
+    },
+    "bare-host-smoke-script.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:22:33.089Z"
+    },
+    "bare-host-smoke-script.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:22:33.089Z"
+    },
+    "bare-host-smoke-script.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:22:33.089Z"
+    },
+    "bare-host-smoke-script.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:22:33.089Z"
+    },
+    "ci-bare-host-linux": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5176",
+      "claimedAt": "2026-11-13T05:22:39.920Z",
+      "doneAt": "2026-11-13T05:48:13.192Z"
+    },
+    "release-macos-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5176",
+      "claimedAt": "2026-11-13T05:29:49.710Z",
+      "doneAt": "2026-11-13T05:31:09.504Z"
+    },
+    "release-macos-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:31:09.504Z"
+    },
+    "release-macos-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:31:09.504Z"
+    },
+    "release-macos-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:31:09.504Z"
+    },
+    "release-macos-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:31:09.504Z"
+    },
+    "ci-bare-host-linux.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:48:13.192Z"
+    },
+    "ci-bare-host-linux.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:48:13.192Z"
+    },
+    "ci-bare-host-linux.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:48:13.192Z"
+    },
+    "ci-bare-host-macos": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5176",
+      "claimedAt": "2026-11-13T05:48:19.898Z",
+      "doneAt": "2026-11-13T07:52:59.136Z"
+    },
+    "ci-bare-host-macos.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T07:52:59.136Z"
+    },
+    "ci-bare-host-macos.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T07:52:59.136Z"
+    },
+    "ci-bare-host-macos.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T07:52:59.136Z"
+    },
+    "ci-known-bad-canary": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5176",
+      "claimedAt": "2026-11-13T07:53:03.056Z",
+      "doneAt": "2026-11-13T08:03:59.913Z"
+    },
+    "ci-known-bad-canary.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T08:03:59.913Z"
+    },
+    "ci-known-bad-canary.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T08:03:59.913Z"
+    },
+    "ci-known-bad-canary.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T08:03:59.913Z"
+    },
+    "budget-calibration": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5176",
+      "claimedAt": "2026-11-13T08:04:02.321Z",
+      "doneAt": "2026-11-13T08:14:54.676Z"
+    },
+    "budget-calibration.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T08:14:54.676Z"
+    },
+    "budget-calibration.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T08:14:54.676Z"
+    },
+    "budget-calibration.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T08:14:54.676Z"
+    },
+    "docs-release-gates": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5176",
+      "claimedAt": "2026-11-13T08:14:56.069Z",
+      "doneAt": "2026-11-13T08:15:13.765Z"
+    },
+    "docs-release-gates.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T08:15:13.765Z"
+    },
+    "docs-release-gates.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T08:15:13.765Z"
+    },
+    "docs-release-gates.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T08:15:13.765Z"
+    },
+    "docs-release-gates.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T08:15:13.765Z"
+    },
+    "docs-release-gates.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T08:15:13.765Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-13T05:37:52Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5176\n\nPull request: https://github.com/eltmon/overdeck/pull/5179 (head `677f6a10`)\n\nSource: check_run:bare-host-linux\n\n## Failing checks (1)\n\n### bare-host-linux\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/131712778197/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43372545357/job/131712778197  \n```\nbare-host smoke: FAIL (linux, /home/runner/work/_temp/subject/overdeck-core-0.82.0.tgz)\n  pan up:  FAIL rc=0 healthy=true forbidden-tool lines=1\n             ⚠ tmux not found — the Herdr terminal backend does not need it; plain terminals in the dashboard do. Install manually: sudo apt-get update && sudo apt-get install -y tmux\n  idle:    PASS booted=true baseline=8 idle=25 net=17 (0.57/s) budget=30\n  ENOENT:  PASS repeats=0\n  result:  /home/runner/work/_temp/bare-host/result.json\n##[error]Process completed with exit code 1.\n##[group]Run actions/upload-artifact@v4\nwith:\n  name: bare-host-linux-logs\n  path: /home/runner/work/_temp/bare-host/result.json\n/home/runner/work/_temp/bare-host/*.log\n\n  if-no-files-found: warn\n  compression-level: 6\n  overwrite: false\n  include-hidden-files: false\nenv:\n  SKIP_DOCS_INDEX: 1\n  OVERDECK_TELEMETRY: 0\n##[endgroup]\n(node:13793) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.\n(Use `node --trace-deprecation ...` to show where the warning was created)\nWith the provided path, there will be 6 files uploaded\nArtifact name is valid!\nRoot directory input is valid!\nBeginning upload of artifact content to blob storage\n(node:13793) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\nUploaded bytes 4568\nFinished uploading artifact content to blob storage!\nSHA256 digest of uploaded artifact zip is 886caf54d759d8f189dfecbc77de8c5ef37f3b8055ccc6d2cf62d676aabf85c7\nFinalizing artifact upload\nArtifact bare-host-linux-logs.zip successfully finalized. Artifact ID 14013132041\nArtifact bare-host-linux-logs has been successfully uploaded! Final size is 4568 bytes. Artifact ID is 14013132041\nArtifact download URL: https://github.com/eltmon/overdeck/actions/runs/43372545357/artifacts/14013132041\nPost job cleanup.\n[command]/usr/bin/g\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-13T05:57:02Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5176\n\nPull request: https://github.com/eltmon/overdeck/pull/5179 (head `663d95e6`)\n\nSource: check_run:test-shard (3/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (3/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/131717661498/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43374485497/job/131717661498  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/skill-overrides/__tests__/store.test.ts\u001b[2m > \u001b[22mproject overrides\u001b[2m > \u001b[22mround-trips set and clear\n\u001b[31m\u001b[1mError\u001b[22m: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/lib/skill-overrides/__tests__/store.test.ts:\u001b[2m152:3\u001b[22m\u001b[39m\n    \u001b[90m150|\u001b[39m\n    \u001b[90m151|\u001b[39m \u001b[34mdescribe\u001b[39m(\u001b[32m'project overrides'\u001b[39m\u001b[33m,\u001b[39m () \u001b[33m=>\u001b[39m {\n    \u001b[90m152|\u001b[39m   \u001b[34mit\u001b[39m(\u001b[32m'round-trips set and clear'\u001b[39m\u001b[33m,\u001b[39m \u001b[35masync\u001b[39m () \u001b[33m=>\u001b[39m {\n    \u001b[90m   |\u001b[39m   \u001b[31m^\u001b[39m\n    \u001b[90m153|\u001b[39m     await setSkillOverride({ level: 'project', projectKey: 'tst', skil…\n    \u001b[90m154|\u001b[39m     expect(await readProjectSkillOverrides('tst')).toEqual({ grilling:…\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/skill-overrides/__tests__/store.test.ts\u001b[2m > \u001b[22mproject overrides\u001b[2m > \u001b[22mround-trips set and clear\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/skill-overrides/__tests__/store.test.ts\u001b[2m > \u001b[22missue overrides\u001b[2m > \u001b[22mdeletes the file and commits the deletion when the last key is cleared\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/skill-overrides/__tests__/store.test.ts\u001b[2m > \u001b[22missue overrides\u001b[2m > \u001b[22mdeletes the file and commits the deletion when the last key is cleared\n\n\u001b[31m\u001b[1mError\u001b[22m: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/lib/skill-overrides/__tests__/store.test.ts:\u001b[2m86:1\u001b[22m\u001b[39m\n    \u001b[90m 84|\u001b[39m }\n    \u001b[90m 85|\u001b[39m\n    \u001b[90m 86|\u001b[39m \u001b[34mbeforeEach\u001b[39m(() \u001b[33m=>\u001b\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m643 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m1 skipped\u001b[39m\u001b[90m (645)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 3,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-13T06:31:13Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5176\n\nPull request: https://github.com/eltmon/overdeck/pull/5179 (head `df3d65a3`)\n\nSource: check_run:bare-host-macos\n\n## Failing checks (1)\n\n### bare-host-macos\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/131731595539/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43378207667/job/131731595539  \n```\nbare-host smoke: FAIL (darwin, /Users/runner/work/_temp/subject/overdeck-core-0.82.0.tgz)\n  pan up:  PASS rc=0 healthy=true forbidden-tool lines=0\n  idle:    FAIL booted=true baseline=676 idle=814 net=138 (4.6/s) budget=30\n           Overdeck child_process calls in the idle window: 25 (0 failed)\n             10x sysctl\n             6x memory_pressure\n             6x vm_stat\n             3x ps\n  ENOENT:  PASS repeats=0\n  result:  /Users/runner/work/_temp/bare-host/result.json\n##[error]Process completed with exit code 1.\n##[group]Run actions/upload-artifact@v4\nwith:\n  name: bare-host-macos-logs\n  path: /Users/runner/work/_temp/bare-host/result.json\n/Users/runner/work/_temp/bare-host/*.log\n\n  if-no-files-found: warn\n  compression-level: 6\n  overwrite: false\n  include-hidden-files: false\nenv:\n  SKIP_DOCS_INDEX: 1\n  OVERDECK_TELEMETRY: 0\n##[endgroup]\n(node:6694) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.\n(Use `node --trace-deprecation ...` to show where the warning was created)\nWith the provided path, there will be 8 files uploaded\nArtifact name is valid!\nRoot directory input is valid!\nBeginning upload of artifact content to blob storage\n(node:6694) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\nUploaded bytes 5671\nFinished uploading artifact content to blob storage!\nSHA256 digest of uploaded artifact zip is fe375446376f5ec1cc9122f98888709c739d116fbfd742db4fa52cea31f1ae7a\nFinalizing artifact upload\nArtifact bare-host-macos-logs.zip successfully finalized. Artifact ID 14016121400\nArtifact bare-host-macos-logs has been successfully uploaded! Final size is 5671 bytes. Artifact ID is 14016121400\nArtifact download URL: https://github.com/eltmon/overdeck/actions/runs/43378207667/artifacts/14016121400\nPost job cleanup.\n[command]/opt/homebrew/b\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 4,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-13T06:39:36Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5176\n\nPull request: https://github.com/eltmon/overdeck/pull/5179 (head `d2971b93`)\n\nSource: check_run:bare-host-macos\n\n## Failing checks (1)\n\n### bare-host-macos\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/131734630969/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43379405419/job/131734630969  \n```\nbare-host smoke: FAIL (darwin, /Users/runner/work/_temp/subject/overdeck-core-0.82.0.tgz)\n  pan up:  PASS rc=0 healthy=true forbidden-tool lines=0\n  idle:    FAIL booted=true baseline=935 idle=1197 net=262 (8.73/s) budget=30\n           Overdeck child_process calls in the idle window: 25 (0 failed)\n             10x sysctl\n             6x memory_pressure\n             6x vm_stat\n             3x ps\n  ENOENT:  PASS repeats=0\n  result:  /Users/runner/work/_temp/bare-host/result.json\n##[error]Process completed with exit code 1.\n##[group]Run actions/upload-artifact@v4\nwith:\n  name: bare-host-macos-logs\n  path: /Users/runner/work/_temp/bare-host/result.json\n/Users/runner/work/_temp/bare-host/*.log\n\n  if-no-files-found: warn\n  compression-level: 6\n  overwrite: false\n  include-hidden-files: false\nenv:\n  SKIP_DOCS_INDEX: 1\n  OVERDECK_TELEMETRY: 0\n##[endgroup]\n(node:8692) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.\n(Use `node --trace-deprecation ...` to show where the warning was created)\nWith the provided path, there will be 8 files uploaded\nArtifact name is valid!\nRoot directory input is valid!\nBeginning upload of artifact content to blob storage\n(node:8692) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\nUploaded bytes 5984\nFinished uploading artifact content to blob storage!\nSHA256 digest of uploaded artifact zip is fad39367ed8ae33cb76e97544b07efc5b9a1407e2f90fbb26600d74a6ce75508\nFinalizing artifact upload\nArtifact bare-host-macos-logs.zip successfully finalized. Artifact ID 14016406990\nArtifact bare-host-macos-logs has been successfully uploaded! Final size is 5984 bytes. Artifact ID is 14016406990\nArtifact download URL: https://github.com/eltmon/overdeck/actions/runs/43379405419/artifacts/14016406990\nPost job cleanup.\n[command]/opt/homebrew\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
+}

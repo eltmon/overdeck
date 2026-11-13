@@ -81,6 +81,13 @@
   `vitest.config.ts` excludes them unless `VITEST_INCLUDE_SLOW=1`, and CI runs only the slow files
   a workflow step names (`docs/TESTING.md`, PAN-5117).
 - Issue IDs are `LETTERS-NUMBER`: `parseIssueId` (`src/lib/issue-id.ts`) and dozens of path/session regexes assume a letters-only prefix, so project issue prefixes must be letters only; use `issue_pattern` for other ID shapes (PAN-4860).
+- Spawn budgets: `tests/helpers/spawn-budget.ts` counts and denies host-tool spawns at the real
+  `node:child_process` boundary. Install it in `vi.hoisted`, before the subject is imported, never
+  `vi.mock` `child_process` in the same file, and `restore()` in `afterAll` (`docs/TESTING.md`,
+  PAN-5176).
+- Bare-host CI: `scripts/bare-host-smoke.sh` runs in the `bare-host-linux`, `bare-host-macos` and
+  `bare-host-macos-known-bad` jobs (`ci.yml`) and gates the release (`release.yml`
+  `bare-host-macos`); macOS asserts the traced spawn cost, Linux the PID net (PAN-5176).
 - Root `setupFiles` (`vitest.config.ts`) run in order: `tests/setup/overdeck-home.ts`,
   `tests/setup/no-real-home-writes.ts`, `tests/setup/no-worker-signals.ts`, `tests/setup.ts`; the
   latter two guards throw `[test-guard]` errors (PAN-4925).

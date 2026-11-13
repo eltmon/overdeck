@@ -1,0 +1,9 @@
+plan-digest: d11d03f36672d5adce136370b728698c1da71516d0b2f270ec8271979a3e3b3b
+
+## blocks-the-design: Local smoke is refused from a feature worktree
+
+The PRD says the script runs locally and gives a command to run from the checkout ([PRD](/home/eltmon/Projects/overdeck/workspaces/feature-pan-5176/.pan/drafts/PAN-5176.md), lines 59, 378, 548). It specifies `pan up --no-resume --no-open --detach` without changing the child's working directory (lines 67, 370–373). On a normal macOS feature worktree, `pan up` calls `refuseNonPrimaryDashboardCwd(process.cwd(), 'start')` before startup ([src/cli/index.ts](/home/eltmon/Projects/overdeck/workspaces/feature-pan-5176/src/cli/index.ts), line 549). The guard identifies linked worktrees and `workspaces/feature-*` roots and exits 2 ([src/cli/commands/restart.ts](/home/eltmon/Projects/overdeck/workspaces/feature-pan-5176/src/cli/commands/restart.ts), lines 98–126; [identity.ts](/home/eltmon/Projects/overdeck/workspaces/feature-pan-5176/src/dashboard/server/identity.ts), lines 28–35, 59–61). Thus the documented local smoke fails before it tests the package. Run the `pan up` and `pan down` children from a non-repository directory under the isolated work dir, and specify that working directory in the script and local-use instructions.
+
+## blocks-the-design: Known-bad canary never checks the smoke exit code
+
+FR-14 requires the v0.81.0 smoke to exit 1 ([PRD](/home/eltmon/Projects/overdeck/workspaces/feature-pan-5176/.pan/drafts/PAN-5176.md), lines 176–179). WI-8 makes the smoke step `continue-on-error: true`, then checks only `result.json` fields (lines 462–475). A smoke regression that writes `pass: false` and the expected observations but exits 0 would leave the canary green. Capture the smoke command's numeric exit status as a step output and require exactly 1 in the assertion step, alongside the existing JSON checks.

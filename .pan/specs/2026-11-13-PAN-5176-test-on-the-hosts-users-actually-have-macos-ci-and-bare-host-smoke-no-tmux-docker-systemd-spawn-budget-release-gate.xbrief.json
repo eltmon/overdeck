@@ -1,0 +1,949 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-13T04:46:05.621Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5176: Test on the hosts users actually have: macOS CI and bare-host smoke (no tmux/docker/systemd), spawn budget, release gate",
+    "updated": "2026-11-13T04:56:34.871Z"
+  },
+  "plan": {
+    "id": "pan-5176",
+    "title": "Test on the hosts users actually have: macOS CI and bare-host smoke (no tmux/docker/systemd), spawn budget, release gate",
+    "status": "proposed",
+    "uid": "84e12cbb-2131-4546-b15b-be8dd6dd31ce",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-13T04:46:05.621Z",
+    "updated": "2026-11-13T04:56:34.871Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5176",
+        "label": "PAN-5176",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5176.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "ci",
+      "macos",
+      "release",
+      "testing",
+      "spawn-budget",
+      "bare-host"
+    ],
+    "narratives": {
+      "Problem": "PAN-5168, PAN-5169 and PAN-5170 made the operator's Mac unusable (an idle dashboard spawned 13-60 dead processes per second, pan up refused to start without tmux, and Linux-only systemctl/journalctl checks ran on macOS). None was caught, because every CI job runs on ubuntu-latest hosts with tmux, Docker and systemd. macOS appears only in the release desktop build, and no test starts Overdeck on a host missing an optional tool. Measured on v0.81.0 on a bare Mac: pan up failed on tmux/brew, and the idle dashboard created about 15 new PIDs per second.",
+      "Proposal": "Add scripts/bare-host-smoke.sh (bash 3.2, env -i bare env without CI, a fixed six-entry PATH without docker/tmux/systemctl/journalctl/brew, Herdr from its vendor installer). It installs a tarball or npm version into an isolated HOME, asserts pan up --detach passes health without forbidden-tool text, measures the idle dashboard's net new PIDs per 30 s against per-OS budgets, scans logs for repeated spawn ENOENT, and writes result.json. Run it in ci.yml as bare-host-linux (every PR), bare-host-macos (path-filtered PRs and every main push) and a v0.81.0 known-bad canary that must fail for the expected reasons. Split release.yml so the exact core tarball is packed after sourcemaps and tests, smoked on macos-latest, and only then published. Add a spawn-ledger Vitest helper that patches the real node:child_process in vi.hoisted (mechanism probed during planning) and denies the host tools, plus three budget tests: PAN-5168 pollers on default deps, darwin with no systemctl/journalctl, and a Herdr conversation poll with 0 tmux calls. Document it in RELEASING.md, PIPELINE-GATES.md, TESTING.md, the codebase map and changelog.d. Full detail: .pan/drafts/PAN-5176.md.",
+      "NonGoals": "- The PAN-5171 drawer-title Playwright e2e: PAN-5171's own plan carries it (item e2e-drawer-title, PR #5177).\n- GitHub branch protection or rulesets: main has none (gh api returned 404), and adding them is an operator setting.\n- Adding bare-host checks to DEFAULT_MAIN_VERIFY_REQUIRED_CHECKS in src/lib/lifecycle/dod-gate.ts: that default applies to every project.\n- Renaming or changing the build (22) check.\n- A tmux-backend bare-host leg, or a Windows leg (windows-smoke.yml exists).\n- Making the Mac rig a dependency of anything.\n- Smoking @overdeck/contracts or @overdeck/desktop; only @overdeck/core goes through the macOS smoke.\n- Runtime src/ changes, except same-class fixes of 20 lines or fewer that the smoke finds (D9).\n- Raising an idle budget above 30 new PIDs per 30 s, or adding continue-on-error to bare-host-linux or bare-host-macos.\n- Using coreutils timeout, or running the full npm test on the host.\n- vi.mock of child_process in files that use the spawn ledger; skipIf, .only or .skip in new tests."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Leave the PAN-5171 drawer-title e2e (issue work item 7) to PAN-5171",
+        "rationale": "The issue says to add it only if PAN-5171 has not; PAN-5171 is open with PR #5177 and its plan has item e2e-drawer-title, and PAN-5171 is not merged, so an e2e here would fail on main."
+      },
+      {
+        "summary": "\"Required check\" means no continue-on-error plus Overdeck's any-failing-check merge gate; no branch protection change and no DEFAULT_MAIN_VERIFY_REQUIRED_CHECKS change",
+        "rationale": "main has no GitHub branch protection (404) and only the protect-overdeck-state ruleset; pr-facts.ts line 257 already fails the merge gate on any failing check; the dod-gate default is shared across projects."
+      },
+      {
+        "summary": "Path-filter the macOS job with a job-level if over a dorny/paths-filter job, and widen the issue's path list with src/cli/**, bun.lock, the script and ci.yml",
+        "rationale": "A workflow-level paths filter would leave a required check missing; SKIPPED counts as passing. pan up lives in src/cli/index.ts, and the smoke must run when it or its own definition changes."
+      },
+      {
+        "summary": "Run pan up with --detach and measure idle from a directly started server after pan down, following the reference script",
+        "rationale": "Without --detach pan up stays in the foreground; v0.81.0 exits before starting the dashboard, so the direct start is the only way to measure it; it also excludes sidecar noise."
+      },
+      {
+        "summary": "Run every smoke child under env -i with a fixed variable list that omits CI",
+        "rationale": "ensureHerdr skips all Herdr setup when CI is set, and a real user host has no CI; OVERDECK_TELEMETRY=0 is passed explicitly (PAN-5084)."
+      },
+      {
+        "summary": "Fixed six-entry PATH per OS (real system dirs on macOS, symlink mirror minus denied tools on Linux)",
+        "rationale": "The macOS spawn storm scales with PATH entry count, so the measurement needs a stable count; Ubuntu runners have docker and systemctl in /usr/bin."
+      },
+      {
+        "summary": "The smoke refuses to run when ports 3010, 3011, 3012 or 8317 are bound, and pkills only under the work dir",
+        "rationale": "stopDashboard kills whatever owns 3010/3011; on a developer host the smoke would otherwise kill the operator's live dashboard."
+      },
+      {
+        "summary": "Net idle count = idle window minus a baseline window; per-OS budgets start at 30 and are calibrated to max(10, min(30, 3 x highest sample))",
+        "rationale": "The issue says start at 1/s and set the figure from the measured post-fix rate; a baseline removes runner background noise; the rule is mechanical."
+      },
+      {
+        "summary": "Add a v0.81.0 known-bad canary job that must fail for the tmux and rate reasons, run when the script changes",
+        "rationale": "It is the only way to satisfy the acceptance criterion \"on v0.81.0 the macOS job fails\" before merge (workflow_dispatch needs the workflow on main), and it keeps proving the smoke has teeth."
+      },
+      {
+        "summary": "Release: pack the core tarball after sourcemaps and tests, smoke it on macOS, then publish that tarball; contracts and desktop publish as before",
+        "rationale": "posthog-cli inject rewrites dist, so the tarball must be packed after it; publishing the tested tarball is the \"exact tarball\" the issue requires; leaving contracts and desktop unchanged keeps the diff small."
+      },
+      {
+        "summary": "Spawn ledger patches the real node:child_process in vi.hoisted with syncBuiltinESMExports, and denies host tools via a nonexistent-path redirect",
+        "rationale": "A planning probe showed this counts module-scope promisify(execFile), exec (once) and Effect spawns; vi.mock misses externalized Effect code; denying means a regression never runs the runner's real docker or tmux."
+      }
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-5176.md",
+      "sizeJustification": "13 files, one issue the operator filed with joint acceptance criteria: the release gate, CI jobs and unit spawn budgets together make macOS regressions of the PAN-5168/5169/5170 class impossible to ship. The 9-subsystem count comes from directory spread (tests/helpers, tests/unit/helpers, tests/unit/spawn-budget, scripts, .github/workflows, docs, changelog.d, .overdeck/context), not from runtime breadth: no runtime src/ file changes. The work runs as two independent tracks inside one DAG (unit spawn budgets; smoke script -> CI -> release), so splitting adds issue overhead without adding parallelism.",
+      "canonicalFilename": "2026-11-13-PAN-5176-test-on-the-hosts-users-actually-have-macos-ci-and-bare-host-smoke-no-tmux-docker-systemd-spawn-budget-release-gate.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "spawn-ledger-helper",
+        "title": "Add the spawn ledger Vitest helper with its self-test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T04:46:05.621Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-5176",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "idle-poller-budget-tests",
+            "darwin-platform-tests",
+            "herdr-conversation-poll-test"
+          ],
+          "files_scope": [
+            "tests/helpers/spawn-budget.ts",
+            "tests/unit/helpers/spawn-budget.test.ts",
+            "docs/TESTING.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/helpers/spawn-budget.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "spawn-budget.test.ts passes with cases (a)-(f)",
+            "typecheck and lint exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "NFR-3",
+            "NFR-7"
+          ],
+          "parallelSafeReason": "Touches only new files under tests/helpers and tests/unit/helpers plus a new docs/TESTING.md subsection; no other item edits these files.",
+          "acJustification": "Six ACs: one per self-test behavior group plus the docs subsection; the rejection-propagation case was added in answer to the plan critique."
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/PAN-5176.md WI-1 exactly. Create tests/helpers/spawn-budget.ts exporting SpawnApi, SpawnRecord, DENIED_HOST_TOOLS, SpawnLedger, installSpawnLedger, spawnsPerTick and expectSpawnBudget, with the signatures in the PRD. Mechanism (D15, verified by probe during planning): createRequire(import.meta.url)('node:child_process'), wrap spawn, execFile, exec, spawnSync, execFileSync and execSync. Record only when a module depth counter is 0, so exec -> execFile counts once. Give execFile and exec their own util.promisify.custom wrapper that records and then calls the original custom function. Copying the original symbol bypasses the ledger, which the probe showed. Then call syncBuiltinESMExports(). Deny, do not pass through (D16): calls whose program basename is in deny are recorded and redirected to /nonexistent/overdeck-spawn-budget/<tool>, so real Node produces ENOENT. For exec, execSync and shell:true the program is the first word of the command string. restore() puts the originals back and calls syncBuiltinESMExports() again. The module header documents the vi.hoisted install rule, the no-vi.mock('child_process') rule and the afterAll restore. Write the self-test with cases (a)-(f) from the PRD. Add a 'Spawn budgets (PAN-5176)' subsection under '### Mocking' in docs/TESTING.md. spawnsPerTick must NOT catch tick rejections: a rejecting tick rejects spawnsPerTick (critique fix)."
+        },
+        "items": [
+          {
+            "id": "spawn-ledger-helper.ac1",
+            "title": "Given the ledger installed in vi.hoisted, when a module calls promisify(execFile)(\"true\", []) and exec(\"true\", cb), then ledger.records contains exactly one entry for each call (spawn-budget.test.ts cases a and b pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-ledger-helper.ac2",
+            "title": "Given an Effect ChildProcess.make(\"true\", []) run under NodeServices.layer, when it completes, then the ledger records exactly one spawn with program \"true\" (case c passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-ledger-helper.ac3",
+            "title": "Given the default deny list, when execFile(\"tmux\", ...) and execFileSync(\"docker\", ...) are called, then each is recorded with denied: true and each fails with code ENOENT without running a real binary (cases d and e pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-ledger-helper.ac4",
+            "title": "Given restore() has run, when execFile(\"true\") is called, then ledger.records does not grow (case f passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-ledger-helper.ac5",
+            "title": "docs/TESTING.md contains a \"Spawn budgets (PAN-5176)\" subsection that states the ledger must be installed in vi.hoisted before the subject is imported",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-ledger-helper.ac6",
+            "title": "Given a tick function that rejects, when spawnsPerTick runs it, then spawnsPerTick rejects with that error instead of recording a 0 count (self-test case g)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "idle-poller-budget-tests",
+        "title": "Add PAN-5168 idle poller spawn-budget tests on default dependencies",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T04:46:05.621Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5176",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/spawn-budget/idle-pollers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/spawn-budget/idle-pollers.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "idle-pollers.test.ts passes: 5 budget cases at 0 and 5 positive controls at >=1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-17",
+            "NFR-3",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2. Install the ledger in vi.hoisted. Fake only Date (vi.useFakeTimers({ toFake: ['Date'] })). Report every denied tool missing with setHostToolFinderForTests. Run spawnsPerTick for 3 ticks with 61 s of system time between ticks (past HOST_TOOL_MISSING_RECHECK_MS) for: DockerStatsCollector.collect() under the real NodeServices.layer, loadDockerContainers(), collectDockerContainerLifecycleSnapshot() via Effect.result, listHostTmuxPanes(), and listLiveConversationSessions/conversationSessionAlive with backend 'tmux'. Assert expectSpawnBudget max 0 over the denied tools. Add one positive control per poller, with the tool reported present at /usr/bin/<tool>, recording at least 1 call. Do not vi.mock child_process. Do not duplicate the existing per-file PAN-5168 tests (D17); this file adds default deps, the child_process-boundary count and the recheck window. Each tick asserts its poller's contract value: collect() resolves, loadDockerContainers() resolves [], liveness resolves a set and false, collectDockerContainerLifecycleSnapshot() fails with code ENOENT via Effect.result, and listHostTmuxPanes() rejects with code ENOENT via expect().rejects. An unexpected rejection fails the test (critique fix)."
+        },
+        "items": [
+          {
+            "id": "idle-poller-budget-tests.ac1",
+            "title": "Given docker, tmux, systemctl, journalctl and brew reported missing, when each of the five PAN-5168 pollers runs 3 ticks with 61 s of fake time between ticks, then expectSpawnBudget records 0 denied-tool calls for every tick",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idle-poller-budget-tests.ac4",
+            "title": "Given docker and tmux missing, when the ticks run, then loadDockerContainers resolves [], conversationSessionAlive resolves false, the stack-health snapshot fails with code ENOENT and listHostTmuxPanes rejects with code ENOENT, and any other outcome fails the test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idle-poller-budget-tests.ac2",
+            "title": "Given the poller's tool reported present at /usr/bin/<tool>, when one tick runs, then the ledger records at least 1 call to that tool (positive control per poller)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idle-poller-budget-tests.ac3",
+            "title": "The test file contains no vi.mock of child_process or node:child_process, and no skipIf, .only or .skip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "darwin-platform-tests",
+        "title": "Add darwin tests proving systemctl and journalctl are never spawned",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T04:46:05.621Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5176",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/spawn-budget/darwin-no-linux-tools.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/spawn-budget/darwin-no-linux-tools.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "darwin-no-linux-tools.test.ts passes: 7 darwin cases at 0 calls, Linux control records 1 systemctl call"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-18",
+            "NFR-3",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3. Install the ledger in vi.hoisted. Stub process.platform to 'darwin' with Object.defineProperty and restore the saved descriptor in afterAll. Set OVERDECK_SUPERVISOR_UNIT=1, so supervisorUnitAllowed() does not short-circuit the start and stop cases. Call isSupervisorUnitFailed, systemdUserAvailable, explainSystemdUserUnavailable, startSupervisorUnitIfAvailable, stopSupervisorUnitIfActive, readNewKernelJournal() with no deps, and announceNewRestart 5 times. announceNewRestart gets only its non-spawn deps injected; platform and readSupervisorUnitFailed stay at their defaults. Assert 0 systemctl and journalctl calls and the stated return values. Add a Linux positive control: isSupervisorUnitFailed() under platform 'linux' records 1 systemctl exec, which the ledger redirects (the shell exits 127), and resolves false."
+        },
+        "items": [
+          {
+            "id": "darwin-platform-tests.ac1",
+            "title": "Given process.platform stubbed to darwin, when isSupervisorUnitFailed, systemdUserAvailable, explainSystemdUserUnavailable, startSupervisorUnitIfAvailable and stopSupervisorUnitIfActive run, then each returns false (or \"not-linux\") and the ledger records 0 systemctl calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "darwin-platform-tests.ac2",
+            "title": "Given process.platform stubbed to darwin, when readNewKernelJournal() runs with no deps and announceNewRestart runs 5 times with the default platform and systemd check, then the ledger records 0 systemctl and 0 journalctl calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "darwin-platform-tests.ac3",
+            "title": "Given process.platform stubbed to linux, when isSupervisorUnitFailed() runs, then the ledger records exactly 1 call whose program is systemctl and the function resolves false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "herdr-conversation-poll-test",
+        "title": "Add a Herdr conversation-poll test proving 0 tmux calls without tmux",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T04:46:05.621Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-5176",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/spawn-budget/herdr-conversation-poll.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/spawn-budget/herdr-conversation-poll.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "herdr-conversation-poll.test.ts passes: 0 tmux calls with >=3 strict pane reads; tmux control records >=1 tmux call"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-19",
+            "NFR-3",
+            "NFR-7"
+          ],
+          "parallelSafeReason": "Creates one new test file under tests/unit/spawn-budget; it shares no file with any other item and only reads the ledger helper after it lands."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4. Set a temp OVERDECK_HOME and OVERDECK_TERMINAL_BACKEND=herdr before imports, and install the ledger in vi.hoisted. Mock event-store (getEventStore -> { emitOnly }). Partially mock terminal-backends/herdr.js, overriding only findHerdrAgentPane (null), readHerdrPaneText (''), probeHerdrAgentLiveness ({ kind: 'alive' }) and listHerdrAgents (the three conv-* agents idle). Use a passthrough vi.fn spy around the real resolveAgentPaneIo. All other read modules stay real. In beforeEach: resetHostTerminalBackendName(), setHostToolFinderForTests(n => n === 'tmux' ? null : n), invalidateConversationListEnrichmentCache(). Create three claude-code conversations with createConversation and markConversationRunning, with no transcript. Poll with deps built like routes/conversations.ts conversationReadDependencies (do not import that route module): getEnrichedConversationList(500, 0), getConversationsPendingInputFeed(deps), and getConversationRead for each name. Assert 0 tmux calls and >= 3 resolveAgentPaneIo calls with { legacyTmuxFallback: false }. Positive control: backend tmux with tmux present records >= 1 tmux call. Load subject modules with await import() after setting the env vars. If an unrelated module fails to load, mock it as conversation-list-input-target.test.ts does, but never mock tmux.js, conversation-reads.js, conversation-liveness.js, conversation-pane-choice.js or the real resolveAgentPaneIo body."
+        },
+        "items": [
+          {
+            "id": "herdr-conversation-poll-test.ac1",
+            "title": "Given the Herdr backend, tmux missing and three live claude-code conversations without transcripts, when the conversation list, the pending-input feed and a single read of each conversation run, then the ledger records 0 tmux calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "herdr-conversation-poll-test.ac2",
+            "title": "Given the same poll, when it completes, then the resolveAgentPaneIo spy has at least 3 calls whose third argument equals { legacyTmuxFallback: false }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "herdr-conversation-poll-test.ac3",
+            "title": "Given OVERDECK_TERMINAL_BACKEND=tmux (after resetHostTerminalBackendName) and tmux reported present, when the same poll runs, then the ledger records at least 1 tmux call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bare-host-smoke-script",
+        "title": "Add scripts/bare-host-smoke.sh (bash 3.2, bare env, idle budget, ENOENT scan)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T04:46:05.621Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "infra",
+          "issueLabel": "pan-5176",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "ci-bare-host-linux",
+            "ci-bare-host-macos",
+            "ci-known-bad-canary",
+            "budget-calibration",
+            "release-macos-gate"
+          ],
+          "files_scope": [
+            "scripts/bare-host-smoke.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -n scripts/bare-host-smoke.sh",
+            "bash scripts/bare-host-smoke.sh --help",
+            "bash scripts/bare-host-smoke.sh --version 0.81.0 --work-dir \"$PWD/.tmp/smoke/refuse\"",
+            "node -e \"require('net').createServer().listen(3010,'::1')\" & sleep 1; bash scripts/bare-host-smoke.sh --version 0.81.0 --work-dir \"$PWD/.tmp/smoke/refuse6\"; kill %1"
+          ],
+          "expected_outputs": [
+            "bash -n exits 0",
+            "--help exits 0",
+            "on a host with port 3011 bound the run exits 2 and names port 3011",
+            "with an IPv6-only listener on ::1 port 3010 the run exits 2 and names port 3010"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "acJustification": "The script carries FR-1..FR-11; five ACs cover its usage, safety, env, measurement and result contracts.",
+          "parallelSafeReason": "Creates the new scripts/bare-host-smoke.sh only; the CI and release items consume it after it lands, and the calibration item edits it later behind a blocks edge."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5 and FR-1..FR-11 exactly, starting from the reference check in the issue body. It must be bash 3.2 compatible (no associative arrays, mapfile, ${x,,}, wait -n) and use no timeout, gtimeout, realpath or readlink -f. Wall-clock caps use the reference limit() function. Use set -u, not set -e. Safety (D8): refuse with exit 2 when ports 3010, 3011, 3012 or 8317 have a listener on any address: lsof -nP -iTCP:<port> -sTCP:LISTEN -t (the pidsOnPort probe), then ss -ltnH when lsof is missing, plus a curl IPv4 check as a second check; fail closed with exit 2 when no probe tool runs (critique fix), and when --work-dir exists and is not empty. pkill only with patterns \"$WORK_DIR/home/\" and \"$WORK_DIR/tools/\". Delete nothing. PATH (D4): exactly six entries; on Darwin the system dirs as-is, on Linux $WORK_DIR/tools/sys/* mirror dirs of symlinks minus docker, tmux, systemctl, journalctl and brew. Verify that every denied tool is absent from the bare PATH. Children run under env -i with only the FR-4 variables, never CI, OVERDECK_HOME or OVERDECK_TERMINAL_BACKEND. Run pan up --no-resume --no-open --detach (D6); pan down plus the pkill backstop (FR-7); a baseline 30 s window; a direct server start with OVERDECK_NO_RESUME=1 and the pan-up port env; health poll, 20 s settle, idle 30 s window; net = idle - baseline against IDLE_BUDGET_MACOS / IDLE_BUDGET_LINUX (both 30 for now); the ENOENT repeat scan (FR-10). Write result.json with node -e, print a summary, append to GITHUB_STEP_SUMMARY when set. Exit 0, 1 or 2 as FR-11 says."
+        },
+        "items": [
+          {
+            "id": "bare-host-smoke-script.ac1",
+            "title": "bash -n scripts/bare-host-smoke.sh exits 0, and bash scripts/bare-host-smoke.sh --help exits 0 and lists --tarball, --version, --work-dir, --out and --budget",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bare-host-smoke-script.ac2",
+            "title": "Given port 3011 bound on IPv4, or an IPv6-only listener on ::1 port 3010, when the script runs with --version 0.81.0 and a fresh --work-dir, then it exits 2, prints the bound port, installs nothing and kills no process",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bare-host-smoke-script.ac3",
+            "title": "The script contains no occurrence of the words timeout, gtimeout, realpath, readlink -f, mapfile or declare -A, and every pkill pattern ends in \"$WORK_DIR/home/\" or \"$WORK_DIR/tools/\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bare-host-smoke-script.ac4",
+            "title": "The script routes every child command through one bare() function that runs env -i with only HOME, PATH, USER, LOGNAME, SHELL, LANG, TMPDIR and OVERDECK_TELEMETRY=0 (plus the FR-4 dashboard variables for the server start), so a child never receives CI",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bare-host-smoke-script.ac5",
+            "title": "Given a completed run, when result.json is read, then it has keys version, os, subject, panUp{rc,healthy,forbiddenToolLines,pass}, idle{booted,baselineNew,idleNew,net,netPerSec,budget,pass}, enoent{repeats,pass}, pass and setupError, and the exit code is 0 when pass is true and 1 when an assertion failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-bare-host-linux",
+        "title": "Pack the CI subject in build and add the bare-host-linux job",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T04:46:05.621Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5176",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"require('yaml').parse(require('fs').readFileSync('.github/workflows/ci.yml','utf8'))\"",
+            "gh pr checks"
+          ],
+          "expected_outputs": [
+            "ci.yml parses",
+            "bare-host-linux concludes SUCCESS on the PR"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-4",
+            "NFR-5",
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6. In job build (job id, matrix and check name 'build (22)' unchanged), after 'Test CLI', add the npm pack --ignore-scripts step and upload artifact bare-host-subject. Add job bare-host-linux (ubuntu-latest, needs: build, timeout-minutes: 30, no continue-on-error): checkout, setup-node 22, download the subject, run bash scripts/bare-host-smoke.sh --tarball <tgz> --work-dir \"$RUNNER_TEMP/bare-host\", and upload result.json plus *.log with if: always() as bare-host-linux-logs. Push the workflow commit with git push git@github.com:eltmon/overdeck.git HEAD:feature/pan-5176 (NFR-5)."
+        },
+        "items": [
+          {
+            "id": "ci-bare-host-linux.ac1",
+            "title": "Given the parsed ci.yml, when jobs.build is inspected, then its name and matrix are unchanged and it has a step that runs npm pack --ignore-scripts and uploads artifact bare-host-subject",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-bare-host-linux.ac2",
+            "title": "Given the parsed ci.yml, when jobs[\"bare-host-linux\"] is inspected, then it runs on ubuntu-latest, needs build, sets timeout-minutes 30, has no continue-on-error and no if condition",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-bare-host-linux.ac3",
+            "title": "Given the PR head, when CI completes, then the bare-host-linux check concludes SUCCESS and its bare-host-linux-logs artifact contains result.json with \"pass\": true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-bare-host-macos",
+        "title": "Add the path-filtered bare-host-macos job",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T04:46:05.621Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5176",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"require('yaml').parse(require('fs').readFileSync('.github/workflows/ci.yml','utf8'))\"",
+            "gh pr checks"
+          ],
+          "expected_outputs": [
+            "ci.yml parses",
+            "bare-host-macos concludes SUCCESS on the PR"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7. Add job bare-host-changes (ubuntu-latest, timeout-minutes 5, permissions contents: read and pull-requests: read) using dorny/paths-filter@v3 with id f and the macos and smoke filters exactly as in the PRD (D11). It exposes outputs macos and smoke. Add job bare-host-macos (macos-latest, needs [build, bare-host-changes], timeout-minutes 30, if: github.event_name == 'push' || needs.bare-host-changes.outputs.macos == 'true', no continue-on-error) that runs /bin/bash scripts/bare-host-smoke.sh on the subject tarball and uploads bare-host-macos-logs with if: always(). Add a comment naming D10 (a skipped job reports SKIPPED, which counts as passing) and the 5-concurrent-macOS-jobs limit. Push over SSH."
+        },
+        "items": [
+          {
+            "id": "ci-bare-host-macos.ac1",
+            "title": "Given the parsed ci.yml, when jobs[\"bare-host-changes\"] is inspected, then its paths-filter macos list contains src/dashboard/server/**, src/lib/**, src/cli/**, package.json, bun.lock, scripts/bare-host-smoke.sh and .github/workflows/ci.yml, and its smoke list contains only scripts/bare-host-smoke.sh",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-bare-host-macos.ac2",
+            "title": "Given the parsed ci.yml, when jobs[\"bare-host-macos\"] is inspected, then it runs on macos-latest, needs build and bare-host-changes, runs the script with /bin/bash, and its if is github.event_name == 'push' || needs.bare-host-changes.outputs.macos == 'true'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-bare-host-macos.ac3",
+            "title": "Given the PR head (which touches scripts/bare-host-smoke.sh), when CI completes, then the bare-host-macos check concludes SUCCESS and its artifact result.json has \"pass\": true and \"os\": \"darwin\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-known-bad-canary",
+        "title": "Add the v0.81.0 known-bad canary job",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T04:46:05.621Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5176",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"require('yaml').parse(require('fs').readFileSync('.github/workflows/ci.yml','utf8'))\"",
+            "gh pr checks"
+          ],
+          "expected_outputs": [
+            "ci.yml parses",
+            "bare-host-macos-known-bad concludes SUCCESS on the PR with the tmux line and an over-budget rate in its log"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-8. Add job bare-host-macos-known-bad (macos-latest, needs bare-host-changes, timeout-minutes 30, if: needs.bare-host-changes.outputs.smoke == 'true'). The smoke step (id smoke, continue-on-error: true) runs /bin/bash scripts/bare-host-smoke.sh --version 0.81.0 --work-dir \"$RUNNER_TEMP/known-bad\". Then the node assertion step from the PRD verbatim fails the job on a setup error, on a pass, when no forbidden-tool line matches /tmux/i, or when idle.net is not above idle.budget. Upload logs with if: always(). Record the measured v0.81.0 rate in the PR body. Push over SSH."
+        },
+        "items": [
+          {
+            "id": "ci-known-bad-canary.ac1",
+            "title": "Given the parsed ci.yml, when jobs[\"bare-host-macos-known-bad\"] is inspected, then it runs on macos-latest, runs the script with --version 0.81.0, and its if reads needs.bare-host-changes.outputs.smoke == 'true'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-known-bad-canary.ac2",
+            "title": "Given result.json from a v0.81.0 run, when the assertion step runs, then it exits non-zero on setupError, on pass: true, when no forbiddenToolLines entry matches /tmux/i, or when idle.net <= idle.budget",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-known-bad-canary.ac3",
+            "title": "Given the PR head, when CI completes, then the bare-host-macos-known-bad check concludes SUCCESS and its log prints \"detected: pan up tmux failure, idle net <n>\" with n above the macOS budget",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "budget-calibration",
+        "title": "Calibrate per-OS idle budgets from measured CI runs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T04:46:05.621Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5176",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/bare-host-smoke.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "gh run download <run-id> -n bare-host-macos-logs",
+            "gh run download <run-id> -n bare-host-linux-logs",
+            "bash -n scripts/bare-host-smoke.sh"
+          ],
+          "expected_outputs": [
+            "at least two idle.net samples per OS collected",
+            "IDLE_BUDGET_MACOS and IDLE_BUDGET_LINUX set by the D14 rule"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implementation checkpoint (PRD WI-9, D14). Collect idle.net from result.json in at least two green runs per OS on this PR (re-run the job for a second sample). Set IDLE_BUDGET_MACOS and IDLE_BUDGET_LINUX each to max(10, min(30, 3 x highest sample)), with a comment listing the samples and the date. Fallback: a sample above 30 on either OS is a D9 finding (fix inline if <= 20 lines with a ledger regression test, else file an issue and pan tell flywheel-orchestrator). Never set a budget above 30. Confirm the next CI run is green and the known-bad canary still detects v0.81.0."
+        },
+        "items": [
+          {
+            "id": "budget-calibration.ac1",
+            "title": "Given at least two idle.net samples per OS, when the budgets are set, then IDLE_BUDGET_MACOS and IDLE_BUDGET_LINUX each equal max(10, min(30, 3 x highest sample)) and neither exceeds 30",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "budget-calibration.ac2",
+            "title": "The comment above IDLE_BUDGET_MACOS and IDLE_BUDGET_LINUX contains every idle.net sample used per OS and the calibration date",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "budget-calibration.ac3",
+            "title": "Given the calibrated budgets, when CI re-runs on the PR head, then bare-host-linux, bare-host-macos and bare-host-macos-known-bad all conclude SUCCESS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "release-macos-gate",
+        "title": "Gate release.yml publish on the macOS smoke of the exact core tarball",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T04:46:05.621Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "infra",
+          "issueLabel": "pan-5176",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "docs-release-gates"
+          ],
+          "files_scope": [
+            ".github/workflows/release.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const y=require('yaml').parse(require('fs').readFileSync('.github/workflows/release.yml','utf8'));const j=y.jobs;if(!j.npm.needs.includes('bare-host-macos')||!j.npm.needs.includes('pack'))process.exit(1);if(j['bare-host-macos'].needs!=='pack'&&!(Array.isArray(j['bare-host-macos'].needs)&&j['bare-host-macos'].needs.includes('pack')))process.exit(1);if(JSON.stringify(j.pack.steps).includes('npm publish'))process.exit(1)\""
+          ],
+          "expected_outputs": [
+            "the node structure check exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15",
+            "NFR-4",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "Edits only .github/workflows/release.yml, which no other item touches; it depends on the script by path only."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-10 and D13. Rename the current npm job to pack. Remove its publish steps and npm-11 install, and keep build -> PostHog sourcemaps -> Playwright -> full test -> Test CLI in that order. Then npm pack --ignore-scripts and upload artifact release-core-tarball. The pack must come after the sourcemaps step, because posthog-cli inject rewrites dist. Add job bare-host-macos (needs pack, macos-latest, timeout 30) running /bin/bash scripts/bare-host-smoke.sh on that tarball, uploading logs with if: always(). Add a new npm job (needs [classify, pack, bare-host-macos]): checkout, Node 22 without registry-url, npm 11, download the tarball, publish it with npm publish \"$TGZ\" --ignore-scripts --provenance --access public (--tag for non-latest). Keep the retry-safe npm view skip, reading name and version from the tarball's package/package.json. Then Bun, install, build, and the unchanged contracts and desktop publish steps. Leave the desktop and release jobs unchanged. Push over SSH. Record in the PR body that the first release tag after merge is the proof of tarball publish with provenance, with the extracted-directory fallback from the PRD hazards."
+        },
+        "items": [
+          {
+            "id": "release-macos-gate.ac1",
+            "title": "Given the parsed release.yml, when jobs.npm is inspected, then its needs include classify, pack and bare-host-macos, and its core publish step runs npm publish on the downloaded tarball path with --provenance and keeps the npm view retry-safe skip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "release-macos-gate.ac2",
+            "title": "Given the parsed release.yml, when jobs.pack is inspected, then no step contains npm publish, and the npm pack step comes after both the PostHog sourcemaps step and the full-suite test step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "release-macos-gate.ac3",
+            "title": "Given the parsed release.yml, when jobs[\"bare-host-macos\"] is inspected, then it needs pack, runs on macos-latest, and runs /bin/bash scripts/bare-host-smoke.sh --tarball on the release-core-tarball artifact",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "release-macos-gate.ac4",
+            "title": "Given the parsed release.yml, when jobs.release is inspected, then its needs are still classify, npm and desktop, so a failed smoke prevents the GitHub Release",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-release-gates",
+        "title": "Document the bare-host smoke, CI jobs and release gate, and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T04:46:05.621Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5176",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/RELEASING.md",
+            "docs/PIPELINE-GATES.md",
+            "changelog.d/pan-5176.md",
+            ".overdeck/context/codebase/conventions.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'Bare-host smoke (PAN-5176)' docs/RELEASING.md",
+            "grep -c 'Bare-host checks (PAN-5176)' docs/PIPELINE-GATES.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "each grep prints at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-11. In docs/RELEASING.md: rewrite the Stable and Canary bullet lists under '## Workflow behavior' to the new job order, with the sentence that a failed macOS bare-host smoke publishes nothing. Add '## Bare-host smoke (PAN-5176)' (what it checks, the six-entry PATH, the calibrated per-OS budgets and their samples, the local command, the port refusal, the optional rig, how to read result.json). Add troubleshooting '### The release stopped at `bare-host-macos`'. In docs/PIPELINE-GATES.md under '## The merge gate': add '### Bare-host checks (PAN-5176)' (the three jobs, when each runs, any-failing-check blocking via pr-facts.ts, SKIPPED passes, no GitHub branch protection on main). Add changelog.d/pan-5176.md with the PRD's #### Improved bullet. In .overdeck/context/codebase/conventions.md '## Testing', add the spawn-ledger bullet and the bare-host jobs bullet, leaving last-verified unchanged. Use no em dashes."
+        },
+        "items": [
+          {
+            "id": "docs-release-gates.ac1",
+            "title": "docs/RELEASING.md contains a \"## Bare-host smoke (PAN-5176)\" section that names scripts/bare-host-smoke.sh, the calibrated IDLE_BUDGET_MACOS and IDLE_BUDGET_LINUX values, and the refusal when ports 3010, 3011, 3012 or 8317 are in use",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-release-gates.ac2",
+            "title": "The docs/RELEASING.md Workflow behavior lists show the macOS bare-host smoke between pack and publish, and state that a failed smoke publishes nothing and creates no GitHub Release",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-release-gates.ac3",
+            "title": "docs/PIPELINE-GATES.md contains \"### Bare-host checks (PAN-5176)\", which names bare-host-linux, bare-host-macos and bare-host-macos-known-bad and states that a failing one blocks merge while a SKIPPED one passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-release-gates.ac4",
+            "title": "changelog.d/pan-5176.md has exactly one #### Improved heading with one bullet linking issue 5176, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-release-gates.ac5",
+            "title": "No line added by this item in docs/RELEASING.md, docs/PIPELINE-GATES.md or changelog.d/pan-5176.md contains an em dash",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "spawn-ledger-helper",
+        "to": "idle-poller-budget-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-ledger-helper",
+        "to": "darwin-platform-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-ledger-helper",
+        "to": "herdr-conversation-poll-test",
+        "type": "blocks"
+      },
+      {
+        "from": "bare-host-smoke-script",
+        "to": "ci-bare-host-linux",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-bare-host-linux",
+        "to": "ci-bare-host-macos",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-bare-host-macos",
+        "to": "ci-known-bad-canary",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-bare-host-linux",
+        "to": "budget-calibration",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-bare-host-macos",
+        "to": "budget-calibration",
+        "type": "blocks"
+      },
+      {
+        "from": "bare-host-smoke-script",
+        "to": "release-macos-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "budget-calibration",
+        "to": "docs-release-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "release-macos-gate",
+        "to": "docs-release-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-known-bad-canary",
+        "to": "docs-release-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "bare-host-smoke-script",
+        "to": "budget-calibration",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-bare-host-linux",
+        "to": "ci-known-bad-canary",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

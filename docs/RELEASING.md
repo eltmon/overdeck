@@ -162,24 +162,45 @@ The GitHub release workflow distinguishes stable vs canary tags.
 ### Stable tags
 
 For tags like `v0.7.1` the workflow will:
-- install dependencies
-- build the project
-- smoke-test the CLI
-- publish to npm `latest`
+- install dependencies and build the project
+- upload the dashboard sourcemaps to PostHog
+- run the full test suite and smoke-test the CLI
+- pack `@overdeck/core` into one tarball (job `pack`)
+- install that exact tarball on a bare macOS host and run the bare-host smoke (job `bare-host-macos`)
+- publish that tarball to npm `latest`, then build and publish `@overdeck/contracts` and `@overdeck/desktop` (job `npm`)
 - build the Linux desktop app
 - generate a structured release body from git history
 - create a normal GitHub Release
 
 ### Canary tags
 
-For tags like `v0.8.0-canary.1` the workflow will:
-- install dependencies
-- build the project
-- smoke-test the CLI
-- publish to npm with `--tag canary`
-- build the Linux desktop app
-- generate a structured release body from git history
-- create a GitHub prerelease
+For tags like `v0.8.0-canary.1` the workflow runs the same steps, except that it publishes to npm with `--tag canary` and creates a GitHub prerelease.
+
+If the macOS bare-host smoke fails, nothing is published and no GitHub Release is created. `npm` needs `bare-host-macos`, and the `release` job needs `npm`.
+
+## Bare-host smoke (PAN-5176)
+
+`scripts/bare-host-smoke.sh` installs `@overdeck/core` the way a user's machine gets it, on a host that has Node, git and the OS's own system directories, and none of `docker`, `tmux`, `systemctl`, `journalctl` or `brew` on `PATH`. CI runs it on every PR (`bare-host-linux`), on relevant PRs and every CI-triggering push to `main` (`bare-host-macos`), and the release runs it on the tarball it is about to publish.
+
+It checks three things:
+
+1. **`pan up --no-resume --no-open --detach`** exits 0, passes `/api/health`, and prints no line that shows it trying to install, or failing on, a tool the Herdr backend does not need.
+2. **The idle dashboard** stays within its budget per 30 s window. On Linux the measure is new PIDs, net of a baseline window with no Overdeck process. On macOS it is the traced spawn cost: the `child_process` calls the dashboard makes, plus 5 for each call that fails to spawn, because macOS makes one try per `PATH` entry. A hosted macOS runner's own process churn moves the baseline by hundreds of PIDs per window, so the PID net is reported there but does not decide.
+3. **No `spawn <tool> ENOENT` line repeats** in the logs.
+
+Every child process runs under `env -i` with an isolated `HOME` and a fixed six-entry `PATH`: Node, Herdr, and the four system directories (on Linux, mirrors of them without the denied tools). The script never passes `CI`, so Herdr setup runs as it does on a user's host.
+
+**Budgets.** `IDLE_BUDGET_MACOS=30` and `IDLE_BUDGET_LINUX=30`, set by the rule `max(10, min(30, 3 x highest sample))` and never above 30. Calibration on 2026-11-13: macOS traced cost 25 on six runs; Linux PID net 10, 5, 6 and 8 on four runs. The known-bad `@overdeck/core@0.81.0` scores a traced cost of 126 on the same macOS runner, and the `bare-host-macos-known-bad` CI job keeps checking that the smoke still fails it.
+
+**Run it locally.** It refuses (exit 2) when any of ports 3010, 3011, 3012 or 8317 has a listener, because `pan up` and `pan down` stop whatever owns the dashboard ports. Stop your own dashboard first, then from the repo root:
+
+```bash
+mkdir -p .tmp/smoke && bash scripts/bare-host-smoke.sh --tarball ".tmp/smoke/$(npm pack --ignore-scripts --pack-destination .tmp/smoke | tail -1)" --work-dir "$PWD/.tmp/smoke/run1"
+```
+
+`--work-dir` must not exist or must be empty, and the script deletes nothing. A run on the Mac rig is optional; CI is the gate.
+
+**Read `result.json`.** It is written to `--work-dir` (or `--out`) and uploaded as the job's logs artifact. `pass` is the verdict. `panUp.forbiddenToolLines` lists the offending `pan up` lines. `idle.rule` says which measure decided (`traced-cost` or `pid-net`), `idle.value` is the number compared with `idle.budget`, and `idle.spawns.top` names the programs the dashboard spawned in the idle window, with their failures. `setupError` is set when the run could not measure at all (exit 2). The script exits 0 on pass and 1 when a check failed.
 
 ## Publishing to npm
 
@@ -276,6 +297,10 @@ Trusted Publishing must be configured per package, and that requires the package
 ### `npm install -g @overdeck/core` fails with `EUNSUPPORTEDPROTOCOL` / `workspace:`
 
 A workspace package leaked into runtime `dependencies` as `workspace:*`. npm can't resolve that protocol. Move the offending dep to `devDependencies` (it's bundled into `dist` at build time) and cut a new patch release. See "Package hygiene the publish depends on".
+
+### The release stopped at `bare-host-macos`
+
+The macOS bare-host smoke failed on the tarball the release was about to publish, so nothing went to npm and no GitHub Release exists. Download the `bare-host-macos-release-logs` artifact from the run and read `result.json` (see "Bare-host smoke (PAN-5176)"): `panUp.forbiddenToolLines` for a `pan up` that needs a missing tool, `idle.spawns.top` for the program the idle dashboard spawns too often. Fix it on `main`, then cut the next version through `pan release stable`. Never publish by hand to get around the gate.
 
 ### `pan release check` fails tests on the no-loss matrix
 
