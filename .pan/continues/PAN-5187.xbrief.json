@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5187",
   "created": "2026-11-13T16:27:22.124Z",
-  "updated": "2026-11-13T17:22:57.879Z",
+  "updated": "2026-11-13T18:14:30.860Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,7 +134,7 @@
       "doneAt": "2026-11-13T16:53:39.234Z"
     },
     "f-preview-open": {
-      "status": "blocked"
+      "status": "pending"
     },
     "f-code-pane-shell": {
       "status": "blocked"
