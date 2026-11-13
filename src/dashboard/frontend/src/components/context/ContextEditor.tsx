@@ -1,11 +1,8 @@
-import Editor, { loader } from '@monaco-editor/react';
-import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js';
+import Editor from '@monaco-editor/react';
 import 'monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js';
-import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+import { ensureMonaco } from '../../lib/monaco-setup';
 
-// This local dashboard must not depend on a public CDN to open its editor.
-self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
-loader.config({ monaco });
+ensureMonaco();
 
 interface ContextEditorProps {
   value: string;
