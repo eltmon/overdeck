@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5176",
   "created": "2026-11-13T05:00:59.712Z",
-  "updated": "2026-11-13T05:48:13.192Z",
+  "updated": "2026-11-13T05:48:19.898Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -168,6 +168,11 @@
     "ci-bare-host-linux.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T05:48:13.192Z"
+    },
+    "ci-bare-host-macos": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5176",
+      "claimedAt": "2026-11-13T05:48:19.898Z"
     }
   },
   "feedback": [
