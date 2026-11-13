@@ -120,6 +120,8 @@ beforeEach(async () => {
   for (const fn of Object.values(harness.liveActivity)) fn.mockClear();
   for (const fn of Object.values(harness.appearance)) fn.mockClear();
   sessionStorage.clear();
+  // The logo sting has its own cases (PAN-5208); keep it out of the rest.
+  sessionStorage.setItem('overdeck.logoSting.played', '1');
   localStorage.clear();
   useShellStore.setState({ account: null, machines: [] });
   await writeAccount({ token: 'odd_x', deviceId: 'd', label: 'Pixel' });
@@ -131,6 +133,22 @@ beforeEach(async () => {
 afterEach(() => {
   cleanup();
   history.replaceState(null, '', '/');
+});
+
+describe('ShellApp logo sting (PAN-5208)', () => {
+  it('plays on the first render of a fresh app process', async () => {
+    sessionStorage.clear();
+    const { container } = render(<ShellApp navigate={() => undefined} />);
+    expect(container.querySelector('[data-component="logo-sting"]')).not.toBeNull();
+    expect(sessionStorage.getItem('overdeck.logoSting.played')).toBe('1');
+    await screen.findByText('This phone was removed from desk. Pair again.');
+  });
+
+  it('does not play again once this process has played it', async () => {
+    const { container } = render(<ShellApp navigate={() => undefined} />);
+    expect(container.querySelector('[data-component="logo-sting"]')).toBeNull();
+    await screen.findByText('This phone was removed from desk. Pair again.');
+  });
 });
 
 describe('ShellApp machine view', () => {

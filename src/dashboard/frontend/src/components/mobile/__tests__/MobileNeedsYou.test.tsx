@@ -52,6 +52,31 @@ describe('MobileNeedsYou', () => {
     vi.unstubAllGlobals();
   });
 
+  it('PAN-5208: shows the empty state with its title', () => {
+    const { container } = render(<MobileNeedsYou subjectId={null} />);
+    const empty = container.querySelector('[data-component="mobile-empty-state"]');
+    expect(empty?.textContent).toContain('Nothing needs you.');
+  });
+
+  it('PAN-5208: marks only blocking rows with the Blocking dot', () => {
+    decisions = [
+      auq('blocker', 'agent', 'tu-b', ['Yes']),
+      auq('waiter', 'agent', 'tu-w', ['Yes'], { blocking: false }),
+    ];
+    const { container } = render(<MobileNeedsYou subjectId={null} />);
+    const blocker = container.querySelector('[data-subject-id="blocker"] > button');
+    const waiter = container.querySelector('[data-subject-id="waiter"] > button');
+    expect(blocker?.textContent).toContain('Blocking');
+    expect(waiter?.textContent).not.toContain('Blocking');
+  });
+
+  it('PAN-5208: names the machine in the secondary line', () => {
+    decisions = [auq('remote', 'conversation', 'tu-r', ['Yes'], { machineLabel: 'desk' })];
+    const { container } = render(<MobileNeedsYou subjectId={null} />);
+    const row = container.querySelector('[data-subject-id="remote"] > button');
+    expect(row?.textContent).toContain('on desk');
+  });
+
   it('shows the decision context under the question', () => {
     decisions = [auq('a1', 'agent', 'operator-decision:q1', ['Yes', 'No'], {
       pendingAskUserQuestion: {

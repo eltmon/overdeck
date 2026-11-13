@@ -49,6 +49,28 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('MachinesScreen', () => {
+  it('PAN-5208: shows the empty state for an online directory with no machines', () => {
+    render(<MachinesScreen client={fakeClient('online', [])} paired={[]} onPair={noop} onSettings={noop} onSignedOut={noop} />);
+    expect(screen.getByText('No machines yet.')).toBeTruthy();
+    expect(screen.getByText('Pair a machine to see it here.')).toBeTruthy();
+  });
+
+  it('PAN-5208: renders the watermark outside the list and keeps the header button names', () => {
+    const onPair = vi.fn();
+    const onSettings = vi.fn();
+    const { container } = render(
+      <MachinesScreen client={fakeClient('online', [machine('e-1', 'desk')])} paired={[]} onPair={onPair} onSettings={onSettings} onSignedOut={noop} />,
+    );
+    const watermark = container.querySelector('[data-component="logo-watermark"]');
+    expect(watermark).not.toBeNull();
+    expect(container.querySelector('ul')?.contains(watermark)).toBe(false);
+    expect(screen.queryByText('No machines yet.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Pair a machine' }));
+    expect(onPair).toHaveBeenCalledWith(null);
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    expect(onSettings).toHaveBeenCalledTimes(1);
+  });
+
   it('lists paired machines first, then by label', () => {
     const client = fakeClient('online', [machine('e-zed', 'zed'), machine('e-alpha', 'alpha'), machine('e-mid', 'mid')]);
     render(<MachinesScreen client={client} paired={[paired('e-zed', 'zed')]} onPair={noop} onSettings={noop} onSignedOut={noop} />);

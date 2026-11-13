@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { OverdeckLockup } from '../../../../src/dashboard/frontend/src/components/mobile/brand';
 import type { SignedOutNotice } from './accountDeletion';
 import { DELETION_STARTED_MESSAGE, FINISH_ON_WEB_MESSAGE } from './accountDeletionCopy';
 
@@ -34,7 +35,9 @@ export function SignInScreen({ onSignIn, error, notice, onOpenAccountPage }: Sig
       data-component="sign-in-screen"
       className="flex flex-1 flex-col gap-4 px-4 pb-[env(safe-area-inset-bottom)] pt-[calc(env(safe-area-inset-top)+2rem)]"
     >
-      <h1 className="text-xl font-medium text-foreground">Overdeck</h1>
+      <h1 className="flex justify-center py-6">
+        <OverdeckLockup className="h-8" />
+      </h1>
       <p className="text-sm text-muted-foreground">Sign in with GitHub through overdeck.ai to reach your machines.</p>
       {notice ? (
         <div className="flex flex-col gap-2">

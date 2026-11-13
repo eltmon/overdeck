@@ -217,6 +217,55 @@ describe('useTheme', () => {
     });
   });
 
+  describe('setLocalTheme (PAN-5208)', () => {
+    it('ac1: applies the theme without writing storage or syncing to the server', () => {
+      mockLocalStorage['overdeck.ui.theme'] = 'dark';
+      mockClassList.add('dark');
+      const { result } = renderHook(() => useTheme());
+
+      act(() => {
+        result.current.setLocalTheme('light');
+      });
+
+      expect(document.documentElement.classList.contains('dark')).toBe(false);
+      expect(mockLocalStorage['overdeck.ui.theme']).toBe('dark');
+      expect(localStorage.setItem).not.toHaveBeenCalled();
+      expect(fetchControl.fetchMock).not.toHaveBeenCalled();
+      expect(result.current.resolvedTheme).toBe('light');
+    });
+  });
+
+  describe('module load on the /m web shell (PAN-5208)', () => {
+    afterEach(() => {
+      window.history.replaceState({}, '', '/');
+    });
+
+    it('ac2: on /m it neither applies the desktop theme nor syncs it, and starts from the appearance', async () => {
+      mockLocalStorage['overdeck.ui.theme'] = 'dark';
+      mockLocalStorage['overdeck.appearance'] = 'light';
+      window.history.replaceState({}, '', '/m');
+
+      vi.resetModules();
+      const mobile = await import('../useTheme');
+
+      expect(fetchControl.fetchMock).not.toHaveBeenCalled();
+      expect(mockClassList.has('dark')).toBe(false);
+      expect(mobile.useTheme.getState().resolvedTheme).toBe('light');
+    });
+
+    it('ac2: on / the load sync still fires once', async () => {
+      mockLocalStorage['overdeck.ui.theme'] = 'dark';
+      window.history.replaceState({}, '', '/');
+
+      vi.resetModules();
+      await import('../useTheme');
+
+      expect(fetchControl.fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchControl.fetchMock.mock.calls[0]?.[0]).toBe('/api/settings/ui-theme');
+      expect(mockClassList.has('dark')).toBe(true);
+    });
+  });
+
   describe('native shell', () => {
     afterEach(() => {
       delete (globalThis as { __OVERDECK_NATIVE__?: boolean }).__OVERDECK_NATIVE__;

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useConnectionState } from '../../../lib/connectionState';
+import { formatRelativeTime } from '../../../lib/formatRelativeTime';
 import { useDashboardStore } from '../../../lib/store';
 import type { DerivedIssueState, Issue } from '../../../types';
 import { MobilePipeline } from '../MobilePipeline';
@@ -38,8 +39,26 @@ describe('MobilePipeline', () => {
 
   it('renders "No active issues." when hasSnapshot is true and there are no active issues', () => {
     useConnectionState.setState({ hasSnapshot: true });
-    render(<MobilePipeline onOpen={vi.fn()} />);
+    const { container } = render(<MobilePipeline onOpen={vi.fn()} />);
     expect(screen.getByText('No active issues.')).toBeInTheDocument();
+    expect(container.querySelector('[data-component="mobile-empty-state"]')?.textContent).toContain('No active issues.');
+  });
+
+  it('PAN-5208: shows the project name and the age in the row', () => {
+    useConnectionState.setState({ hasSnapshot: true });
+    const updatedAt = new Date(Date.now() - 5 * 60_000).toISOString();
+    useDashboardStore.setState({
+      issuesRaw: [issue({ identifier: 'PAN-30', title: 'With project', updatedAt, project: { id: 'p', name: 'overdeck', color: '' } })],
+      derivedIssueStateByIssueId: {
+        'PAN-30': { issueId: 'PAN-30', state: 'working' },
+      } satisfies Record<string, DerivedIssueState>,
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    render(<MobilePipeline onOpen={vi.fn()} />);
+    const row = document.querySelector('[data-issue-id="PAN-30"]') as HTMLElement;
+    expect(row.textContent).toContain('overdeck');
+    expect(within(row).getByText(formatRelativeTime(updatedAt, new Date()))).toBeInTheDocument();
   });
 
   it('renders non-empty board phases in order and omits the closed issue and the empty ready section', () => {

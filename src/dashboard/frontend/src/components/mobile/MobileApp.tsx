@@ -21,12 +21,16 @@
  *     and scope, so the two registrations stay idempotent.
  */
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { Inbox, ListOrdered, type LucideIcon, MessageSquare, Settings } from 'lucide-react';
 import { EventRouter } from '../EventRouter';
 import { useConnectionState } from '../../lib/connectionState';
 import { isNativeShell } from '../../lib/nativeShell';
-import { TurnOnNotificationsButton } from '../push/TurnOnNotificationsButton';
 import { MobileNeedsYou } from './MobileNeedsYou';
 import { MobileConversations } from './MobileConversations';
+import { LogoWatermark, MobileScreenHeader, OverdeckLockup } from './brand';
+import { LogoSting } from './LogoSting';
+import { MobileHintsBanner, MobileSettingsSheet, useInstallPrompt } from './MobileChrome';
+import { useMobileAppearance } from './useMobileAppearance';
 import { MobileIssueSheet } from './MobileIssueSheet';
 import { MobilePairScreen } from './MobilePairScreen';
 import { MobilePipeline } from './MobilePipeline';
@@ -91,76 +95,30 @@ function useServiceWorkerRegistration(): void {
   }, []);
 }
 
-/** The Chromium install event; not in the DOM lib types. */
-interface BeforeInstallPromptEvent extends Event {
-  prompt(): Promise<void>;
-}
-
-function isStandalone(): boolean {
-  const iosStandalone = (navigator as Navigator & { standalone?: boolean }).standalone === true;
-  return iosStandalone || (typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches);
-}
-
-function isIosSafari(): boolean {
-  const ua = navigator.userAgent;
-  const ios = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
-  // Other iOS browsers (CriOS, FxiOS, EdgiOS) cannot add a web app to the home screen.
-  return ios && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
-}
-
-function InstallAffordance() {
-  const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
-  const [standalone] = useState(isStandalone);
-  const [iosSafari] = useState(isIosSafari);
-
-  useEffect(() => {
-    const onBeforeInstall = (event: Event) => {
-      event.preventDefault();
-      setInstallEvent(event as BeforeInstallPromptEvent);
-    };
-    window.addEventListener('beforeinstallprompt', onBeforeInstall);
-    return () => window.removeEventListener('beforeinstallprompt', onBeforeInstall);
-  }, []);
-
-  const install = useCallback(() => {
-    if (!installEvent) return;
-    setInstallEvent(null);
-    void installEvent.prompt();
-  }, [installEvent]);
-
-  if (standalone) return null;
-  if (installEvent) {
-    return (
-      <button
-        type="button"
-        onClick={install}
-        className="min-h-11 min-w-11 rounded-sm border border-border px-3 text-sm font-medium text-foreground"
-      >
-        Install app
-      </button>
-    );
-  }
-  if (iosSafari) {
-    return <p className="text-xs text-muted-foreground">To install, tap Share, then Add to Home Screen</p>;
-  }
-  return null;
-}
-
-const TABS: ReadonlyArray<{ tab: MobileTab; label: string }> = [
-  { tab: 'needs-you', label: 'Needs you' },
-  { tab: 'conversations', label: 'Conversations' },
-  { tab: 'pipeline', label: 'Pipeline' },
+const TABS: ReadonlyArray<{ tab: MobileTab; label: string; icon: LucideIcon }> = [
+  { tab: 'needs-you', label: 'Needs you', icon: Inbox },
+  { tab: 'conversations', label: 'Conversations', icon: MessageSquare },
+  { tab: 'pipeline', label: 'Pipeline', icon: ListOrdered },
 ];
 
 /**
  * `headerSlot`: in the phone app (PAN-4837 D-9) the header renders it in place
- * of the install and notifications controls; the PWA ignores it.
+ * of the Settings button (PAN-5208 D-7); the PWA ignores it.
  */
 export default function MobileApp({ headerSlot }: { headerSlot?: ReactNode } = {}) {
   const native = isNativeShell();
   const route = useMobileRoute();
   const sessionAuthFailed = useConnectionState((s) => s.sessionAuthFailed);
+  const hasSnapshot = useConnectionState((s) => s.hasSnapshot);
+  // PAN-5208 D-10: a deep-link open (read once, from the first route) skips the logo sting.
+  const [initialDeepLink] = useState(() => route.subjectId !== null || route.conversationId !== null || route.issueId !== null);
   useServiceWorkerRegistration();
+  // The /m web shell's System/Light/Dark (PAN-5208 D-6); a no-op in the phone app.
+  useMobileAppearance();
+  // Once, from the first render: the install event fires only near page load.
+  const installPrompt = useInstallPrompt();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
   const openConversation = useCallback((id: string) => {
     navigateMobile({ tab: 'conversations', subjectId: null, conversationId: id, issueId: null });
@@ -189,51 +147,71 @@ export default function MobileApp({ headerSlot }: { headerSlot?: ReactNode } = {
       ) : (
         <>
           {!fullScreen && (
-            <header className="flex min-h-11 items-center justify-between gap-3 border-b border-border px-4 pt-[env(safe-area-inset-top)]">
-              <h1 className="text-base font-medium">Overdeck</h1>
-              {/* PAN-2354's control, sized up to the phone's 44 px tap target from here. */}
-              <div className="flex items-center gap-2 [&_button]:min-h-11 [&_button]:min-w-11">
-                {native ? headerSlot : <><InstallAffordance /><TurnOnNotificationsButton compact /></>}
-              </div>
-            </header>
+            <MobileScreenHeader
+              leading={<OverdeckLockup className="h-6" />}
+              trailing={
+                native ? (
+                  // The phone app's machine button, sized up to the phone's 44 px tap target.
+                  <div className="flex items-center gap-2 [&_button]:min-h-11 [&_button]:min-w-11">{headerSlot}</div>
+                ) : (
+                  <button
+                    type="button"
+                    aria-label="Settings"
+                    onClick={() => setSettingsOpen(true)}
+                    className="-mr-2 flex min-h-11 min-w-11 items-center justify-center text-muted-foreground active:text-foreground"
+                  >
+                    <Settings className="h-5 w-5" aria-hidden />
+                  </button>
+                )
+              }
+            />
           )}
-          <main className="min-h-0 flex-1 overflow-y-auto">
-            {route.tab === 'needs-you' ? (
-              <MobileNeedsYou subjectId={route.subjectId} />
-            ) : route.tab === 'conversations' ? (
-              <MobileConversations
-                conversationId={route.conversationId}
-                onOpen={openConversation}
-                onBack={closeConversation}
-              />
-            ) : route.issueId ? (
-              <MobileIssueSheet issueId={route.issueId} onBack={closeIssue} />
-            ) : (
-              <MobilePipeline onOpen={openIssue} />
-            )}
-          </main>
+          {!native && !fullScreen && <MobileHintsBanner prompt={installPrompt} />}
+          {/* D-14: the watermark sits behind the scroller; main stays the scroll container (MobileNeedsYou scrolls via closest('main')). */}
+          <div className="relative min-h-0 flex-1">
+            {!fullScreen && <LogoWatermark />}
+            <main className="relative h-full overflow-y-auto">
+              {route.tab === 'needs-you' ? (
+                <MobileNeedsYou subjectId={route.subjectId} />
+              ) : route.tab === 'conversations' ? (
+                <MobileConversations
+                  conversationId={route.conversationId}
+                  onOpen={openConversation}
+                  onBack={closeConversation}
+                />
+              ) : route.issueId ? (
+                <MobileIssueSheet issueId={route.issueId} onBack={closeIssue} />
+              ) : (
+                <MobilePipeline onOpen={openIssue} />
+              )}
+            </main>
+          </div>
           {!fullScreen && (
             <nav
               aria-label="Phone sections"
-              className="flex border-t border-border pb-[env(safe-area-inset-bottom)]"
+              className="flex shrink-0 border-t border-border bg-card pb-[env(safe-area-inset-bottom)]"
             >
-              {TABS.map(({ tab, label }) => (
+              {TABS.map(({ tab, label, icon: Icon }) => (
                 <button
                   key={tab}
                   type="button"
                   aria-current={route.tab === tab ? 'page' : undefined}
                   onClick={() => navigateMobile({ tab, subjectId: null, conversationId: null, issueId: null })}
-                  className={`min-h-11 min-w-11 flex-1 text-sm ${
+                  className={`flex min-h-14 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] ${
                     route.tab === tab ? 'font-medium text-foreground' : 'text-muted-foreground'
                   }`}
                 >
+                  <Icon className="h-5 w-5" aria-hidden />
                   {label}
                 </button>
               ))}
             </nav>
           )}
+          {!native && <MobileSettingsSheet open={settingsOpen} onClose={closeSettings} prompt={installPrompt} />}
         </>
       )}
+      {/* PAN-5208 D-9: an overlay over the mounted app, never a gate. The phone app plays its own from ShellApp. */}
+      {!native && <LogoSting ready={sessionAuthFailed || hasSnapshot} skip={initialDeepLink} />}
     </div>
   );
 }

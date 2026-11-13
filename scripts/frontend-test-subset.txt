@@ -260,12 +260,17 @@ src/components/home/__tests__/useTypeToFocus.test.tsx
 src/components/issue-view/IssueHeaderTitle.test.tsx
 src/components/issue-view/useIssueRecord.test.tsx
 src/components/merge-train/__tests__/MergeTrainView.test.tsx
+src/components/mobile/__tests__/AppearanceChoice.test.tsx
+src/components/mobile/__tests__/LogoSting.test.tsx
 src/components/mobile/__tests__/MobileApp.test.tsx
+src/components/mobile/__tests__/MobileChrome.test.tsx
 src/components/mobile/__tests__/MobileConversations.test.tsx
 src/components/mobile/__tests__/MobileIssueSheet.test.tsx
 src/components/mobile/__tests__/MobileNeedsYou.test.tsx
 src/components/mobile/__tests__/MobilePipeline.test.tsx
+src/components/mobile/__tests__/brand.test.tsx
 src/components/mobile/__tests__/conversationGroups.test.ts
+src/components/mobile/__tests__/useMobileAppearance.test.ts
 src/components/newConversation/__tests__/ConversationSkillsField.test.tsx
 src/components/newConversation/__tests__/IssuePickerField.test.tsx
 src/components/newConversation/__tests__/MachineField.test.tsx
@@ -302,6 +307,8 @@ src/components/terminal/terminalControlFrames.test.ts
 src/components/workspace/new/__tests__/smartField.test.ts
 src/components/workspace/new/__tests__/useWorkspaceCreateIntent.test.ts
 src/hooks/__tests__/useColorTheme.test.ts
+src/hooks/__tests__/useTheme.test.ts
+src/lib/__tests__/appearance.test.ts
 src/lib/__tests__/bootRequests.test.ts
 src/lib/__tests__/citationFormat.test.ts
 src/lib/__tests__/colorThemeEditor.test.ts
