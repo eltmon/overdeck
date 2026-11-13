@@ -205,6 +205,24 @@ describe('ProjectHome', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6))
   })
 
+  it('opens Files on the project explorer root (PAN-5186)', () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({})))
+    const openPane = vi.fn()
+    render(<ProjectHome projectName="Overdeck" projectKey="overdeck" api={api({ openPane })} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Files' }))
+
+    expect(openPane).toHaveBeenCalledWith({ paneType: 'files', label: 'Files', explorerRootId: 'project:overdeck' })
+  })
+
+  it('renders no Files button without a project key', () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({})))
+    render(<ProjectHome projectName="No project" api={api()} />)
+
+    expect(screen.queryByRole('button', { name: 'Files' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Web' })).toBeInTheDocument()
+  })
+
   it('opens the main checkout of a registered project from its Home', () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({})))
     render(<ProjectHome projectName="Mind Your Now" projectKey="myn" api={api()} />)
