@@ -61,6 +61,10 @@ test('groups by project, starts collapsed, and + starts a conversation', async (
   const baseUrl = dashboard.baseUrl;
 
   const context = await browser.newContext(PHONE);
+  // PAN-5208: keep the once-per-session logo sting out of this spec's taps and screenshots.
+  await context.addInitScript(() => {
+    sessionStorage.setItem('overdeck.logoSting.played', '1');
+  });
   try {
     const page = await context.newPage();
 

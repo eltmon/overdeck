@@ -10,6 +10,12 @@
  * Screenshots land in test-results/pan-5208/<device>-<theme>-<tab>.png and are
  * copied into apps/mobile/acceptance/ for PAN-5208.md.
  *
+ * Three behavior checks follow: the logo sting plays once per tab session, it
+ * runs no animation under reduced motion, and the /m Settings sheet's
+ * appearance choice survives a reload without ever touching the desktop
+ * theme route (`PUT /api/settings/ui-theme`). Each test makes at most 3 page
+ * loads per context.
+ *
  * Seeding follows pan-4661-mobile-pipeline.spec.ts: an `addInitScript`-seeded
  * `pan-snapshot-cache-v1` entry fills the pipeline store before any WebSocket
  * bootstrap, and `/ws/rpc` is closed so a real, empty bootstrap never
@@ -116,17 +122,24 @@ const PROJECTS = [
   { key: 'beta', name: 'beta', path: '/tmp/beta' },
 ];
 
-async function installFixtures(page: Page, scheme: Scheme): Promise<void> {
+interface FixtureOptions {
+  /** Stored phone appearance; omitted leaves it unset (System). */
+  appearance?: Scheme;
+  /** Mark the logo sting as already played this session (default true). */
+  stingPlayed?: boolean;
+}
+
+async function installFixtures(page: Page, { appearance, stingPlayed = true }: FixtureOptions = {}): Promise<void> {
   const cacheEntry = { data: buildSnapshot(), timestamp: iso() };
   await page.addInitScript(
-    ({ entry, theme }) => {
+    ({ entry, theme, played }) => {
       localStorage.setItem('pan-snapshot-cache-v1', JSON.stringify(entry));
-      localStorage.setItem('overdeck.ui.theme', theme);
+      if (theme) localStorage.setItem('overdeck.appearance', theme);
       // Open the first project group so the Conversations shot shows rows.
       localStorage.setItem('pan-mobile-expanded-projects', JSON.stringify(['alpha']));
-      sessionStorage.setItem('overdeck.logoSting.played', '1');
+      if (played) sessionStorage.setItem('overdeck.logoSting.played', '1');
     },
-    { entry: cacheEntry, theme: scheme },
+    { entry: cacheEntry, theme: appearance ?? null, played: stingPlayed },
   );
 
   await page.route('**/api/conversations/pending-input', (route) => route.fulfill({ json: PENDING }));
@@ -144,7 +157,7 @@ async function captureDevice(browser: Browser, baseUrl: string, device: DeviceNa
     try {
       await context.grantPermissions(['notifications'], { origin: baseUrl });
       const page = await context.newPage();
-      await installFixtures(page, scheme);
+      await installFixtures(page, { appearance: scheme });
 
       pageLoads++;
       await page.goto(`${baseUrl}/m`, { waitUntil: 'domcontentloaded' });
@@ -184,4 +197,84 @@ test('iPhone 14 landing screens, light and dark', async ({ browser }) => {
 
 test('Pixel 7 landing screens, light and dark', async ({ browser }) => {
   await captureDevice(browser, dashboard.baseUrl, 'pixel7');
+});
+
+test('sting plays once per session', async ({ browser }) => {
+  const baseUrl = dashboard.baseUrl;
+  const context = await browser.newContext({ ...DEVICES.iphone14, colorScheme: 'dark', reducedMotion: 'no-preference' });
+  try {
+    const page = await context.newPage();
+    await installFixtures(page, { stingPlayed: false });
+
+    await page.goto(`${baseUrl}/m`, { waitUntil: 'domcontentloaded' });
+    const sting = page.locator('[data-component="logo-sting"]');
+    await expect(sting).toBeVisible({ timeout: 30_000 });
+    await expect(sting).toHaveCount(0, { timeout: 5_000 });
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-component="mobile-app"]')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Ship the phone shell').first()).toBeVisible({ timeout: 30_000 });
+    await expect(sting).toHaveCount(0);
+  } finally {
+    await context.close();
+  }
+});
+
+test('reduced motion shows no sting animation', async ({ browser }) => {
+  const baseUrl = dashboard.baseUrl;
+  const context = await browser.newContext({ ...DEVICES.iphone14, colorScheme: 'light', reducedMotion: 'reduce' });
+  try {
+    const page = await context.newPage();
+    await installFixtures(page, { stingPlayed: false });
+
+    await page.goto(`${baseUrl}/m`, { waitUntil: 'domcontentloaded' });
+    const sting = page.locator('[data-component="logo-sting"]');
+    await expect(sting).toBeVisible({ timeout: 30_000 });
+    // Other page animations (spinners) may run; none may target the sting.
+    const probe = await page.evaluate(() => {
+      const overlay = document.querySelector('[data-component="logo-sting"]');
+      const stingAnimations = document.getAnimations().filter((animation) => {
+        const target = (animation.effect as KeyframeEffect | null)?.target ?? null;
+        return overlay !== null && target !== null && overlay.contains(target);
+      });
+      return { overlayPresent: overlay !== null, stingAnimations: stingAnimations.length };
+    });
+    expect(probe.overlayPresent).toBe(true);
+    expect(probe.stingAnimations).toBe(0);
+    await expect(sting).toHaveCount(0, { timeout: 2_000 });
+  } finally {
+    await context.close();
+  }
+});
+
+test('appearance in /m', async ({ browser }) => {
+  const baseUrl = dashboard.baseUrl;
+  const context = await browser.newContext({ ...DEVICES.iphone14, colorScheme: 'light', reducedMotion: 'reduce' });
+  const requests: Array<{ method: string; url: string }> = [];
+  try {
+    const page = await context.newPage();
+    page.on('request', (request) => requests.push({ method: request.method(), url: request.url() }));
+    await installFixtures(page);
+
+    await page.goto(`${baseUrl}/m`, { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-component="mobile-app"]')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('html')).not.toHaveClass(/(^|\s)dark(\s|$)/);
+
+    await page.getByRole('button', { name: 'Settings', exact: true }).tap();
+    const sheet = page.getByRole('dialog', { name: 'Settings', exact: true });
+    await expect(sheet).toBeVisible();
+    await sheet.getByRole('radio', { name: 'Dark', exact: true }).tap();
+    await expect(page.locator('html')).toHaveClass(/(^|\s)dark(\s|$)/);
+    await page.screenshot({ path: `${SHOT_DIR}/iphone14-settings-sheet.png` });
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-component="mobile-app"]')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('html')).toHaveClass(/(^|\s)dark(\s|$)/);
+    expect(await page.evaluate(() => localStorage.getItem('overdeck.ui.theme'))).toBeNull();
+
+    const themePuts = requests.filter((r) => r.method === 'PUT' && new URL(r.url).pathname === '/api/settings/ui-theme');
+    expect(themePuts).toEqual([]);
+  } finally {
+    await context.close();
+  }
 });

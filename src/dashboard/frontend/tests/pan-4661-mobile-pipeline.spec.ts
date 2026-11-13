@@ -78,6 +78,10 @@ async function installFixtures(page: Page): Promise<void> {
 
 async function phoneContext(browser: Browser, baseUrl: string): Promise<BrowserContext> {
   const context = await browser.newContext({ ...PHONE });
+  // PAN-5208: keep the once-per-session logo sting out of this spec's taps and screenshots.
+  await context.addInitScript(() => {
+    sessionStorage.setItem('overdeck.logoSting.played', '1');
+  });
   await context.grantPermissions(['notifications'], { origin: baseUrl });
   return context;
 }
