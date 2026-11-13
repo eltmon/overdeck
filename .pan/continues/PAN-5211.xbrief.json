@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5211",
   "created": "2026-11-13T22:53:14.172Z",
-  "updated": "2026-11-13T23:11:11.540Z",
+  "updated": "2026-11-13T23:18:34.078Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -180,9 +180,26 @@
       "doneAt": "2026-11-13T23:11:03.881Z"
     },
     "wi8-offset-sequences": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5211",
-      "claimedAt": "2026-11-13T23:11:11.539Z"
+      "claimedAt": "2026-11-13T23:11:11.539Z",
+      "doneAt": "2026-11-13T23:18:34.077Z"
+    },
+    "wi8-offset-sequences.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:18:34.077Z"
+    },
+    "wi8-offset-sequences.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:18:34.077Z"
+    },
+    "wi8-offset-sequences.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:18:34.077Z"
+    },
+    "wi8-offset-sequences.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:18:34.077Z"
     }
   }
 }
