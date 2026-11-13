@@ -57,6 +57,10 @@ function seedProject(home: string): void {
     );
   }
 
+  // D-C5: a text file just under the 5 MiB editable limit (4.9 MiB).
+  const line = '// filler line for the 4.9 MiB save check, padded to a fixed width.......\n';
+  writeFileSync(path.join(fixture, 'big.ts'), line.repeat(Math.floor((4.9 * 1024 * 1024) / line.length)));
+
   writeFileSync(
     path.join(home, 'projects.yaml'),
     `projects:\n  ${DECK}:\n    name: ${DECK}\n    path: ${repo}\n    issue_prefix: UAT\n`,
@@ -178,6 +182,22 @@ test('an external change raises the banner on a dirty pane and reloads a clean o
   await expect(plain.locator('.view-lines')).toContainText('y from another process', { timeout: 1000 });
   await expect(banner).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('external-change-reloaded.png') });
+});
+
+test('a 4.9 MiB file saves through one WebSocket frame (D-C5)', async ({ page }) => {
+  const file = path.join(workspace, 'uat-fixture', 'big.ts');
+  const before = readFileSync(file, 'utf8').length;
+  await openDeck(page);
+  await treeItem(page, 'uat-fixture').click();
+  await treeItem(page, 'big.ts').dblclick();
+  const editor = page.locator('.monaco-editor').first();
+  await expect(editor.locator('.view-lines')).toContainText('filler line', { timeout: 30_000 });
+  await editor.locator('.view-lines').click();
+  await page.keyboard.press('Control+Home');
+  await page.keyboard.insertText('z');
+  await expect.poll(() => readFileSync(file, 'utf8').length, { timeout: 15_000 }).toBe(before + 1);
+  expect(readFileSync(file, 'utf8').startsWith('z')).toBe(true);
+  await expect(page.getByTestId('external-change-banner')).toHaveCount(0);
 });
 
 test('the Context page editor still mounts Monaco with the shared setup', async ({ page }) => {
