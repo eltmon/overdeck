@@ -2,7 +2,7 @@
 import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, readdir, readlink, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { Option } from 'effect';
@@ -173,10 +173,22 @@ describe('handleExplorerDownload', () => {
     expect(JSON.parse(await HttpServerResponse.toWeb(missingRoot).text())).toMatchObject({ code: 'ROOT_NOT_FOUND' });
   });
 
-  it('answers 404 for a missing file, a directory and the root itself', async () => {
+  it('answers 404 for a missing file', async () => {
     expect((await download('nope.txt')).status).toBe(404);
-    expect((await download('sub')).status).toBe(404);
-    expect((await download('')).status).toBe(404);
+  });
+
+  it('streams a directory as an attachment named <name>.tar.gz', async () => {
+    await writeFile(join(dir, 'sub', 'inner.txt'), 'inner');
+    const folder = await download('sub');
+    expect(folder.status).toBe(200);
+    expect(folder.headers.get('content-type')).toBe('application/gzip');
+    expect(folder.headers.get('content-disposition')).toMatch(/^attachment; filename="sub\.tar\.gz"/u);
+    expect(folder.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(folder.headers.get('content-security-policy')).toBe(DOWNLOAD_CSP);
+    expect(folder.headers.get('content-length')).toBeNull();
+
+    const whole = await download('');
+    expect(whole.headers.get('content-disposition')).toContain(`filename="${basename(dir)}.tar.gz"`);
   });
 
   it('closes the file handle when the client cancels the body mid-stream', async () => {

@@ -3,21 +3,25 @@
  *
  *   GET /api/explorer/download?root=<rootId>&path=<rel>&inline=0|1
  *     Streams a regular file's bytes with single-range support (D-3) and the
- *     hardened header policy from services/explorer/download-headers.ts.
+ *     hardened header policy from services/explorer/download-headers.ts, or a
+ *     folder as .tar.gz (services/explorer/folder-archive.ts).
  *
  * Paths resolve only through PAN-5185's resolveExplorerRoot + resolveInsideRoot
  * (FR-8). The route checks the dashboard credential itself before touching the
  * filesystem (FR-21). Handlers are exported so tests drive them directly.
  */
+import { spawn } from 'node:child_process';
 import { constants } from 'node:fs';
 import { open, stat } from 'node:fs/promises';
+import { basename } from 'node:path';
 
 import { Effect, Layer, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import { jsonResponse } from '../http-helpers.js';
 import { explorerError } from '../services/explorer/errors.js';
-import { downloadHeaders } from '../services/explorer/download-headers.js';
+import { DOWNLOAD_CSP, contentDisposition, downloadHeaders } from '../services/explorer/download-headers.js';
+import { archiveFolder } from '../services/explorer/folder-archive.js';
 import { explorerErrorResponse } from '../services/explorer/http-errors.js';
 import { resolveInsideRoot } from '../services/explorer/paths.js';
 import { resolveExplorerRoot } from '../services/explorer/roots.js';
@@ -27,9 +31,10 @@ import { httpHandler } from './http-handler.js';
 export interface ExplorerRouteDeps {
   resolveExplorerRoot: typeof resolveExplorerRoot;
   resolveInsideRoot: typeof resolveInsideRoot;
+  spawn: typeof spawn;
 }
 
-const defaultDeps: ExplorerRouteDeps = { resolveExplorerRoot, resolveInsideRoot };
+const defaultDeps: ExplorerRouteDeps = { resolveExplorerRoot, resolveInsideRoot, spawn };
 
 export type ParsedRange =
   | { kind: 'full' }
@@ -75,7 +80,7 @@ export async function handleExplorerDownload(
   const authError = rejectUnauthorizedDashboardRequest(request);
   if (authError) return authError;
 
-  const { resolveExplorerRoot: resolveRoot, resolveInsideRoot: resolveInside } = { ...defaultDeps, ...deps };
+  const { resolveExplorerRoot: resolveRoot, resolveInsideRoot: resolveInside, spawn: spawnTar } = { ...defaultDeps, ...deps };
   const params = new URL(request.url, 'http://localhost').searchParams;
   const rootId = params.get('root');
   if (!rootId) return jsonResponse({ error: 'root is required' }, { status: 400 });
@@ -86,6 +91,19 @@ export async function handleExplorerDownload(
     const root = await resolveRoot(rootId);
     const abs = await resolveInside(root, relPath, { forWrite: false, allowRoot: true });
     const target = await stat(abs);
+    if (target.isDirectory()) {
+      const name = basename(abs);
+      const bytes = await archiveFolder(root, abs, { spawn: spawnTar });
+      return HttpServerResponse.stream(Stream.fromAsyncIterable<Uint8Array, unknown>(bytes, (error) => error), {
+        headers: {
+          'Content-Type': 'application/gzip',
+          'Content-Disposition': contentDisposition('attachment', `${name}.tar.gz`),
+          'X-Content-Type-Options': 'nosniff',
+          'Content-Security-Policy': DOWNLOAD_CSP,
+          'Cache-Control': 'no-store',
+        },
+      });
+    }
     if (!target.isFile()) {
       throw explorerError('NOT_FOUND', `${JSON.stringify(relPath)} is not a regular file`);
     }
