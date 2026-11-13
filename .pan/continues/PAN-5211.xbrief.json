@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5211",
   "created": "2026-11-13T22:53:14.172Z",
-  "updated": "2026-11-13T23:07:21.483Z",
+  "updated": "2026-11-13T23:08:44.926Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -144,9 +144,22 @@
       "doneAt": "2026-11-13T23:07:13.222Z"
     },
     "wi4-reader-retained-budget": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5211",
-      "claimedAt": "2026-11-13T23:07:21.483Z"
+      "claimedAt": "2026-11-13T23:07:21.483Z",
+      "doneAt": "2026-11-13T23:08:44.926Z"
+    },
+    "wi4-reader-retained-budget.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:08:44.926Z"
+    },
+    "wi4-reader-retained-budget.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:08:44.926Z"
+    },
+    "wi4-reader-retained-budget.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:08:44.926Z"
     }
   }
 }
