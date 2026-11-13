@@ -226,6 +226,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'DELETE', path: '/api/connectors/self', scope: 'read:state' },
   // PAN-5069 FR-10: a connector reads its own record (the handler also requires a connector credential).
   { method: 'GET', path: '/api/connectors/self', scope: 'read:state' },
+  // PAN-5188: file explorer download (parent PRD PAN-5183 D-8: explicit admin).
+  { method: 'GET', path: '/api/explorer/download', scope: 'admin' },
 ];
 
 /** `/ws/terminal` needs `operate`; every other WebSocket path keeps the `admin` default. */
