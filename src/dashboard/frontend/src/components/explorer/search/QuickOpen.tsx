@@ -48,8 +48,11 @@ export function QuickOpen({ rootId, open, onClose, onPick }: QuickOpenProps) {
       setSearching(false)
       return
     }
+    // Results belong to the query that produced them: clear them now, so Enter
+    // during the debounce cannot open a file the new query does not match.
+    setPaths([])
+    setSearching(true)
     const timer = setTimeout(() => {
-      setSearching(true)
       searchFiles(rootId, q, QUICK_OPEN_LIMIT).then(
         (result) => {
           if (mySeq !== seq.current) return

@@ -79,6 +79,19 @@ describe('QuickOpen', () => {
     expect(screen.queryByText('old.ts')).toBeNull()
   })
 
+  it('drops the old results as soon as the query changes', async () => {
+    rpc.searchFiles.mockResolvedValueOnce({ paths: ['src/foo.ts'] })
+    rpc.searchFiles.mockReturnValueOnce(new Promise(() => {}))
+    const { input, onPick } = renderQuickOpen()
+    type(input, 'foo')
+    await act(() => vi.advanceTimersByTimeAsync(120))
+    expect(screen.getByText('foo.ts')).toBeInTheDocument()
+    type(input, 'bar')
+    expect(screen.queryByText('foo.ts')).toBeNull()
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onPick).not.toHaveBeenCalled()
+  })
+
   it('closes on Escape', () => {
     const { input, onClose } = renderQuickOpen()
     fireEvent.keyDown(input, { key: 'Escape' })
