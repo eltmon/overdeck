@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5190",
   "created": "2026-11-13T20:35:48.124Z",
-  "updated": "2026-11-13T20:56:59.174Z",
+  "updated": "2026-11-13T20:57:08.471Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -162,6 +162,11 @@
     "create-rename-ui.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T20:56:59.173Z"
+    },
+    "duplicate-delete-ui": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T20:57:08.470Z"
     }
   }
 }
