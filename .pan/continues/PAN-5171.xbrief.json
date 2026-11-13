@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5171",
   "created": "2026-11-13T03:13:45.277Z",
-  "updated": "2026-11-13T03:47:44.313Z",
+  "updated": "2026-11-13T03:47:51.369Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -144,6 +144,11 @@
     "cockpit-header.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T03:47:44.313Z"
+    },
+    "mobile-sheet": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5171",
+      "claimedAt": "2026-11-13T03:47:51.369Z"
     }
   }
 }
