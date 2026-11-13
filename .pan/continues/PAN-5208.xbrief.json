@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5208",
+  "created": "2026-11-13T21:57:26.421Z",
+  "updated": "2026-11-13T21:57:26.421Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "baseline-screens": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5208",
+      "claimedAt": "2026-11-13T21:57:26.421Z"
+    }
+  }
+}
