@@ -176,6 +176,16 @@ jobs:
           name: release-core-tarball
           path: ${{ runner.temp }}/release
 
+      # PAN-5176: the smoke counts new PIDs, and Spotlight's mdworker processes
+      # indexing the fresh npm install swamp that count on a hosted runner
+      # (baselines of 600 to 1100 per 30 s with nothing of ours running).
+      # Indexing is turned off on this throwaway runner only; the smoke itself
+      # never changes a developer's Mac.
+      - name: Turn off Spotlight indexing on the runner
+        run: |
+          sudo mdutil -a -i off || echo "::warning::mdutil could not turn off indexing"
+          mdutil -a -s || true
+
       - name: Bare-host smoke (macOS /bin/bash 3.2)
         run: /bin/bash scripts/bare-host-smoke.sh --tarball "$(ls "$RUNNER_TEMP"/release/*.tgz)" --work-dir "$RUNNER_TEMP/bare-host"
 
