@@ -63,6 +63,8 @@ R_IDLE_NEW=''
 R_IDLE_NET=''
 R_IDLE_PASS=false
 R_ENOENT_PASS=false
+R_TRACE_FROM=''
+R_TRACE_TO=''
 
 usage() {
   cat <<'EOF'
@@ -136,9 +138,10 @@ window_count() {
 
 write_result() {
   export R_SETUP_ERROR R_PANUP_RC R_PANUP_HEALTHY R_PANUP_PASS R_IDLE_BOOTED R_IDLE_BASELINE \
-    R_IDLE_NEW R_IDLE_NET R_IDLE_PASS R_ENOENT_PASS
+    R_IDLE_NEW R_IDLE_NET R_IDLE_PASS R_ENOENT_PASS R_TRACE_FROM R_TRACE_TO
   R_OS="$OS_NAME" R_SUBJECT="$SUBJECT" R_BUDGET="$BUDGET" R_WINDOW="$WINDOW_SECS" R_OUT="$OUT" \
     R_FORBIDDEN_FILE="$WORK_DIR/forbidden-lines.txt" R_ENOENT_FILE="$WORK_DIR/enoent-counts.txt" \
+    R_TRACE_FILE="$WORK_DIR/spawn-trace.log" \
     node -e '
 const fs = require("fs");
 const e = process.env;
@@ -150,6 +153,24 @@ const repeats = readLines(e.R_ENOENT_FILE)
   .map((line) => { const m = /^\s*(\d+)\s+(.*)$/.exec(line); return m ? { key: m[2], count: Number(m[1]) } : null; })
   .filter((entry) => entry && entry.count >= 2);
 const net = num(e.R_IDLE_NET);
+// Diagnostic: the child_process calls Overdeck made during the idle window.
+let spawns = null;
+if (e.R_TRACE_FROM && e.R_TRACE_TO) {
+  const from = Number(e.R_TRACE_FROM), to = Number(e.R_TRACE_TO);
+  const groups = new Map();
+  let count = 0, failed = 0;
+  for (const line of readLines(e.R_TRACE_FILE)) {
+    let rec; try { rec = JSON.parse(line); } catch { continue; }
+    if (!(rec.t >= from && rec.t <= to)) continue;
+    count += 1;
+    if (rec.error) failed += 1;
+    const key = rec.program + "\u0000" + (rec.error || "");
+    groups.set(key, (groups.get(key) || 0) + 1);
+  }
+  const top = [...groups.entries()].sort((x, y) => y[1] - x[1]).slice(0, 10)
+    .map(([key, n]) => { const [program, error] = key.split("\u0000"); return { program, error: error || null, count: n }; });
+  spawns = { count, failed, top };
+}
 const window = Number(e.R_WINDOW);
 const result = {
   version: "1",
@@ -158,7 +179,7 @@ const result = {
   panUp: { rc: num(e.R_PANUP_RC), healthy: bool(e.R_PANUP_HEALTHY), forbiddenToolLines: readLines(e.R_FORBIDDEN_FILE), pass: bool(e.R_PANUP_PASS) },
   idle: {
     booted: bool(e.R_IDLE_BOOTED), baselineNew: num(e.R_IDLE_BASELINE), idleNew: num(e.R_IDLE_NEW), net,
-    netPerSec: net === null ? null : Math.round((net / window) * 100) / 100, budget: num(e.R_BUDGET), pass: bool(e.R_IDLE_PASS),
+    netPerSec: net === null ? null : Math.round((net / window) * 100) / 100, budget: num(e.R_BUDGET), pass: bool(e.R_IDLE_PASS), spawns,
   },
   enoent: { repeats, pass: bool(e.R_ENOENT_PASS) },
   pass: false,
@@ -178,6 +199,10 @@ if (setupError) lines.push("  setup error: " + setupError);
 lines.push("  pan up:  " + verdict(result.panUp.pass) + " rc=" + show(result.panUp.rc) + " healthy=" + result.panUp.healthy + " forbidden-tool lines=" + result.panUp.forbiddenToolLines.length);
 for (const line of result.panUp.forbiddenToolLines) lines.push("           " + line);
 lines.push("  idle:    " + verdict(result.idle.pass) + " booted=" + result.idle.booted + " baseline=" + show(result.idle.baselineNew) + " idle=" + show(result.idle.idleNew) + " net=" + show(result.idle.net) + " (" + show(result.idle.netPerSec) + "/s) budget=" + show(result.idle.budget));
+if (spawns) {
+  lines.push("           Overdeck child_process calls in the idle window: " + spawns.count + " (" + spawns.failed + " failed)");
+  for (const g of spawns.top) lines.push("             " + g.count + "x " + g.program + (g.error ? " (" + g.error + ")" : ""));
+}
 lines.push("  ENOENT:  " + verdict(result.enoent.pass) + " repeats=" + repeats.length);
 for (const r of repeats) lines.push("           " + r.count + "x " + r.key);
 lines.push("  result:  " + (e.R_OUT || "not written"));
@@ -190,6 +215,7 @@ if (e.GITHUB_STEP_SUMMARY) {
     "| --- | --- | --- |",
     "| pan up | " + verdict(result.panUp.pass) + " | rc " + show(result.panUp.rc) + ", healthy " + result.panUp.healthy + ", " + result.panUp.forbiddenToolLines.length + " forbidden-tool lines |",
     "| Idle new PIDs | " + verdict(result.idle.pass) + " | net " + show(result.idle.net) + " per " + window + " s (" + show(result.idle.netPerSec) + "/s), budget " + show(result.idle.budget) + " |",
+    "| Overdeck spawns (idle window) | info | " + (spawns ? spawns.count + " calls, " + spawns.failed + " failed" + (spawns.top.length ? "; top: " + spawns.top.slice(0, 5).map((g) => g.count + "x " + g.program + (g.error ? " (" + g.error + ")" : "")).join(", ") : "") : "n/a") + " |",
     "| ENOENT repeats | " + verdict(result.enoent.pass) + " | " + repeats.length + " repeated |",
     "",
     "Subject: `" + show(result.subject) + "`" + (setupError ? ". Setup error: " + setupError : ""),
@@ -408,6 +434,71 @@ stop_all() {
   sleep 5
 }
 
+# Diagnostic only, never an assertion: a Node preload that appends one JSON
+# line per child_process call (program, API, error code) to spawn-trace.log,
+# so a failed idle window says which programs Overdeck spawned. It is loaded
+# into the directly started dashboard (and the Node processes it starts) via
+# NODE_OPTIONS; it spawns nothing itself.
+write_spawn_tracer() {
+  cat >"$WORK_DIR/tools/spawn-trace.cjs" <<'TRACER'
+'use strict';
+const cp = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const { promisify } = require('util');
+const file = process.env.OVERDECK_SPAWN_TRACE;
+if (file && !cp.__overdeckSpawnTrace) {
+  Object.defineProperty(cp, '__overdeckSpawnTrace', { value: true });
+  let depth = 0;
+  const optionsOf = (a) => a.slice(1, 3).find((x) => x && typeof x === 'object' && !Array.isArray(x));
+  const programOf = (api, a) => {
+    const target = String(a[0] ?? '');
+    const shell = api === 'exec' || api === 'execSync' || Boolean(optionsOf(a)?.shell);
+    return path.basename(shell ? (target.trim().split(/\s+/)[0] || '') : target);
+  };
+  const log = (rec) => { try { fs.appendFileSync(file, JSON.stringify(rec) + '\n'); } catch {} };
+  for (const api of ['spawn', 'execFile', 'exec', 'fork', 'spawnSync', 'execFileSync', 'execSync']) {
+    const orig = cp[api];
+    if (typeof orig !== 'function') continue;
+    const wrapped = function (...a) {
+      if (depth > 0) return orig.apply(this, a);
+      const rec = { t: Date.now(), pid: process.pid, api, program: api === 'fork' ? 'node' : programOf(api, a) };
+      depth += 1;
+      try {
+        const r = orig.apply(this, a);
+        if (r && typeof r.once === 'function') {
+          r.once('spawn', () => log(rec));
+          r.once('error', (e) => log({ ...rec, error: (e && e.code) || 'error' }));
+        } else {
+          log(r && r.error ? { ...rec, error: r.error.code || 'error' } : rec);
+        }
+        return r;
+      } catch (e) {
+        log({ ...rec, error: (e && e.code) || 'error' });
+        throw e;
+      } finally {
+        depth -= 1;
+      }
+    };
+    if (orig[promisify.custom]) {
+      Object.defineProperty(wrapped, promisify.custom, {
+        value: (...a) => {
+          let child;
+          const promise = new Promise((resolve, reject) => {
+            child = wrapped(...a, (err, stdout, stderr) => (err ? reject(Object.assign(err, { stdout, stderr })) : resolve({ stdout, stderr })));
+          });
+          promise.child = child;
+          return promise;
+        },
+      });
+    }
+    cp[api] = wrapped;
+  }
+  require('module').syncBuiltinESMExports();
+}
+TRACER
+}
+
 measure_idle() {
   local server waited=0
   echo "== baseline window (${WINDOW_SECS} s, no Overdeck process)"
@@ -415,7 +506,9 @@ measure_idle() {
   echo "baseline new PIDs: $R_IDLE_BASELINE"
 
   echo "== dashboard server idle window"
+  write_spawn_tracer
   bare OVERDECK_NO_RESUME=1 DASHBOARD_PORT=3010 API_PORT=3011 PORT=3011 OVERDECK_MODE=production \
+    NODE_OPTIONS="--require $WORK_DIR/tools/spawn-trace.cjs" OVERDECK_SPAWN_TRACE="$WORK_DIR/spawn-trace.log" \
     "$NODE_BIN" "$CORE/dist/dashboard/server.js" >"$WORK_DIR/server.log" 2>&1 &
   server=$!
   while [ "$waited" -lt "$HEALTH_TIMEOUT_SECS" ]; do
@@ -426,7 +519,9 @@ measure_idle() {
 
   if [ "$R_IDLE_BOOTED" = true ]; then
     sleep "$SETTLE_SECS"
+    R_TRACE_FROM="$(date +%s)000"
     R_IDLE_NEW=$(window_count)
+    R_TRACE_TO="$(date +%s)999"
     R_IDLE_NET=$((R_IDLE_NEW - R_IDLE_BASELINE))
     if [ "$R_IDLE_NET" -le "$BUDGET" ]; then R_IDLE_PASS=true; fi
     echo "idle new PIDs: $R_IDLE_NEW, net $R_IDLE_NET, budget $BUDGET"
