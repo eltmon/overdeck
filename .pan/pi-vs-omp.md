@@ -12,7 +12,17 @@ and extension `sendUserMessage(..., { deliverAs })`), session resume
 (`--session <id>`), the extension lifecycle hooks, slash-command
 registration, thinking levels and per-session model switching all exist.
 The differences below are shape differences that the pi runtime, launcher
-and extension must follow.
+and extension must follow. The two that change launches are model
+resolution (pi fuzzy-matches unknown ids to the wrong provider, see
+"Model resolution") and resume (`--session`, not `--resume`).
+
+Live evidence (2026-11-13): an RPC run on `openrouter/openai/gpt-oss-20b`
+ran a bash tool call and replied; `turn_end` carried real usage
+(`input 28215, output 43, cost.total 0.00051`), `tool_execution_end` carried
+`{toolCallId, toolName, result, isError}`, and a `before_agent_start`
+system-prompt edit took effect. A TUI launch inside this worktree reached
+the input prompt with no dialog, and `session_start` fired with
+`ctx.mode === "tui"`.
 
 ## Binary and runtime
 
@@ -38,6 +48,7 @@ pi needs no Bun on PATH.
 | System prompt | `--append-system-prompt <text\|file>` (repeatable) | one value only |
 | **Resume** | **`--session <path\|id>`** (partial UUID). `--resume` is a boolean that opens an interactive picker. | `--resume <id>` |
 | Context files | `--no-context-files` exists; not emitted (parity with omp, which loads AGENTS.md/CLAUDE.md) | flag removed |
+| Project trust | TUI shows a trust dialog when the cwd has `.pi/settings.json`, `.pi/{extensions,skills,prompts,themes}`, `.pi/SYSTEM.md` or `.agents/skills`; RPC never prompts and ignores those resources. Launcher passes **`--no-approve`** so both modes behave the same and a conversation never blocks on a dialog. AGENTS.md/CLAUDE.md load regardless of trust. | no equivalent |
 
 Verified live: a second launch with `--session <id> --session-dir <dir>`
 reopened the same `<ts>_<id>.jsonl` file (no new file) and reported the same
@@ -57,8 +68,8 @@ ladder still escalates to SIGTERM/kill-session). Every command gets a
 | Overdeck extension needs | pi 0.85 | omp |
 | --- | --- | --- |
 | `on('session_start')` | yes; event is `{ reason }` only (`startup\|reload\|new\|resume\|fork`). Session id comes from `ctx.sessionManager.getSessionId()`, transcript path from `ctx.sessionManager.getSessionFile()`, model from `ctx.model` | event carries `sessionId`, `model` |
-| Fold Overdeck context into the system prompt | **no `ctx.appendSystemPrompt`**. Use `on('before_agent_start')` and return `{ systemPrompt: event.systemPrompt + extra }` (chained across extensions, applied per turn) | `ctx.appendSystemPrompt(text)` at session start |
-| `on('turn_end')` | `{ turnIndex, message, toolResults }`. Output text is in `message.content[].text`, usage in `message.usage`, model in `message.provider`/`message.model`. No `output`/`sessionLogPath`; transcript path from `ctx.sessionManager.getSessionFile()` | `output`, `sessionLogPath`, `usage`, `model` |
+| Fold Overdeck context into the system prompt | no `ctx.appendSystemPrompt` (omp 17.4.1 has none either, so the extension's fold is a no-op on both). The launcher already passes the rendered context layers and the session briefing via `--append-system-prompt`, so the extension must not inject them again. `before_agent_start` returning `{ systemPrompt }` works (verified) if ever needed | no `appendSystemPrompt` in omp's extension types |
+| `on('turn_end')` | `{ turnIndex, message, toolResults }`, fired once **per LLM response**, including tool-call responses. Output text is in `message.content[].text`, usage in `message.usage`, model in `message.provider`/`message.model`. No `output`/`sessionLogPath`; transcript path from `ctx.sessionManager.getSessionFile()`. Work-agent completion checks run on `agent_settled` (pi will not continue on its own), not on every `turn_end`, so a tool-heavy reply is not counted as several progressless turns | `output`, `sessionLogPath`, `usage`, `model` |
 | `on('tool_execution_end')` | `{ toolCallId, toolName, result, isError }`; no usage | similar, may carry usage |
 | `on('input')` | `{ text, images, source: interactive\|rpc\|extension, streamingBehavior }` | same |
 | `registerCommand('pan-done')` | yes; handler `(args, ctx)` receives the raw argument string (verified: `/pan-done finished it` -> `"finished it"`) | same |
@@ -87,21 +98,60 @@ already read both. Assistant usage is `usage.{input,output,cacheRead,cacheWrite,
 | `apiKey` env reference | **`"$ENV_NAME"`** (a bare `ENV_NAME` is a literal key) | bare env-var name |
 | Model fields | `id, name, reasoning, input, contextWindow, maxTokens, cost` (no `supportsTools`) | adds `supportsTools` |
 
-pi's bundled catalog (pi-ai `models.generated.js`) has the providers
-google, minimax, zai, xiaomi, xai, groq, cerebras, mistral, openrouter,
-kimi-coding, openai-codex, anthropic, but **not dashscope**, and lacks
-`google/gemini-4-argon`. So pi needs the same provisioning omp gets
-(dashscope + the missing Gemini ids), written to pi's file with `$`-prefixed
-key references.
+## Model resolution
+
+pi resolves `--model <provider>/<id>` exactly when the id is in its catalog
+(case-insensitive: `minimax/minimax-m2.7` binds `MiniMax-M2.7`). An unknown
+id is **fuzzy-matched to another provider**: `xai/grok-build-0.1` bound a
+`vercel-ai-gateway` model, and a bare OpenRouter id `openai/gpt-oss-20b`
+bound pi's **groq** provider. `openrouter/openai/gpt-oss-20b` bound
+OpenRouter correctly (real turn replied). So the launcher must always pass
+a pi-provider-qualified id, OpenRouter included, and every Overdeck tier
+model pi does not ship must be provisioned.
+
+Overdeck tier models vs pi 0.85.0's bundled catalog (pi-ai
+`models.generated.js`):
+
+| Overdeck provider | pi provider | Missing from pi's catalog |
+| --- | --- | --- |
+| google | `google` | `gemini-4-argon` |
+| minimax | `minimax` | `MiniMax-M3.1-Flash` (lowercase m2.7 ids resolve by case) |
+| zai | `zai` | `glm-5.3-flashx`, `glm-5.1`, `glm-4.7-flash` |
+| mimo | `xiaomi` | `mimo-v2.6-pro`, `mimo-v2.6-flash`, `mimo-v2.6-pro-ultraspeed` |
+| xai | `xai` | `grok-build-0.1`, `grok-4.7` |
+| groq | `groq` | none |
+| cerebras | `cerebras` | none |
+| mistral | `mistral` | `mistral-large-4-0` |
+| openrouter | `openrouter` | dynamic; ids must be prefixed `openrouter/` |
+| nous | none (no pi provider) | custom `nous` provider (Nous Portal OpenAI-compatible endpoint) |
+| dashscope | none matching (pi's `qwen-token-plan` is a different product and key) | custom `dashscope` provider, as omp |
+
+omp 17.4.1 resolves `grok-build-0.1` and `glm-5.1` natively but also misses
+`mimo-v2.6-pro` and `MiniMax-M3.1-Flash` (it falls through to zenmux), so
+pi's provisioning list is longer than omp's (dashscope + google).
 
 ## Auth
 
 pi reads provider keys from env (`OPENROUTER_API_KEY`, `GEMINI_API_KEY`,
 `XAI_API_KEY`, `ZAI_API_KEY`, `MINIMAX_API_KEY`, `GROQ_API_KEY`,
 `CEREBRAS_API_KEY`, `MISTRAL_API_KEY`, `ANTHROPIC_API_KEY`/`ANTHROPIC_OAUTH_TOKEN`,
-...) and from `~/.pi/agent/auth.json` (`/login`). The launcher already exports
-the Overdeck provider env, so no pi-specific auth work is needed.
-`pi auth check --provider <p>` reports readiness.
+...) and from `~/.pi/agent/auth.json` (`/login`). Overdeck's launcher exports
+the provider key under each of those names (`getProviderEnv` in
+`src/lib/providers.ts`), with two gaps: MiMo is exported as `MIMO_API_KEY`
+but pi's `xiaomi` provider reads `XIAOMI_API_KEY`, and Nous/DashScope have no
+pi provider. The provisioned `models.json` entries reference the Overdeck
+names (`$MIMO_API_KEY`, `$NOUS_API_KEY`, `$DASHSCOPE_API_KEY`), which closes
+both gaps without new env vars. `pi auth check --provider <p>` reports
+readiness.
+
+## Stored `pi` rows
+
+Un-folding `pi` from `ohmypi` changes how stored `pi` rows resolve. On this
+machine `overdeck.db` holds 25 `harness='pi'` conversations, all created
+2026-06-20..2026-06-24. 24 predate the PAN-1989 commit (2026-06-24 16:16
+UTC); one (16:40 UTC) is 24 minutes after it and most likely ran before that
+build was deployed. No agent `state.json` carries `harness: pi`. So the rows
+that will now resume on pi really ran on pi.
 
 ## Terms of service
 
