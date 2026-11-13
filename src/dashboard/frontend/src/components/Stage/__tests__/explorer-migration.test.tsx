@@ -39,7 +39,7 @@ function mountStage() {
   )
 }
 
-const filesPanes = () => selectPanesForWorkspace(DECK)(usePanesStore.getState()).filter((p) => p.paneType === 'files')
+const explorerPanes = () => selectPanesForWorkspace(DECK)(usePanesStore.getState()).filter((p) => p.paneType === 'files')
 
 describe('Stage deck load — legacy Files pane migration (PAN-5186)', () => {
   it('gives a legacy issue-scoped files pane its issue root', async () => {
@@ -47,7 +47,7 @@ describe('Stage deck load — legacy Files pane migration (PAN-5186)', () => {
     const id = addPane(DECK, { paneType: 'files', label: 'Files', issueId: 'PAN-1', agentId: 'agent-pan-1' })
     setActivePane(DECK, selectPanesForWorkspace(DECK)(usePanesStore.getState())[0].paneId)
     mountStage()
-    await waitFor(() => expect(filesPanes()).toEqual([expect.objectContaining({ paneId: id, explorerRootId: 'issue:PAN-1' })]))
+    await waitFor(() => expect(explorerPanes()).toEqual([expect.objectContaining({ paneId: id, explorerRootId: 'issue:PAN-1' })]))
   })
 
   it('closes a files pane with neither an issue nor a root', async () => {
@@ -55,7 +55,7 @@ describe('Stage deck load — legacy Files pane migration (PAN-5186)', () => {
     addPane(DECK, { paneType: 'files', label: 'Files' })
     setActivePane(DECK, selectPanesForWorkspace(DECK)(usePanesStore.getState())[0].paneId)
     mountStage()
-    await waitFor(() => expect(filesPanes()).toHaveLength(0))
+    await waitFor(() => expect(explorerPanes()).toHaveLength(0))
   })
 
   it('keeps a project-root files pane that has no issueId', async () => {
@@ -63,7 +63,7 @@ describe('Stage deck load — legacy Files pane migration (PAN-5186)', () => {
     addPane(DECK, { paneType: 'files', label: 'Files', explorerRootId: 'project:overdeck' })
     setActivePane(DECK, selectPanesForWorkspace(DECK)(usePanesStore.getState())[0].paneId)
     mountStage()
-    await waitFor(() => expect(filesPanes()).toEqual([expect.objectContaining({ explorerRootId: 'project:overdeck' })]))
-    expect(filesPanes()[0].issueId).toBeUndefined()
+    await waitFor(() => expect(explorerPanes()).toEqual([expect.objectContaining({ explorerRootId: 'project:overdeck' })]))
+    expect(explorerPanes()[0].issueId).toBeUndefined()
   })
 })

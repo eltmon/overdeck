@@ -54,11 +54,11 @@ function listing(path: string): ExplorerListDirResult {
   return { entries: LISTINGS[path] ?? [], truncated: false, absPath: path ? `/ws/${path}` : '/ws' }
 }
 
-function filesPane(over: Partial<WorkspacePane> = {}): WorkspacePane {
+function explorerPaneSpec(over: Partial<WorkspacePane> = {}): WorkspacePane {
   return { paneId: 'f1', paneType: 'files', label: 'Files', createdAt: 1, explorerRootId: 'issue:PAN-1', ...over }
 }
 
-function renderPane(pane = filesPane()) {
+function renderPane(pane = explorerPaneSpec()) {
   return render(
     <DialogProvider>
       <ExplorerPane pane={pane} ctx={ctx} />
@@ -94,7 +94,7 @@ describe('ExplorerPane', () => {
   })
 
   it('renders a sentence when the pane has no root', () => {
-    renderPane(filesPane({ explorerRootId: undefined }))
+    renderPane(explorerPaneSpec({ explorerRootId: undefined }))
     expect(screen.getByText('This Files pane has no root. Close it and open Files again.')).toBeInTheDocument()
   })
 
@@ -157,7 +157,7 @@ describe('ExplorerPane', () => {
 
   it('disables Changed on a non-git root', async () => {
     rpc.gitStatus.mockRejectedValue(new PanRpcError({ message: 'no git', code: 'NOT_A_GIT_REPO' }))
-    renderPane(filesPane({ explorerRootId: 'project:plain' }))
+    renderPane(explorerPaneSpec({ explorerRootId: 'project:plain' }))
     await screen.findByText('README.md')
     await waitFor(() => expect(screen.getByRole('button', { name: 'Changed' })).toBeDisabled())
     expect(screen.getByRole('button', { name: 'Changed' })).toHaveAttribute('title', 'Not a git repository')

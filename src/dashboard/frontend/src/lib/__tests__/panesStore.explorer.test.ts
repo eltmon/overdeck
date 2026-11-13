@@ -3,7 +3,7 @@ import { usePanesStore, selectPanesForWorkspace, selectActivePaneId } from '../p
 
 const WS = 'overdeck'
 
-const filesPanes = () => selectPanesForWorkspace(WS)(usePanesStore.getState()).filter((p) => p.paneType === 'files')
+const explorerPanes = () => selectPanesForWorkspace(WS)(usePanesStore.getState()).filter((p) => p.paneType === 'files')
 
 beforeEach(() => {
   localStorage.clear()
@@ -18,7 +18,7 @@ describe('addPane — explorer (files) panes dedupe on explorerRootId', () => {
     setActivePane(WS, selectPanesForWorkspace(WS)(usePanesStore.getState())[0].paneId)
     const second = addPane(WS, { paneType: 'files', label: 'Files', issueId: 'PAN-1', explorerRootId: 'issue:PAN-1' })
     expect(second).toBe(first)
-    expect(filesPanes()).toHaveLength(1)
+    expect(explorerPanes()).toHaveLength(1)
     expect(selectActivePaneId(WS)(usePanesStore.getState())).toBe(first)
   })
 
@@ -26,13 +26,13 @@ describe('addPane — explorer (files) panes dedupe on explorerRootId', () => {
     const { addPane } = usePanesStore.getState()
     addPane(WS, { paneType: 'files', label: 'Files', issueId: 'PAN-1', explorerRootId: 'issue:PAN-1' })
     addPane(WS, { paneType: 'files', label: 'Files', explorerRootId: 'project:overdeck' })
-    expect(filesPanes().map((p) => p.explorerRootId)).toEqual(['issue:PAN-1', 'project:overdeck'])
+    expect(explorerPanes().map((p) => p.explorerRootId)).toEqual(['issue:PAN-1', 'project:overdeck'])
   })
 
   it('does not dedupe a files spec without a root against one with a root', () => {
     const { addPane } = usePanesStore.getState()
     addPane(WS, { paneType: 'files', label: 'Files', issueId: 'PAN-1', explorerRootId: 'issue:PAN-1' })
     addPane(WS, { paneType: 'files', label: 'Files', issueId: 'PAN-1' })
-    expect(filesPanes()).toHaveLength(2)
+    expect(explorerPanes()).toHaveLength(2)
   })
 })
