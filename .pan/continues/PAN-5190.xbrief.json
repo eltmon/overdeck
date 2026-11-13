@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5190",
   "created": "2026-11-13T20:35:48.124Z",
-  "updated": "2026-11-13T20:35:48.124Z",
+  "updated": "2026-11-13T20:37:03.383Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,22 @@
   "sessionHistory": [],
   "items": {
     "rpc-write-wrappers": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5190",
-      "claimedAt": "2026-11-13T20:35:48.124Z"
+      "claimedAt": "2026-11-13T20:35:48.124Z",
+      "doneAt": "2026-11-13T20:37:03.382Z"
+    },
+    "rpc-write-wrappers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:37:03.382Z"
+    },
+    "rpc-write-wrappers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:37:03.382Z"
+    },
+    "rpc-write-wrappers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:37:03.382Z"
     }
   }
 }
