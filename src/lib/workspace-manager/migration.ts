@@ -2,6 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameS
 import { dirname, join } from 'path';
 import { homedir } from 'os';
 import type { PanMigrationResult } from './types.js';
+import { OVERDECK_PROJECT_GITIGNORE_ENTRIES } from '../workspace-sync-paths.js';
 
 /**
  * Migrate existing .overdeck/<subdir> directories to .pan/<subdir> within a project.
@@ -203,7 +204,7 @@ export function copyOverdeckSettingsToWorkspace(workspacePath: string): { copied
  */
 export function ensurePanGitignore(projectPath: string): void {
   const gitignorePath = join(projectPath, '.gitignore');
-  const requiredEntries = ['.pan/events/', '.pan/review/', '.pan/prompts/', '.pan/test/', '.claude/skills/'];
+  const requiredEntries: readonly string[] = OVERDECK_PROJECT_GITIGNORE_ENTRIES;
 
   let content = existsSync(gitignorePath) ? readFileSync(gitignorePath, 'utf-8') : '';
   const lines = content.split('\n');
