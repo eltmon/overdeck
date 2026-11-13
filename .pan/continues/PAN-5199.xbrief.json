@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5199",
   "created": "2026-11-13T20:11:44.953Z",
-  "updated": "2026-11-13T20:54:46.918Z",
+  "updated": "2026-11-13T20:54:54.797Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,11 @@
     "start-route-heal.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T20:54:46.917Z"
+    },
+    "docs-and-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5199",
+      "claimedAt": "2026-11-13T20:54:54.797Z"
     }
   }
 }
