@@ -7,8 +7,11 @@
  * a relaunch that now lands on Herdr never looked ready, and a menu on its
  * screen was never seen.
  *
- * Conversation readiness reads through here too (PAN-3921); only the
- * conversation pane-choice route keeps its own tmux reads.
+ * Conversation readiness reads through here too (PAN-3921). The polled
+ * conversation reads (input target, needs-terminal, pane permission) pass
+ * `legacyTmuxFallback: false`, so a Herdr host never reads them through tmux
+ * (PAN-5169). Pane-choice detection stays tmux-only and is skipped on a
+ * Herdr host.
  */
 
 import { stripVTControlCharacters } from 'node:util';
@@ -108,14 +111,26 @@ export interface AgentPaneIo {
   sendKey(key: SelectorKey): Promise<void>;
 }
 
+/** PAN-5169: `legacyTmuxFallback: false` is the strict read the polled conversation reads use. */
+export interface ResolveAgentPaneIoOptions {
+  /** Default true. False: on Herdr, a pane Herdr does not hold throws instead of falling back to tmux. */
+  readonly legacyTmuxFallback?: boolean;
+}
+
 /**
  * Resolve the pane once (PAN-4268). On a Herdr host with a Herdr pane for the
  * agent: `pane.read` (source `visible`) and `pane.send_keys`. Otherwise — a tmux
  * host, or a Herdr host whose agent Herdr does not hold (legacy tmux agents on
  * `tmux -L overdeck`, the same fallback `deliverAgentMessage` takes) — tmux
- * `capturePane` and `sendKeysAsync`.
+ * `capturePane` and `sendKeysAsync`, unless `options.legacyTmuxFallback` is
+ * `false`, in which case a Herdr host whose agent Herdr does not hold throws
+ * instead of falling back.
  */
-export async function resolveAgentPaneIo(agentId: string, backend?: TerminalBackend): Promise<AgentPaneIo> {
+export async function resolveAgentPaneIo(
+  agentId: string,
+  backend?: TerminalBackend,
+  options: ResolveAgentPaneIoOptions = {},
+): Promise<AgentPaneIo> {
   const { resolveLaunchBackend } = await import('./launch.js');
   const resolved = backend ?? (await resolveLaunchBackend());
   if (resolved.name === 'herdr') {
@@ -128,6 +143,7 @@ export async function resolveAgentPaneIo(agentId: string, backend?: TerminalBack
         sendKey: (key) => sendHerdrPaneKeys(pane.paneId, [key]),
       };
     }
+    if (options.legacyTmuxFallback === false) throw new Error(`herdr holds no pane for ${agentId}`);
   }
   const { capturePane, sendKeysAsync } = await import('../tmux.js');
   return {
