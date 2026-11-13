@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5184",
   "created": "2026-11-13T13:50:17.317Z",
-  "updated": "2026-11-13T14:09:17.711Z",
+  "updated": "2026-11-13T14:09:26.121Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,11 @@
     "store-send-clock.ac2": {
       "status": "completed",
       "doneAt": "2026-11-13T14:09:17.711Z"
+    },
+    "queued-prompt-send": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5184",
+      "claimedAt": "2026-11-13T14:09:26.121Z"
     }
   }
 }
