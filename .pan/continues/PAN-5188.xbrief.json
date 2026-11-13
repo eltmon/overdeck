@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5188",
   "created": "2026-11-13T17:44:21.691Z",
-  "updated": "2026-11-13T18:39:34.530Z",
+  "updated": "2026-11-13T18:39:41.751Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -331,6 +331,11 @@
       "status": "cancelled",
       "claimedBy": "agent-pan-5188",
       "claimedAt": "2026-11-13T18:38:43.264Z"
+    },
+    "port-records-ci-list": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:39:41.750Z"
     }
   }
 }
