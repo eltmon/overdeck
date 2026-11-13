@@ -620,6 +620,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/projects/:projectKey/finish-setup', kind: 'http', disposition: 'WRITE',      door: 'finishProjectSetup — idempotent repair through existing workspace doors; never clones (PAN-3836)' },
   { surface: 'GET /api/fs/list-dirs',                     kind: 'http', disposition: 'READ',        door: 'FilesystemResolver.listDirs (folder-browser for project registration)' },
   { surface: 'GET /api/explorer/download',                 kind: 'http', disposition: 'READ',        door: 'Explorer door (src/dashboard/server/routes/explorer.ts, PAN-5188): file bytes with Range, folder .tar.gz' },
+  { surface: 'POST /api/explorer/upload',                  kind: 'http', disposition: 'WRITE',       door: 'Explorer door (src/dashboard/server/routes/explorer.ts, PAN-5188): one new file, no-clobber' },
   { surface: 'GET /api/confirmations',                    kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Confirmation prompts; outside 8 remodel domains' },
   { surface: 'POST /api/confirmations/:id/respond',       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Confirmation prompts; outside 8 remodel domains' },
   { surface: 'GET /api/skills',                           kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Skills index; outside 8 remodel domains' },

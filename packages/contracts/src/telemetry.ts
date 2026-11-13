@@ -240,6 +240,7 @@ const TELEMETRY_CLIENT_ROUTES = [
   "/api/costs/summary",
   "/api/disk-alert",
   "/api/explorer/download",
+  "/api/explorer/upload",
   "/api/fleet/conversations",
   "/api/fleet/issues/:id/activity",
   "/api/fleet/issues/:id/start",
