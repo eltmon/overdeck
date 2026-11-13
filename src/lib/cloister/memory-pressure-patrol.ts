@@ -179,13 +179,27 @@ function feedKey(level: MemoryFeedLevel, verdict: MemoryVerdict): string {
 // Module-level state for OOM canary: disabled if journal reading fails
 let oomCanaryDisabled = false;
 
+export interface KernelJournalDeps {
+  platform: NodeJS.Platform;
+  /** Runs journalctl with these args and resolves its stdout. */
+  runJournalctl: (args: string[]) => Promise<string>;
+  warn: (line: string) => void;
+}
+
 /**
  * WI-4: Read new kernel journal entries via journalctl with cursor-file persistence.
  * On first call (cursor file absent), uses -n 0 to initialize and returns empty string.
- * On ANY error, disables the canary permanently and returns empty string.
+ * Linux only (PAN-5170): macOS has no kernel journal and no journalctl, so off Linux
+ * this returns '' without a stat, a spawn or a log line.
+ * On ANY error, logs one line and disables the canary permanently.
  */
-async function readNewKernelJournal(): Promise<string> {
+export async function readNewKernelJournal(deps: Partial<KernelJournalDeps> = {}): Promise<string> {
+  const platform = deps.platform ?? process.platform;
+  if (platform !== 'linux') return '';
   if (oomCanaryDisabled) return '';
+  const warn = deps.warn ?? ((line: string) => console.warn(line));
+  const runJournalctl = deps.runJournalctl ?? (async (args: string[]) =>
+    (await promisify(execFile)('journalctl', args, { timeout: 10000 })).stdout);
 
   try {
     const overdeckHome = process.env.OVERDECK_HOME || resolve(homedir(), '.overdeck');
@@ -201,7 +215,6 @@ async function readNewKernelJournal(): Promise<string> {
       // Cursor doesn't exist yet
     }
 
-    const execFileAsync = promisify(execFile);
     const args = ['-k', '--cursor-file', cursorFile, '--no-pager', '-o', 'cat'];
 
     // On first run (no cursor), use -n 0 to initialize without replaying
@@ -209,10 +222,10 @@ async function readNewKernelJournal(): Promise<string> {
       args.push('-n', '0');
     }
 
-    const result = await execFileAsync('journalctl', args, { timeout: 10000 });
-    return result.stdout;
+    return await runJournalctl(args);
   } catch (err) {
-    console.warn('[memory-pressure-patrol] Journal reader failed, disabling OOM canary:', err);
+    const { code, message } = err as { code?: unknown; message?: unknown };
+    warn(`[memory-pressure-patrol] OOM canary disabled: journalctl failed (${String(code ?? message ?? err)})`);
     oomCanaryDisabled = true;
     return '';
   }
@@ -232,7 +245,7 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
     readRecoveryReserveBytes: deps.readRecoveryReserveBytes || (() => readGovernorReserves().recoveryBytes),
     readPsiCalmConfig: deps.readPsiCalmConfig || (() => readGovernorPsiCalmConfig()),
     census: deps.census || (() => getRuntimeCensus()),
-    readNewKernelJournal: deps.readNewKernelJournal || readNewKernelJournal,
+    readNewKernelJournal: deps.readNewKernelJournal || (() => readNewKernelJournal()),
     emit: deps.emit || emitActivityEntry,
     readCpuRecovery: deps.readCpuRecovery || readCpuRecoveryThresholds,
     now: deps.now || Date.now,
