@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5211",
   "created": "2026-11-13T22:53:14.172Z",
-  "updated": "2026-11-13T22:53:14.172Z",
+  "updated": "2026-11-13T22:55:12.596Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,30 @@
   "sessionHistory": [],
   "items": {
     "wi1-text-bounds": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5211",
-      "claimedAt": "2026-11-13T22:53:14.172Z"
+      "claimedAt": "2026-11-13T22:53:14.172Z",
+      "doneAt": "2026-11-13T22:55:12.596Z"
+    },
+    "wi1-text-bounds.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T22:55:12.596Z"
+    },
+    "wi1-text-bounds.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T22:55:12.596Z"
+    },
+    "wi1-text-bounds.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T22:55:12.596Z"
+    },
+    "wi1-text-bounds.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T22:55:12.596Z"
+    },
+    "wi1-text-bounds.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T22:55:12.596Z"
     }
   }
 }
