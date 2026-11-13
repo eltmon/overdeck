@@ -196,5 +196,29 @@
     "upstream": "t3code",
     "path": "packages/shared/src/filePreview.ts",
     "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/code/save-queue.ts",
+    "upstream": "orca",
+    "path": "src/renderer/src/components/editor/save/queue/editor-save-queue.ts",
+    "commit": "73771e67d01"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/code/save-queue.ts",
+    "upstream": "orca",
+    "path": "src/renderer/src/components/editor/save/queue/editor-save-slots.ts",
+    "commit": "73771e67d01"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/code/self-write-registry.ts",
+    "upstream": "orca",
+    "path": "src/renderer/src/components/editor/external-changes/editor-self-write-registry.ts",
+    "commit": "73771e67d01"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/code/external-change.ts",
+    "upstream": "orca",
+    "path": "src/renderer/src/hooks/editor-external-watch-event-reconciliation.ts",
+    "commit": "73771e67d01"
   }
 ]
