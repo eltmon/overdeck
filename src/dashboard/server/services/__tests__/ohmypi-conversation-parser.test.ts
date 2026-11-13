@@ -1,4 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { isOhmypiSessionFile, parseOhmypiConversationMessages } from '../ohmypi-conversation-parser.js';
@@ -53,5 +55,29 @@ describe('parseOhmypiConversationMessages — tool-call join (PAN-1989)', () => 
     const readEntry = result.workLog.find((e) => e.toolTitle === 'read');
     expect(readEntry).toBeDefined();
     expect(readEntry!.result).toContain('pi version is 0.79.0');
+  });
+});
+
+/** PAN-5211: ohmypi tool results are stored bounded. */
+describe('parseOhmypiConversationMessages — bounded tool results', () => {
+  let dir: string;
+  beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), 'omp-bounds-')); });
+  afterEach(async () => { await rm(dir, { recursive: true, force: true }); });
+
+  it('cuts a 100,000-character result to the stored cap plus the marker', async () => {
+    const file = join(dir, 'session.jsonl');
+    const lines = [
+      { type: 'session', id: 'sess-1', timestamp: '2026-11-13T00:00:00.000Z' },
+      { type: 'message', id: 'a1', timestamp: '2026-11-13T00:00:01.000Z', message: { role: 'assistant', content: [{ type: 'toolCall', id: 'call_big', name: 'read', arguments: { path: '/big' } }] } },
+      { type: 'message', id: 't1', timestamp: '2026-11-13T00:00:02.000Z', message: { role: 'toolResult', toolCallId: 'call_big', toolName: 'read', isError: false, content: [{ type: 'text', text: 'r'.repeat(100_000) }] } },
+    ];
+    await writeFile(file, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+
+    const result = await parseOhmypiConversationMessages(file);
+
+    const marker = /\n\n… \[[\d,]+ characters omitted\] …\n\n/;
+    const stored = result.workLog.find((e) => e.toolTitle === 'read')?.result ?? '';
+    expect(stored).toMatch(marker);
+    expect(stored.replace(marker, '').length).toBeLessThanOrEqual(65_536);
   });
 });

@@ -21,6 +21,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import type { ChatMessage, CompactBoundary, WorkLogEntry } from '@overdeck/contracts';
 import type { ParseResult } from './conversation/types.js';
+import { boundToolResultText } from './conversation/tool-result-bounds.js';
 import { summarizeKimiEntries } from '../../../lib/cost-parsers/kimi-parser.js';
 
 interface KimiLoopEvent {
@@ -146,7 +147,8 @@ export async function parseKimiConversationMessages(sessionFile: string): Promis
 
     if (event.type === 'tool.result') {
       const callId = event.toolCallId ?? '';
-      const output = extractToolOutput(event.result);
+      // PAN-5211: image data URLs become placeholders and long text keeps its head and tail.
+      const output = boundToolResultText(extractToolOutput(event.result)).text;
       const wl = callId ? toolCallsByCallId.get(callId) : undefined;
       if (wl) {
         if (output) (wl as { result?: string }).result = output;
