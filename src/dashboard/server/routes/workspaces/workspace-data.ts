@@ -34,6 +34,7 @@ import {
   collectDockerContainerLifecycleSnapshot,
   getWorkspaceStackHealth,
 } from '../../../../lib/workspace/stack-health.js';
+import type { DockerContainerLifecycle } from '../../../../lib/docker-stats.js';
 import { listSessionNames, capturePane } from '../../../../lib/tmux.js';
 import { getActiveSessionModel } from '../../../../lib/cost-parsers/jsonl-parser.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
@@ -424,7 +425,9 @@ const getWorkspaceStackHealthBatchRoute = HttpRouter.add(
       const containers = workspaceRequests.some((request) =>
         request.kind === 'local' && Boolean(request.projectConfig.workspace?.docker?.compose_template)
       )
-        ? await Effect.runPromise(collectDockerContainerLifecycleSnapshot())
+        ? await Effect.runPromise(
+            collectDockerContainerLifecycleSnapshot().pipe(Effect.orElseSucceed(() => [] as DockerContainerLifecycle[])),
+          )
         : undefined;
 
       return Promise.all(workspaceRequests.map(async (request) => {

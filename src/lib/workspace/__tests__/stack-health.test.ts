@@ -2,15 +2,20 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
-import { Effect } from 'effect';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Cause, Effect } from 'effect';
+
+const mocks = vi.hoisted(() => ({ execFile: vi.fn() }));
+vi.mock('node:child_process', () => ({ execFile: mocks.execFile }));
 
 import {
   recordDockerContainerLifecycleSnapshot,
   resetCachedDockerContainerLifecycleSnapshotForTests,
 } from '../../docker-stats.js';
+import { resetHostToolsForTests, setHostToolFinderForTests } from '../../host-tools.js';
 import type { ProjectConfig } from '../../projects.js';
 import {
+  collectDockerContainerLifecycleSnapshot,
   evaluateWorkspaceStackHealth,
   getWorkspaceStackHealth as getWorkspaceStackHealthProgram,
   inferIssueIdFromStackContainerName,
@@ -37,6 +42,8 @@ const now = new Date('2026-05-16T23:00:00.000Z');
 
 afterEach(() => {
   resetCachedDockerContainerLifecycleSnapshotForTests();
+  resetHostToolsForTests();
+  mocks.execFile.mockReset();
 });
 
 function container(overrides: Partial<DockerContainerLifecycle>): DockerContainerLifecycle {
@@ -291,5 +298,35 @@ describe('evaluateWorkspaceStackHealth', () => {
     expect(recordWorkspaceStackHealthTransition('PAN-1140', { healthy: false, reasons: ['still broken'], lastObserved: now.toISOString() })).toBe(false);
     expect(recordWorkspaceStackHealthTransition('PAN-1140', { healthy: true, reasons: [], lastObserved: now.toISOString() })).toBe(false);
     expect(recordWorkspaceStackHealthTransition('PAN-1140', { healthy: false, reasons: ['broken again'], lastObserved: now.toISOString() })).toBe(true);
+  });
+});
+
+describe('collectDockerContainerLifecycleSnapshot host-tools gate (PAN-5168)', () => {
+  it('fails fast with ENOENT and calls execFile 0 times when docker is missing', async () => {
+    setHostToolFinderForTests(() => null);
+
+    const exit = await Effect.runPromiseExit(collectDockerContainerLifecycleSnapshot());
+
+    expect(exit._tag).toBe('Failure');
+    if (exit._tag === 'Failure') {
+      const error = Cause.squash(exit.cause) as NodeJS.ErrnoException;
+      expect(error.code).toBe('ENOENT');
+    }
+    expect(mocks.execFile).not.toHaveBeenCalled();
+  });
+
+  it('spawns the resolved path and returns the parsed containers when docker is present', async () => {
+    setHostToolFinderForTests(() => '/fake/bin/docker');
+    mocks.execFile.mockImplementation(
+      (_cmd: string, _args: string[], _opts: unknown, cb: (err: unknown, out: unknown) => void) => {
+        cb(null, { stdout: '{"ID":"abc123","Names":"web","Status":"Up 2 hours"}\n', stderr: '' });
+      },
+    );
+
+    const containers = await Effect.runPromise(collectDockerContainerLifecycleSnapshot());
+
+    expect(containers).toEqual([{ id: 'abc123', name: 'web', status: 'Up 2 hours', state: undefined, createdAt: undefined, composeProject: undefined }]);
+    expect(mocks.execFile).toHaveBeenCalledTimes(1);
+    expect(mocks.execFile.mock.calls[0]?.[0]).toBe('/fake/bin/docker');
   });
 });

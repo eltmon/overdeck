@@ -23,7 +23,7 @@ import { promisify } from 'node:util';
 
 import { Effect } from 'effect';
 
-import { recordDockerContainerLifecycleSnapshot } from '../docker-stats.js';
+import { recordDockerContainerLifecycleSnapshot, type DockerContainerLifecycle } from '../docker-stats.js';
 import { reserveDiskFloor } from '../disk-floor.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { isIssueClosed } from '../cloister/issue-closed.js';
@@ -109,7 +109,9 @@ const removeStaleIssueContainers = (
   composeProjectName: string,
 ): Effect.Effect<number> =>
   Effect.promise(async () => {
-    const containers = await Effect.runPromise(collectDockerContainerLifecycleSnapshot());
+    const containers = await Effect.runPromise(
+      collectDockerContainerLifecycleSnapshot().pipe(Effect.orElseSucceed(() => [] as DockerContainerLifecycle[])),
+    );
     let removed = 0;
     for (const container of containers) {
       if (container.composeProject === composeProjectName) continue;
@@ -294,7 +296,9 @@ export const rebuildWorkspaceStack = (
         invalidateWorkspaceDiskCostMemo(projectConfig.path);
       })),
     );
-    const containers = yield* collectDockerContainerLifecycleSnapshot();
+    const containers = yield* collectDockerContainerLifecycleSnapshot().pipe(
+      Effect.orElseSucceed(() => [] as DockerContainerLifecycle[]),
+    );
     recordDockerContainerLifecycleSnapshot(containers);
 
     // Sweep corpses from any previous project naming for this issue so
