@@ -1,0 +1,721 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-13T13:45:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5184: Composer keeps sent text and blocks a second send until the server acknowledges",
+    "updated": "2026-11-13T13:49:57.343Z"
+  },
+  "plan": {
+    "id": "pan-5184",
+    "title": "Composer keeps sent text and blocks a second send until the server acknowledges",
+    "status": "running",
+    "uid": "f60091cf-ef41-4c57-a990-b5c56b9c4f46",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-13T13:45:00Z",
+    "updated": "2026-11-13T13:49:57.343Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5184",
+        "label": "PAN-5184",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5184.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "composer",
+      "conversation"
+    ],
+    "narratives": {
+      "Problem": "After Send, the conversation composer keeps the sent text until the server acknowledges the POST (up to the 120 s client bound) and refuses a second Send until then, because ComposerFooter sets the per-conversation sending flag for every send and clears the editor only after the POST resolves. The operator cannot send a quick follow-up, and the text shows twice: in the Sending bubble and in the box.",
+      "Proposal": "Clear the editor, its conv-draft localStorage key, attachments and citations synchronously at prompt Send, right after the optimistic bubble is added, and post the prompt through a new per-conversation send queue (lib/composerSendQueue.ts) that runs POSTs one at a time in Send order. Prompt sends stop setting the sending flag, so the composer stays editable. The POST and its outcome move to components/chat/queuedPromptSend.ts. Held-message resends and outbox retries share the queue, a retry after a proven non-delivery uses a fresh clientMessageId, a queued prompt behind a held bubble is held too, and a queued bubble restarts its stall clock when its POST starts. /pan commands, held-kickoff starts and limit-reset schedules keep today's blocking behavior.",
+      "NonGoals": "- No server change: message routes, the receipts cache and the 120 s client request bound stay as they are.\n- /pan commands, held-kickoff Send and limit-reset schedule Send must keep blocking the composer and keep their text until their round trip succeeds; they do not use the send queue.\n- A failed prompt send must not put its text back into the composer (PAN-2083); it lives only in the outbox.\n- No change to SubagentComposer, TellComposer, HomeComposer or any other composer.\n- No reload durability for queued sends and no cancel control for a queued send.\n- No allowlist row in scripts/file-size-allowlist.txt; ComposerFooter.tsx stays at or under 1000 lines.\n- No edits to the external OKF knowledge bundle (../overdeck-knowledge).\n- No change to how releaseHeldMessages resends: it already drops deliverAs and agentId, so a steer held behind a held bubble is released as a plain send."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Put the queue in a new module lib/composerSendQueue.ts instead of inside composerStore.ts",
+        "rationale": "The issue names composerStore.ts only as an example; a standalone module is unit-testable alone and keeps ComposerFooter.tsx under the 1000-line file-size ceiling."
+      },
+      {
+        "summary": "/pan commands bypass the queue and keep blocking the composer",
+        "rationale": "The issue says commands keep their current behavior; they are answered by the dashboard control plane and never reach the agent transcript, so prompt ordering does not apply."
+      },
+      {
+        "summary": "Steer sends (Ctrl/Cmd+Enter) are queued like any prompt",
+        "rationale": "Requirement 2 says messages for one conversation reach the agent in Send order; a steer that overtakes an in-flight prompt would break that."
+      },
+      {
+        "summary": "Held-message resends and outbox retries also go through the queue, and a queued prompt behind a held bubble is held without a POST",
+        "rationale": "Without this, a permission-prompt hold or a retry lets a later message reach the agent before an earlier one, which requirement 2 forbids."
+      },
+      {
+        "summary": "A queued bubble restarts its createdAt when its POST starts",
+        "rationale": "useComposerEchoes counts TURN_STALL_MS from createdAt; queue wait plus a slow POST could otherwise move a just-delivered message to the outbox as Not found in transcript."
+      },
+      {
+        "summary": "Draft helpers move to lib/composerDraft.ts and Send calls an explicit clearDraft",
+        "rationale": "Requirement 5 asks for removal at send time; the debounce plus pagehide flush misses a crash inside 300 ms, and every ComposerFooter test mocks ComposerPromptEditor, so a helper there could not be tested against real localStorage."
+      },
+      {
+        "summary": "An outbox Retry of a deliveryUnknown:false failure sends a fresh clientMessageId",
+        "rationale": "The server receipts cache replays a cached 409 for the old id, so Retry of input-target-not-main would always fail; once failed text lives only in the outbox, Retry must actually resend, and a proven non-delivery cannot duplicate."
+      },
+      {
+        "summary": "Editor focus happens once at Send, never when a queued POST settles",
+        "rationale": "The editor no longer goes read-only, so the old refocus is not needed, and a late focus could pull the cursor away from wherever the operator is working."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-13-PAN-5184-composer-keeps-sent-text-and-blocks-a-second-send-until-the-server-acknowledges.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "send-queue",
+        "title": "Add the per-conversation send queue module lib/composerSendQueue.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T13:45:00Z",
+        "metadata": {
+          "issueLabel": "pan-5184",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "store-held-order",
+            "store-retry-queue",
+            "queued-prompt-send",
+            "composer-prompt-path"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/composerSendQueue.ts",
+            "src/dashboard/frontend/src/lib/__tests__/composerSendQueue.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/__tests__/composerSendQueue.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "composerSendQueue.test.ts reports 4 passed tests",
+            "typecheck:frontend completes without errors"
+          ],
+          "traces": [
+            "FR-3",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/lib/composerSendQueue.ts exactly as PRD WI-1 shows: enqueueConversationSend<T>(conversationName, task) chains each task behind the previous tail for that conversation, starts synchronously when the queue is empty, keeps a never-rejecting tail so a failed task never blocks later ones, and deletes the map entry when the last tail settles; export resetConversationSendQueues() for tests. Put the header comment from the PRD on the module, including the warning never to enqueue from inside a running task for the same conversation. Add lib/__tests__/composerSendQueue.test.ts with the four named tests from WI-1 (deferred promises, no timers needed) and add the test path to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "send-queue.ac1",
+            "title": "When task A for conversation x is pending, then task B enqueued for x starts only after A resolves, and the test records the start order A, B",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "send-queue.ac2",
+            "title": "When task A rejects, then the promise returned for A rejects with A's error and task B still runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "send-queue.ac3",
+            "title": "Given tasks for conversations x and y, both tasks start before either resolves (different conversations run concurrently)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "send-queue.ac4",
+            "title": "Given an empty queue, the task's first synchronous statement runs before enqueueConversationSend returns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "draft-module",
+        "title": "Move draft helpers into lib/composerDraft.ts with a clearDraft export",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T13:45:00Z",
+        "metadata": {
+          "issueLabel": "pan-5184",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "refactor",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/composerDraft.ts",
+            "src/dashboard/frontend/src/lib/__tests__/composerDraft.test.ts",
+            "src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/__tests__/composerDraft.test.ts src/components/chat/__tests__/ComposerPromptEditor.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "composerDraft.test.ts and ComposerPromptEditor.test.tsx report all tests passed",
+            "typecheck:frontend completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/lib/composerDraft.ts and move getDraftKey, loadDraft and saveDraft out of components/chat/ComposerPromptEditor.tsx (the \"Draft persistence\" block, lines 37-59) unchanged, exporting all three, and add clearDraft(conversationName) which calls saveDraft(conversationName, ''). ComposerPromptEditor.tsx imports loadDraft and saveDraft from ../../lib/composerDraft and re-exports loadDraft so ComposerFooter.tsx and SubagentComposer.tsx imports keep working. Add lib/__tests__/composerDraft.test.ts with the two tests from PRD WI-2 and list it in scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "draft-module.ac1",
+            "title": "Given localStorage conv-draft:c1 = hi, when clearDraft('c1') runs, then localStorage.getItem('conv-draft:c1') returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "draft-module.ac2",
+            "title": "grep -n \"function saveDraft\" on ComposerPromptEditor.tsx prints nothing, and ComposerPromptEditor.tsx still exports loadDraft (SubagentComposer.tsx typechecks unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "draft-module.ac3",
+            "title": "The existing ComposerPromptEditor.test.tsx draft flush test (pagehide) still passes against the moved helpers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "store-held-order",
+        "title": "Keep held messages in order: holdBehindHeld action and releaseHeld through the queue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T13:45:00Z",
+        "metadata": {
+          "issueLabel": "pan-5184",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/composerStore.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/composerHeldMessages.test.tsx"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/chat/__tests__/composerHeldMessages.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "composerHeldMessages.test.tsx reports all tests passed, including the three new held-order tests",
+            "typecheck:frontend completes without errors"
+          ],
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/lib/composerStore.ts add the store action holdBehindHeld(conversationName, clientMessageId): boolean declared next to hold in interface ComposerStore: when any other optimistic bubble of the slice is held, mark this bubble held (deliveryState held, heldAt Date.now()) and return true, otherwise change nothing and return false. Rewrite releaseHeldMessages (line 317) so each iteration runs inside enqueueConversationSend as PRD WI-3 shows, returning next, stop or done, with the flip-to-pending, POST, acknowledge, re-hold and failSend logic unchanged. Make resetComposerStore() also call resetConversationSendQueues(). Add the three named tests from WI-3 to components/chat/__tests__/composerHeldMessages.test.tsx."
+        },
+        "items": [
+          {
+            "id": "store-held-order.ac1",
+            "title": "Given bubble A held and bubble B pending, holdBehindHeld(name, B.clientMessageId) returns true and marks B held",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-held-order.ac2",
+            "title": "Given no held bubble, holdBehindHeld returns false and B keeps deliveryState pending",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-held-order.ac3",
+            "title": "When a deferred task is queued for the conversation, then releaseHeld sends no /message fetch until that task resolves, and then resends the held bubble",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "store-retry-queue",
+        "title": "Route retryFailed POSTs through the send queue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T13:45:00Z",
+        "metadata": {
+          "issueLabel": "pan-5184",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/composerStore.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/composerHeldMessages.test.tsx"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/chat/__tests__/composerHeldMessages.test.tsx src/lib/__tests__/composerStore.test.ts src/lib/__tests__/composerDelivery.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "the three test files report all tests passed",
+            "typecheck:frontend completes without errors"
+          ],
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In retryFailed in src/dashboard/frontend/src/lib/composerStore.ts (line 631) wrap only the sendConversationMessage call in enqueueConversationSend(conversationName, () => sendConversationMessage(...)) as PRD WI-4 shows, leaving the optimistic bubble, removeFailed, acknowledge and failSend logic unchanged. Add the test \"retryFailed waits for an in-flight queued send\" to components/chat/__tests__/composerHeldMessages.test.tsx and confirm composerStore.test.ts and composerDelivery.test.ts still pass, since an empty queue starts the POST synchronously."
+        },
+        "items": [
+          {
+            "id": "store-retry-queue.ac1",
+            "title": "When a deferred task is queued for the conversation, then retryFailed sends its /message fetch only after that task resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-retry-queue.ac2",
+            "title": "Given an empty queue, retryFailed sends its /message fetch in the same call, so composerStore.test.ts and composerDelivery.test.ts still pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "store-retry-fresh-id",
+        "title": "Retry a proven non-delivery under a fresh clientMessageId",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T13:45:00Z",
+        "metadata": {
+          "issueLabel": "pan-5184",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/composerStore.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/composerHeldMessages.test.tsx"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/chat/__tests__/composerHeldMessages.test.tsx src/lib/__tests__/composerStore.test.ts src/lib/__tests__/composerDelivery.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "the three test files report all tests passed, including the fresh-identity retry test",
+            "typecheck:frontend completes without errors"
+          ],
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "In retryFailed in src/dashboard/frontend/src/lib/composerStore.ts extend isFreshIdentity with || failed.deliveryUnknown === false as PRD WI-9 shows, and extend the comment above it: the server receipts cache replays any response, including a 409, under the old clientMessageId, and a deliveryUnknown false response proves nothing was pasted, so a fresh send cannot duplicate it. Leave neverSent (heldOffline) handling unchanged. Add the test retries a deliveryUnknown:false failure under a fresh clientMessageId to components/chat/__tests__/composerHeldMessages.test.tsx."
+        },
+        "items": [
+          {
+            "id": "store-retry-fresh-id.ac1",
+            "title": "Given a failed prompt with clientMessageId c-old and deliveryUnknown false, when retryFailed runs, then the POST body carries a clientMessageId other than c-old and no retry key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-retry-fresh-id.ac2",
+            "title": "Given a failed prompt with deliveryUnknown true, retryFailed still sends the old clientMessageId with retry true, so the existing composerDelivery.test.ts retry test passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "store-send-clock",
+        "title": "Add markSendStarted so queue wait time never counts toward TURN_STALL_MS",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T13:45:00Z",
+        "metadata": {
+          "issueLabel": "pan-5184",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/composerStore.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/composerHeldMessages.test.tsx"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/chat/__tests__/composerHeldMessages.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "composerHeldMessages.test.tsx reports all tests passed, including the markSendStarted test",
+            "typecheck:frontend completes without errors"
+          ],
+          "traces": [
+            "FR-9",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the store action markSendStarted(conversationName, clientMessageId) to src/dashboard/frontend/src/lib/composerStore.ts and declare it in interface ComposerStore: on the optimistic bubble with that clientMessageId set createdAt to new Date().toISOString(), and set deliveryState back to pending when it was unknown; leave other or missing bubbles unchanged. Add the fake-timer test from PRD WI-5 (vi.useFakeTimers plus vi.setSystemTime, no real waits) to components/chat/__tests__/composerHeldMessages.test.tsx."
+        },
+        "items": [
+          {
+            "id": "store-send-clock.ac1",
+            "title": "Given a bubble created at T0 and marked unknown, when markSendStarted runs at T0+5min, then the bubble createdAt equals the new time and deliveryState returns to pending",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-send-clock.ac2",
+            "title": "When markSendStarted names a clientMessageId that is not in the slice, then the store returns an unchanged slice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "queued-prompt-send",
+        "title": "Add deliverQueuedPrompt in components/chat/queuedPromptSend.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T13:45:00Z",
+        "metadata": {
+          "issueLabel": "pan-5184",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/queuedPromptSend.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/queuedPromptSend.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/chat/__tests__/queuedPromptSend.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "queuedPromptSend.test.ts reports 4 passed tests",
+            "typecheck:frontend completes without errors"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-7",
+            "FR-9",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/chat/queuedPromptSend.ts with the QueuedPrompt interface and deliverQueuedPrompt exactly as PRD WI-6 shows: call holdBehindHeld and return when it is true, call markSendStarted, POST via sendConversationMessage with clientMessageId and the steer-degraded toast, then route a ui result to onOpenUi, a command result to addCommandResult, and an empty result to onAcknowledged; a permission-pending MessageSendError calls hold, any other error logs, toasts and calls onFailed with kind prompt, the clientMessageId and deliverAs. It never touches the editor. Add components/chat/__tests__/queuedPromptSend.test.ts with the four named tests and list it in scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "queued-prompt-send.ac1",
+            "title": "When the /message POST returns 200 with an empty body, then onAcknowledged receives (message, clientMessageId)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "queued-prompt-send.ac2",
+            "title": "Given a bubble seeded with addOptimistic, when the POST returns 409 with code permission-pending, then the bubble is marked held and onFailed is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "queued-prompt-send.ac3",
+            "title": "When the POST returns 500, then onFailed receives kind prompt with details.clientMessageId and toast.error is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "queued-prompt-send.ac4",
+            "title": "Given seeded bubble A held and seeded bubble B pending, deliverQueuedPrompt for B sends no /message fetch and marks B held",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-prompt-path",
+        "title": "Clear the composer on prompt Send and post prompts through the send queue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T13:45:00Z",
+        "metadata": {
+          "issueLabel": "pan-5184",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.send-queue.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/chat/__tests__/ComposerFooter.send-queue.test.tsx src/components/chat/__tests__/ComposerFooter.test.tsx src/components/chat/__tests__/ComposerFooter.citations.test.tsx src/components/chat/__tests__/ComposerFooter.schedule.test.tsx src/components/chat/__tests__/ComposerFooter.native.test.tsx src/components/chat/__tests__/ComposerFooter.streaming-render-count.test.tsx src/components/chat/__tests__/ComposerFooter.model-picker.test.tsx src/components/chat/__tests__/composerHeldMessages.test.tsx src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "wc -l src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "all listed ComposerFooter, composerHeldMessages and ConversationPanel test files report all tests passed",
+            "wc -l prints 1000 or fewer lines for ComposerFooter.tsx",
+            "typecheck and lint complete without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit handleSubmit in src/dashboard/frontend/src/components/chat/ComposerFooter.tsx as PRD WI-7 shows: remove the unconditional setSendingFor(true) at line 492 and set it only in the schedule branch and the /pan command branch; for a prompt, call onSend, consumeAttachments, clearDraft, clear the editor, setText('') and editor.focus() synchronously, then void enqueueConversationSend(name, () => deliverQueuedPrompt({...})) with the captured callbacks and return; keep the /pan command branch blocking with its post-success clear, toast, onSendFailed(kind command) and finally. No code clears or focuses the editor after a prompt POST settles. Add components/chat/__tests__/ComposerFooter.send-queue.test.tsx with the six named tests from WI-7 (do not mock lib/composerDraft), list it in scripts/frontend-test-subset.txt, rewrite the ComposerFooter.test.tsx line 701 Sending-state test onto /pan status, and keep ComposerFooter.tsx at 1000 lines or fewer."
+        },
+        "items": [
+          {
+            "id": "composer-prompt-path.ac1",
+            "title": "When the operator clicks Send on a prompt and the /message POST is still pending, then the editor text is empty, the editor is not disabled, and onSend was called once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-prompt-path.ac2",
+            "title": "When a second prompt is sent while the first POST is pending, then the composer accepts it and sends exactly one /message request until the first resolves, then sends the second with body two",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-prompt-path.ac3",
+            "title": "Given onSend wired to addOptimistic and onSendFailed wired to failSend, when the /message POST returns 500, then the outbox slice contains the sent text and the editor text stays empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-prompt-path.ac4",
+            "title": "Given localStorage conv-draft:test-conv = hi, when hi is sent with a pending POST, then localStorage.getItem('conv-draft:test-conv') returns null before the POST resolves, and text typed after Send survives the first POST resolving",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-prompt-path.ac5",
+            "title": "When /pan status is sent with a pending POST, then the editor stays disabled and keeps its text until the result resolves, and the rewritten unmount/remount test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Document the clear-on-send composer and its send queue, and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T13:45:00Z",
+        "metadata": {
+          "issueLabel": "pan-5184",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5184.md"
+          ],
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c composerSendQueue docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -c \"the draft stays in the editor\" docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "the composerSendQueue grep prints 1 or more",
+            "the \"draft stays in the editor\" grep prints 0"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/DASHBOARD-ARCHITECTURE.md, in the bullet that starts \"HTTP acceptance and transcript confirmation are distinct\", add the PAN-5184 paragraph from PRD WI-8 step 1 after the deliveryState list, and replace \"the toast shows the reason, and the draft stays in the editor\" with \"the toast shows the reason, and the message moves to the outbox, whose Retry sends it again under a fresh clientMessageId\". Create changelog.d/pan-5184.md with the #### Fixed entry from WI-8 step 3, following changelog.d/README.md. Run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains composerSendQueue and states that a prompt Send clears the composer and its conv-draft key, that sends run in Send order, and that /pan commands still block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md no longer contains \"the draft stays in the editor\" and instead says the message moves to the outbox",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac3",
+            "title": "changelog.d/pan-5184.md contains a #### Fixed heading with one bullet linking issue 5184, and npm run lint:docs passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "send-queue",
+        "to": "store-held-order",
+        "type": "blocks"
+      },
+      {
+        "from": "send-queue",
+        "to": "store-retry-queue",
+        "type": "blocks"
+      },
+      {
+        "from": "store-held-order",
+        "to": "store-retry-queue",
+        "type": "blocks"
+      },
+      {
+        "from": "store-retry-queue",
+        "to": "store-retry-fresh-id",
+        "type": "blocks"
+      },
+      {
+        "from": "store-retry-fresh-id",
+        "to": "store-send-clock",
+        "type": "blocks"
+      },
+      {
+        "from": "store-held-order",
+        "to": "queued-prompt-send",
+        "type": "blocks"
+      },
+      {
+        "from": "store-send-clock",
+        "to": "queued-prompt-send",
+        "type": "blocks"
+      },
+      {
+        "from": "send-queue",
+        "to": "composer-prompt-path",
+        "type": "blocks"
+      },
+      {
+        "from": "draft-module",
+        "to": "composer-prompt-path",
+        "type": "blocks"
+      },
+      {
+        "from": "queued-prompt-send",
+        "to": "composer-prompt-path",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

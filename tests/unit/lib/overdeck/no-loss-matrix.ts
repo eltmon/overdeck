@@ -973,6 +973,22 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'pan.readFileAtPath',             kind: 'rpc', disposition: 'RELOCATE',    door: 'File-at-path door (src/dashboard/server/services/file-at-path.ts, PAN-3260)' },
   { surface: 'pan.writeFileAtPath',            kind: 'rpc', disposition: 'RELOCATE',    door: 'File-at-path door (src/dashboard/server/services/file-at-path.ts, PAN-3260)' },
 
+  // File explorer (PAN-5183)
+  { surface: 'pan.explorerListDir',            kind: 'rpc', disposition: 'READ',       door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
+  { surface: 'pan.explorerReadFile',           kind: 'rpc', disposition: 'READ',       door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
+  { surface: 'pan.explorerWriteFile',          kind: 'rpc', disposition: 'WRITE',      door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
+  { surface: 'pan.explorerCreate',             kind: 'rpc', disposition: 'WRITE',      door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
+  { surface: 'pan.explorerRename',             kind: 'rpc', disposition: 'WRITE',      door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
+  { surface: 'pan.explorerCopy',               kind: 'rpc', disposition: 'WRITE',      door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
+  { surface: 'pan.explorerDelete',             kind: 'rpc', disposition: 'WRITE',      door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
+  { surface: 'pan.explorerRestore',            kind: 'rpc', disposition: 'WRITE',      door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
+  { surface: 'pan.explorerGitStatus',          kind: 'rpc', disposition: 'READ',       door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
+  { surface: 'pan.explorerGitStage',           kind: 'rpc', disposition: 'WRITE',      door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
+  { surface: 'pan.explorerSearchFiles',        kind: 'rpc', disposition: 'READ',       door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
+  { surface: 'pan.explorerSearchContent',      kind: 'rpc', disposition: 'READ',       door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
+  { surface: 'pan.explorerWatch',              kind: 'rpc', disposition: 'READ',       door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
+  { surface: 'pan.explorerBeginEdit',          kind: 'rpc', disposition: 'WRITE',      door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
+
   // Terminal control
   { surface: 'pan.terminalOpen',               kind: 'rpc', disposition: 'RELOCATE',    door: 'Terminal RPC (ws-terminal.ts)' },
   { surface: 'pan.terminalWrite',              kind: 'rpc', disposition: 'RELOCATE',    door: 'Terminal RPC (ws-terminal.ts)' },

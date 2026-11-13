@@ -628,10 +628,20 @@ door that does not exist; a real record read door would be a separate change.
   into a running subagent instead of this conversation; PAN-4247), `held` ("Waiting:
   the agent needs a permission answer first"; see "Terminal permission prompts and held
   messages" below, PAN-4278), or `scheduled` (a server-held message waiting for a usage
-  limit to reset; see "Scheduled messages: send when limits reset" below, PAN-4641). Before pasting, the
+  limit to reset; see "Scheduled messages: send when limits reset" below, PAN-4641).
+  A prompt Send clears the composer and its `conv-draft:<name>` key at once; the bubble
+  carries the text (PAN-5184). The composer stays editable, so the operator can send again
+  while earlier sends are in flight. `lib/composerSendQueue.ts` runs a conversation's
+  composer POSTs, held-message resends and outbox retries one at a time in Send order; a
+  failed POST never blocks the ones behind it, and a queued prompt behind a `held` bubble
+  is held too. A queued bubble's `createdAt` restarts when its POST starts, so queue time
+  never counts toward `TURN_STALL_MS`. `/pan` commands, held-kickoff starts and
+  limit-reset schedules still block the composer until their round trip finishes. Before pasting, the
   composer route checks Claude Code's agent selector and switches input back to the main
   agent (PAN-4268); if that cannot be confirmed the route answers 409
-  `input-target-not-main`, the toast shows the reason, and the draft stays in the editor.
+  `input-target-not-main`, the toast shows the reason, and the message moves to the
+  outbox, whose Retry sends it again under a fresh `clientMessageId` because the
+  response proved nothing was delivered (PAN-5184).
   Conversation rows carry `inputTarget` (`'main' | { subagent } | 'unknown'`), which
   drives the composer's "Typed messages are going to subagent" notice. An `accepted` bubble
   that stays unmatched for `TURN_STALL_MS` (4 minutes) **while the conversation is not
@@ -1619,3 +1629,149 @@ existing tests that mock `child_process` for `docker`/`tmux` keep behaving as
 before. A test that needs a missing tool calls
 `setHostToolFinderForTests(() => null)` and resets with
 `resetHostToolsForTests()` in its own `afterEach`.
+
+## File explorer server (PAN-5183)
+
+The file explorer's server half lives in `src/dashboard/server/services/explorer/`
+and is reached only through the 14 `pan.explorer*` RPC methods on `/ws/rpc`. Their
+handlers are in `src/dashboard/server/ws-rpc-explorer.ts`, which ws-rpc.ts spreads
+into `PanRpcGroup.of`. Schemas are in `packages/contracts/src/explorer.ts`. No
+HTTP route exists, and the methods have no `RPC_METHOD_SCOPES` entry, so they
+default to the `admin` scope.
+
+### Roots and path safety
+
+Every request names an explorer root by id. `resolveExplorerRoot` (`roots.ts`)
+turns it into a realpath'd directory, and any failure is `ROOT_NOT_FOUND`:
+
+- `project:<key>` is the project's primary checkout. It is read-only: a write
+  fails with `EDIT_WORKSPACE_REQUIRED` before anything is changed.
+- `issue:<ID>` is the issue's feature workspace, `workspaces/feature-<id>`. Its
+  canonical id is upper-cased (`issue:PAN-1`).
+- `workspace:<id>` is a scratch edit workspace from the workspace registry. A
+  scratch row can point at the primary checkout or at any directory, so it is
+  accepted only when the row is `kind: 'scratch'`, not archived, on a
+  `scratch/` branch, belongs to a registered project, and its realpath is a
+  directory strictly inside the project's `workspaces/` dir and not the primary
+  checkout. Without that rule a scratch row could turn the primary checkout
+  into a writable root.
+
+Paths inside a root are root-relative POSIX strings (`''` is the root itself).
+`resolveInsideRoot` (`paths.ts`) rejects absolute paths, backslashes, NUL
+bytes, drive prefixes and empty, `.` or `..` segments with `PATH_OUTSIDE_ROOT`.
+It then realpaths the nearest existing ancestor and requires it to stay inside
+the root, so a symlink cannot escape; a dangling symlink is refused because its
+target cannot be checked. For writes it also refuses git folders with
+`PATH_IN_GIT_DIR`: any `.git` segment (including the NTFS spellings `GIT~1`
+and `.git.`), and any directory git recognizes as a repository, such as a
+renamed bare repo whose hooks could run code (`git-dir-guard.ts`, ported from
+t3code).
+
+### Methods
+
+| Method | Kind | Owner | What it does |
+| --- | --- | --- | --- |
+| `pan.explorerListDir` | read | PAN-5185 | One directory, unsorted, with git-ignore flags; capped at 10,000 entries |
+| `pan.explorerReadFile` | read | PAN-5185 | A file as text, binary or large-text (over 5 MiB), with a disk signature; `ref: 'HEAD'` reads the committed version |
+| `pan.explorerGitStatus` | read | PAN-5185 | Per-path status from `git status --porcelain=v2`, the branch, and files committed since the default branch |
+| `pan.explorerGitStage` | write (index) | PAN-5185 | Stage, unstage or discard paths |
+| `pan.explorerSearchFiles` | read | PAN-5185 | Fuzzy file-name search over tracked and untracked, non-ignored files (30 s cache) |
+| `pan.explorerSearchContent` | read | PAN-5185 | `git grep`, literal or regex, with UTF-16 columns |
+| `pan.explorerWatch` | stream | PAN-5185 | Batches of change events for a root |
+| `pan.explorerWriteFile` | write | PAN-5187 | Stub: `NOT_IMPLEMENTED` |
+| `pan.explorerCreate` | write | PAN-5187 | Stub: `NOT_IMPLEMENTED` |
+| `pan.explorerRename` | write | PAN-5187 | Stub: `NOT_IMPLEMENTED` |
+| `pan.explorerCopy` | write | PAN-5187 | Stub: `NOT_IMPLEMENTED` |
+| `pan.explorerDelete` | write | PAN-5187 | Stub: `NOT_IMPLEMENTED` |
+| `pan.explorerRestore` | write | PAN-5187 | Stub: `NOT_IMPLEMENTED` |
+| `pan.explorerBeginEdit` | write | PAN-5191 | Stub: `NOT_IMPLEMENTED` |
+
+Errors are `PanRpcError`s whose `code` is one of `EXPLORER_ERROR_CODES`:
+`ROOT_NOT_FOUND`, `PATH_OUTSIDE_ROOT`, `PATH_IN_GIT_DIR`, `NOT_FOUND`,
+`ALREADY_EXISTS`, `DISK_CONFLICT`, `EDIT_WORKSPACE_REQUIRED`, `FILE_TOO_LARGE`,
+`NOT_A_GIT_REPO`, `NOTHING_TO_COMMIT`, `NOT_IMPLEMENTED`, `INVALID_QUERY` (a
+regex git rejects) and `EXPLORER_FAILED` (anything else, with the cause in the
+message). A stub's message names the issue that ships it.
+
+Discard never removes a file that is not in `HEAD`. A request that names such a
+file, or a directory holding an index entry that is not in `HEAD`, fails as a
+whole with `NOT_IMPLEMENTED` before git runs, because `git restore` in its
+default no-overlay mode would delete it. Removing those files waits for the
+Overdeck trash in PAN-5187. Git actions also refuse a root that is not the top
+level of its checkout, so git can never fall through to an enclosing
+repository's index.
+
+### Git calls
+
+Explorer git calls go through `runGit` (`git-exec.ts`), one async
+`spawn` wrapper with a timeout (10 s by default) and an output cap. It passes
+`-c core.fsmonitor=false --literal-pathspecs`, so a file named `*.ts` or `:x`
+is a plain path and `git add -- '*.ts'` stages that one file. The exception is
+`git check-ignore`, which rejects the flag and already reads its paths
+literally. It also sets `GIT_OPTIONAL_LOCKS=0`, so `git status` never rewrites
+`.git/index` and never contends for `index.lock` with an agent working in the
+same worktree, and `GIT_TERMINAL_PROMPT=0`, so git never waits on a prompt.
+One lookup bypasses it: `gitStatus` finds the base ref for `committed` with
+`resolveBaseRef` (`src/lib/checkpoint/checkpoint-manager.ts`), the same
+function the vs-main diff panel uses, so both agree on the base. It runs
+`git rev-parse --verify --quiet` through its own `execFile`, a read-only call
+that takes no lock.
+
+### Watcher
+
+`@parcel/watcher` froze the dashboard when it shared a process with
+child-process spawning (SIGCHLD, PAN-4193), so it runs only in a forked child,
+`dist/dashboard/explorer-watch-child.js` (entry
+`services/explorer/watch-child.ts`, logic in `watch-child-runtime.ts`). The
+child never spawns a process. A `writeBundle` assertion in
+`src/dashboard/server/tsdown.config.ts` fails the build if any other chunk
+imports `@parcel/watcher` or the child chunk is missing. The desktop packager
+lists `explorer-watch-child.js` in `ENTRY_POINTS`
+(`apps/desktop/scripts/prepare-server-resources.mjs`) so the packaged app
+stages its native dependency.
+
+`watch-supervisor.ts` owns the child from the dashboard process:
+
+- It forks the child on the first subscription and kills it 60 s after the last
+  subscription ends. Several listeners on one root share one parcel
+  subscription.
+- The child sends a heartbeat every 5 s. An exit, or 15 s without any message,
+  is a crash: the supervisor forks a new child, re-watches every root and sends
+  every listener an `overflow` event (`path: ''`), which tells clients to
+  re-list what they show.
+- After 3 restarts in 5 minutes it stops forking (poll mode) and sends every
+  listener `overflow` every 5 s. A root the child could not watch
+  (`watch-failed`, for example when inotify runs out of watches) is polled the
+  same way while other roots keep real events. Poll mode ends when the last
+  listener leaves.
+- A send to a closed IPC channel is skipped, and every child has an `error`
+  listener, so a dying child can never throw into the dashboard.
+
+In the child, each root's events pass through `createWatchBatcher`
+(`watch-batch.ts`, ported from Orca): the first event flushes after 75 ms,
+later flushes come every 100 ms, an armed timer is never reset, a create then
+delete of one path cancels out, and more than 5,000 events in one window
+collapse into one `overflow`. Parcel gets one anchored ignore regex
+(`watch-ignore.ts`, ported from Orca) for `.git`, `node_modules`, `dist` and
+the other generated directories at any depth, because leading-`**` globs are
+slow in parcel's regex engine. It also gets a root-only regex for the root's
+git-ignored top-level directories, plus `workspaces/` for project roots. Every
+watch batch also invalidates that root's file-name search cache.
+
+### Upstream ports
+
+Files that port logic from Orca or t3code start with a header naming the
+upstream, its license and the source path and commit:
+
+```ts
+// Ported from Orca (MIT, Copyright (c) 2026 Lovecast Inc.)
+// upstream: src/shared/file-write/disk-baseline-signature.ts @ c6b9ac9549b
+```
+
+`scripts/upstream-ports.json` holds one record per ported file and upstream
+path. `npm run lint` runs `scripts/upstream-port-diff.sh --check`, which
+fails when a record and its file's header disagree. Run
+`bash scripts/upstream-port-diff.sh [orca|t3code] [--patch]` with the upstream
+checkouts in `~/Projects/` to list the upstream commits that changed each
+ported file since its port. The license texts are in `licenses/`, and
+`docs/ACKNOWLEDGEMENTS.md` credits both projects.

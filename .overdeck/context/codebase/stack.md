@@ -47,8 +47,10 @@
   dashboard halves, where server and frontend are shrink-only ratchets
   (`scripts/lint-dashboard-types.sh`, `scripts/lint-frontend-types.sh`) — note
   those two ratchets live in the **typecheck** chain, not the lint chain.
-  `packages/effect-acp` is checked by the root `typecheck:acp` lane; `packages/contracts`
-  remains typechecked by no root gate.
+  `packages/effect-acp` is checked by the root `typecheck:acp` lane and `packages/contracts`
+  by `typecheck:contracts` (package source). The dashboard server's typecheck resolves
+  `@overdeck/contracts` to `packages/contracts/dist/`, so run `npm run build:contracts`
+  first after a contracts change; Vitest and the frontend alias the source.
 - **Agent substrate:** Herdr terminal backend by default (strict — no silent
   tmux fallback); tmux on a dedicated `overdeck` socket (`tmux -L overdeck`)
   only with `terminal.backend: tmux`; per-agent state under `~/.overdeck/agents/`;
