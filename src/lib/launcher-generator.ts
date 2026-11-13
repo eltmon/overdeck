@@ -1,13 +1,11 @@
 import { agentTmpdirLauncherLine } from './agent-tmpdir.js';
 import { museDataHome } from './runtimes/storage/muse.js';
 import { prepareClaudeContext } from './launcher-context.js';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import type { Role } from './agents.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
-import { qualifyPiModel, resolveKimiCodeModelAlias } from './providers.js';
-import { provisionOhmypiProviderForModel } from './ohmypi-models.js';
-import { provisionPiProviderForModel } from './pi-models.js';
-import { getPiFamilyProfile, type PiFamilyHarness } from './runtimes/pi-family.js';
+import { resolveKimiCodeModelAlias } from './providers.js';
+import { buildPiFamilyCommand, provisionPiFamilyModel } from './launcher-pi-command.js';
 import { shellQuoteModelId } from './model-validation.js';
 import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
 import { getOverdeckHome, packageRoot } from './paths.js';
@@ -314,7 +312,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
   // from the catalog must be provisioned before spawn: omp fails with "No
   // model selected", and pi silently binds another provider's model.
   if (getHarnessBehavior(config.harness ?? 'claude-code').launchCommandKind === 'ohmypi-rpc' && config.model) {
-    PI_FAMILY_MODEL_PROVISIONERS[getPiFamilyProfile(config.harness).harness](config.model);
+    provisionPiFamilyModel(config.harness, config.model);
   }
 
   // Shebang
@@ -534,7 +532,7 @@ function buildCommand(config: LauncherConfig): string[] {
 
   if (config.spawnMode === 'conversation') {
     if (behavior.launchCommandKind === 'ohmypi-rpc') {
-      return buildOhmypiCommand(config, false);
+      return buildPiFamilyCommand({ ...config, systemPromptFiles: systemPromptFiles(config) }, false);
     }
     if (behavior.launchCommandKind === 'codex-work-tui') {
       return buildCodexCommand(config, false, cmd => wrapWithSupervisor(config, cmd));
@@ -653,7 +651,7 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
   const behavior = getHarnessBehavior(config.harness ?? 'claude-code');
   if (behavior.launchCommandKind === 'muse-tui') return buildMuseCommand(config, useExec);
   if (behavior.launchCommandKind === 'ohmypi-rpc') {
-    return buildOhmypiCommand(config, useExec);
+    return buildPiFamilyCommand({ ...config, systemPromptFiles: systemPromptFiles(config) }, useExec);
   }
   if (behavior.launchCommandKind === 'codex-work-tui') {
     return buildCodexCommand(config, useExec, cmd => wrapWithSupervisor(config, cmd));
@@ -721,104 +719,6 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
   const wrapped = wrapWithSupervisor(config, cmd.trim());
   parts.push(useExec ? `exec ${wrapped}` : wrapped);
   return parts;
-}
-
-const PI_FAMILY_MODEL_PROVISIONERS: Record<PiFamilyHarness, (model: string) => void> = {
-  pi: (model) => provisionPiProviderForModel(model),
-  ohmypi: (model) => provisionOhmypiProviderForModel(model),
-};
-
-/**
- * Build a pi-family command line: pi (PAN-5212) or oh-my-pi (omp, PAN-1989).
- * The binary, resume flag and fixed launch flags come from the harness's
- * {@link getPiFamilyProfile} profile (.pan/pi-vs-omp.md).
- *
- * RPC mode (work-agents):
- *   <pi|omp> --mode rpc \
- *      --model <model> \
- *      --session-dir <piSessionDir> \
- *      --extension <piExtensionPath> \
- *      [--no-approve] \
- *      [--session|--resume <resumeSessionId>] \
- *      [--append-system-prompt "$prompt"] \
- *      <> <piFifoPath> >> <agentDir>/output.log 2>&1
- *
- * TUI mode (conversations): the same without `--mode rpc` and the FIFO.
- *
- * - `--no-context-files` is never emitted: omp removed it, and pi keeps
- *   loading AGENTS.md/CLAUDE.md for parity.
- * - Resume: pi uses `--session <id>` (its `--resume` opens a picker); omp
- *   uses `--resume <id>` (its `--session` silently starts fresh).
- */
-function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] {
-  const profile = getPiFamilyProfile(config.harness);
-  const label = profile.harness;
-  const piMode = config.piMode ?? 'rpc';
-  if (!config.piSessionDir) {
-    throw new Error(`${label} launcher requires piSessionDir`);
-  }
-  if (!config.piEffort) throw new Error(`${label} launcher requires piEffort`);
-  if (piMode === 'rpc') {
-    if (!config.piExtensionPath) {
-      throw new Error(`${label} launcher (rpc mode) requires piExtensionPath`);
-    }
-    if (!config.piFifoPath) {
-      throw new Error(`${label} launcher (rpc mode) requires piFifoPath`);
-    }
-  }
-
-  const tokens: string[] = [profile.binary];
-  if (piMode === 'rpc') {
-    tokens.push('--mode', 'rpc');
-  }
-  tokens.push('--thinking', shellQuote(config.piEffort));
-  if (config.model) {
-    tokens.push('--model', shellQuoteModelId(qualifyPiModel(config.model, profile.harness)));
-  }
-  tokens.push('--session-dir', shellQuote(config.piSessionDir));
-  if (config.piExtensionPath) {
-    tokens.push('--extension', shellQuote(config.piExtensionPath));
-  }
-  tokens.push(...profile.launchArgs);
-
-  // One append value carrying every layer: omp accepts only one (repeating
-  // the flag loses earlier layers); pi accepts the joined value the same way.
-  const promptSections = systemPromptFiles(config).map(file => `"$(cat -- ${shellQuote(file)})"`);
-  if (config.promptFile) promptSections.push('"$prompt"');
-  else if (config.promptInline) promptSections.push(shellQuote(config.promptInline));
-  if (promptSections.length > 0) {
-    tokens.push('--append-system-prompt', `"$(printf '%s\\n\\n' ${promptSections.join(' ')})"`);
-  }
-
-  if (config.resumeSessionId) {
-    tokens.push(profile.resumeFlag, shellQuote(config.resumeSessionId));
-  }
-  if (config.extraArgs) {
-    tokens.push(config.extraArgs);
-  }
-  let cmd = tokens.join(' ').replace(/\s+/g, ' ').trim();
-
-  if (piMode === 'rpc') {
-    // PAN-2108: capture the harness's exit so a silent post-startup death leaves a trace.
-    // The launcher bash must OUTLIVE the harness to record the exit code + timestamp, so
-    // the rpc path deliberately does NOT `exec` (exec would replace bash with the harness
-    // and the exit would be lost — the failure mode that made the flywheel
-    // orchestrator's death undiagnosable). `remain-on-exit on` keeps the dead
-    // pane for `#{pane_exit_status}`; the exit-status file survives even if the
-    // pane is later reaped. The deacon reads both on death detection.
-    const agentDir = dirname(config.piFifoPath!);
-    const outputLogPath = join(agentDir, 'output.log');
-    const exitStatusPath = join(agentDir, 'exit-status');
-    const runLine = `${cmd} <> ${shellQuote(config.piFifoPath!)} >> ${shellQuote(outputLogPath)} 2>&1`;
-    return [
-      runLine,
-      '__omp_exit=$?',
-      `printf '%s %s\\n' "$__omp_exit" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ${shellQuote(exitStatusPath)}`,
-      'exit $__omp_exit',
-    ];
-  }
-
-  return [useExec ? `exec ${cmd}` : cmd];
 }
 
 /**
