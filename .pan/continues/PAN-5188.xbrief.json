@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5188",
   "created": "2026-11-13T17:44:21.691Z",
-  "updated": "2026-11-13T18:05:31.078Z",
+  "updated": "2026-11-13T18:06:44.264Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,9 +84,26 @@
       "doneAt": "2026-11-13T18:05:26.855Z"
     },
     "upload-csrf-guard": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5188",
-      "claimedAt": "2026-11-13T18:05:31.077Z"
+      "claimedAt": "2026-11-13T18:05:31.077Z",
+      "doneAt": "2026-11-13T18:06:44.264Z"
+    },
+    "upload-csrf-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:06:44.264Z"
+    },
+    "upload-csrf-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:06:44.264Z"
+    },
+    "upload-csrf-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:06:44.264Z"
+    },
+    "upload-csrf-guard.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:06:44.264Z"
     }
   }
 }
