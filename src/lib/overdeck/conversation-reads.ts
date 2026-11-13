@@ -21,7 +21,8 @@ import { scanPendingInputs, type PendingAskUserQuestionSnapshot, type PendingInp
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { loadConfigSync } from '../config-yaml.js';
 import { isBackgroundFeatureEnabled } from '../background-ai/features.js';
-import { capturePane, listSessionNames } from '../tmux.js';
+import { resolveAgentPaneIo } from '../terminal-backends/agent-pane-io.js';
+import { listSessionNames } from '../tmux.js';
 import { paneShowsClaudeBootBlockingScreen } from '../cloister/modal-detector.js';
 import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { resolveDiscoveredSessionFile } from '../conversations/discovered-session-file.js';
@@ -204,8 +205,14 @@ export function conversationTranscriptMissing(
   return !sessionFile || !existsSync(sessionFile);
 }
 
-const captureVisiblePane = (sessionName: string): Promise<string> =>
-  capturePane(sessionName, 0);
+/** Herdr `pane.read` lines for the visible screen; tmux keeps `-S -0` (visible only, no scrollback). */
+const HERDR_VISIBLE_SCREEN_LINES = 60;
+
+/** PAN-5169: the visible screen on the host's backend; on Herdr never tmux (throws when Herdr holds no pane). */
+const captureVisiblePane = async (sessionName: string): Promise<string> => {
+  const io = await resolveAgentPaneIo(sessionName, undefined, { legacyTmuxFallback: false });
+  return io.read(io.backend === 'tmux' ? 0 : HERDR_VISIBLE_SCREEN_LINES);
+};
 
 /**
  * An alive claude-code session with no transcript file yet may be parked on a
