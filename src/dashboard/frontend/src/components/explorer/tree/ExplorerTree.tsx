@@ -9,6 +9,7 @@
 import {
   forwardRef,
   useCallback,
+  type ReactNode,
   useEffect,
   useId,
   useMemo,
@@ -19,6 +20,7 @@ import {
 } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 
+import { isInlineRow, type InlineEdit, type InlineRow } from '../actions/inline-edit'
 import type { SelectMode } from '../explorerStore'
 import type { Decorations } from '../git/git-decoration'
 import {
@@ -30,8 +32,18 @@ import {
 } from './explorer-tree-model'
 import { ExplorerRow, ExplorerTruncatedRow, ROW_HEIGHT } from './ExplorerRow'
 
+/** What the tree passes to `renderInline` for a create row or the row being renamed (PAN-5190). */
+export interface InlineRenderProps {
+  depth: number
+  kind: 'file' | 'dir'
+  renamePath?: string
+}
+
+export type ExplorerTreeRowItem = ExplorerTreeItem | InlineRow
+
 export interface ExplorerTreeProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onSelect' | 'onFocus' | 'onToggle'> {
-  rows: readonly ExplorerTreeItem[]
+  /** Projected rows, with the inline create row from `withInlineRow` when one is open. */
+  rows: readonly ExplorerTreeRowItem[]
   decorations: Decorations
   selection: readonly string[]
   focused: string | null
@@ -42,14 +54,34 @@ export interface ExplorerTreeProps extends Omit<HTMLAttributes<HTMLDivElement>, 
   onPreview?(path: string): void
   onFocus(path: string): void
   onContextMenuRow(path: string): void
+  /** The open inline edit; a rename renders its row through `renderInline` (PAN-5190). */
+  inlineEdit?: InlineEdit | null
+  renderInline?(props: InlineRenderProps): ReactNode
 }
 
-function isTreeRow(row: ExplorerTreeItem | undefined): row is TreeRow {
-  return !!row && !isTruncatedRow(row)
+/** A focusable row: not a truncated row and not an inline name row. */
+function isTreeRow(row: ExplorerTreeRowItem | undefined): row is TreeRow {
+  return !!row && !isInlineRow(row) && !isTruncatedRow(row)
 }
 
 export const ExplorerTree = forwardRef<HTMLDivElement, ExplorerTreeProps>(function ExplorerTree(
-  { rows, decorations, selection, focused, onToggle, onSelect, onOpen, onPreview, onFocus, onContextMenuRow, className, onKeyDown, ...rest },
+  {
+    rows,
+    decorations,
+    selection,
+    focused,
+    onToggle,
+    onSelect,
+    onOpen,
+    onPreview,
+    onFocus,
+    onContextMenuRow,
+    inlineEdit = null,
+    renderInline,
+    className,
+    onKeyDown,
+    ...rest
+  },
   forwardedRef,
 ) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -136,7 +168,7 @@ export const ExplorerTree = forwardRef<HTMLDivElement, ExplorerTreeProps>(functi
         if (!row || row.kind !== 'dir') return
         if (!row.expanded) onToggle(row.path)
         else {
-          const child = getFirstChildIndex(rows, focusedIndex)
+          const child = getFirstChildIndex(rows as readonly ExplorerTreeItem[], focusedIndex)
           if (child !== null) move(child, false)
         }
         break
@@ -145,7 +177,7 @@ export const ExplorerTree = forwardRef<HTMLDivElement, ExplorerTreeProps>(functi
         if (!row) return
         if (row.kind === 'dir' && row.expanded) onToggle(row.path)
         else {
-          const parent = getParentIndex(rows, focusedIndex)
+          const parent = getParentIndex(rows as readonly ExplorerTreeItem[], focusedIndex)
           if (parent !== null) move(parent, false)
         }
         break
@@ -188,12 +220,26 @@ export const ExplorerTree = forwardRef<HTMLDivElement, ExplorerTreeProps>(functi
         {virtualItems.map((item) => {
           const row = rows[item.index]
           if (!row) return null
+          const renaming = inlineEdit?.mode === 'rename' && !isInlineRow(row) && !isTruncatedRow(row) && row.path === inlineEdit.path
+          const inline = isInlineRow(row) || renaming
           return (
             <div
               key={row.path}
-              style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${item.start}px)` }}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${item.start}px)`,
+                // The inline row's error line hangs below it, over the next row.
+                zIndex: inline ? 1 : undefined,
+              }}
             >
-              {isTruncatedRow(row) ? (
+              {isInlineRow(row) ? (
+                renderInline?.({ depth: row.depth, kind: row.kind })
+              ) : renaming ? (
+                renderInline?.({ depth: row.depth, kind: row.kind === 'dir' ? 'dir' : 'file', renamePath: row.path })
+              ) : isTruncatedRow(row) ? (
                 <ExplorerTruncatedRow depth={row.depth} />
               ) : (
                 <ExplorerRow

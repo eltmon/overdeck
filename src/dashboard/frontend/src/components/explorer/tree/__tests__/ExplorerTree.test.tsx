@@ -15,6 +15,7 @@ vi.mock('@tanstack/react-virtual', () => ({
 import { ExplorerTree, type ExplorerTreeProps } from '../ExplorerTree'
 import { buildDecorations, EMPTY_DECORATIONS } from '../../git/git-decoration'
 import type { ExplorerTreeItem, TreeRow } from '../explorer-tree-model'
+import { withInlineRow } from '../../actions/inline-edit'
 
 function row(path: string, over: Partial<TreeRow> = {}): TreeRow {
   return {
@@ -166,5 +167,23 @@ describe('ExplorerTree', () => {
   it('points aria-activedescendant at the focused row', () => {
     renderTree({ focused: 'src/b.ts' })
     expect(screen.getByRole('tree').getAttribute('aria-activedescendant')).toBe(item('b.ts').id)
+  })
+
+  it('renders an inline create row through renderInline, and ArrowDown skips it', () => {
+    const rows = withInlineRow(ROWS, { mode: 'create', kind: 'file', parentDir: 'src' })
+    const renderInline = vi.fn(({ depth }: { depth: number }) => <input aria-label="inline" data-depth={depth} />)
+    const props = renderTree({ rows, focused: 'src', inlineEdit: { mode: 'create', kind: 'file', parentDir: 'src' }, renderInline })
+    expect(screen.getByLabelText('inline')).toHaveAttribute('data-depth', '1')
+    expect(screen.getAllByRole('treeitem')).toHaveLength(5)
+    fireEvent.keyDown(screen.getByRole('tree'), { key: 'ArrowDown' })
+    expect(props.onFocus).toHaveBeenLastCalledWith('src/a.ts')
+  })
+
+  it('renders the renamed row through renderInline with its path', () => {
+    const renderInline = vi.fn(({ renamePath }: { renamePath?: string }) => <input aria-label="rename" defaultValue={renamePath} />)
+    renderTree({ inlineEdit: { mode: 'rename', path: 'src/a.ts' }, renderInline })
+    expect(screen.getByLabelText('rename')).toHaveValue('src/a.ts')
+    expect(screen.queryByText('a.ts')).toBeNull()
+    expect(renderInline).toHaveBeenCalledWith({ depth: 1, kind: 'file', renamePath: 'src/a.ts' })
   })
 })

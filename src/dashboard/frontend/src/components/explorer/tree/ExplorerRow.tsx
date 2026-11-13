@@ -16,7 +16,7 @@ import {
 import type { TreeRow } from './explorer-tree-model'
 
 export const ROW_HEIGHT = 22
-const INDENT_PX = 12
+export const INDENT_PX = 12
 
 export interface ExplorerRowProps {
   id: string
