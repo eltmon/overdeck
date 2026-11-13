@@ -289,7 +289,8 @@ export async function buildAgentConversationWindowResult(
     return { status: 200, body: selectPageBefore(result.body, page.before, page.limit, await transcriptIdAt(result.transcriptPath)) };
   }
   if (query.get('window') === 'initial') {
-    return { status: 200, body: { ...result.body, ...selectInitialWindow(result.body, await transcriptIdAt(result.transcriptPath)) } };
+    const input = { ...result.body, historyStartOffset: result.historyStartOffset };
+    return { status: 200, body: { ...result.body, ...selectInitialWindow(input, await transcriptIdAt(result.transcriptPath)) } };
   }
   return { status: 200, body: result.body };
 }

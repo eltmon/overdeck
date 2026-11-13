@@ -115,3 +115,13 @@ describe('windowed transcript deltas (PAN-4558)', () => {
     expect(event.reset).toBeUndefined();
   });
 });
+
+describe('bounded transcript deltas (PAN-5211)', () => {
+  it('marks the first snapshot of a bounded result', () => {
+    const event = createTranscriptDelta(null)(result({ ...rows(10), historyStartOffset: 4096 }), false, '1:2')!;
+
+    expect(event.snapshot).toBe(true);
+    expect(event.window).toMatchObject({ hasOlder: true, bounded: true });
+  });
+});
+

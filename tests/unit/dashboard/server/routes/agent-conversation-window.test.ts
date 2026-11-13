@@ -179,3 +179,25 @@ describe('Codex agent bodies keep server-internal fields off the wire (PAN-5211)
     expect(wire).not.toContain('historyStartOffset');
   });
 });
+
+describe('bounded Codex agent windows (PAN-5211)', () => {
+  const bigTranscript = join(TEST_DIR, 'rollout-bounded.jsonl');
+  // 20 messages of 1 Mi characters pass the 16 Mi in-memory cap, so the window slides.
+  writeFileSync(bigTranscript, Array.from({ length: 20 }, (_, i) => JSON.stringify({
+    type: 'event_msg', timestamp: at(i), payload: { type: 'user_message', message: `${i} ${'b'.repeat(1024 * 1024)}` },
+  })).join('\n') + '\n');
+
+  beforeEach(() => {
+    vi.mocked(listAgentTranscriptCandidates).mockResolvedValue([{ kind: 'codex', path: bigTranscript }] as never);
+  });
+
+  it('marks ?window=initial bounded', async () => {
+    const result = await buildAgentConversationWindowResult('agent-pan-5211', new URLSearchParams('window=initial'));
+
+    expect(result.status).toBe(200);
+    const body = result.body as Body & { window?: { bounded?: boolean; hasOlder: boolean } };
+    expect(body.window).toMatchObject({ hasOlder: true, bounded: true });
+    expect(body).not.toHaveProperty('historyStartOffset');
+  });
+});
+

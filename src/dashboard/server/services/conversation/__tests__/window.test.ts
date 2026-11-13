@@ -284,3 +284,23 @@ describe('selectResumeDelta (PAN-4558)', () => {
     expect(delta).toEqual({ messages: [], workLog: [] });
   });
 });
+
+describe('bounded windows (PAN-5211)', () => {
+  it('marks a window bounded with older history when historyStartOffset is above 0', () => {
+    const rows = { messages: [message(0), message(2)], workLog: [tool(1)] };
+
+    const { window } = selectInitialWindow({ ...rows, historyStartOffset: 1000 }, '1:2');
+
+    expect(window).toMatchObject({ hasOlder: true, bounded: true });
+  });
+
+  it('adds no bounded key without historyStartOffset', () => {
+    const rows = { messages: [message(0), message(2)], workLog: [tool(1)] };
+
+    const { window } = selectInitialWindow(rows, '1:2');
+
+    expect(window).not.toHaveProperty('bounded');
+    expect(window.hasOlder).toBe(false);
+  });
+});
+

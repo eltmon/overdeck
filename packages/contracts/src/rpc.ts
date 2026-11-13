@@ -256,6 +256,8 @@ export const ConversationWindow = Schema.Struct({
   hasOlder: Schema.Boolean,
   /** `"<dev>:<ino>"` of the transcript file the window was read from. */
   transcript: Schema.optional(Schema.String),
+  /** PAN-5211: the server holds only this transcript's newest records; older pages load from disk. */
+  bounded: Schema.optional(Schema.Boolean),
 })
 export type ConversationWindow = typeof ConversationWindow.Type
 

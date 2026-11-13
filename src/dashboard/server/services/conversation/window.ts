@@ -30,6 +30,8 @@ import { projectWorkLogEntry } from './wire-projection.js';
 export interface WindowInput {
   messages: readonly ChatMessage[];
   workLog: readonly WorkLogEntry[];
+  /** PAN-5211: byte offset of the oldest record in memory; > 0 means older history is only on disk. */
+  historyStartOffset?: number;
 }
 
 export interface WindowedRows {
@@ -138,7 +140,9 @@ export function selectInitialWindow(
 ): WindowedRows {
   const items = timelineItems(input);
   const { taken, oldestIndex } = takeNewest(items, budget);
-  const window = windowOf(items, taken, oldestIndex, transcript);
+  const inMemory = windowOf(items, taken, oldestIndex, transcript);
+  // PAN-5211 D13: a bounded conversation always has older history, on disk.
+  const window = (input.historyStartOffset ?? 0) > 0 ? { ...inMemory, hasOlder: true, bounded: true } : inMemory;
 
   // Pinned entries sit older than the cursor and never move it.
   const pinned: TimelineItem[] = [];
