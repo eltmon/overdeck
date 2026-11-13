@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5208",
   "created": "2026-11-13T21:57:26.421Z",
-  "updated": "2026-11-13T22:08:29.549Z",
+  "updated": "2026-11-13T22:09:56.771Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,9 +116,26 @@
       "doneAt": "2026-11-13T22:08:28.114Z"
     },
     "m-appearance-controller": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5208",
-      "claimedAt": "2026-11-13T22:08:29.549Z"
+      "claimedAt": "2026-11-13T22:08:29.549Z",
+      "doneAt": "2026-11-13T22:09:56.771Z"
+    },
+    "m-appearance-controller.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T22:09:56.771Z"
+    },
+    "m-appearance-controller.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T22:09:56.771Z"
+    },
+    "m-appearance-controller.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T22:09:56.771Z"
+    },
+    "m-appearance-controller.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T22:09:56.771Z"
     }
   }
 }
