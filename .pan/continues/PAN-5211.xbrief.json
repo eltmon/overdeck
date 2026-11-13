@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5211",
   "created": "2026-11-13T22:53:14.172Z",
-  "updated": "2026-11-13T23:21:25.881Z",
+  "updated": "2026-11-13T23:21:33.533Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -232,6 +232,11 @@
     "wi10-oversized-records.ac2": {
       "status": "completed",
       "doneAt": "2026-11-13T23:21:25.880Z"
+    },
+    "wi13-expand-by-offset": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5211",
+      "claimedAt": "2026-11-13T23:21:33.532Z"
     }
   }
 }
