@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5208",
   "created": "2026-11-13T21:57:26.421Z",
-  "updated": "2026-11-13T22:15:52.801Z",
+  "updated": "2026-11-13T22:18:30.917Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -204,9 +204,26 @@
       "doneAt": "2026-11-13T22:15:51.629Z"
     },
     "m-watermark-sting": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5208",
-      "claimedAt": "2026-11-13T22:15:52.801Z"
+      "claimedAt": "2026-11-13T22:15:52.801Z",
+      "doneAt": "2026-11-13T22:18:30.916Z"
+    },
+    "m-watermark-sting.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T22:18:30.916Z"
+    },
+    "m-watermark-sting.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T22:18:30.916Z"
+    },
+    "m-watermark-sting.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T22:18:30.916Z"
+    },
+    "m-watermark-sting.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T22:18:30.916Z"
     }
   }
 }
