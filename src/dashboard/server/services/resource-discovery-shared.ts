@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import { linkedConversationName } from '@overdeck/contracts';
 
 import { listConversations, type LegacyConversation as Conversation } from '../../../lib/overdeck/conversations.js';
+import { noteHostToolSpawnFailed, resolveHostTool } from '../../../lib/host-tools.js';
 import { listLinkedConversations } from '../../../lib/overdeck/linked-conversations.js';
 import { getRuntimeCensus } from '../../../lib/runtime-census.js';
 
@@ -66,14 +67,17 @@ async function loadTrackerIssues(): Promise<Map<string, TrackerIssueRecord>> {
   return map;
 }
 
-async function loadDockerContainers(): Promise<string[]> {
+export async function loadDockerContainers(): Promise<string[]> {
+  const docker = resolveHostTool('docker');
+  if (docker === null) return [];
   try {
-    const { stdout } = await execFileAsync('docker', ['ps', '--format', '{{.Names}}'], {
+    const { stdout } = await execFileAsync(docker, ['ps', '--format', '{{.Names}}'], {
       encoding: 'utf-8',
       timeout: 5000,
     });
     return stdout.split('\n').map((line) => line.trim()).filter(Boolean);
-  } catch {
+  } catch (error) {
+    noteHostToolSpawnFailed('docker', error);
     return [];
   }
 }
