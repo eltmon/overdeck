@@ -28,6 +28,12 @@ delete process.env.PAN_YOLO;
 // Herdr policy set the env var themselves or mock `hostTerminalBackendName`.
 process.env.OVERDECK_TERMINAL_BACKEND ??= 'tmux';
 
+// PAN-5168 D8: host-tools.ts treats a missing tool as found under this flag,
+// so tests that mock `child_process` for docker/tmux keep behaving as before
+// on a runner that has neither binary. Tests that need a missing tool call
+// `setHostToolFinderForTests(() => null)` instead.
+process.env.OVERDECK_TEST_ASSUME_HOST_TOOLS = '1';
+
 // Clean up temp directory before each test
 beforeEach(() => {
   try {
