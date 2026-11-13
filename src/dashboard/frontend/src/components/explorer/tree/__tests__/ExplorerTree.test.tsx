@@ -186,4 +186,23 @@ describe('ExplorerTree', () => {
     expect(screen.queryByText('a.ts')).toBeNull()
     expect(renderInline).toHaveBeenCalledWith({ depth: 1, kind: 'file', renamePath: 'src/a.ts' })
   })
+
+  it('renders rows draggable when a drag handler is set, on any root kind', () => {
+    const onRowDragStart = vi.fn()
+    renderTree({ onRowDragStart })
+    expect(item('a.ts')).toHaveAttribute('draggable', 'true')
+    fireEvent.dragStart(item('a.ts'))
+    expect(onRowDragStart).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ path: 'src/a.ts' }))
+  })
+
+  it('renders rows not draggable without a drag handler', () => {
+    renderTree()
+    expect(item('a.ts')).toHaveAttribute('draggable', 'false')
+  })
+
+  it('highlights the drop folder row only', () => {
+    renderTree({ dropDir: 'src' })
+    expect(item('src')).toHaveClass('bg-accent/60')
+    expect(item('lib')).not.toHaveClass('bg-accent/60')
+  })
 })

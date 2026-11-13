@@ -7,7 +7,7 @@
 // 'code' panes (rendered by PAN-5187). The Changed filter replaces the old
 // changed-files list: it shows a tree synthesized from git status (D-B8).
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { ChevronsDownUp, ChevronsUpDown, Eye, EyeOff, FilePlus, FolderPlus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -17,6 +17,7 @@ import { useDeleteFlow } from './actions/useDeleteFlow'
 import { useExplorerActions } from './actions/useExplorerActions'
 import { useInlineEdit } from './actions/useInlineEdit'
 import { useTreeActionKeys } from './actions/useTreeActionKeys'
+import { startRowDrag, useTreeDropZone } from './actions/useTreeDragMove'
 import { explorerErrorMessage, listDir, parseRootId, rootLabel } from './explorer-rpc'
 import { useExplorerStore, type RootState, type SelectMode } from './explorerStore'
 import { useExplorerGitStatus } from './git/useExplorerGitStatus'
@@ -257,6 +258,19 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
     },
     [actions, rootId],
   )
+  const dropZone = useTreeDropZone({
+    rootId,
+    writable,
+    changedOnly,
+    getRow: (path) => rowByPath.get(path),
+    expand: (path) => useExplorerStore.getState().setExpanded(rootId, path, true),
+    onMove: (paths, dir) => void actions.move(paths, dir),
+  })
+  const onRowDragStart = useCallback(
+    (event: DragEvent, row: TreeRow) =>
+      startRowDrag(event.dataTransfer, rootId, row.path, useExplorerStore.getState().roots[rootId]?.selection ?? []),
+    [rootId],
+  )
   const onTreeKeyDown = useTreeActionKeys({
     writable,
     isProjectRoot: rootKind === 'project',
@@ -398,6 +412,8 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
             renderInline={inline.renderInline}
             onContextMenuBlank={clearSelection}
             onKeyDown={onTreeKeyDown}
+            onRowDragStart={onRowDragStart}
+            dropDir={dropZone.dropDir}
             decorations={git.decorations}
             selection={root?.selection ?? []}
             focused={root?.focused ?? null}
@@ -412,6 +428,16 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
       </ExplorerContextMenu>
     )
   }
+
+  // The drop zone wraps the tree body and the empty-folder message (D-E10, D-E14).
+  const zonedBody = (
+    <div
+      {...dropZone.zoneProps}
+      className={`flex min-h-0 flex-1 flex-col ${dropZone.dropDir === '' ? 'ring-1 ring-inset ring-ring' : ''}`}
+    >
+      {body}
+    </div>
+  )
 
   const branch = git.result?.branch
 
@@ -466,11 +492,11 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
       )}
       {/* PAN-5191 edit-workspace banner slot */}
       {contentSearchScope === null ? (
-        body
+        zonedBody
       ) : (
         <>
           {/* The tree keeps the upper half; search takes the lower half. */}
-          <div className="flex min-h-0 flex-1 flex-col">{body}</div>
+          <div className="flex min-h-0 flex-1 flex-col">{zonedBody}</div>
           <ContentSearch
             rootId={rootId}
             scopePath={contentSearchScope || undefined}

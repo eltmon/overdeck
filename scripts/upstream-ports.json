@@ -232,5 +232,11 @@
     "upstream": "orca",
     "path": "src/renderer/src/components/right-sidebar/file-explorer/mutations/useFileDuplicate.ts",
     "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/actions/useTreeDragMove.ts",
+    "upstream": "orca",
+    "path": "src/renderer/src/components/right-sidebar/file-explorer/mutations/file-explorer-drag-edge-scroll.ts",
+    "commit": "c6b9ac9549b"
   }
 ]

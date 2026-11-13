@@ -15,6 +15,7 @@ import {
   useMemo,
   useRef,
   type HTMLAttributes,
+  type DragEvent,
   type KeyboardEvent,
   type MouseEvent,
 } from 'react'
@@ -59,6 +60,10 @@ export interface ExplorerTreeProps extends Omit<HTMLAttributes<HTMLDivElement>, 
   renderInline?(props: InlineRenderProps): ReactNode
   /** A right-click on blank tree space, outside every row (PAN-5190, D-E10). */
   onContextMenuBlank?(): void
+  /** Set to make rows draggable (PAN-5190, D-E15). */
+  onRowDragStart?(event: DragEvent, row: TreeRow): void
+  /** The folder a drag over the tree would drop into; its row is highlighted (D-E14). */
+  dropDir?: string | null
 }
 
 /** A focusable row: not a truncated row and not an inline name row. */
@@ -81,6 +86,8 @@ export const ExplorerTree = forwardRef<HTMLDivElement, ExplorerTreeProps>(functi
     inlineEdit = null,
     renderInline,
     onContextMenuBlank,
+    onRowDragStart,
+    dropDir = null,
     className,
     onKeyDown,
     onContextMenu,
@@ -259,6 +266,9 @@ export const ExplorerTree = forwardRef<HTMLDivElement, ExplorerTreeProps>(functi
                   onClick={handleRowClick}
                   onDoubleClick={handleRowDoubleClick}
                   onContextMenu={handleRowContextMenu}
+                  draggable={!!onRowDragStart}
+                  onDragStart={onRowDragStart}
+                  dropTarget={row.kind === 'dir' && row.path === dropDir}
                 />
               )}
             </div>
