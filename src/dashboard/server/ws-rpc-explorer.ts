@@ -8,7 +8,7 @@
  *
  * A method whose service has not shipped yet answers NOT_IMPLEMENTED with a
  * message naming the issue that owns it:
- *   - write methods (write, create, rename, copy, delete, restore): PAN-5187
+ *   - write methods (create, rename, copy, delete, restore): PAN-5187
  *   - explorerBeginEdit: PAN-5191
  */
 import { Effect, Queue, Stream } from 'effect';
@@ -19,6 +19,7 @@ import { listDir, readFile } from './services/explorer/read.js';
 import { resolveExplorerRoot } from './services/explorer/roots.js';
 import { invalidateFileListCache, searchContent, searchFiles } from './services/explorer/search.js';
 import { getExplorerWatchSupervisor } from './services/explorer/watch-supervisor.js';
+import { writeFile } from './services/explorer/write.js';
 
 /** The 14 pan.explorer* method tags. */
 type ExplorerMethodTag = Extract<(typeof WS_METHODS)[keyof typeof WS_METHODS], `pan.explorer${string}`>;
@@ -37,7 +38,16 @@ export const explorerRpcHandlers = {
     run(async () => listDir(await resolveExplorerRoot(input.rootId), input.path)),
   [WS_METHODS.explorerReadFile]: (input) =>
     run(async () => readFile(await resolveExplorerRoot(input.rootId), input.path, { ref: input.ref })),
-  [WS_METHODS.explorerWriteFile]: () => notImplemented(WS_METHODS.explorerWriteFile, WRITE_OWNER),
+  [WS_METHODS.explorerWriteFile]: (input) =>
+    run(async () =>
+      writeFile(
+        await resolveExplorerRoot(input.rootId),
+        input.path,
+        input.text,
+        input.expectedSignature,
+        input.allowMissing,
+      ),
+    ),
   [WS_METHODS.explorerCreate]: () => notImplemented(WS_METHODS.explorerCreate, WRITE_OWNER),
   [WS_METHODS.explorerRename]: () => notImplemented(WS_METHODS.explorerRename, WRITE_OWNER),
   [WS_METHODS.explorerCopy]: () => notImplemented(WS_METHODS.explorerCopy, WRITE_OWNER),

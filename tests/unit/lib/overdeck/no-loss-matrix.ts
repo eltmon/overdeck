@@ -976,7 +976,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   // File explorer (PAN-5183)
   { surface: 'pan.explorerListDir',            kind: 'rpc', disposition: 'READ',       door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
   { surface: 'pan.explorerReadFile',           kind: 'rpc', disposition: 'READ',       door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
-  { surface: 'pan.explorerWriteFile',          kind: 'rpc', disposition: 'WRITE',      door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
+  { surface: 'pan.explorerWriteFile',          kind: 'rpc', disposition: 'WRITE',      door: 'Explorer write door (src/dashboard/server/services/explorer/write.ts, PAN-5187)' },
   { surface: 'pan.explorerCreate',             kind: 'rpc', disposition: 'WRITE',      door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
   { surface: 'pan.explorerRename',             kind: 'rpc', disposition: 'WRITE',      door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
   { surface: 'pan.explorerCopy',               kind: 'rpc', disposition: 'WRITE',      door: 'Explorer door (src/dashboard/server/services/explorer/, PAN-5183)' },
