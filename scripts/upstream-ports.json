@@ -220,5 +220,11 @@
     "upstream": "orca",
     "path": "src/renderer/src/hooks/editor-external-watch-event-reconciliation.ts",
     "commit": "73771e67d01"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/actions/undo-stack.ts",
+    "upstream": "orca",
+    "path": "src/renderer/src/components/right-sidebar/file-explorer/mutations/fileExplorerUndoRedo.ts",
+    "commit": "c6b9ac9549b"
   }
 ]
