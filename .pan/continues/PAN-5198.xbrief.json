@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5198",
   "created": "2026-11-13T19:57:57.248Z",
-  "updated": "2026-11-13T20:36:12.120Z",
+  "updated": "2026-11-13T20:37:22.631Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,9 +116,22 @@
       "doneAt": "2026-11-13T20:36:03.671Z"
     },
     "skill-needs-you-contract": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5198",
-      "claimedAt": "2026-11-13T20:36:12.120Z"
+      "claimedAt": "2026-11-13T20:36:12.120Z",
+      "doneAt": "2026-11-13T20:37:22.630Z"
+    },
+    "skill-needs-you-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:37:22.630Z"
+    },
+    "skill-needs-you-contract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:37:22.630Z"
+    },
+    "skill-needs-you-contract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:37:22.630Z"
     }
   }
 }
