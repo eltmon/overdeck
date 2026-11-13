@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5185",
   "created": "2026-11-13T14:58:00.032Z",
-  "updated": "2026-11-13T15:53:21.217Z",
+  "updated": "2026-11-13T15:53:32.697Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -318,6 +318,11 @@
     "port-diff-script.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T15:53:21.217Z"
+    },
+    "port-records": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T15:53:32.697Z"
     }
   }
 }
