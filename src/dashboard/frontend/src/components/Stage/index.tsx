@@ -43,6 +43,7 @@ import { AgentPane } from './panes/AgentPane'
 import { ExplorerPane } from '../explorer/ExplorerPane'
 import { BrowserPane } from './panes/BrowserPane'
 import { EditorPane } from './panes/EditorPane'
+import { CodePaneSlot } from '../explorer/code/CodePaneSlot'
 import type { StageContext, PaneWrapperProps, StageApi } from './types'
 import { StageDeckProvider, type StageDeckContextValue } from './StageDeckContext'
 import styles from './stage.module.css'
@@ -120,6 +121,8 @@ function renderPane(pane: WorkspacePane, ctx: StageContext) {
       return <BrowserPane pane={pane} ctx={ctx} />
     case 'editor':
       return <EditorPane pane={pane} ctx={ctx} />
+    case 'code':
+      return <CodePaneSlot pane={pane} ctx={ctx} />
     default:
       return <PanePlaceholder pane={pane} ctx={ctx} />
   }
