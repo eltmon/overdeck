@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5199",
   "created": "2026-11-13T20:11:44.953Z",
-  "updated": "2026-11-13T20:49:29.713Z",
+  "updated": "2026-11-13T20:54:46.918Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,9 +138,26 @@
       "doneAt": "2026-11-13T20:49:17.653Z"
     },
     "start-route-heal": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5199",
-      "claimedAt": "2026-11-13T20:49:29.713Z"
+      "claimedAt": "2026-11-13T20:49:29.713Z",
+      "doneAt": "2026-11-13T20:54:46.917Z"
+    },
+    "start-route-heal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:54:46.917Z"
+    },
+    "start-route-heal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:54:46.917Z"
+    },
+    "start-route-heal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:54:46.917Z"
+    },
+    "start-route-heal.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:54:46.917Z"
     }
   }
 }
