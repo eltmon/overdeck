@@ -2,7 +2,7 @@
 // color; files show the color and a one-letter badge (D-B10). Ignored rows
 // are italic and dimmed. Badges are plain monospace letters, never pills.
 
-import { memo, type MouseEvent } from 'react'
+import { memo, type DragEvent, type MouseEvent } from 'react'
 import { File, FileSymlink, Folder, FolderOpen } from 'lucide-react'
 
 import {
@@ -16,7 +16,7 @@ import {
 import type { TreeRow } from './explorer-tree-model'
 
 export const ROW_HEIGHT = 22
-const INDENT_PX = 12
+export const INDENT_PX = 12
 
 export interface ExplorerRowProps {
   id: string
@@ -27,6 +27,11 @@ export interface ExplorerRowProps {
   onClick(event: MouseEvent, row: TreeRow): void
   onDoubleClick(row: TreeRow): void
   onContextMenu(row: TreeRow): void
+  /** Rows drag their paths on every root kind, so a project root can still drop paths in a composer (PAN-5190). */
+  draggable?: boolean
+  onDragStart?(event: DragEvent, row: TreeRow): void
+  /** The folder a drag would drop into (PAN-5190, D-E14). */
+  dropTarget?: boolean
 }
 
 function nameClass(row: TreeRow, decoration: ExplorerRowProps['decoration']): string {
@@ -44,6 +49,9 @@ export const ExplorerRow = memo(function ExplorerRow({
   onClick,
   onDoubleClick,
   onContextMenu,
+  draggable = false,
+  onDragStart,
+  dropTarget = false,
 }: ExplorerRowProps) {
   const isDir = row.kind === 'dir'
   const Icon = isDir ? (row.expanded ? FolderOpen : Folder) : row.kind === 'symlink' ? FileSymlink : File
@@ -63,9 +71,11 @@ export const ExplorerRow = memo(function ExplorerRow({
       aria-selected={selected}
       aria-busy={row.loading || undefined}
       data-path={row.path}
+      draggable={draggable}
+      onDragStart={draggable ? (e) => onDragStart?.(e, row) : undefined}
       className={`list-row flex cursor-pointer select-none items-center gap-1.5 pr-2 text-xs ${
-        selected ? 'bg-accent text-accent-foreground' : ''
-      } ${focused ? 'outline outline-1 -outline-offset-1 outline-ring' : ''}`}
+        selected ? 'bg-accent text-accent-foreground' : dropTarget ? 'bg-accent/60' : ''
+      } ${focused || dropTarget ? 'outline outline-1 -outline-offset-1 outline-ring' : ''}`}
       style={{ height: ROW_HEIGHT, paddingLeft: 6 + row.depth * INDENT_PX }}
       onClick={(e) => onClick(e, row)}
       onDoubleClick={() => onDoubleClick(row)}

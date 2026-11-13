@@ -12,15 +12,20 @@ vi.mock('../../../lib/wsTransport', () => ({
 }))
 
 import {
+  copyEntry,
+  createEntry,
   explorerDownloadUrl,
   explorerErrorCode,
   gitStage,
   listDir,
   parseRootId,
+  renameEntry,
+  restoreEntry,
   rootLabel,
   searchContent,
   searchFiles,
   subscribeWatchStream,
+  trashPath,
 } from '../explorer-rpc'
 
 beforeEach(() => {
@@ -30,6 +35,11 @@ beforeEach(() => {
     [WS_METHODS.explorerSearchFiles]: vi.fn().mockReturnValue({ paths: [] }),
     [WS_METHODS.explorerSearchContent]: vi.fn().mockReturnValue({ matches: [], truncated: false }),
     [WS_METHODS.explorerWatch]: vi.fn().mockReturnValue('stream'),
+    [WS_METHODS.explorerCreate]: vi.fn().mockReturnValue({ entry: { name: 'a.ts' } }),
+    [WS_METHODS.explorerRename]: vi.fn().mockReturnValue({ entry: { name: 'b.ts' } }),
+    [WS_METHODS.explorerCopy]: vi.fn().mockReturnValue({ entry: { name: 'a copy.ts' } }),
+    [WS_METHODS.explorerDelete]: vi.fn().mockReturnValue({ trashIds: ['t1'] }),
+    [WS_METHODS.explorerRestore]: vi.fn().mockReturnValue({ path: 'a.ts' }),
   }
   transportMock.request.mockReset()
   transportMock.request.mockImplementation(async (execute: (client: unknown) => unknown) => execute(transportMock.methods))
@@ -131,5 +141,40 @@ describe('explorerDownloadUrl', () => {
     expect(explorerDownloadUrl('issue:PAN-1', 'src/a b&c.ts')).toBe(
       '/api/explorer/download?root=issue%3APAN-1&path=src%2Fa%20b%26c.ts&inline=0',
     )
+  })
+})
+
+describe('explorer-rpc write wrappers', () => {
+  it('createEntry sends { rootId, path, kind } to explorerCreate', async () => {
+    const result = await createEntry('issue:PAN-1', 'src/a.ts', 'file')
+    expect(transportMock.methods[WS_METHODS.explorerCreate]).toHaveBeenCalledWith({ rootId: 'issue:PAN-1', path: 'src/a.ts', kind: 'file' })
+    expect(result).toEqual({ entry: { name: 'a.ts' } })
+  })
+
+  it('renameEntry sends { rootId, from, to } to explorerRename', async () => {
+    await renameEntry('issue:PAN-1', 'a.ts', 'b.ts')
+    expect(transportMock.methods[WS_METHODS.explorerRename]).toHaveBeenCalledWith({ rootId: 'issue:PAN-1', from: 'a.ts', to: 'b.ts' })
+  })
+
+  it('copyEntry sends { rootId, from, to } to explorerCopy', async () => {
+    await copyEntry('workspace:w1', 'a.ts', 'a copy.ts')
+    expect(transportMock.methods[WS_METHODS.explorerCopy]).toHaveBeenCalledWith({ rootId: 'workspace:w1', from: 'a.ts', to: 'a copy.ts' })
+  })
+
+  it('restoreEntry sends { rootId, trashId } to explorerRestore and returns the path', async () => {
+    const result = await restoreEntry('issue:PAN-1', 't1')
+    expect(transportMock.methods[WS_METHODS.explorerRestore]).toHaveBeenCalledWith({ rootId: 'issue:PAN-1', trashId: 't1' })
+    expect(result).toEqual({ path: 'a.ts' })
+  })
+
+  it('trashPath sends one path to explorerDelete and returns its trash id', async () => {
+    const id = await trashPath('issue:PAN-1', 'a')
+    expect(transportMock.methods[WS_METHODS.explorerDelete]).toHaveBeenCalledWith({ rootId: 'issue:PAN-1', paths: ['a'] })
+    expect(id).toBe('t1')
+  })
+
+  it('trashPath rejects when the server returns no trash id', async () => {
+    transportMock.methods[WS_METHODS.explorerDelete] = vi.fn().mockReturnValue({ trashIds: [] })
+    await expect(trashPath('issue:PAN-1', 'a')).rejects.toThrow('no trash id for a')
   })
 })

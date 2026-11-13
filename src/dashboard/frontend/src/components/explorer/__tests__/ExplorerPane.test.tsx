@@ -14,6 +14,7 @@ const rpc = vi.hoisted(() => ({
   listDir: vi.fn(),
   gitStatus: vi.fn(),
   gitStage: vi.fn(),
+  createEntry: vi.fn(),
   subscribeWatchStream: vi.fn(),
   stream: null as null | { onBatch: (b: ExplorerWatchBatch) => void; onReconnect: () => void },
 }))
@@ -27,6 +28,7 @@ vi.mock('../explorer-rpc', async (importOriginal) => {
     listDir: rpc.listDir,
     gitStatus: rpc.gitStatus,
     gitStage: rpc.gitStage,
+    createEntry: rpc.createEntry,
     subscribeWatchStream: rpc.subscribeWatchStream,
   }
 })
@@ -76,6 +78,8 @@ beforeEach(() => {
   rpc.gitStatus.mockReset()
   rpc.gitStatus.mockResolvedValue({ entries: [], committed: [], branch: 'feature/pan-1', truncated: false })
   rpc.gitStage.mockReset()
+  rpc.createEntry.mockReset()
+  rpc.createEntry.mockResolvedValue({ entry: entry('x.ts') })
   rpc.stream = null
   rpc.subscribeWatchStream.mockReset()
   rpc.subscribeWatchStream.mockImplementation((_root: string, onBatch: (b: ExplorerWatchBatch) => void, onReconnect: () => void) => {
@@ -263,6 +267,69 @@ describe('ExplorerPane', () => {
       } finally {
         vi.useRealTimers()
       }
+    })
+  })
+
+  describe('create and rename (PAN-5190)', () => {
+    it('creates a file from the header New file button and opens it', async () => {
+      renderPane()
+      await screen.findByText('README.md')
+      fireEvent.click(screen.getByRole('button', { name: 'New file' }))
+      const input = screen.getByRole('textbox', { name: 'New file name' })
+      fireEvent.change(input, { target: { value: 'x.ts' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      await waitFor(() => expect(rpc.createEntry).toHaveBeenCalledWith('issue:PAN-1', 'x.ts', 'file'))
+      await waitFor(() => expect(screen.queryByRole('textbox', { name: 'New file name' })).toBeNull())
+      const panes = selectPanesForWorkspace(DECK)(usePanesStore.getState())
+      expect(panes.find((p) => p.paneType === 'code')).toMatchObject({ explorerRootId: 'issue:PAN-1', explorerPath: 'x.ts' })
+    })
+
+    it('creates inside the selected folder', async () => {
+      renderPane()
+      await screen.findByText('README.md')
+      act(() => useExplorerStore.getState().select('issue:PAN-1', 'src', 'replace', ['src']))
+      fireEvent.click(screen.getByRole('button', { name: 'New folder' }))
+      const input = screen.getByRole('textbox', { name: 'New folder name' })
+      fireEvent.change(input, { target: { value: 'lib' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      await waitFor(() => expect(rpc.createEntry).toHaveBeenCalledWith('issue:PAN-1', 'src/lib', 'dir'))
+    })
+
+    it('keeps the row open with the message when the name already exists on the server', async () => {
+      rpc.createEntry.mockRejectedValueOnce(new PanRpcError({ message: 'exists', code: 'ALREADY_EXISTS' }))
+      renderPane()
+      await screen.findByText('README.md')
+      fireEvent.click(screen.getByRole('button', { name: 'New file' }))
+      const input = screen.getByRole('textbox', { name: 'New file name' })
+      fireEvent.change(input, { target: { value: 'x.ts' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      expect(await screen.findByRole('alert')).toHaveTextContent('x.ts already exists here.')
+      expect(screen.getByRole('textbox', { name: 'New file name' })).toBeInTheDocument()
+    })
+
+    it('shows no New buttons on a project root', async () => {
+      renderPane(explorerPaneSpec({ explorerRootId: 'project:overdeck' }))
+      await screen.findByText('README.md')
+      expect(screen.queryByRole('button', { name: 'New file' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'New folder' })).toBeNull()
+    })
+
+    it('shows no New buttons while the Changed filter is on', async () => {
+      renderPane()
+      await screen.findByText('README.md')
+      await waitFor(() => expect(rpc.gitStatus).toHaveBeenCalled())
+      fireEvent.click(screen.getByRole('button', { name: 'Changed' }))
+      await waitFor(() => expect(screen.queryByRole('button', { name: 'New file' })).toBeNull())
+      expect(screen.queryByRole('button', { name: 'New folder' })).toBeNull()
+    })
+
+    it('opens the menu with New file and New folder on an empty root', async () => {
+      rpc.listDir.mockImplementation(async () => ({ entries: [], truncated: false, absPath: '/ws' }))
+      renderPane()
+      const empty = await screen.findByText('This folder is empty.')
+      fireEvent.contextMenu(empty)
+      expect(await screen.findByRole('menuitem', { name: 'New file' })).toBeInTheDocument()
+      expect(screen.getByRole('menuitem', { name: 'New folder' })).toBeInTheDocument()
     })
   })
 })

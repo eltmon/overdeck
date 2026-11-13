@@ -1,11 +1,13 @@
-// The explorer's right-click menu: read actions and git actions (PAN-5186,
-// WI-B10; FR-5). Write actions (new, rename, delete, …) are PAN-5190's.
+// The explorer's right-click menu: read actions, git actions (PAN-5186,
+// WI-B10; FR-5) and write actions (PAN-5190, FR-E1).
 //
 // Git actions write the index and the working tree, so they never render on a
-// `project` root: the primary checkout is never written (D-B7). Download links
-// the PAN-5188 route, which answers 404 until that issue merges (D-B6).
+// `project` root: the primary checkout is never written (D-B7). Write actions
+// (New file, New folder, Rename, Duplicate, Delete) render only in a writable
+// tree: never on a `project` root and never under the Changed filter (D-E1,
+// D-E2). Download links the PAN-5188 route (D-B6).
 
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { toast } from 'sonner'
 
 import { useConfirm } from '../../DialogProvider'
@@ -19,6 +21,7 @@ import {
 } from '../../shared/ContextMenu'
 import { explorerDownloadUrl, explorerErrorMessage, gitStage, type ExplorerRootKind, type GitStageAction } from '../explorer-rpc'
 import type { Decorations, FileDecoration } from '../git/git-decoration'
+import { INLINE_NAME_INPUT_ATTR } from '../actions/InlineNameRow'
 import { parentPath } from '../tree/explorer-tree-model'
 
 export interface ExplorerMenuTarget {
@@ -36,6 +39,13 @@ export interface ExplorerContextMenuProps {
   onOpen(path: string): void
   onFindInFolder(dirPath: string): void
   onGitChanged(): void
+  /** True when write actions apply: not a project root, Changed filter off (PAN-5190). */
+  writable: boolean
+  onNewFile(): void
+  onNewFolder(): void
+  onRename(path: string): void
+  onDuplicate(path: string): void
+  onDelete(paths: readonly string[]): void
   children: ReactNode
 }
 
@@ -77,9 +87,25 @@ export function ExplorerContextMenu({
   onOpen,
   onFindInFolder,
   onGitChanged,
+  writable,
+  onNewFile,
+  onNewFolder,
+  onRename,
+  onDuplicate,
+  onDelete,
   children,
 }: ExplorerContextMenuProps) {
   const confirm = useConfirm()
+  // An item that opens an inline name input renders it while the menu's focus
+  // trap is still active, so the input's own focus does not stick, and Radix
+  // would then return focus to the trigger (the tree). Once the menu content
+  // has unmounted, focus the input instead.
+  const startsInlineEditRef = useRef(false)
+  const triggerRef = useRef<HTMLElement | null>(null)
+  const startInlineEdit = (start: () => void) => () => {
+    startsInlineEditRef.current = true
+    start()
+  }
   const single = targets.length === 1 ? targets[0] : null
   const paths = targets.map((t) => t.path)
   const changes = targets.flatMap((t) => workingChanges(t, decorations))
@@ -113,8 +139,17 @@ export function ExplorerContextMenu({
 
   return (
     <ContextMenuRoot>
-      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent>
+      <ContextMenuTrigger asChild ref={triggerRef}>
+        {children}
+      </ContextMenuTrigger>
+      <ContextMenuContent
+        onCloseAutoFocus={(event) => {
+          if (!startsInlineEditRef.current) return
+          event.preventDefault()
+          startsInlineEditRef.current = false
+          triggerRef.current?.querySelector<HTMLInputElement>(`[${INLINE_NAME_INPUT_ATTR}]`)?.focus()
+        }}
+      >
         {single && single.kind !== 'dir' && <ContextMenuItem onSelect={() => onOpen(single.path)}>Open</ContextMenuItem>}
         {targets.length > 0 && (
           <>
@@ -147,6 +182,24 @@ export function ExplorerContextMenu({
             <ContextMenuDestructiveItem disabled={!canDiscard} onSelect={() => void discard()}>
               Discard changes
             </ContextMenuDestructiveItem>
+          </>
+        )}
+        {writable && (
+          <>
+            <ContextMenuSeparator />
+            {targets.length <= 1 && (
+              <>
+                <ContextMenuItem onSelect={startInlineEdit(onNewFile)}>New file</ContextMenuItem>
+                <ContextMenuItem onSelect={startInlineEdit(onNewFolder)}>New folder</ContextMenuItem>
+              </>
+            )}
+            {single && (
+              <>
+                <ContextMenuItem onSelect={startInlineEdit(() => onRename(single.path))}>Rename</ContextMenuItem>
+                <ContextMenuItem onSelect={() => onDuplicate(single.path)}>Duplicate</ContextMenuItem>
+              </>
+            )}
+            {targets.length > 0 && <ContextMenuDestructiveItem onSelect={() => onDelete(paths)}>Delete</ContextMenuDestructiveItem>}
           </>
         )}
       </ContextMenuContent>

@@ -2036,3 +2036,74 @@ one per file, extension rows first:
 stay out of the entry bundle. Workers build as ES modules (`worker: { format:
 'es' }` in `vite.config.ts`), and the `pdfjs-dist-assets` alias points the
 pdf.js font, cmap and wasm globs at the real package folder.
+
+### File actions, undo and drag (PAN-5190)
+
+The explorer tree can create, rename, duplicate, move and delete entries, undo
+and redo those actions, upload files dropped from the desktop, and hand paths
+to a conversation composer. The modules live in
+`src/dashboard/frontend/src/components/explorer/actions/`.
+
+**Where write actions render.** New file, New folder, Rename, Duplicate and
+Delete appear in the right-click menu; New file and New folder also appear as
+header buttons. While the tree has focus, `F2` renames the single selected
+row, `Delete` (or `Meta+Backspace`) deletes the selection, `Ctrl/Cmd+Z` undoes
+and `Ctrl/Cmd+Shift+Z` redoes. All of this renders and works only in a
+writable tree: an `issue:` or `workspace:` root with the Changed filter off.
+A `project` root gets no write action, and the Changed view gets none either,
+because its rows are synthesized from git status. Dragging rows to a composer
+still works there, because it writes nothing.
+
+**One write seam.** Every create, rename, copy, delete, restore and upload call
+goes through `runWrite` in `explorer/actions/useExplorerActions.ts`. It refuses
+a `project` root with "The main checkout is read-only." PAN-5191 wraps this one
+function with its edit workspace to make project roots writable.
+
+**Undo stack** (`actions/undo-stack.ts`, a port of Orca's
+`fileExplorerUndoRedo.ts`). Each root keeps up to 50 ops in memory; a page
+reload clears them, and a new op clears the redo list. An op is one user action
+made of steps, and it remembers how many steps are applied. When a step fails
+with a refusal code (`ALREADY_EXISTS`, `NOT_FOUND`, `INVALID_TARGET`), nothing
+was written, so the op goes back on its stack and a retry continues where it
+stopped. Any other error drops the op, because the server state is unknown and
+a replay could overwrite newer work. Undo of a create, a duplicate or an upload
+moves the entry to the Overdeck trash rather than deleting it, so content
+written after the create survives an undo and redo.
+
+**Delete** moves each top-level path to the Overdeck trash with its own
+`pan.explorerDelete` call, because a failing multi-path call does not report
+the ids it already moved. If call *k* fails, the first *k − 1* deletes still
+form one undoable op. One clean item deletes at once. Two or more items, or an
+item with an unsaved code-pane draft at or under it, confirm first, and the
+dialog lists the unsaved files. After a delete, an 8-second toast offers Undo
+for that op, even when newer ops sit above it.
+
+**Rename keeps code panes.** A rename or move from `from` to `to` waits for
+every affected draft's in-flight save, renames on disk, rekeys the drafts, and
+then retargets every open code pane in every deck (`explorerPath` and label).
+Rekeying before retargeting means the old pane's autosave finds no draft under
+the old key when it disposes, so it never writes to a path that no longer
+exists. The explorer store then rewrites its expanded set, selection and focus,
+and the parent folders are re-listed.
+
+**Drag payload** (`src/dashboard/frontend/src/lib/explorer-drag-paths.ts`). A
+row drag carries the dragged row, or the whole selection when the row is in
+it, as two `DataTransfer` types:
+
+- `application/x-overdeck-paths`: root-relative paths, one per line. The
+  conversation composer (`ComposerFooter`) reads it and inserts the paths at
+  the caret, one per line, or at the end when the editor has no selection.
+- `application/x-overdeck-explorer`: `{ rootId, paths }` JSON. The tree's drop
+  zone reads it to move rows into the folder they are dropped on; a payload
+  from another root is refused.
+
+No `text/plain` is set, so other text fields ignore the drag. A folder expands
+after 600 ms of drag hover, and the tree scrolls within 24 px of its edges.
+
+**OS drop** (`actions/useOsFileDrop.ts`). Files dropped from the desktop onto a
+folder row, blank tree space or the empty-folder message upload through
+`POST /api/explorer/upload`, one at a time. Only files are accepted: a dropped
+folder is recognized by `webkitGetAsEntry().isDirectory` and skipped, and
+nothing walks its contents. Files over 100 MiB are skipped before sending. An
+existing name is refused with a toast and never overwritten. The files of one
+drop form one undo op.

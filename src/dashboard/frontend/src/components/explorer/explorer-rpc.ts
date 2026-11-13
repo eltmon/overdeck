@@ -7,10 +7,12 @@
 import {
   PanRpcError,
   WS_METHODS,
+  type ExplorerEntryResult,
   type ExplorerGitStageInput,
   type ExplorerGitStatusResult,
   type ExplorerListDirResult,
   type ExplorerReadFileResult,
+  type ExplorerRestoreResult,
   type ExplorerSearchContentResult,
   type ExplorerSearchFilesResult,
   type ExplorerWatchBatch,
@@ -36,6 +38,40 @@ export function readFile(rootId: string, path: string, ref?: 'HEAD'): Promise<Ex
 /** Save a code pane's text with the disk-signature precondition (PAN-5187). */
 export function writeFile(input: ExplorerWriteFileInput): Promise<ExplorerWriteFileResult> {
   return getTransport().request((client) => (client as PanRpcProtocolClient)[WS_METHODS.explorerWriteFile](input))
+}
+
+/** Create a file or folder; the server makes missing parent folders (PAN-5190). */
+export function createEntry(rootId: string, path: string, kind: 'file' | 'dir'): Promise<ExplorerEntryResult> {
+  return getTransport().request((client) => (client as PanRpcProtocolClient)[WS_METHODS.explorerCreate]({ rootId, path, kind }))
+}
+
+/** Rename or move one path within a root (PAN-5190). */
+export function renameEntry(rootId: string, from: string, to: string): Promise<ExplorerEntryResult> {
+  return getTransport().request((client) => (client as PanRpcProtocolClient)[WS_METHODS.explorerRename]({ rootId, from, to }))
+}
+
+/** Copy one path to a free target within a root (PAN-5190). */
+export function copyEntry(rootId: string, from: string, to: string): Promise<ExplorerEntryResult> {
+  return getTransport().request((client) => (client as PanRpcProtocolClient)[WS_METHODS.explorerCopy]({ rootId, from, to }))
+}
+
+/**
+ * Move one path to the Overdeck trash; returns its trash id (PAN-5190 D-E6).
+ * One path per call, because a failing multi-path delete does not report the
+ * ids it already moved.
+ */
+export async function trashPath(rootId: string, path: string): Promise<string> {
+  const { trashIds } = await getTransport().request((client) =>
+    (client as PanRpcProtocolClient)[WS_METHODS.explorerDelete]({ rootId, paths: [path] }),
+  )
+  const id = trashIds[0]
+  if (!id) throw new Error(`The server returned no trash id for ${path}`)
+  return id
+}
+
+/** Restore a trashed entry to its original path (PAN-5190). */
+export function restoreEntry(rootId: string, trashId: string): Promise<ExplorerRestoreResult> {
+  return getTransport().request((client) => (client as PanRpcProtocolClient)[WS_METHODS.explorerRestore]({ rootId, trashId }))
 }
 
 export function gitStatus(rootId: string): Promise<ExplorerGitStatusResult> {
