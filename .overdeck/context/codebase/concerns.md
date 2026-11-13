@@ -822,4 +822,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   through the non-failing seam `src/lib/tracker/jira-lifecycle.ts`; other unknown trackers on write paths
   (`issue-lifecycle.ts`, `close-issue.ts` `closeViaDirect`, `workflows.ts` reset steps,
   `planning-sessions.ts`) still fall through to Linear.
+- **A missing binary is expensive on macOS** (PAN-5168, PAN-5170) — libuv tries `posix_spawn` once per
+  PATH entry and XNU creates a process for each try, so one failed spawn of a tool macOS lacks
+  (`systemctl`, `journalctl`, `systemd-run`) leaves about ten dead `node` processes. A Linux-only tool
+  call in a poller needs a `process.platform === 'linux'` early return before it spawns. Until PAN-5170
+  merges, two pollers lack one: the supervisor unit check (`isSupervisorUnitFailed`,
+  `src/lib/systemd.ts`, called by the restart announcer every pass) and the OOM canary
+  (`readNewKernelJournal`, `src/lib/cloister/memory-pressure-patrol.ts`). `findManagedServerPid`
+  (`src/lib/tmux.ts`) also calls `systemctl` unguarded, but only on conversation stop.
 <!-- last-verified: 2026-11-04 -->

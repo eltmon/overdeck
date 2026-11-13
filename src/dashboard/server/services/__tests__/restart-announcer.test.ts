@@ -31,6 +31,8 @@ interface TestDeps {
     getLastAnnounced: () => string | null;
     setLastAnnounced: (ts: string) => void;
     now: () => number;
+    platform: NodeJS.Platform;
+    probeSupervisor: () => Promise<boolean>;
   };
   setStatus: (status: RestartStatus | null) => void;
   lastAnnounced: () => string | null;
@@ -50,6 +52,8 @@ function makeDeps(initial: RestartStatus | null = watchdogSuccess): TestDeps {
       getLastAnnounced: () => stored,
       setLastAnnounced: (ts) => { stored = ts; },
       now: () => ONE_MINUTE_LATER,
+      platform: 'linux' as NodeJS.Platform,
+      probeSupervisor: async () => true,
     },
     setStatus: (next) => { status = next; },
     lastAnnounced: () => stored,
@@ -163,6 +167,8 @@ describe('initiatorLink', () => {
 });
 
 describe('announceNewRestart', () => {
+  afterEach(() => { stopRestartAnnouncer(); });
+
   it('emits once for a new restart status and persists the announced ts', async () => {
     const t = makeDeps();
 
@@ -271,6 +277,101 @@ describe('announceNewRestart', () => {
 
     expect(writeStatus).not.toHaveBeenCalled();
     expect(t.emitted).toHaveLength(0);
+  });
+});
+
+describe('announceNewRestart on darwin (PAN-5170)', () => {
+  afterEach(() => { stopRestartAnnouncer(); });
+
+  it('never calls the systemd path and emits nothing when the probe answers', async () => {
+    const t = makeDeps(null);
+    const readSupervisorUnitFailed = vi.fn(async () => true);
+    const writeStatus = vi.fn(async (status: RestartStatus) => { t.setStatus(status); });
+
+    expect(await announceNewRestart({
+      ...t.deps,
+      platform: 'darwin',
+      supervisorUrl: () => 'http://127.0.0.1:3012',
+      probeSupervisor: async () => true,
+      readSupervisorUnitFailed,
+      writeStatus,
+    })).toBe(false);
+
+    expect(readSupervisorUnitFailed).not.toHaveBeenCalled();
+    expect(writeStatus).not.toHaveBeenCalled();
+    expect(t.emitted).toHaveLength(0);
+  });
+
+  it('emits exactly one supervisor-down row after 60 s unreachable, then nothing more', async () => {
+    const t = makeDeps(null);
+    const T = Date.parse(RESTART_TS);
+    let answered = true;
+
+    const pass = (nowMs: number) => announceNewRestart({
+      ...t.deps,
+      platform: 'darwin',
+      supervisorUrl: () => 'http://127.0.0.1:3012',
+      probeSupervisor: async () => answered,
+      now: () => nowMs,
+    });
+
+    await pass(T);
+    expect(t.emitted).toHaveLength(0);
+
+    answered = false;
+    await pass(T + 1_000);
+    expect(t.emitted).toHaveLength(0);
+
+    await pass(T + 61_000);
+    expect(t.emitted).toHaveLength(1);
+    expect(t.emitted[0].source).toBe('supervisor');
+    expect(t.emitted[0].level).toBe('error');
+    expect(t.emitted[0].message).toContain('http://127.0.0.1:3012');
+    expect(t.emitted[0].message).toContain('has not answered for 60 s');
+    expect(t.emitted[0].message).toContain('pan up');
+
+    await pass(T + 120_000);
+    expect(t.emitted).toHaveLength(1);
+  });
+
+  it('emits nothing across 10 minutes of passes when the supervisor never answers', async () => {
+    const t = makeDeps(null);
+    const T = Date.parse(RESTART_TS);
+
+    for (let elapsed = 0; elapsed <= 10 * 60_000; elapsed += 15_000) {
+      await announceNewRestart({
+        ...t.deps,
+        platform: 'darwin',
+        supervisorUrl: () => 'http://127.0.0.1:3012',
+        probeSupervisor: async () => false,
+        now: () => T + elapsed,
+      });
+    }
+
+    expect(t.emitted).toHaveLength(0);
+  });
+
+  it('never touches restart-status.json while reporting a down supervisor', async () => {
+    const t = makeDeps(null);
+    const writeStatus = vi.fn(async (status: RestartStatus) => { t.setStatus(status); });
+    const T = Date.parse(RESTART_TS);
+    let answered = true;
+
+    const pass = (nowMs: number) => announceNewRestart({
+      ...t.deps,
+      platform: 'darwin',
+      supervisorUrl: () => 'http://127.0.0.1:3012',
+      probeSupervisor: async () => answered,
+      writeStatus,
+      now: () => nowMs,
+    });
+
+    await pass(T);
+    answered = false;
+    await pass(T + 1_000);
+    await pass(T + 61_000);
+
+    expect(writeStatus).not.toHaveBeenCalled();
   });
 });
 

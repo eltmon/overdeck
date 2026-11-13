@@ -199,6 +199,8 @@ export async function isSupervisorUnitActive(): Promise<boolean> {
 }
 
 export async function isSupervisorUnitFailed(): Promise<boolean> {
+  // PAN-5170: no systemd on macOS, and a failed spawn there costs ~10 processes.
+  if (process.platform !== 'linux') return false;
   try {
     const { stdout } = await systemctl(`is-failed ${SUPERVISOR_UNIT_NAME}`);
     return stdout.trim() === 'failed';
