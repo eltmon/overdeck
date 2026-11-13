@@ -1,4 +1,6 @@
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import path from 'node:path';
 
 import { defineConfig, type Plugin, type ViteDevServer } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -56,13 +58,21 @@ function panDevFullReloadOnSignal(): Plugin {
   };
 }
 
+// PAN-5188: the PDF viewer globs pdf.js fonts, cmaps and wasm through this
+// alias. bun links packages from a store under the repo root, so a path
+// relative to node_modules would match nothing; the alias is the real folder.
+const pdfjsAssetsAlias = {
+  find: 'pdfjs-dist-assets',
+  replacement: path.dirname(realpathSync(createRequire(import.meta.url).resolve('pdfjs-dist/package.json'))),
+};
+
 // PAN-4560: `vite build --mode profile` aliases react-dom to its profiling
 // build, so React records per-fiber render timings in production mode. The
 // output goes to the gitignored .tmp/dashboard-profile; it must never
 // overwrite the normal dist/dashboard/public.
 const profileOverrides = {
   resolve: {
-    alias: [{ find: /^react-dom$/, replacement: 'react-dom/profiling' }],
+    alias: [{ find: /^react-dom$/, replacement: 'react-dom/profiling' }, pdfjsAssetsAlias],
   },
   build: {
     outDir: '../../../.tmp/dashboard-profile',
@@ -74,6 +84,9 @@ const profileOverrides = {
 
 export default defineConfig(({ mode }) => ({
   plugins: [react(), panDevFullReloadOnSignal()],
+  resolve: {
+    alias: [pdfjsAssetsAlias],
+  },
   server: {
     port: 3010,
     host: '0.0.0.0',
