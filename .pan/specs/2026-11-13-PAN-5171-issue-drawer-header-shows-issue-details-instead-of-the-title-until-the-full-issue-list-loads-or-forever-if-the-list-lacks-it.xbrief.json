@@ -1,0 +1,797 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-13T02:49:44Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5171: Issue drawer header shows 'Issue details' instead of the title until the full issue list loads (or forever if the list lacks it)",
+    "updated": "2026-11-13T03:00:47.680Z"
+  },
+  "plan": {
+    "id": "pan-5171",
+    "title": "Issue drawer header shows 'Issue details' instead of the title until the full issue list loads (or forever if the list lacks it)",
+    "status": "proposed",
+    "uid": "3c9dfd0d-e94e-48f8-8451-3bf184d7b929",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-13T02:49:44Z",
+    "updated": "2026-11-13T03:00:47.680Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5171",
+        "label": "PAN-5171",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-5171.md",
+        "label": "PRD draft (.pan/drafts/pan-5171.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "issue-drawer",
+      "issue-view",
+      "frontend",
+      "api",
+      "route-scopes"
+    ],
+    "narratives": {
+      "Problem": "The drawer header reads issue?.title ?? 'Issue details' and finds the issue only in the global issuesRaw list. The list takes 2.6 s to 4 s to arrive, lacks new issues until the next push, and never holds backlog or canceled issues (the snapshot uses getIssues() with the default 'current' cycle filter). The cockpit header shows the bare identifier and the phone sheet shows 'Loading issue…' or 'This issue is not in the pipeline.' for the same reason.",
+      "Proposal": "Add GET /api/issues/:id (new routes/issue-read.ts) that looks the issue up in getIssues({ cycle: 'all', includeCompleted: true }), backfills through the tracker door when absent, and answers 404 only on IssueNotFoundError (503 otherwise). Teach issue-title-fallback.ts to memoize the failure kind. Add one frontend hook, useIssueRecord, that prefers the list entry and otherwise runs a React Query fetch of the route, and one renderer, IssueHeaderTitle, that shows the title, a neutral skeleton while loading, or the identifier with a hint on failure. Use them in the drawer, cockpit and phone sheet headers. Register the route at read:state with an explicit admin row for resource-allocated, add a no-loss row, a committed Playwright check, and docs.",
+      "NonGoals": "- Fixing the Linear adapter's mapping of every LinearApiError to IssueNotFoundError.\n- Changing the snapshot's cycle filter so backlog and canceled issues reach issuesRaw.\n- Live-updating or polling the per-issue cache; a list row replaces it when it appears.\n- Rate-limiting GET /api/issues/:id beyond the existing tracker-door memo.\n- Threading new props through CommandDeck/index.tsx or changing cockpit tab labels.\n- Removing the PAN-3659 backfill trigger in subscribeIssueEvents.\n- Reworking the phone sheet beyond its loading and not-found branches.\n- Any header surface rendering the literal string 'Issue details'.\n- Raising any scripts/file-size-allowlist.txt cap."
+    },
+    "metadata": {
+      "sizeJustification": "Nine small vertical items across one server route, one tracker-door change, one shared hook, one renderer and three header surfaces; the surfaces share the hook so they belong to one plan.",
+      "canonicalFilename": "2026-11-13-PAN-5171-issue-drawer-header-shows-issue-details-instead-of-the-title-until-the-full-issue-list-loads-or-forever-if-the-list-lacks-it.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Put the route in a new module src/dashboard/server/routes/issue-read.ts built only from public IssueDataService methods.",
+        "rationale": "routes/issues.ts is 889 lines and issue-data-service.ts sits 6 lines under its file-size cap; routes/test-removal-waiver.ts is the existing pattern for a separate issue route module."
+      },
+      {
+        "summary": "Look the issue up with getIssues({ cycle: 'all', includeCompleted: true }).",
+        "rationale": "The snapshot's default 'current' cycle drops backlog and canceled rows, and backfillIssue is a no-op for them, so only the 'all' view finds them."
+      },
+      {
+        "summary": "Answer 503 for every tracker failure that is not IssueNotFoundError, including an unconfigured tracker.",
+        "rationale": "The issue requires 404 only when the tracker says the issue does not exist; 503 tells the client the read could not be completed."
+      },
+      {
+        "summary": "Accept Linear's mapping of every LinearApiError to IssueNotFoundError.",
+        "rationale": "Other callers depend on the adapter; the header shows the identifier plus a hint either way, so only the hint text differs."
+      },
+      {
+        "summary": "Scope GET /api/issues/:id at read:state and add an explicit admin row for GET /api/issues/resource-allocated before it.",
+        "rationale": "GET /api/issues is already read:state; route-scope matching is first-match, so without the explicit row the :id pattern would silently widen resource-allocated from admin."
+      },
+      {
+        "summary": "Use retry: false and staleTime 30 s for the per-issue query, with no refetchInterval, and return 404 as data.",
+        "rationale": "The server memoizes tracker failures for 10 minutes, so a client retry gets the same answer; a query-level retry would also override test clients' retry:false and add a real 1 s delay to failure tests."
+      },
+      {
+        "summary": "Apply the new rule to the phone sheet by replacing its 'Loading issue…' and 'not in the pipeline' branches.",
+        "rationale": "The issue names the mobile sheet among the header surfaces; the per-issue read gives it the full row when the list lacks it."
+      },
+      {
+        "summary": "Ship the Playwright check as a new case in tests/e2e/styleguide-conformance.spec.ts and leave the signed-in live check to the test role's UAT.",
+        "rationale": "That spec already serves the real frontend with mocked fetch and opens ?issue=PAN-1148 in CI; a committed signed-in check against a live dashboard is not reproducible in CI."
+      },
+      {
+        "summary": "Rewrite docs/ISSUE-VIEW.md line 7 to name the one per-issue read as an allowed exception.",
+        "rationale": "The doc currently forbids the issue view from adding another endpoint, which this fix deliberately does."
+      }
+    ],
+    "items": [
+      {
+        "id": "tracker-outcome",
+        "title": "Memoize the tracker-door failure kind (not-found vs unavailable)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T02:49:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5171",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/issue-title-fallback.ts",
+            "src/dashboard/server/services/__tests__/issue-title-fallback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/issue-title-fallback.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "issue-title-fallback.test.ts passes including the new not-found, unavailable, no-tracker, success and memo-expiry cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In issue-title-fallback.ts, replace failedLookupsAt with failedLookups: Map<string, { at, kind: 'not-found' | 'unavailable' }>. lookupIssue returns { kind: 'found', issue } | { kind: 'not-found' } | { kind: 'unavailable' }: Effect.catchTag('IssueNotFoundError') maps to not-found, every other failure (timeout, API, auth, factory throw, no tracker) maps to unavailable. resolveMissingIssue keeps its Promise<Issue | null> signature and records the kind on failure. resolveMissingIssueTitles reads failedLookups.get(id)?.at. Export missingIssueFailureKind(issueId) returning the fresh memoized kind or null. Add the five tests from the PRD."
+        },
+        "items": [
+          {
+            "id": "tracker-outcome.ac1",
+            "title": "Given a tracker that fails getIssue with IssueNotFoundError, When resolveMissingIssue runs, Then it returns null and missingIssueFailureKind returns 'not-found'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tracker-outcome.ac2",
+            "title": "Given a tracker that fails with any other error, or a prefix with no tracker, When resolveMissingIssue runs, Then missingIssueFailureKind returns 'unavailable'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tracker-outcome.ac3",
+            "title": "Given a successful lookup, missingIssueFailureKind returns null; given a failure older than FAILURE_RETRY_MS (fake time), it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tracker-outcome.ac4",
+            "title": "Given the change, resolveMissingIssue still returns Promise<Issue | null>, resolveMissingIssueTitles keeps its signature, and every pre-existing case in issue-title-fallback.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issue-read-route",
+        "title": "Add GET /api/issues/:id with route-scope and no-loss rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T02:49:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5171",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "issue-record-hook",
+            "mobile-sheet"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/issue-read.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/routes/__tests__/issue-read-route.test.ts",
+            "src/dashboard/server/__tests__/route-scopes.test.ts",
+            "src/dashboard/server/__tests__/route-scopes-phone.test.ts",
+            "packages/contracts/src/telemetry.ts",
+            "docs/TELEMETRY.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/issue-read-route.test.ts src/dashboard/server/__tests__/route-scopes.test.ts src/dashboard/server/__tests__/route-scopes-phone.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts tests/unit/telemetry-docs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "issue-read-route.test.ts, route-scopes.test.ts, route-scopes-phone.test.ts, no-loss-matrix.test.ts and telemetry-docs.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/dashboard/server/routes/issue-read.ts exporting issueReadRouteLayer and readIssueRow (code in PRD). The handler returns 400 for an id parseIssueId rejects; looks up getSharedIssueService().getIssues({ cycle: 'all', includeCompleted: true }) by identifier (case-insensitive); when absent awaits backfillIssue(id) and looks again; returns 200 with the bare row, 404 { error: 'Issue not found', issueId } when missingIssueFailureKind is 'not-found', else 503 { error: 'Issue tracker unavailable', issueId }. Register the layer in server.ts next to testRemovalWaiverRouteLayer. In route-scopes.ts, right after the GET /api/issues row, add GET /api/issues/resource-allocated at admin and then GET /api/issues/:id at read:state, each with a PAN-5171 comment. Add the no-loss-matrix row. Write the route tests listed in the PRD, including the static-route precedence test, plus the route-scope and phone-surface assertions. Add \"/api/issues/:id\" and \"/api/issues/resource-allocated\" right after \"/api/issues\" in TELEMETRY_CLIENT_ROUTES (packages/contracts/src/telemetry.ts line 188) and in the client_route row of docs/TELEMETRY.md (line 190): route-scopes.test.ts requires every ROUTE_SCOPES path there and telemetry-docs.test.ts checks the doc."
+        },
+        "items": [
+          {
+            "id": "issue-read-route.ac1",
+            "title": "Given a row present only in getIssues({ cycle: 'all', includeCompleted: true }) (a canceled issue), When GET /api/issues/PAN-7 runs, Then it returns 200 with that row's identifier and title and backfillIssue is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-read-route.ac2",
+            "title": "Given an issue absent until backfillIssue adds it, When GET /api/issues/:id runs, Then it returns 200 with the backfilled row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-read-route.ac3",
+            "title": "Given an absent issue, the route returns 404 { error: 'Issue not found', issueId } when the failure kind is 'not-found', 503 when it is 'unavailable' or null, and 400 for /api/issues/not-an-id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-read-route.ac4",
+            "title": "requiredScopeFor returns 'read:state' for GET /api/issues/PAN-1, 'admin' for GET /api/issues/resource-allocated and 'admin' for GET /api/issues/PAN-1/tasks; PHONE_SURFACE_HTTP includes GET /api/issues/PAN-1 and its test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-read-route.ac5",
+            "title": "Given issueReadRouteLayer merged with a stub GET /api/issues/resource-allocated route, When that path is requested, Then the stub body is returned; no-loss-matrix.test.ts accepts the new GET /api/issues/:id row and telemetry-docs.test.ts accepts both new client_route paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issue-record-hook",
+        "title": "Add the useIssueRecord hook (list entry first, per-issue read otherwise)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T02:49:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5171",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "issue-header-title",
+            "drawer-header",
+            "cockpit-header",
+            "mobile-sheet"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/useIssueRecord.ts",
+            "src/dashboard/frontend/src/components/issue-view/useIssueRecord.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-view/useIssueRecord.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useIssueRecord.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create useIssueRecord.ts exporting IssueRecordStatus ('ready' | 'loading' | 'not-found' | 'unavailable'), IssueRecord, issueRecordQueryKey (['issue', id.toUpperCase()]), findListedIssue (identifier or id, case-insensitive), fetchIssueRecord (404 resolves null; non-ok throws; a body without string identifier and title throws) and useIssueRecord (code in PRD). The query is enabled only when the list lacks the row, staleTime 30_000, retry false, no refetchInterval. The list entry always wins. Do not import from drawer/useDrawerData.ts. Add useIssueRecord.test.tsx with the PRD cases (hold loading with an unresolved fetch promise) and list it in scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "issue-record-hook.ac1",
+            "title": "Given the issue in issuesRaw, When useIssueRecord renders, Then it returns status 'ready' with the list row and fetch is never called for /api/issues/PAN-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-record-hook.ac2",
+            "title": "Given an empty issuesRaw, the hook returns 'loading' while the fetch is unresolved and then the fetched row with status 'ready'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-record-hook.ac3",
+            "title": "Given an empty issuesRaw, a 404 answer returns status 'not-found', a 503 answer returns 'unavailable', and a { success: true } body returns 'unavailable'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-record-hook.ac4",
+            "title": "Given a fetched row and then a list row with a different title arriving, the hook returns the list row; issueRecordQueryKey('pan-1') equals ['issue', 'PAN-1']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-record-hook.ac5",
+            "title": "scripts/frontend-test-subset.txt contains src/components/issue-view/useIssueRecord.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issue-header-title",
+        "title": "Add the IssueHeaderTitle renderer (title, skeleton, or identifier with hint)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T02:49:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5171",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/IssueHeaderTitle.tsx",
+            "src/dashboard/frontend/src/components/issue-view/IssueHeaderTitle.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-view/IssueHeaderTitle.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueHeaderTitle.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Create IssueHeaderTitle.tsx ({ issueId, title, status }) as in the PRD (hint size and font may follow /pan-style-guide: muted, regular weight, no color): a title renders as text; 'loading' renders an aria-hidden neutral bg-muted skeleton bar with data-testid issue-title-skeleton plus sr-only 'Loading issue title'; otherwise the identifier plus a data-testid issue-title-hint span reading 'not found on tracker' for 'not-found' and 'title unavailable' for anything else. Callers own the heading element. Add IssueHeaderTitle.test.tsx and list it in scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "issue-header-title.ac1",
+            "title": "Given a non-empty title, the component renders that title text and no skeleton or hint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-header-title.ac2",
+            "title": "Given title null and status 'loading', it renders the issue-title-skeleton element and the text 'Loading issue title'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-header-title.ac3",
+            "title": "Given title null, status 'unavailable' renders the identifier and 'title unavailable', and status 'not-found' renders the identifier and 'not found on tracker'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-header-title.ac4",
+            "title": "In every tested state, queryByText('Issue details') returns null; the test file is listed in scripts/frontend-test-subset.txt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drawer-header",
+        "title": "Render the drawer header from the issue record",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T02:49:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5171",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/drawer/useDrawerData.ts",
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx",
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.tracker-fallback.test.tsx",
+            "src/dashboard/frontend/src/components/drawer/useDrawerData.absent-issue.test.tsx",
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/drawer/IssueDrawer.tracker-fallback.test.tsx src/components/drawer/useDrawerData.absent-issue.test.tsx",
+            "npm run typecheck",
+            "git grep -n \"'Issue details'\" -- src/dashboard/frontend/src ':!*.test.tsx'"
+          ],
+          "expected_outputs": [
+            "IssueDrawer.tracker-fallback.test.tsx and useDrawerData.absent-issue.test.tsx pass",
+            "typecheck completes without errors",
+            "the git grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In useDrawerData.ts, call useIssueRecord(drawerIssueId) inside useIssueData, use record.issue as issue, and add issueStatus: IssueRecordStatus to DrawerData ('unavailable' for a null id); drop issueMatches and the issues subscription if unused. In IssueDrawer.tsx replace {issue?.title ?? 'Issue details'} with <IssueHeaderTitle issueId={drawer.issueId} title={issue?.title ?? null} status={issueStatus} />. Rewrite the IssueDrawer.tracker-fallback.test.tsx case at line 130 and add the fetched-title, loading and 404 cases; extend useDrawerData.absent-issue.test.tsx line 67 with issueStatus. Best effort outside the ACs: run IssueDrawer.test.tsx (not in the CI subset, may already fail on origin/main) and fix only cases that pass on origin/main and fail after this change."
+        },
+        "items": [
+          {
+            "id": "drawer-header.ac1",
+            "title": "Given an empty issuesRaw and a fetch answering /api/issues/MIN-658 with a row titled 'Fetched title', When the drawer opens MIN-658, Then its h2 renders 'Fetched title'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-header.ac2",
+            "title": "Given an unresolved per-issue fetch, the drawer renders the issue-title-skeleton element and queryByText('Issue details') returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-header.ac3",
+            "title": "Given a 503 answer, the drawer h2 renders 'MIN-658' with 'title unavailable' and the Issue link still points at the passed tracker URL; given a 404, it renders 'not found on tracker'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-header.ac4",
+            "title": "git grep -n \"'Issue details'\" -- src/dashboard/frontend/src ':!*.test.tsx' prints nothing, and IssueDrawer.tracker-fallback.test.tsx and useDrawerData.absent-issue.test.tsx pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cockpit-header",
+        "title": "Render the cockpit header from the issue record",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T02:49:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5171",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.header-title.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.header-title.test.tsx src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueMissionControl.header-title.test.tsx and IssueMissionControl.render-count.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In IssueMissionControl, call useIssueRecord(issueId); headerTitle = record.issue?.title || (title prop when it differs from issueId case-insensitively) || null; replace {title} in the h1 (line 604) with <IssueHeaderTitle issueId={issueId} title={headerTitle} status={record.status} />. Leave every other title use unchanged. Mock ../../issue-view/useIssueRecord with one fixed ready record in the render-count test so pinned counts stay. Add IssueMissionControl.header-title.test.tsx (fetched title when the title prop equals the id; skeleton on an unresolved fetch) and list it in scripts/frontend-test-subset.txt. The file stays under 1000 lines."
+        },
+        "items": [
+          {
+            "id": "cockpit-header.ac1",
+            "title": "Given title prop equal to the issue id, an empty issuesRaw and a fetch answering a row titled 'Cockpit title', When IssueMissionControl renders, Then its h1 renders 'Cockpit title'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cockpit-header.ac2",
+            "title": "Given an unresolved per-issue fetch and a title prop equal to the id, the h1 renders the issue-title-skeleton element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cockpit-header.ac3",
+            "title": "IssueMissionControl.render-count.test.tsx passes with its pinned render counts unchanged, and IssueMissionControl.tsx stays at or under 1000 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mobile-sheet",
+        "title": "Render the phone issue sheet from the issue record",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T02:49:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5171",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileIssueSheet.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileIssueSheet.test.tsx",
+            "src/dashboard/frontend/tests/pan-4661-mobile-pipeline.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/mobile/__tests__/MobileIssueSheet.test.tsx",
+            "npm --prefix ./src/dashboard/frontend run test:playwright -- tests/pan-4661-mobile-pipeline.spec.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MobileIssueSheet.test.tsx passes",
+            "pan-4661-mobile-pipeline.spec.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In MobileIssueSheet, replace the issuesRaw lookup with useIssueRecord(issueId). Replace the !hasSnapshot and !issue branches with one !issue branch that renders Header plus an h2 containing <IssueHeaderTitle issueId={issueId} title={null} status={status} />. The resolved-issue branch is unchanged. Remove unused imports (useConnectionState, selectIssues). Confirm MobileApp renders under a QueryClientProvider in src/dashboard/frontend/src/main.tsx and apps/mobile/src/shell/MachineView.tsx. Update MobileIssueSheet.test.tsx: wrap in QueryClientProvider, replace the line 94 and line 100 cases, and add the fetched-row case. Update src/dashboard/frontend/tests/pan-4661-mobile-pipeline.spec.ts line 205: for /m/pipeline?issue=PAN-99999 expect the sheet h2 to contain PAN-99999 and [data-testid=\"issue-title-hint\"] visible instead of 'This issue is not in the pipeline.'; keep the Back-button checks and the 30 s timeout."
+        },
+        "items": [
+          {
+            "id": "mobile-sheet.ac1",
+            "title": "Given an id absent from issuesRaw and a fetch answering its row, When MobileIssueSheet renders, Then it renders the row's title and its Phase, State and Project fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-sheet.ac2",
+            "title": "Given an unresolved fetch, the sheet renders the issue-title-skeleton element; given a 404, it renders the identifier and 'not found on tracker'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-sheet.ac3",
+            "title": "MobileIssueSheet.tsx no longer contains the strings 'Loading issue…' or 'This issue is not in the pipeline.', and the existing D-4661-10 field tests still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-sheet.ac4",
+            "title": "Given the isolated dashboard in pan-4661-mobile-pipeline.spec.ts, When /m/pipeline?issue=PAN-99999 opens, Then the sheet renders PAN-99999 with the issue-title-hint element and the spec passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e2e-drawer-title",
+        "title": "Add a committed Playwright check for the drawer title from the per-issue read",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T02:49:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5171",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/e2e/styleguide-conformance.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run test:e2e -- tests/e2e/styleguide-conformance.spec.ts"
+          ],
+          "expected_outputs": [
+            "styleguide-conformance.spec.ts passes including 'renders the drawer title from the per-issue read when the issue list lacks it'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. In tests/e2e/styleguide-conformance.spec.ts give newContext an optional { snapshotIssues, issueReadDelayMs } argument passed into addInitScript; when snapshotIssues is set, the cached snapshot's issues use it. In the init-script fetch mock answer GET /api/issues/PAN-1148 with the issue fixture after issueReadDelayMs. Install a MutationObserver in the init script that sets window.__sawIssueDetails when the body text includes 'Issue details', records window.__skeletonAt (performance.now()) the first time [data-testid=\"issue-title-skeleton\"] exists, and records window.__titleAt the first time the drawer h2 text equals the fixture title (passed into the init script). Add the new it-case: open /pipeline?issue=PAN-1148&tab=overview with snapshotIssues [] and delay 300 ms; poll until the drawer h2 equals the fixture title; assert __titleAt - __skeletonAt < 1000 and __sawIssueDetails is not true. Measure from the skeleton, not from goto, so dev-server load time on CI does not count. Existing cases keep passing. Pass the issue fixture into the init script as its own argument, since snapshotIssues [] removes it from the snapshot fixture. Separately, the test role verifies the live check (AC4) on the running dashboard."
+        },
+        "items": [
+          {
+            "id": "e2e-drawer-title.ac1",
+            "title": "Given a cached snapshot with no issues and a per-issue read delayed 300 ms, When the browser opens /pipeline?issue=PAN-1148, Then the drawer h2 renders the fixture title less than 1000 ms after the issue-title-skeleton first appears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-drawer-title.ac2",
+            "title": "In that run the MutationObserver records window.__skeletonAt as a number and never sets window.__sawIssueDetails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-drawer-title.ac3",
+            "title": "Given the snapshot holds the issue, the existing drawer cases in styleguide-conformance.spec.ts still render the drawer action bar and the Space Grotesk drawer title, and the spec passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-drawer-title.ac4",
+            "title": "UAT (test role, isolated Playwright browser context with its own profile and in-context sign-in, against the workspace's running dashboard): opening ?issue=<a listed issue id> renders the real title in the drawer header within 1 s and a MutationObserver installed before navigation never sees 'Issue details'; opening a backlog or canceled issue renders its real title. The committed spec in AC1-AC3 is the work agent's evidence; this live run is the test role's.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Document the header data source and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T02:49:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5171",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ISSUE-VIEW.md",
+            "docs/DASHBOARD-AUTH.md",
+            "changelog.d/pan-5171.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c '—' changelog.d/pan-5171.md"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "the grep count prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. In docs/ISSUE-VIEW.md, rewrite the line 7 sentence that forbids another endpoint so it names useIssueRecord and GET /api/issues/:id as the one per-issue header read (PAN-5171), and add a 'Header title' paragraph near the cockpit section describing list-first resolution, the covered cases (snapshot loading, new, backlog, canceled, aged-out issues), the skeleton, and the identifier-plus-hint failure states. In docs/DASHBOARD-AUTH.md line 229 add GET /api/issues/:id (PAN-5171) to the read:state row and note the explicit admin row for GET /api/issues/resource-allocated. Create changelog.d/pan-5171.md with the #### Fixed entry from the PRD, no em dashes."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "docs/ISSUE-VIEW.md contains GET /api/issues/:id, useIssueRecord and IssueHeaderTitle, and no longer contains the sentence saying the issue view must not introduce another endpoint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "docs/DASHBOARD-AUTH.md contains GET /api/issues/:id in the read:state row and states that GET /api/issues/resource-allocated keeps an explicit admin row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac3",
+            "title": "changelog.d/pan-5171.md exists with a '#### Fixed' heading and a bullet linking #5171, contains no '—' character, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "tracker-outcome",
+        "to": "issue-read-route",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-record-hook",
+        "to": "issue-header-title",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-record-hook",
+        "to": "drawer-header",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-header-title",
+        "to": "drawer-header",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-record-hook",
+        "to": "cockpit-header",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-header-title",
+        "to": "cockpit-header",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-record-hook",
+        "to": "mobile-sheet",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-header-title",
+        "to": "mobile-sheet",
+        "type": "blocks"
+      },
+      {
+        "from": "drawer-header",
+        "to": "e2e-drawer-title",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-read-route",
+        "to": "issue-record-hook",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}
