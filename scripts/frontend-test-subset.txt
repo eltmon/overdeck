@@ -298,6 +298,7 @@ src/lib/__tests__/composerDraft.test.ts
 src/lib/__tests__/composerSendQueue.test.ts
 src/lib/__tests__/connectionState.test.ts
 src/lib/__tests__/flywheelNeedsYou.test.ts
+src/lib/__tests__/flywheelNeedsYouLinks.test.ts
 src/lib/__tests__/issueActions.menu-by-state.test.ts
 src/lib/__tests__/issueActions.no-actions-lost.test.ts
 src/lib/__tests__/issueActions.parity.test.tsx
