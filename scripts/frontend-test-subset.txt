@@ -193,6 +193,7 @@ src/components/deft/DeftSubagentRows.test.tsx
 src/components/deft/queries.test.ts
 src/components/drawer/IssueDrawer.tracker-fallback.test.tsx
 src/components/drawer/useDrawerData.absent-issue.test.tsx
+src/components/explorer/code/__tests__/code-drafts.test.ts
 src/components/home/__tests__/AnywhereSetUpRow.test.tsx
 src/components/home/__tests__/HomeComposer.test.tsx
 src/components/home/__tests__/HomeComposerProjectChip.test.tsx
