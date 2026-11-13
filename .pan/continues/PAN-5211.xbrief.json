@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5211",
   "created": "2026-11-13T22:53:14.172Z",
-  "updated": "2026-11-13T23:08:51.459Z",
+  "updated": "2026-11-13T23:11:03.882Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -162,9 +162,22 @@
       "doneAt": "2026-11-13T23:08:44.926Z"
     },
     "wi5-tail-read": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5211",
-      "claimedAt": "2026-11-13T23:08:51.459Z"
+      "claimedAt": "2026-11-13T23:08:51.459Z",
+      "doneAt": "2026-11-13T23:11:03.881Z"
+    },
+    "wi5-tail-read.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:11:03.881Z"
+    },
+    "wi5-tail-read.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:11:03.881Z"
+    },
+    "wi5-tail-read.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:11:03.881Z"
     }
   }
 }
