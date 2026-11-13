@@ -10,6 +10,17 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: do not edit this page for an unreleased change. Each PR adds its bullets to changelog.d/<issue>.md (format: changelog.d/README.md), and pan release stable folds them into a dated <Update> block here. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so in its entry and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.82.0" description="2026-11-13">
+  #### Fixed
+
+  - **Idle dashboard process storm on macOS without Docker or tmux:** an idle dashboard on a Mac with neither binary installed no longer creates a stream of short-lived processes. ([#5168](https://github.com/eltmon/overdeck/issues/5168))
+  - **Herdr hosts without tmux:** `pan up` now starts when tmux is missing under the Herdr terminal backend, and the conversation list no longer runs tmux for each conversation on every poll. On macOS without Homebrew, Overdeck no longer tries `brew install` and prints a download link instead. ([#5169](https://github.com/eltmon/overdeck/issues/5169))
+  - **macOS no longer runs Linux-only checks:** the dashboard no longer calls `systemctl` to check the supervisor or `journalctl` to look for kernel OOM kills on macOS. Each failed call there left about ten dead processes. On macOS the dashboard now checks the supervisor over HTTP and reports it in the activity feed when it stops answering for a minute. ([#5170](https://github.com/eltmon/overdeck/issues/5170))
+  - **Issue headers show the real title right away:** the issue drawer, the Command Deck issue view and the phone issue sheet now load the issue's title on their own instead of waiting for the full issue list, so they no longer show "Issue details" for several seconds, or forever for backlog and canceled issues. While the title loads you see a short placeholder bar; if the tracker cannot be reached you see the issue ID. ([#5171](https://github.com/eltmon/overdeck/issues/5171))
+
+  [Compare v0.81.0...v0.82.0](https://github.com/eltmon/overdeck/compare/v0.81.0...v0.82.0)
+</Update>
+
 <Update label="v0.81.0" description="2026-11-12">
   #### New
 
