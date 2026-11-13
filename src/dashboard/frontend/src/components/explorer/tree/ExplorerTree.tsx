@@ -165,6 +165,11 @@ export const ExplorerTree = forwardRef<HTMLDivElement, ExplorerTreeProps>(functi
     event.preventDefault()
   }
 
+  const virtualItems = virtualizer.getVirtualItems()
+  // Point aria-activedescendant only at a mounted row: once the focused row
+  // scrolls out of the virtual range its element is gone.
+  const focusedMounted = focusedIndex >= 0 && virtualItems.some((item) => item.index === focusedIndex)
+
   return (
     <div
       {...rest}
@@ -172,12 +177,12 @@ export const ExplorerTree = forwardRef<HTMLDivElement, ExplorerTreeProps>(functi
       role="tree"
       tabIndex={0}
       aria-multiselectable
-      aria-activedescendant={focusedIndex >= 0 ? rowId(focusedIndex) : undefined}
+      aria-activedescendant={focusedMounted ? rowId(focusedIndex) : undefined}
       onKeyDown={handleKeyDown}
       className={`min-h-0 flex-1 overflow-auto outline-none ${className ?? ''}`}
     >
       <div style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
-        {virtualizer.getVirtualItems().map((item) => {
+        {virtualItems.map((item) => {
           const row = rows[item.index]
           if (!row) return null
           return (

@@ -1,10 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 
+const virt = vi.hoisted(() => ({ visible: Number.POSITIVE_INFINITY }))
+
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: ({ count, estimateSize }: { count: number; estimateSize?: (index: number) => number }) => ({
     getVirtualItems: () =>
-      Array.from({ length: count }, (_, index) => ({ index, key: index, start: index * 22, size: estimateSize?.(index) ?? 22 })),
+      Array.from({ length: Math.min(count, virt.visible) }, (_, index) => ({ index, key: index, start: index * 22, size: estimateSize?.(index) ?? 22 })),
     getTotalSize: () => count * 22,
     scrollToIndex: () => {},
   }),
@@ -135,6 +137,17 @@ describe('ExplorerTree', () => {
     expect(down.onSelect).toHaveBeenLastCalledWith('src/b.ts', 'range')
     fireEvent.keyDown(screen.getByRole('tree'), { key: 'ArrowLeft' })
     expect(down.onFocus).toHaveBeenLastCalledWith('src')
+  })
+
+  it('drops aria-activedescendant while the focused row is outside the rendered range', () => {
+    virt.visible = 2
+    try {
+      renderTree({ focused: 'lib' })
+      expect(screen.getAllByRole('treeitem')).toHaveLength(2)
+      expect(screen.getByRole('tree')).not.toHaveAttribute('aria-activedescendant')
+    } finally {
+      virt.visible = Number.POSITIVE_INFINITY
+    }
   })
 
   it('points aria-activedescendant at the focused row', () => {
