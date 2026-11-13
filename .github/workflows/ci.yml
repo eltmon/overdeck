@@ -84,6 +84,54 @@ jobs:
           node dist/cli/index.js --version
           node dist/cli/index.js --help
 
+      - name: Pack the bare-host subject (PAN-5176)
+        run: |
+          mkdir -p "$RUNNER_TEMP/subject"
+          npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/subject"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bare-host-subject
+          path: ${{ runner.temp }}/subject/*.tgz
+          if-no-files-found: error
+
+  # PAN-5176: install the packed @overdeck/core on a bare host (Node, git and
+  # the system directories only; no docker, tmux, systemctl, journalctl or
+  # brew on PATH, isolated HOME, no CI variable) and fail on the
+  # PAN-5168/5169/5170 bug classes: `pan up` needing a tool the Herdr backend
+  # does not need, an idle dashboard over its new-PID budget, and a repeated
+  # host-tool ENOENT. See scripts/bare-host-smoke.sh. This is a blocking
+  # check: no continue-on-error and no if, so it runs on every PR and push,
+  # and Overdeck's merge gate refuses a PR whose check fails.
+  bare-host-linux:
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Download the bare-host subject
+        uses: actions/download-artifact@v4
+        with:
+          name: bare-host-subject
+          path: ${{ runner.temp }}/subject
+
+      - name: Bare-host smoke
+        run: bash scripts/bare-host-smoke.sh --tarball "$(ls "$RUNNER_TEMP"/subject/*.tgz)" --work-dir "$RUNNER_TEMP/bare-host"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bare-host-linux-logs
+          path: |
+            ${{ runner.temp }}/bare-host/result.json
+            ${{ runner.temp }}/bare-host/*.log
+          if-no-files-found: warn
+
   # `npm run lint` took ~9 min as one job, almost all of it in three steps.
   # scripts/run-lint-group.mjs splits the lint script's steps into groups that
   # run as parallel jobs; any step it doesn't name as heavy runs in `core`.
