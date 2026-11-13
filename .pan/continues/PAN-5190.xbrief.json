@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5190",
   "created": "2026-11-13T20:35:48.124Z",
-  "updated": "2026-11-13T20:51:26.044Z",
+  "updated": "2026-11-13T20:51:34.119Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,11 @@
     "inline-name-row.ac5": {
       "status": "completed",
       "doneAt": "2026-11-13T20:51:26.044Z"
+    },
+    "drag-payload": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T20:51:34.118Z"
     }
   }
 }
