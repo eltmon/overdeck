@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5190",
   "created": "2026-11-13T20:35:48.124Z",
-  "updated": "2026-11-13T20:37:03.383Z",
+  "updated": "2026-11-13T20:37:10.333Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
     "rpc-write-wrappers.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T20:37:03.382Z"
+    },
+    "undo-stack": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T20:37:10.332Z"
     }
   }
 }
