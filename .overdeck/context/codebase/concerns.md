@@ -833,4 +833,17 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
 - **Optional host tools resolve through `src/lib/host-tools.ts`** — a poller that spawns a bare missing
   command on macOS creates ~10 processes per call, because libuv retries `posix_spawn` once per `PATH`
   entry (PAN-5168).
+- **A tab open fires ~45 REST requests at once** (PAN-5178, measured 2026-11-13) — on an
+  HTTP/1.1 origin (`http://localhost:3011`, the desktop shell) Chromium sends at most 6 at a
+  time per origin, and a few slow status reads (`/api/prerequisites` 0.8–2.1 s, uncached;
+  `/api/claude-code/status` 0.5–1.4 s; `/api/flywheel/status` 0.2–1.7 s; `/api/workspace-registry`
+  333 KB, 1.2 s+) hold the slots. A request issued late in the burst waits 1–2 s in the browser
+  although the server answers it in under 10 ms. On HTTP/2 (Traefik, `https://overdeck.localhost`)
+  nothing queues in the browser, but the burst reaches the server together and the late requests
+  wait 1–1.4 s for their first byte. `/ws/rpc` sends nothing until `POST /api/dashboard/session`
+  returns (`WsTransport` awaits `ensureDashboardSession`), so the snapshot waits on the same queue.
+  The `getSnapshot` work itself is small: 3–11 ms in the handler, then 45–65 ms of schema
+  encode, `JSON.stringify` and `TextEncoder` warm (about 90–95 ms on the first connect after a
+  server start) for 1,450 issues and 1,662 agents (5.5 MB, 61% of it issue `description`). Server
+  congestion during the burst is PAN-5180.
 <!-- last-verified: 2026-11-04 -->

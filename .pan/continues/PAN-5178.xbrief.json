@@ -1,0 +1,178 @@
+{
+  "version": "1",
+  "issueId": "PAN-5178",
+  "created": "2026-11-13T05:44:52.973Z",
+  "updated": "2026-11-13T07:06:05.890Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-13T07:06Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-13T07:06:05.890Z"
+    }
+  ],
+  "items": {
+    "boot-session-first": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5178",
+      "claimedAt": "2026-11-13T05:44:52.973Z",
+      "doneAt": "2026-11-13T05:57:07.417Z"
+    },
+    "boot-session-first.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:57:07.417Z"
+    },
+    "boot-session-first.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:57:07.417Z"
+    },
+    "boot-session-first.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:57:07.417Z"
+    },
+    "boot-session-first.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:57:07.417Z"
+    },
+    "boot-session-first.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:57:07.417Z"
+    },
+    "boot-deeplink-prefetch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5178",
+      "claimedAt": "2026-11-13T05:57:13.855Z",
+      "doneAt": "2026-11-13T06:12:55.128Z"
+    },
+    "boot-deeplink-prefetch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:12:55.128Z"
+    },
+    "boot-deeplink-prefetch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:12:55.128Z"
+    },
+    "boot-deeplink-prefetch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:12:55.128Z"
+    },
+    "boot-deeplink-prefetch.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:12:55.128Z"
+    },
+    "boot-deeplink-prefetch.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:12:55.128Z"
+    },
+    "clean-issues-memo": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5178",
+      "claimedAt": "2026-11-13T06:13:00.799Z",
+      "doneAt": "2026-11-13T06:23:29.623Z"
+    },
+    "clean-issues-memo.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:23:29.623Z"
+    },
+    "clean-issues-memo.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:23:29.623Z"
+    },
+    "clean-issues-memo.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:23:29.623Z"
+    },
+    "snapshot-event-loop-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5178",
+      "claimedAt": "2026-11-13T06:23:39.055Z",
+      "doneAt": "2026-11-13T06:42:44.072Z"
+    },
+    "snapshot-event-loop-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:42:44.072Z"
+    },
+    "snapshot-event-loop-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:42:44.072Z"
+    },
+    "snapshot-event-loop-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:42:44.072Z"
+    },
+    "snapshot-event-loop-test.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:42:44.072Z"
+    },
+    "deep-link-latency-script": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5178",
+      "claimedAt": "2026-11-13T06:42:49.465Z",
+      "doneAt": "2026-11-13T06:53:53.935Z"
+    },
+    "deep-link-latency-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:53:53.935Z"
+    },
+    "deep-link-latency-script.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:53:53.935Z"
+    },
+    "deep-link-latency-script.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:53:53.935Z"
+    },
+    "deep-link-latency-script.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:53:53.935Z"
+    },
+    "verify-deep-link-fix": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5178",
+      "claimedAt": "2026-11-13T06:54:02.591Z",
+      "doneAt": "2026-11-13T06:56:09.765Z"
+    },
+    "verify-deep-link-fix.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:56:09.765Z"
+    },
+    "verify-deep-link-fix.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:56:09.765Z"
+    },
+    "verify-deep-link-fix.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:56:09.765Z"
+    },
+    "docs-boot-order": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5178",
+      "claimedAt": "2026-11-13T06:56:15.258Z",
+      "doneAt": "2026-11-13T06:57:33.014Z"
+    },
+    "docs-boot-order.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:57:33.014Z"
+    },
+    "docs-boot-order.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:57:33.014Z"
+    },
+    "docs-boot-order.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:57:33.014Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-13T07:06:05Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5178 (PR #5182)\n\nCodeRabbit posted 2 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4560606759 · scripts/verify-deep-link-latency.mjs:86 [Major]: Remove the context-wide internal token header.\n  https://github.com/eltmon/overdeck/pull/5182#discussion_r4560606759\n- Thread 4560606764 · scripts/verify-deep-link-latency.mjs:122 [Minor]: Start title observation before waiting for the page load event.\n  https://github.com/eltmon/overdeck/pull/5182#discussion_r4560606764\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5182/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5178`.\n   If you only replied, you are done.\n5. If PR #5182 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
+}

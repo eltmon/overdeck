@@ -1,0 +1,7 @@
+plan-digest: 2c577a360f2bf87797457213a5dbce603d2933dd53dfe603571a818fdfc98aef
+
+## blocks-the-design: Internal token sent to external hosts
+
+WI-5, line 307 of `.pan/drafts/PAN-5178.md`, puts the root `x-overdeck-internal-token` in Playwright `extraHTTPHeaders` for the whole browser context. Playwright's installed type documentation says those headers go with **every request** (`node_modules/playwright/types/test.d.ts`, line 7418). This dashboard can initialize PostHog in the browser (`src/dashboard/frontend/src/lib/telemetry.ts`, lines 274-285 and 219-241); the production host is `https://us.i.posthog.com` (`src/dashboard/frontend/.env.production`, line 2). The header can therefore be sent to an external host. The token is a root credential with admin scope (`src/dashboard/server/route-scopes.ts`, line 9), so this is unsafe even in a verification script. It also changes the browser's request behavior and can confound its latency result.
+
+Smallest fix: remove context-wide `extraHTTPHeaders`. Authenticate the fresh context through its same-origin `context.request.post('/api/dashboard/session', { headers: { 'x-overdeck-internal-token': token } })` before navigation, so its cookie jar is signed in; let the app issue its own measured session mint. Keep the existing Node-side title lookup scoped to the base URL. If a browser header remains necessary, attach it only to same-origin dashboard requests with a route handler and explicitly exclude all external URLs.

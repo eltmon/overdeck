@@ -117,6 +117,16 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
 - `EventRouter.tsx` → connects to `/ws/rpc`, fetches snapshot via `getSnapshot` RPC,
   subscribes to `subscribeDomainEvents` stream, applies events to Zustand store; on a
   sequence gap it calls `replayEvents` — see "Gap replay" under Degraded mode.
+- Boot order (PAN-5178): `main.tsx` calls `startBootRequests`
+  (`src/dashboard/frontend/src/lib/bootRequests.ts`) before React renders. It sends
+  `POST /api/dashboard/session` first, and on a deep link (`?issue=<ID>` or
+  `/issues/<ID>`) it prefetches `GET /api/issues/<ID>` into the `issueRecordQueryKey`
+  cache entry. A tab open sends about 45 REST requests in one React commit. On an
+  HTTP/1.1 origin the browser sends 6 at a time, and on HTTP/2 the burst reaches the
+  server together, so a request issued late in it waits 1 to 2 s. `WsTransport` sends
+  no RPC until the session mint returns, so the mint must go first. The
+  shared-conversation route (`#/shared/<code>`) sends neither request. New code that
+  must beat the burst belongs in `startBootRequests`, not in a component effect.
 - The snapshot's agent `status` is derived when it is served, not copied from the stored
   record (#4098). A row stored as `running`/`starting` with no non-exited pane in the
   backend inventory is served `stopped`. Every agent-to-pane join in the server, including
@@ -145,6 +155,15 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
   kept, and an agent the snapshot omits keeps its entry.
   The God View's idle age therefore comes from the agent's last runtime event, not
   from the spawn-time `state.json` `lastActivity`.
+- Snapshot delivery cost (PAN-5178): one `getSnapshot` with 1,450 issues and 1,662
+  agents is about 5.5 MB. The handler takes 3 to 11 ms. The schema encode plus
+  `JSON.stringify` plus `TextEncoder` take about 45 to 65 ms warm, and about 90 to
+  95 ms on the first connect after a server start (JIT warm-up). Issue `description`
+  is 61% of the bytes. `cleanIssues` cleans each `IssueDataService.getIssues()` array
+  once (a `WeakMap` by array identity), so repeat connects skip the deep copy.
+  `ws-rpc-snapshot-event-loop.test.ts` keeps the event-loop delay of a warm connect
+  with 1,500 issues under 100 ms (smallest `max` of three runs after one warm-up),
+  and of the first connect at production volume (1,700 agents) under 300 ms.
 - `wsTransport.ts` — Effect-based RPC client with auto-reconnection
 - Outage handling never blocks the UI: see [Degraded mode (PAN-4279)](#degraded-mode-pan-4279).
 - Store: Zustand with shared reducers from `@overdeck/contracts`

@@ -166,8 +166,17 @@ function toJsonish(value: unknown, seen = new WeakSet<object>()): Jsonish | unde
   return undefined;
 }
 
-function cleanIssues(issues: unknown[]): unknown[] {
-  return issues.map((issue) => toJsonish(issue) ?? null);
+// PAN-5178: IssueDataService.getIssues() returns one cached array until the
+// next poll, and getSnapshot runs on every /ws/rpc connect and every 500 ms
+// while an issue stream is open. Clean each array once.
+const cleanedIssuesByInput = new WeakMap<readonly unknown[], unknown[]>();
+
+export function cleanIssues(issues: unknown[]): unknown[] {
+  const cached = cleanedIssuesByInput.get(issues);
+  if (cached) return cached;
+  const cleaned = issues.map((issue) => toJsonish(issue) ?? null);
+  cleanedIssuesByInput.set(issues, cleaned);
+  return cleaned;
 }
 
 // ─── Value validators for strict literal types ──────────────────────────────

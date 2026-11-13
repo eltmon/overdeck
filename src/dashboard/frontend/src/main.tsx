@@ -17,6 +17,7 @@ import { NewConversationDialogHost } from './components/newConversation/NewConve
 import { ShareDialogHost } from './components/chat/sharing/ShareDialog';
 import { AnywhereDialogHost } from './components/Settings/anywhere/AnywhereDialogHost';
 import { ImageLightboxHost } from './components/chat/ImageLightbox';
+import { startBootRequests } from './lib/bootRequests';
 import './index.css';
 
 installRequestFailureObserver({ client: 'desktop' });
@@ -74,6 +75,10 @@ if (import.meta.env.MODE === 'profile') {
 // PAN-3527: the deck's project and conversation lists retry with backoff and
 // refetch when the RPC websocket reconnects, instead of latching empty.
 installQueryRecovery(queryClient);
+
+// PAN-5178: the session mint (and a deep-linked issue read) go out before any
+// component's request, so they never wait behind the tab-open burst.
+startBootRequests(queryClient);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
