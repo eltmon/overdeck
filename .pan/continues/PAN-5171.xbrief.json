@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5171",
   "created": "2026-11-13T03:13:45.277Z",
-  "updated": "2026-11-13T03:42:34.351Z",
+  "updated": "2026-11-13T03:42:39.873Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,11 @@
     "drawer-header.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T03:42:34.351Z"
+    },
+    "cockpit-header": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5171",
+      "claimedAt": "2026-11-13T03:42:39.873Z"
     }
   }
 }
