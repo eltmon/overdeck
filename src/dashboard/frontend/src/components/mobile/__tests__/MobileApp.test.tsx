@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import MobileApp, { readMobileRoute } from '../MobileApp';
 import { MobilePairScreen, parsePairingInput } from '../MobilePairScreen';
 import { useConnectionState } from '../../../lib/connectionState';
@@ -82,20 +82,53 @@ describe('MobileApp', () => {
     expect(register).not.toHaveBeenCalled();
   });
 
-  it('shows the Install button after beforeinstallprompt', () => {
+  it('shows the Install button in Settings after beforeinstallprompt', () => {
     setSecureContext(false);
     render(<MobileApp />);
     expect(screen.queryByRole('button', { name: 'Install app' })).not.toBeInTheDocument();
+    // Dispatched before Settings opens: the event fires once near page load, long before a tap.
     const event = Object.assign(new Event('beforeinstallprompt', { cancelable: true }), { prompt: vi.fn(async () => {}) });
     act(() => {
       window.dispatchEvent(event);
     });
     expect(event.defaultPrevented).toBe(true);
-    const install = screen.getByRole('button', { name: 'Install app' });
+    fireEvent.click(screen.getByRole('button', { name: 'Settings', exact: true }));
+    const dialog = screen.getByRole('dialog', { name: 'Settings' });
+    const install = within(dialog).getByRole('button', { name: 'Install app' });
     act(() => {
       install.click();
     });
     expect(event.prompt).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the Overdeck lockup and a Settings button that opens the settings sheet (PAN-5208)', () => {
+    setSecureContext(false);
+    localStorage.removeItem('overdeck.appearance');
+    render(<MobileApp />);
+    const header = screen.getByRole('banner');
+    expect(within(header).getByText('Overdeck')).toBeInTheDocument();
+    expect(within(header).queryByRole('button', { name: 'Install app' })).not.toBeInTheDocument();
+    expect(within(header).queryByText('Notifications unavailable')).not.toBeInTheDocument();
+
+    fireEvent.click(within(header).getByRole('button', { name: 'Settings', exact: true }));
+    const dialog = screen.getByRole('dialog', { name: 'Settings' });
+    expect(within(dialog).getByRole('radiogroup', { name: 'Appearance' })).toBeInTheDocument();
+
+    document.documentElement.classList.add('dark');
+    fireEvent.click(within(dialog).getByRole('radio', { name: /Light/ }));
+    expect(localStorage.getItem('overdeck.appearance')).toBe('light');
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
+    localStorage.removeItem('overdeck.appearance');
+  });
+
+  it('puts an aria-hidden icon in every tab and keeps aria-current on the active one (PAN-5208)', () => {
+    setSecureContext(false);
+    render(<MobileApp />);
+    for (const name of ['Needs you', 'Conversations', 'Pipeline']) {
+      const tab = screen.getByRole('button', { name, exact: true });
+      expect(tab.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    }
+    expect(screen.getByRole('button', { name: 'Needs you', exact: true })).toHaveAttribute('aria-current', 'page');
   });
 
   it('switches tabs through the URL', () => {
@@ -175,6 +208,7 @@ describe('MobileApp in the phone app (PAN-4837)', () => {
     });
     expect(screen.getByRole('button', { name: 'desk ▾' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Install app' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Settings', exact: true })).not.toBeInTheDocument();
     expect(register).not.toHaveBeenCalled();
   });
 });
