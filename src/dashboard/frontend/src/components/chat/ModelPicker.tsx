@@ -412,6 +412,7 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
   const effectiveHarness = selectedModel?.harness
     ?? (showHarnessModelPermutations ? harness : selectedProviderHarness ?? harness);
   const selectedWarning = costWarningLevel(selectedModel?.costPer1MTokens);
+  const harnessIndicatorLabel = effectiveHarness ? HARNESS_INDICATOR_LABELS[effectiveHarness] : undefined;
 
   useEffect(() => {
     if (!followProviderDefault || !providerHarnessesLoaded || showHarnessModelPermutations) return;
@@ -470,10 +471,10 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
           />
         )}
         <span className={styles.pickerLabel}>{label}</span>
-        {HARNESS_INDICATOR_LABELS[effectiveHarness] && (
-          <span className={styles.harnessIndicator} title={`${HARNESS_INDICATOR_LABELS[effectiveHarness]} harness active`}>
+        {effectiveHarness && harnessIndicatorLabel && (
+          <span className={styles.harnessIndicator} title={`${harnessIndicatorLabel} harness active`}>
             <HarnessLogo harness={effectiveHarness} className={styles.harnessIndicatorIcon} />
-            {HARNESS_INDICATOR_LABELS[effectiveHarness]}
+            {harnessIndicatorLabel}
           </span>
         )}
         {selectedWarning && (

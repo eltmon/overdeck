@@ -6,7 +6,6 @@ import {
   PRIME_AGENT_BEHAVIOR,
   getHarnessBehavior,
   getRuntimeBehavior,
-  isLegacyPiHarnessName,
   normalizeHarnessName,
   type RuntimeName,
 } from "./harness-behavior"
@@ -132,17 +131,18 @@ describe("HarnessCapabilities (PAN-4562)", () => {
 
 describe("normalizeHarnessName (PAN-4562)", () => {
   it("maps legacy pi to ohmypi, keeps known names, and rejects everything else", () => {
-    expect(normalizeHarnessName("pi")).toBe("ohmypi")
+    // PAN-5212: pi is its own harness again; a stored pi reads as pi.
+    expect(normalizeHarnessName("pi")).toBe("pi")
     expect(normalizeHarnessName("codex")).toBe("codex")
     expect(normalizeHarnessName("claude")).toBeNull()
     expect(normalizeHarnessName(42)).toBeNull()
     expect(normalizeHarnessName(undefined)).toBeNull()
   })
 
-  it("isLegacyPiHarnessName matches only the pi alias", () => {
-    expect(isLegacyPiHarnessName("pi")).toBe(true)
-    expect(isLegacyPiHarnessName("ohmypi")).toBe(false)
-    expect(isLegacyPiHarnessName(undefined)).toBe(false)
+  it("gives pi and ohmypi distinct behaviors on the shared pi-family kinds (PAN-5212)", () => {
+    expect(getHarnessBehavior("pi")).not.toBe(getHarnessBehavior("ohmypi"))
+    expect(getHarnessBehavior("pi").executableName).toBe("pi")
+    expect(getHarnessBehavior("pi").launchCommandKind).toBe(getHarnessBehavior("ohmypi").launchCommandKind)
   })
 
   it("getHarnessBehavior falls back to Claude Code for missing or unknown names", () => {
