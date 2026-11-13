@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5170",
   "created": "2026-11-13T02:57:05.197Z",
-  "updated": "2026-11-13T02:59:17.293Z",
+  "updated": "2026-11-13T03:03:53.186Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,26 @@
       "doneAt": "2026-11-13T02:58:40.429Z"
     },
     "supervisor-reachability-tracker": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5170",
-      "claimedAt": "2026-11-13T02:59:17.293Z"
+      "claimedAt": "2026-11-13T02:59:17.293Z",
+      "doneAt": "2026-11-13T03:03:53.186Z"
+    },
+    "supervisor-reachability-tracker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:03:53.186Z"
+    },
+    "supervisor-reachability-tracker.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:03:53.186Z"
+    },
+    "supervisor-reachability-tracker.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:03:53.186Z"
+    },
+    "supervisor-reachability-tracker.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:03:53.186Z"
     }
   }
 }
