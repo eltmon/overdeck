@@ -6,8 +6,14 @@
 #
 #   1. `pan up --no-resume --no-open --detach` must exit 0, pass /api/health and
 #      print no line that asks for a tool the Herdr backend does not need.
-#   2. The idle dashboard must create at most the per-OS idle budget of new
-#      PIDs per 30 s window, net of a baseline window with no Overdeck running.
+#   2. The idle dashboard must stay within the per-OS idle budget per 30 s
+#      window. On Linux the measure is new PIDs, net of a baseline window with
+#      no Overdeck running. On macOS it is the traced spawn cost: the
+#      child_process calls the dashboard makes, plus 5 for each call that
+#      fails to spawn (macOS tries every one of the 6 PATH entries, one
+#      process each). A hosted macOS runner's own process churn moves the
+#      baseline by hundreds of PIDs per window, so the PID net cannot decide
+#      there; it is still measured and reported (operator decision, PAN-5176).
 #   3. No `spawn <tool> ENOENT` line may repeat in the logs.
 #
 # Every child runs under `env -i` with a fixed six-entry PATH and an isolated
@@ -27,6 +33,7 @@ set -u
 
 IDLE_BUDGET_MACOS=30
 IDLE_BUDGET_LINUX=30
+BARE_PATH_ENTRIES=6
 WINDOW_SECS=30
 SETTLE_SECS=20
 HEALTH_TIMEOUT_SECS=120
@@ -62,7 +69,6 @@ R_IDLE_BOOTED=false
 R_IDLE_BASELINE=''
 R_IDLE_NEW=''
 R_IDLE_NET=''
-R_IDLE_PASS=false
 R_ENOENT_PASS=false
 R_TRACE_FROM=''
 R_TRACE_TO=''
@@ -139,10 +145,10 @@ window_count() {
 
 write_result() {
   export R_SETUP_ERROR R_PANUP_RC R_PANUP_HEALTHY R_PANUP_PASS R_IDLE_BOOTED R_IDLE_BASELINE \
-    R_IDLE_NEW R_IDLE_NET R_IDLE_PASS R_ENOENT_PASS R_TRACE_FROM R_TRACE_TO
+    R_IDLE_NEW R_IDLE_NET R_ENOENT_PASS R_TRACE_FROM R_TRACE_TO
   R_OS="$OS_NAME" R_SUBJECT="$SUBJECT" R_BUDGET="$BUDGET" R_WINDOW="$WINDOW_SECS" R_OUT="$OUT" \
     R_FORBIDDEN_FILE="$WORK_DIR/forbidden-lines.txt" R_ENOENT_FILE="$WORK_DIR/enoent-counts.txt" \
-    R_TRACE_FILE="$WORK_DIR/spawn-trace.log" \
+    R_TRACE_FILE="$WORK_DIR/spawn-trace.log" R_PATH_ENTRIES="$BARE_PATH_ENTRIES" \
     node -e '
 const fs = require("fs");
 const e = process.env;
@@ -161,12 +167,13 @@ if (e.R_TRACE_FROM && e.R_TRACE_TO) {
   // A call is a "spawn" or "error" record; an "exit" record marks a call
   // that already counted as failed (its shell exited 127).
   const groups = new Map();
-  let count = 0, failed = 0;
+  let count = 0, failed = 0, spawnErrors = 0;
   for (const line of readLines(e.R_TRACE_FILE)) {
     let rec; try { rec = JSON.parse(line); } catch { continue; }
     if (!(rec.t >= from && rec.t <= to)) continue;
     const g = groups.get(rec.program) || { program: rec.program, count: 0, failed: 0, errors: [] };
     if (rec.event !== "exit") { count += 1; g.count += 1; }
+    if (rec.event === "error" && rec.error !== "exit 127") spawnErrors += 1;
     if (rec.error) {
       failed += 1; g.failed += 1;
       if (!g.errors.includes(rec.error)) g.errors.push(rec.error);
@@ -174,9 +181,18 @@ if (e.R_TRACE_FROM && e.R_TRACE_TO) {
     groups.set(rec.program, g);
   }
   const top = [...groups.values()].sort((x, y) => y.count - x.count).slice(0, 10);
-  spawns = { count, failed, top };
+  // A call that fails to spawn costs one process per bare PATH entry on
+  // macOS, so it weighs PATH_ENTRIES; every other call weighs 1.
+  const cost = count + (Number(e.R_PATH_ENTRIES) - 1) * spawnErrors;
+  spawns = { count, failed, spawnErrors, cost, top };
 }
 const window = Number(e.R_WINDOW);
+// Which number decides the idle check: the traced spawn cost on macOS, the
+// PID net elsewhere.
+const rule = e.R_OS === "darwin" ? "traced-cost" : "pid-net";
+const value = rule === "traced-cost" ? (spawns ? spawns.cost : null) : net;
+const budget = num(e.R_BUDGET);
+const idlePass = bool(e.R_IDLE_BOOTED) && value !== null && budget !== null && value <= budget;
 const result = {
   version: "1",
   os: e.R_OS || null,
@@ -184,7 +200,7 @@ const result = {
   panUp: { rc: num(e.R_PANUP_RC), healthy: bool(e.R_PANUP_HEALTHY), forbiddenToolLines: readLines(e.R_FORBIDDEN_FILE), pass: bool(e.R_PANUP_PASS) },
   idle: {
     booted: bool(e.R_IDLE_BOOTED), baselineNew: num(e.R_IDLE_BASELINE), idleNew: num(e.R_IDLE_NEW), net,
-    netPerSec: net === null ? null : Math.round((net / window) * 100) / 100, budget: num(e.R_BUDGET), pass: bool(e.R_IDLE_PASS), spawns,
+    netPerSec: net === null ? null : Math.round((net / window) * 100) / 100, budget, rule, value, pass: idlePass, spawns,
   },
   enoent: { repeats, pass: bool(e.R_ENOENT_PASS) },
   pass: false,
@@ -203,9 +219,10 @@ const lines = [
 if (setupError) lines.push("  setup error: " + setupError);
 lines.push("  pan up:  " + verdict(result.panUp.pass) + " rc=" + show(result.panUp.rc) + " healthy=" + result.panUp.healthy + " forbidden-tool lines=" + result.panUp.forbiddenToolLines.length);
 for (const line of result.panUp.forbiddenToolLines) lines.push("           " + line);
-lines.push("  idle:    " + verdict(result.idle.pass) + " booted=" + result.idle.booted + " baseline=" + show(result.idle.baselineNew) + " idle=" + show(result.idle.idleNew) + " net=" + show(result.idle.net) + " (" + show(result.idle.netPerSec) + "/s) budget=" + show(result.idle.budget));
+lines.push("  idle:    " + verdict(result.idle.pass) + " booted=" + result.idle.booted + " rule=" + rule + " value=" + show(value) + " budget=" + show(budget));
+lines.push("           PIDs: baseline=" + show(result.idle.baselineNew) + " idle=" + show(result.idle.idleNew) + " net=" + show(result.idle.net) + " (" + show(result.idle.netPerSec) + "/s)" + (rule === "pid-net" ? "" : " (reported, not asserted)"));
 if (spawns) {
-  lines.push("           Overdeck child_process calls in the idle window: " + spawns.count + " (" + spawns.failed + " failed)");
+  lines.push("           Overdeck child_process calls in the idle window: " + spawns.count + " (" + spawns.failed + " failed, " + spawns.spawnErrors + " failed to spawn), traced cost " + spawns.cost);
   for (const g of spawns.top) lines.push("             " + g.count + "x " + g.program + (g.failed ? " (" + g.failed + " failed: " + g.errors.join(", ") + ")" : ""));
 }
 lines.push("  ENOENT:  " + verdict(result.enoent.pass) + " repeats=" + repeats.length);
@@ -219,7 +236,8 @@ if (e.GITHUB_STEP_SUMMARY) {
     "| Check | Result | Detail |",
     "| --- | --- | --- |",
     "| pan up | " + verdict(result.panUp.pass) + " | rc " + show(result.panUp.rc) + ", healthy " + result.panUp.healthy + ", " + result.panUp.forbiddenToolLines.length + " forbidden-tool lines |",
-    "| Idle new PIDs | " + verdict(result.idle.pass) + " | net " + show(result.idle.net) + " per " + window + " s (" + show(result.idle.netPerSec) + "/s), budget " + show(result.idle.budget) + " |",
+    "| Idle (" + rule + ") | " + verdict(result.idle.pass) + " | " + show(value) + " per " + window + " s, budget " + show(budget) + " |",
+    "| Idle new PIDs | " + (rule === "pid-net" ? verdict(result.idle.pass) : "info") + " | net " + show(result.idle.net) + " per " + window + " s (" + show(result.idle.netPerSec) + "/s) |",
     "| Overdeck spawns (idle window) | info | " + (spawns ? spawns.count + " calls, " + spawns.failed + " failed" + (spawns.top.length ? "; top: " + spawns.top.slice(0, 5).map((g) => g.count + "x " + g.program + (g.failed ? " (" + g.failed + " failed)" : "")).join(", ") : "") : "n/a") + " |",
     "| ENOENT repeats | " + verdict(result.enoent.pass) + " | " + repeats.length + " repeated |",
     "",
@@ -228,6 +246,7 @@ if (e.GITHUB_STEP_SUMMARY) {
   ];
   fs.appendFileSync(e.GITHUB_STEP_SUMMARY, md.join("\n") + "\n");
 }
+process.exit(result.pass ? 0 : 1);
 '
 }
 
@@ -553,8 +572,7 @@ measure_idle() {
     R_IDLE_NEW=$(window_count)
     R_TRACE_TO="$(date +%s)999"
     R_IDLE_NET=$((R_IDLE_NEW - R_IDLE_BASELINE))
-    if [ "$R_IDLE_NET" -le "$BUDGET" ]; then R_IDLE_PASS=true; fi
-    echo "idle new PIDs: $R_IDLE_NEW, net $R_IDLE_NET, budget $BUDGET"
+    echo "idle new PIDs: $R_IDLE_NEW, net $R_IDLE_NET (the verdict is in the summary below)"
   else
     echo "dashboard never answered /api/health within ${HEALTH_TIMEOUT_SECS} s; see $WORK_DIR/server.log"
   fi
@@ -594,10 +612,9 @@ main() {
   stop_all
   measure_idle
   scan_enoent
-  write_result
-  if [ "$R_PANUP_PASS" = true ] && [ "$R_IDLE_PASS" = true ] && [ "$R_ENOENT_PASS" = true ]; then
-    exit 0
-  fi
+  # write_result decides the verdict (it owns the idle rule) and exits 0 on
+  # pass, 1 otherwise.
+  if write_result; then exit 0; fi
   exit 1
 }
 
