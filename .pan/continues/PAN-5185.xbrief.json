@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5185",
   "created": "2026-11-13T14:58:00.032Z",
-  "updated": "2026-11-13T15:33:30.425Z",
+  "updated": "2026-11-13T15:36:52.465Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -230,9 +230,10 @@
       "doneAt": "2026-11-13T15:30:24.508Z"
     },
     "watch-supervisor": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5185",
-      "claimedAt": "2026-11-13T15:30:33.223Z"
+      "claimedAt": "2026-11-13T15:30:33.223Z",
+      "doneAt": "2026-11-13T15:36:52.464Z"
     },
     "git-runner.ac1": {
       "status": "completed",
@@ -249,6 +250,30 @@
     "git-runner.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T15:33:30.424Z"
+    },
+    "watch-supervisor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:36:52.464Z"
+    },
+    "watch-supervisor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:36:52.464Z"
+    },
+    "watch-supervisor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:36:52.464Z"
+    },
+    "watch-supervisor.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:36:52.464Z"
+    },
+    "watch-supervisor.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:36:52.464Z"
+    },
+    "watch-supervisor.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-13T15:36:52.464Z"
     }
   }
 }
