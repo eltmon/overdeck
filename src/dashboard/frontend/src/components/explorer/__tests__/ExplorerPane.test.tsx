@@ -33,7 +33,7 @@ vi.mock('../explorer-rpc', async (importOriginal) => {
 
 import { DialogProvider } from '../../DialogProvider'
 import { StageDeckProvider } from '../../Stage/StageDeckContext'
-import { ExplorerPane } from '../ExplorerPane'
+import { ExplorerPane, PREVIEW_OPEN_DELAY_MS } from '../ExplorerPane'
 import { useExplorerStore } from '../explorerStore'
 import { usePanesStore, selectPanesForWorkspace } from '../../../lib/panesStore'
 import type { WorkspacePane } from '../../../lib/panesStore'
@@ -224,5 +224,45 @@ describe('ExplorerPane', () => {
     renderPane()
     await screen.findByText('README.md')
     await waitFor(() => expect(useExplorerStore.getState().roots['issue:PAN-1'].expanded).toEqual([]))
+  })
+
+  describe('opening files from the tree (PAN-5187)', () => {
+    const codePanes = () => selectPanesForWorkspace(DECK)(usePanesStore.getState()).filter((p) => p.paneType === 'code')
+
+    it('a single click opens the preview pane once the double-click interval passes', async () => {
+      renderPane()
+      const row = await screen.findByText('README.md')
+      vi.useFakeTimers()
+      try {
+        fireEvent.click(row)
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(PREVIEW_OPEN_DELAY_MS - 1)
+        })
+        expect(codePanes()).toHaveLength(0)
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1)
+        })
+        expect(codePanes().map((p) => [p.explorerPath, p.explorerPreview])).toEqual([['README.md', true]])
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('a double click opens one permanent pane and no preview', async () => {
+      renderPane()
+      const row = await screen.findByText('README.md')
+      vi.useFakeTimers()
+      try {
+        fireEvent.click(row)
+        fireEvent.click(row)
+        fireEvent.doubleClick(row)
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(PREVIEW_OPEN_DELAY_MS * 2)
+        })
+        expect(codePanes().map((p) => [p.explorerPath, p.explorerPreview])).toEqual([['README.md', false]])
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 })

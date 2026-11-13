@@ -10,19 +10,19 @@
  * state, so unsaved edits survive the pane unmounting.
  */
 import type { ExplorerReadFileResult } from '@overdeck/contracts'
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { usePanesStore } from '../../../lib/panesStore'
 import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
+import { pickViewer } from '../viewers/viewer-router'
 import styles from '../../Stage/stage.module.css'
 import type { PaneWrapperProps } from '../../Stage/types'
 import { explorerErrorCode, explorerErrorMessage, readFile } from '../explorer-rpc'
-import { codePaneLabel, openCodePane } from '../openCodePane'
+import { openCodePane } from '../openCodePane'
 import { draftKey, isDraftDirty, useCodeDrafts } from './code-drafts'
 import { MonacoCodeEditor, type CodeEditorInstance, type CodePosition } from './MonacoCodeEditor'
 import { ChangesView } from './ChangesView'
 import { CodePaneHeader, isMarkdownPath, type CodePaneView } from './CodePaneHeader'
 import { ExternalChangeBanner } from './ExternalChangeBanner'
-import { NonTextFallback } from './NonTextFallback'
 import { useCodePaneSave } from './useCodePaneSave'
 import { readDisk, useExternalChange } from './useExternalChange'
 
@@ -30,6 +30,10 @@ type LoadState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
   | { status: 'ready'; result: ExplorerReadFileResult }
+
+// PAN-5188's viewer host: images, PDFs, audio, fonts, tables, archives and
+// large text. Its viewers lazy-load in turn (PAN-5188 D-1, the §6.7 seam).
+const FileViewer = lazy(() => import('../viewers/FileViewer'))
 
 export const READ_ONLY_NOTE = 'Read-only: the main checkout is never edited directly.'
 
@@ -63,8 +67,9 @@ function CodePaneForFile({
   const key = draftKey(rootId, path)
   const [load, setLoad] = useState<LoadState>({ status: 'loading' })
   const [wordWrap, setWordWrap] = useState<'on' | 'off'>('on')
-  const [view, setView] = useState<CodePaneView>('edit')
-  const showPreview = view === 'preview' && isMarkdownPath(path)
+  // null until the user picks: a text file a viewer can show (CSV, SVG)
+  // opens in Preview, everything else in Edit.
+  const [chosenView, setView] = useState<CodePaneView | null>(null)
   // The diff in the body: the Changes view (HEAD) or the banner's Compare (disk).
   const [diff, setDiff] = useState<'head' | 'disk' | null>(null)
   // The cursor carried between the plain editor and the diff's modified side.
@@ -213,7 +218,22 @@ function CodePaneForFile({
   if (load.status === 'loading') return <Placeholder title="Loading…" testId="code-pane-loading" />
   if (load.status === 'error') return <Placeholder title="Couldn’t open file" hint={load.message} testId="code-pane-error" />
   const { result } = load
-  if (result.kind !== 'text') return <NonTextFallback name={codePaneLabel(path)} size={result.size} />
+  const viewer = pickViewer(path, result)
+  // A viewer-only file (binary, large text, or a text read such as an ASCII
+  // PDF that only a viewer can show) never opens in Monaco.
+  if (result.kind !== 'text' || (viewer.kind !== 'text' && !viewer.textEditable)) {
+    return (
+      <div className="flex h-full min-h-0 flex-col" data-testid="code-pane-viewer">
+        <Suspense fallback={<Placeholder title="Loading…" testId="code-pane-loading" />}>
+          <FileViewer rootId={rootId} path={path} read={result} wordWrap={wordWrap === 'on'} />
+        </Suspense>
+      </div>
+    )
+  }
+  const viewerPreview = viewer.kind !== 'text' && viewer.textEditable
+  const previewable = viewerPreview || isMarkdownPath(path)
+  const view = chosenView ?? (viewerPreview ? 'preview' : 'edit')
+  const showPreview = previewable && view === 'preview'
   // Compare shows the disk text only while the banner reports it.
   const diskDiff = diff === 'disk' && externalState.kind === 'changed' ? externalState.diskText : undefined
 
@@ -221,6 +241,7 @@ function CodePaneForFile({
     <div className="flex h-full min-h-0 flex-col" data-testid="code-pane" onKeyDown={onPaneKeyDown}>
       <CodePaneHeader
         path={path}
+        previewable={previewable}
         view={view}
         onView={setView}
         wordWrap={wordWrap}
@@ -260,6 +281,12 @@ function CodePaneForFile({
             onSaveShortcut={save.saveNow}
             onMount={onDiffMount}
           />
+        </div>
+      ) : showPreview && viewerPreview ? (
+        <div className="flex min-h-0 flex-1 flex-col" data-testid="code-pane-viewer">
+          <Suspense fallback={<Placeholder title="Loading…" testId="code-pane-loading" />}>
+            <FileViewer rootId={rootId} path={path} read={{ ...result, text: text ?? result.text }} wordWrap={wordWrap === 'on'} />
+          </Suspense>
         </div>
       ) : showPreview ? (
         <div className="min-h-0 flex-1 overflow-auto" data-testid="code-pane-markdown">

@@ -68,6 +68,14 @@ function seedProject(home: string): void {
     "import { useState } from 'react'\nexport function View() {\n  const [n] = useState(0)\n  return <div className=\"x\">{n}</div>\n}\n",
   );
 
+  // PAN-5188's viewers, mounted by the code pane: a 1x1 PNG, a one-page PDF and a CSV.
+  writeFileSync(
+    path.join(fixture, 'logo.png'),
+    Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'),
+  );
+  writeFileSync(path.join(fixture, 'doc.pdf'), minimalPdf());
+  writeFileSync(path.join(fixture, 'table.csv'), 'name,count\nalpha,42\nbeta,7\n');
+
   // D-C5: a text file just under the 5 MiB editable limit (4.9 MiB).
   const line = '// filler line for the 4.9 MiB save check, padded to a fixed width.......\n';
   writeFileSync(path.join(fixture, 'big.ts'), line.repeat(Math.floor((4.9 * 1024 * 1024) / line.length)));
@@ -76,6 +84,28 @@ function seedProject(home: string): void {
     path.join(home, 'projects.yaml'),
     `projects:\n  ${DECK}:\n    name: ${DECK}\n    path: ${repo}\n    issue_prefix: UAT\n`,
   );
+}
+
+/** A one-page PDF with a correct cross-reference table. */
+function minimalPdf(): Buffer {
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    '<< /Length 44 >>\nstream\nBT /F1 18 Tf 20 40 Td (PAN-5187) Tj ET\nendstream',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  let body = '%PDF-1.4\n';
+  const offsets: number[] = [];
+  objects.forEach((object, i) => {
+    offsets.push(body.length);
+    body += `${i + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xref = body.length;
+  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const offset of offsets) body += `${String(offset).padStart(10, '0')} 00000 n \n`;
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(body, 'latin1');
 }
 
 async function openDeck(page: Page): Promise<void> {
@@ -244,6 +274,38 @@ test('real TypeScript and TSX files show no false error squiggles', async ({ pag
     await page.screenshot({ path: test.info().outputPath(`squiggles-${name}.png`) });
     await expect(editor.locator('.squiggly-error')).toHaveCount(0);
   }
+});
+
+test('a PNG, a PDF and a CSV render in code panes through the PAN-5188 viewers', async ({ page }) => {
+  await openDeck(page);
+  await treeItem(page, 'uat-fixture').click();
+  const open = async (name: string) => {
+    await page.getByRole('tab').filter({ hasText: 'Files' }).first().click();
+    await treeItem(page, name).dblclick();
+  };
+
+  await open('logo.png');
+  const image = page.getByTestId('code-pane-viewer').locator('img').first();
+  await expect(image).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => image.evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBe(1);
+
+  await open('doc.pdf');
+  await expect(page.getByTestId('code-pane-viewer').getByLabel('Page 1')).toBeVisible({ timeout: 30_000 });
+  await page.screenshot({ path: test.info().outputPath('viewer-pdf.png') });
+
+  await open('table.csv');
+  const table = page.getByRole('table', { name: 'table.csv' });
+  await expect(table).toContainText('alpha', { timeout: 15_000 });
+  await expect(table).toContainText('42');
+  // Double click opens permanent panes, even in an unsplit deck: all three stay, none italic.
+  for (const name of ['logo.png', 'doc.pdf', 'table.csv']) {
+    const tab = page.getByRole('tab').filter({ hasText: name });
+    await expect(tab).toHaveCount(1);
+    await expect(tab.locator('span.italic')).toHaveCount(0);
+  }
+  await page.getByRole('tab', { name: 'Edit' }).click();
+  await expect(page.locator('.monaco-editor .view-lines').first()).toContainText('name,count');
+  await page.screenshot({ path: test.info().outputPath('viewer-csv-edit.png') });
 });
 
 test('the Context page editor still mounts Monaco with the shared setup', async ({ page }) => {

@@ -17,6 +17,8 @@ vi.mock('../../explorer-rpc', async (importOriginal) => ({
   // The pane subscribes to the watch hub; no server stream in unit tests.
   subscribeWatchStream: () => () => {},
   readFile: mocks.readFile,
+  // A test that types leaves an autosave armed; the unmount flush writes.
+  writeFile: async () => ({ signature: 'saved', mtimeMs: 2 }),
 }))
 
 vi.mock('../MonacoCodeEditor', async () => {
@@ -43,6 +45,12 @@ vi.mock('../MonacoCodeEditor', async () => {
     },
   }
 })
+
+vi.mock('../../viewers/FileViewer', () => ({
+  default: (props: { path: string; read: ExplorerReadFileResult }) => (
+    <div data-testid="file-viewer" data-path={props.path} data-kind={props.read.kind} data-text={props.read.text} />
+  ),
+}))
 
 const { CodePane, READ_ONLY_NOTE } = await import('../CodePane')
 const { draftKey, useCodeDrafts } = await import('../code-drafts')
@@ -108,13 +116,26 @@ describe('CodePane', () => {
     expect(((await screen.findByTestId('monaco')) as HTMLTextAreaElement).value).toBe('unsaved\n')
   })
 
-  it('renders the non-text fallback for a binary file', async () => {
-    mocks.readFile.mockResolvedValue({ kind: 'binary', size: 2048, mtimeMs: 1, signature: '', lang: '', writable: true })
+  it('renders the PAN-5188 viewer host for a binary file', async () => {
+    mocks.readFile.mockResolvedValue({ kind: 'binary', size: 2048, mtimeMs: 1, signature: 'sig-png', lang: '', writable: true })
     render(<CodePane pane={pane({ explorerPath: 'img/logo.png' })} ctx={ctx} />)
-    const fallback = await screen.findByTestId('code-pane-non-text')
-    expect(fallback.textContent).toContain('logo.png')
-    expect(fallback.textContent).toContain('2.0 KiB')
+    const viewer = await screen.findByTestId('file-viewer')
+    expect(viewer.getAttribute('data-path')).toBe('img/logo.png')
+    expect(viewer.getAttribute('data-kind')).toBe('binary')
     expect(screen.queryByTestId('monaco')).toBeNull()
+    expect(screen.queryByTestId('code-pane-header')).toBeNull()
+  })
+
+  it('opens a CSV in the table preview, and Edit switches to Monaco with the draft', async () => {
+    mocks.readFile.mockResolvedValue(textRead({ text: 'a,b\n1,2\n' }))
+    render(<CodePane pane={pane({ explorerPath: 'data/t.csv', label: 't.csv' })} ctx={ctx} />)
+    const viewer = await screen.findByTestId('file-viewer')
+    expect(viewer.getAttribute('data-text')).toBe('a,b\n1,2\n')
+    fireEvent.click(screen.getByRole('tab', { name: 'Edit' }))
+    expect(((await screen.findByTestId('monaco')) as HTMLTextAreaElement).value).toBe('a,b\n1,2\n')
+    fireEvent.change(screen.getByTestId('monaco'), { target: { value: 'a,b\n3,4\n' } })
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    expect((await screen.findByTestId('file-viewer')).getAttribute('data-text')).toBe('a,b\n3,4\n')
   })
 
   it('says the file no longer exists on NOT_FOUND', async () => {

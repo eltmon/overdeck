@@ -1,6 +1,6 @@
 /**
  * Code pane header (PAN-5187, FR-7): the root-relative path, Edit / Preview
- * for markdown files, the word-wrap and Changes toggles, and Keep open for a
+ * for markdown files and text files a viewer can show (CSV, SVG), the word-wrap and Changes toggles, and Keep open for a
  * preview tab. The sub-tab markup follows EditorPane.tsx.
  */
 import styles from '../../Stage/stage.module.css'
@@ -16,6 +16,8 @@ const TOGGLE_ON = 'bg-muted text-foreground'
 
 export interface CodePaneHeaderProps {
   path: string
+  /** Show Edit / Preview; defaults to markdown files only. */
+  previewable?: boolean
   view: CodePaneView
   onView(view: CodePaneView): void
   wordWrap: 'on' | 'off'
@@ -29,14 +31,14 @@ export interface CodePaneHeaderProps {
 
 export function CodePaneHeader(props: CodePaneHeaderProps) {
   const { path, view, onView, wordWrap, onToggleWrap, changes, onToggleChanges, preview, onKeepOpen } = props
-  const markdown = isMarkdownPath(path)
+  const markdown = props.previewable ?? isMarkdownPath(path)
   return (
     <div className={`${styles.subTabs} items-center`} data-testid="code-pane-header">
       <span className="min-w-0 truncate font-mono text-xs text-muted-foreground" title={path}>
         {path}
       </span>
       {markdown ? (
-        <div role="tablist" aria-label="Markdown view" className="flex">
+        <div role="tablist" aria-label="View" className="flex">
           {(['edit', 'preview'] as const).map((v) => (
             <button
               key={v}

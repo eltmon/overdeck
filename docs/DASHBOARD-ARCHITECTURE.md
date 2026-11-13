@@ -1853,16 +1853,21 @@ local web workers and never loads from a CDN. The slot keys the pane by root
 and path, so a retargeted preview tab mounts a fresh pane. The language comes
 from the path against Monaco's own language list (`monaco-language.ts`), not
 from the server's Shiki id. A `project` root opens read-only with the note
-"Read-only: the main checkout is never edited directly." Binary and large
-files show a fallback that PAN-5188 replaces with its viewers.
+"Read-only: the main checkout is never edited directly." The pane asks
+PAN-5188's `pickViewer` how to show a file: a binary or large-text read renders
+the `FileViewer` host (images, PDF, audio, fonts, archives, large text); a text
+file a viewer can show (CSV, TSV, SVG) opens in Preview with an Edit tab that
+switches to Monaco, and the preview shows the live draft.
 
 **Preview tabs.** Every caller opens files through `openCodePane(deck,
 { rootId, path, line?, column?, preview? })`. A single click on a file row in
 the tree passes `preview: true`: it reuses the root's one preview pane
 (`explorerPreview: true`, italic tab label) instead of adding a tab per file.
 A double click, Enter, quick open, the first edit and the header's **Keep
-open** make the pane permanent. In an unsplit deck a preview open activates
-the code tab, so the tree leaves the screen until its tab is selected again.
+open** make the pane permanent. The single click waits 250 ms before it opens
+the preview, so a double click can cancel it and open a permanent pane: in an
+unsplit deck a preview open activates the code tab, so the tree leaves the
+screen until its tab is selected again.
 
 **Drafts.** The pane's text lives in `code-drafts.ts`, a zustand store keyed by
 `(rootId, path)` and never persisted, so unsaved edits survive the pane
