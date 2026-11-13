@@ -43,9 +43,8 @@ import { buildHarnessPolicyDecisions, parseHarnessPolicyModels } from '../../../
 import {
   detectProviderEnvConflicts,
 } from '../../../lib/claude-settings-overlay.js';
-import { refreshTtsRuntimeConfig } from '../services/tts-runtime-config.js';
-import { syncTtsPlaybackWithConfig } from '../services/tts-playback.js';
 import { stopConversationSearchWatcher, syncConversationSearchWatcher } from '../services/conversation-search-watcher.js';
+import { applySavedSettings } from '../services/settings-saved.js';
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { validateOrigin } from './origin-validation.js';
 import { getConversationSearchConfig } from '../../../lib/config-yaml.js';
@@ -868,9 +867,7 @@ const putSettingsRoute = HttpRouter.add(
           return jsonResponse({ error: validation.errors.join('; ') }, { status: 400 });
         }
         await saveSettingsApi(newSettings);
-        await refreshTtsRuntimeConfig();
-        await syncTtsPlaybackWithConfig();
-        await syncConversationSearchWatcher();
+        await applySavedSettings();
         return jsonResponse({
           success: true,
           message: 'Settings saved to config.yaml',
