@@ -33,7 +33,11 @@ HEALTH_TIMEOUT_SECS=120
 
 DENIED_TOOLS="docker tmux systemctl journalctl brew"
 GUARDED_PORTS="3010 3011 3012 8317"
-FORBIDDEN_LINE_RE='tmux not found|Failed to install tmux|brew: command not found|Install manually: brew|docker: command not found|systemctl: command not found|journalctl: command not found'
+# Lines that show pan up trying to install, or failing on, a tool the Herdr
+# backend does not need. `tmux not found\. Installing` (v0.81.0) is matched,
+# but not PAN-5169's intended warning "tmux not found — the Herdr terminal
+# backend does not need it; ...", after which pan up carries on.
+FORBIDDEN_LINE_RE='tmux not found\. Installing|Failed to install tmux|brew: command not found|Install manually: brew|docker: command not found|systemctl: command not found|journalctl: command not found'
 HERDR_INSTALL_URL='https://herdr.dev/install.sh'
 
 TARBALL=''
