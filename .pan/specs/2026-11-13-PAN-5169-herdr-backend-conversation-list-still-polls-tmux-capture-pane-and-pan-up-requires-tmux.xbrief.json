@@ -1,0 +1,645 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-13T02:26:13Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5169: herdr backend: conversation list still polls tmux capture-pane, and pan up requires tmux",
+    "updated": "2026-11-13T02:33:01.724Z"
+  },
+  "plan": {
+    "id": "pan-5169",
+    "title": "herdr backend: conversation list still polls tmux capture-pane, and pan up requires tmux",
+    "status": "proposed",
+    "uid": "a7451931-338e-4e48-98ed-9ac9ef3d51e7",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-13T02:26:13Z",
+    "updated": "2026-11-13T02:33:01.724Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5169",
+        "label": "PAN-5169",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5169.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "herdr",
+      "terminal-backend",
+      "conversations",
+      "pan-up",
+      "prereqs",
+      "macos"
+    ],
+    "narratives": {
+      "Problem": "On a Herdr host with no tmux (a Mac without tmux or Homebrew), the dashboard still runs tmux capture-pane for polled conversation pane reads: conversationNeedsTerminal calls tmux directly, claudeConversationPaneChoice captures through tmux on every pending-input feed poll and single read because tmuxPaneText is always null on Herdr, and readConversationInputTarget / readConversationPermission take resolveAgentPaneIo's legacy tmux fallback whenever findHerdrAgentPane returns null. Each failed spawn on macOS leaves ~10 dead processes, per conversation per poll. Separately, pan up's ensureHostTools treats tmux as fatal regardless of backend, runs brew install tmux even when brew is not on PATH, and exits 1.",
+      "Proposal": "Add an opt-in legacyTmuxFallback: false option to resolveAgentPaneIo (default unchanged) that throws on a Herdr miss instead of falling back to tmux; use it for the three polled reads (needs-terminal, input-target, pane permission). Skip pane-choice detection inside claudeConversationPaneChoice on a Herdr host when no captured screen is supplied. Make ensureHostTools require tmux only under the tmux backend (warn and continue under Herdr, no install attempt). Guard every darwin brew install behind a spawn-free findExecutableOnPath('brew') check and print a download-URL hint when brew is absent. Update docs/TERMINAL-BACKENDS.md, configuration/terminal-backend.mdx and add changelog.d/pan-5169.md.",
+      "NonGoals": "- Conversation liveness tmux fallbacks in src/lib/overdeck/conversation-liveness.ts stay unchanged (deliberate PAN-3921 rollback safety; once per poll, not per conversation).\n- No host-tool cache or shared PATH-lookup module (PAN-5168 owns it).\n- The execSync tmux set-environment loop in src/cli/index.ts after ensureHostTools stays unchanged.\n- PREREQ_REGISTRY.spawnAgent and the /api/prereqs route stay unchanged.\n- Other capturePane callers under src/dashboard/server/routes/ and services/ stay unchanged.\n- User-initiated paths keep the default legacy tmux fallback: answerConversationPermission, the message-send permission hold in conversation-message.ts (it guards ensure-main's keys), the pane-choice answer route, scheduled-message delivery and ensure-main.\n- Pane-choice detection is not routed through Herdr (the answer path is tmux-only).\n- pan install's prerequisite warning wording in src/cli/commands/install-prereqs.ts stays unchanged.\n- The pre-existing installTtyd darwin download fallback is not fixed; only its brew attempt is guarded.\n- Tmux-host behavior of every polled conversation read must not change (same session names, same line counts)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Under Herdr, polled conversation pane reads never fall back to tmux; a pane Herdr does not hold reads as unreadable.",
+        "rationale": "The issue body and operator comment both say never call tmux under herdr. Consequence recorded: legacy tmux conversations on a Herdr host lose inputTarget (reads 'unknown'), needsTerminal (false), pane permission detection (hook registry still reports) and pane-choice menus."
+      },
+      {
+        "summary": "Strict reads are an opt-in option (legacyTmuxFallback: false) on resolveAgentPaneIo, default true.",
+        "rationale": "User-initiated answer and keying paths share resolveAgentPaneIo and still need the legacy fallback; an option keeps one door (one variant per operation) and existing test mocks that return a fixed io keep working."
+      },
+      {
+        "summary": "Pane-choice detection is skipped on a Herdr host inside claudeConversationPaneChoice when no capture is supplied, rather than routed through Herdr.",
+        "rationale": "The pane-choice answer path is tmux-only (docs/TERMINAL-BACKENDS.md), so a Herdr-detected menu could not be answered; one change covers both the pending-input feed and the single conversation read."
+      },
+      {
+        "summary": "needsTerminal keeps capturePane(name, 0) on tmux and reads Herdr with source 'visible' and 60 lines.",
+        "rationale": "On tmux, scrollback could still hold an answered onboarding screen and falsely flip the view to terminal; no Herdr read uses lines=0 anywhere today."
+      },
+      {
+        "summary": "Under Herdr, pan up does not try to install a missing tmux; it prints one warning and continues.",
+        "rationale": "Matches pan install (install-prereqs.ts forgives tmux under herdr) and pan doctor (warns under herdr); installing an unneeded tool at every boot, possibly via sudo, is intrusive."
+      },
+      {
+        "summary": "brew presence is checked with the existing uncached, spawn-free findExecutableOnPath from src/lib/pan-cli-shim.ts.",
+        "rationale": "Operator comment: do not add a second tool cache; PAN-5168 has no commits yet, so there is nothing shared to import; an fs PATH scan avoids the very spawn storm this issue is about."
+      },
+      {
+        "summary": "The pending-input feed's second (unnamed in the issue) per-conversation tmux leak via claudeConversationPaneChoice is in scope.",
+        "rationale": "It is the same class of bug (a polled conversation pane read calling tmux under Herdr) and the largest per-conversation cost on current main."
+      },
+      {
+        "summary": "The strict permission read is opted into by the two polled callers in conversation-reads.ts, not made the default of readConversationPermission.",
+        "rationale": "conversation-message.ts line 619 uses conversationPendingPermission as the hold that stops ensure-main's Down/Enter keys from answering a permission prompt; ensure-main keys through the default fallback, so the guard must read the same pane."
+      }
+    ],
+    "items": [
+      {
+        "id": "pane-io-strict",
+        "title": "Add legacyTmuxFallback option to resolveAgentPaneIo",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T02:26:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5169",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "needs-terminal-strict",
+            "input-target-strict",
+            "permission-read-strict"
+          ],
+          "files_scope": [
+            "src/lib/terminal-backends/agent-pane-io.ts",
+            "src/lib/terminal-backends/__tests__/agent-pane-io-strict.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/terminal-backends/__tests__/agent-pane-io-strict.test.ts src/lib/terminal-backends/__tests__/agent-pane-io-keys.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent-pane-io-strict.test.ts and agent-pane-io-keys.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 exactly. In src/lib/terminal-backends/agent-pane-io.ts export interface ResolveAgentPaneIoOptions { readonly legacyTmuxFallback?: boolean } and add a third parameter options: ResolveAgentPaneIoOptions = {} to resolveAgentPaneIo. Inside the herdr branch, after the 'if (pane) return {...}' block, add: if (options.legacyTmuxFallback === false) throw new Error(`herdr holds no pane for ${agentId}`). Everything else unchanged; the default keeps the legacy tmux fallback for every existing caller. Update the JSDoc above resolveAgentPaneIo and the module header sentence 'only the conversation pane-choice route keeps its own tmux reads' to the replacement text in PRD WI-1. Add src/lib/terminal-backends/__tests__/agent-pane-io-strict.test.ts with the four cases in PRD WI-1, copying the mock setup from agent-pane-io-keys.test.ts lines 10-36."
+        },
+        "items": [
+          {
+            "id": "pane-io-strict.ac1",
+            "title": "Given a Herdr host where findHerdrAgentPane returns null, when resolveAgentPaneIo('conv-x', herdrHost, { legacyTmuxFallback: false }) runs, then it rejects with 'herdr holds no pane for conv-x' and the mocked tmux capturePane and sendKeysAsync record 0 calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-io-strict.ac2",
+            "title": "Given a Herdr host where findHerdrAgentPane returns null, when resolveAgentPaneIo('conv-x', herdrHost) runs with no options, then it returns an io whose backend is 'tmux' (default fallback preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-io-strict.ac3",
+            "title": "Given a Herdr host holding pane p-1, when the strict io reads 60 lines, then readHerdrPaneText is called with ('p-1', 60, 'visible') and io.backend is 'herdr'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-io-strict.ac4",
+            "title": "Given a tmux host, when resolveAgentPaneIo('conv-x', tmuxHost, { legacyTmuxFallback: false }).read(0) runs, then capturePane is called with ('conv-x', 0), and the existing agent-pane-io-keys.test.ts passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "needs-terminal-strict",
+        "title": "Route conversationNeedsTerminal's screen capture through the strict pane read",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T02:26:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5169",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-reads.ts",
+            "src/lib/overdeck/__tests__/conversation-needs-terminal-backend.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-needs-terminal-backend.test.ts src/lib/overdeck/__tests__/conversation-needs-terminal.test.ts src/lib/overdeck/__tests__/conversation-permission-feed.test.ts src/lib/overdeck/__tests__/conversation-read-input-target.test.ts src/lib/overdeck/__tests__/conversation-list-input-target.test.ts src/lib/overdeck/__tests__/conversation-list-repair-door.test.ts src/lib/overdeck/__tests__/conversation-list-clear-chain.test.ts",
+            "npm run typecheck",
+            "wc -l src/lib/overdeck/conversation-reads.ts"
+          ],
+          "expected_outputs": [
+            "all seven needs-terminal and conversation read/list test files pass",
+            "typecheck completes without errors",
+            "conversation-reads.ts line count is 1000 or fewer"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2 exactly. In src/lib/overdeck/conversation-reads.ts drop capturePane from the '../tmux.js' import (keep listSessionNames), import resolveAgentPaneIo from '../terminal-backends/agent-pane-io.js', add const HERDR_VISIBLE_SCREEN_LINES = 60, and replace captureVisiblePane (line 207-208) with an async function that calls resolveAgentPaneIo(sessionName, undefined, { legacyTmuxFallback: false }) and returns io.read(io.backend === 'tmux' ? 0 : HERDR_VISIBLE_SCREEN_LINES). Do not change conversationNeedsTerminal's body; its .catch(() => '') turns a Herdr miss into false. Keep the file at or under 1000 lines. Add src/lib/overdeck/__tests__/conversation-needs-terminal-backend.test.ts exercising the default capture (no capture argument) with mocks of terminal-backends/launch.js (resolveLaunchBackend), terminal-backends/herdr.js (findHerdrAgentPane, readHerdrPaneText) and tmux.js (capturePane), covering the three cases in PRD WI-2."
+        },
+        "items": [
+          {
+            "id": "needs-terminal-strict.ac1",
+            "title": "Given a Herdr host where findHerdrAgentPane returns null, when conversationNeedsTerminal(conv, true, null) runs with the default capture, then it resolves false and the mocked tmux capturePane records 0 calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-terminal-strict.ac2",
+            "title": "Given a Herdr host holding pane p-1 whose visible text is the Claude onboarding screen, when conversationNeedsTerminal runs, then it resolves true, readHerdrPaneText is called with ('p-1', 60, 'visible') and capturePane records 0 calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-terminal-strict.ac3",
+            "title": "Given a tmux host whose pane shows the onboarding screen, when conversationNeedsTerminal runs, then it resolves true and capturePane is called with ('conv-20260714-4261', 0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-terminal-strict.ac4",
+            "title": "When wc -l src/lib/overdeck/conversation-reads.ts runs after the change, then it reports 1000 lines or fewer and conversation-needs-terminal.test.ts still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "input-target-strict",
+        "title": "Use the strict pane read in readConversationInputTarget",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T02:26:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5169",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-input-target.ts",
+            "src/lib/overdeck/__tests__/conversation-input-target-backend.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-input-target-backend.test.ts src/lib/overdeck/__tests__/conversation-input-target.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both input-target test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3 exactly. In src/lib/overdeck/conversation-input-target.ts line 35, pass undefined, { legacyTmuxFallback: false } as the second and third arguments to resolveAgentPaneIo in the default read. The call already sits inside the try/catch that returns 'unknown'. Add one sentence to the module header (lines 1-7) as written in PRD WI-3. Add src/lib/overdeck/__tests__/conversation-input-target-backend.test.ts exercising the default read (deps contain only hasSubagentsDir: async () => true) with the same launch.js / herdr.js / tmux.js mocks as WI-2, covering the two cases in PRD WI-3."
+        },
+        "items": [
+          {
+            "id": "input-target-strict.ac1",
+            "title": "Given a Herdr host where findHerdrAgentPane returns null, when readConversationInputTarget({ tmuxSession: 'conv-x', harness: 'claude-code' }, true, '/s/session.jsonl', { hasSubagentsDir: async () => true }) runs, then it resolves 'unknown' and the mocked tmux capturePane records 0 calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "input-target-strict.ac2",
+            "title": "Given a tmux host whose capturePane returns the claude-code-2.1.280 subagent-selected.txt fixture, when the same call runs, then it resolves { subagent: 'Counter run' } and capturePane is called with ('conv-x', 60)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "permission-read-strict",
+        "title": "Use the strict pane read in the polled permission reads",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T02:26:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5169",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-permission.ts",
+            "src/lib/overdeck/conversation-reads.ts",
+            "src/lib/overdeck/__tests__/conversation-permission-strict-read.test.ts",
+            "src/lib/overdeck/__tests__/conversation-permission-feed.test.ts",
+            "src/lib/overdeck/__tests__/conversation-message-permission-hold.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-permission-strict-read.test.ts src/lib/overdeck/__tests__/conversation-permission-feed.test.ts src/lib/overdeck/__tests__/conversation-message-permission-hold.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three permission test files pass, including the new feed and message-send cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4 exactly. In src/lib/overdeck/conversation-permission.ts add legacyTmuxFallback?: boolean to ConversationPermissionDeps and pass { legacyTmuxFallback: deps.legacyTmuxFallback } as the third argument of resolveAgentPaneIo in readConversationPermission (line 183). In src/lib/overdeck/conversation-reads.ts pass { legacyTmuxFallback: false } at line 423 (readConversationPermission in the pending-input feed) and line 523 (conversationPendingPermission in the single read), without adding lines. Do NOT change answerConversationPermission (line 243) or src/lib/overdeck/conversation-message.ts line 619: the message-send permission hold guards ensure-main's Down/Enter keys, which key through the default fallback, so it must read the same pane. Add conversation-permission-strict-read.test.ts (two cases) and one case each in conversation-permission-feed.test.ts and conversation-message-permission-hold.test.ts as written in PRD WI-4."
+        },
+        "items": [
+          {
+            "id": "permission-read-strict.ac1",
+            "title": "Given resolveAgentPaneIo rejects with 'herdr holds no pane for conv-x', when readConversationPermission(conv, { legacyTmuxFallback: false }) runs for a claude-code conversation, then it resolves tmuxPaneText null and resolveAgentPaneIo was called with ('conv-x', undefined, { legacyTmuxFallback: false })",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-read-strict.ac2",
+            "title": "Given resolveAgentPaneIo resolves a tmux io whose read returns 'screen', when readConversationPermission(conv) runs with no deps, then it resolves tmuxPaneText 'screen' and the third argument's legacyTmuxFallback is not false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-read-strict.ac3",
+            "title": "When getConversationsPendingInputFeed and getConversationRead run in conversation-permission-feed.test.ts, then the mocked resolveAgentPaneIo receives { legacyTmuxFallback: false } as its third argument for the conversation's session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-read-strict.ac4",
+            "title": "When the message-send flow in conversation-message-permission-hold.test.ts runs, then no recorded resolveAgentPaneIo call has legacyTmuxFallback false (the hold keeps the default fallback)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pane-choice-herdr-skip",
+        "title": "Skip pane-choice detection on a Herdr host",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T02:26:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5169",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-pane-choice.ts",
+            "src/lib/overdeck/__tests__/conversation-pane-choice-backend.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-pane-choice-backend.test.ts src/lib/overdeck/__tests__/conversation-permission-feed.test.ts src/lib/overdeck/__tests__/conversation-pending-feed-clear-chain.test.ts src/lib/overdeck/__tests__/conversation-input-doors-clear-chain.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the pane-choice backend test and the existing feed tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5 exactly. In src/lib/overdeck/conversation-pane-choice.ts, add an optional hostBackend?: () => Promise<TerminalBackendName> test seam to claudeConversationPaneChoice's options, import hostTerminalBackendName from '../terminal-backends/select.js' and the TerminalBackendName type from '../terminal-backends/types.js', and after the claude-code guard return null when options.capture is not supplied and the host backend is 'herdr'. Add one sentence to the module header. Do not edit conversation-reads.ts for this: line 428 passes capture only with tmux pane text and line 533 passes nothing. Add src/lib/overdeck/__tests__/conversation-pane-choice-backend.test.ts mocking ../../session-pane-choice.js captureSessionPaneChoice (spread original), with the four cases in PRD WI-5."
+        },
+        "items": [
+          {
+            "id": "pane-choice-herdr-skip.ac1",
+            "title": "Given hostBackend resolves 'herdr' and no capture option, when claudeConversationPaneChoice(conv) runs for a claude-code conversation, then it resolves null and captureSessionPaneChoice records 0 calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-choice-herdr-skip.ac2",
+            "title": "Given hostBackend resolves 'tmux' and no capture option, when claudeConversationPaneChoice(conv) runs, then captureSessionPaneChoice is called once with (conv.tmuxSession, undefined)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-choice-herdr-skip.ac3",
+            "title": "Given hostBackend resolves 'herdr' and a capture function is supplied, when claudeConversationPaneChoice runs, then captureSessionPaneChoice is called once with that capture function",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-choice-herdr-skip.ac4",
+            "title": "Given a codex conversation, when claudeConversationPaneChoice runs, then it resolves null without calling captureSessionPaneChoice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "host-tools-backend",
+        "title": "Require tmux in ensureHostTools only under the tmux backend",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T02:26:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5169",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/prereqs/registry.ts",
+            "src/cli/index.ts",
+            "tests/unit/lib/prereqs/registry.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/prereqs/registry.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "registry.test.ts passes including the new ensureHostTools (PAN-5169) cases",
+            "typecheck completes without errors",
+            "lint completes without errors (including the circular-import check)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6 exactly. In src/lib/prereqs/registry.ts import hostTerminalBackendName from '../terminal-backends/select.js' and the TerminalBackendName type, export interface EnsureHostToolsDeps { readonly backend?: TerminalBackendName }, give ensureHostTools a deps parameter, compute backend = deps.backend ?? await hostTerminalBackendName(), set tmux fatal only when backend === 'tmux', and when tmux is missing and not fatal print the yellow warning from PRD WI-6 (containing 'tmux not found — the Herdr terminal backend does not need it') and continue without calling installTool. Replace the ensureHostTools JSDoc with the PRD text. Rewrite the comment in src/cli/index.ts lines 622-625 to the PRD text without adding lines. Add the two ensureHostTools cases in PRD WI-6 to tests/unit/lib/prereqs/registry.test.ts; make the installer fail by mocking exec to call back an error (a bare vi.fn() exec never calls back and hangs promisify(exec))."
+        },
+        "items": [
+          {
+            "id": "host-tools-backend.ac1",
+            "title": "Given tmux -V fails and backend 'herdr', when ensureHostTools({ backend: 'herdr' }) runs, then process.exit is not called, the mocked exec is never called with a command containing 'tmux', and console.log receives a message containing 'tmux not found — the Herdr terminal backend does not need it'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-tools-backend.ac2",
+            "title": "Given tmux -V fails, backend 'tmux' and an installer exec that calls back an error, when ensureHostTools({ backend: 'tmux' }) runs, then process.exit is called with 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-tools-backend.ac3",
+            "title": "When npm run lint runs after the change, then it exits 0 with no circular-import error from registry.ts importing terminal-backends/select.js, and src/cli/index.ts has no more lines than before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "brew-guard",
+        "title": "Skip automatic brew install when brew is not on PATH",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T02:26:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5169",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/prereqs/registry.ts",
+            "tests/unit/lib/prereqs/registry.test.ts",
+            "tests/unit/lib/prereqs/registry-darwin.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/prereqs/registry.test.ts tests/unit/lib/prereqs/registry-darwin.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both registry test files pass, including the darwin-without-Homebrew cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7 exactly. In src/lib/prereqs/registry.ts import findExecutableOnPath from '../pan-cli-shim.js', add brewOnPath() (findExecutableOnPath('brew', process.env.PATH) !== null; no caching) and brewMissingError(tool) ('Homebrew (brew) is not on PATH, so <tool> was not installed automatically'). In installTmux, installJq and installMkcert darwin branches throw brewMissingError before any execAsync when brew is absent; in installTtyd wrap the brew try in if (brewOnPath()). Change getManualInstallHint's darwin branch to return 'brew install <tool>' only when brew is on PATH, otherwise `${getLinuxManualInstallHint(tool, null)}, or install Homebrew (https://brew.sh) and run: brew install <tool>`. Add the four darwin cases from PRD WI-7, in tests/unit/lib/prereqs/registry-darwin.test.ts if a module-level platform.js mock would disturb the existing Linux tests (repeat the node:child_process, config-yaml and semgrep/install mocks from registry.test.ts lines 6-40). Set process.env.PATH to a fresh mkdtempSync directory in beforeEach and restore it in afterEach."
+        },
+        "items": [
+          {
+            "id": "brew-guard.ac1",
+            "title": "Given darwin and a PATH with no brew, when installTool('tmux') and installTool('jq') run, then each resolves success false with a message containing 'Homebrew (brew) is not on PATH' and the mocked exec records 0 calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "brew-guard.ac2",
+            "title": "Given darwin, a PATH directory containing an executable brew file and an exec that calls back success, when installTool('tmux') runs, then it resolves success true and exec is called with 'brew install tmux'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "brew-guard.ac3",
+            "title": "Given darwin, no brew on PATH and tmux missing, when ensureHostTools({ backend: 'herdr' }) runs, then the printed warning contains 'https://github.com/tmux/tmux/wiki/Installing' and does not contain 'Install manually: brew install tmux'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Document Herdr pane-read and pan up tmux behavior, and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T02:26:13Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5169",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TERMINAL-BACKENDS.md",
+            "configuration/terminal-backend.mdx",
+            "changelog.d/pan-5169.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'legacyTmuxFallback: false' docs/TERMINAL-BACKENDS.md",
+            "grep -n 'pan up` warns and keeps starting' configuration/terminal-backend.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "docs/TERMINAL-BACKENDS.md contains the legacyTmuxFallback paragraph and the pan up host-setup sentence",
+            "configuration/terminal-backend.mdx contains the pan up warning sentence"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-8 exactly. In docs/TERMINAL-BACKENDS.md: change the line-604 sentence about conversation-pane-choice.ts to add 'and a Herdr host skips it (PAN-5169)'; add the polled-conversation-reads paragraph from the PRD directly after that paragraph; add the pan up sentence from the PRD under '### Host setup (PAN-3956)'. In configuration/terminal-backend.mdx change the first sentence of the 'Under Herdr, tmux is optional' paragraph to the PRD text. Create changelog.d/pan-5169.md with exactly the '#### Fixed' section and bullet from the PRD, following changelog.d/README.md. Inline module headers are handled by pane-io-strict, input-target-strict and pane-choice-herdr-skip, not here."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "When changelog.d/pan-5169.md is read, then it contains one '#### Fixed' heading and one bullet linking https://github.com/eltmon/overdeck/issues/5169, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "When docs/TERMINAL-BACKENDS.md is read, then it states that polled conversation pane reads pass legacyTmuxFallback: false and never fall back to tmux on a Herdr host, and that pan up requires tmux only under the tmux backend",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac3",
+            "title": "When configuration/terminal-backend.mdx is read, then its 'Under Herdr, tmux is optional' paragraph says pan up warns and keeps starting when tmux is missing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pane-io-strict",
+        "to": "needs-terminal-strict",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-io-strict",
+        "to": "input-target-strict",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-io-strict",
+        "to": "permission-read-strict",
+        "type": "blocks"
+      },
+      {
+        "from": "host-tools-backend",
+        "to": "brew-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "needs-terminal-strict",
+        "to": "permission-read-strict",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-13-PAN-5169-herdr-backend-conversation-list-still-polls-tmux-capture-pane-and-pan-up-requires-tmux.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
