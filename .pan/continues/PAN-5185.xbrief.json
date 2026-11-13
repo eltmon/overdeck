@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5185",
   "created": "2026-11-13T14:58:00.032Z",
-  "updated": "2026-11-13T15:20:22.709Z",
+  "updated": "2026-11-13T15:20:28.644Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,11 @@
     "read-service.ac5": {
       "status": "completed",
       "doneAt": "2026-11-13T15:20:22.708Z"
+    },
+    "git-service": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T15:20:28.644Z"
     }
   }
 }
