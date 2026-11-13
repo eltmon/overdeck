@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5169",
   "created": "2026-11-13T02:56:46.720Z",
-  "updated": "2026-11-13T03:25:17.211Z",
+  "updated": "2026-11-13T03:29:36.077Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,9 +130,22 @@
       "doneAt": "2026-11-13T03:25:04.759Z"
     },
     "brew-guard": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5169",
-      "claimedAt": "2026-11-13T03:25:17.211Z"
+      "claimedAt": "2026-11-13T03:25:17.211Z",
+      "doneAt": "2026-11-13T03:29:36.076Z"
+    },
+    "brew-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:29:36.076Z"
+    },
+    "brew-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:29:36.076Z"
+    },
+    "brew-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:29:36.076Z"
     }
   }
 }
