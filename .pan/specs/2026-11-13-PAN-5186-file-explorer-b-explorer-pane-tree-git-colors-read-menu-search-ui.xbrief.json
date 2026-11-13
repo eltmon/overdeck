@@ -4,17 +4,17 @@
     "created": "2026-11-13T14:39:30Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5186: File explorer B: explorer pane, tree, git colors, read menu, search UI",
-    "updated": "2026-11-13T14:46:52.655Z"
+    "updated": "2026-11-13T16:26:57.726Z"
   },
   "plan": {
     "id": "pan-5186",
     "title": "File explorer B: explorer pane, tree, git colors, read menu, search UI",
-    "status": "proposed",
+    "status": "running",
     "uid": "6d715d21-7c86-42ef-b11d-1a122983743a",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-13T14:39:30Z",
-    "updated": "2026-11-13T14:46:52.655Z",
+    "updated": "2026-11-13T16:26:57.726Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5186",
@@ -1546,5 +1546,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
