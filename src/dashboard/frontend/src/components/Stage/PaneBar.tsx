@@ -2,6 +2,7 @@ import { memo, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Home, CircleDot, Bot, Terminal, FileCode, GitCommit, ListTodo, FileText, Globe, Pencil, Plus, X, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react'
 import type { PaneType, WorkspacePane, PaneId } from '../../lib/panesStore'
+import { CodeTabDirtyDot } from '../explorer/code/CodeTabDirtyDot'
 import styles from './stage.module.css'
 
 export interface NewPaneAction {
@@ -201,6 +202,7 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
               <Icon size={14} />
             </span>
             <span className={pane.paneType === 'code' && pane.explorerPreview ? 'italic' : undefined}>{pane.label}</span>
+            {pane.paneType === 'code' ? <CodeTabDirtyDot rootId={pane.explorerRootId} path={pane.explorerPath} /> : null}
             {index < 9 && <span className={styles.kbd}>⌘{index + 1}</span>}
             {closable && (
               <button

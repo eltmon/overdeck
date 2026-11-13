@@ -10,7 +10,8 @@
  * state, so unsaved edits survive the pane unmounting.
  */
 import type { ExplorerReadFileResult } from '@overdeck/contracts'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type KeyboardEvent } from 'react'
+import { usePanesStore } from '../../../lib/panesStore'
 import styles from '../../Stage/stage.module.css'
 import type { PaneWrapperProps } from '../../Stage/types'
 import { explorerErrorCode, explorerErrorMessage, readFile } from '../explorer-rpc'
@@ -18,6 +19,7 @@ import { codePaneLabel } from '../openCodePane'
 import { draftKey, useCodeDrafts } from './code-drafts'
 import { MonacoCodeEditor, type CodeEditorInstance } from './MonacoCodeEditor'
 import { NonTextFallback } from './NonTextFallback'
+import { useCodePaneSave } from './useCodePaneSave'
 
 type LoadState =
   | { status: 'loading' }
@@ -35,14 +37,26 @@ function Placeholder({ title, hint, testId }: { title: string; hint?: string; te
   )
 }
 
-export function CodePane({ pane }: PaneWrapperProps) {
+export const CONFLICT_NOTE = 'The file changed on disk. Your edits are not saved.'
+
+export function CodePane({ pane, ctx }: PaneWrapperProps) {
   const rootId = pane.explorerRootId
   const path = pane.explorerPath
   if (!rootId || !path) return <Placeholder title="No file" hint="This code tab has no file path." testId="code-pane-no-file" />
-  return <CodePaneForFile rootId={rootId} path={path} pane={pane} />
+  return <CodePaneForFile rootId={rootId} path={path} pane={pane} workspaceId={ctx.workspaceId} />
 }
 
-function CodePaneForFile({ rootId, path, pane }: { rootId: string; path: string; pane: PaneWrapperProps['pane'] }) {
+function CodePaneForFile({
+  rootId,
+  path,
+  pane,
+  workspaceId,
+}: {
+  rootId: string
+  path: string
+  pane: PaneWrapperProps['pane']
+  workspaceId: string
+}) {
   const key = draftKey(rootId, path)
   const [load, setLoad] = useState<LoadState>({ status: 'loading' })
   const [wordWrap, setWordWrap] = useState<'on' | 'off'>('on')
@@ -79,9 +93,26 @@ function CodePaneForFile({ rootId, path, pane }: { rootId: string; path: string;
     editor.focus()
   }, [editor, revealLine, revealColumn, revealNonce])
 
-  const onChange = useCallback((next: string) => useCodeDrafts.getState().edited(key, next), [key])
+  const writable = load.status === 'ready' && load.result.kind === 'text' && load.result.writable
+  const preview = pane.explorerPreview === true
+  const save = useCodePaneSave({ rootId, path, workspaceId, paneId: pane.paneId, writable, preview })
   const toggleWrap = useCallback(() => setWordWrap((w) => (w === 'on' ? 'off' : 'on')), [])
-  const noop = useCallback(() => {}, [])
+  const keepOpen = useCallback(
+    () => usePanesStore.getState().updatePane(workspaceId, pane.paneId, { explorerPreview: false }),
+    [workspaceId, pane.paneId],
+  )
+  // Ctrl/Cmd+S while focus is anywhere in this pane, e.g. its header (D-C17).
+  // The editor's own action handles it while the editor has focus.
+  const { saveNow } = save
+  const onPaneKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault()
+        saveNow()
+      }
+    },
+    [saveNow],
+  )
 
   if (load.status === 'loading') return <Placeholder title="Loading…" testId="code-pane-loading" />
   if (load.status === 'error') return <Placeholder title="Couldn’t open file" hint={load.message} testId="code-pane-error" />
@@ -89,7 +120,19 @@ function CodePaneForFile({ rootId, path, pane }: { rootId: string; path: string;
   if (result.kind !== 'text') return <NonTextFallback name={codePaneLabel(path)} size={result.size} />
 
   return (
-    <div className="flex h-full min-h-0 flex-col" data-testid="code-pane">
+    <div className="flex h-full min-h-0 flex-col" data-testid="code-pane" onKeyDown={onPaneKeyDown}>
+      {preview ? (
+        <div className="flex items-center justify-end border-b border-border px-3 py-1">
+          <button type="button" className="text-xs text-muted-foreground hover:text-foreground" onClick={keepOpen}>
+            Keep open
+          </button>
+        </div>
+      ) : null}
+      {save.conflict ? (
+        <div className="border-b border-border px-3 py-1.5 text-xs text-warning-foreground" role="status" data-testid="code-pane-conflict">
+          {CONFLICT_NOTE}
+        </div>
+      ) : null}
       {!result.writable ? (
         <div className="border-b border-border px-3 py-1.5 text-xs text-muted-foreground" data-testid="code-pane-read-only">
           {READ_ONLY_NOTE}
@@ -102,9 +145,9 @@ function CodePaneForFile({ rootId, path, pane }: { rootId: string; path: string;
           value={text ?? result.text ?? ''}
           wordWrap={wordWrap}
           readOnly={!result.writable}
-          onChange={onChange}
-          onBlur={noop}
-          onSaveShortcut={noop}
+          onChange={save.onChange}
+          onBlur={save.onBlur}
+          onSaveShortcut={save.saveNow}
           onToggleWrap={toggleWrap}
           onMount={setEditor}
         />
