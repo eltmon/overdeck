@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5171",
   "created": "2026-11-13T03:13:45.277Z",
-  "updated": "2026-11-13T03:14:42.398Z",
+  "updated": "2026-11-13T03:15:28.891Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "tracker-outcome.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T03:14:42.398Z"
+    },
+    "issue-read-route": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5171",
+      "claimedAt": "2026-11-13T03:15:28.890Z"
     }
   }
 }
