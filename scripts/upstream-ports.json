@@ -108,6 +108,18 @@
     "commit": "2d8a843e6b"
   },
   {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/extendedDocumentPreview.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/extendedDocumentPreview.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/officePreview.worker.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/officePreview.worker.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
     "local": "src/dashboard/frontend/src/components/explorer/viewers/font/FontViewer.tsx",
     "upstream": "t3code",
     "path": "apps/web/src/components/files/FontViewer.tsx",
