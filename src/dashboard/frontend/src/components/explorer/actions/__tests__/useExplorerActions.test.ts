@@ -306,8 +306,11 @@ describe('move', () => {
 describe('recordCreated and undo errors', () => {
   it('commits one step per uploaded path that trashes on undo', async () => {
     rpc.trashPath.mockResolvedValue('t1')
-    const actions = createExplorerActions(makeDeps())
+    const deps = makeDeps()
+    const actions = createExplorerActions(deps)
     expect(actions.recordCreated(['up/a.png', 'up/b.png'], 'upload of 2 files')).not.toBe('')
+    expect(deps.reloadDirs).toHaveBeenCalledWith(['up'])
+    expect(deps.refreshGit).toHaveBeenCalledTimes(1)
     await actions.undo()
     expect(rpc.trashPath.mock.calls).toEqual([
       [ROOT, 'up/b.png'],

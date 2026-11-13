@@ -261,7 +261,8 @@ export function createExplorerActions(deps: ExplorerActionsDeps): ExplorerAction
     },
 
     recordCreated: (paths, label) => {
-      if (!writable) return ''
+      if (!writable || paths.length === 0) return ''
+      afterWrite(paths.map(parentPath))
       return history.commitOp(rootId, { label, steps: paths.map(createdStep) })
     },
 

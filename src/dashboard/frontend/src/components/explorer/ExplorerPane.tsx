@@ -16,6 +16,7 @@ import type { PaneWrapperProps } from '../Stage/types'
 import { useDeleteFlow } from './actions/useDeleteFlow'
 import { useExplorerActions } from './actions/useExplorerActions'
 import { useInlineEdit } from './actions/useInlineEdit'
+import { snapshotDroppedItems, uploadDroppedItems } from './actions/useOsFileDrop'
 import { useTreeActionKeys } from './actions/useTreeActionKeys'
 import { startRowDrag, useTreeDropZone } from './actions/useTreeDragMove'
 import { explorerErrorMessage, listDir, parseRootId, rootLabel } from './explorer-rpc'
@@ -265,6 +266,11 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
     getRow: (path) => rowByPath.get(path),
     expand: (path) => useExplorerStore.getState().setExpanded(rootId, path, true),
     onMove: (paths, dir) => void actions.move(paths, dir),
+    onFiles: (dt, dir) => {
+      if (rootKind === 'project') toast.error("The main checkout is read-only, so files can't be added here.")
+      else if (changedOnly) toast.error('Turn off the Changed filter to add files.')
+      else void uploadDroppedItems(snapshotDroppedItems(dt), dir, actions)
+    },
   })
   const onRowDragStart = useCallback(
     (event: DragEvent, row: TreeRow) =>
