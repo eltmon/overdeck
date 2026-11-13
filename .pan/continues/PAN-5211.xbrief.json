@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5211",
   "created": "2026-11-13T22:53:14.172Z",
-  "updated": "2026-11-13T23:11:03.882Z",
+  "updated": "2026-11-13T23:11:11.540Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -178,6 +178,11 @@
     "wi5-tail-read.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T23:11:03.881Z"
+    },
+    "wi8-offset-sequences": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5211",
+      "claimedAt": "2026-11-13T23:11:11.539Z"
     }
   }
 }
