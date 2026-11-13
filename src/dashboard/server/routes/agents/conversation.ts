@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import type { ConversationResponse, WorkLogEntry } from '@overdeck/contracts';
 import type { RecordLocation } from '../../services/conversation/types.js';
-import { resolveToolBodyEntry, selectHistoryPageBefore } from '../../services/conversation/codex-transcript-ranges.js';
+import { resolveToolBodyEntry, selectHistoryPageBefore, toolBodyQuery } from '../../services/conversation/codex-transcript-ranges.js';
 import { Effect, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
@@ -301,15 +301,15 @@ export async function buildAgentConversationWindowResult(
 export async function buildAgentToolBodyResult(
   id: string,
   toolUseId: string,
-  opts: { subagentId?: string } = {},
+  opts: { subagentId?: string; seq?: number } = {},
 ): Promise<{ status: number; body: unknown }> {
-  const result = await buildAgentConversationResult(id, opts);
+  const result = await buildAgentConversationResult(id, opts.subagentId === undefined ? {} : { subagentId: opts.subagentId });
   if (result.status !== 200) return result;
   const entry: WorkLogEntry | undefined = await resolveToolBodyEntry(result.transcriptPath, {
     workLog: result.body.workLog,
     toolResultLocations: result.toolResultLocations,
     historyStartOffset: result.historyStartOffset,
-  }, toolUseId);
+  }, toolUseId, opts.seq);
   return entry ? { status: 200, body: { entry } } : { status: 404, body: { error: 'Tool entry not found' } };
 }
 
@@ -343,10 +343,12 @@ export const getAgentConversationToolBodyRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const toolUseId = params['toolUseId'] ?? '';
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const urlOpt = HttpServerRequest.toURL(request);
-    const subagentId = Option.isSome(urlOpt) ? urlOpt.value.searchParams.get('subagentId') : null;
+    const { subagentId, seq } = toolBodyQuery(request.url);
     return yield* Effect.promise(async () => {
-      const result = await buildAgentToolBodyResult(id, toolUseId, subagentId === null ? {} : { subagentId });
+      const result = await buildAgentToolBodyResult(id, toolUseId, {
+        ...(subagentId !== undefined ? { subagentId } : {}),
+        ...(seq !== undefined ? { seq } : {}),
+      });
       return jsonResponse(result.body, { status: result.status });
     });
   })),

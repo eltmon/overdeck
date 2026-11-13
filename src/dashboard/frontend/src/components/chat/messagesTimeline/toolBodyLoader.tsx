@@ -11,7 +11,8 @@ import type { WorkLogEntry } from '../chat-types';
 export interface ToolBodyLoader {
   /** Distinguishes transcripts so one entry id never resolves against another transcript. */
   key: string;
-  load: (entryId: string) => Promise<WorkLogEntry>;
+  /** PAN-5211: `sequence` lets the server find a row that came from a disk page (`?seq=`). */
+  load: (entryId: string, sequence?: number) => Promise<WorkLogEntry>;
 }
 
 export const ToolBodyLoaderContext = createContext<ToolBodyLoader | null>(null);
@@ -20,8 +21,9 @@ export const ToolBodyLoaderContext = createContext<ToolBodyLoader | null>(null);
 export function toolBodyLoaderFor(basePath: string, query = ''): ToolBodyLoader {
   return {
     key: `${basePath}${query}`,
-    load: async (entryId) => {
-      const response = await fetchWithTimeout(`${basePath}/${encodeURIComponent(entryId)}${query}`);
+    load: async (entryId, sequence) => {
+      const seq = sequence === undefined ? '' : `${query ? '&' : '?'}seq=${sequence}`;
+      const response = await fetchWithTimeout(`${basePath}/${encodeURIComponent(entryId)}${query}${seq}`);
       if (!response.ok) throw new Error(`Failed to load tool output (${response.status})`);
       return (await response.json() as { entry: WorkLogEntry }).entry;
     },
@@ -31,11 +33,11 @@ export function toolBodyLoaderFor(basePath: string, query = ''): ToolBodyLoader 
 const TOOL_BODY_CACHE_MAX = 50;
 const toolBodyCache = new Map<string, Promise<WorkLogEntry>>();
 
-function loadCached(loader: ToolBodyLoader, entryId: string): Promise<WorkLogEntry> {
+function loadCached(loader: ToolBodyLoader, entryId: string, sequence?: number): Promise<WorkLogEntry> {
   const cacheKey = `${loader.key}\u0000${entryId}`;
   const cached = toolBodyCache.get(cacheKey);
   if (cached) return cached;
-  const request = loader.load(entryId);
+  const request = loader.load(entryId, sequence);
   request.catch(() => toolBodyCache.delete(cacheKey));
   toolBodyCache.set(cacheKey, request);
   if (toolBodyCache.size > TOOL_BODY_CACHE_MAX) {
@@ -65,12 +67,12 @@ export function useToolBody(entry: WorkLogEntry, expanded: boolean): { entry: Wo
     if (!needed || !loader) return;
     let cancelled = false;
     setState((previous) => (previous?.id === entry.id && previous.status === 'loaded' ? previous : { id: entry.id, status: 'loading' }));
-    loadCached(loader, entry.id).then(
+    loadCached(loader, entry.id, entry.sequence).then(
       (full) => { if (!cancelled) setState({ id: entry.id, status: 'loaded', entry: full }); },
       () => { if (!cancelled) setState({ id: entry.id, status: 'error' }); },
     );
     return () => { cancelled = true; };
-  }, [needed, loader, entry.id]);
+  }, [needed, loader, entry.id, entry.sequence]);
 
   const current = needed && state?.id === entry.id ? state : null;
   return {

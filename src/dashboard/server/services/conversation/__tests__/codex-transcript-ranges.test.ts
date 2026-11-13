@@ -9,7 +9,7 @@ import { decodeTimelineCursor } from '@overdeck/contracts';
 
 import { createCodexConversationAccumulator } from '../../codex-conversation-parser.js';
 import { createIncrementalTranscriptReader } from '../../incremental-transcript-reader.js';
-import { selectHistoryPageBefore, withFullToolResult } from '../codex-transcript-ranges.js';
+import { resolveToolBodyEntry, selectHistoryPageBefore, withFullToolResult } from '../codex-transcript-ranges.js';
 import { selectInitialWindow, selectPageBefore } from '../window.js';
 import { RECORD_FULL_READ_MAX_BYTES } from '../tool-result-bounds.js';
 import type { RecordLocation } from '../types.js';
@@ -118,6 +118,40 @@ describe('selectHistoryPageBefore (PAN-5211)', () => {
 
     expect(page).toEqual(selectPageBefore(parsed, before, 5));
     expect(page.window).not.toHaveProperty('bounded');
+  });
+});
+
+describe('resolveToolBodyEntry for a row from a disk page (PAN-5211)', () => {
+  async function boundedTranscript() {
+    const output = 'z'.repeat(100_000);
+    const lines = [
+      record({ type: 'function_call', name: 'exec_command', arguments: '{"cmd":"cat big"}', call_id: 'call_old' }),
+      record({ type: 'function_call_output', call_id: 'call_old', output }),
+      ...Array.from({ length: 200 }, (_, i) => JSON.stringify({
+        type: 'event_msg', timestamp: '2026-11-13T00:00:01.000Z', payload: { type: 'user_message', message: `later ${i} ${'l'.repeat(200)}` },
+      })),
+    ];
+    const [call] = await writeLines(lines);
+    const parsed = await createIncrementalTranscriptReader(createCodexConversationAccumulator, { tailReadBytes: 16 * 1024 })(file);
+    return { parsed, callOffset: call!.offset, output };
+  }
+
+  it('finds an evicted tool row from its call offset and serves its full output', async () => {
+    const { parsed, callOffset, output } = await boundedTranscript();
+    expect(parsed.workLog.find((w) => w.id === 'call_old')).toBeUndefined();
+    expect(parsed.historyStartOffset).toBeGreaterThan(callOffset);
+
+    const entry = await resolveToolBodyEntry(file, parsed, 'call_old', callOffset);
+
+    expect(entry?.id).toBe('call_old');
+    expect(entry?.result).toBe(output);
+  });
+
+  it('returns undefined without seq or for a seq that is not a line start', async () => {
+    const { parsed, callOffset } = await boundedTranscript();
+
+    expect(await resolveToolBodyEntry(file, parsed, 'call_old')).toBeUndefined();
+    expect(await resolveToolBodyEntry(file, parsed, 'call_old', callOffset + 1)).toBeUndefined();
   });
 });
 

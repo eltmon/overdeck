@@ -78,14 +78,79 @@ export interface ToolBodySource {
   readonly historyStartOffset?: ParseResult['historyStartOffset'];
 }
 
-/** The tool-body routes' lookup: the in-memory entry, with its full output when the transcript has it. */
+/**
+ * The tool-body routes' lookup: the in-memory entry, with its full output when the transcript has it.
+ * PAN-5211 D19: a row from a disk page is not in memory; `seq` (its call record's offset) finds it on disk.
+ */
 export async function resolveToolBodyEntry(
   sessionFile: string | undefined,
   parsed: ToolBodySource,
   toolUseId: string,
+  seq?: number,
 ): Promise<WorkLogEntry | undefined> {
   const entry = parsed.workLog.find((candidate) => candidate.id === toolUseId) ?? parsed.pendingToolUse?.get(toolUseId);
-  return entry ? withFullToolResult(sessionFile, parsed.toolResultLocations, entry) : undefined;
+  if (entry) return withFullToolResult(sessionFile, parsed.toolResultLocations, entry);
+  const historyStart = parsed.historyStartOffset ?? 0;
+  if (sessionFile && historyStart > 0 && seq !== undefined && seq < historyStart) {
+    return findCodexToolEntryFrom(sessionFile, seq, toolUseId);
+  }
+  return undefined;
+}
+
+/**
+ * PAN-5211 D19: parse forward from the line start `seq` until the row `toolUseId` has its output, or
+ * `OLDER_PAGE_READ_MAX_BYTES` are read, and serve it with its full output. A `seq` that is not a line
+ * start, or a row that never appears, returns `undefined`.
+ */
+export async function findCodexToolEntryFrom(
+  sessionFile: string,
+  seq: number,
+  toolUseId: string,
+): Promise<WorkLogEntry | undefined> {
+  let handle: FileHandle | undefined;
+  try {
+    handle = await open(sessionFile, 'r');
+    const { size } = await handle.stat();
+    if (seq < 0 || seq >= size) return undefined;
+    if (seq > 0) {
+      const before = Buffer.alloc(1);
+      await handle.read(before, 0, 1, seq - 1);
+      if (before[0] !== 10) return undefined;
+    }
+    const parser = createCodexConversationAccumulator(sessionFile, { historyStartOffset: seq });
+    const splitter = createTranscriptLineSplitter(seq, (line, location) => pushTranscriptLine(parser, line, location));
+    const end = Math.min(size, seq + OLDER_PAGE_READ_MAX_BYTES);
+    const chunk = Buffer.alloc(Math.max(1, Math.min(RANGE_READ_CHUNK_BYTES, end - seq)));
+    let found: WorkLogEntry | undefined;
+    for (let offset = seq; offset < end;) {
+      const { bytesRead } = await handle.read(chunk, 0, Math.min(chunk.length, end - offset), offset);
+      if (bytesRead === 0) break;
+      splitter.write(chunk.subarray(0, bytesRead));
+      offset += bytesRead;
+      found = parser.result(offset, 0).workLog.find((candidate) => candidate.id === toolUseId);
+      if (found && (found.result !== undefined || found.bodyOmitted)) break;
+    }
+    if (!found) return undefined;
+    return await withFullToolResult(sessionFile, parser.result(end, 0).toolResultLocations, found);
+  } catch {
+    return undefined;
+  } finally {
+    await handle?.close();
+  }
+}
+
+/** The tool-body routes' query: `agentId`, `subagentId`, and `seq` when it is a non-negative integer. */
+export function toolBodyQuery(url: string): { agentId?: string; subagentId?: string; seq?: number } {
+  const params = new URL(url, 'http://localhost').searchParams;
+  const agentId = params.get('agentId');
+  const subagentId = params.get('subagentId');
+  const rawSeq = params.get('seq');
+  const seq = rawSeq !== null && /^\d+$/.test(rawSeq) ? Number(rawSeq) : undefined;
+  return {
+    ...(agentId !== null ? { agentId } : {}),
+    ...(subagentId !== null ? { subagentId } : {}),
+    ...(seq !== undefined && Number.isSafeInteger(seq) ? { seq } : {}),
+  };
 }
 
 export interface DiskPageOptions {

@@ -87,6 +87,7 @@ import { isKimiWirePath } from '../runtimes/storage/kimi-code.js';
 import { isBrowsableVaultId, vaultBrowseFilePath } from '../vault/browse.js';
 import { vaultIdFromBrowseName } from './conversation-vault-rows.js';
 import { resolveToolBodyEntry, selectHistoryPageBefore } from '../../dashboard/server/services/conversation/codex-transcript-ranges.js';
+export { toolBodyQuery } from '../../dashboard/server/services/conversation/codex-transcript-ranges.js';
 
 export interface ConversationReadResult {
   body: unknown;
@@ -686,7 +687,7 @@ export async function getConversationToolBodyRead(
   name: string,
   toolUseId: string,
   deps: Pick<ConversationReadDependencies, 'resolveSessionFile'>,
-  agentId?: string,
+  agentId?: string, seq?: number,
 ): Promise<ConversationReadResult> {
   const notFound = result({ error: 'Tool entry not found' }, 404);
   try {
@@ -700,7 +701,7 @@ export async function getConversationToolBodyRead(
       if ((parseErr as { code?: string })?.code === 'ENOENT') return notFound;
       throw parseErr;
     }
-    const entry = await resolveToolBodyEntry(target.sessionFile, parsed, toolUseId);
+    const entry = await resolveToolBodyEntry(target.sessionFile, parsed, toolUseId, seq);
     return entry ? result({ entry }) : notFound;
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
