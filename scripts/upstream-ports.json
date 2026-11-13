@@ -180,6 +180,12 @@
     "commit": "2d8a843e6b"
   },
   {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/mermaid/MermaidViewer.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/MermaidViewer.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
     "local": "src/dashboard/frontend/src/components/explorer/viewers/font/FontViewer.tsx",
     "upstream": "t3code",
     "path": "apps/web/src/components/files/FontViewer.tsx",
