@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5211",
   "created": "2026-11-13T22:53:14.172Z",
-  "updated": "2026-11-13T23:30:55.817Z",
+  "updated": "2026-11-13T23:31:04.889Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -298,6 +298,11 @@
     "wi14-disk-paging.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T23:30:55.817Z"
+    },
+    "wi19-snapshot-cache-budget": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5211",
+      "claimedAt": "2026-11-13T23:31:04.889Z"
     }
   }
 }
