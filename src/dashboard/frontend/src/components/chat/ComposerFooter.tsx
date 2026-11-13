@@ -20,6 +20,8 @@ import { isNativeShell } from '../../lib/nativeShell';
 import type { LexicalEditor } from 'lexical';
 import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical';
 import { ComposerPromptEditor, loadDraft } from './ComposerPromptEditor';
+import { hasDragPaths, readDragPaths } from '../../lib/explorer-drag-paths';
+import { insertPathsIntoComposer } from './composerPathDrop';
 import { clearDraft } from '../../lib/composerDraft';
 import { enqueueConversationSend } from '../../lib/composerSendQueue';
 import { deliverQueuedPrompt } from './queuedPromptSend';
@@ -384,12 +386,23 @@ function ComposerFooterInput({
   const handleDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     if (sending || !conversation.sessionAlive) return;
+    // Explorer rows dropped here insert their paths at the caret (PAN-5190).
+    const paths = readDragPaths(event.dataTransfer);
+    if (paths) {
+      if (editorRef.current) insertPathsIntoComposer(editorRef.current, paths);
+      return;
+    }
     const files = Array.from(event.dataTransfer.files);
     if (files.length === 0) return;
     enqueueAttachments(files);
   }, [enqueueAttachments, sending, conversation.sessionAlive]);
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
+    if (hasDragPaths(Array.from(event.dataTransfer.types))) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+      return;
+    }
     const items = Array.from(event.dataTransfer.items);
     // Accept any file-kind drag (files don't expose their MIME type during dragover —
     // type is empty until drop on most browsers).

@@ -47,6 +47,14 @@ export interface ExplorerStore {
   setChangedOnly(rootId: string, on: boolean): void
   select(rootId: string, path: string, mode: SelectMode, visibleOrder: readonly string[]): void
   setFocused(rootId: string, path: string | null): void
+  /**
+   * A rename or move on disk (PAN-5190, D-E5): rewrite the expanded set, the
+   * selection, the anchor and the focused path, and drop listings at or under
+   * `from`. Persists.
+   */
+  renamePaths(rootId: string, from: string, to: string): void
+  /** Empty the selection and the anchor; the focused path is unchanged. */
+  clearSelection(rootId: string): void
 }
 
 const storageKey = (rootId: string): string => `overdeck.explorer.${rootId}`
@@ -80,6 +88,17 @@ function writePersisted(rootId: string, root: RootState): void {
   } catch {
     // Storage blocked or full: the tree still works for this session.
   }
+}
+
+/**
+ * Map a path through a rename of `from` to `to`. Kept here rather than imported
+ * from actions/name-rules, which reaches the tree model, which imports this
+ * module's types.
+ */
+function movedPath(path: string, from: string, to: string): string {
+  if (path === from) return to
+  if (path.startsWith(`${from}/`)) return `${to}${path.slice(from.length)}`
+  return path
 }
 
 function freshRoot(rootId: string): RootState {
@@ -171,5 +190,29 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => {
       }),
 
     setFocused: (rootId, path) => update(rootId, (r) => (r.focused === path ? r : { ...r, focused: path })),
+
+    renamePaths: (rootId, from, to) =>
+      update(
+        rootId,
+        (r) => {
+          const move = (path: string): string => movedPath(path, from, to)
+          const dirs: Record<string, DirState> = {}
+          for (const [path, dir] of Object.entries(r.dirs)) {
+            if (path !== from && !path.startsWith(`${from}/`)) dirs[path] = dir
+          }
+          return {
+            ...r,
+            dirs,
+            expanded: [...new Set(r.expanded.map(move))],
+            selection: [...new Set(r.selection.map(move))],
+            anchor: r.anchor === null ? null : move(r.anchor),
+            focused: r.focused === null ? null : move(r.focused),
+          }
+        },
+        true,
+      ),
+
+    clearSelection: (rootId) =>
+      update(rootId, (r) => (r.selection.length === 0 && r.anchor === null ? r : { ...r, selection: [], anchor: null })),
   }
 })

@@ -1,0 +1,325 @@
+{
+  "version": "1",
+  "issueId": "PAN-5190",
+  "created": "2026-11-13T20:35:48.124Z",
+  "updated": "2026-11-13T21:22:58.563Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "rpc-write-wrappers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T20:35:48.124Z",
+      "doneAt": "2026-11-13T20:37:03.382Z"
+    },
+    "rpc-write-wrappers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:37:03.382Z"
+    },
+    "rpc-write-wrappers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:37:03.382Z"
+    },
+    "rpc-write-wrappers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:37:03.382Z"
+    },
+    "undo-stack": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T20:37:10.332Z",
+      "doneAt": "2026-11-13T20:38:42.698Z"
+    },
+    "undo-stack.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:38:42.698Z"
+    },
+    "undo-stack.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:38:42.698Z"
+    },
+    "undo-stack.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:38:42.698Z"
+    },
+    "undo-stack.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:38:42.698Z"
+    },
+    "name-rules": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T20:38:56.833Z",
+      "doneAt": "2026-11-13T20:40:18.939Z"
+    },
+    "name-rules.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:40:18.939Z"
+    },
+    "name-rules.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:40:18.939Z"
+    },
+    "name-rules.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:40:18.939Z"
+    },
+    "name-rules.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:40:18.939Z"
+    },
+    "actions-core": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T20:40:28.187Z",
+      "doneAt": "2026-11-13T20:46:24.506Z"
+    },
+    "actions-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:46:24.506Z"
+    },
+    "actions-core.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:46:24.506Z"
+    },
+    "actions-core.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:46:24.506Z"
+    },
+    "actions-core.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:46:24.506Z"
+    },
+    "actions-core.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:46:24.506Z"
+    },
+    "inline-name-row": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T20:46:40.022Z",
+      "doneAt": "2026-11-13T20:51:26.044Z"
+    },
+    "inline-name-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:51:26.044Z"
+    },
+    "inline-name-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:51:26.044Z"
+    },
+    "inline-name-row.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:51:26.044Z"
+    },
+    "inline-name-row.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:51:26.044Z"
+    },
+    "inline-name-row.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:51:26.044Z"
+    },
+    "drag-payload": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T20:51:34.118Z",
+      "doneAt": "2026-11-13T20:52:50.597Z"
+    },
+    "drag-payload.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:52:50.597Z"
+    },
+    "drag-payload.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:52:50.597Z"
+    },
+    "drag-payload.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:52:50.597Z"
+    },
+    "create-rename-ui": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T20:52:58.517Z",
+      "doneAt": "2026-11-13T20:56:59.173Z"
+    },
+    "create-rename-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:56:59.173Z"
+    },
+    "create-rename-ui.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:56:59.173Z"
+    },
+    "create-rename-ui.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:56:59.173Z"
+    },
+    "create-rename-ui.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:56:59.173Z"
+    },
+    "duplicate-delete-ui": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T20:57:08.470Z",
+      "doneAt": "2026-11-13T20:59:30.379Z"
+    },
+    "duplicate-delete-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:59:30.379Z"
+    },
+    "duplicate-delete-ui.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:59:30.379Z"
+    },
+    "duplicate-delete-ui.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:59:30.379Z"
+    },
+    "tree-action-keys": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T20:59:41.002Z",
+      "doneAt": "2026-11-13T21:01:34.146Z"
+    },
+    "tree-action-keys.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:01:34.146Z"
+    },
+    "tree-action-keys.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:01:34.146Z"
+    },
+    "tree-action-keys.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:01:34.146Z"
+    },
+    "tree-action-keys.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:01:34.146Z"
+    },
+    "drag-move": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T21:01:43.122Z",
+      "doneAt": "2026-11-13T21:05:49.351Z"
+    },
+    "drag-move.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:05:49.351Z"
+    },
+    "drag-move.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:05:49.351Z"
+    },
+    "drag-move.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:05:49.351Z"
+    },
+    "drag-move.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:05:49.351Z"
+    },
+    "drag-move.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:05:49.351Z"
+    },
+    "os-drop-upload": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T21:05:57.348Z",
+      "doneAt": "2026-11-13T21:09:52.062Z"
+    },
+    "os-drop-upload.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:09:52.062Z"
+    },
+    "os-drop-upload.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:09:52.062Z"
+    },
+    "os-drop-upload.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:09:52.062Z"
+    },
+    "os-drop-upload.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:09:52.062Z"
+    },
+    "os-drop-upload.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:09:52.062Z"
+    },
+    "composer-path-drop": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T21:10:02.126Z",
+      "doneAt": "2026-11-13T21:13:10.234Z"
+    },
+    "composer-path-drop.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:13:10.234Z"
+    },
+    "composer-path-drop.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:13:10.234Z"
+    },
+    "composer-path-drop.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:13:10.234Z"
+    },
+    "composer-path-drop.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:13:10.234Z"
+    },
+    "browser-uat": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T21:13:17.171Z",
+      "doneAt": "2026-11-13T21:22:18.717Z"
+    },
+    "browser-uat.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:22:18.717Z"
+    },
+    "browser-uat.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:22:18.717Z"
+    },
+    "browser-uat.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:22:18.717Z"
+    },
+    "browser-uat.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:22:18.717Z"
+    },
+    "browser-uat.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:22:18.717Z"
+    },
+    "docs-ci": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T21:22:20.321Z",
+      "doneAt": "2026-11-13T21:22:58.563Z"
+    },
+    "docs-ci.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:22:58.563Z"
+    },
+    "docs-ci.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:22:58.563Z"
+    },
+    "docs-ci.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:22:58.563Z"
+    }
+  }
+}
