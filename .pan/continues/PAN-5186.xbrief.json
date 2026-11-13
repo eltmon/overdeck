@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5186",
   "created": "2026-11-13T16:27:17.519Z",
-  "updated": "2026-11-13T17:06:01.393Z",
+  "updated": "2026-11-13T17:06:18.367Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -284,9 +284,26 @@
       "doneAt": "2026-11-13T17:05:42.749Z"
     },
     "stage-swap": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5186",
-      "claimedAt": "2026-11-13T17:06:01.392Z"
+      "claimedAt": "2026-11-13T17:06:01.392Z",
+      "doneAt": "2026-11-13T17:06:18.367Z"
+    },
+    "stage-swap.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:06:18.367Z"
+    },
+    "stage-swap.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:06:18.367Z"
+    },
+    "stage-swap.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:06:18.367Z"
+    },
+    "stage-swap.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:06:18.367Z"
     }
   }
 }
