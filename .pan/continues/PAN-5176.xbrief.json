@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5176",
   "created": "2026-11-13T05:00:59.712Z",
-  "updated": "2026-11-13T08:14:54.677Z",
+  "updated": "2026-11-13T08:14:56.069Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -237,6 +237,11 @@
     "budget-calibration.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T08:14:54.676Z"
+    },
+    "docs-release-gates": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5176",
+      "claimedAt": "2026-11-13T08:14:56.069Z"
     }
   },
   "feedback": [
