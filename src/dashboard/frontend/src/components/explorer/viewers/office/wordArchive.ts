@@ -334,7 +334,7 @@ export function wordPartTypes() {
         }
       });
       parser.write(xml).close();
-      for (const range of removed.toReversed())
+      for (const range of [...removed].reverse())
         xml = xml.slice(0, range.start) + xml.slice(range.end);
       return xml;
     },
@@ -665,7 +665,7 @@ export async function wordExpansion(
       }
     });
     parser.write(xml).close();
-    for (const range of removed.toReversed())
+    for (const range of [...removed].reverse())
       xml = xml.slice(0, range.start) + xml.slice(range.end);
     archive.file(relPath, xml);
   }

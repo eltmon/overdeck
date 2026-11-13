@@ -257,7 +257,7 @@ function boundedWorksheet(
   let defaultColumns = '';
   if (defaultWidth !== undefined) {
     let next = 1;
-    for (const span of sizedColumns.toSorted((a, b) => a.min - b.min)) {
+    for (const span of [...sizedColumns].sort((a, b) => a.min - b.min)) {
       if (span.min > next)
         defaultColumns += `<${dataPrefix}col min="${next}" max="${Math.min(span.min - 1, OFFICE_PREVIEW_MAX_COLUMNS)}" width="${defaultWidth}"/>`;
       next = Math.max(next, span.max + 1);

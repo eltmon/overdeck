@@ -143,7 +143,7 @@ export async function boundedArchive(input: Extract<OfficeWorkerRequest, { type:
       if (roles && [...roles].every((role) => WORD_DISABLED_PARTS.has(role))) continue;
       // Picture bullets come out, and their list levels keep the text bullets Word falls back to.
       if (roles?.has('numbering') && cost.pictures.length > 0) {
-        for (const range of cost.pictures.toReversed())
+        for (const range of [...cost.pictures].reverse())
           xml = xml.slice(0, range.start) + xml.slice(range.end);
         cost = wordXmlCost(xml, roles);
         wordInputTruncated = true;
@@ -259,7 +259,7 @@ export async function prepareOffice(
       }
     });
     parser.write(xml).close();
-    for (const range of removed.toReversed())
+    for (const range of [...removed].reverse())
       xml = xml.slice(0, range.start) + xml.slice(range.end);
     result.archive.file(root, xml);
   }
