@@ -1,7 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useConnectionState } from '../../../lib/connectionState';
 import { useDashboardStore } from '../../../lib/store';
 import type { DerivedIssueState, Issue } from '../../../types';
 import { MobileIssueSheet } from '../MobileIssueSheet';
@@ -21,6 +21,15 @@ function issue(overrides: Partial<Issue>): Issue {
   };
 }
 
+function renderSheet(issueId: string, onBack = vi.fn()) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MobileIssueSheet issueId={issueId} onBack={onBack} />
+    </QueryClientProvider>,
+  );
+}
+
 describe('MobileIssueSheet', () => {
   beforeEach(() => {
     useDashboardStore.setState({
@@ -28,11 +37,13 @@ describe('MobileIssueSheet', () => {
       derivedIssueStateByIssueId: {},
       agentsById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
-    useConnectionState.setState({ hasSnapshot: false });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('renders the D-4661-10 fields for an in-review issue with a PR, agent, project and labels', () => {
-    useConnectionState.setState({ hasSnapshot: true });
     useDashboardStore.setState({
       issuesRaw: [
         issue({
@@ -64,7 +75,7 @@ describe('MobileIssueSheet', () => {
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
-    render(<MobileIssueSheet issueId="PAN-12" onBack={vi.fn()} />);
+    renderSheet('PAN-12');
 
     expect(screen.getByRole('heading', { name: 'Fix the thing' })).toBeInTheDocument();
     expect(screen.getByText('Review')).toBeInTheDocument();
@@ -76,7 +87,6 @@ describe('MobileIssueSheet', () => {
   });
 
   it('renders an "Open in tracker" link to the issue URL and finds the issue case-insensitively', () => {
-    useConnectionState.setState({ hasSnapshot: true });
     useDashboardStore.setState({
       issuesRaw: [issue({ identifier: 'PAN-5', url: 'https://example.com/PAN-5' })],
       derivedIssueStateByIssueId: {
@@ -85,26 +95,47 @@ describe('MobileIssueSheet', () => {
       agentsById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
-    render(<MobileIssueSheet issueId="pan-5" onBack={vi.fn()} />);
+    renderSheet('pan-5');
 
     const link = screen.getByRole('link', { name: 'Open in tracker' });
     expect(link).toHaveAttribute('href', 'https://example.com/PAN-5');
   });
 
-  it('renders "This issue is not in the pipeline." for an unknown id when hasSnapshot is true', () => {
-    useConnectionState.setState({ hasSnapshot: true });
-    render(<MobileIssueSheet issueId="PAN-404" onBack={vi.fn()} />);
-    expect(screen.getByText('This issue is not in the pipeline.')).toBeInTheDocument();
+  it('renders the identifier and "not found on tracker" for an unknown id whose read answers 404', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 404 })));
+
+    renderSheet('PAN-404');
+
+    expect(await screen.findByText('not found on tracker')).toBeInTheDocument();
+    expect(screen.getAllByText('PAN-404').length).toBeGreaterThan(0);
   });
 
-  it('renders "Loading issue…" when hasSnapshot is false', () => {
-    useConnectionState.setState({ hasSnapshot: false });
-    render(<MobileIssueSheet issueId="PAN-404" onBack={vi.fn()} />);
-    expect(screen.getByText('Loading issue…')).toBeInTheDocument();
+  it('renders the skeleton while the per-issue read is unresolved', () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<never>(() => {})));
+
+    renderSheet('PAN-404');
+
+    expect(screen.getByTestId('issue-title-skeleton')).toBeInTheDocument();
+  });
+
+  it('renders the fetched title and D-4661-10 fields for an id absent from issuesRaw', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json(
+      issue({ identifier: 'PAN-20', title: 'Fetched issue', project: { id: 'pan', name: 'Overdeck', color: '#fff' } }),
+    )));
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: {
+        'PAN-20': { issueId: 'PAN-20', state: 'working' },
+      } satisfies Record<string, DerivedIssueState>,
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderSheet('PAN-20');
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Fetched issue' })).toBeInTheDocument());
+    expect(screen.getByText('Overdeck')).toBeInTheDocument();
+    expect(screen.getByText('working')).toBeInTheDocument();
   });
 
   it('renders the Needs you mark only when the issue needs the operator', () => {
-    useConnectionState.setState({ hasSnapshot: true });
     useDashboardStore.setState({
       issuesRaw: [issue({ identifier: 'PAN-9' })],
       derivedIssueStateByIssueId: {
@@ -113,12 +144,11 @@ describe('MobileIssueSheet', () => {
       agentsById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
-    render(<MobileIssueSheet issueId="PAN-9" onBack={vi.fn()} />);
+    renderSheet('PAN-9');
     expect(screen.getAllByText('Needs you').length).toBeGreaterThan(0);
   });
 
   it('renders exactly one button (Back), and tapping it calls onBack', () => {
-    useConnectionState.setState({ hasSnapshot: true });
     useDashboardStore.setState({
       issuesRaw: [issue({ identifier: 'PAN-7' })],
       derivedIssueStateByIssueId: {
@@ -128,7 +158,7 @@ describe('MobileIssueSheet', () => {
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
     const onBack = vi.fn();
-    render(<MobileIssueSheet issueId="PAN-7" onBack={onBack} />);
+    renderSheet('PAN-7', onBack);
 
     const buttons = screen.getAllByRole('button');
     expect(buttons).toHaveLength(1);
