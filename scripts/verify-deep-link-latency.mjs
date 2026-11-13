@@ -81,9 +81,25 @@ async function runOnce(baseUrl, issue, token, realTitle) {
   const issuePath = `/api/issues/${issue}`
   const browser = await chromium.launch()
   try {
-    const context = await browser.newContext({
-      ignoreHTTPSErrors: true,
-      extraHTTPHeaders: { [INTERNAL_TOKEN_HEADER]: token },
+    const context = await browser.newContext({ ignoreHTTPSErrors: true })
+    const dashboardOrigin = new URL(baseUrl).origin
+    // extraHTTPHeaders would send this root credential to every origin the
+    // context reaches, including a cross-origin telemetry endpoint when
+    // enabled. Attach it only to requests the dashboard itself will see.
+    await context.route('**/*', async (route) => {
+      const request = route.request()
+      let origin
+      try {
+        origin = new URL(request.url()).origin
+      } catch {
+        await route.continue()
+        return
+      }
+      if (origin !== dashboardOrigin) {
+        await route.continue()
+        return
+      }
+      await route.continue({ headers: { ...request.headers(), [INTERNAL_TOKEN_HEADER]: token } })
     })
     const page = await context.newPage()
 
@@ -119,7 +135,10 @@ async function runOnce(baseUrl, issue, token, realTitle) {
     let dclAt = null
     page.once('domcontentloaded', () => { dclAt = Date.now() })
 
-    await page.goto(`${baseUrl}/?issue=${encodeURIComponent(issue)}`)
+    // The default waitUntil ('load') would block until every unrelated
+    // resource finishes, delaying the title check past when the title
+    // actually appeared and inflating the measured dcl-to-title gap.
+    await page.goto(`${baseUrl}/?issue=${encodeURIComponent(issue)}`, { waitUntil: 'domcontentloaded' })
 
     await page.waitForFunction(
       (title) => document.querySelector('[data-testid="issue-drawer"]')?.textContent?.includes(title) ?? false,
