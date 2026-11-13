@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5188",
   "created": "2026-11-13T17:44:21.691Z",
-  "updated": "2026-11-13T18:38:43.265Z",
+  "updated": "2026-11-13T18:39:34.530Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -328,7 +328,7 @@
       "doneAt": "2026-11-13T18:38:31.371Z"
     },
     "codepane-wiring": {
-      "status": "in_progress",
+      "status": "cancelled",
       "claimedBy": "agent-pan-5188",
       "claimedAt": "2026-11-13T18:38:43.264Z"
     }
