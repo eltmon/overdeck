@@ -64,7 +64,7 @@ export default function OpenXmlOfficeViewer(props: {
       worker.terminate();
     };
     const timer = setTimeout(
-      () => failure(new Error('This document took too long to preview. Open it in another app.')),
+      () => failure(new Error('This document took too long to preview.')),
       30000,
     );
     worker.addEventListener('error', () => failure(new Error('Could not load the Office viewer.')));

@@ -74,7 +74,7 @@ export default function OdfViewer(props: {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
     timerRef.current = setTimeout(
-      () => fail('This document took too long to preview. Open it in another app.'),
+      () => fail('This document took too long to preview.'),
       30_000,
     );
     worker.addEventListener('error', () =>

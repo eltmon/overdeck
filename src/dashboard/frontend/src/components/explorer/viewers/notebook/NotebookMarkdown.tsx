@@ -10,7 +10,13 @@ import styles from '../../../CommandDeck/styles/command-deck.module.css';
 function inertNotebookMarkdown() {
   function clean(nodes: RootContent[]): RootContent[] {
     return nodes.flatMap((node): RootContent[] => {
-      if (node.type === 'html' || node.type === 'definition') return [];
+      if (
+        node.type === 'html' ||
+        node.type === 'definition' ||
+        node.type === 'footnoteReference' ||
+        node.type === 'footnoteDefinition'
+      )
+        return [];
       if (node.type === 'image' || node.type === 'imageReference')
         return [{ type: 'text', value: node.alt ?? '' }];
       if (node.type === 'link' || node.type === 'linkReference') return clean(node.children);

@@ -67,6 +67,27 @@ describe('NotebookViewer', () => {
     expect(await screen.findByText('Saved outputs only. Code is never executed.')).toBeTruthy();
   });
 
+  it('renders no link elements for GFM footnotes', async () => {
+    stubFetch(
+      JSON.stringify({
+        nbformat: 4,
+        metadata: {},
+        cells: [{ cell_type: 'markdown', source: 'See note[^1].\n\n[^1]: a footnote body' }],
+      }),
+    );
+    const { default: NotebookViewer } = await import('../NotebookViewer');
+    render(
+      <NotebookViewer
+        src="/api/explorer/download?path=a.ipynb"
+        name="a.ipynb"
+        size={4}
+        downloadUrl="/api/explorer/download?path=a.ipynb"
+      />,
+    );
+    expect(await screen.findByText('See note', { exact: false })).toBeTruthy();
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
   it('renders a download card when the body is not JSON', async () => {
     stubFetch('not json');
     const { default: NotebookViewer } = await import('../NotebookViewer');

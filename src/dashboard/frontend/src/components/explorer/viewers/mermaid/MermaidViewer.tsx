@@ -34,16 +34,18 @@ export default function MermaidViewer(props: {
     if (guarded) return;
     let cancelled = false;
     setState({ status: 'loading' });
-    void import('mermaid').then(async ({ default: mermaid }) => {
-      mermaid.initialize({
-        startOnLoad: false,
-        securityLevel: 'strict',
-        theme: resolvedTheme === 'dark' ? 'dark' : 'default',
-        htmlLabels: false,
-        flowchart: { htmlLabels: false },
-        maxTextSize: 50_000,
-      });
+    void (async () => {
       try {
+        const { default: mermaid } = await import('mermaid');
+        mermaid.initialize({
+          startOnLoad: false,
+          securityLevel: 'strict',
+          theme: resolvedTheme === 'dark' ? 'dark' : 'default',
+          htmlLabels: false,
+          flowchart: { htmlLabels: false },
+          maxTextSize: 50_000,
+          suppressErrorRendering: true,
+        });
         const { svg } = await mermaid.render(id, props.text);
         if (!cancelled) setState({ status: 'ready', svg });
       } catch (cause) {
@@ -53,7 +55,7 @@ export default function MermaidViewer(props: {
             message: cause instanceof Error ? cause.message : 'Could not render this diagram.',
           });
       }
-    });
+    })();
     return () => {
       cancelled = true;
     };

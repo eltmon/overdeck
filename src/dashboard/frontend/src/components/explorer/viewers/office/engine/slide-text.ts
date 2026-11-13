@@ -125,13 +125,13 @@ const Inspected = Schema.Struct({
 const decodeInspected = Schema.decodeUnknownOption(Inspected);
 
 const scriptRanges: readonly (readonly [FallbackScript, RegExp])[] = [
-  ['hebrew', /[֐-׿יִ-ﭏ]/u],
-  ['arabic', /[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/u],
-  ['cjk-jp', /[぀-ヿㇰ-ㇿｦ-ﾟ]/u],
-  ['cjk-kr', /[ᄀ-ᇿ㄰-㆏가-힯]/u],
+  ['hebrew', /[\u0590-\u05FF\uFB1D-\uFB4F]/u],
+  ['arabic', /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/u],
+  ['cjk-jp', /[\u3040-\u30FF\u31F0-\u31FF\uFF66-\uFF9F]/u],
+  ['cjk-kr', /[\u1100-\u11FF\u3130-\u318F\uAC00-\uD7AF]/u],
 ];
 
-const hanRange = /[　-〿㐀-䶿一-鿿豈-﫿＀-￯]/u;
+const hanRange = /[\u3000-\u303F\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/u;
 
 function scripts(text: string): FallbackScript[] {
   const found = scriptRanges.flatMap((entry) => (entry[1].test(text) ? [entry[0]] : []));

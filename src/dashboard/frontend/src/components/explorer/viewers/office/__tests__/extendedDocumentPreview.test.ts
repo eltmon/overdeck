@@ -1,4 +1,4 @@
-/** PAN-5189 WI-4: openDocument reads ODF text and spreadsheet content, with openEpub/openRtf/openNotebook dropped. */
+/** PAN-5189 WI-4: openDocument reads ODF text and spreadsheet content; the epub, rtf and notebook open functions are dropped. */
 import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 

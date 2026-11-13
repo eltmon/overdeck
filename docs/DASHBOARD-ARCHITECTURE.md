@@ -2060,7 +2060,8 @@ choose `'mermaid'`.
   only the cells' saved outputs are shown. Markdown cells render through
   `NotebookMarkdown.tsx`'s inert `react-markdown` plugin, which drops images,
   links and raw HTML. A cell's HTML output renders inside a sandboxed
-  `<iframe>` (`DocumentPages.tsx`, `sandbox=""`) with no `allow-scripts`.
+  `<iframe>` (`DocumentPages.tsx`, `sandbox="allow-same-origin"`) with no
+  `allow-scripts`.
 - **Mermaid.** `.mmd`/`.mermaid` files render through `MermaidViewer.tsx`,
   which refuses resource URLs, markup, node metadata or custom configuration
   with a lexical guard before Mermaid lays out any DOM, then calls
