@@ -24,9 +24,10 @@ describe('harness native command capabilities', () => {
     },
   );
 
-  it('normalizes the legacy pi name to the ohmypi capability list', () => {
+  it('gives pi its own behavior with no unverified native commands (PAN-5212)', () => {
     expect(getHarnessBehavior('pi').nativeCommands).toEqual([]);
-    expect(getHarnessBehavior('pi')).toBe(getHarnessBehavior('ohmypi'));
+    expect(getHarnessBehavior('pi').executableName).toBe('pi');
+    expect(getHarnessBehavior('pi').capabilities.askAnswerDelivery).toBe('message');
   });
 });
 

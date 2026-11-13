@@ -9,11 +9,15 @@ describe('buildPendingAnswerRequest', () => {
     });
   });
 
-  it.each(['ohmypi', 'pi'])('routes a %s conversation answer to pi-ask-answer', (harness) => {
-    expect(buildPendingAnswerRequest({ kind: 'conv', id: 'conv 7', answers: ['A'], harness, toolUseId: 'tu-2' })).toEqual({
+  it('routes an ohmypi conversation answer to pi-ask-answer', () => {
+    expect(buildPendingAnswerRequest({ kind: 'conv', id: 'conv 7', answers: ['A'], harness: 'ohmypi', toolUseId: 'tu-2' })).toEqual({
       url: '/api/conversations/conv%207/pi-ask-answer',
       body: { toolUseId: 'tu-2', answers: ['A'] },
     });
+  });
+
+  it('routes a pi conversation answer as a message: pi has no ask modal (PAN-5212)', () => {
+    expect(buildPendingAnswerRequest({ kind: 'conv', id: 'conv 7', answers: ['A'], harness: 'pi', toolUseId: 'tu-2' }).url).toBe('/api/conversations/conv%207/message');
   });
 
   it('routes another conversation answer to message with the prose for one answer', () => {

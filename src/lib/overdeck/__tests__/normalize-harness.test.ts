@@ -3,8 +3,8 @@ import { KNOWN_HARNESSES } from '@overdeck/contracts';
 import { normalizeHarness } from '../conversations.js';
 
 describe('normalizeHarness', () => {
-  it("normalizes legacy 'pi' to 'ohmypi'", () => {
-    expect(normalizeHarness('pi')).toBe('ohmypi');
+  it("reads a stored 'pi' as 'pi' (PAN-5212)", () => {
+    expect(normalizeHarness('pi')).toBe('pi');
   });
 
   it("accepts 'ohmypi' and returns it unchanged", () => {

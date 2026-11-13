@@ -242,10 +242,11 @@ describe('parseOhmypiSession (PAN-1989)', () => {
     ])
   })
 
-  it('AC3: transcript-source harness filter — ohmypi sessions included in snapshot', () => {
-    // This is a structural assertion: the filter in transcript-source.ts now
-    // checks harness === 'ohmypi' in addition to 'pi'. The actual behavior is
-    // integration-tested via the runtime; here we verify the filter string.
+  it('AC3: transcript-source harness filter — pi-family sessions included in snapshot', () => {
+    // This is a structural assertion: the filter in transcript-source.ts keeps
+    // every rpc-fifo (pi-family) work agent, pi and ohmypi alike (PAN-5212).
+    // The actual behavior is integration-tested via the runtime; here we
+    // verify the filter string.
     const src = require('fs').readFileSync(
       require('path').join(
         __dirname,
@@ -253,7 +254,7 @@ describe('parseOhmypiSession (PAN-1989)', () => {
       ),
       'utf-8',
     )
-    expect(src).toContain("agent.harness === 'ohmypi'")
+    expect(src).toContain('getHarnessBehavior(agent.harness as RuntimeName | undefined).usesRpcFifo')
   })
 })
 

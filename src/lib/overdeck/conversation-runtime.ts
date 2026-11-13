@@ -242,7 +242,7 @@ async function readConversationPane(tmuxSession: string, lines: number): Promise
   const { readAgentPaneText } = await import('../terminal-backends/agent-pane-io.js');
   return readAgentPaneText(tmuxSession, lines, undefined, 'visible').catch(() => '');
 }
-export function isPiTuiInputReady(snapshot: string): boolean {
+function isPiTuiInputReady(snapshot: string): boolean {
   return /^\s*[❯›>]\s/m.test(snapshot)
     || /(?:^|\s)0(?:\.\d+)?%\s+context\s+used\b/i.test(snapshot)
     // pi 0.85 (PAN-5212): the editor box has no prompt glyph; the footer

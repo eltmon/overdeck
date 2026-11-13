@@ -253,6 +253,7 @@ describe('agents auth routing', () => {
         'unset MINIMAX_API_KEY',
         'unset ZAI_API_KEY',
         'unset MIMO_API_KEY',
+        'unset XIAOMI_API_KEY',
         'unset OPENROUTER_API_KEY',
         'unset NOUS_API_KEY',
         'unset DASHSCOPE_API_KEY',

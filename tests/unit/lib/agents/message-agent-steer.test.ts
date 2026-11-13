@@ -259,7 +259,8 @@ describe('messageAgent steer (PAN-4292)', () => {
   it.each([
     ['codex', 'Codex'],
     ['kimi-code', 'Kimi Code'],
-    ['ohmypi', 'Pi'],
+    ['ohmypi', 'Oh My Pi'],
+    ['pi', 'Pi'],
   ])('refuses a steer to a %s agent with nothing delivered or mailed', async (harness, displayName) => {
     mocks.getAgentState.mockReturnValue({ ...CLAUDE_AGENT, harness });
 
