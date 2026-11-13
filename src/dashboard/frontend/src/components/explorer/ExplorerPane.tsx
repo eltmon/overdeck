@@ -133,9 +133,21 @@ function ExplorerPaneBody({ rootId, deckKey }: { rootId: string; deckKey: string
     })
     loaderRef.current = loader
     loader.ensure('')
-    const expanded = useExplorerStore.getState().roots[rootId]?.expanded ?? []
+    const current = useExplorerStore.getState().roots[rootId]
+    const expanded = current?.expanded ?? []
     const open = new Set(expanded)
-    for (const path of expanded) if (ancestorsExpanded(path, open)) loader.ensure(path)
+    const reachable = new Set([''])
+    for (const path of expanded) {
+      if (!ancestorsExpanded(path, open)) continue
+      reachable.add(path)
+      loader.ensure(path)
+    }
+    // While the pane was unmounted no watch events arrived, so a cached
+    // listing of a collapsed folder may be stale: drop it, and it re-lists
+    // when the folder opens again.
+    for (const path of Object.keys(current?.dirs ?? {})) {
+      if (!reachable.has(path)) useExplorerStore.getState().removeDir(rootId, path)
+    }
     return () => {
       loader.dispose()
       if (loaderRef.current === loader) loaderRef.current = null

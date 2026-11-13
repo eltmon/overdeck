@@ -184,6 +184,22 @@ describe('ExplorerPane', () => {
     expect(screen.getByText('src/')).toBeInTheDocument()
   })
 
+  it('drops a collapsed folder’s cached listing on remount so it re-lists when opened', async () => {
+    const first = renderPane()
+    await screen.findByText('README.md')
+    fireEvent.click(screen.getByText('src'))
+    expect(await screen.findByText('a.ts')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('src'))
+    first.unmount()
+
+    renderPane()
+    await screen.findByText('README.md')
+    expect(useExplorerStore.getState().roots['issue:PAN-1'].dirs.src).toBeUndefined()
+    rpc.listDir.mockClear()
+    fireEvent.click(screen.getByText('src'))
+    await waitFor(() => expect(rpc.listDir).toHaveBeenCalledWith('issue:PAN-1', 'src'))
+  })
+
   it('removes a persisted expanded folder that is gone', async () => {
     localStorage.setItem('overdeck.explorer.issue:PAN-1', JSON.stringify({ expanded: ['old'], showDotfiles: true }))
     rpc.listDir.mockImplementation(async (_root: string, path: string) => {
