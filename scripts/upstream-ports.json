@@ -162,6 +162,24 @@
     "commit": "2d8a843e6b"
   },
   {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/notebook/notebookParse.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/extendedDocumentPreview.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/notebook/NotebookMarkdown.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/NotebookPreview.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/notebook/NotebookPreview.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/NotebookPreview.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
     "local": "src/dashboard/frontend/src/components/explorer/viewers/font/FontViewer.tsx",
     "upstream": "t3code",
     "path": "apps/web/src/components/files/FontViewer.tsx",
