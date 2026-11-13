@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 
 import { defineConfig, type Plugin, type ViteDevServer } from 'vite';
 import react from '@vitejs/plugin-react';
+import pdfjsPkg from 'pdfjs-dist/package.json' with { type: 'json' };
 
 // "In container" and "behind Traefik" are two different things and must NOT be
 // conflated (PAN-1153). Traefik routinely fronts the dev server while Vite runs
@@ -96,6 +97,18 @@ export default defineConfig(({ mode }) => ({
     outDir: '../../../dist/dashboard/public',
     emptyOutDir: true,
     sourcemap: 'hidden',
+    rolldownOptions: {
+      output: {
+        // PDF.js resolves its decoder modules relative to wasmUrl, so its wasm
+        // assets keep stable names in one folder (t3code vite.config.ts, PAN-5188).
+        assetFileNames: (asset) =>
+          asset.originalFileNames.some((p) => /[/\\]pdfjs-dist[/\\]wasm[/\\]/.test(p))
+            ? `assets/pdfjs-${pdfjsPkg.version}/[name][extname]`
+            : 'assets/[name]-[hash][extname]',
+      },
+    },
   },
+  // Workers build as ES modules so they can code-split dynamic imports (sql.js, tiff; PAN-5188 D-8).
+  worker: { format: 'es' },
   ...(mode === 'profile' ? profileOverrides : {}),
 }));
