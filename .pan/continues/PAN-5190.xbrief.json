@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5190",
   "created": "2026-11-13T20:35:48.124Z",
-  "updated": "2026-11-13T21:22:18.718Z",
+  "updated": "2026-11-13T21:22:20.321Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -302,6 +302,11 @@
     "browser-uat.ac5": {
       "status": "completed",
       "doneAt": "2026-11-13T21:22:18.717Z"
+    },
+    "docs-ci": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T21:22:20.321Z"
     }
   }
 }
