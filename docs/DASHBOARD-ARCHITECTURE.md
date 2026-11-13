@@ -1703,7 +1703,7 @@ repository's index.
 
 ### Git calls
 
-Every explorer git call goes through `runGit` (`git-exec.ts`), one async
+Explorer git calls go through `runGit` (`git-exec.ts`), one async
 `spawn` wrapper with a timeout (10 s by default) and an output cap. It passes
 `-c core.fsmonitor=false --literal-pathspecs`, so a file named `*.ts` or `:x`
 is a plain path and `git add -- '*.ts'` stages that one file. The exception is
@@ -1711,6 +1711,11 @@ is a plain path and `git add -- '*.ts'` stages that one file. The exception is
 literally. It also sets `GIT_OPTIONAL_LOCKS=0`, so `git status` never rewrites
 `.git/index` and never contends for `index.lock` with an agent working in the
 same worktree, and `GIT_TERMINAL_PROMPT=0`, so git never waits on a prompt.
+One lookup bypasses it: `gitStatus` finds the base ref for `committed` with
+`resolveBaseRef` (`src/lib/checkpoint/checkpoint-manager.ts`), the same
+function the vs-main diff panel uses, so both agree on the base. It runs
+`git rev-parse --verify --quiet` through its own `execFile`, a read-only call
+that takes no lock.
 
 ### Watcher
 

@@ -4,8 +4,10 @@
  * `gitStatus` parses `git status --porcelain=v2 -z --branch` into per-path
  * statuses, plus the files committed on this branch since the default
  * branch (`committed`, D-A10). `gitStage` stages, unstages or discards
- * root-relative paths. Every call goes through `runGit` (literal pathspecs,
- * no optional locks).
+ * root-relative paths. Git calls go through `runGit` (literal pathspecs, no
+ * optional locks), except the base-ref lookup: `resolveBaseRef` from
+ * checkpoint-manager runs its own read-only `git rev-parse --verify`, so the
+ * Changed filter shares the vs-main diff panel's base (D-A10).
  *
  * Discard never removes a file that is not in HEAD: removing one needs the
  * Overdeck trash (PAN-5187), so such a request fails as a whole with
