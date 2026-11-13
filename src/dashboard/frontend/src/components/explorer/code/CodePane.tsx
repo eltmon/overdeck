@@ -23,6 +23,7 @@ import { ChangesView } from './ChangesView'
 import { CodePaneHeader, isMarkdownPath, type CodePaneView } from './CodePaneHeader'
 import { NonTextFallback } from './NonTextFallback'
 import { useCodePaneSave } from './useCodePaneSave'
+import { useExternalChange } from './useExternalChange'
 
 type LoadState =
   | { status: 'loading' }
@@ -71,13 +72,21 @@ function CodePaneForFile({
   const carriedPosition = useRef<CodePosition | null>(null)
   const [editor, setEditor] = useState<CodeEditorInstance | null>(null)
   const text = useCodeDrafts((s) => s.drafts[key]?.text)
+  const external = useExternalChange(rootId, path)
+  const { setState: setExternal } = external
 
   useEffect(() => {
     let cancelled = false
     readFile(rootId, path)
       .then((result) => {
         if (cancelled) return
-        if (result.kind === 'text') useCodeDrafts.getState().loaded(key, result.text ?? '', result.signature)
+        if (result.kind === 'text') {
+          const diskText = result.text ?? ''
+          // An unsaved draft from an earlier visit that disk no longer matches.
+          if (!useCodeDrafts.getState().loaded(key, diskText, result.signature)) {
+            setExternal({ kind: 'changed', diskText, diskSignature: result.signature })
+          }
+        }
         setLoad({ status: 'ready', result })
       })
       .catch((error: unknown) => {
@@ -89,7 +98,7 @@ function CodePaneForFile({
     return () => {
       cancelled = true
     }
-  }, [rootId, path, key])
+  }, [rootId, path, key, setExternal])
 
   // Reveal the line content search asked for (D-C23): once on mount and once
   // per new nonce, not again when the editor remounts after the diff closes.

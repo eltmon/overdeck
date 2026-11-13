@@ -212,6 +212,7 @@ src/components/explorer/code/__tests__/external-change.test.ts
 src/components/explorer/code/__tests__/monaco-language.test.ts
 src/components/explorer/code/__tests__/save-queue.test.ts
 src/components/explorer/code/__tests__/self-write-registry.test.ts
+src/components/explorer/code/__tests__/useExternalChange.test.tsx
 src/components/explorer/git/__tests__/git-decoration.test.ts
 src/components/explorer/git/__tests__/git-status-scheduler.test.ts
 src/components/explorer/git/__tests__/useExplorerGitStatus.test.tsx

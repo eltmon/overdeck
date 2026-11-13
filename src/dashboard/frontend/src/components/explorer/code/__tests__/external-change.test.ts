@@ -211,6 +211,17 @@ describe('deletes and renames', () => {
   });
 });
 
+describe('noteState', () => {
+  it('lets a re-read that finds the base clear a mark the pane set itself', async () => {
+    const { controller, state, states } = harness({ dirty: true });
+    controller.noteState({ kind: 'changed', diskText: 'x', diskSignature: 'x-sig' });
+    state.disk = { missing: false, text: 'base', signature: 'base-sig' };
+    controller.handle([ev('update', 'src/a.ts')]);
+    await vi.advanceTimersByTimeAsync(REREAD_DELAY_MS);
+    expect(states).toEqual([{ kind: 'clean' }]);
+  });
+});
+
 describe('dispose', () => {
   it('clears every pending timer', async () => {
     const { controller, reread, states } = harness();

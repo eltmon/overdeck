@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../explorer-rpc', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../explorer-rpc')>()),
+  // The pane subscribes to the watch hub; no server stream in unit tests.
+  subscribeWatchStream: () => () => {},
   readFile: mocks.readFile,
 }))
 

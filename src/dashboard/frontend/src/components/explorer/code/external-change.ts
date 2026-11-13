@@ -50,6 +50,8 @@ export interface ExternalChangeDeps {
 
 export interface ExternalChangeController {
   handle(events: readonly ExplorerWatchEvent[]): void;
+  /** Record a state the pane set itself (a banner action, a DISK_CONFLICT answer). */
+  noteState(state: ExternalChangeState): void;
   dispose(): void;
 }
 
@@ -177,6 +179,9 @@ export function createExternalChangeController(deps: ExternalChangeDeps): Extern
       // within a batch, so this never reorders an atomic save.
       for (const event of events) if (event.kind === 'delete') handleOne(event, path);
       for (const event of events) if (event.kind !== 'delete') handleOne(event, path);
+    },
+    noteState(state) {
+      current = state.kind;
     },
     dispose() {
       disposed = true;
