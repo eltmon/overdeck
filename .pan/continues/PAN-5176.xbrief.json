@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5176",
   "created": "2026-11-13T05:00:59.712Z",
-  "updated": "2026-11-13T05:06:07.966Z",
+  "updated": "2026-11-13T05:06:14.384Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,11 @@
     "idle-poller-budget-tests.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T05:06:07.966Z"
+    },
+    "darwin-platform-tests": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5176",
+      "claimedAt": "2026-11-13T05:06:14.384Z"
     }
   }
 }
