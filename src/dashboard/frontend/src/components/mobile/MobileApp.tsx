@@ -27,6 +27,7 @@ import { isNativeShell } from '../../lib/nativeShell';
 import { TurnOnNotificationsButton } from '../push/TurnOnNotificationsButton';
 import { MobileNeedsYou } from './MobileNeedsYou';
 import { MobileConversations } from './MobileConversations';
+import { InstallAffordance, useInstallPrompt } from './MobileChrome';
 import { MobileIssueSheet } from './MobileIssueSheet';
 import { MobilePairScreen } from './MobilePairScreen';
 import { MobilePipeline } from './MobilePipeline';
@@ -91,61 +92,6 @@ function useServiceWorkerRegistration(): void {
   }, []);
 }
 
-/** The Chromium install event; not in the DOM lib types. */
-interface BeforeInstallPromptEvent extends Event {
-  prompt(): Promise<void>;
-}
-
-function isStandalone(): boolean {
-  const iosStandalone = (navigator as Navigator & { standalone?: boolean }).standalone === true;
-  return iosStandalone || (typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches);
-}
-
-function isIosSafari(): boolean {
-  const ua = navigator.userAgent;
-  const ios = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
-  // Other iOS browsers (CriOS, FxiOS, EdgiOS) cannot add a web app to the home screen.
-  return ios && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
-}
-
-function InstallAffordance() {
-  const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
-  const [standalone] = useState(isStandalone);
-  const [iosSafari] = useState(isIosSafari);
-
-  useEffect(() => {
-    const onBeforeInstall = (event: Event) => {
-      event.preventDefault();
-      setInstallEvent(event as BeforeInstallPromptEvent);
-    };
-    window.addEventListener('beforeinstallprompt', onBeforeInstall);
-    return () => window.removeEventListener('beforeinstallprompt', onBeforeInstall);
-  }, []);
-
-  const install = useCallback(() => {
-    if (!installEvent) return;
-    setInstallEvent(null);
-    void installEvent.prompt();
-  }, [installEvent]);
-
-  if (standalone) return null;
-  if (installEvent) {
-    return (
-      <button
-        type="button"
-        onClick={install}
-        className="min-h-11 min-w-11 rounded-sm border border-border px-3 text-sm font-medium text-foreground"
-      >
-        Install app
-      </button>
-    );
-  }
-  if (iosSafari) {
-    return <p className="text-xs text-muted-foreground">To install, tap Share, then Add to Home Screen</p>;
-  }
-  return null;
-}
-
 const TABS: ReadonlyArray<{ tab: MobileTab; label: string }> = [
   { tab: 'needs-you', label: 'Needs you' },
   { tab: 'conversations', label: 'Conversations' },
@@ -161,6 +107,8 @@ export default function MobileApp({ headerSlot }: { headerSlot?: ReactNode } = {
   const route = useMobileRoute();
   const sessionAuthFailed = useConnectionState((s) => s.sessionAuthFailed);
   useServiceWorkerRegistration();
+  // Once, from the first render: the install event fires only near page load.
+  const installPrompt = useInstallPrompt();
 
   const openConversation = useCallback((id: string) => {
     navigateMobile({ tab: 'conversations', subjectId: null, conversationId: id, issueId: null });
@@ -193,7 +141,7 @@ export default function MobileApp({ headerSlot }: { headerSlot?: ReactNode } = {
               <h1 className="text-base font-medium">Overdeck</h1>
               {/* PAN-2354's control, sized up to the phone's 44 px tap target from here. */}
               <div className="flex items-center gap-2 [&_button]:min-h-11 [&_button]:min-w-11">
-                {native ? headerSlot : <><InstallAffordance /><TurnOnNotificationsButton compact /></>}
+                {native ? headerSlot : <><InstallAffordance prompt={installPrompt} /><TurnOnNotificationsButton compact /></>}
               </div>
             </header>
           )}
