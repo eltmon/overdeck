@@ -20,3 +20,4 @@ tests/cli/commands/work/reopen.test.ts  # PAN-2421
 tests/unit/cli/commands/pause.test.ts  # PAN-2421
 tests/unit/lib/cloister/deacon-swarm-doneness.test.ts  # PAN-2421
 tests/cli/commands/work/start-workspace-rollback.test.ts  # PAN-2421
+tests/integration/services/share/rate-limit.test.ts  # PAN-5174
