@@ -110,6 +110,7 @@ src/components/Stage/HomePane/Launcher.test.tsx
 src/components/Stage/IssueOverview.test.tsx
 src/components/Stage/ProjectHome.test.tsx
 src/components/Stage/__tests__/explorer-migration.test.tsx
+src/components/Stage/__tests__/revealPane.test.tsx
 src/components/Stage/cockpit/IssueMissionControl.header-title.test.tsx
 src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx
 src/components/Stage/cockpit/IssueTreeLane.test.ts

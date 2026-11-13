@@ -32,6 +32,7 @@ vi.mock('../explorer-rpc', async (importOriginal) => {
 })
 
 import { DialogProvider } from '../../DialogProvider'
+import { StageDeckProvider } from '../../Stage/StageDeckContext'
 import { ExplorerPane } from '../ExplorerPane'
 import { useExplorerStore } from '../explorerStore'
 import { usePanesStore, selectPanesForWorkspace } from '../../../lib/panesStore'
@@ -153,6 +154,20 @@ describe('ExplorerPane', () => {
     const panes = selectPanesForWorkspace(DECK)(usePanesStore.getState())
     const code = panes.find((p) => p.paneType === 'code')
     expect(code).toMatchObject({ explorerRootId: 'issue:PAN-1', explorerPath: 'README.md', label: 'README.md' })
+  })
+
+  it('asks the deck to reveal an opened file beside the explorer', async () => {
+    const revealPane = vi.fn()
+    render(
+      <StageDeckProvider value={{ deckKey: DECK, openOrFocusEditorPane: vi.fn(), openOrFocusAgentPane: vi.fn(), revealPane }}>
+        <DialogProvider>
+          <ExplorerPane pane={explorerPaneSpec()} ctx={ctx} />
+        </DialogProvider>
+      </StageDeckProvider>,
+    )
+    fireEvent.doubleClick(await screen.findByText('README.md'))
+    const code = selectPanesForWorkspace(DECK)(usePanesStore.getState()).find((p) => p.paneType === 'code')
+    expect(revealPane).toHaveBeenCalledWith(code?.paneId, 'f1')
   })
 
   it('disables Changed on a non-git root', async () => {

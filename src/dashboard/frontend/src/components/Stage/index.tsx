@@ -306,11 +306,6 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     [deckKey, openPane, openTypedPane, openIssue, openOrFocusAgentPane, toggleTerminal, openTerminalDrawer],
   )
 
-  const deckContextValue: StageDeckContextValue = useMemo(
-    () => ({ deckKey, openOrFocusEditorPane, openOrFocusAgentPane }),
-    [deckKey, openOrFocusEditorPane, openOrFocusAgentPane],
-  )
-
   const ctx: StageContext = useMemo(
     () => ({
       workspaceId: deckKey,
@@ -375,6 +370,24 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
       setActivePane(deckKey, paneId)
     },
     [layout, activeId, deckKey, setActivePane, setLayout],
+  )
+  // PAN-5186: panes opened from inside a pane (explorer files) land in the grid
+  // too. A pane outside the split replaces a region other than the opener's.
+  const revealPane = useCallback(
+    (paneId: string, besidePaneId?: string) => {
+      if (layout && leafCount(layout) > 1 && !hasLeaf(layout, paneId)) {
+        const leaves = collectLeafIds(layout)
+        const others = leaves.filter((id) => id !== besidePaneId)
+        const target = others.includes(activeId) ? activeId : others[0] ?? leaves[0]
+        if (target) setLayout(replaceLeaf(layout, target, paneId))
+      }
+      setActivePane(deckKey, paneId)
+    },
+    [layout, activeId, deckKey, setActivePane, setLayout],
+  )
+  const deckContextValue: StageDeckContextValue = useMemo(
+    () => ({ deckKey, openOrFocusEditorPane, openOrFocusAgentPane, revealPane }),
+    [deckKey, openOrFocusEditorPane, openOrFocusAgentPane, revealPane],
   )
   const handleClosePane = useCallback(
     (paneId: string) => closePane(deckKey, paneId),
