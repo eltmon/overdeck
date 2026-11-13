@@ -211,6 +211,62 @@ jobs:
             ${{ runner.temp }}/bare-host/*.log
           if-no-files-found: warn
 
+  # PAN-5176: the known-bad canary. Smoke @overdeck/core@0.81.0, the last
+  # release with the PAN-5168/5169/5170 bugs, and require the smoke to FAIL
+  # for those reasons (exit 1, the tmux line from pan up, idle over budget).
+  # This proves the smoke still detects them. It runs only when the smoke
+  # script itself changes, and installs from npm, so it needs no build.
+  bare-host-macos-known-bad:
+    runs-on: macos-latest
+    needs: bare-host-changes
+    if: needs.bare-host-changes.outputs.smoke == 'true'
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Turn off Spotlight indexing on the runner
+        run: |
+          sudo mdutil -a -i off || echo "::warning::mdutil could not turn off indexing"
+          mdutil -a -s || true
+
+      # The smoke is expected to exit 1 here; record its exit code for the
+      # assertion instead of failing this step.
+      - id: smoke
+        name: Bare-host smoke on the known-bad v0.81.0
+        run: |
+          set +e
+          /bin/bash scripts/bare-host-smoke.sh --version 0.81.0 --work-dir "$RUNNER_TEMP/known-bad"
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+
+      - name: The smoke must fail on v0.81.0 for the PAN-5168/5169 reasons
+        env:
+          SMOKE_RC: ${{ steps.smoke.outputs.rc }}
+        run: |
+          node -e '
+            const r = require(process.env.RUNNER_TEMP + "/known-bad/result.json");
+            const fail = (m) => { console.error("::error::" + m); process.exit(1); };
+            if (r.setupError) fail("setup error, not a detection: " + r.setupError);
+            if (process.env.SMOKE_RC !== "1") fail("the smoke exited " + process.env.SMOKE_RC + ", expected 1 (a failed check)");
+            if (r.pass) fail("the smoke passed v0.81.0; it no longer detects the known bugs");
+            if (!r.panUp.forbiddenToolLines.some((l) => /tmux/i.test(l))) fail("pan up did not report the tmux failure");
+            if (!(r.idle.value > r.idle.budget)) fail("idle " + r.idle.rule + " " + r.idle.value + " is not above budget " + r.idle.budget);
+            console.log("detected: pan up tmux failure, idle " + r.idle.rule + " " + r.idle.value + " per 30 s (budget " + r.idle.budget + "; PID net " + r.idle.net + ", " + r.idle.netPerSec + "/s)");
+          '
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bare-host-macos-known-bad-logs
+          path: |
+            ${{ runner.temp }}/known-bad/result.json
+            ${{ runner.temp }}/known-bad/*.log
+          if-no-files-found: warn
+
   # `npm run lint` took ~9 min as one job, almost all of it in three steps.
   # scripts/run-lint-group.mjs splits the lint script's steps into groups that
   # run as parallel jobs; any step it doesn't name as heavy runs in `core`.
