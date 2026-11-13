@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5169",
   "created": "2026-11-13T02:56:46.720Z",
-  "updated": "2026-11-13T03:02:20.994Z",
+  "updated": "2026-11-13T03:02:35.368Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,11 @@
     "needs-terminal-strict.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T03:02:20.993Z"
+    },
+    "input-target-strict": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5169",
+      "claimedAt": "2026-11-13T03:02:35.368Z"
     }
   }
 }
