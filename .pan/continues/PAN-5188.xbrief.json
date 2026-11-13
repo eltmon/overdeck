@@ -1,0 +1,368 @@
+{
+  "version": "1",
+  "issueId": "PAN-5188",
+  "created": "2026-11-13T17:44:21.691Z",
+  "updated": "2026-11-13T18:49:02.574Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "download-headers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T17:44:21.691Z",
+      "doneAt": "2026-11-13T17:45:42.942Z"
+    },
+    "download-headers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:45:42.942Z"
+    },
+    "download-headers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:45:42.942Z"
+    },
+    "download-headers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:45:42.942Z"
+    },
+    "download-headers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:45:42.942Z"
+    },
+    "download-headers.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:45:42.942Z"
+    },
+    "download-file-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T17:45:52.105Z",
+      "doneAt": "2026-11-13T17:59:05.476Z"
+    },
+    "download-file-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:59:05.476Z"
+    },
+    "download-file-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:59:05.476Z"
+    },
+    "download-file-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:59:05.476Z"
+    },
+    "download-file-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:59:05.476Z"
+    },
+    "download-file-route.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:59:05.476Z"
+    },
+    "folder-download": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:01:44.063Z",
+      "doneAt": "2026-11-13T18:05:26.855Z"
+    },
+    "folder-download.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:05:26.855Z"
+    },
+    "folder-download.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:05:26.855Z"
+    },
+    "folder-download.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:05:26.855Z"
+    },
+    "folder-download.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:05:26.855Z"
+    },
+    "upload-csrf-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:05:31.077Z",
+      "doneAt": "2026-11-13T18:06:44.264Z"
+    },
+    "upload-csrf-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:06:44.264Z"
+    },
+    "upload-csrf-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:06:44.264Z"
+    },
+    "upload-csrf-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:06:44.264Z"
+    },
+    "upload-csrf-guard.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:06:44.264Z"
+    },
+    "upload-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:06:50.043Z",
+      "doneAt": "2026-11-13T18:10:58.494Z"
+    },
+    "upload-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:10:58.494Z"
+    },
+    "upload-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:10:58.494Z"
+    },
+    "upload-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:10:58.494Z"
+    },
+    "upload-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:10:58.494Z"
+    },
+    "upload-route.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:10:58.494Z"
+    },
+    "viewer-deps-build": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:11:03.229Z",
+      "doneAt": "2026-11-13T18:12:34.472Z"
+    },
+    "viewer-deps-build.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:12:34.472Z"
+    },
+    "viewer-deps-build.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:12:34.472Z"
+    },
+    "viewer-deps-build.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:12:34.472Z"
+    },
+    "viewer-shared": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:12:41.935Z",
+      "doneAt": "2026-11-13T18:20:00.461Z"
+    },
+    "viewer-shared.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:20:00.461Z"
+    },
+    "viewer-shared.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:20:00.461Z"
+    },
+    "viewer-shared.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:20:00.461Z"
+    },
+    "viewer-shared.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:20:00.461Z"
+    },
+    "explorer-http-client": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:20:01.765Z",
+      "doneAt": "2026-11-13T18:21:44.973Z"
+    },
+    "explorer-http-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:21:44.973Z"
+    },
+    "explorer-http-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:21:44.973Z"
+    },
+    "explorer-http-client.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:21:44.973Z"
+    },
+    "font-viewer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:21:50.110Z",
+      "doneAt": "2026-11-13T18:23:22.447Z"
+    },
+    "font-viewer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:23:22.447Z"
+    },
+    "font-viewer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:23:22.447Z"
+    },
+    "font-viewer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:23:22.447Z"
+    },
+    "large-text-viewer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:23:32.046Z",
+      "doneAt": "2026-11-13T18:26:09.030Z"
+    },
+    "large-text-viewer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:26:09.030Z"
+    },
+    "large-text-viewer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:26:09.030Z"
+    },
+    "large-text-viewer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:26:09.030Z"
+    },
+    "large-text-viewer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:26:09.030Z"
+    },
+    "pdf-viewer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:26:16.128Z",
+      "doneAt": "2026-11-13T18:29:29.405Z"
+    },
+    "pdf-viewer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:29:29.405Z"
+    },
+    "pdf-viewer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:29:29.405Z"
+    },
+    "pdf-viewer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:29:29.405Z"
+    },
+    "pdf-viewer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:29:29.405Z"
+    },
+    "image-viewer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:29:36.353Z",
+      "doneAt": "2026-11-13T18:31:34.240Z"
+    },
+    "image-viewer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:31:34.240Z"
+    },
+    "image-viewer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:31:34.240Z"
+    },
+    "image-viewer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:31:34.240Z"
+    },
+    "image-viewer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:31:34.240Z"
+    },
+    "audio-viewer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:31:45.364Z",
+      "doneAt": "2026-11-13T18:32:47.902Z"
+    },
+    "audio-viewer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:32:47.902Z"
+    },
+    "audio-viewer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:32:47.902Z"
+    },
+    "archive-sqlite-viewer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:32:56.354Z",
+      "doneAt": "2026-11-13T18:36:40.396Z"
+    },
+    "archive-sqlite-viewer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:36:40.396Z"
+    },
+    "archive-sqlite-viewer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:36:40.396Z"
+    },
+    "archive-sqlite-viewer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:36:40.396Z"
+    },
+    "viewer-router-host": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:36:45.897Z",
+      "doneAt": "2026-11-13T18:38:31.371Z"
+    },
+    "viewer-router-host.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:38:31.371Z"
+    },
+    "viewer-router-host.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:38:31.371Z"
+    },
+    "viewer-router-host.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:38:31.371Z"
+    },
+    "viewer-router-host.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:38:31.371Z"
+    },
+    "codepane-wiring": {
+      "status": "cancelled",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:38:43.264Z"
+    },
+    "port-records-ci-list": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:39:41.750Z",
+      "doneAt": "2026-11-13T18:48:31.295Z"
+    },
+    "port-records-ci-list.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:48:31.295Z"
+    },
+    "port-records-ci-list.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:48:31.295Z"
+    },
+    "docs-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:48:36.640Z",
+      "doneAt": "2026-11-13T18:49:02.574Z"
+    },
+    "docs-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:49:02.574Z"
+    },
+    "docs-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:49:02.574Z"
+    },
+    "docs-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:49:02.574Z"
+    }
+  }
+}

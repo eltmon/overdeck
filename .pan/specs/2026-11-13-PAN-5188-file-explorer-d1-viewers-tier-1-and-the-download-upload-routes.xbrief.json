@@ -1,0 +1,1503 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-13T14:42:32Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5188: File explorer D1: viewers tier 1 and the download/upload routes",
+    "updated": "2026-11-13T17:43:57.187Z"
+  },
+  "plan": {
+    "id": "pan-5188",
+    "title": "File explorer D1: viewers tier 1 and the download/upload routes",
+    "status": "running",
+    "uid": "cea5866b-b3ab-42cc-ad17-0e9dc81ac797",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-11-13T14:42:32Z",
+    "updated": "2026-11-13T17:43:57.187Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5188",
+        "label": "PAN-5188",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5188/.pan/drafts/pan-5188.md",
+        "label": "PRD draft (.pan/drafts/pan-5188.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5183",
+        "label": "PAN-5183 parent (PRD .pan/drafts/pan-5183.md)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "file-explorer",
+      "viewers",
+      "http-routes",
+      "security",
+      "t3code-port"
+    ],
+    "metadata": {
+      "sizeJustification": "This is already one child slice (D1) of the PAN-5183 epic, scoped by the operator in the parent PRD section 8 as WI-10 tier 1 plus WI-12. The viewers need the download route's Range support, so the two halves verify together. The file count comes from many small ported leaf modules in one folder (components/explorer/viewers/), and the subsystem count is inflated by repo-root bookkeeping files every PR touches (bun.lock, scripts/*.json|txt, changelog.d, docs). Items are fine-grained and mostly parallel.",
+      "canonicalFilename": "2026-11-13-PAN-5188-file-explorer-d1-viewers-tier-1-and-the-download-upload-routes.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The file explorer (PAN-5183) needs to show non-text files (images, PDF, audio, fonts, large text and CSV, archives, SQLite) and to move file bytes in and out of explorer roots. RPC frames over /ws/rpc are the wrong carrier for large binary bodies, and repo content served from the dashboard origin can run script with the operator's admin session if it is served as active content.",
+      "Proposal": "Add a top-level route file src/dashboard/server/routes/explorer.ts with a hardened GET /api/explorer/download (exact bytes, single-range 206/416, nosniff + sandbox CSP on every response, inline only for a passive allow-list, SVG/HTML never active, folders as tar.gz via system tar) and POST /api/explorer/upload (octet-stream through the existing CSRF guard extended with a content-type option, streamed to a temp file, 100 MiB cap, link-then-unlink no-clobber commit). On the frontend, port t3code's tier-1 viewers to React 18 / Tailwind 3 under components/explorer/viewers/, add a pure viewer router and a props-only FileViewer host that PAN-5187's code pane mounts, and an explorer-http client for download URLs and uploads. Full design in .pan/drafts/pan-5188.md.",
+      "NonGoals": "- Mounting viewers in a pane, the 'code' pane type and CodePane.tsx (PAN-5186, PAN-5187); only the conditional codepane-wiring item may edit an existing CodePane.tsx, and it never creates one\n- The explorer's Download menu item and the OS-drop upload UI (PAN-5186 WI-6, PAN-5190 WI-13); this issue ships the routes and client helpers only\n- Tier-2 viewers: Office documents, Jupyter notebooks and Mermaid (PAN-5189)\n- Video preview; video files show the binary card\n- A HEIC/HEIF decoder or the heic-to package (LGPL-3.0)\n- The browser's built-in PDF viewer, BrowserDocumentFrame, and PDF scroll-position restore across tab switches\n- Folder upload from the OS (webkitGetAsEntry)\n- The phone app (apps/mobile) and its channel shims\n- New RPC methods or changes to PAN-5185's EXPLORER_ERROR_CODES\n- Any write from a viewer (CSV cell editing, notebook editing); viewers are read-only\n- Changing the existing 118 callers of rejectUnsafeDashboardMutationRequest\n- Serving any file as text/html, application/xhtml+xml, text/xml or application/xml, or inline SVG"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Ship a props-only FileViewer host and never create CodePane; wire it into CodePane only if PAN-5187 already merged (codepane-wiring item).",
+        "rationale": "PAN-5188 depends only on PAN-5185 and the order book runs PAN-5187 concurrently; this works in either merge order without duplicating PAN-5187's pane."
+      },
+      {
+        "summary": "Drop heic-to; HEIC uses a plain img and falls back to the binary card with a notice.",
+        "rationale": "npm reports heic-to 1.5.2 as LGPL-3.0; Overdeck is MIT and the parent PRD drops non-permissive viewer packages (tier-2 Office rule); ACKNOWLEDGEMENTS keeps copyleft code out of the bundle."
+      },
+      {
+        "summary": "The download route supports single-range requests (206/416).",
+        "rationale": "t3code's LargeTextViewer and its worker depend on 206 and on 416 'bytes */0'; audio seeking also needs ranges."
+      },
+      {
+        "summary": "Always use the ported pdf.js viewer, never the browser's built-in PDF viewer.",
+        "rationale": "Every download response carries CSP sandbox, under which Chromium refuses its PDF viewer."
+      },
+      {
+        "summary": "Protect the upload with rejectUnsafeDashboardMutationRequest extended by an optional { contentType } parameter.",
+        "rationale": "Keeps Origin and CSRF checks identical to every other write; application/octet-stream is not CORS-safelisted, so the preflight defense holds; 118 callers stay unchanged."
+      },
+      {
+        "summary": "Folder downloads spawn the system tar with names on stdin; the npm tar package is not used.",
+        "rationale": "Keeps gzip and archive work off the dashboard event loop; GNU tar and bsdtar accept the flags."
+      },
+      {
+        "summary": "Set Vite worker.format to 'es' and add t3code's pdfjs wasm assetFileNames rule.",
+        "rationale": "Ported workers use dynamic import(), which iife workers cannot code-split; the rule is what pdf.js wasmUrl resolution needs."
+      },
+      {
+        "summary": "Audio and image viewers are written fresh; the TIFF decode worker is ported.",
+        "rationale": "t3code's AudioPreview is a chat chip with React 19-only ref cleanups; the parent PRD says not to port ExpandedImageDialog."
+      },
+      {
+        "summary": "Same-origin media and worker fetches authenticate with the overdeck_session cookie, so no blob: URL fallback is planned.",
+        "rationale": "Resolves the parent WI-12 checkpoint from dashboard-auth.ts (DASHBOARD_SESSION_COOKIE) and the global remote request gate."
+      }
+    ],
+    "items": [
+      {
+        "id": "download-headers",
+        "title": "Add the download header policy module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:42:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5188",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/download-headers.ts",
+            "src/dashboard/server/services/explorer/__tests__/download-headers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/download-headers.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "download-headers.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ],
+          "foundationFor": [
+            "download-file-route",
+            "folder-download"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/pan-5188.md WI-1 / section 6.2 exactly: new src/dashboard/server/services/explorer/download-headers.ts exporting contentTypeForPath, isInlineAllowed, contentDisposition, downloadHeaders and DOWNLOAD_CSP, using the extension table and inline allow-list in 6.2 (svg is image/svg+xml and never inline; html/htm/xhtml/xht/mhtml/shtml/xml/xsl/xslt are text/plain; unknown is application/octet-stream). Pure module, no I/O. Tests in services/explorer/__tests__/download-headers.test.ts as listed in WI-1."
+        },
+        "items": [
+          {
+            "id": "download-headers.ac1",
+            "title": "Given a .svg path with inline requested, when downloadHeaders runs, then it returns Content-Type image/svg+xml and a Content-Disposition that starts with attachment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "download-headers.ac2",
+            "title": "Given a .html or .xml path, when contentTypeForPath runs, then it returns text/plain; charset=utf-8 and never text/html, application/xhtml+xml, text/xml or application/xml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "download-headers.ac3",
+            "title": "Given a .png path with inline requested, when downloadHeaders runs, then Content-Disposition starts with inline; for an unknown .bin it returns application/octet-stream with attachment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "download-headers.ac4",
+            "title": "Given any path, when downloadHeaders runs, then it returns X-Content-Type-Options: nosniff, Content-Security-Policy equal to DOWNLOAD_CSP, Cache-Control: no-store and Accept-Ranges: bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "download-headers.ac5",
+            "title": "contentDisposition('attachment', 'naïve \"x\".txt') returns an ASCII filename with _ replacements and filename*=UTF-8''na%C3%AFve%20%22x%22.txt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "download-file-route",
+        "title": "Add GET /api/explorer/download for files with Range support",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:42:32Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-5188",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/explorer.ts",
+            "src/dashboard/server/services/explorer/http-errors.ts",
+            "src/dashboard/server/routes/__tests__/explorer-download.test.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/explorer-download.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "explorer-download.test.ts, no-loss-matrix.test.ts and route-scopes.test.ts pass",
+            "typecheck and lint:circular complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-8",
+            "FR-21",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "Its shared files (server.ts, route-scopes.ts, no-loss-matrix.ts, routes/explorer.ts) are touched by later items only after it through blocks edges; no frontend item touches them."
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/pan-5188.md WI-2 (including WI-0: re-verify PAN-5185's resolveExplorerRoot, resolveInsideRoot, PanRpcError codes and ExplorerReadFileResult on origin/main first; if services/explorer/roots.ts is missing, stop and pan tell flywheel-orchestrator). Create services/explorer/http-errors.ts (section 6.4 status table) and routes/explorer.ts with parseRange, handleExplorerDownload(request, deps) and the GET route per section 6.3 steps 0-5 (step 0: rejectUnauthorizedDashboardRequest(request) first, FR-21, because the global gate passes trusted local callers without a credential; a 416 closes the file handle; open with O_RDONLY|O_NONBLOCK, fstat must be a regular file, stream via Stream.fromReadableStream(Readable.toWeb(handle.createReadStream({start,end})))). Directories answer 404 NOT_FOUND until folder-download. Register explorerRouteLayer in server.ts after fsRouteLayer, add the admin ROUTE_SCOPES row and the READ no-loss-matrix row from section 6.1. Async I/O only."
+        },
+        "items": [
+          {
+            "id": "download-file-route.ac1",
+            "title": "Given a regular file in the root, when GET /api/explorer/download is handled without a Range header, then it returns 200 with the file's exact bytes and a matching Content-Length",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "download-file-route.ac2",
+            "title": "Given Range: bytes=0-3, when the file is downloaded, then the route returns 206 with Content-Range: bytes 0-3/<size> and exactly 4 bytes; bytes=5- and bytes=-2 return the matching slices; a multi-range header returns 200 with the full body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "download-file-route.ac3",
+            "title": "Given a range starting at or past the file size (including bytes=0- on an empty file), when downloaded, then the route returns 416 with Content-Range: bytes */<size>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "download-file-route.ac4",
+            "title": "Given a request with no credential header, when downloaded, then the route returns 401 before any resolver call; a resolver that throws PATH_OUTSIDE_ROOT or ROOT_NOT_FOUND returns 400 or 404 with that code; a FIFO path returns 404 without hanging",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "download-file-route.ac5",
+            "title": "no-loss-matrix.test.ts passes with the GET /api/explorer/download READ row, and route-scopes.ts has an admin row for GET /api/explorer/download",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "folder-download",
+        "title": "Stream folders as .tar.gz from the download route",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:42:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5188",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/folder-archive.ts",
+            "src/dashboard/server/services/explorer/__tests__/folder-archive.test.ts",
+            "src/dashboard/server/routes/explorer.ts",
+            "src/dashboard/server/routes/__tests__/explorer-download.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/folder-archive.test.ts src/dashboard/server/routes/__tests__/explorer-download.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "folder-archive.test.ts and explorer-download.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/pan-5188.md WI-3 / section 6.3 step 6: new services/explorer/folder-archive.ts archiveFolder(root, abs, deps) spawning system tar ('-czf','-','-C',parent, --exclude per name, '--null','-T','-') with NUL-separated <folder>/<entry> members on stdin; never -h. Exclude names: import PAN-5185's ignore list if exported (search '.dart_tool' under services/explorer/), else define ARCHIVE_EXCLUDE_NAMES as in 6.3. Remove the requested folder's own name from the --exclude flags (GNU tar would otherwise exclude every member, giving an empty archive). Drop top-level workspaces for a project root's own top level. Empty folder -> single member with --no-recursion. Client disconnect kills tar. In routes/explorer.ts a directory path (or empty path) returns the stream with application/gzip and attachment filename <name>.tar.gz."
+        },
+        "items": [
+          {
+            "id": "folder-download.ac1",
+            "title": "Given a temp tree with node_modules at the top and nested levels, when archiveFolder streams it, then tar -tzf lists pkg/a.txt and pkg/sub/b.txt and no member containing node_modules",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "folder-download.ac2",
+            "title": "Given a project root, when its own top level is archived, then no pkg/workspaces/ member exists; given an issue root, pkg/workspaces/w.txt is present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "folder-download.ac3",
+            "title": "Given an empty folder, when archived, then the archive is valid and its single member is the folder itself; given a folder named build holding x and node_modules/z, the archive contains build/x and no node_modules member",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "folder-download.ac4",
+            "title": "Given a directory path, when GET /api/explorer/download is handled, then it returns Content-Type application/gzip with Content-Disposition attachment and filename=\"<name>.tar.gz\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "upload-csrf-guard",
+        "title": "Let the mutation guard accept a named content type",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:42:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5188",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/dashboard-auth.ts",
+            "src/dashboard/server/routes/__tests__/dashboard-auth-content-type.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/dashboard-auth-content-type.test.ts src/dashboard/server/routes/__tests__/dashboard-auth.test.ts src/dashboard/server/routes/__tests__/dashboard-auth-phone.test.ts src/dashboard/server/routes/__tests__/dashboard-auth-connector.test.ts src/dashboard/server/routes/__tests__/dashboard-auth-forwarded.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all five dashboard-auth test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ],
+          "foundationFor": [
+            "upload-route"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/pan-5188.md WI-4 / section 6.5 'Change in dashboard-auth.ts': rename isJsonContentType to hasContentType(headers, expected) and give rejectUnsafeDashboardMutationRequest an optional second parameter { contentType?: string } defaulting to 'application/json'; the 400 message becomes `Content-Type must be ${contentType}`. All other lines and all 118 existing callers stay unchanged. New test file routes/__tests__/dashboard-auth-content-type.test.ts built like dashboard-auth-phone.test.ts."
+        },
+        "items": [
+          {
+            "id": "upload-csrf-guard.ac1",
+            "title": "Given default options, when a request with application/octet-stream is checked, then the guard returns 400 with 'Content-Type must be application/json' and with application/json it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "upload-csrf-guard.ac2",
+            "title": "Given { contentType: 'application/octet-stream' }, when a request with 'application/octet-stream; charset=binary' and an internal-token credential is checked, then the guard returns null, and a request with application/json returns 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "upload-csrf-guard.ac3",
+            "title": "Given a browser cookie session with a trusted Origin and the octet-stream option, when the CSRF header is missing, then the guard returns 403 'Invalid CSRF token', and with the CSRF header it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "upload-csrf-guard.ac4",
+            "title": "Given no edits to them, when dashboard-auth.test.ts, dashboard-auth-phone.test.ts, dashboard-auth-connector.test.ts and dashboard-auth-forwarded.test.ts run, then each passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "upload-route",
+        "title": "Add POST /api/explorer/upload with a streamed, capped, no-clobber write",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:42:32Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-5188",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/upload.ts",
+            "src/dashboard/server/services/explorer/__tests__/upload.test.ts",
+            "src/dashboard/server/routes/__tests__/explorer-upload.test.ts",
+            "src/dashboard/server/routes/explorer.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/upload.test.ts src/dashboard/server/routes/__tests__/explorer-upload.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "upload.test.ts, explorer-upload.test.ts, no-loss-matrix.test.ts and route-scopes.test.ts pass",
+            "typecheck and lint:circular complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "NFR-1"
+          ],
+          "parallelSafeReason": "Runs after download-file-route, folder-download and upload-csrf-guard via blocks edges; no other item edits its files."
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/pan-5188.md WI-5 / section 6.5 steps 1-6: services/explorer/upload.ts (EXPLORER_UPLOAD_MAX_BYTES = 100 MiB, validateUploadName, openUploadSink with fixed-length temp file .overdeck-upload-<16hex> opened 'wx', counting write, commit = sync, close, link(temp,target) then unlink(temp), abort = close + unlink). Route POST /api/explorer/upload in routes/explorer.ts: rejectUnsafeDashboardMutationRequest(request, { contentType: 'application/octet-stream' }), Content-Length over cap -> 413 before reading, resolveInsideRoot(root, rel, { forWrite: true }), parent must be a directory (404), existing target -> 409 before reading, then write every chunk to the sink, abort on any failure, answer 201 { path, size, mtimeMs }. Export handleExplorerUpload(request, chunks: AsyncIterable<Uint8Array>, deps); the route passes Stream.toAsyncIterable(request.stream) as chunks so route and tests share one code path; the handler loops for await over chunks into the sink. Add the admin ROUTE_SCOPES row and the WRITE no-loss-matrix row."
+        },
+        "items": [
+          {
+            "id": "upload-route.ac1",
+            "title": "Given a writable root and an existing dir, when bytes are uploaded, then the handler returns 201 with { path: 'dir/x.bin', size, mtimeMs } and the file on disk holds the exact bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "upload-route.ac2",
+            "title": "Given Content-Length 104857601, when the upload is handled, then it returns 413 FILE_TOO_LARGE before reading any chunk; given maxBytes 10 and 11 streamed bytes, the sink throws FILE_TOO_LARGE and no .overdeck-upload- file remains after abort",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "upload-route.ac3",
+            "title": "Given a target name that exists before or appears during streaming, when the upload commits, then it returns 409 ALREADY_EXISTS, the existing file is unchanged and no temp file remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "upload-route.ac4",
+            "title": "Given a resolver that throws EDIT_WORKSPACE_REQUIRED, when the upload is handled, then it returns 409 with that code; a bad name (empty, ., .., a/b, a\\b, NUL, over 255 bytes) returns 400 INVALID_NAME; a missing dir returns 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "upload-route.ac5",
+            "title": "no-loss-matrix.test.ts passes with the POST /api/explorer/upload WRITE row, and route-scopes.ts has an admin row for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "viewer-deps-build",
+        "title": "Add viewer packages and ES-module worker build config",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:42:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-5188",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/package.json",
+            "bun.lock",
+            "src/dashboard/frontend/vite.config.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bun install --frozen-lockfile",
+            "cd src/dashboard/frontend && npx vite build",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "vite build exits 0 and dist/dashboard/public/assets contains a pdfjs-6.4.299 folder after a viewer imports pdfjs (or the rule is present and the build is clean before then)",
+            "worker chunks for @pierre/diffs and Monaco's editor worker are still emitted",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "FR-13",
+            "FR-17",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/pan-5188.md WI-6a: add exact pins pdfjs-dist 6.4.299, sql.js 1.15.0, jszip 3.10.1, tiff 7.1.3 (dependencies) and @types/sql.js 1.4.11 (devDependencies) to src/dashboard/frontend/package.json, run bun install at the repo root and commit bun.lock. Do NOT add heic-to (LGPL-3.0, D-2). In src/dashboard/frontend/vite.config.ts add build.rolldownOptions.output.assetFileNames (pdfjs-dist wasm assets to assets/pdfjs-<version>/[name][extname]) and worker: { format: 'es' } exactly as in WI-6a, importing pdfjs-dist/package.json with { type: 'json' }. Checkpoint: if Vite rejects rolldownOptions, use rollupOptions. Then npx vite build must pass and the existing @pierre/diffs and Monaco editor workers must still be emitted."
+        },
+        "items": [
+          {
+            "id": "viewer-deps-build.ac1",
+            "title": "src/dashboard/frontend/package.json pins pdfjs-dist 6.4.299, sql.js 1.15.0, jszip 3.10.1, tiff 7.1.3 and @types/sql.js 1.4.11, contains no heic-to entry, and bun.lock resolves each pin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-deps-build.ac2",
+            "title": "vite.config.ts sets worker.format to 'es' and an assetFileNames rule that routes pdfjs-dist wasm assets to assets/pdfjs-<version>/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-deps-build.ac3",
+            "title": "Given the change, when cd src/dashboard/frontend && npx vite build runs, then it exits 0 and still emits the @pierre/diffs worker and the Monaco editor worker chunks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "viewer-shared",
+        "title": "Add shared viewer chrome, binary card and fetch helpers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:42:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5188",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/shared/ViewerChrome.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/shared/BinaryCard.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/shared/readBounded.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/shared/observeResize.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/shared/useLatestCallback.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/shared/formatSize.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/shared/__tests__/shared.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/shared/__tests__/shared.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "shared.test.tsx passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-18"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/pan-5188.md WI-6b in src/dashboard/frontend/src/components/explorer/viewers/shared/: ViewerChrome.tsx (ViewerNotice, ViewerLoading, ViewerFailure, ViewerAction in Overdeck tokens; load the pan-style-guide skill first), BinaryCard.tsx ({ name, size, downloadUrl, notice? } with a Download link carrying the download attribute), readBounded.ts (ports of t3code readBoundedDocument.ts and readBinaryPreview.ts), observeResize.ts (port of apps/web/src/lib/observeResize.ts), useLatestCallback.ts (useRef + useLayoutEffect + stable useCallback, the React 18 replacement for useEffectEvent), formatSize.ts (copy of formatAttachmentSize). Ported files carry the two-line port header (section 6.10)."
+        },
+        "items": [
+          {
+            "id": "viewer-shared.ac1",
+            "title": "Given a Response body of two chunks larger than the limit, when readBounded reads it, then it rejects; under the limit it resolves the full ArrayBuffer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-shared.ac2",
+            "title": "BinaryCard renders the file name, formatSize(size) text and an anchor whose href is downloadUrl and that has a download attribute",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-shared.ac3",
+            "title": "useLatestCallback returns the same function identity across re-renders and calls the newest closure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-shared.ac4",
+            "title": "formatSize(1536) returns '2 KB' and formatSize(1572864) returns '1.5 MB'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "explorer-http-client",
+        "title": "Add the explorer download URL builder and upload client",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:42:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5188",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/explorer-http.ts",
+            "src/dashboard/frontend/src/components/explorer/__tests__/explorer-http.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/__tests__/explorer-http.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "explorer-http.test.ts passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "FR-19"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/pan-5188.md WI-6c / section 6.8: new src/dashboard/frontend/src/components/explorer/explorer-http.ts with explorerDownloadUrl(rootId, path, { inline, rev? }), ExplorerHttpError(message, status, code) and uploadExplorerFile(rootId, dir, file, { signal? }) that POSTs the file to /api/explorer/upload with headers from dashboardMutationJsonHeaders() (src/dashboard/frontend/src/lib/wsTransport.ts) overridden to Content-Type application/octet-stream, and throws ExplorerHttpError on non-2xx."
+        },
+        "items": [
+          {
+            "id": "explorer-http-client.ac1",
+            "title": "explorerDownloadUrl('issue:PAN-1', 'a b/c#.png', { inline: true, rev: 'x-y-3' }) returns /api/explorer/download?root=issue%3APAN-1&path=a%20b%2Fc%23.png&inline=1&rev=x-y-3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "explorer-http-client.ac2",
+            "title": "Given a stubbed fetch, when uploadExplorerFile runs, then it sends POST with the x-overdeck-csrf-token header, Content-Type application/octet-stream and the file as the body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "explorer-http-client.ac3",
+            "title": "Given a 409 answer { error, code: 'ALREADY_EXISTS' }, when uploadExplorerFile runs, then it throws ExplorerHttpError with status 409 and code 'ALREADY_EXISTS'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "font-viewer",
+        "title": "Port the font viewer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:42:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5188",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/font/FontViewer.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/font/__tests__/FontViewer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/font/__tests__/FontViewer.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "FontViewer.test.tsx passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/pan-5188.md WI-7: port t3code apps/web/src/components/files/FontViewer.tsx to src/dashboard/frontend/src/components/explorer/viewers/font/FontViewer.tsx with the port header; replace ~/hooks/useTheme with useTheme((s) => s.resolvedTheme) from src/dashboard/frontend/src/hooks/useTheme.ts and fileSurfaceChrome with ../shared/ViewerChrome. Keep the 10 MB cap, 30 s timeout, FontFace validation and sandboxed srcDoc iframe with its CSP. Run git -C ~/Projects/t3code log --oneline 2d8a843e6b..origin/main -- <path> before porting."
+        },
+        "items": [
+          {
+            "id": "font-viewer.ac1",
+            "title": "Given a stubbed fetch and a FontFace whose load() resolves, when FontViewer renders, then it renders an iframe whose sandbox attribute is an empty string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "font-viewer.ac2",
+            "title": "Given a FontFace whose load() rejects, when FontViewer renders, then it shows the failure text from ViewerFailure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "font-viewer.ac3",
+            "title": "FontViewer.tsx contains the two-line t3code port header on lines 1-2, naming apps/web/src/components/files/FontViewer.tsx and the ported commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "large-text-viewer",
+        "title": "Port the large-text and delimited table viewers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:42:32Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5188",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/large-text/LargeTextViewer.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/large-text/VirtualTablePreview.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/large-text/DelimitedTablePreview.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/large-text/largeText.worker.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/large-text/largeTextProtocol.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/large-text/delimitedPreview.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/large-text/__tests__/delimitedPreview.test.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/large-text/__tests__/LargeTextViewer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/large-text/__tests__/delimitedPreview.test.ts src/components/explorer/viewers/large-text/__tests__/LargeTextViewer.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "delimitedPreview.test.ts and LargeTextViewer.test.tsx pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16"
+          ],
+          "parallelSafeReason": "Writes only new files under viewers/large-text/; the host that imports it waits on a blocks edge."
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/pan-5188.md WI-8: port LargeTextViewer.tsx, VirtualTablePreview.tsx, DelimitedTablePreview.tsx, largeText.worker.ts, largeTextProtocol.ts (apps/web/src/components/files/) and delimitedPreview.ts (packages/shared/src/) into src/dashboard/frontend/src/components/explorer/viewers/large-text/ under the section 6.10 rules: useEffectEvent at VirtualTablePreview line 328 -> useLatestCallback; t3code tooltip -> components/shared/Tooltip; contain-strict -> [contain:strict]; z-1 -> z-[1]; useClientSettings wordWrap -> a wordWrap prop defaulting to true; formatAttachmentSize -> ../shared/formatSize. Keep the worker form new Worker(new URL('./largeText.worker.ts', import.meta.url), { type: 'module' }) and t3code's Range fetches."
+        },
+        "items": [
+          {
+            "id": "large-text-viewer.ac1",
+            "title": "delimitedPreview.test.ts passes with the cases ported from t3code packages/shared/src/delimitedPreview.test.ts for the functions ported",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "large-text-viewer.ac2",
+            "title": "Given a Fake Worker, when LargeTextViewer mounts with a src, then it posts an open message carrying that src, and when the fake answers with a 3-row index it renders the first row's text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "large-text-viewer.ac3",
+            "title": "Given text 'a,b\\n1,2' and delimiter ',', when DelimitedTablePreview renders, then cells a, b, 1 and 2 appear",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "large-text-viewer.ac4",
+            "title": "Given the ported files, when npm run typecheck:frontend runs, then it passes, and no file under viewers/large-text/ contains useEffectEvent, contain-strict or z-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pdf-viewer",
+        "title": "Port the pdf.js viewer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:42:32Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5188",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/vite.config.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/pdf/PdfViewer.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/pdf/pdfDocument.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/pdf/pdfLayout.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/pdf/pdfViewer.css",
+            "src/dashboard/frontend/src/components/explorer/viewers/pdf/__tests__/pdfLayout.test.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/pdf/__tests__/PdfViewer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/pdf/__tests__/pdfLayout.test.ts src/components/explorer/viewers/pdf/__tests__/PdfViewer.test.tsx",
+            "npm run typecheck:frontend",
+            "cd src/dashboard/frontend && npx vite build"
+          ],
+          "expected_outputs": [
+            "pdfLayout.test.ts and PdfViewer.test.tsx pass",
+            "vite build exits 0 and emits an assets/pdfjs-6.4.299/ folder"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ],
+          "parallelSafeReason": "Writes only new files under viewers/pdf/ after viewer-deps-build and viewer-shared; the host waits on a blocks edge."
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/pan-5188.md WI-9: port pdfLayout.ts, pdfViewer.css (keep the PDF.js attribution comment), pdfDocument.ts and PdfViewer.tsx into src/dashboard/frontend/src/components/explorer/viewers/pdf/. pdfDocument: add a vite.config.ts resolve.alias 'pdfjs-dist-assets' -> dirname(realpathSync(createRequire(import.meta.url).resolve('pdfjs-dist/package.json'))) (bun links packages from node_modules/.bun), glob 'pdfjs-dist-assets/{standard_fonts/*,cmaps/*.bcmap,wasm/*.{wasm,js}}' as three globs, key each map by basename. Checkpoint: after npx vite build, bcmap assets and assets/pdfjs-6.4.299/ must exist; else try the relative path to src/dashboard/frontend/node_modules/pdfjs-dist; only if both match nothing set cMaps and standardFonts to {} and note it in the PR description. PdfViewer: useEffectEvent (lines 234, 254) -> useLatestCallback; <Input ref={find}> (line 398) -> native <input>; scrollbar-gutter-stable -> [scrollbar-gutter:stable]; readBoundedDocument -> ../shared/readBounded. Do not port BrowserDocumentFrame.tsx (D-4)."
+        },
+        "items": [
+          {
+            "id": "pdf-viewer.ac1",
+            "title": "pdfLayout.test.ts passes with the cases ported from t3code apps/web/src/components/files/pdfLayout.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pdf-viewer.ac2",
+            "title": "Given pdfDocument mocked to open a 3-page document, when PdfViewer renders, then it shows the page count 3; a 2,001-page document shows the refusal text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pdf-viewer.ac3",
+            "title": "Given npx vite build, when it completes, then dist/dashboard/public/assets contains a pdfjs-6.4.299 folder, and either bcmap assets are emitted or the PR description records the empty cMaps fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pdf-viewer.ac4",
+            "title": "Given PdfViewer renders, when the find control is shown, then it renders a native input element, and PdfViewer.tsx contains no useEffectEvent import",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "image-viewer",
+        "title": "Add the image viewer with TIFF decode",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:42:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5188",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/image/ImageViewer.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/image/imageDecode.worker.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/image/decodeImagePreview.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/image/__tests__/ImageViewer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/image/__tests__/ImageViewer.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "ImageViewer.test.tsx passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/pan-5188.md WI-10: new src/dashboard/frontend/src/components/explorer/viewers/image/ImageViewer.tsx (fresh code, no port header; props { src, name, size, downloadUrl, svg? }; <img> with a Fit / 100% toggle; svg fetched as text via readBounded with a 10 MiB limit and shown as a data:image/svg+xml;base64 img; onError: .tif/.tiff -> decodeImagePreview -> blob URL revoked on unmount, .heic/.heif -> BinaryCard with the notice 'This browser cannot show HEIC images.', else ViewerFailure). Port decodeImagePreview.ts with the heif parameter removed and imageDecode.worker.ts with the HEIF branch and heic-to import removed (D-2), keeping TIFF validation."
+        },
+        "items": [
+          {
+            "id": "image-viewer.ac1",
+            "title": "Given a png src, when ImageViewer renders, then an img with that src appears and the Fit / 100% toggle switches its sizing class",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "image-viewer.ac2",
+            "title": "Given svg true and a stubbed fetch returning '<svg/>', when ImageViewer renders, then the img src starts with data:image/svg+xml;base64,",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "image-viewer.ac3",
+            "title": "Given a .heic image whose img fires error, when ImageViewer handles it, then it renders the notice 'This browser cannot show HEIC images.' and a Download link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "image-viewer.ac4",
+            "title": "Given a .tiff image whose img fires error and decodeImagePreview mocked to resolve a Blob, when ImageViewer handles it, then it renders an img whose src starts with blob:",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audio-viewer",
+        "title": "Add the audio viewer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:42:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5188",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/audio/AudioViewer.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/audio/__tests__/AudioViewer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/audio/__tests__/AudioViewer.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "AudioViewer.test.tsx passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/pan-5188.md WI-11: new src/dashboard/frontend/src/components/explorer/viewers/audio/AudioViewer.tsx (fresh code; props { src, name, size }; name, formatSize(size), <audio controls preload=\"metadata\" src className=\"w-full\">; on the audio error event render ViewerFailure with 'This browser cannot play this audio file.')."
+        },
+        "items": [
+          {
+            "id": "audio-viewer.ac1",
+            "title": "Given a src, when AudioViewer renders, then an audio element with controls, preload='metadata' and that src appears with the file name and size text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audio-viewer.ac2",
+            "title": "Given the audio element fires error, when AudioViewer handles it, then it renders 'This browser cannot play this audio file.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "archive-sqlite-viewer",
+        "title": "Port the archive and SQLite viewer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:42:32Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5188",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/binary/BinaryViewer.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/binary/binaryPreview.worker.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/binary/binaryPreviewProtocol.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/binary/boundedZip.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/binary/zipDirectory.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/binary/entryPreview.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/binary/__tests__/zipDirectory.test.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/binary/__tests__/BinaryViewer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/binary/__tests__/zipDirectory.test.ts src/components/explorer/viewers/binary/__tests__/BinaryViewer.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "zipDirectory.test.ts and BinaryViewer.test.tsx pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-17"
+          ],
+          "parallelSafeReason": "Writes only new files under viewers/binary/ after viewer-deps-build and viewer-shared; the host waits on a blocks edge."
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/pan-5188.md WI-12: port BinaryViewer.tsx, binaryPreview.worker.ts, binaryPreviewProtocol.ts (apps/web/src/components/files/), boundedZip.ts and zipDirectory.ts (packages/client-runtime/src/zip/) into src/dashboard/frontend/src/components/explorer/viewers/binary/, plus entryPreview.ts porting only decodeFilePreviewText, filePreviewKind and hostPreviewMimeTypeFromExtension from packages/shared/src/filePreview.ts. ui/select -> native <select>; PreviewImage -> <img src={blobUrl}>; ReadOnlySourcePreview -> <pre> (max 1 MiB); scrollbar-gutter-both -> [scrollbar-gutter:stable_both-edges]. Keep the worker's dynamic import('sql.js') and 'sql.js/dist/sql-wasm.wasm?url' with locateFile, PRAGMA query_only=ON and t3code's bounds."
+        },
+        "items": [
+          {
+            "id": "archive-sqlite-viewer.ac1",
+            "title": "Given a small zip built with jszip in the test, when checkZipDirectory runs, then it accepts it; a buffer with no end-of-central-directory record and one declaring more than 2,048 entries are rejected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "archive-sqlite-viewer.ac2",
+            "title": "Given a Fake Worker answering two archive entries a.txt and dir/, when BinaryViewer renders kind='archive', then both names appear and the fetched bytes were transferred to the worker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "archive-sqlite-viewer.ac3",
+            "title": "Given kind='sqlite' and a Fake Worker answering one table, when BinaryViewer renders, then the table name appears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "viewer-router-host",
+        "title": "Add the viewer router and the FileViewer host",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:42:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5188",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/viewer-router.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/FileViewer.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/__tests__/viewer-router.test.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/__tests__/FileViewer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/__tests__/viewer-router.test.ts src/components/explorer/viewers/__tests__/FileViewer.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "viewer-router.test.ts and FileViewer.test.tsx pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-11"
+          ],
+          "foundationFor": [
+            "codepane-wiring"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/pan-5188.md WI-13 / sections 6.6 and 6.7 exactly: src/dashboard/frontend/src/components/explorer/viewers/viewer-router.ts (ViewerKind, ViewerChoice, LARGE_TEXT_MAX_BYTES = 256 MiB, pickViewer with the 12 ordered rows of section 6.6, extension rows before the read-kind rows so an ASCII PDF or a text SVG still reaches its viewer; header comment states the seam and that PAN-5189 inserts tier-2 rows before row 9, the read-kind text row) and src/dashboard/frontend/src/components/explorer/viewers/FileViewer.tsx (props { rootId, path, read: ExplorerReadFileResult, wordWrap? }; React.lazy per viewer in one Suspense with ViewerLoading; src = explorerDownloadUrl(rootId, path, { inline: true, rev: read.signature }); key = read.signature; 'text' renders null; 'binary' renders BinaryCard with an inline=0 URL; 'svg' renders ImageViewer with svg)."
+        },
+        "items": [
+          {
+            "id": "viewer-router-host.ac1",
+            "title": "viewer-router.test.ts has one case per row of PRD section 6.6 plus .CSV upper-case, a .db text read (returns text), an a.pdf text read (returns pdf) and an a.svg binary read (returns svg with textEditable false), and all pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-router-host.ac2",
+            "title": "Given a .png binary read, when FileViewer renders with mocked viewers, then the image viewer receives a src containing inline=1 and rev=<signature>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-router-host.ac3",
+            "title": "Given a .zip binary read, FileViewer renders the archive viewer; given a .xyz binary read, it renders BinaryCard with a Download href containing inline=0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-router-host.ac4",
+            "title": "Given a text read of a.ts, when FileViewer renders, then it renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codepane-wiring",
+        "title": "Mount FileViewer in CodePane when PAN-5187 has merged",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:42:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5188",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/CodePane.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/CodePane.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "test -f src/dashboard/frontend/src/components/explorer/code/CodePane.tsx && (cd src/dashboard/frontend && npx vitest run src/components/explorer/code/__tests__) || echo 'CodePane absent: D-1 no-op'"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "either the CodePane tests pass with the new case, or the command prints the D-1 no-op line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/pan-5188.md WI-14 / decision D-1. Run pan sync-main PAN-5188. If src/dashboard/frontend/src/components/explorer/code/CodePane.tsx exists and does not import FileViewer, replace its non-text placeholder branch with the section 6.7 seam (lazy ../viewers/FileViewer, pickViewer(...).kind === 'text' keeps Monaco) and add one case to its existing test file. If it already imports FileViewer or does not exist, change nothing, run pan task cancel PAN-5188 codepane-wiring (a no-op has no Item: commit, so pan task done would refuse it) and put the D-1 sentence in the PR description. Never create CodePane.tsx or the 'code' pane type."
+        },
+        "items": [
+          {
+            "id": "codepane-wiring.ac1",
+            "title": "Given CodePane.tsx exists on the branch after pan sync-main, when a binary .png read is shown, then CodePane renders the lazy FileViewer (its test case passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codepane-wiring.ac2",
+            "title": "Given CodePane.tsx does not exist or already imports FileViewer, when this item is handled, then pan task show PAN-5188 codepane-wiring reports cancelled and git diff --name-only origin/main... -- src/dashboard/frontend/src/components/explorer/code/ prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "port-records-ci-list",
+        "title": "Record the ported files and add the frontend tests to the CI list",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:42:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5188",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/upstream-ports.json",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const r=require('./scripts/upstream-ports.json');const fs=require('fs');for(const x of r.filter(x=>x.local.includes('components/explorer/viewers'))){if(!fs.readFileSync(x.local,'utf8').startsWith('// Ported from t3code'))throw new Error(x.local)}console.log('ok')\"",
+            "test -f scripts/__tests__/upstream-ports.test.ts && npx vitest run scripts/__tests__/upstream-ports.test.ts || echo 'no upstream-ports test'"
+          ],
+          "expected_outputs": [
+            "the node check prints ok",
+            "upstream-ports.test.ts passes when PAN-5185 added it"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/pan-5188.md WI-15: add one { local, upstream: 't3code', path, commit } record per ported file listed in WI-15 to scripts/upstream-ports.json (Overdeck-written files ViewerChrome, BinaryCard, useLatestCallback, ImageViewer, AudioViewer, FileViewer, explorer-http get none), and add every new frontend test file from viewer-shared through viewer-router-host to scripts/frontend-test-subset.txt in sorted position, paths relative to src/dashboard/frontend."
+        },
+        "items": [
+          {
+            "id": "port-records-ci-list.ac1",
+            "title": "Given scripts/upstream-ports.json, when each viewer record's local file is read, then it exists and its first line starts with '// Ported from t3code' and its second line names the same upstream path and commit as the record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "port-records-ci-list.ac2",
+            "title": "scripts/frontend-test-subset.txt contains every new test file under src/components/explorer/ added by this issue, each on its own line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Document the viewers and routes and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:42:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5188",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/ACKNOWLEDGEMENTS.md",
+            "changelog.d/pan-5188.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'Viewers, download and upload (PAN-5188)' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints the new heading"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-10",
+            "FR-20"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/pan-5188.md WI-16: add '### Viewers, download and upload (PAN-5188)' under the File explorer section of docs/DASHBOARD-ARCHITECTURE.md (create '## File explorer (PAN-5183)' before '## Optional host tools (PAN-5168)' if PAN-5185 did not), covering the content listed in WI-16 step 1; extend the t3code entry of docs/ACKNOWLEDGEMENTS.md with the ported viewers and a 'Viewer packages' list (pdfjs-dist Apache-2.0, sql.js MIT, tiff MIT, jszip used under MIT) plus the heic-to LGPL exclusion sentence; create changelog.d/pan-5188.md with the #### New bullet from WI-16 step 3. Run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains the heading '### Viewers, download and upload (PAN-5188)' whose text names both routes, the inline allow-list, Range support, the 100 MiB upload cap, the octet-stream CSRF guard and FileViewer as the code-pane seam",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "docs/ACKNOWLEDGEMENTS.md contains pdfjs-dist, sql.js, tiff and jszip with their licenses and a sentence stating that heic-to is not bundled because it is LGPL-3.0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac3",
+            "title": "changelog.d/pan-5188.md exists with a '#### New' heading and one bullet linking #5188, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "download-headers",
+        "to": "download-file-route",
+        "type": "blocks"
+      },
+      {
+        "from": "download-file-route",
+        "to": "folder-download",
+        "type": "blocks"
+      },
+      {
+        "from": "download-file-route",
+        "to": "upload-route",
+        "type": "blocks"
+      },
+      {
+        "from": "folder-download",
+        "to": "upload-route",
+        "type": "blocks"
+      },
+      {
+        "from": "upload-csrf-guard",
+        "to": "upload-route",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-deps-build",
+        "to": "pdf-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-deps-build",
+        "to": "image-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-deps-build",
+        "to": "archive-sqlite-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-shared",
+        "to": "font-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-shared",
+        "to": "large-text-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-shared",
+        "to": "pdf-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-shared",
+        "to": "image-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-shared",
+        "to": "audio-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-shared",
+        "to": "archive-sqlite-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "font-viewer",
+        "to": "viewer-router-host",
+        "type": "blocks"
+      },
+      {
+        "from": "large-text-viewer",
+        "to": "viewer-router-host",
+        "type": "blocks"
+      },
+      {
+        "from": "pdf-viewer",
+        "to": "viewer-router-host",
+        "type": "blocks"
+      },
+      {
+        "from": "image-viewer",
+        "to": "viewer-router-host",
+        "type": "blocks"
+      },
+      {
+        "from": "audio-viewer",
+        "to": "viewer-router-host",
+        "type": "blocks"
+      },
+      {
+        "from": "archive-sqlite-viewer",
+        "to": "viewer-router-host",
+        "type": "blocks"
+      },
+      {
+        "from": "explorer-http-client",
+        "to": "viewer-router-host",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-router-host",
+        "to": "codepane-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-shared",
+        "to": "port-records-ci-list",
+        "type": "blocks"
+      },
+      {
+        "from": "explorer-http-client",
+        "to": "port-records-ci-list",
+        "type": "blocks"
+      },
+      {
+        "from": "font-viewer",
+        "to": "port-records-ci-list",
+        "type": "blocks"
+      },
+      {
+        "from": "large-text-viewer",
+        "to": "port-records-ci-list",
+        "type": "blocks"
+      },
+      {
+        "from": "pdf-viewer",
+        "to": "port-records-ci-list",
+        "type": "blocks"
+      },
+      {
+        "from": "image-viewer",
+        "to": "port-records-ci-list",
+        "type": "blocks"
+      },
+      {
+        "from": "audio-viewer",
+        "to": "port-records-ci-list",
+        "type": "blocks"
+      },
+      {
+        "from": "archive-sqlite-viewer",
+        "to": "port-records-ci-list",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-router-host",
+        "to": "port-records-ci-list",
+        "type": "blocks"
+      },
+      {
+        "from": "upload-route",
+        "to": "docs-changelog",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-router-host",
+        "to": "docs-changelog",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -198,6 +198,7 @@ src/components/deft/queries.test.ts
 src/components/drawer/IssueDrawer.tracker-fallback.test.tsx
 src/components/drawer/useDrawerData.absent-issue.test.tsx
 src/components/explorer/__tests__/ExplorerPane.test.tsx
+src/components/explorer/__tests__/explorer-http.test.ts
 src/components/explorer/__tests__/explorer-rpc.test.ts
 src/components/explorer/__tests__/explorerStore.test.ts
 src/components/explorer/__tests__/openCodePane.test.ts
@@ -211,6 +212,18 @@ src/components/explorer/search/__tests__/useExplorerShortcuts.test.ts
 src/components/explorer/tree/__tests__/ExplorerTree.test.tsx
 src/components/explorer/tree/__tests__/directory-loader.test.ts
 src/components/explorer/tree/__tests__/explorer-tree-model.test.ts
+src/components/explorer/viewers/__tests__/FileViewer.test.tsx
+src/components/explorer/viewers/__tests__/viewer-router.test.ts
+src/components/explorer/viewers/audio/__tests__/AudioViewer.test.tsx
+src/components/explorer/viewers/binary/__tests__/BinaryViewer.test.tsx
+src/components/explorer/viewers/binary/__tests__/zipDirectory.test.ts
+src/components/explorer/viewers/font/__tests__/FontViewer.test.tsx
+src/components/explorer/viewers/image/__tests__/ImageViewer.test.tsx
+src/components/explorer/viewers/large-text/__tests__/LargeTextViewer.test.tsx
+src/components/explorer/viewers/large-text/__tests__/delimitedPreview.test.ts
+src/components/explorer/viewers/pdf/__tests__/PdfViewer.test.tsx
+src/components/explorer/viewers/pdf/__tests__/pdfLayout.test.ts
+src/components/explorer/viewers/shared/__tests__/shared.test.tsx
 src/components/explorer/watch/__tests__/explorer-watch-hub.test.ts
 src/components/explorer/watch/__tests__/useExplorerWatch.test.tsx
 src/components/home/__tests__/AnywhereSetUpRow.test.tsx
