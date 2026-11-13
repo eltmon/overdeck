@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5198",
   "created": "2026-11-13T19:57:57.248Z",
-  "updated": "2026-11-13T20:36:03.671Z",
+  "updated": "2026-11-13T20:36:12.120Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,11 @@
     "page-row-jump.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T20:36:03.671Z"
+    },
+    "skill-needs-you-contract": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5198",
+      "claimedAt": "2026-11-13T20:36:12.120Z"
     }
   }
 }
