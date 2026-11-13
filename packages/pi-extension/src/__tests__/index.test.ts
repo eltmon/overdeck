@@ -6,7 +6,11 @@ import overdeckPiExtension, {
   handleSessionStart,
   handleToolExecutionEnd,
   handleTurnEnd,
+  handleTurnCompletion,
   handlePanDone,
+  dispatchControlCommand,
+  normalizePiSessionStart,
+  normalizePiTurnEnd,
   handleSessionBriefingContext,
   handleConversationControlSessionStart,
   handleWorkspaceContext,
@@ -816,7 +820,120 @@ describe('default export — Pi extension wiring', () => {
       registerCommand: (name, command) => { commands[name] = command },
     }
     overdeckPiExtension(pi)
-    expect(Object.keys(handlers).sort()).toEqual(['input', 'session_start', 'tool_execution_end', 'turn_end'])
+    expect(Object.keys(handlers).sort()).toEqual(['agent_settled', 'input', 'session_start', 'tool_execution_end', 'turn_end'])
     expect(Object.keys(commands)).toEqual(['pan-done'])
+  })
+
+  it('PAN-5212: runs work completion on agent_settled, not on every pi turn_end', async () => {
+    process.env['OVERDECK_AGENT_ID'] = 'agent-pan-5212'
+    vi.stubEnv('OVERDECK_SESSION_TYPE', 'work')
+    vi.stubEnv('OVERDECK_ISSUE_ID', 'PAN-5212')
+    vi.stubEnv('OVERDECK_WORKSPACE', '/workspace')
+    const handlers: Record<string, (event: unknown, ctx: unknown) => Promise<void>> = {}
+    const pi: PiExtensionAPI = {
+      on: (event: string, handler) => { handlers[event] = handler as (event: unknown, ctx: unknown) => Promise<void> },
+      registerCommand: () => {},
+    }
+    overdeckPiExtension(pi)
+    const checklistUrl = 'http://localhost:3011/api/agents/agent-pan-5212/plan-checklist'
+    const toolTurn = { type: 'turn_end', turnIndex: 0, message: { role: 'assistant', content: [{ type: 'toolCall' }], provider: 'openrouter', model: 'openai/gpt-oss-20b' }, toolResults: [] }
+    const finalTurn = { type: 'turn_end', turnIndex: 1, message: { role: 'assistant', content: [{ type: 'text', text: 'hi' }], provider: 'openrouter', model: 'openai/gpt-oss-20b' }, toolResults: [] }
+
+    await handlers['turn_end']!(toolTurn, {})
+    await handlers['turn_end']!(finalTurn, {})
+    expect(fetchCalls.some(call => call.url === checklistUrl)).toBe(false)
+
+    await handlers['agent_settled']!({ type: 'agent_settled' }, {})
+    expect(fetchCalls.filter(call => call.url === checklistUrl)).toHaveLength(1)
+  })
+})
+
+describe('pi 0.85 event shapes (PAN-5212)', () => {
+  // Shapes captured from a live `pi --mode rpc` run (.pan/pi-vs-omp.md).
+  const ctx = {
+    sessionManager: {
+      getSessionId: () => '01a1d70d-f4cd-756e-8144-4ef301d3ed82',
+      getSessionFile: () => '/agents/a/sessions/2026-11-13T22-36-18-509Z_01a1d70d-f4cd-756e-8144-4ef301d3ed82.jsonl',
+    },
+    model: { provider: 'openrouter', id: 'openai/gpt-oss-20b' },
+  }
+
+  it('fills session_start ({ reason } only) from the context', () => {
+    const start = normalizePiSessionStart({ reason: 'startup' }, ctx)
+    expect(start.event).toEqual({ reason: 'startup', sessionId: '01a1d70d-f4cd-756e-8144-4ef301d3ed82', model: 'openrouter/openai/gpt-oss-20b' })
+    expect(start.transcriptFile).toBe('/agents/a/sessions/2026-11-13T22-36-18-509Z_01a1d70d-f4cd-756e-8144-4ef301d3ed82.jsonl')
+  })
+
+  it('fills turn_end output, usage, cost, model and session file from the message', () => {
+    const event = normalizePiTurnEnd({
+      message: {
+        role: 'assistant',
+        content: [{ type: 'thinking' }, { type: 'text', text: 'hi' }, { type: 'text', text: 'BANANA' }],
+        provider: 'openrouter',
+        model: 'openai/gpt-oss-20b',
+        usage: { input: 28274, output: 7, cacheRead: 0, cacheWrite: 0, cost: { total: 0.0005 } },
+      },
+    }, ctx)
+    expect(event.output).toBe('hi\nBANANA')
+    expect(event.cost).toBe(0.0005)
+    expect(event.model).toBe('openrouter/openai/gpt-oss-20b')
+    expect(event.sessionLogPath).toBe(ctx.sessionManager.getSessionFile())
+    expect(event.usage).toMatchObject({ input: 28274, output: 7 })
+  })
+
+  it('records pi usage field names in the turn cost event', async () => {
+    const h = makeFakeHome()
+    try {
+      await handleTurnEnd(
+        { agentId: 'agent-pan-5212', home: h.home, pid: 7, now },
+        normalizePiTurnEnd({ message: { role: 'assistant', content: [], usage: { input: 10, output: 3, cacheRead: 2, cacheWrite: 1 } } }, {}),
+      )
+      const cost = fetchCalls.map(call => call.body as Record<string, unknown>).find(body => body?.['kind'] === 'cost-event')
+      expect(cost?.['usage']).toEqual({ inputTokens: 10, outputTokens: 3, cacheReadTokens: 2, cacheWriteTokens: 1 })
+    } finally {
+      h.cleanup()
+    }
+  })
+
+  it('records the transcript path pi reports at session start', async () => {
+    const h = makeFakeHome()
+    try {
+      const start = normalizePiSessionStart({ reason: 'startup' }, ctx)
+      await handleSessionStart({ agentId: 'agent-pan-5212', home: h.home, pid: 7, now }, start.event, start.transcriptFile)
+      const index = readFileSync(overdeckPathsFor('agent-pan-5212', h.home).sessionsIndexPath, 'utf8')
+      expect(JSON.parse(index.trim())).toMatchObject({ sessionId: '01a1d70d-f4cd-756e-8144-4ef301d3ed82', harness: 'pi', path: start.transcriptFile })
+    } finally {
+      h.cleanup()
+    }
+  })
+
+  it('resolves set_model through the model registry and reports missing auth', async () => {
+    const model = { provider: 'xai', id: 'grok-4.3' }
+    const find = vi.fn((provider: string, id: string) => (provider === 'xai' && id === 'grok-4.3' ? model : undefined))
+    const setModel = vi.fn(async () => true)
+    const pi = { on: () => {}, registerCommand: () => {}, setModel } satisfies PiExtensionAPI
+    const env = { agentId: 'agent-pan-5212' }
+
+    await expect(dispatchControlCommand(env, pi, { modelRegistry: { find } }, { id: '1', type: 'set_model', model: 'xai/grok-4.3' })).resolves.toEqual({ id: '1', ok: true })
+    expect(setModel).toHaveBeenCalledWith(model)
+
+    await expect(dispatchControlCommand(env, pi, { modelRegistry: { find } }, { id: '2', type: 'set_model', model: 'xai/nope' })).resolves.toMatchObject({ id: '2', ok: false })
+
+    setModel.mockResolvedValueOnce(false)
+    await expect(dispatchControlCommand(env, pi, { modelRegistry: { find } }, { id: '3', type: 'set_model', model: 'xai/grok-4.3' })).resolves.toMatchObject({ id: '3', ok: false, error: 'no auth configured for xai/grok-4.3' })
+  })
+
+  it('handleTurnCompletion is what handleTurnEnd skips with runCompletion:false', async () => {
+    const h = makeFakeHome()
+    try {
+      const env = { agentId: 'agent-pan-5212', home: h.home, pid: 7, now, role: 'work', issueId: 'PAN-5212', workspace: '/workspace' }
+      const checklistUrl = 'http://localhost:3011/api/agents/agent-pan-5212/plan-checklist'
+      await handleTurnEnd(env, {}, { runCompletion: false })
+      expect(fetchCalls.some(call => call.url === checklistUrl)).toBe(false)
+      await handleTurnCompletion(env, {})
+      expect(fetchCalls.some(call => call.url === checklistUrl)).toBe(true)
+    } finally {
+      h.cleanup()
+    }
   })
 })
