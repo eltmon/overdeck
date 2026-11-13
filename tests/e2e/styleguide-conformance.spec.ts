@@ -187,10 +187,35 @@ const snapshot = {
   embedProgressBySessionId: {},
 };
 
-async function newContext(): Promise<BrowserContext> {
+declare global {
+  interface Window {
+    __sawIssueDetails?: boolean;
+    __skeletonAt?: number | null;
+    __titleAt?: number | null;
+  }
+}
+
+async function newContext(options: { snapshotIssues?: unknown[]; issueReadDelayMs?: number } = {}): Promise<BrowserContext> {
   const context = await browser.newContext();
-  await context.addInitScript(({ snapshotFixture, featureFixture }) => {
+  const snapshotFixture = { ...snapshot, issues: options.snapshotIssues ?? snapshot.issues };
+  await context.addInitScript(({ snapshotFixture, featureFixture, issueFixture, issueReadDelayMs }) => {
     localStorage.setItem('pan-snapshot-cache-v1', JSON.stringify({ data: snapshotFixture, timestamp: new Date().toISOString() }));
+
+    window.__sawIssueDetails = false;
+    window.__skeletonAt = null;
+    window.__titleAt = null;
+    const observer = new MutationObserver(() => {
+      if (document.body?.innerText.includes('Issue details')) window.__sawIssueDetails = true;
+      if (window.__skeletonAt === null && document.querySelector('[data-testid="issue-title-skeleton"]')) {
+        window.__skeletonAt = performance.now();
+      }
+      const drawerTitle = document.querySelector('[data-testid="issue-drawer"] h2');
+      if (window.__titleAt === null && drawerTitle?.textContent === issueFixture.title) {
+        window.__titleAt = performance.now();
+      }
+    });
+    observer.observe(document, { subtree: true, childList: true, characterData: true });
+
     window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname + input.search : input.url;
       const method = init?.method ?? (input instanceof Request ? input.method : 'GET');
@@ -312,14 +337,18 @@ async function newContext(): Promise<BrowserContext> {
       if (path === '/api/conversations/pending-input') return json([]);
       if (path === '/api/git-activity') return json([]);
       if (path === '/api/conversations/cost' || path === '/api/conversations/cost/by-workspace') return json({ totalCost: 0, entries: [] });
+      if (path === `/api/issues/${issueFixture.identifier}`) {
+        if (issueReadDelayMs) await new Promise((r) => setTimeout(r, issueReadDelayMs));
+        return json(issueFixture);
+      }
       return json(search ? { search } : {});
     };
-  }, { snapshotFixture: snapshot, featureFixture: feature });
+  }, { snapshotFixture, featureFixture: feature, issueFixture: issue, issueReadDelayMs: options.issueReadDelayMs ?? 0 });
   return context;
 }
 
-async function openRoute(path: string): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await newContext();
+async function openRoute(path: string, options?: { snapshotIssues?: unknown[]; issueReadDelayMs?: number }): Promise<{ context: BrowserContext; page: Page }> {
+  const context = await newContext(options);
   const page = await context.newPage();
   await page.goto(`${baseUrl}${path}`);
   return { context, page };
@@ -509,5 +538,24 @@ describe('styleguide rendered surface conformance', () => {
     const treeTitleFont = await treeTitle.evaluate((node) => window.getComputedStyle(node).fontFamily);
     expect(treeTitleFont.split(',')[0]?.replace(/["']/g, '').trim()).toBe('Space Grotesk');
     await commandDeck.context.close();
+  }, 45_000);
+
+  it('renders the drawer title from the per-issue read when the issue list lacks it', async () => {
+    const { context, page } = await openRoute('/pipeline?issue=PAN-1148&tab=overview', { snapshotIssues: [], issueReadDelayMs: 300 });
+    const drawerTitle = page.locator('[data-testid="issue-drawer"] h2');
+
+    // Measure from the skeleton, not from goto, so Vite dev-server module
+    // loading on a slow CI runner does not count against the 1s budget.
+    await expect.poll(() => drawerTitle.textContent(), renderPoll).toBe(issue.title);
+    const skeletonAt = await page.evaluate(() => window.__skeletonAt);
+    const titleAt = await page.evaluate(() => window.__titleAt);
+    const sawIssueDetails = await page.evaluate(() => window.__sawIssueDetails);
+
+    expect(typeof skeletonAt).toBe('number');
+    expect(typeof titleAt).toBe('number');
+    expect((titleAt as number) - (skeletonAt as number)).toBeLessThan(1000);
+    expect(sawIssueDetails).not.toBe(true);
+
+    await context.close();
   }, 45_000);
 });

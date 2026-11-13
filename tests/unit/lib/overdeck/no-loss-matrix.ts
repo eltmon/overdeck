@@ -384,6 +384,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
 
   // ── issues.ts ─────────────────────────────────────────────────────────────
   { surface: 'GET /api/issues',                                     kind: 'http', disposition: 'READ',        door: 'IssuesResolver.list' },
+  { surface: 'GET /api/issues/:id',                                 kind: 'http', disposition: 'READ',        door: 'issue-read readIssueRow → IssueDataService.getIssues(cycle all) + backfillIssue (PAN-5171)' },
   { surface: 'GET /api/issues/:id/analyze',                         kind: 'http', disposition: 'DELETE',      door: 'ad-hoc analysis helper; no pipeline branch reads it' },
   { surface: 'GET /api/issues/:id/prd',                             kind: 'http', disposition: 'READ',        door: 'getIssuePrd → findDraftPrd + readPrdContent' },
   { surface: 'GET /api/issues/:id/ship-log',                        kind: 'http', disposition: 'AGGREGATE',   door: 'ShipLog runtime ring buffer + ReviewStatus merge state' },

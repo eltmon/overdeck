@@ -30,10 +30,12 @@ import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
 import { DrawerActivityRailView } from '../../drawer/DrawerActivityRail'
 import type { DrawerActivityItem, DrawerActivityPhase } from '../../drawer/useDrawerData'
 import { IssueView } from '../../issue-view/IssueView'
+import { IssueHeaderTitle } from '../../issue-view/IssueHeaderTitle'
 import { NeedsYouSlot } from '../../issue-view/NeedsYouSlot'
 import { deriveShip, isShipped } from '../../issue-view/derivations'
 import { RunDetailsCard } from '../../issue-view/RunDetailsCard'
 import { VerificationGatesGrid } from '../../issue-view/VerificationGates'
+import { useIssueRecord } from '../../issue-view/useIssueRecord'
 import { useIssueView } from '../../issue-view/useIssueView'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import { MissionConversationTab } from './MissionConversationTab'
@@ -452,6 +454,9 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const { isDeft } = useDeftIssueSummary(issueId)
   const tabs = isDeft ? [...TABS.slice(0, 5), DEFT_DECISIONS_TAB, ...TABS.slice(5)] : TABS
   const issueView = useIssueView(issueId, { title, branch, projectName })
+  const headerIssueRecord = useIssueRecord(issueId)
+  const headerTitle = headerIssueRecord.issue?.title
+    || (title && title.toUpperCase() !== issueId.toUpperCase() ? title : null)
   const recentActivity = useMemo<DrawerActivityItem[]>(
     () => issueView.activity.sections.map((section, index) => ({
       id: `${section.sessionId}-${section.status}-${index}`,
@@ -601,7 +606,9 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             <div className="text-[11px] text-muted-foreground/70">
               {projectName ? <><span className="text-muted-foreground">{projectName}</span> / </> : null}<span>Issues</span> / <span className="font-mono text-foreground">{issueId}</span>
             </div>
-            <h1 className="mt-1 min-w-0 max-w-full break-words text-[17px] font-medium leading-snug text-foreground">{title}</h1>
+            <h1 className="mt-1 min-w-0 max-w-full break-words text-[17px] font-medium leading-snug text-foreground">
+              <IssueHeaderTitle issueId={issueId} title={headerTitle} status={headerIssueRecord.status} />
+            </h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <CockpitPill tone={pillTone(pipelineState)}>{phase}</CockpitPill>
               <StatusNarrative

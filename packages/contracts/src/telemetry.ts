@@ -252,6 +252,8 @@ const TELEMETRY_CLIENT_ROUTES = [
   "/api/github/identities",
   "/api/harness-auto-update",
   "/api/issues",
+  "/api/issues/:id",
+  "/api/issues/resource-allocated",
   "/api/lanes",
   "/api/lanes/:name",
   "/api/lanes/:name/stop",

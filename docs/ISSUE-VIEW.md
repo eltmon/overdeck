@@ -4,7 +4,7 @@ The issue view kit gives the dashboard one semantic issue surface at three densi
 
 ## Data model
 
-`IssueViewModel` is a derived, read-only view model with `header`, `narrative`, `pipeline`, `agents`, `verification`, `ship`, `activity`, `resources`, and `operator` groups. `useIssueView` builds it by composing the existing review-status, cost, workspace, activity, and ship-log query hooks plus the dashboard store's agent selector. Tasks remain owned by the canonical `TasksPanel`, `TasksRail`, and `TasksTab` queries so the issue view does not fabricate a second task model. It must reuse those hooks and their query keys; it must not introduce another endpoint, polling loop, store, or direct canonical-state access. Writes continue through the domain's existing write door.
+`IssueViewModel` is a derived, read-only view model with `header`, `narrative`, `pipeline`, `agents`, `verification`, `ship`, `activity`, `resources`, and `operator` groups. `useIssueView` builds it by composing the existing review-status, cost, workspace, activity, and ship-log query hooks plus the dashboard store's agent selector. Tasks remain owned by the canonical `TasksPanel`, `TasksRail`, and `TasksTab` queries so the issue view does not fabricate a second task model. It must reuse those hooks and their query keys; it must not introduce another endpoint, polling loop, store, or direct canonical-state access, with one exception: the header title comes from `useIssueRecord` (list entry first, else `GET /api/issues/:id`), the one per-issue read the issue view adds (PAN-5171). That read adds no polling loop, store, or direct canonical-state access of its own. Writes continue through the domain's existing write door.
 
 ## Shared components
 
@@ -47,6 +47,10 @@ The Command Deck issue tree (`src/dashboard/frontend/src/components/CommandDeck/
 - **Activity dot** — the `StatusDot` primitive renders on the row only while an agent session is live (`dominantStatus` is `active`, `thinking`, or `waiting`); it is the row's "something is live right now" signal, separate from the state badge.
 - **Resource cluster** — `ResourceCluster` (`ProjectTree/ResourceCluster.tsx`) is the single icon-only home for resource facts (workspace, branch, tmux, xBRIEF, PRD, tasks, PR, docker) on the row's meta line, in both collapsed and expanded states; a hover popover carries full identifiers. The expanded `ResourcesGroup` lists only live docker containers, headed "Containers" — it no longer repeats branches or PRs (`BranchNode`/`PrNode` were removed).
 - **Pipeline pips** — the five-segment plan/work/review/test/merge strip is labelled, not decorative: `describePipeline()` (`ProjectTree/pipelineStrip.ts`) names the current step in the strip's `title`/`aria-label`, and each segment carries its own per-phase title.
+
+### Header title
+
+The drawer, cockpit, and phone sheet headers render through `IssueHeaderTitle`, backed by `useIssueRecord`: the list entry wins when the store already has it; the per-issue read (`GET /api/issues/:id`) covers issues the list lacks — the snapshot still loading, a new issue, a backlog or canceled issue, or an issue aged out of the tracker sync window. While the read is pending the header shows a skeleton bar; on failure it shows the issue id with "title unavailable" or "not found on tracker". It never shows a placeholder string (PAN-5171).
 
 ### Cockpit layout
 

@@ -4,8 +4,9 @@ import { type DomainEvent, WS_METHODS } from '@overdeck/contracts';
 import { Stream } from 'effect';
 
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
-import { useDashboardStore, selectIssues, selectAgents, selectBackendPanes, selectDerivedIssueState } from '../../lib/store';
+import { useDashboardStore, selectAgents, selectBackendPanes, selectDerivedIssueState } from '../../lib/store';
 import { useTasksQuery } from '../Stage/cockpit/TasksRail';
+import { useIssueRecord, type IssueRecordStatus } from '../issue-view/useIssueRecord';
 import type { Agent, BackendPane, DerivedIssueState, Issue } from '../../types';
 import { sortIssueAgents } from '../../lib/agentConversation';
 
@@ -99,6 +100,7 @@ export function resetDrawerIssueSubscriptionForTest() {
 
 export type DrawerData = {
   issue: Issue | null;
+  issueStatus: IssueRecordStatus;
   agents: Agent[];
   derived?: DerivedIssueState;
   panes: BackendPane[];
@@ -111,10 +113,6 @@ export type DrawerData = {
   /** Full activity feed for the Activity tab — same filter, no slice cap. */
   activityFull: DrawerActivityItem[];
 };
-
-function issueMatches(issue: Issue, issueId: string) {
-  return issue.identifier.toLowerCase() === issueId.toLowerCase() || issue.id.toLowerCase() === issueId.toLowerCase();
-}
 
 function buildAgentIssueLookup(agents: Agent[]) {
   const lookup = new Map<string, string>();
@@ -298,7 +296,7 @@ function phaseTimeline(issue: Issue | null, derived: DerivedIssueState | undefin
  */
 export function useIssueData(issueIdArg: string | null): DrawerData {
   const drawerIssueId = issueIdArg;
-  const issues = useDashboardStore(selectIssues) as Issue[];
+  const record = useIssueRecord(drawerIssueId);
   const agents = useDashboardStore(selectAgents) as Agent[];
   const recentActivity = useDashboardStore((state) => state.recentActivity) as ActivityEntry[];
   const detailedActivity = useDashboardStore((state) => state.detailedActivity) as ActivityEntry[];
@@ -349,10 +347,10 @@ export function useIssueData(issueIdArg: string | null): DrawerData {
 
   return useMemo(() => {
     if (!drawerIssueId) {
-      return { issue: null, agents: [], derived: undefined, panes: [], tasks: [], reviewSpecialists: [], verificationGates: [], phaseTimeline: [], activityRail: [], activityFull: [] };
+      return { issue: null, issueStatus: 'unavailable', agents: [], derived: undefined, panes: [], tasks: [], reviewSpecialists: [], verificationGates: [], phaseTimeline: [], activityRail: [], activityFull: [] };
     }
 
-    const issue = issues.find((candidate) => issueMatches(candidate, drawerIssueId)) ?? null;
+    const issue = record.issue;
     const issueAgents = sortIssueAgents(
       agents.filter((agent) => agent.issueId?.toLowerCase() === drawerIssueId.toLowerCase()),
     );
@@ -380,6 +378,7 @@ export function useIssueData(issueIdArg: string | null): DrawerData {
 
     return {
       issue,
+      issueStatus: record.status,
       agents: issueAgents,
       derived,
       panes,
@@ -390,7 +389,7 @@ export function useIssueData(issueIdArg: string | null): DrawerData {
       activityRail,
       activityFull,
     };
-  }, [agents, detailedActivity, drawerIssueId, issues, recentActivity, derived, panes, tasksQuery.data]);
+  }, [agents, detailedActivity, drawerIssueId, record.issue, record.status, recentActivity, derived, panes, tasksQuery.data]);
 }
 
 /**

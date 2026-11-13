@@ -29,6 +29,10 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/events/stream', scope: 'read:events' },
   { method: 'GET', path: '/events/version', scope: 'read:events' },
   { method: 'GET', path: '/api/issues', scope: 'read:state' },
+  // PAN-5171: explicit so the `/api/issues/:id` row below never widens it (first match wins).
+  { method: 'GET', path: '/api/issues/resource-allocated', scope: 'admin' },
+  // PAN-5171: one issue for the drawer, cockpit and phone sheet headers.
+  { method: 'GET', path: '/api/issues/:id', scope: 'read:state' },
   { method: 'GET', path: '/api/agents', scope: 'read:state' },
   { method: 'GET', path: '/api/agent-directory', scope: 'read:state' },
   { method: 'GET', path: '/api/flywheel/status', scope: 'read:state' },

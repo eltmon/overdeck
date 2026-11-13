@@ -7,6 +7,7 @@ import DrawerActionBar from './DrawerActionBar';
 import { IssueDetail, type IssueDetailTabId } from '../issue-detail/IssueDetail';
 import { useDrawerData } from './useDrawerData';
 import { IssueView } from '../issue-view/IssueView';
+import { IssueHeaderTitle } from '../issue-view/IssueHeaderTitle';
 
 function taskBadge(tasks: ReturnType<typeof useDrawerData>['tasks']) {
   if (tasks.length === 0) return '0/0';
@@ -25,7 +26,7 @@ export function IssueDrawer() {
   const closeIssue = useDashboardStore((state) => state.closeIssue);
   const setDrawerTab = useDashboardStore((state) => state.setDrawerTab);
   const syncDrawerFromUrl = useDashboardStore((state) => state.syncDrawerFromUrl);
-  const { issue, agents, derived, tasks } = useDrawerData();
+  const { issue, issueStatus, agents, derived, tasks } = useDrawerData();
 
   useEffect(() => {
     syncDrawerFromUrl();
@@ -102,7 +103,7 @@ export function IssueDrawer() {
               {drawer.issueId}
             </div>
             <h2 className="truncate font-display text-[22px] font-semibold leading-none tracking-[-0.01em] text-foreground">
-              {issue?.title ?? 'Issue details'}
+              <IssueHeaderTitle issueId={drawer.issueId} title={issue?.title ?? null} status={issueStatus} />
             </h2>
           </div>
           {(() => {

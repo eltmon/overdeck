@@ -202,7 +202,8 @@ test('tab navigation and unknown issue', async ({ browser }) => {
     await expect(page.locator('[data-issue-id="PAN-90001"]')).toBeVisible({ timeout: 30_000 });
 
     await page.goto(`${baseUrl}/m/pipeline?issue=PAN-99999`, { waitUntil: 'domcontentloaded' });
-    await expect(page.getByText('This issue is not in the pipeline.')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('section[aria-label="Issue"] h2')).toContainText('PAN-99999', { timeout: 30_000 });
+    await expect(page.getByTestId('issue-title-hint')).toBeVisible();
     const back = page.getByRole('button', { name: 'Back', exact: true });
     await expect(back).toBeVisible();
     const box = await back.boundingBox();

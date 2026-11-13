@@ -9,11 +9,12 @@
  *     `IssuePeek`, the desktop `IssueRow` or the issue drawer — none of
  *     those are read-only.
  */
-import { useConnectionState } from '../../lib/connectionState';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { derivedForIssue, firstAgentByIssueId, getPipelineIssuePhase } from '../../lib/pipeline-state';
-import { useDashboardStore, selectAgents, selectIssues } from '../../lib/store';
-import type { Agent, Issue } from '../../types';
+import { useDashboardStore, selectAgents } from '../../lib/store';
+import type { Agent } from '../../types';
+import { IssueHeaderTitle } from '../issue-view/IssueHeaderTitle';
+import { useIssueRecord } from '../issue-view/useIssueRecord';
 import { PHASE_LABELS } from '../primitives/PhaseHeader';
 import { issueNeedsOperator, NeedsYouMark } from './MobilePipeline';
 
@@ -33,27 +34,17 @@ function Header({ issueId, onBack }: { issueId: string; onBack: () => void }) {
 }
 
 export function MobileIssueSheet({ issueId, onBack }: { issueId: string; onBack: () => void }) {
-  const issues = useDashboardStore(selectIssues) as Issue[];
   const derivedByIssueId = useDashboardStore((s) => s.derivedIssueStateByIssueId);
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
-  const hasSnapshot = useConnectionState((s) => s.hasSnapshot);
-
-  const issue = issues.find((i) => i.identifier.toLowerCase() === issueId.toLowerCase());
-
-  if (!hasSnapshot) {
-    return (
-      <section aria-label="Issue" className="px-4 pb-[env(safe-area-inset-bottom)]">
-        <Header issueId={issueId} onBack={onBack} />
-        <p className="px-0 py-6 text-sm text-muted-foreground">Loading issue…</p>
-      </section>
-    );
-  }
+  const { issue, status } = useIssueRecord(issueId);
 
   if (!issue) {
     return (
       <section aria-label="Issue" className="px-4 pb-[env(safe-area-inset-bottom)]">
         <Header issueId={issueId} onBack={onBack} />
-        <p className="px-0 py-6 text-sm text-muted-foreground">This issue is not in the pipeline.</p>
+        <h2 className="mt-3 break-words text-base font-medium">
+          <IssueHeaderTitle issueId={issueId} title={null} status={status} />
+        </h2>
       </section>
     );
   }

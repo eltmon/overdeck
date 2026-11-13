@@ -41,9 +41,14 @@ function createQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
 }
 
-function mockFetch() {
+function mockFetch(issueReadResponse?: (issueId: string) => Promise<Response> | null) {
   return vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
+    if (/\/api\/issues\/[^/]+$/.test(url)) {
+      const issueId = url.split('/').pop() ?? '';
+      const override = issueReadResponse?.(issueId);
+      if (override) return override;
+    }
     if (url.endsWith('/artifacts')) return Response.json({ artifacts: [] });
     if (url.endsWith('/plan')) return Response.json(null);
     if (url.includes('/api/backlog/issue-state')) return Response.json({
@@ -127,19 +132,61 @@ describe('IssueDrawer tracker URL fallback (PAN-4717)', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders "Issue details" and an Issue link to the tracker URL for an issue absent from the snapshot', async () => {
+  it('renders the identifier with "title unavailable" and an Issue link to the tracker URL for an issue absent from the snapshot', async () => {
     // issuesRaw holds only PAN-1 — MIN-658 is not in the snapshot.
+    vi.stubGlobal('fetch', mockFetch((issueId) => (issueId === 'MIN-658' ? Promise.resolve(new Response(null, { status: 503 })) : null)));
     renderDrawer();
 
     await act(async () => {
       useDashboardStore.getState().openIssue('MIN-658', 'overview', 'https://linear.app/mindyournow/issue/MIN-658/x');
     });
 
-    expect(screen.getByText('Issue details')).toBeInTheDocument();
+    expect(await screen.findByText('title unavailable')).toBeInTheDocument();
+    expect(screen.getAllByText('MIN-658').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Issue details')).toBeNull();
     expect(screen.getByRole('link', { name: 'Issue' })).toHaveAttribute(
       'href',
       'https://linear.app/mindyournow/issue/MIN-658/x',
     );
+  });
+
+  it('renders the fetched title when the issue read answers a row', async () => {
+    vi.stubGlobal('fetch', mockFetch((issueId) => (issueId === 'MIN-658' ? Promise.resolve(Response.json({
+      id: 'MIN-658', identifier: 'MIN-658', title: 'Fetched title', status: 'Todo', priority: 0, labels: [],
+      url: 'https://example.com/MIN-658', createdAt: '2026-05-18T00:00:00.000Z', updatedAt: '2026-05-18T00:00:00.000Z',
+    })) : null)));
+    renderDrawer();
+
+    await act(async () => {
+      useDashboardStore.getState().openIssue('MIN-658', 'overview');
+    });
+
+    expect(await screen.findByText('Fetched title')).toBeInTheDocument();
+    expect(screen.queryByText('Issue details')).toBeNull();
+  });
+
+  it('renders the skeleton and never "Issue details" while the issue read is unresolved', async () => {
+    vi.stubGlobal('fetch', mockFetch((issueId) => (issueId === 'MIN-658' ? new Promise<never>(() => {}) as never : null)));
+    renderDrawer();
+
+    await act(async () => {
+      useDashboardStore.getState().openIssue('MIN-658', 'overview');
+    });
+
+    expect(screen.getByTestId('issue-title-skeleton')).toBeInTheDocument();
+    expect(screen.queryByText('Issue details')).toBeNull();
+  });
+
+  it('renders "not found on tracker" for a 404 issue read', async () => {
+    vi.stubGlobal('fetch', mockFetch((issueId) => (issueId === 'MIN-658' ? Promise.resolve(new Response(null, { status: 404 })) : null)));
+    renderDrawer();
+
+    await act(async () => {
+      useDashboardStore.getState().openIssue('MIN-658', 'overview');
+    });
+
+    expect(await screen.findByText('not found on tracker')).toBeInTheDocument();
+    expect(screen.queryByText('Issue details')).toBeNull();
   });
 
   it('keeps trackerUrl across setDrawerTab, and clears it when reopening without one', async () => {

@@ -107,6 +107,7 @@ src/components/Settings/sections/__tests__/TelemetrySection.test.tsx
 src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx
 src/components/Settings/sections/__tests__/tiered-crews.test.ts
 src/components/Stage/HomePane/Launcher.test.tsx
+src/components/Stage/cockpit/IssueMissionControl.header-title.test.tsx
 src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx
 src/components/Stage/cockpit/IssueTreeLane.test.ts
 src/components/Stage/launcherFocusStore.test.ts
@@ -196,6 +197,8 @@ src/components/home/__tests__/HomeComposerProjectChip.test.tsx
 src/components/home/__tests__/homeComposerIntents.test.ts
 src/components/home/__tests__/pendingTerminal.test.ts
 src/components/home/__tests__/useTypeToFocus.test.tsx
+src/components/issue-view/IssueHeaderTitle.test.tsx
+src/components/issue-view/useIssueRecord.test.tsx
 src/components/merge-train/__tests__/MergeTrainView.test.tsx
 src/components/mobile/__tests__/MobileApp.test.tsx
 src/components/mobile/__tests__/MobileConversations.test.tsx
