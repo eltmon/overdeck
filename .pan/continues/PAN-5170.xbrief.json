@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5170",
   "created": "2026-11-13T02:57:05.197Z",
-  "updated": "2026-11-13T02:58:40.430Z",
+  "updated": "2026-11-13T02:59:17.293Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
     "guard-supervisor-unit-failed.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T02:58:40.429Z"
+    },
+    "supervisor-reachability-tracker": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5170",
+      "claimedAt": "2026-11-13T02:59:17.293Z"
     }
   }
 }
