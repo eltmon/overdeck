@@ -12,12 +12,14 @@
 import type { ExplorerReadFileResult } from '@overdeck/contracts'
 import { useCallback, useEffect, useState, type KeyboardEvent } from 'react'
 import { usePanesStore } from '../../../lib/panesStore'
+import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
 import styles from '../../Stage/stage.module.css'
 import type { PaneWrapperProps } from '../../Stage/types'
 import { explorerErrorCode, explorerErrorMessage, readFile } from '../explorer-rpc'
 import { codePaneLabel } from '../openCodePane'
 import { draftKey, useCodeDrafts } from './code-drafts'
 import { MonacoCodeEditor, type CodeEditorInstance } from './MonacoCodeEditor'
+import { CodePaneHeader, isMarkdownPath, type CodePaneView } from './CodePaneHeader'
 import { NonTextFallback } from './NonTextFallback'
 import { useCodePaneSave } from './useCodePaneSave'
 
@@ -60,6 +62,8 @@ function CodePaneForFile({
   const key = draftKey(rootId, path)
   const [load, setLoad] = useState<LoadState>({ status: 'loading' })
   const [wordWrap, setWordWrap] = useState<'on' | 'off'>('on')
+  const [view, setView] = useState<CodePaneView>('edit')
+  const showPreview = view === 'preview' && isMarkdownPath(path)
   const [editor, setEditor] = useState<CodeEditorInstance | null>(null)
   const text = useCodeDrafts((s) => s.drafts[key]?.text)
 
@@ -121,13 +125,15 @@ function CodePaneForFile({
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="code-pane" onKeyDown={onPaneKeyDown}>
-      {preview ? (
-        <div className="flex items-center justify-end border-b border-border px-3 py-1">
-          <button type="button" className="text-xs text-muted-foreground hover:text-foreground" onClick={keepOpen}>
-            Keep open
-          </button>
-        </div>
-      ) : null}
+      <CodePaneHeader
+        path={path}
+        view={view}
+        onView={setView}
+        wordWrap={wordWrap}
+        onToggleWrap={toggleWrap}
+        preview={preview}
+        onKeepOpen={keepOpen}
+      />
       {save.conflict ? (
         <div className="border-b border-border px-3 py-1.5 text-xs text-warning-foreground" role="status" data-testid="code-pane-conflict">
           {CONFLICT_NOTE}
@@ -138,20 +144,26 @@ function CodePaneForFile({
           {READ_ONLY_NOTE}
         </div>
       ) : null}
-      <div className="min-h-0 flex-1">
-        <MonacoCodeEditor
-          rootId={rootId}
-          path={path}
-          value={text ?? result.text ?? ''}
-          wordWrap={wordWrap}
-          readOnly={!result.writable}
-          onChange={save.onChange}
-          onBlur={save.onBlur}
-          onSaveShortcut={save.saveNow}
-          onToggleWrap={toggleWrap}
-          onMount={setEditor}
-        />
-      </div>
+      {showPreview ? (
+        <div className="min-h-0 flex-1 overflow-auto" data-testid="code-pane-markdown">
+          <MarkdownTab body={text ?? result.text ?? ''} />
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1">
+          <MonacoCodeEditor
+            rootId={rootId}
+            path={path}
+            value={text ?? result.text ?? ''}
+            wordWrap={wordWrap}
+            readOnly={!result.writable}
+            onChange={save.onChange}
+            onBlur={save.onBlur}
+            onSaveShortcut={save.saveNow}
+            onToggleWrap={toggleWrap}
+            onMount={setEditor}
+          />
+        </div>
+      )}
     </div>
   )
 }

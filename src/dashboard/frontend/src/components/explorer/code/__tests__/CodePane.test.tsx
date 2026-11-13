@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { PanRpcError, type ExplorerReadFileResult } from '@overdeck/contracts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspacePane } from '../../../../lib/panesStore'
@@ -24,6 +24,7 @@ vi.mock('../MonacoCodeEditor', async () => {
     MonacoCodeEditor: (props: {
       value: string
       readOnly: boolean
+      wordWrap: string
       onChange(text: string): void
       onMount(editor: unknown): void
     }) => {
@@ -31,6 +32,7 @@ vi.mock('../MonacoCodeEditor', async () => {
       return (
         <textarea
           data-testid="monaco"
+          data-wrap={props.wordWrap}
           value={props.value}
           readOnly={props.readOnly}
           onChange={(e) => props.onChange(e.target.value)}
@@ -139,6 +141,33 @@ describe('CodePane', () => {
       rerender(<CodePane pane={pane({ explorerRevealLine: 40, explorerRevealColumn: 3, explorerRevealNonce: 2 })} ctx={ctx} />)
     })
     await waitFor(() => expect(mocks.editor.revealLineInCenter).toHaveBeenCalledTimes(2))
+  })
+})
+
+describe('CodePane header', () => {
+  it('previews a markdown file from the current draft text', async () => {
+    const key = draftKey('issue:PAN-1', 'docs/README.md')
+    mocks.readFile.mockResolvedValue(textRead({ text: '# Title\n' }))
+    render(<CodePane pane={pane({ explorerPath: 'docs/README.md', label: 'README.md' })} ctx={ctx} />)
+    await screen.findByTestId('monaco')
+    act(() => useCodeDrafts.getState().edited(key, '# Draft heading\n'))
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    const preview = await screen.findByTestId('code-pane-markdown')
+    expect(preview.textContent).toContain('Draft heading')
+    expect(screen.queryByTestId('monaco')).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Edit' }))
+    expect(((await screen.findByTestId('monaco')) as HTMLTextAreaElement).value).toBe('# Draft heading\n')
+  })
+
+  it('wraps by default and the Wrap button turns it off for the editor', async () => {
+    mocks.readFile.mockResolvedValue(textRead())
+    render(<CodePane pane={pane()} ctx={ctx} />)
+    const editor = await screen.findByTestId('monaco')
+    expect(editor.getAttribute('data-wrap')).toBe('on')
+    const wrap = screen.getByRole('button', { name: 'Wrap' })
+    fireEvent.click(wrap)
+    expect(wrap.getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByTestId('monaco').getAttribute('data-wrap')).toBe('off')
   })
 })
 
