@@ -38,7 +38,7 @@ export interface WorkspacePane {
   isPermanent?: boolean
   // issue pane — an issue tab opened inside a project-scoped deck (PAN-1561)
   issueId?: string
-  // agent id backing an issue-scoped pane (e.g. FilesPane diff target, PAN-1561)
+  // agent id backing an issue-scoped pane (PAN-1561)
   agentId?: string
   // agent pane
   conversationId?: string
@@ -331,14 +331,15 @@ export const usePanesStore = create<PanesStore>((set, get) => ({
     // the issue-scoped singleton panes (files/commits/plan/docs) key on
     // (type, issueId) so each issue gets at most one. Browser panes are exempt —
     // multiple are legitimate (different URLs).
-    const SINGLETON_TYPES: PaneType[] = ['files', 'commits', 'plan', 'docs']
+    // Explorer panes key on their root, code panes on (root, path) (PAN-5186).
+    const SINGLETON_TYPES: PaneType[] = ['commits', 'plan', 'docs']
     const existingPanes = get().panesByWorkspace[workspaceId] ?? []
     const dup = existingPanes.find(
       (p) =>
         (spec.paneType === 'agent' && p.paneType === 'agent' && !!spec.conversationId && p.conversationId === spec.conversationId) ||
         (spec.paneType === 'issue' && p.paneType === 'issue' && !!spec.issueId && p.issueId === spec.issueId) ||
         (SINGLETON_TYPES.includes(spec.paneType) && p.paneType === spec.paneType && p.issueId === spec.issueId) ||
-        // Code panes key on (root, path) (PAN-5186).
+        (spec.paneType === 'files' && p.paneType === 'files' && !!spec.explorerRootId && p.explorerRootId === spec.explorerRootId) ||
         (spec.paneType === 'code' && p.paneType === 'code' && !!spec.explorerRootId && !!spec.explorerPath &&
           p.explorerRootId === spec.explorerRootId && p.explorerPath === spec.explorerPath),
     )

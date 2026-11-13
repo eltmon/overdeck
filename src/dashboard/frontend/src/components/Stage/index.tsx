@@ -40,7 +40,7 @@ import { CommitsPane } from './panes/CommitsPane'
 import { PlanPane } from './panes/PlanPane'
 import { DocsPane } from './panes/DocsPane'
 import { AgentPane } from './panes/AgentPane'
-import { FilesPane } from './panes/FilesPane'
+import { ExplorerPane } from '../explorer/ExplorerPane'
 import { BrowserPane } from './panes/BrowserPane'
 import { EditorPane } from './panes/EditorPane'
 import type { StageContext, PaneWrapperProps, StageApi } from './types'
@@ -115,7 +115,7 @@ function renderPane(pane: WorkspacePane, ctx: StageContext) {
     case 'agent':
       return <AgentPane pane={pane} ctx={ctx} />
     case 'files':
-      return <FilesPane pane={pane} ctx={ctx} />
+      return <ExplorerPane pane={pane} ctx={ctx} />
     case 'browser':
       return <BrowserPane pane={pane} ctx={ctx} />
     case 'editor':
@@ -214,11 +214,18 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
   useEffect(() => {
     const current = usePanesStore.getState().panesByWorkspace[deckKey] ?? []
     const seenConversationIds = new Set<string>()
-    const ISSUE_SCOPED = new Set<PaneType>(['files', 'commits', 'plan', 'docs'])
+    const ISSUE_SCOPED = new Set<PaneType>(['commits', 'plan', 'docs'])
     for (const p of current) {
       // Terminals are drawer-only now.
       if (p.paneType === 'terminal') {
         closePane(deckKey, p.paneId)
+        continue
+      }
+      // PAN-5186: the Files pane is the explorer, keyed by root. Migrate the
+      // legacy issue-scoped pane; close one with neither field.
+      if (p.paneType === 'files' && !p.explorerRootId) {
+        if (p.issueId) updatePane(deckKey, p.paneId, { explorerRootId: `issue:${p.issueId}` })
+        else closePane(deckKey, p.paneId)
         continue
       }
       // Issue-scoped panes created at project scope (no issueId) were broken —
@@ -233,7 +240,7 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
         else seenConversationIds.add(p.conversationId)
       }
     }
-  }, [deckKey, closePane])
+  }, [deckKey, closePane, updatePane])
 
   useStageShortcuts(deckKey)
 
