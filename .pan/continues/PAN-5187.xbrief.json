@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5187",
   "created": "2026-11-13T16:27:22.124Z",
-  "updated": "2026-11-13T18:52:07.312Z",
+  "updated": "2026-11-13T18:52:08.551Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,7 +152,9 @@
       "doneAt": "2026-11-13T18:37:49.737Z"
     },
     "f-external-change-wiring": {
-      "status": "pending"
+      "status": "pending",
+      "claimedBy": "agent-pan-5187",
+      "claimedAt": "2026-11-13T18:52:08.551Z"
     },
     "f-monaco-setup": {
       "status": "completed",
