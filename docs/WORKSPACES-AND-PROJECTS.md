@@ -712,20 +712,41 @@ one `additionalContext` rather than printing two objects.
 
 ## Wrapper-repo git posture (polyrepo projects)
 
-For a `workspace.type: polyrepo` project (PAN-2948), the workspace *root* is a
-one-commit wrapper repo whose `.gitignore` excludes the real code sub-repos
-(e.g. `fe/`, `api/`) — no review-path git operation may run at that root
-(`docs/REVIEW-AGENT-ARCHITECTURE.md`, "Polyrepo workspaces (PAN-2948)"). The
-wrapper's HEAD never moves, so anything that snapshots it as a review anchor
-reports "no drift" forever (`git-utils.ts`'s `snapshotWorkspaceHeads`
-doc comment; `project-repos.ts`'s `degradedPolyrepo` field). The invariant
-this domain's `workspaces.path` column must respect: **the wrapper repo's
-HEAD is workspace metadata (where the worktree lives on disk), never a
-review anchor** — anchor/drift comparisons belong to the composite sub-repo
-snapshot, not to the wrapper. `WorkspaceRow.isGitRepository`/`branchName`/
-`parentBranch` describe the workspace root as Overdeck sees it on disk; they
-are not, and must never be promoted to, a review signal for a polyrepo
-project.
+For a `workspace.type: polyrepo` project (PAN-2948), the workspace *root* is
+an Overdeck-created wrapper repo with no remote, whose `.gitignore` excludes
+the real code sub-repos (e.g. `fe/`, `api/`) — no review-path git operation
+may run at that root (`docs/REVIEW-AGENT-ARCHITECTURE.md`, "Polyrepo
+workspaces (PAN-2948)"). The wrapper tracks its `.gitignore` and any planning
+artifacts the planning commit stages there, while all code lives in the
+sub-repos. The wrapper's HEAD moves only for planning commits and the
+`.gitignore` heal commit below, never for code, so anything that snapshots it
+as a review anchor still reports "no drift" (`git-utils.ts`'s
+`snapshotWorkspaceHeads` doc comment; `project-repos.ts`'s `degradedPolyrepo`
+field). The invariant this domain's `workspaces.path` column must respect:
+**the wrapper repo's HEAD is workspace metadata (where the worktree lives on
+disk), never a review anchor** — anchor/drift comparisons belong to the
+composite sub-repo snapshot, not to the wrapper. `WorkspaceRow.isGitRepository`/
+`branchName`/`parentBranch` describe the workspace root as Overdeck sees it on
+disk; they are not, and must never be promoted to, a review signal for a
+polyrepo project.
+
+The wrapper `.gitignore` also lists Overdeck's own runtime and sync output,
+since the wrapper is a separate git repo from the sub-repos and never
+inherits their ignores: the sub-repo dirs, `.overdeck/`, `.devcontainer/`,
+`dev`, and every entry of `OVERDECK_PROJECT_GITIGNORE_ENTRIES` and
+`OVERDECK_WORKSPACE_ROOT_SYNC_ENTRIES` (`src/lib/workspace-sync-paths.ts`) —
+the skills merge, the agent template (`.mcp.json`), Hume config
+(`.hume-config`) and env (`.env`) all land at the workspace root. A wrapper
+created before PAN-5199 predates these entries; `spawnIssueAgentForRoute`
+heals it with `healPolyrepoWorkspaceGitignoreAsync` before the dirty-workspace
+check on every start, committing the missing entries into the wrapper's
+`.gitignore`. A heal whose commit cannot land (a blocked pre-commit hook, a
+race with a concurrent start) restores the original `.gitignore` from `HEAD`
+rather than leaving a half-written file. Independently of the heal, the start
+gate (`isOnlyOverdeckRuntimeWorkspaceChanges`) accepts an *untracked* sync
+path only inside a confirmed polyrepo wrapper; it still refuses a tracked or
+staged edit to one of those paths, every other untracked path, and — in a
+monorepo project — every sync path at all.
 
 ## No-loss discipline
 
