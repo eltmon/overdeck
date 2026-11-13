@@ -4,17 +4,17 @@
     "created": "2026-11-13T19:51:49Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5198: Flywheel page: Needs-you click only highlights the newest message; make each item actionable",
-    "updated": "2026-11-13T19:56:20.553Z"
+    "updated": "2026-11-13T19:57:35.567Z"
   },
   "plan": {
     "id": "pan-5198",
     "title": "Flywheel page: Needs-you click only highlights the newest message; make each item actionable",
-    "status": "proposed",
+    "status": "running",
     "uid": "cda3e7cc-0815-4e7d-a85d-dcf1f415326e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-13T19:51:49Z",
-    "updated": "2026-11-13T19:56:20.553Z",
+    "updated": "2026-11-13T19:57:35.567Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5198",
@@ -578,5 +578,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
