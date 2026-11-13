@@ -149,6 +149,20 @@ window_count() {
   echo "$n"
 }
 
+# The idle window into R_IDLE_NEW, with the spawn-trace bounds stamped
+# around exactly the window that is kept: a retake after a PID-counter wrap
+# restamps R_TRACE_FROM, so the traced cost never covers two windows. Call
+# it directly, never in $(...), so its assignments reach the caller.
+idle_window() {
+  R_TRACE_FROM="$(date +%s)000"
+  R_IDLE_NEW=$(new_pids "$WINDOW_SECS")
+  if [ "$R_IDLE_NEW" -lt 0 ]; then
+    R_TRACE_FROM="$(date +%s)000"
+    R_IDLE_NEW=$(new_pids "$WINDOW_SECS")
+  fi
+  R_TRACE_TO="$(date +%s)999"
+}
+
 write_result() {
   export R_SETUP_ERROR R_PANUP_RC R_PANUP_HEALTHY R_PANUP_PASS R_IDLE_BOOTED R_IDLE_BASELINE \
     R_IDLE_NEW R_IDLE_NET R_ENOENT_PASS R_TRACE_FROM R_TRACE_TO
@@ -574,9 +588,7 @@ measure_idle() {
 
   if [ "$R_IDLE_BOOTED" = true ]; then
     sleep "$SETTLE_SECS"
-    R_TRACE_FROM="$(date +%s)000"
-    R_IDLE_NEW=$(window_count)
-    R_TRACE_TO="$(date +%s)999"
+    idle_window
     R_IDLE_NET=$((R_IDLE_NEW - R_IDLE_BASELINE))
     echo "idle new PIDs: $R_IDLE_NEW, net $R_IDLE_NET (the verdict is in the summary below)"
   else
