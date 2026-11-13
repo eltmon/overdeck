@@ -246,6 +246,7 @@ src/lib/__tests__/bootRequests.test.ts
 src/lib/__tests__/citationFormat.test.ts
 src/lib/__tests__/colorThemeEditor.test.ts
 src/lib/__tests__/composerCitations.test.ts
+src/lib/__tests__/composerSendQueue.test.ts
 src/lib/__tests__/connectionState.test.ts
 src/lib/__tests__/flywheelNeedsYou.test.ts
 src/lib/__tests__/issueActions.menu-by-state.test.ts
