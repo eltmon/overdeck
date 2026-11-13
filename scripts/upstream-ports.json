@@ -282,6 +282,36 @@
     "commit": "2d8a843e6b"
   },
   {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/slide-protocol.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/slide-protocol.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/slide-fonts.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/slide-fonts.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/slide-text.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/slide-text.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/presentation.worker.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/presentation.worker.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/Presentation.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/Presentation.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
     "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/__tests__/sheet-viewport.test.ts",
     "upstream": "t3code",
     "path": "apps/web/src/components/files/office/sheet-viewport.test.ts",
