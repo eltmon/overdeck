@@ -1,0 +1,681 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-13T20:30:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5199: Polyrepo workspaces: work agent start refused as dirty because the wrapper repo doesn't ignore Overdeck's own sync files",
+    "updated": "2026-11-13T20:09:15.995Z"
+  },
+  "plan": {
+    "id": "pan-5199",
+    "title": "Polyrepo workspaces: work agent start refused as dirty because the wrapper repo doesn't ignore Overdeck's own sync files",
+    "status": "proposed",
+    "uid": "877f7a4d-9e03-4e62-818c-79a0ab1ea2fb",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-13T20:30:00.000Z",
+    "updated": "2026-11-13T20:09:15.995Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5199",
+        "label": "PAN-5199",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5199.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "polyrepo",
+      "workspace",
+      "start-gate",
+      "gitignore",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "On polyrepo projects (MYN) the work agent start is refused with WORKSPACE_DIRTY after planning, and nothing retries it. The wrapper repo at the workspace root has a .gitignore that lists the sub-repo dirs, .overdeck/, .devcontainer/ and dev, but none of the files Overdeck itself writes there (.claude/ from skills merge, template copy_dirs, settings/mcp copy and caveman; .mcp.json from the agent template; .hume-config from Hume setup; .env from env.template). The start gate in spawn-issue.ts accepts only .pan/, .overdeck/ and .husky/_/, so `?? .claude/...`, `?? .mcp.json` and `?? .hume-config` refuse every start. Eleven MYN issues hit this; MIN-1141 has been stuck since 2026-11-06.",
+      "Proposal": "Add one shared leaf module (src/lib/workspace-sync-paths.ts) holding the project .gitignore entries (moved from ensurePanGitignore) and the workspace-root sync entries (.claude/, .mcp.json, .hume-config, .env), plus an isOverdeckWorkspaceSyncPath predicate. Extract the polyrepo .gitignore helpers from create.ts into src/lib/workspace-manager/polyrepo-gitignore.ts, make ensurePolyrepoWorkspaceGitignore write the shared entries, and add healPolyrepoWorkspaceGitignoreAsync, which ensures and commits the wrapper .gitignore and restores the original file if the commit fails. spawnIssueAgentForRoute calls the heal before the dirty check for local polyrepo workspaces. In polyrepo wrappers only, the start gate (isOnlyOverdeckRuntimeWorkspaceChanges with { polyrepoWrapper: true }) also accepts untracked (??) sync paths through a new status-aware porcelain parser; the heal commit is limited to the .gitignore path; while tracked edits to those paths and every other path stay refused. Docs and a changelog entry describe the behaviour. Full detail: .pan/drafts/PAN-5199.md.",
+      "NonGoals": "- No automatic retry of starts refused before this fix (MIN-1141 and the other ten); operators run `pan start <issue>` once.\n- No change to any monorepo or project .gitignore: ensurePanGitignore output stays byte-identical.\n- No widening of isOverdeckWorkspaceRuntimePath or isOverdeckOwnedOnlyStatus; the pan done preflight and merge-ops gates are unchanged.\n- No discovery of per-project agent.template_dir *.template targets beyond .mcp.json.\n- No start-gate tolerance for tracked or staged changes to sync paths, and none at all for monorepo workspaces.\n- No change to where or how Overdeck writes sync files (skills merge, settings copy, caveman, templates, Hume, env)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "One shared leaf module src/lib/workspace-sync-paths.ts holds OVERDECK_PROJECT_GITIGNORE_ENTRIES (moved verbatim from ensurePanGitignore) and OVERDECK_WORKSPACE_ROOT_SYNC_ENTRIES = ['.claude/', '.mcp.json', '.hume-config', '.env'].",
+        "rationale": "The issue requires reusing ensurePanGitignore's list with no second copy, but that list only covers .claude/skills/; a second constant in the same module covers the verified writers without changing project .gitignore output. A leaf with no imports keeps lint:circular green for state-plane, migration and the dashboard route."
+      },
+      {
+        "summary": "The wrapper .gitignore ignores .claude/ as a whole, while the project list stays .claude/skills/ only.",
+        "rationale": "The wrapper is an Overdeck-created scaffold with no remote; every file under its .claude/ is Overdeck output. A project repo can legitimately track parts of .claude/."
+      },
+      {
+        "summary": "The start gate accepts sync paths only as untracked (??) entries and only in a polyrepo wrapper (isOnlyOverdeckRuntimeWorkspaceChanges(porcelain, { polyrepoWrapper })); monorepo starts are unchanged.",
+        "rationale": "In a monorepo, untracked .claude/agents/*.md or .mcp.json can be team-owned work (configuration/meta-repos.mdx), so it must stay refused; inside the wrapper (an Overdeck scaffold with no code) every such file has a verified Overdeck writer. Plan critic round 1 finding."
+      },
+      {
+        "summary": "Heal runs in spawnIssueAgentForRoute before the dirty check, for local polyrepo workspaces whose wrapper has a .git.",
+        "rationale": "Every start path (pan start, dashboard, MCP start_issue, planning auto-handoff, machine work) goes through spawnIssueAgentForRoute; createWorkspace already runs the ensure on its resume path."
+      },
+      {
+        "summary": "The heal runs only on a tracked, clean wrapper .gitignore, and a failed commit restores .gitignore from HEAD (index and working tree).",
+        "rationale": "Leaving ` M .gitignore` would make the gate refuse for a new reason. Restoring from HEAD stays correct when two starts heal at once, because claimAgentStart runs only after the dirty gate. The clean precondition means an uncommitted .gitignore edit is never overwritten."
+      },
+      {
+        "summary": ".env is included in the sync entries even though the issue names only .mcp.json and .hume-config.",
+        "rationale": "The issue asks for every path Overdeck writes into a workspace root; create.ts writes .env from workspace.env.template, which would block a polyrepo start the same way."
+      },
+      {
+        "summary": "Static sync list; no per-project *.template target discovery.",
+        "rationale": "The start gate is a pure function over porcelain text and the issue requires one shared list for both uses; .mcp.json is the only root template target in the only live polyrepo project."
+      },
+      {
+        "summary": "ensurePolyrepoWorkspaceGitignore and commitPolyrepoWorkspaceGitignoreAsync move into src/lib/workspace-manager/polyrepo-gitignore.ts, re-exported from create.ts.",
+        "rationale": "The route must import the heal without pulling create.ts's DNS/tunnel/Hume/Docker/workspace-row imports; spawn-issue.ts is at 918 of 1000 lines, so the route change stays one guarded call."
+      },
+      {
+        "summary": "commitPolyrepoWorkspaceGitignoreAsync checks and commits only the .gitignore path (`-- .gitignore`).",
+        "rationale": "The heal must never commit an unrelated staged file and hide it from the dirty gate. Plan critic round 1 finding."
+      }
+    ],
+    "items": [
+      {
+        "id": "shared-sync-paths",
+        "title": "Add the shared workspace-sync-paths leaf module and point ensurePanGitignore at it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T20:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5199",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wrapper-sync-entries",
+            "start-gate-sync-tolerance",
+            "heal-helper",
+            "start-route-heal"
+          ],
+          "files_scope": [
+            "src/lib/workspace-sync-paths.ts",
+            "src/lib/workspace-manager/migration.ts",
+            "src/lib/__tests__/workspace-sync-paths.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/workspace-sync-paths.test.ts tests/lib/pan-artifacts.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "workspace-sync-paths.test.ts and pan-artifacts.test.ts pass",
+            "lint:circular reports no cycles"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/workspace-sync-paths.ts exactly as in PRD WI-1: export OVERDECK_PROJECT_GITIGNORE_ENTRIES = ['.pan/events/', '.pan/review/', '.pan/prompts/', '.pan/test/', '.claude/skills/'] as const, OVERDECK_WORKSPACE_ROOT_SYNC_ENTRIES = ['.claude/', '.mcp.json', '.hume-config', '.env'] as const, and isOverdeckWorkspaceSyncPath(relativePath) (normalize backslashes and trim; an entry ending in '/' matches the bare dir name or any path under it; other entries match exactly). The module has no imports. In src/lib/workspace-manager/migration.ts ensurePanGitignore, replace the inline requiredEntries array with `const requiredEntries: readonly string[] = OVERDECK_PROJECT_GITIGNORE_ENTRIES;` and import it from '../workspace-sync-paths.js'. Add src/lib/__tests__/workspace-sync-paths.test.ts with the true/false cases listed in PRD WI-1."
+        },
+        "items": [
+          {
+            "id": "shared-sync-paths.ac1",
+            "title": "Given the new module, when isOverdeckWorkspaceSyncPath is called with .claude, .claude/settings.json, .claude/agents/pan-work-agent.md, .mcp.json, .hume-config, .env or .pan/review/x.md, then it returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-sync-paths.ac2",
+            "title": "Given the new module, when isOverdeckWorkspaceSyncPath is called with notes.txt, .mcp.json.bak, .claude-notes.md, src/.env or .envrc, then it returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-sync-paths.ac3",
+            "title": "Given the unchanged tests/lib/pan-artifacts.test.ts, when it runs against ensurePanGitignore reading OVERDECK_PROJECT_GITIGNORE_ENTRIES, then every ensurePanGitignore case passes and the written .gitignore contains the same five entries as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-sync-paths.ac4",
+            "title": "src/lib/workspace-sync-paths.ts contains no import statement and npm run lint:circular exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-polyrepo-gitignore",
+        "title": "Move the polyrepo .gitignore helpers from create.ts into workspace-manager/polyrepo-gitignore.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T20:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-5199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-manager/polyrepo-gitignore.ts",
+            "src/lib/workspace-manager/create.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/workspace-manager/__tests__/create-polyrepo-gitignore.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "create-polyrepo-gitignore.test.ts passes without edits",
+            "lint:circular reports no cycles"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-2: move the PolyrepoWorkspaceRepoRef interface (export it as a type), ensurePolyrepoWorkspaceGitignore and commitPolyrepoWorkspaceGitignoreAsync, with their doc comments and without behaviour changes, from src/lib/workspace-manager/create.ts into the new src/lib/workspace-manager/polyrepo-gitignore.ts. Use the same import specifiers create.ts uses ('fs', 'path', 'child_process', 'util') so the existing vi.mock('node:child_process') still applies. In create.ts add `import { ensurePolyrepoWorkspaceGitignore, commitPolyrepoWorkspaceGitignoreAsync } from './polyrepo-gitignore.js';` and `export { ensurePolyrepoWorkspaceGitignore, commitPolyrepoWorkspaceGitignoreAsync } from './polyrepo-gitignore.js';`, and drop imports only the moved code used. Do not edit the existing test file in this item."
+        },
+        "items": [
+          {
+            "id": "extract-polyrepo-gitignore.ac1",
+            "title": "When create.ts is imported, then it exports ensurePolyrepoWorkspaceGitignore and commitPolyrepoWorkspaceGitignoreAsync through a re-export from ./polyrepo-gitignore.js, and create.ts contains no definition of either function",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-polyrepo-gitignore.ac2",
+            "title": "The unedited create-polyrepo-gitignore.test.ts, still importing from '../create.js', passes against the moved functions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-polyrepo-gitignore.ac3",
+            "title": "create.ts line count after the item is lower than its origin/main line count (850) and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wrapper-sync-entries",
+        "title": "Write the shared sync entries into the polyrepo wrapper .gitignore",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T20:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-manager/polyrepo-gitignore.ts",
+            "src/lib/workspace-manager/__tests__/create-polyrepo-gitignore.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/workspace-manager/__tests__/create-polyrepo-gitignore.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "create-polyrepo-gitignore.test.ts passes including the two new PAN-5199 cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-3: in ensurePolyrepoWorkspaceGitignore, after the `dev` runtime entry, compute syncEntries = [...OVERDECK_PROJECT_GITIGNORE_ENTRIES, ...OVERDECK_WORKSPACE_ROOT_SYNC_ENTRIES] filtered to entries absent from normalizedLines both with and without the trailing slash. Add syncEntries.length === 0 to the early-return condition. When non-empty, append the header `# Overdeck sync output (PAN-5199: written by Overdeck into the workspace root, never work product)` and the entries, and push them onto `added` after the runtime entries. Update every exact result.added expectation in create-polyrepo-gitignore.test.ts to end with the nine sync entries in constant order, or seed them where the test asserts no additions. Add the tests 'adds the Overdeck sync entries to a MIN-1141-shaped .gitignore once' and 'does not re-add a sync entry written without its trailing slash' as specified in the PRD."
+        },
+        "items": [
+          {
+            "id": "wrapper-sync-entries.ac1",
+            "title": "Given a MIN-1141-shaped wrapper .gitignore, when ensurePolyrepoWorkspaceGitignore runs, then result.added equals ['.pan/events/', '.pan/review/', '.pan/prompts/', '.pan/test/', '.claude/skills/', '.claude/', '.mcp.json', '.hume-config', '.env']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wrapper-sync-entries.ac2",
+            "title": "When ensurePolyrepoWorkspaceGitignore runs a second time on the same directory, then result.added is [] and each sync entry appears exactly once in the file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wrapper-sync-entries.ac3",
+            "title": "Given a .gitignore that already lists `.claude` without a slash, when the function runs, then `.claude/` is not added",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "heal-helper",
+        "title": "Add healPolyrepoWorkspaceGitignoreAsync that commits the wrapper .gitignore or restores it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T20:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-manager/polyrepo-gitignore.ts",
+            "src/lib/workspace-manager/__tests__/polyrepo-gitignore-heal.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/workspace-manager/__tests__/polyrepo-gitignore-heal.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "polyrepo-gitignore-heal.test.ts passes all six cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "acJustification": "Six ACs, one per real-git test case: the heal's safety depends on each failure mode (blocked commit, staged unrelated file, dirty .gitignore, no .git, re-run) being pinned separately."
+        },
+        "narrative": {
+          "Action": "Per PRD WI-4. First scope commitPolyrepoWorkspaceGitignoreAsync to the one path: `git diff --cached --quiet -- .gitignore` and `git commit -m \"chore(workspace): add polyrepo scaffold .gitignore\" -- .gitignore`, so any other staged entry stays staged and uncommitted (createWorkspace uses the same helper; the change is correct there too). Then export interface PolyrepoGitignoreHealResult { added: string[]; committed: boolean; warning: string | null } and async healPolyrepoWorkspaceGitignoreAsync(workspacePath, repos). Steps: (1) return the no-op result { added: [], committed: false, warning: null } when join(workspacePath, '.git') does not exist; (2) return the no-op result unless `git ls-files --error-unmatch -- .gitignore` succeeds and `git status --porcelain -- .gitignore` prints nothing; (3) run ensurePolyrepoWorkspaceGitignore and return no-op when added is empty; (4) call commitPolyrepoWorkspaceGitignoreAsync; (5) `git status --porcelain -- .gitignore` empty means committed:true; (6) otherwise run `git restore --source=HEAD --staged --worktree -- .gitignore` and return committed:false with the commit message or 'wrapper .gitignore commit did not land' as warning (race-safe: claimAgentStart runs after the gate); (7) try/catch so it never throws; after a throw following step 3 run the step-6 restore best effort and return { added: [], committed: false, warning: err.message }. Only async child-process calls. Add src/lib/workspace-manager/__tests__/polyrepo-gitignore-heal.test.ts with a real git repo in mkdtempSync(join(tmpdir(), ...)), GIT_AUTHOR_*/GIT_COMMITTER_* env, `git config core.hooksPath .git/hooks`, and no child_process mock, covering the six PRD cases (commit + clean tree; second run no-op; failing pre-commit hook restores from HEAD; no .git; unrelated staged notes.txt stays staged and out of the commit; uncommitted .gitignore edit left alone). The test must not import the dashboard route."
+        },
+        "items": [
+          {
+            "id": "heal-helper.ac1",
+            "title": "Given a git wrapper with a MIN-1141-shaped committed .gitignore and untracked .claude/settings.json, .mcp.json and .hume-config, when the heal runs, then it returns committed:true and `git status --porcelain --untracked-files=all` produces empty output with two commits in git log",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heal-helper.ac2",
+            "title": "When the heal runs a second time on the healed wrapper, then it returns added:[] and committed:false and creates no third commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heal-helper.ac3",
+            "title": "Given a pre-commit hook that exits 1, when the heal runs, then it returns committed:false with a non-null warning, the .gitignore content equals the HEAD content, and `git status --porcelain -- .gitignore` produces empty output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heal-helper.ac4",
+            "title": "Given a plain directory without .git, when the heal runs, then it returns { added: [], committed: false, warning: null } and creates no .gitignore",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heal-helper.ac6",
+            "title": "Given a wrapper with `notes.txt` staged, when the heal runs, then it commits only .gitignore (`git show --name-only --format= HEAD` lists only .gitignore) and `git status --porcelain` still shows `A  notes.txt`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heal-helper.ac5",
+            "title": "Given a committed .gitignore with an uncommitted local edit, when the heal runs, then it returns the no-op result and preserves the edited file content byte for byte",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "porcelain-status-entries",
+        "title": "Add parsePorcelainStatusEntries to state-plane.ts and make parsePorcelainStatusPaths delegate to it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T20:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/state-plane.ts",
+            "src/lib/__tests__/state-plane.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/state-plane.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "state-plane.test.ts passes including the new parsePorcelainStatusEntries cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-5: add `export interface PorcelainStatusEntry { status: string; path: string }` and `parsePorcelainStatusEntries(porcelain)` to src/lib/state-plane.ts with the existing parse logic (split lines, trimEnd, status = first two chars, rename/copy split on ' -> ', unquoteGitPath, drop empty paths), returning { status, path } per path. Rewrite parsePorcelainStatusPaths as `parsePorcelainStatusEntries(porcelain).map((entry) => entry.path)`. Add a describe('parsePorcelainStatusEntries') block to src/lib/__tests__/state-plane.test.ts with the two cases in the PRD."
+        },
+        "items": [
+          {
+            "id": "porcelain-status-entries.ac1",
+            "title": "When parsePorcelainStatusEntries('?? .mcp.json\\n M .claude/settings.json') is called, then it returns [{ status: '??', path: '.mcp.json' }, { status: ' M', path: '.claude/settings.json' }]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "porcelain-status-entries.ac2",
+            "title": "When parsePorcelainStatusEntries('R  a.ts -> b.ts') is called, then it returns two entries for a.ts and b.ts, each with status 'R '",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "porcelain-status-entries.ac3",
+            "title": "When the existing describe('parsePorcelainStatusPaths') cases run without edits, then parsePorcelainStatusPaths returns the same path arrays as before and every case passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-gate-sync-tolerance",
+        "title": "Start gate accepts untracked Overdeck sync paths in a polyrepo wrapper only",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T20:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/spawn-issue.ts",
+            "src/dashboard/server/routes/__tests__/agents-spawn-dirty-workspace.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/routes/__tests__/agents-spawn-dirty-workspace.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "agents-spawn-dirty-workspace.test.ts passes including the new MIN-1141 cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-6: change isOnlyOverdeckRuntimeWorkspaceChanges in src/dashboard/server/routes/agents/spawn-issue.ts to `(porcelain: string, options: { polyrepoWrapper?: boolean } = {})`, iterate parsePorcelainStatusEntries, and accept an entry when isOverdeckWorkspaceRuntimePath(path) || isGeneratedGitHookPath(path) || (options.polyrepoWrapper === true && status === '??' && isOverdeckWorkspaceSyncPath(path)). Import parsePorcelainStatusEntries from state-plane.js and isOverdeckWorkspaceSyncPath from '../../../../lib/workspace-sync-paths.js'; drop parsePorcelainStatusPaths from the import if unused. Mention PAN-5199 in the doc comment. Do NOT change the call site at line 687 in this item (start-route-heal passes the flag). Do not touch isOverdeckWorkspaceRuntimePath or isOverdeckOwnedOnlyStatus. Tests in agents-spawn-dirty-workspace.test.ts: existing tables unchanged; new describe 'isOnlyOverdeckRuntimeWorkspaceChanges in a polyrepo wrapper (PAN-5199)' with { polyrepoWrapper: true } allowing the MIN-1141 porcelain and '?? .env', rejecting MIN-1141 + '?? notes.txt', ' M .claude/settings.json', 'A  .mcp.json' and 'A  notes.txt'; and two monorepo (no options) rejections: '?? .claude/agents/my-agent.md' and '?? .mcp.json'."
+        },
+        "items": [
+          {
+            "id": "start-gate-sync-tolerance.ac1",
+            "title": "Given { polyrepoWrapper: true }, when isOnlyOverdeckRuntimeWorkspaceChanges is called with the MIN-1141 porcelain (?? .claude/... files, ?? .hume-config, ?? .mcp.json), then it returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-gate-sync-tolerance.ac2",
+            "title": "Given { polyrepoWrapper: true }, when the MIN-1141 porcelain plus `?? notes.txt`, or ` M .claude/settings.json`, `A  .mcp.json` or `A  notes.txt` is passed, then it returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-gate-sync-tolerance.ac3",
+            "title": "Given no options (a monorepo), when `?? .claude/agents/my-agent.md` or `?? .mcp.json` is passed, then it returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-gate-sync-tolerance.ac4",
+            "title": "Every pre-existing allow/reject case in agents-spawn-dirty-workspace.test.ts still returns its old result, and the diff leaves isOverdeckWorkspaceRuntimePath and the line-687 call site unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-route-heal",
+        "title": "Start route heals the polyrepo wrapper .gitignore before the dirty-workspace check",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T20:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/spawn-issue.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/routes/__tests__/agents-spawn-dirty-workspace.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "wc -l src/dashboard/server/routes/agents/spawn-issue.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "agents-spawn-dirty-workspace.test.ts passes",
+            "lint-file-size.sh exits 0",
+            "spawn-issue.ts line count is below 1000"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-7: import healPolyrepoWorkspaceGitignoreAsync from '../../../../lib/workspace-manager/polyrepo-gitignore.js' in spawn-issue.ts. Directly before the `// PAN-1531: dirty-worktree refusal replaces silent pre-spawn stashing.` comment, insert the block from the PRD: when projectConfig?.workspace?.type === 'polyrepo' and its repos are set and existsSync(workspacePath), run the heal through Effect.promise and, when heal.added is non-empty or heal.warning is set, append the lifecycle event 'agent.polyrepo_gitignore_heal' with { issueId, workspacePath, ...heal }. Then change the gate call at line 687 to `isOnlyOverdeckRuntimeWorkspaceChanges(statusOut, { polyrepoWrapper: Boolean(polyrepoWorkspace) })`. No extra try/catch is needed because the heal never throws. Keep the file under 1000 lines; never raise scripts/file-size-allowlist.txt. No source-grep test (lint rejects source-reading tests); reviewers verify placement from the diff."
+        },
+        "items": [
+          {
+            "id": "start-route-heal.ac1",
+            "title": "In the diff, the healPolyrepoWorkspaceGitignoreAsync call precedes the `git status --porcelain --untracked-files=all` execAsync in spawnIssueAgentForRoute and runs only when workspace.type is 'polyrepo' and the local workspace directory exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-route-heal.ac4",
+            "title": "The gate call passes `{ polyrepoWrapper: true }` only for polyrepo projects, so a monorepo start with `?? .mcp.json` still returns 409 WORKSPACE_DIRTY",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-route-heal.ac2",
+            "title": "When the heal added entries or returned a warning, the route appends an 'agent.polyrepo_gitignore_heal' lifecycle event carrying issueId, workspacePath, added, committed and warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-route-heal.ac3",
+            "title": "`wc -l src/dashboard/server/routes/agents/spawn-issue.ts` reports fewer than 1000 lines and `bash scripts/lint-file-size.sh` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-changelog",
+        "title": "Document the wrapper .gitignore, start-time heal and gate tolerance; add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T20:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "configuration/polyrepo.mdx",
+            "changelog.d/pan-5199.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-8. docs/WORKSPACES-AND-PROJECTS.md, section '## Wrapper-repo git posture (polyrepo projects)': replace 'one-commit wrapper repo' with wording that the wrapper is an Overdeck-created repo with no remote that tracks .gitignore and any planning artifacts committed there, while all code lives in the sub-repos; replace 'The wrapper's HEAD never moves' with: it moves only for planning and .gitignore heal commits, never for code, so snapshots still report no drift; add a paragraph naming what the wrapper .gitignore lists (sub-repo dirs, .overdeck/, .devcontainer/, dev, and the entries of OVERDECK_PROJECT_GITIGNORE_ENTRIES and OVERDECK_WORKSPACE_ROOT_SYNC_ENTRIES in src/lib/workspace-sync-paths.ts), that spawnIssueAgentForRoute heals an older wrapper with healPolyrepoWorkspaceGitignoreAsync before the dirty check, that a failed heal commit restores the old file, and that in a polyrepo wrapper only the start gate accepts untracked sync paths, while it refuses tracked or staged edits to them, every other path, and every sync path in a monorepo. configuration/polyrepo.mdx: add '## The workspace root repository' after '## Dependency installs in polyrepo workspaces' with 1-2 operator paragraphs as in the PRD. Create changelog.d/pan-5199.md with the exact '#### Fixed' bullet from the PRD, including the instruction to run `pan start <issue>` once for issues already stuck in Planned."
+        },
+        "items": [
+          {
+            "id": "docs-and-changelog.ac1",
+            "title": "docs/WORKSPACES-AND-PROJECTS.md no longer contains the phrases 'one-commit wrapper repo' or 'HEAD never moves', and it names healPolyrepoWorkspaceGitignoreAsync and src/lib/workspace-sync-paths.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac2",
+            "title": "configuration/polyrepo.mdx renders a '## The workspace root repository' section that lists .claude/, .mcp.json, .hume-config and .env and says the next pan start repairs an older workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac3",
+            "title": "changelog.d/pan-5199.md exists with a single '#### Fixed' heading whose bullet links issue #5199 and tells operators to run `pan start <issue>` for already-stuck issues, and `npm run lint:docs` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "shared-sync-paths",
+        "to": "wrapper-sync-entries",
+        "type": "blocks"
+      },
+      {
+        "from": "shared-sync-paths",
+        "to": "start-gate-sync-tolerance",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-polyrepo-gitignore",
+        "to": "wrapper-sync-entries",
+        "type": "blocks"
+      },
+      {
+        "from": "wrapper-sync-entries",
+        "to": "heal-helper",
+        "type": "blocks"
+      },
+      {
+        "from": "porcelain-status-entries",
+        "to": "start-gate-sync-tolerance",
+        "type": "blocks"
+      },
+      {
+        "from": "heal-helper",
+        "to": "start-route-heal",
+        "type": "blocks"
+      },
+      {
+        "from": "start-gate-sync-tolerance",
+        "to": "start-route-heal",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-polyrepo-gitignore",
+        "to": "heal-helper",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-13-PAN-5199-polyrepo-workspaces-work-agent-start-refused-as-dirty-because-the-wrapper-repo-doesn-t-ignore-overdeck-s-own-sync-files.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
