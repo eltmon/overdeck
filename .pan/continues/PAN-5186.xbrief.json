@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5186",
   "created": "2026-11-13T16:27:17.519Z",
-  "updated": "2026-11-13T16:45:32.517Z",
+  "updated": "2026-11-13T16:45:50.897Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,9 +50,10 @@
       "doneAt": "2026-11-13T16:45:32.516Z"
     },
     "git-decoration": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5186",
-      "claimedAt": "2026-11-13T16:44:08.489Z"
+      "claimedAt": "2026-11-13T16:44:08.489Z",
+      "doneAt": "2026-11-13T16:45:50.897Z"
     },
     "dir-loader": {
       "status": "in_progress",
@@ -106,6 +107,18 @@
     "tree-model.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T16:45:32.516Z"
+    },
+    "git-decoration.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:45:50.897Z"
+    },
+    "git-decoration.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:45:50.897Z"
+    },
+    "git-decoration.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:45:50.897Z"
     }
   }
 }
