@@ -120,3 +120,23 @@ describe('GET /api/conversations/:name/tool-body/:toolUseId (PAN-4558)', () => {
     expect(JSON.parse(new TextDecoder().decode(payload.body))).toEqual({ error: 'Tool entry not found' });
   });
 });
+
+describe('getConversationToolBodyRead for a Codex conversation (PAN-5211)', () => {
+  const codexName = 'tool-body-codex-conv';
+  const codexFile = join(TEST_HOME, 'rollout-2026-11-13T00-00-00-thread.jsonl');
+  const record = (payload: object) => JSON.stringify({ type: 'response_item', timestamp: '2026-11-13T00:00:00.000Z', payload });
+  writeFileSync(codexFile, [
+    record({ type: 'function_call', name: 'exec_command', arguments: '{"cmd":"cat big.log"}', call_id: 'call_big' }),
+    record({ type: 'function_call_output', call_id: 'call_big', output: 'o'.repeat(100_000) }),
+  ].join('\n') + '\n');
+  createConversation({ name: codexName, tmuxSession: `conv-${codexName}`, cwd: TEST_HOME, title: codexName, model: 'gpt-5.5' });
+
+  it('serves the full 100,000-character output read from the transcript record', async () => {
+    const res = await getConversationToolBodyRead(codexName, 'call_big', { resolveSessionFile: async () => codexFile });
+
+    expect(res.status ?? 200).toBe(200);
+    const { entry } = res.body as { entry: WorkLogEntry };
+    expect(entry.result!.length).toBeGreaterThanOrEqual(100_000);
+    expect(entry.result).not.toContain('characters omitted');
+  });
+});

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 
 import type { ConversationResponse, WorkLogEntry } from '@overdeck/contracts';
 import type { RecordLocation } from '../../services/conversation/types.js';
+import { resolveToolBodyEntry } from '../../services/conversation/codex-transcript-ranges.js';
 import { Effect, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
@@ -301,7 +302,11 @@ export async function buildAgentToolBodyResult(
 ): Promise<{ status: number; body: unknown }> {
   const result = await buildAgentConversationResult(id, opts);
   if (result.status !== 200) return result;
-  const entry: WorkLogEntry | undefined = result.body.workLog.find((candidate) => candidate.id === toolUseId);
+  const entry: WorkLogEntry | undefined = await resolveToolBodyEntry(result.transcriptPath, {
+    workLog: result.body.workLog,
+    toolResultLocations: result.toolResultLocations,
+    historyStartOffset: result.historyStartOffset,
+  }, toolUseId);
   return entry ? { status: 200, body: { entry } } : { status: 404, body: { error: 'Tool entry not found' } };
 }
 

@@ -86,6 +86,7 @@ import { ACP_TRANSCRIPT_FILE } from '../runtimes/storage/acp.js';
 import { isKimiWirePath } from '../runtimes/storage/kimi-code.js';
 import { isBrowsableVaultId, vaultBrowseFilePath } from '../vault/browse.js';
 import { vaultIdFromBrowseName } from './conversation-vault-rows.js';
+import { resolveToolBodyEntry } from '../../dashboard/server/services/conversation/codex-transcript-ranges.js';
 
 export interface ConversationReadResult {
   body: unknown;
@@ -699,8 +700,7 @@ export async function getConversationToolBodyRead(
       if ((parseErr as { code?: string })?.code === 'ENOENT') return notFound;
       throw parseErr;
     }
-    const entry = parsed.workLog.find((candidate) => candidate.id === toolUseId)
-      ?? parsed.pendingToolUse.get(toolUseId);
+    const entry = await resolveToolBodyEntry(target.sessionFile, parsed, toolUseId);
     return entry ? result({ entry }) : notFound;
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
