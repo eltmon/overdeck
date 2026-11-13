@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5188",
   "created": "2026-11-13T17:44:21.691Z",
-  "updated": "2026-11-13T18:21:50.110Z",
+  "updated": "2026-11-13T18:23:22.447Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -190,9 +190,22 @@
       "doneAt": "2026-11-13T18:21:44.973Z"
     },
     "font-viewer": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5188",
-      "claimedAt": "2026-11-13T18:21:50.110Z"
+      "claimedAt": "2026-11-13T18:21:50.110Z",
+      "doneAt": "2026-11-13T18:23:22.447Z"
+    },
+    "font-viewer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:23:22.447Z"
+    },
+    "font-viewer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:23:22.447Z"
+    },
+    "font-viewer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:23:22.447Z"
     }
   }
 }
