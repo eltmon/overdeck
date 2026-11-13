@@ -4,6 +4,20 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ensurePolyrepoWorkspaceGitignore, commitPolyrepoWorkspaceGitignoreAsync } from '../create.js';
 
+const SYNC_ENTRIES = [
+  '.pan/events/',
+  '.pan/review/',
+  '.pan/prompts/',
+  '.pan/test/',
+  '.claude/skills/',
+  '.claude/',
+  '.mcp.json',
+  '.hume-config',
+  '.env',
+];
+
+const MIN_1141_GITIGNORE = ['api/', '.overdeck/', '.devcontainer/', 'dev', ''].join('\n');
+
 const mockExec = vi.hoisted(() => vi.fn());
 
 vi.mock('node:child_process', async (importOriginal) => {
@@ -33,7 +47,7 @@ describe('ensurePolyrepoWorkspaceGitignore', () => {
       { name: 'infra' },
     ]);
 
-    expect(result.added).toEqual(['api/', 'fe/', 'docs/', 'infra/', '.overdeck/', '.devcontainer/', 'dev']);
+    expect(result.added).toEqual(['api/', 'fe/', 'docs/', 'infra/', '.overdeck/', '.devcontainer/', 'dev', ...SYNC_ENTRIES]);
     expect(result.removed).toEqual([]);
     const content = readFileSync(join(workspacePath, '.gitignore'), 'utf-8');
     expect(content).toContain('api/');
@@ -54,7 +68,7 @@ describe('ensurePolyrepoWorkspaceGitignore', () => {
 
     const result = ensurePolyrepoWorkspaceGitignore(workspacePath, [{ name: 'api' }]);
 
-    expect(result.added).toEqual(['.overdeck/', '.devcontainer/', 'dev']);
+    expect(result.added).toEqual(['.overdeck/', '.devcontainer/', 'dev', ...SYNC_ENTRIES]);
     const lines = readFileSync(join(workspacePath, '.gitignore'), 'utf-8').split('\n');
     expect(lines.filter(l => l === '.overdeck/')).toHaveLength(1);
     expect(lines.some(l => l.includes('Overdeck workspace runtime'))).toBe(true);
@@ -64,6 +78,7 @@ describe('ensurePolyrepoWorkspaceGitignore', () => {
     writeFileSync(join(workspacePath, '.gitignore'), [
       'api/',
       '.overdeck',
+      ...SYNC_ENTRIES,
       '',
     ].join('\n'));
 
@@ -87,7 +102,7 @@ describe('ensurePolyrepoWorkspaceGitignore', () => {
       { name: 'docs' },
     ]);
 
-    expect(result.added).toEqual(['fe/', 'docs/', '.devcontainer/', 'dev']);
+    expect(result.added).toEqual(['fe/', 'docs/', '.devcontainer/', 'dev', ...SYNC_ENTRIES]);
     expect(result.removed).toEqual([]);
     const content = readFileSync(join(workspacePath, '.gitignore'), 'utf-8');
     const lines = content.split('\n');
@@ -103,6 +118,7 @@ describe('ensurePolyrepoWorkspaceGitignore', () => {
       '.overdeck/',
       '.devcontainer/',
       'dev',
+      ...SYNC_ENTRIES,
       '',
     ].join('\n'));
 
@@ -121,6 +137,7 @@ describe('ensurePolyrepoWorkspaceGitignore', () => {
       '.overdeck/',
       '.devcontainer/',
       'dev',
+      ...SYNC_ENTRIES,
       '',
     ].join('\n'));
 
@@ -128,6 +145,33 @@ describe('ensurePolyrepoWorkspaceGitignore', () => {
 
     expect(result.added).toEqual([]);
     expect(result.removed).toEqual([]);
+  });
+
+  it('adds the Overdeck sync entries to a MIN-1141-shaped .gitignore once', () => {
+    writeFileSync(join(workspacePath, '.gitignore'), MIN_1141_GITIGNORE);
+
+    const first = ensurePolyrepoWorkspaceGitignore(workspacePath, [{ name: 'api' }]);
+    expect(first.added).toEqual(SYNC_ENTRIES);
+
+    const second = ensurePolyrepoWorkspaceGitignore(workspacePath, [{ name: 'api' }]);
+    expect(second.added).toEqual([]);
+
+    const lines = readFileSync(join(workspacePath, '.gitignore'), 'utf-8').split('\n');
+    for (const entry of SYNC_ENTRIES) {
+      expect(lines.filter(l => l === entry)).toHaveLength(1);
+    }
+  });
+
+  it('does not re-add a sync entry written without its trailing slash', () => {
+    writeFileSync(join(workspacePath, '.gitignore'), [
+      MIN_1141_GITIGNORE.trimEnd(),
+      '.claude',
+      '',
+    ].join('\n'));
+
+    const result = ensurePolyrepoWorkspaceGitignore(workspacePath, [{ name: 'api' }]);
+
+    expect(result.added).not.toContain('.claude/');
   });
 
 });
@@ -223,7 +267,7 @@ describe('generated devcontainer harness entries (MIN-896/MIN-898)', () => {
 
     const result = ensurePolyrepoWorkspaceGitignore(workspacePath, [{ name: 'fe' }, { name: 'api' }]);
 
-    expect(result.added).toEqual(['.devcontainer/', 'dev']);
+    expect(result.added).toEqual(['.devcontainer/', 'dev', ...SYNC_ENTRIES]);
     const lines = readFileSync(join(workspacePath, '.gitignore'), 'utf-8').split('\n');
     expect(lines.filter(l => l === '.devcontainer/')).toHaveLength(1);
     expect(lines.filter(l => l === 'dev')).toHaveLength(1);
@@ -232,7 +276,7 @@ describe('generated devcontainer harness entries (MIN-896/MIN-898)', () => {
   });
 
   it('is idempotent when harness entries already exist', () => {
-    writeFileSync(join(workspacePath, '.gitignore'), ['fe/', '.overdeck/', '.devcontainer/', 'dev', ''].join('\n'));
+    writeFileSync(join(workspacePath, '.gitignore'), ['fe/', '.overdeck/', '.devcontainer/', 'dev', ...SYNC_ENTRIES, ''].join('\n'));
 
     const result = ensurePolyrepoWorkspaceGitignore(workspacePath, [{ name: 'fe' }]);
 

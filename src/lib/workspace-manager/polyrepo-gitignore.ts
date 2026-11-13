@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { OVERDECK_PROJECT_GITIGNORE_ENTRIES, OVERDECK_WORKSPACE_ROOT_SYNC_ENTRIES } from '../workspace-sync-paths.js';
 
 const execAsync = promisify(exec);
 
@@ -55,7 +56,13 @@ export function ensurePolyrepoWorkspaceGitignore(
     runtimeEntries.push('dev');
   }
 
-  if (added.length === 0 && runtimeEntries.length === 0 && removed.length === 0) {
+  // PAN-5199: Overdeck's own sync output in the wrapper root (skills, agents,
+  // settings, .mcp.json, .hume-config, .env). Without these, `?? .claude/…`
+  // refuses every work-agent start. One shared list: ../workspace-sync-paths.ts.
+  const syncEntries = [...OVERDECK_PROJECT_GITIGNORE_ENTRIES, ...OVERDECK_WORKSPACE_ROOT_SYNC_ENTRIES]
+    .filter(entry => !normalizedLines.includes(entry) && !normalizedLines.includes(entry.replace(/\/$/, '')));
+
+  if (added.length === 0 && runtimeEntries.length === 0 && removed.length === 0 && syncEntries.length === 0) {
     return { added, removed };
   }
 
@@ -72,6 +79,11 @@ export function ensurePolyrepoWorkspaceGitignore(
     content += '\n# Overdeck workspace runtime (PAN-2541: disposable issue runtime; devcontainer harness is generated)\n';
     content += runtimeEntries.join('\n') + '\n';
     added.push(...runtimeEntries);
+  }
+  if (syncEntries.length > 0) {
+    content += '\n# Overdeck sync output (PAN-5199: written by Overdeck into the workspace root, never work product)\n';
+    content += syncEntries.join('\n') + '\n';
+    added.push(...syncEntries);
   }
   writeFileSync(gitignorePath, content, 'utf-8');
   return { added, removed };
