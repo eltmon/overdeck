@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5188",
   "created": "2026-11-13T17:44:21.691Z",
-  "updated": "2026-11-13T18:36:40.396Z",
+  "updated": "2026-11-13T18:36:45.897Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -304,6 +304,11 @@
     "archive-sqlite-viewer.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T18:36:40.396Z"
+    },
+    "viewer-router-host": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:36:45.897Z"
     }
   }
 }
