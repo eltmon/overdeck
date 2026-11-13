@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5186",
   "created": "2026-11-13T16:27:17.519Z",
-  "updated": "2026-11-13T17:36:46.394Z",
+  "updated": "2026-11-13T17:48:57.466Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-13T17:48Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-13T17:48:57.466Z"
+    }
+  ],
   "items": {
     "pane-model": {
       "status": "completed",
@@ -373,5 +379,14 @@
       "status": "completed",
       "doneAt": "2026-11-13T17:36:46.394Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-13T17:48:57Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5186 (PR #5196)\n\nCodeRabbit posted 8 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4566713145 · src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx:257 [Minor]: Share the directory request limit with the normal loader.\n  https://github.com/eltmon/overdeck/pull/5196#discussion_r4566713145\n- Thread 4566713153 · src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx:258 [Minor]: Cancel Expand all writes when the pane unmounts.\n  https://github.com/eltmon/overdeck/pull/5196#discussion_r4566713153\n- Thread 4566713164 · src/dashboard/frontend/src/components/explorer/git/git-decoration.ts:104 [Major]: Partially staged files cannot be staged from the explorer menu.\n  https://github.com/eltmon/overdeck/pull/5196#discussion_r4566713164\n- Thread 4566713174 · src/dashboard/frontend/src/components/explorer/menu/ExplorerContextMenu.tsx:133 [Minor]: Hide or disable Download until the endpoint exists.\n  https://github.com/eltmon/overdeck/pull/5196#discussion_r4566713174\n- Thread 4566713186 · src/dashboard/frontend/src/components/explorer/search/QuickOpen.tsx:51 [Minor]: Clear or disable results when the query changes.\n  https://github.com/eltmon/overdeck/pull/5196#discussion_r4566713186\n- Thread 4566713192 · src/dashboard/frontend/src/components/explorer/tree/ExplorerTree.tsx:175 [Minor]: Keep the active descendant mounted.\n  https://github.com/eltmon/overdeck/pull/5196#discussion_r4566713192\n- Thread 4566713200 · src/dashboard/frontend/src/components/explorer/watch/explorer-watch-hub.ts:41 [Minor]: Remove the provisional channel when stream creation throws.\n  https://github.com/eltmon/overdeck/pull/5196#discussion_r4566713200\n- Thread 4566713208 · src/dashboard/frontend/src/components/Stage/index.tsx:118 [Major]: Explorer-opened files do not appear when the layout is split.\n  https://github.com/eltmon/overdeck/pull/5196#discussion_r4566713208\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5196/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5186`.\n   If you only replied, you are done.\n5. If PR #5196 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
 }
