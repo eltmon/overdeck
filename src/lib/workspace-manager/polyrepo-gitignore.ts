@@ -121,8 +121,9 @@ export async function commitPolyrepoWorkspaceGitignoreAsync(workspacePath: strin
       },
     );
     return 'Committed polyrepo workspace .gitignore';
-  } catch (err: any) {
-    return `Warning: could not commit workspace .gitignore: ${err.message}`;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return `Warning: could not commit workspace .gitignore: ${message}`;
   }
 }
 
@@ -169,15 +170,15 @@ export async function healPolyrepoWorkspaceGitignoreAsync(
       }
       await execAsync('git restore --source=HEAD --staged --worktree -- .gitignore', { cwd: workspacePath });
       return { added, committed: false, warning: commitMessage ?? 'wrapper .gitignore commit did not land' };
-    } catch (err: any) {
+    } catch (err) {
       try {
         await execAsync('git restore --source=HEAD --staged --worktree -- .gitignore', { cwd: workspacePath });
       } catch {
         // Best effort; fall through to report the original error.
       }
-      return { added: [], committed: false, warning: err.message };
+      return { added: [], committed: false, warning: err instanceof Error ? err.message : String(err) };
     }
-  } catch (err: any) {
-    return { added: [], committed: false, warning: err.message };
+  } catch (err) {
+    return { added: [], committed: false, warning: err instanceof Error ? err.message : String(err) };
   }
 }
