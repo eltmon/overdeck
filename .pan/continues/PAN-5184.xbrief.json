@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5184",
   "created": "2026-11-13T13:50:17.317Z",
-  "updated": "2026-11-13T13:55:14.771Z",
+  "updated": "2026-11-13T14:00:17.406Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,9 +50,22 @@
       "doneAt": "2026-11-13T13:55:07.040Z"
     },
     "store-held-order": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5184",
-      "claimedAt": "2026-11-13T13:55:14.771Z"
+      "claimedAt": "2026-11-13T13:55:14.771Z",
+      "doneAt": "2026-11-13T14:00:17.406Z"
+    },
+    "store-held-order.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T14:00:17.406Z"
+    },
+    "store-held-order.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T14:00:17.406Z"
+    },
+    "store-held-order.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T14:00:17.406Z"
     }
   }
 }
