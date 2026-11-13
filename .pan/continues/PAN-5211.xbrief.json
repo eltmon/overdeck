@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5211",
   "created": "2026-11-13T22:53:14.172Z",
-  "updated": "2026-11-13T23:24:24.160Z",
+  "updated": "2026-11-13T23:24:33.041Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -254,6 +254,11 @@
     "wi13-expand-by-offset.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T23:24:24.160Z"
+    },
+    "wi15-window-bounded-flag": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5211",
+      "claimedAt": "2026-11-13T23:24:33.041Z"
     }
   }
 }
