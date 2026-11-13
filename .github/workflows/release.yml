@@ -73,7 +73,9 @@ jobs:
           fi
           echo "Release guard passed: $tag matches all three package.json files and $notes_path is committed."
 
-  npm:
+  # PAN-5176: build, test and pack @overdeck/core once. The tarball this job
+  # uploads is exactly what bare-host-macos smokes and what npm publishes.
+  pack:
     needs: classify
     runs-on: ubuntu-latest
     steps:
@@ -95,17 +97,6 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-
-      # npm >= 11.5.1 is required for OIDC trusted publishing. Node 22 LTS
-      # ships npm 10.x. We can't `npm install -g npm@latest` in place — the
-      # in-place upgrade corrupts npm's own dependency tree partway through
-      # ("Cannot find module 'promise-retry'"). Install to a separate prefix
-      # and prepend to PATH instead.
-      - name: Install npm 11 for OIDC trusted publishing
-        run: |
-          npm install --location=global --prefix="$RUNNER_TEMP/npm-bin" npm@11
-          echo "$RUNNER_TEMP/npm-bin/bin" >> "$GITHUB_PATH"
-          "$RUNNER_TEMP/npm-bin/bin/npm" --version
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -132,9 +123,9 @@ jobs:
 
       # PAN-1609: gate the release on the full test suite. release.yml is a
       # separate workflow from ci.yml (it fires on tag push, not PR), so without
-      # this a `v*` tag could publish a red vitest suite to npm. This runs in the
-      # same job as `npm publish` below, so a test failure aborts BEFORE publish
-      # (and blocks the GitHub Release job, which `needs: npm`). chromium is
+      # this a `v*` tag could publish a red vitest suite to npm. A test failure
+      # fails this job, and `npm` needs it, so nothing is published (and the
+      # GitHub Release job, which `needs: npm`, is blocked). chromium is
       # required by the Playwright-backed UAT tests in the suite; SKIP_DOCS_INDEX
       # matches ci.yml (the docs index is a publish-time artifact, irrelevant to
       # verifying code).
@@ -151,23 +142,119 @@ jobs:
           node dist/cli/index.js --version
           node dist/cli/index.js --help
 
+      # PAN-5176: pack AFTER the sourcemaps step (it injects chunk ids into dist and
+      # removes .map files) and after the test gate; this tarball is what npm gets.
+      - name: Pack @overdeck/core
+        run: |
+          mkdir -p "$RUNNER_TEMP/release"
+          npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/release"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-core-tarball
+          path: ${{ runner.temp }}/release/*.tgz
+          if-no-files-found: error
+
+  # PAN-5176: the release gate. Install the exact tarball npm will get on a
+  # bare macOS host (no docker, tmux, systemctl, journalctl or brew on PATH)
+  # and fail on the PAN-5168/5169/5170 bug classes. `npm` needs this job, so
+  # a failed smoke publishes nothing and creates no GitHub Release.
+  bare-host-macos:
+    needs: pack
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Download the release tarball
+        uses: actions/download-artifact@v4
+        with:
+          name: release-core-tarball
+          path: ${{ runner.temp }}/release
+
+      - name: Bare-host smoke (macOS /bin/bash 3.2)
+        run: /bin/bash scripts/bare-host-smoke.sh --tarball "$(ls "$RUNNER_TEMP"/release/*.tgz)" --work-dir "$RUNNER_TEMP/bare-host"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bare-host-macos-release-logs
+          path: |
+            ${{ runner.temp }}/bare-host/result.json
+            ${{ runner.temp }}/bare-host/*.log
+          if-no-files-found: warn
+
+  npm:
+    needs: [classify, pack, bare-host-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          # Deliberately NO `registry-url`. setup-node's registry-url writes a
+          # dummy `//registry.npmjs.org/:_authToken=XXXXX...` into .npmrc, which
+          # makes `npm publish` attempt (failing) token auth instead of OIDC
+          # Trusted Publishing — the cause of the v0.30.0/v0.30.1 publish 404s.
+          # With npm 11.5.1+ and `id-token: write`, `npm publish` uses OIDC
+          # automatically when no token is configured (requires a Trusted
+          # Publisher on each @overdeck/* package on npmjs.com).
+
+      # npm >= 11.5.1 is required for OIDC trusted publishing. Node 22 LTS
+      # ships npm 10.x. We can't `npm install -g npm@latest` in place — the
+      # in-place upgrade corrupts npm's own dependency tree partway through
+      # ("Cannot find module 'promise-retry'"). Install to a separate prefix
+      # and prepend to PATH instead.
+      - name: Install npm 11 for OIDC trusted publishing
+        run: |
+          npm install --location=global --prefix="$RUNNER_TEMP/npm-bin" npm@11
+          echo "$RUNNER_TEMP/npm-bin/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/npm-bin/bin/npm" --version
+
+      - name: Download the release tarball
+        uses: actions/download-artifact@v4
+        with:
+          name: release-core-tarball
+          path: ${{ runner.temp }}/release
+
       # Trusted Publishing: no NODE_AUTH_TOKEN. npm authenticates to npmjs.org
       # using the GitHub OIDC token granted by `id-token: write` above. The
       # trusted-publisher config on each @overdeck/* package on npmjs.com pins
       # this repo + workflow filename as the only allowed publisher.
+      # PAN-5176: publish the tarball the pack job built, tested and smoked, not a
+      # fresh pack of this checkout.
       - name: Publish CLI to npm
         run: |
-          PKG_NAME=$(node -p "require('./package.json').name")
-          PKG_VERSION=$(node -p "require('./package.json').version")
+          TGZ=$(ls "$RUNNER_TEMP"/release/*.tgz)
+          read -r PKG_NAME PKG_VERSION <<EOF
+          $(tar -xOzf "$TGZ" package/package.json | node -e 'const p=JSON.parse(require("fs").readFileSync(0));console.log(p.name+" "+p.version)')
+          EOF
           if npm view "${PKG_NAME}@${PKG_VERSION}" version >/dev/null 2>&1; then
             echo "${PKG_NAME}@${PKG_VERSION} already on npm — skipping (retry-safe)."
             exit 0
           fi
           if [ "${{ needs.classify.outputs.npm_tag }}" = "latest" ]; then
-            npm publish --ignore-scripts --provenance --access public
+            npm publish "$TGZ" --ignore-scripts --provenance --access public
           else
-            npm publish --ignore-scripts --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
+            npm publish "$TGZ" --ignore-scripts --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
           fi
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build
 
       - name: Build contracts
         run: cd packages/contracts && npm run build
