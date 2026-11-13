@@ -8,6 +8,7 @@ import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@t
 import { ComposerFooter } from '../ComposerFooter';
 import { useComposerDeliveryState } from '../useComposerDeliveryState';
 import { resetComposerStore, useComposerStore } from '../../../lib/composerStore';
+import { enqueueConversationSend } from '../../../lib/composerSendQueue';
 import { useConnectionState } from '../../../lib/connectionState';
 
 const { editorState, mockToastError } = vi.hoisted(() => ({
@@ -203,5 +204,123 @@ describe('held composer messages (PAN-4279)', () => {
 
     expect(messagePosts(fetchMock)).toHaveLength(0);
     expect(heldEntries()).toHaveLength(1);
+  });
+
+  it('holdBehindHeld holds a message queued behind a held one', () => {
+    const { addOptimistic, hold, holdBehindHeld } = useComposerStore.getState();
+    addOptimistic(conversation.name, 'first', 0, { clientMessageId: 'client-a' });
+    hold(conversation.name, 'client-a');
+    addOptimistic(conversation.name, 'second', 0, { clientMessageId: 'client-b' });
+
+    expect(holdBehindHeld(conversation.name, 'client-b')).toBe(true);
+
+    const bubbleB = useComposerStore.getState().byConversation[conversation.name]?.optimistic
+      .find((message) => message.clientMessageId === 'client-b');
+    expect(bubbleB?.deliveryState).toBe('held');
+  });
+
+  it('holdBehindHeld leaves a message alone when nothing is held', () => {
+    const { addOptimistic, holdBehindHeld } = useComposerStore.getState();
+    addOptimistic(conversation.name, 'second', 0, { clientMessageId: 'client-b' });
+
+    expect(holdBehindHeld(conversation.name, 'client-b')).toBe(false);
+
+    const bubbleB = useComposerStore.getState().byConversation[conversation.name]?.optimistic
+      .find((message) => message.clientMessageId === 'client-b');
+    expect(bubbleB?.deliveryState).toBe('pending');
+  });
+
+  it('releaseHeld waits for an in-flight queued send', async () => {
+    const { addOptimistic, hold, releaseHeld } = useComposerStore.getState();
+    addOptimistic(conversation.name, 'held ping', 0, { clientMessageId: 'client-a' });
+    hold(conversation.name, 'client-a');
+
+    let resolveTask: () => void = () => {};
+    const blocker = enqueueConversationSend(conversation.name, () => new Promise<void>((resolve) => {
+      resolveTask = resolve;
+    }));
+
+    const releasePromise = releaseHeld(conversation.name);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(messagePosts(fetchMock)).toHaveLength(0);
+
+    resolveTask();
+    await blocker;
+    await releasePromise;
+
+    expect(messagePosts(fetchMock)).toHaveLength(1);
+  });
+
+  it('retryFailed waits for an in-flight queued send', async () => {
+    const { holdSend, retryFailed } = useComposerStore.getState();
+    holdSend(conversation.name, 'queued retry', { clientMessageId: 'client-retry' });
+    const [failed] = heldEntries();
+
+    let resolveTask: () => void = () => {};
+    const blocker = enqueueConversationSend(conversation.name, () => new Promise<void>((resolve) => {
+      resolveTask = resolve;
+    }));
+
+    const retryPromise = retryFailed(conversation.name, failed!.id, 'queued retry', 0);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(messagePosts(fetchMock)).toHaveLength(0);
+
+    resolveTask();
+    await blocker;
+    await retryPromise;
+
+    expect(messagePosts(fetchMock)).toHaveLength(1);
+  });
+
+  it('markSendStarted resets the clock and returns an unknown bubble to pending', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-09-27T23:00:00.000Z'));
+      const { addOptimistic, markDeliveryUnknown, markSendStarted } = useComposerStore.getState();
+      addOptimistic(conversation.name, 'hi', 0, { clientMessageId: 'client-a' });
+      const bubbleId = useComposerStore.getState().byConversation[conversation.name]!.optimistic[0]!.id;
+      markDeliveryUnknown(conversation.name, bubbleId);
+
+      vi.setSystemTime(new Date('2026-09-27T23:05:00.000Z'));
+      markSendStarted(conversation.name, 'client-a');
+
+      const bubble = useComposerStore.getState().byConversation[conversation.name]!.optimistic[0]!;
+      expect(bubble.createdAt).toBe('2026-09-27T23:05:00.000Z');
+      expect(bubble.deliveryState).toBe('pending');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('markSendStarted leaves the slice unchanged for an unknown clientMessageId', () => {
+    const { addOptimistic, markSendStarted } = useComposerStore.getState();
+    addOptimistic(conversation.name, 'hi', 0, { clientMessageId: 'client-a' });
+    const before = useComposerStore.getState().byConversation[conversation.name];
+
+    markSendStarted(conversation.name, 'client-missing');
+
+    expect(useComposerStore.getState().byConversation[conversation.name]).toEqual(before);
+  });
+
+  it('retries a deliveryUnknown:false failure under a fresh clientMessageId', async () => {
+    const { addOptimistic, failSend, retryFailed } = useComposerStore.getState();
+    addOptimistic(conversation.name, 'hi', 0, { clientMessageId: 'c-old' });
+    failSend(conversation.name, 'hi', 'prompt', {
+      clientMessageId: 'c-old',
+      deliveryUnknown: false,
+      retryable: true,
+      code: 'input-target-not-main',
+    });
+    const [failed] = useComposerStore.getState().byConversation[conversation.name]?.failed ?? [];
+
+    await retryFailed(conversation.name, failed!.id, 'hi', 0);
+
+    const posts = messagePosts(fetchMock);
+    expect(posts).toHaveLength(1);
+    const body = JSON.parse(String((posts[0]![1] as RequestInit).body));
+    expect(body.clientMessageId).not.toBe('c-old');
+    expect(body).not.toHaveProperty('retry');
   });
 });

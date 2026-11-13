@@ -133,6 +133,7 @@ src/components/chat/__tests__/ChatMarkdown.pull-request-links.test.tsx
 src/components/chat/__tests__/ComposerFooter.citations.test.tsx
 src/components/chat/__tests__/ComposerFooter.native.test.tsx
 src/components/chat/__tests__/ComposerFooter.schedule.test.tsx
+src/components/chat/__tests__/ComposerFooter.send-queue.test.tsx
 src/components/chat/__tests__/ComposerFooter.streaming-render-count.test.tsx
 src/components/chat/__tests__/ConversationAboutDrawer.test.tsx
 src/components/chat/__tests__/ConversationMachineBanner.test.tsx
@@ -154,6 +155,7 @@ src/components/chat/__tests__/composerHeldMessages.test.tsx
 src/components/chat/__tests__/conversationHistory.test.ts
 src/components/chat/__tests__/conversationMachineState.test.ts
 src/components/chat/__tests__/heldKickoff.test.tsx
+src/components/chat/__tests__/queuedPromptSend.test.ts
 src/components/chat/__tests__/resetClippedScroll.test.ts
 src/components/chat/__tests__/scheduledMessages.test.ts
 src/components/chat/__tests__/useFloatingPickerPosition.test.tsx
@@ -246,6 +248,8 @@ src/lib/__tests__/bootRequests.test.ts
 src/lib/__tests__/citationFormat.test.ts
 src/lib/__tests__/colorThemeEditor.test.ts
 src/lib/__tests__/composerCitations.test.ts
+src/lib/__tests__/composerDraft.test.ts
+src/lib/__tests__/composerSendQueue.test.ts
 src/lib/__tests__/connectionState.test.ts
 src/lib/__tests__/flywheelNeedsYou.test.ts
 src/lib/__tests__/issueActions.menu-by-state.test.ts
