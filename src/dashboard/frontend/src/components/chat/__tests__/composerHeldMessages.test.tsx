@@ -273,4 +273,24 @@ describe('held composer messages (PAN-4279)', () => {
 
     expect(messagePosts(fetchMock)).toHaveLength(1);
   });
+
+  it('retries a deliveryUnknown:false failure under a fresh clientMessageId', async () => {
+    const { addOptimistic, failSend, retryFailed } = useComposerStore.getState();
+    addOptimistic(conversation.name, 'hi', 0, { clientMessageId: 'c-old' });
+    failSend(conversation.name, 'hi', 'prompt', {
+      clientMessageId: 'c-old',
+      deliveryUnknown: false,
+      retryable: true,
+      code: 'input-target-not-main',
+    });
+    const [failed] = useComposerStore.getState().byConversation[conversation.name]?.failed ?? [];
+
+    await retryFailed(conversation.name, failed!.id, 'hi', 0);
+
+    const posts = messagePosts(fetchMock);
+    expect(posts).toHaveLength(1);
+    const body = JSON.parse(String((posts[0]![1] as RequestInit).body));
+    expect(body.clientMessageId).not.toBe('c-old');
+    expect(body).not.toHaveProperty('retry');
+  });
 });

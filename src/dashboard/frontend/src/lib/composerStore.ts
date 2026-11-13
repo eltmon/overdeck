@@ -670,7 +670,10 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     // 4-minute stall timer on the new optimistic bubble. A 'not-delivered'
     // failure needs one too: the server cached that 502 under the old
     // clientMessageId, so a retry with it would replay the failure (PAN-4278).
-    const isFreshIdentity = failed.notFoundInTranscript === true || failed.code === 'not-delivered';
+    // PAN-5184: a response with deliveryUnknown: false proved nothing was pasted, and the
+    // receipts cache would replay it under the old id, so the retry is a fresh send.
+    const isFreshIdentity = failed.notFoundInTranscript === true || failed.code === 'not-delivered'
+      || failed.deliveryUnknown === false;
     // A held message was never POSTed (PAN-4279): its first send keeps its
     // clientMessageId but is not a retry, and its bubble starts its clock now.
     const neverSent = failed.heldOffline === true;
