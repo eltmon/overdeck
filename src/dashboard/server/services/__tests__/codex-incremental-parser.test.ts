@@ -315,4 +315,32 @@ describe('incremental Codex history', () => {
     expect(result.workLog.map(w => [w.id, w.sequence])).toEqual([['codex-tool-2', 2]]);
     expect(result.lastSequence).toBe(3);
   });
+
+  it('stores an oversized output for a known call as an omitted body with its location', async () => {
+    const call = line('response_item', { type: 'function_call', name: 'exec_command', arguments: '{"cmd":"cat big"}', call_id: 'c-big' });
+    const output = line('response_item', { type: 'function_call_output', call_id: 'c-big', output: 'b'.repeat(10_000) });
+    await writeFile(file, call + output);
+    const result = await createIncrementalTranscriptReader(createCodexConversationAccumulator, { recordParseMaxBytes: 2048 })(file);
+
+    const entry = result.workLog.find((w) => w.id === 'c-big');
+    expect(entry).toMatchObject({ bodyOmitted: true, resultBytes: Buffer.byteLength(output) - 1 });
+    expect(entry).not.toHaveProperty('result');
+    expect(result.toolResultLocations?.get('c-big')).toEqual({ offset: Buffer.byteLength(call), length: Buffer.byteLength(output) - 1 });
+  });
+
+  it('adds a skipped row for an oversized record it cannot attach', async () => {
+    const small = message('before');
+    const big = line('response_item', { type: 'something_new', blob: 'k'.repeat(10_000) });
+    await writeFile(file, small + big);
+    const result = await createIncrementalTranscriptReader(createCodexConversationAccumulator, { recordParseMaxBytes: 2048 })(file);
+
+    const offset = Buffer.byteLength(small);
+    expect(result.workLog).toEqual([{
+      id: `codex-skipped-${offset}`,
+      createdAt: '2026-09-09T00:00:00Z',
+      label: 'Skipped a 0.0 MB transcript record',
+      tone: 'info',
+      sequence: offset,
+    }]);
+  });
 });

@@ -115,6 +115,10 @@ function extractCommand(name: string, args: string): string | undefined {
   return undefined;
 }
 
+const OVERSIZED_OUTPUT_TYPE_RE = /"type":"(function_call_output|custom_tool_call_output)"/;
+const OVERSIZED_CALL_ID_RE = /"call_id":"([^"]+)"/;
+const OVERSIZED_TIMESTAMP_RE = /"timestamp":"([^"]+)"/;
+
 export interface CodexAccumulatorOptions {
   /** PAN-5211: byte offset of the first record this accumulator receives (a tail read starts above 0). */
   readonly historyStartOffset?: number;
@@ -350,7 +354,34 @@ export function createCodexConversationAccumulator(sessionFile: string, options:
       toolResultLocations: new Map(resultLocations),
     };
   };
-  return { push, result, retainedChars: (): number => retained };
+  // PAN-5211 D3: a record over the parse limit is never decoded whole; `head` is its first bytes.
+  const pushOversized = (head: string, location: RecordLocation): void => {
+    located = true;
+    const outputType = OVERSIZED_OUTPUT_TYPE_RE.exec(head);
+    const callId = OVERSIZED_CALL_ID_RE.exec(head)?.[1] ?? '';
+    const absolute = outputType && callId ? toolCallsByCallId.get(callId) : undefined;
+    const position = absolute === undefined ? -1 : absolute - droppedWorkLogRows;
+    const wl = position >= 0 ? workLog[position] : undefined;
+    if (wl) {
+      // The full read on expand serves this body (withFullToolResult).
+      const { result: _result, ...call } = wl;
+      replaceWork(position, { ...call, bodyOmitted: true, resultBytes: location.length });
+      resultLocations.set(callId, location);
+      toolCallsByCallId.delete(callId);
+    } else {
+      const previous = workLog[workLog.length - 1]?.createdAt ?? messages[messages.length - 1]?.createdAt;
+      addWork({
+        id: `codex-skipped-${location.offset}`,
+        createdAt: OVERSIZED_TIMESTAMP_RE.exec(head)?.[1] ?? previous ?? new Date().toISOString(),
+        label: `Skipped a ${(location.length / (1024 * 1024)).toFixed(1)} MB transcript record`,
+        tone: 'info',
+        sequence: nextRowSequence(location),
+      });
+    }
+    if (retained > maxRetainedChars) dropOldest();
+  };
+
+  return { push, pushOversized, result, retainedChars: (): number => retained };
 }
 
 export const parseCodexConversationMessages = createIncrementalTranscriptReader(createCodexConversationAccumulator);
