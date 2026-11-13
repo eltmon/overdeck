@@ -161,8 +161,8 @@ export const PI_BEHAVIOR: HarnessBehavior = {
   executableName: "pi",
   // pi sets process.title = "pi" (dist/bundle/cli.js).
   processNames: ["pi"],
-  // pi accepts off|minimal|low|medium|high|xhigh|max, so every Overdeck effort level maps 1:1.
-  effortLevels: undefined,
+  // effortLevels: inherited low..xhigh. pi 0.85 parses `max`, but the Pi rows
+  // stop at xhigh by decision (PAN-4260, configuration/harnesses.mdx).
 }
 
 export const CODEX_BEHAVIOR: HarnessBehavior = {
