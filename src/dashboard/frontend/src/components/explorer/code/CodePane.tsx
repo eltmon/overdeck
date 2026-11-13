@@ -10,7 +10,7 @@
  * state, so unsaved edits survive the pane unmounting.
  */
 import type { ExplorerReadFileResult } from '@overdeck/contracts'
-import { useCallback, useEffect, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { usePanesStore } from '../../../lib/panesStore'
 import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
 import styles from '../../Stage/stage.module.css'
@@ -18,7 +18,8 @@ import type { PaneWrapperProps } from '../../Stage/types'
 import { explorerErrorCode, explorerErrorMessage, readFile } from '../explorer-rpc'
 import { codePaneLabel } from '../openCodePane'
 import { draftKey, useCodeDrafts } from './code-drafts'
-import { MonacoCodeEditor, type CodeEditorInstance } from './MonacoCodeEditor'
+import { MonacoCodeEditor, type CodeEditorInstance, type CodePosition } from './MonacoCodeEditor'
+import { ChangesView } from './ChangesView'
 import { CodePaneHeader, isMarkdownPath, type CodePaneView } from './CodePaneHeader'
 import { NonTextFallback } from './NonTextFallback'
 import { useCodePaneSave } from './useCodePaneSave'
@@ -64,6 +65,10 @@ function CodePaneForFile({
   const [wordWrap, setWordWrap] = useState<'on' | 'off'>('on')
   const [view, setView] = useState<CodePaneView>('edit')
   const showPreview = view === 'preview' && isMarkdownPath(path)
+  const [changes, setChanges] = useState(false)
+  // The cursor carried between the plain editor and the diff's modified side.
+  const diffEditor = useRef<CodeEditorInstance | null>(null)
+  const carriedPosition = useRef<CodePosition | null>(null)
   const [editor, setEditor] = useState<CodeEditorInstance | null>(null)
   const text = useCodeDrafts((s) => s.drafts[key]?.text)
 
@@ -86,21 +91,44 @@ function CodePaneForFile({
     }
   }, [rootId, path, key])
 
-  // Reveal the line content search asked for (D-C23), on mount and on each new nonce.
+  // Reveal the line content search asked for (D-C23): once on mount and once
+  // per new nonce, not again when the editor remounts after the diff closes.
   const revealLine = pane.explorerRevealLine
   const revealColumn = pane.explorerRevealColumn
   const revealNonce = pane.explorerRevealNonce
+  const revealedNonce = useRef<number | undefined | null>(null)
   useEffect(() => {
-    if (!editor || revealLine === undefined) return
+    if (!editor || revealLine === undefined || revealedNonce.current === revealNonce) return
+    revealedNonce.current = revealNonce
     editor.setPosition({ lineNumber: revealLine, column: revealColumn ?? 1 })
     editor.revealLineInCenter(revealLine)
     editor.focus()
   }, [editor, revealLine, revealColumn, revealNonce])
 
+  // Back from the diff: put the cursor where it was on the modified side.
+  useEffect(() => {
+    const position = carriedPosition.current
+    if (!editor || changes || !position) return
+    carriedPosition.current = null
+    editor.setPosition(position)
+    editor.revealPositionInCenter(position)
+    editor.focus()
+  }, [editor, changes])
+
   const writable = load.status === 'ready' && load.result.kind === 'text' && load.result.writable
   const preview = pane.explorerPreview === true
   const save = useCodePaneSave({ rootId, path, workspaceId, paneId: pane.paneId, writable, preview })
   const toggleWrap = useCallback(() => setWordWrap((w) => (w === 'on' ? 'off' : 'on')), [])
+  const toggleChanges = useCallback(() => {
+    carriedPosition.current = (changes ? diffEditor.current : editor)?.getPosition() ?? null
+    if (changes) diffEditor.current = null
+    else setEditor(null)
+    setView('edit')
+    setChanges(!changes)
+  }, [changes, editor])
+  const onDiffMount = useCallback((instance: CodeEditorInstance) => {
+    diffEditor.current = instance
+  }, [])
   const keepOpen = useCallback(
     () => usePanesStore.getState().updatePane(workspaceId, pane.paneId, { explorerPreview: false }),
     [workspaceId, pane.paneId],
@@ -131,6 +159,8 @@ function CodePaneForFile({
         onView={setView}
         wordWrap={wordWrap}
         onToggleWrap={toggleWrap}
+        changes={changes}
+        onToggleChanges={toggleChanges}
         preview={preview}
         onKeepOpen={keepOpen}
       />
@@ -144,7 +174,22 @@ function CodePaneForFile({
           {READ_ONLY_NOTE}
         </div>
       ) : null}
-      {showPreview ? (
+      {changes ? (
+        <div className="min-h-0 flex-1" data-testid="code-pane-changes">
+          <ChangesView
+            rootId={rootId}
+            path={path}
+            modified={text ?? result.text ?? ''}
+            wordWrap={wordWrap}
+            readOnly={!result.writable}
+            initialPosition={carriedPosition.current}
+            onChange={save.onChange}
+            onBlur={save.onBlur}
+            onSaveShortcut={save.saveNow}
+            onMount={onDiffMount}
+          />
+        </div>
+      ) : showPreview ? (
         <div className="min-h-0 flex-1 overflow-auto" data-testid="code-pane-markdown">
           <MarkdownTab body={text ?? result.text ?? ''} />
         </div>

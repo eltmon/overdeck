@@ -18,6 +18,12 @@ import { monacoLanguageForPath } from './monaco-language'
 ensureMonaco()
 
 export type CodeEditorInstance = monaco.editor.IStandaloneCodeEditor
+export type CodePosition = monaco.IPosition
+
+/** The Monaco language id for a path, from Monaco's registered languages (D-C15). */
+export function codeLanguageForPath(path: string): string {
+  return monacoLanguageForPath(path, monaco.languages.getLanguages())
+}
 
 /** The model URI of a file, unique per (root, path), so two roots never share a model. */
 export function codeModelUri(rootId: string, path: string): string {
@@ -40,7 +46,7 @@ export interface MonacoCodeEditorProps {
 export function MonacoCodeEditor(props: MonacoCodeEditorProps) {
   const { rootId, path, value, wordWrap, readOnly } = props
   const theme = useTheme((s) => s.resolvedTheme)
-  const language = useMemo(() => monacoLanguageForPath(path, monaco.languages.getLanguages()), [path])
+  const language = useMemo(() => codeLanguageForPath(path), [path])
 
   // The editor's actions are registered once, so they call through a ref to
   // reach the latest callbacks.
