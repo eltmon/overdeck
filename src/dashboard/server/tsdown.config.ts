@@ -80,6 +80,35 @@ function deaconEntryChunkAssertion() {
   };
 }
 
+// PAN-5183 D-5 / NFR-A2: @parcel/watcher froze the dashboard when it shared a
+// process with child-process spawning (SIGCHLD, PAN-4193). The explorer runs
+// it only in the forked explorer-watch-child.js; this fails the build if any
+// other chunk imports it, or if the child entry is missing.
+const WATCH_CHILD_CHUNK = 'explorer-watch-child.js';
+
+function parcelWatcherIsolationAssertion() {
+  return {
+    name: 'parcel-watcher-isolation-assertion',
+    writeBundle(
+      _outputOptions: unknown,
+      bundle: Record<string, { type: string; fileName: string; imports?: string[]; dynamicImports?: string[] }>,
+    ) {
+      const chunks = Object.values(bundle).filter((output) => output.type === 'chunk');
+      if (!chunks.some((chunk) => chunk.fileName === WATCH_CHILD_CHUNK)) {
+        throw new Error(`Expected the explorer watcher entry to produce ${WATCH_CHILD_CHUNK}; found none.`);
+      }
+      for (const chunk of chunks) {
+        const imported = [...(chunk.imports ?? []), ...(chunk.dynamicImports ?? [])].includes('@parcel/watcher');
+        if (imported && chunk.fileName !== WATCH_CHILD_CHUNK) {
+          throw new Error(
+            `Only ${WATCH_CHILD_CHUNK} may import @parcel/watcher (PAN-5183 D-5); found it in ${chunk.fileName}`,
+          );
+        }
+      }
+    },
+  };
+}
+
 export default defineConfig(async () => {
   const repoRoot = resolve(import.meta.dirname, '../../..');
   const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
@@ -105,6 +134,8 @@ export default defineConfig(async () => {
       server: 'main.ts',
       deacon: 'deacon-main.ts',
       'dashboard-db-worker': 'services/dashboard-db-worker.ts',
+      // PAN-5185: the explorer's @parcel/watcher runs only in this forked child (D-5).
+      'explorer-watch-child': 'services/explorer/watch-child.ts',
       'checkpoint-worker': '../../lib/memory/checkpoint-worker.ts',
       'memory-fts-worker': '../../lib/memory/fts-worker.ts',
     },
@@ -139,6 +170,7 @@ export default defineConfig(async () => {
       cliEntrypointExclusionAssertion(),
       configYamlSingleChunkAssertion(),
       deaconEntryChunkAssertion(),
+      parcelWatcherIsolationAssertion(),
     ],
     deps: {
       alwaysBundle: [/^@overdeck\//, 'es-module-lexer'],

@@ -26,6 +26,7 @@
 import type { ComposerCommandResult } from '@overdeck/contracts';
 import { MessageSendError, sendConversationMessage, sendFailureDetails, type SendFailureDetails } from './composerSend';
 import { reconcileComposerEchoes, type SendIdentity } from './composerEchoes';
+import { enqueueConversationSend, resetConversationSendQueues } from './composerSendQueue';
 import { create } from 'zustand';
 import type { ChatMessage, FailedMessage, SubagentSummary } from '../components/chat/chat-types';
 import {
@@ -237,6 +238,11 @@ interface ComposerStore {
   acknowledgeOptimistic(conversationName: string, text: string, clientMessageId?: string): void;
   reconcileEchoes(conversationName: string, messages: ChatMessage[], subagents?: SubagentSummary[]): void;
   markDeliveryUnknown(conversationName: string, id: string): void;
+  /**
+   * PAN-5184: reset a bubble's send clock when its POST actually starts, so time
+   * spent waiting in the send queue never counts toward TURN_STALL_MS.
+   */
+  markSendStarted(conversationName: string, clientMessageId: string): void;
   /** An accepted bubble stayed unmatched too long while not streaming: move it
    * to the outbox as a 'Not found in transcript' entry (PAN-4247). */
   markNotFoundInTranscript(conversationName: string, id: string): void;
@@ -247,6 +253,11 @@ interface ComposerStore {
    * (409 permission-pending). Keep the bubble as 'held' until the prompt clears.
    */
   hold(conversationName: string, clientMessageId: string): void;
+  /**
+   * PAN-5184: when a message is queued behind one already held, hold it too
+   * instead of letting it overtake. Returns true when it held the bubble.
+   */
+  holdBehindHeld(conversationName: string, clientMessageId: string): boolean;
   /**
    * Resend every held message of a conversation, in order, each with a fresh
    * clientMessageId (the receipts cache replays the 409 for the old one). A
@@ -317,30 +328,36 @@ const releasingConversations = new Set<string>();
 async function releaseHeldMessages(conversationName: string): Promise<void> {
   const { getState, setState } = useComposerStore;
   for (;;) {
-    // Re-read each time: a discard or a new hold may have changed the list.
-    const message = getState().byConversation[conversationName]?.optimistic.find((m) => m.deliveryState === 'held');
-    if (!message) return;
-    const clientMessageId = crypto.randomUUID();
-    // Back to a fresh pending send before the await; the stall timer starts from now.
-    setState((state) => ({
-      byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
-        ...s,
-        optimistic: s.optimistic.map((m) => m.id === message.id
-          ? { ...m, clientMessageId, deliveryState: 'pending' as const, heldAt: undefined, createdAt: new Date().toISOString() }
-          : m),
-      })),
-    }));
-    try {
-      await sendConversationMessage(conversationName, message.text, undefined, undefined, undefined, { clientMessageId });
-      getState().acknowledgeOptimistic(conversationName, message.text, clientMessageId);
-    } catch (err) {
-      if (err instanceof MessageSendError && err.code === 'permission-pending') {
-        // The prompt is up again: re-hold and leave the rest held behind it.
-        getState().hold(conversationName, clientMessageId);
-        return;
+    // PAN-5184: each resend waits its turn behind in-flight composer sends.
+    const outcome = await enqueueConversationSend(conversationName, async (): Promise<'next' | 'stop' | 'done'> => {
+      // Re-read each time: a discard or a new hold may have changed the list.
+      const message = getState().byConversation[conversationName]?.optimistic.find((m) => m.deliveryState === 'held');
+      if (!message) return 'done';
+      const clientMessageId = crypto.randomUUID();
+      // Back to a fresh pending send before the await; the stall timer starts from now.
+      setState((state) => ({
+        byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
+          ...s,
+          optimistic: s.optimistic.map((m) => m.id === message.id
+            ? { ...m, clientMessageId, deliveryState: 'pending' as const, heldAt: undefined, createdAt: new Date().toISOString() }
+            : m),
+        })),
+      }));
+      try {
+        await sendConversationMessage(conversationName, message.text, undefined, undefined, undefined, { clientMessageId });
+        getState().acknowledgeOptimistic(conversationName, message.text, clientMessageId);
+        return 'next';
+      } catch (err) {
+        if (err instanceof MessageSendError && err.code === 'permission-pending') {
+          // The prompt is up again: re-hold and leave the rest held behind it.
+          getState().hold(conversationName, clientMessageId);
+          return 'stop';
+        }
+        getState().failSend(conversationName, message.text, 'prompt', { ...sendFailureDetails(err), clientMessageId });
+        return 'next';
       }
-      getState().failSend(conversationName, message.text, 'prompt', { ...sendFailureDetails(err), clientMessageId });
-    }
+    });
+    if (outcome !== 'next') return;
   }
 }
 
@@ -493,6 +510,18 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     })),
   })),
 
+  markSendStarted: (conversationName, clientMessageId) => set((state) => ({
+    byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
+      ...s,
+      optimistic: s.optimistic.map((message) => message.clientMessageId === clientMessageId
+        ? {
+          ...message,
+          createdAt: new Date().toISOString(),
+          deliveryState: message.deliveryState === 'unknown' ? 'pending' as const : message.deliveryState,
+        } : message),
+    })),
+  })),
+
   markNotFoundInTranscript: (conversationName, id) => set((state) => ({
     byConversation: mutateSlice(state.byConversation, conversationName, (s) => {
       const entry = s.optimistic.find((message) => message.id === id);
@@ -520,6 +549,21 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
         ? { ...message, deliveryState: 'held' as const, heldAt: Date.now() } : message),
     })),
   })),
+
+  holdBehindHeld: (conversationName, clientMessageId) => {
+    const optimistic = get().byConversation[conversationName]?.optimistic ?? [];
+    const blocked = optimistic.some((message) =>
+      message.clientMessageId !== clientMessageId && message.deliveryState === 'held');
+    if (!blocked) return false;
+    set((state) => ({
+      byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
+        ...s,
+        optimistic: s.optimistic.map((message) => message.clientMessageId === clientMessageId
+          ? { ...message, deliveryState: 'held' as const, heldAt: Date.now() } : message),
+      })),
+    }));
+    return true;
+  },
 
   releaseHeld: async (conversationName) => {
     // One release per conversation at a time keeps held messages in order and
@@ -643,7 +687,10 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     // 4-minute stall timer on the new optimistic bubble. A 'not-delivered'
     // failure needs one too: the server cached that 502 under the old
     // clientMessageId, so a retry with it would replay the failure (PAN-4278).
-    const isFreshIdentity = failed.notFoundInTranscript === true || failed.code === 'not-delivered';
+    // PAN-5184: a response with deliveryUnknown: false proved nothing was pasted, and the
+    // receipts cache would replay it under the old id, so the retry is a fresh send.
+    const isFreshIdentity = failed.notFoundInTranscript === true || failed.code === 'not-delivered'
+      || failed.deliveryUnknown === false;
     // A held message was never POSTed (PAN-4279): its first send keeps its
     // clientMessageId but is not a retry, and its bubble starts its clock now.
     const neverSent = failed.heldOffline === true;
@@ -657,8 +704,9 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     }
     removeFailed(conversationName, failedId);
     try {
-      const result = await sendConversationMessage(conversationName, text, agentId, failed.deliverAs, undefined,
-        isFreshIdentity || neverSent ? { clientMessageId } : { clientMessageId, retry: true });
+      // PAN-5184: a retry waits behind in-flight composer sends of this conversation.
+      const result = await enqueueConversationSend(conversationName, () => sendConversationMessage(conversationName, text, agentId, failed.deliverAs, undefined,
+        isFreshIdentity || neverSent ? { clientMessageId } : { clientMessageId, retry: true }));
       if (kind === 'prompt') get().acknowledgeOptimistic(conversationName, text, clientMessageId);
       if (kind === 'command' && result && result.kind !== 'ui') {
         addCommandResult(conversationName, text, result);
@@ -719,5 +767,6 @@ export function resetComposerStore(): void {
   activeUploads = 0;
   removedAttachmentIds.clear();
   releasingConversations.clear();
+  resetConversationSendQueues();
   useComposerStore.setState({ byConversation: {} });
 }

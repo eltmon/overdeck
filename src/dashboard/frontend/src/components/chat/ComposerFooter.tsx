@@ -20,6 +20,9 @@ import { isNativeShell } from '../../lib/nativeShell';
 import type { LexicalEditor } from 'lexical';
 import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical';
 import { ComposerPromptEditor, loadDraft } from './ComposerPromptEditor';
+import { clearDraft } from '../../lib/composerDraft';
+import { enqueueConversationSend } from '../../lib/composerSendQueue';
+import { deliverQueuedPrompt } from './queuedPromptSend';
 import { VoiceWidget } from './VoiceWidget';
 import { ModelPicker, MODEL_EFFORT_SUPPORT, saveStoredHarness, saveStoredModel } from './ModelPicker';
 import { pickerEffortLevels } from '../shared/ModelPicker';
@@ -54,7 +57,6 @@ import {
   sendConversationMessage,
   sendFailureDetails,
   getAttachmentAccept,
-  MessageSendError,
   type SendFailureDetails,
 } from '../../lib/composerStore';
 import { classifyAttachmentKind, isDotfileAttachment, isExtensionlessAttachment } from '../../lib/attachmentTypes';
@@ -489,7 +491,6 @@ function ComposerFooterInput({
     const citations = messageText.startsWith('/') ? [] : getConversationCitations(submitConversationName);
     if (!messageText && uploadedAttachments.length === 0 && citations.length === 0) return;
 
-    setSendingFor(submitConversationName, true);
     const attachmentPrefix = uploadedAttachments
       .map((attachment) => `@${attachment.serverPath}`)
       .join('\n');
@@ -500,6 +501,7 @@ function ComposerFooterInput({
     const submissionMessage = isPortableCommand ? messageText : composedMessage;
     // PAN-4641: queue on the server until the usage limit resets, instead of sending now.
     if (schedule || (!deliverAsOverride && deliverAs === 'when_limit_resets')) {
+      setSendingFor(submitConversationName, true);
       try {
         await scheduleMessage(submissionMessage);
         if (!isPortableCommand) consumeAttachmentsForConversation(submitConversationName);
@@ -518,52 +520,74 @@ function ComposerFooterInput({
     // Follow-up exists only on the Pi control channel; "when limits reset" never reaches the send route.
     const selectedDeliverAs = deliverAs === 'when_limit_resets' || (deliverAs === 'follow_up' && steerKind !== 'control-channel') ? undefined : deliverAs;
     const sendDeliverAs = deliverAsOverride ?? (showDeliverySelector && selectedDeliverAs !== 'auto' ? selectedDeliverAs : undefined);
+    // DISABLED 2026-06-16: a plain message-send must NEVER switch the model.
+    // This auto-switch silently killed a running agent's live session (the Opus
+    // planning takeover on PAN-1847): the picker showed a hardcoded gpt-5.5
+    // default (ConversationPanel.tsx `|| getDefaultConversationModel()`) because
+    // the agent's real model wasn't reflected, that mismatched the agent's actual
+    // model, and submitting a message tore down its session. Model changes are now
+    // an EXPLICIT picker action only. Do NOT re-enable a submit-time switch without
+    // (a) the picker reflecting the agent's true model and (b) an explicit confirm.
+
+    // Abort if conversation switched during the async model switch. Leave the
+    // pending attachments in their owning conversation (they persist now) so they
+    // survive for a retry when the user returns — do not revoke or delete.
+    if (submitConversationName !== currentConversationNameRef.current) {
+      return;
+    }
+
+    // PAN-4642 D6: the composed text now carries the citations into whichever
+    // store takes it (bubble, hold, offline hold, or outbox), so the chips go.
+    if (citations.length > 0) consumeCitations(submitConversationName);
+
+    // Degraded mode (PAN-4279): while the server is unreachable a prompt is
+    // held and sent on reconnect; a command needs a live round trip, so it
+    // keeps its draft instead.
+    if (isServerWriteBlocked()) {
+      if (isPortableCommand) {
+        toast.error("Can't reach the Overdeck server — commands need a live connection");
+        return;
+      }
+      holdSend(submitConversationName, composedMessage, {
+        clientMessageId,
+        deliverAs: sendDeliverAs,
+      });
+      consumeAttachmentsForConversation(submitConversationName);
+      editor.update(() => {
+        $getRoot().clear();
+      });
+      setText('');
+      return;
+    }
+
+    // The `/pan` namespace is intercepted by the dashboard control plane and
+    // returns a structured result. It must never appear as an optimistic user
+    // prompt or reach the harness transcript.
+    if (!isPortableCommand) {
+      // PAN-5184: the prompt leaves the composer the moment it is sent. The
+      // bubble shows it as "Sending…"; the POST waits its turn in this
+      // conversation's send queue, so quick follow-ups land in order.
+      onSend?.(composedMessage, clientMessageId);
+      consumeAttachmentsForConversation(submitConversationName);
+      clearDraft(submitConversationName);
+      editor.update(() => { $getRoot().clear(); });
+      setText('');
+      editor.focus();
+      void enqueueConversationSend(submitConversationName, () => deliverQueuedPrompt({
+        conversationName: submitConversationName,
+        message: composedMessage,
+        clientMessageId,
+        agentId,
+        deliverAs: sendDeliverAs,
+        onAcknowledged: onSendAcknowledged,
+        onFailed: onSendFailed,
+        onOpenUi: (action, focus) => openComposerUi(conversation, action, focus),
+      }));
+      return;
+    }
+    // `/pan` commands keep their round-trip-first, blocking behavior (FR-6).
+    setSendingFor(submitConversationName, true);
     try {
-      // DISABLED 2026-06-16: a plain message-send must NEVER switch the model.
-      // This auto-switch silently killed a running agent's live session (the Opus
-      // planning takeover on PAN-1847): the picker showed a hardcoded gpt-5.5
-      // default (ConversationPanel.tsx `|| getDefaultConversationModel()`) because
-      // the agent's real model wasn't reflected, that mismatched the agent's actual
-      // model, and submitting a message tore down its session. Model changes are now
-      // an EXPLICIT picker action only. Do NOT re-enable a submit-time switch without
-      // (a) the picker reflecting the agent's true model and (b) an explicit confirm.
-
-      // Abort if conversation switched during the async model switch. Leave the
-      // pending attachments in their owning conversation (they persist now) so they
-      // survive for a retry when the user returns — do not revoke or delete.
-      if (submitConversationName !== currentConversationNameRef.current) {
-        return;
-      }
-
-      // PAN-4642 D6: the composed text now carries the citations into whichever
-      // store takes it (bubble, hold, offline hold, or outbox), so the chips go.
-      if (citations.length > 0) consumeCitations(submitConversationName);
-
-      // Degraded mode (PAN-4279): while the server is unreachable a prompt is
-      // held and sent on reconnect; a command needs a live round trip, so it
-      // keeps its draft instead.
-      if (isServerWriteBlocked()) {
-        if (isPortableCommand) {
-          toast.error("Can't reach the Overdeck server — commands need a live connection");
-          return;
-        }
-        holdSend(submitConversationName, composedMessage, {
-          clientMessageId,
-          deliverAs: sendDeliverAs,
-        });
-        consumeAttachmentsForConversation(submitConversationName);
-        editor.update(() => {
-          $getRoot().clear();
-        });
-        setText('');
-        return;
-      }
-
-      // The `/pan` namespace is intercepted by the dashboard control plane and
-      // returns a structured result. It must never appear as an optimistic user
-      // prompt or reach the harness transcript.
-      if (!isPortableCommand) onSend?.(composedMessage, clientMessageId);
-
       const commandResult = await sendConversationMessage(
         submitConversationName,
         submissionMessage,
@@ -588,15 +612,6 @@ function ComposerFooterInput({
         onSendAcknowledged?.(submissionMessage, clientMessageId);
       }
 
-      // The send consumed this conversation's attachments — revoke their previews and
-      // drop them from the store. Target submitConversationName explicitly so the
-      // right conversation is cleared even if the user switched while the send
-      // was in flight. The sent message references the server uploads by @path,
-      // so consumeAttachments does NOT delete them server-side.
-      if (!isPortableCommand) {
-        consumeAttachmentsForConversation(submitConversationName);
-      }
-
       // Only clear the editor if still on the same conversation, to avoid wiping
       // the new conversation's draft if the user switched while the send was in
       // flight.
@@ -607,20 +622,9 @@ function ComposerFooterInput({
         setText('');
       }
     } catch (err) {
-      // PAN-4278: a permission prompt is up, so the server pasted nothing. The
-      // bubble waits as 'held' and resends itself once the prompt clears.
-      if (!isPortableCommand && err instanceof MessageSendError && err.code === 'permission-pending') {
-        useComposerStore.getState().hold(submitConversationName, clientMessageId);
-        consumeAttachmentsForConversation(submitConversationName);
-        if (submitConversationName === currentConversationNameRef.current) {
-          editor.update(() => { $getRoot().clear(); });
-          setText('');
-        }
-        return;
-      }
       console.error('[ComposerFooter] Failed to send:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to send message');
-      onSendFailed?.(submissionMessage, isPortableCommand ? 'command' : 'prompt', {
+      onSendFailed?.(submissionMessage, 'command', {
         ...sendFailureDetails(err), clientMessageId,
         deliverAs: sendDeliverAs,
       });
