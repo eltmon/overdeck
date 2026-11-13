@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5198",
   "created": "2026-11-13T19:57:57.248Z",
-  "updated": "2026-11-13T20:32:05.604Z",
+  "updated": "2026-11-13T20:32:20.481Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,11 @@
     "status-pane-rows.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T20:32:05.604Z"
+    },
+    "page-row-jump": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5198",
+      "claimedAt": "2026-11-13T20:32:20.481Z"
     }
   }
 }
