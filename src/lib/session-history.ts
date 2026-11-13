@@ -22,7 +22,7 @@ import { randomUUID } from 'crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'path';
-import { isEffortLevel, isLegacyPiHarnessName, type EffortLevel, type HarnessTranscriptKind } from '@overdeck/contracts';
+import { isEffortLevel, type EffortLevel, type HarnessTranscriptKind } from '@overdeck/contracts';
 import { getOverdeckHome } from './paths.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
 import type { RuntimeName } from './runtimes/types.js';
@@ -81,7 +81,6 @@ const CANDIDATE_KIND_BY_TRANSCRIPT: Record<HarnessTranscriptKind, TranscriptCand
 };
 
 export function transcriptCandidateKind(harness: string | null | undefined): TranscriptCandidateKind {
-  if (isLegacyPiHarnessName(harness)) return 'pi';
   return CANDIDATE_KIND_BY_TRANSCRIPT[getHarnessBehavior(harness as Parameters<typeof getHarnessBehavior>[0]).transcriptKind];
 }
 

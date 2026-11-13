@@ -278,8 +278,9 @@ type ConversationControlCommandInput = ControlCommand extends infer C
 const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const satisfies readonly ThinkingLevel[];
 const PI_CONVERSATION_ABORT_KEY = 'Escape';
 
-export function isPiControlChannelHarness(harness: RuntimeName | 'pi'): boolean {
-  return harness === 'ohmypi' || harness === 'pi';
+/** pi and ohmypi conversations take messages through the extension's control channel. */
+export function isPiControlChannelHarness(harness: RuntimeName): boolean {
+  return getHarnessBehavior(harness).usesRpcFifo;
 }
 
 function parseThinkingLevel(value: unknown): ThinkingLevel | null {

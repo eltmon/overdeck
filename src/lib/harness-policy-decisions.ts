@@ -5,8 +5,8 @@
  * GET /api/settings/harness-policy. The previous in-route implementation
  * emitted a 'pi' decision key while the pickers queried 'ohmypi', so the
  * ohmypi + Anthropic + subscription ToS block was silently dropped before
- * the picker UI could read it. The picker-visible key is now 'ohmypi', the
- * current RuntimeName for that harness ('pi' is no longer a RuntimeName).
+ * the picker UI could read it. Keys are RuntimeNames; since PAN-5212 that
+ * includes 'pi' as its own harness, with its own decision.
  *
  * The auth-mode resolver is injected so this helper is pure and can be
  * unit-tested without spinning up an Effect HTTP server.
@@ -81,6 +81,7 @@ export async function buildHarnessPolicyDecisions(
     }
     decisions[model] = {
       'claude-code': canUseHarness('claude-code', model, authMode),
+      pi: canUseHarness('pi', model, authMode),
       ohmypi: canUseHarness('ohmypi', model, authMode),
       codex: canUseHarness('codex', model, authMode),
       acp: canUseHarness('acp', model, authMode),

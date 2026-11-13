@@ -33,6 +33,7 @@ import { runModelSummary } from './smart-compaction.js';
 import { getTranscriptAdapter } from './transcript-adapter.js';
 import { createHandoffPaths, ensureHandoffsDir, type HandoffPaths } from './handoff-paths.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
 
 export type SummaryForkMode = 'summary' | 'plain' | 'handoff';
@@ -199,7 +200,7 @@ export async function authorHandoffExternal(
   // tool vs Pi's lowercase `write` tool, with harness-specific phrasing about
   // how the model should call it. Both templates share the same H2 contract,
   // and the file-on-disk read below is harness-independent.
-  const templateName = effectiveHarness === 'ohmypi' ? 'handoff-external-pi.md' : 'handoff-external.md';
+  const templateName = getHarnessBehavior(effectiveHarness).usesRpcFifo ? 'handoff-external-pi.md' : 'handoff-external.md';
   const template = await readFile(join(packageRoot, 'roles', templateName), 'utf-8');
 
   // The source's harness decides how the transcript is read/serialized; the

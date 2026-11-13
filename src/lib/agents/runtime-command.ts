@@ -25,7 +25,8 @@ import { piFifoPaths, PiNotReady, writePiCommand } from '../runtimes/pi-fifo.js'
 import type { RuntimeName } from '../runtimes/types.js';
 import { requireModelOverride, shellQuoteModelId } from '../model-validation.js';
 import { getOpenAIAuthStatus } from '../openai-auth.js';
-import { getOverdeckHome, packageRoot, resolveOhmypiExtensionPath } from '../paths.js';
+import { getOverdeckHome, packageRoot } from '../paths.js';
+import { getPiFamilyProfile, type PiFamilyHarness } from '../runtimes/pi-family.js';
 import { getProviderForModel, resolveKimiCodeModelAlias } from '../providers.js';
 import type { AuthMode } from '../subscription-types.js';
 import { capturePane, sessionExists } from '../tmux.js';
@@ -95,26 +96,32 @@ function isNodeNotFound(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
 }
 
-export async function getOhmypiLauncherFields(agentId: string, model: string, effort?: string): Promise<{
-  harness: 'ohmypi';
+/**
+ * Launcher fields for a pi-family work agent: oh-my-pi (default) or pi
+ * (PAN-5212). Both use the same FIFO and agent dir; the extension bundle
+ * comes from the harness's pi-family profile.
+ */
+export async function getOhmypiLauncherFields(agentId: string, model: string, effort?: string, harness?: string): Promise<{
+  harness: PiFamilyHarness;
   piEffort: string;
   piExtensionPath: string;
   piFifoPath: string;
   piSessionDir: string;
   model: string;
 }> {
+  const profile = getPiFamilyProfile(harness);
   const paths = ohmypiFifoPaths(agentId);
   await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
-  const ohmypiExtensionPath = resolveOhmypiExtensionPath();
-  if (!ohmypiExtensionPath) {
+  const extensionPath = profile.resolveExtensionPath();
+  if (!extensionPath) {
     throw new Error(
-      `ohmypi extension not built. Run: npm run build\n(looked for dist/extensions/ohmypi.js and packages/ohmypi-extension/dist/index.js under ${packageRoot})`
+      `${profile.harness} extension not built. Run: npm run build\n(looked for ${profile.extensionCandidates().join(', ')})`
     );
   }
   return {
-    harness: 'ohmypi',
-    piEffort: resolveEffort({ explicit: effort, model, harness: 'ohmypi' }).effort,
-    piExtensionPath: ohmypiExtensionPath,
+    harness: profile.harness,
+    piEffort: resolveEffort({ explicit: effort, model, harness: profile.harness }).effort,
+    piExtensionPath: extensionPath,
     piFifoPath: await Effect.runPromise(createOhmypiFifo(agentId)),
     piSessionDir: paths.agentDir,
     model,
@@ -590,7 +597,7 @@ async function injectPiPromptTimeMemory(agentId: string, prompt: string): Promis
  * unchanged so a memory hiccup can never block a message.
  */
 export async function injectPiConversationMemory(
-  opts: { cwd: string; issueId?: string | null; conversationName: string },
+  opts: { cwd: string; issueId?: string | null; conversationName: string; harness?: RuntimeName },
   prompt: string,
 ): Promise<string> {
   if (!prompt.trim() || !opts.issueId || !opts.cwd) return prompt;
@@ -602,7 +609,7 @@ export async function injectPiConversationMemory(
       runId: opts.conversationName,
       sessionId: opts.conversationName,
       agentRole: 'work',
-      agentHarness: 'ohmypi',
+      agentHarness: opts.harness ?? 'ohmypi',
     };
     const { injectPromptTimeMemory } = await import('../memory/injection.js');
     const result = await injectPromptTimeMemory({ prompt, identity, surface: 'user-prompt' });
@@ -702,7 +709,7 @@ export async function getAgentRuntimeBaseCommand(
   const quotedModel = shellQuoteModelId(harness === 'claude-code' ? getClaudeCodeLaunchModel(validatedModel) : validatedModel);
   const behavior = getHarnessBehavior(harness);
   if (behavior.launchCommandKind === 'ohmypi-rpc') {
-    return `omp --mode rpc --model ${quotedModel}`;
+    return `${getPiFamilyProfile(harness).binary} --mode rpc --model ${quotedModel}`;
   }
   if (behavior.launchCommandKind === 'codex-work-tui') {
     // buildCodexCommand in launcher-generator builds the full Codex command;
@@ -899,9 +906,9 @@ export async function getRoleRuntimeBaseCommand(
   if (behavior.launchCommandKind === 'ohmypi-rpc') {
     const mcpNames = Object.keys(parseRoleMcpServers(roleAgentDefinitionPath(role)));
     if (mcpNames.length > 0) {
-      console.warn(`[spawn] role '${role}' declares MCP servers (${mcpNames.join(', ')}) but harness 'ohmypi' does not provision MCP — those tools will be unavailable`);
+      console.warn(`[spawn] role '${role}' declares MCP servers (${mcpNames.join(', ')}) but harness '${harness}' does not provision MCP — those tools will be unavailable`);
     }
-    return `omp --mode rpc --model ${quotedModel}`;
+    return `${getPiFamilyProfile(harness).binary} --mode rpc --model ${quotedModel}`;
   }
   if (behavior.launchCommandKind === 'codex-work-tui') {
     return `codex`;

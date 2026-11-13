@@ -6,6 +6,8 @@ import type { Role } from './agents.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
 import { qualifyPiModel, resolveKimiCodeModelAlias } from './providers.js';
 import { provisionOhmypiProviderForModel } from './ohmypi-models.js';
+import { provisionPiProviderForModel } from './pi-models.js';
+import { getPiFamilyProfile, type PiFamilyHarness } from './runtimes/pi-family.js';
 import { shellQuoteModelId } from './model-validation.js';
 import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
 import { getOverdeckHome, packageRoot } from './paths.js';
@@ -21,7 +23,7 @@ import { panCliShimLauncherLines } from './pan-cli-shim.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
-export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok';
+export type LauncherHarness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok';
 
 export interface LauncherConfig extends CodexNativeEndpointOption {
   role: Role;
@@ -307,12 +309,12 @@ export function generateLauncherScript(config: LauncherConfig): string {
   config = preparedContext.config;
   const lines: string[] = [];
 
-  // PAN-3531: omp resolves --model against its bundled catalog plus the user
-  // registry at ~/.omp/agent/models.json; providers absent from the catalog
-  // (dashscope) must be provisioned before spawn or omp fails with
-  // "No model selected".
+  // PAN-3531 / PAN-5212: pi and omp resolve --model against their bundled
+  // catalog plus the user registry (<agentDir>/models.json). Models absent
+  // from the catalog must be provisioned before spawn: omp fails with "No
+  // model selected", and pi silently binds another provider's model.
   if (getHarnessBehavior(config.harness ?? 'claude-code').launchCommandKind === 'ohmypi-rpc' && config.model) {
-    provisionOhmypiProviderForModel(config.model);
+    PI_FAMILY_MODEL_PROVISIONERS[getPiFamilyProfile(config.harness).harness](config.model);
   }
 
   // Shebang
@@ -721,60 +723,66 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
   return parts;
 }
 
+const PI_FAMILY_MODEL_PROVISIONERS: Record<PiFamilyHarness, (model: string) => void> = {
+  pi: (model) => provisionPiProviderForModel(model),
+  ohmypi: (model) => provisionOhmypiProviderForModel(model),
+};
+
 /**
- * Build an oh-my-pi (omp) command line (PAN-1989).
+ * Build a pi-family command line: pi (PAN-5212) or oh-my-pi (omp, PAN-1989).
+ * The binary, resume flag and fixed launch flags come from the harness's
+ * {@link getPiFamilyProfile} profile (.pan/pi-vs-omp.md).
  *
  * RPC mode (work-agents):
- *   omp --mode rpc \
+ *   <pi|omp> --mode rpc \
  *      --model <model> \
  *      --session-dir <piSessionDir> \
  *      --extension <piExtensionPath> \
- *      [--resume <resumeSessionId>] \
+ *      [--no-approve] \
+ *      [--session|--resume <resumeSessionId>] \
  *      [--append-system-prompt "$prompt"] \
  *      <> <piFifoPath> >> <agentDir>/output.log 2>&1
  *
- * TUI mode (conversations):
- *   omp --model <model> \
- *      --session-dir <piSessionDir> \
- *      [--extension <piExtensionPath>] \
- *      [--resume <resumeSessionId>] \
- *      [--append-system-prompt "$prompt"]
+ * TUI mode (conversations): the same without `--mode rpc` and the FIFO.
  *
- * Contract differences from pi (docs/ohmypi-contract.md):
- * - Binary is `omp`, not `pi`
- * - `--no-context-files` is REMOVED (flag does not exist in omp)
- * - `--resume <id>` replaces `--session <id>`
+ * - `--no-context-files` is never emitted: omp removed it, and pi keeps
+ *   loading AGENTS.md/CLAUDE.md for parity.
+ * - Resume: pi uses `--session <id>` (its `--resume` opens a picker); omp
+ *   uses `--resume <id>` (its `--session` silently starts fresh).
  */
 function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] {
+  const profile = getPiFamilyProfile(config.harness);
+  const label = profile.harness;
   const piMode = config.piMode ?? 'rpc';
   if (!config.piSessionDir) {
-    throw new Error('ohmypi launcher requires piSessionDir');
+    throw new Error(`${label} launcher requires piSessionDir`);
   }
-  if (!config.piEffort) throw new Error('ohmypi launcher requires piEffort');
+  if (!config.piEffort) throw new Error(`${label} launcher requires piEffort`);
   if (piMode === 'rpc') {
     if (!config.piExtensionPath) {
-      throw new Error('ohmypi launcher (rpc mode) requires piExtensionPath');
+      throw new Error(`${label} launcher (rpc mode) requires piExtensionPath`);
     }
     if (!config.piFifoPath) {
-      throw new Error('ohmypi launcher (rpc mode) requires piFifoPath');
+      throw new Error(`${label} launcher (rpc mode) requires piFifoPath`);
     }
   }
 
-  const tokens: string[] = ['omp'];
+  const tokens: string[] = [profile.binary];
   if (piMode === 'rpc') {
     tokens.push('--mode', 'rpc');
   }
   tokens.push('--thinking', shellQuote(config.piEffort));
   if (config.model) {
-    tokens.push('--model', shellQuoteModelId(qualifyPiModel(config.model)));
+    tokens.push('--model', shellQuoteModelId(qualifyPiModel(config.model, profile.harness)));
   }
   tokens.push('--session-dir', shellQuote(config.piSessionDir));
   if (config.piExtensionPath) {
     tokens.push('--extension', shellQuote(config.piExtensionPath));
   }
-  // NOTE: --no-context-files is intentionally absent — removed in omp (docs/ohmypi-contract.md).
+  tokens.push(...profile.launchArgs);
 
-  // OMP accepts one append value. Repeating the flag loses earlier layers.
+  // One append value carrying every layer: omp accepts only one (repeating
+  // the flag loses earlier layers); pi accepts the joined value the same way.
   const promptSections = systemPromptFiles(config).map(file => `"$(cat -- ${shellQuote(file)})"`);
   if (config.promptFile) promptSections.push('"$prompt"');
   else if (config.promptInline) promptSections.push(shellQuote(config.promptInline));
@@ -783,7 +791,7 @@ function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] 
   }
 
   if (config.resumeSessionId) {
-    tokens.push('--resume', shellQuote(config.resumeSessionId));
+    tokens.push(profile.resumeFlag, shellQuote(config.resumeSessionId));
   }
   if (config.extraArgs) {
     tokens.push(config.extraArgs);
@@ -791,9 +799,9 @@ function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] 
   let cmd = tokens.join(' ').replace(/\s+/g, ' ').trim();
 
   if (piMode === 'rpc') {
-    // PAN-2108: capture omp's exit so a silent post-startup death leaves a trace.
-    // The launcher bash must OUTLIVE omp to record the exit code + timestamp, so
-    // the rpc path deliberately does NOT `exec` (exec would replace bash with omp
+    // PAN-2108: capture the harness's exit so a silent post-startup death leaves a trace.
+    // The launcher bash must OUTLIVE the harness to record the exit code + timestamp, so
+    // the rpc path deliberately does NOT `exec` (exec would replace bash with the harness
     // and the exit would be lost — the failure mode that made the flywheel
     // orchestrator's death undiagnosable). `remain-on-exit on` keeps the dead
     // pane for `#{pane_exit_status}`; the exit-status file survives even if the

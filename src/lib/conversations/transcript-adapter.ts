@@ -582,6 +582,7 @@ const primeAgentAdapter: ConversationTranscriptAdapter = {
 
 const REGISTRY: Partial<Record<RuntimeName, ConversationTranscriptAdapter>> = {
   'claude-code': claudeCodeAdapter,
+  pi: piAdapter,
   'ohmypi': piAdapter,
   'codex': codexAdapter,
   'acp': acpAdapter,

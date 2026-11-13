@@ -22,6 +22,11 @@ export function getDashScopeUpstreamBaseUrl(): string {
 let server: http.Server | null = null;
 let started = false;
 
+/** Nous Portal's real OpenAI-compatible endpoint, for harnesses that call it directly (pi, PAN-5212). */
+export function getNousUpstreamBaseUrl(): string {
+  return UPSTREAMS.nous!;
+}
+
 export function getOpenAICompatibleProxyBaseUrl(provider: string): string {
   return `http://${HOST}:${PORT}/${provider}`;
 }

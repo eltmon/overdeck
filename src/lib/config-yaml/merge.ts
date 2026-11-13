@@ -7,7 +7,7 @@ import { mergeCpuResources } from './merge-cpu.js';
 import { mergeDiskResources } from './merge-disk.js';
 import type { ModelId } from '../settings.js';
 import { BACKGROUND_AI_FEATURES } from '../background-ai/registry.js';
-import { isTerminalBackendName } from '@overdeck/contracts';
+import { isTerminalBackendName, KNOWN_HARNESSES } from '@overdeck/contracts';
 import { DEFAULT_TIERED_EXECUTION_CONFIG, TieredExecutionConfigError, validateTieredExecutionConfig } from '../agents/tier-table.js';
 import { DEFAULT_CONFIG } from './defaults.js';
 import { normalizeOllamaConfig } from './ollama.js';
@@ -62,8 +62,8 @@ function normalizeProviderConfig(
 }
 
 function validateProviderHarness(provider: ModelProvider, harness: RuntimeName | undefined): void {
-  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse' && harness !== 'prime-agent' && harness !== 'grok') {
-    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, or grok`);
+  if (harness !== undefined && !KNOWN_HARNESSES.has(harness)) {
+    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, pi, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, or grok`);
   }
 }
 

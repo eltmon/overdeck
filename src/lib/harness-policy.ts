@@ -1,5 +1,5 @@
 /**
- * Harness policy gate (PAN-636 + PAN-1067 + PAN-1989).
+ * Harness policy gate (PAN-636 + PAN-1067 + PAN-1989 + PAN-5212).
  *
  * Single source of truth for "is this {harness, model, authMode} combination
  * allowed?". Every spawn entry point and every harness/model picker UI MUST
@@ -9,9 +9,11 @@
  * Rules:
  *   1. gpt-5.5 and the gpt-5.6 family require ChatGPT subscription auth — OpenAI
  *      does not expose them via the standard API-key endpoint. (PAN-1067)
- *   2. ohmypi running an Anthropic model under Anthropic *subscription* auth is
- *      blocked (Claude Code subscription terms forbid using the Anthropic
- *      subscription with non-Anthropic harnesses). (Formerly applied to 'pi'.)
+ *   2. pi or ohmypi running an Anthropic model under Anthropic *subscription*
+ *      auth is blocked (Claude Code subscription terms forbid using the
+ *      Anthropic subscription with non-Anthropic harnesses). pi is a
+ *      third-party client like omp; with an Anthropic API key both are allowed
+ *      (PAN-5212, .pan/pi-vs-omp.md "Terms of service").
  *   3. prime-agent running an Anthropic model under Anthropic *subscription*
  *      auth is blocked for the same Terms-of-Service reason as rule 2
  *      (PAN-3668). Every other prime-agent cell follows the model-level rules.
@@ -25,10 +27,10 @@
  *
  * Allowed cells:
  *   - claude-code + any provider + any authMode -> allowed (modulo rule 1)
- *   - ohmypi + non-Anthropic provider + any authMode -> allowed (modulo rule 1)
- *   - ohmypi + Anthropic provider + api-key -> allowed
- *   - ohmypi + Anthropic provider + subscription -> BLOCKED
- *   - ohmypi + Anthropic provider + undefined authMode -> allowed (no
+ *   - pi/ohmypi + non-Anthropic provider + any authMode -> allowed (modulo rule 1)
+ *   - pi/ohmypi + Anthropic provider + api-key -> allowed
+ *   - pi/ohmypi + Anthropic provider + subscription -> BLOCKED
+ *   - pi/ohmypi + Anthropic provider + undefined authMode -> allowed (no
  *     subscription is in play, so the ToS bar is not engaged)
  */
 
@@ -63,6 +65,7 @@ const ALLOWED: HarnessPolicyDecision = { allowed: true }
  */
 export const POLICY_RUNTIME_NAMES = Object.keys({
   'claude-code': true,
+  pi: true,
   ohmypi: true,
   codex: true,
   acp: true,
@@ -82,6 +85,16 @@ const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK: HarnessPolicyDecision = {
 
 /** Canonical reason returned for the blocked cell (exposed for tests + UI). */
 export const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON = OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK.reason!
+
+const PI_ANTHROPIC_SUBSCRIPTION_BLOCK: HarnessPolicyDecision = {
+  allowed: false,
+  reason:
+    'Claude Code subscription Terms of Service restrict Anthropic models to the Claude Code harness — pi cannot run Anthropic models under subscription auth. ' +
+    'To proceed, switch the Anthropic provider to API-key auth, or pick a non-Anthropic model for pi.',
+}
+
+/** Canonical reason returned for the blocked pi cell (exposed for tests + UI). */
+export const PI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON = PI_ANTHROPIC_SUBSCRIPTION_BLOCK.reason!
 
 const PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK: HarnessPolicyDecision = {
   allowed: false,
@@ -225,10 +238,11 @@ export function canUseHarness(
     return ALLOWED
   }
 
-  // Legacy 'pi' is normally rewritten to 'ohmypi' at settings load; a raw value
-  // that slips through gets the ohmypi rules, never a free pass.
-  if ((harness as string) === 'pi') {
-    return canUseHarness('ohmypi', model, authMode, context)
+  if (harness === 'pi') {
+    if (getProviderForModel(model).name === 'anthropic' && authMode === 'subscription') {
+      return PI_ANTHROPIC_SUBSCRIPTION_BLOCK
+    }
+    return ALLOWED
   }
 
   if (harness === 'prime-agent') {

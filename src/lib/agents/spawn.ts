@@ -261,7 +261,7 @@ async function spawnRunWithoutConsentClaim(
   // their prompt via tmux after Claude boots (same as the orchestrator/test/
   // ship), not on stdin to a headless `claude --print`.
   const shouldDeliverPromptViaTmux = shouldRegisterConversation && resolvedHarness === 'claude-code';
-  const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'ohmypi';
+  const shouldDeliverPromptViaPi = shouldRegisterConversation && harnessBehavior.usesRpcFifo;
   // PAN-3920: codex reads no prompt file, so a worker's brief is delivered after launch, as its parent.
   const shouldDeliverPromptViaCodexTui = (shouldRegisterConversation || role === 'worker') && resolvedHarness === 'codex';
   const kickoffOpts = options.parentId ? { sender: { id: options.parentId } } : {};
@@ -317,8 +317,8 @@ async function spawnRunWithoutConsentClaim(
   // correct `omp --mode rpc` command instead of a malformed Claude command.
   // Without this, a config'd `roles.review.harness: ohmypi` produced a launcher
   // that silently fell back to Claude shape.
-  const piLauncherFields = resolvedHarness === 'ohmypi'
-    ? await getOhmypiLauncherFields(agentId, selectedModel, options.effort)
+  const piLauncherFields = harnessBehavior.usesRpcFifo
+    ? await getOhmypiLauncherFields(agentId, selectedModel, options.effort, resolvedHarness)
     : {};
   const codexLauncherFields = resolvedHarness === 'codex'
     ? getCodexLauncherFields(agentId, selectedModel, workspace, role, options.effort, await prepareCodexOverdeckMcp({ agentId, agentKind: 'agent', role, harness: resolvedHarness, cwd: workspace, issueId }))
@@ -931,7 +931,7 @@ async function spawnAgentWithoutConsentClaim(
       }
       throw new Error(`Agent ${agentId} kickoff delivery failed: ${message}`);
     }
-  } else if (prompt && resolvedHarness === 'ohmypi') {
+  } else if (prompt && getHarnessBehavior(resolvedHarness).usesRpcFifo) {
     try {
       await writeOhmypiAgentPrompt(agentId, prompt);
       if (tracksKickoffDelivery) {

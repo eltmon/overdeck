@@ -496,8 +496,8 @@ export async function messageAgent(
       agentState.hostOverride === true,
       agentState.workspace,
     );
-    const fallbackPiFields = fallbackHarness === 'ohmypi'
-      ? await getOhmypiLauncherFields(normalizedId, resumeModel, relaunchEffort.effort)
+    const fallbackPiFields = getHarnessBehavior(fallbackHarness).usesRpcFifo
+      ? await getOhmypiLauncherFields(normalizedId, resumeModel, relaunchEffort.effort, fallbackHarness)
       : {};
     const fallbackCodexFields = fallbackHarness === 'codex'
       ? getCodexLauncherFields(normalizedId, resumeModel, agentState.workspace, resumeRole, relaunchEffort.effort, await prepareCodexOverdeckMcp({ agentId: normalizedId, agentKind: 'agent', role: resumeRole, harness: fallbackHarness, cwd: agentState.workspace, issueId: agentState.issueId }))
