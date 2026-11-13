@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5211",
   "created": "2026-11-13T22:53:14.172Z",
-  "updated": "2026-11-13T23:37:18.513Z",
+  "updated": "2026-11-13T23:37:26.883Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -352,6 +352,11 @@
     "wi16-ui-notice.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T23:37:18.512Z"
+    },
+    "wi21-bookmark-migration": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5211",
+      "claimedAt": "2026-11-13T23:37:26.883Z"
     }
   }
 }
