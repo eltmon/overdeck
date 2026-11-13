@@ -4,17 +4,17 @@
     "created": "2026-11-13T19:48:23Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5189: File explorer D2: viewers tier 2 (Office, notebooks, Mermaid)",
-    "updated": "2026-11-13T19:49:33.247Z"
+    "updated": "2026-11-13T19:50:42.616Z"
   },
   "plan": {
     "id": "pan-5189",
     "title": "File explorer D2: viewers tier 2 (Office, notebooks, Mermaid)",
-    "status": "proposed",
+    "status": "running",
     "uid": "4fab3235-5cf2-4b46-9881-0df79ded0ca2",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-13T19:48:23Z",
-    "updated": "2026-11-13T19:49:33.247Z",
+    "updated": "2026-11-13T19:50:42.616Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5189",
@@ -1433,5 +1433,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
