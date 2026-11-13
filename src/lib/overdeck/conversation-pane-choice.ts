@@ -12,6 +12,9 @@
  * PAN-3228 extracts the session-scoped capture, signature verification, and
  * keystroke delivery into session-pane-choice.ts so agents and conversations
  * share one safe answer path.
+ *
+ * On a Herdr host detection is skipped unless the caller passes a captured
+ * screen (PAN-5169).
  */
 import {
   getConversationById,
@@ -26,6 +29,8 @@ import {
   type PendingPaneChoice,
   type SessionPaneChoiceDeps,
 } from '../session-pane-choice.js';
+import { hostTerminalBackendName } from '../terminal-backends/select.js';
+import type { TerminalBackendName } from '../terminal-backends/types.js';
 import { tmuxSessionExists } from './conversation-runtime.js';
 
 export type { PendingPaneChoice, PendingPaneChoiceOption } from '../session-pane-choice.js';
@@ -37,9 +42,16 @@ function isClaudeCodeConversation(conv: Conversation): boolean {
 /** Parse the conversation's current pane for a blocking numbered-choice menu. */
 export async function claudeConversationPaneChoice(
   conv: Conversation,
-  options: { capture?: (sessionName: string, lines: number) => Promise<string> } = {},
+  options: {
+    capture?: (sessionName: string, lines: number) => Promise<string>;
+    /** Test seam; production reads the host backend. */
+    hostBackend?: () => Promise<TerminalBackendName>;
+  } = {},
 ): Promise<PendingPaneChoice | null> {
   if (!isClaudeCodeConversation(conv)) return null;
+  // PAN-5169: the answer path is tmux-only, so a Herdr host neither captures
+  // (a tmux spawn per conversation per poll) nor reports a menu it cannot answer.
+  if (!options.capture && (await (options.hostBackend ?? hostTerminalBackendName)()) === 'herdr') return null;
   return captureSessionPaneChoice(conv.tmuxSession, options.capture);
 }
 
