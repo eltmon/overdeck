@@ -107,10 +107,11 @@ export function mergeWindowIntoCache(previous: HistoryRows | undefined, incoming
 
   const transcript = window.transcript ?? previousTranscript;
   const kept = { messages: keptMessages, workLog: keptWorkLog };
+  const bounded = window.bounded !== undefined ? { bounded: window.bounded } : {};
   const history: ConversationWindow = previous.history
-    ? { ...previous.history, ...(transcript !== undefined ? { transcript } : {}) }
+    ? { ...previous.history, ...(transcript !== undefined ? { transcript } : {}), ...bounded }
     // A legacy full body held the whole transcript, so nothing older remains.
-    : { cursor: encodeTimelineCursor(oldestKey(kept)!), hasOlder: false, ...(transcript !== undefined ? { transcript } : {}) };
+    : { cursor: encodeTimelineCursor(oldestKey(kept)!), hasOlder: false, ...(transcript !== undefined ? { transcript } : {}), ...bounded };
   return {
     messages: sortedMessages([...keptMessages, ...incoming.messages]),
     workLog: sortedWorkLog([...keptWorkLog, ...incoming.workLog]),
@@ -135,7 +136,14 @@ export function prependOlderPage<T extends HistoryRows>(
     ...previous,
     messages: sortedMessages([...page.messages.filter((message) => !messageIds.has(message.id)), ...previous.messages]),
     workLog: sortedWorkLog([...page.workLog.filter((entry) => !workIds.has(entry.id)), ...previous.workLog]),
-    history: { ...previous.history, cursor: page.window.cursor, hasOlder: page.window.hasOlder },
+    history: {
+      ...previous.history,
+      cursor: page.window.cursor,
+      hasOlder: page.window.hasOlder,
+      ...((page.window.bounded ?? previous.history.bounded) !== undefined
+        ? { bounded: page.window.bounded ?? previous.history.bounded }
+        : {}),
+    },
   };
 }
 

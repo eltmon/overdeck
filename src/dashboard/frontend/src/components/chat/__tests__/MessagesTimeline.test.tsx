@@ -914,3 +914,20 @@ describe('MessagesTimeline — older history (PAN-4558)', () => {
     expect(screen.getByText(/compacted/i)).toBeInTheDocument();
   });
 });
+
+describe('MessagesTimeline — bounded conversation notice (PAN-5211)', () => {
+  const notice = /Large conversation: the dashboard keeps recent history in memory/;
+
+  it('renders the notice when the history is bounded', () => {
+    render(<MessagesTimeline messages={[]} workLog={[]} streaming={false}
+      history={{ hasOlder: true, loadingOlder: false, bounded: true }} />);
+    expect(screen.getByText(notice)).toBeInTheDocument();
+  });
+
+  it('renders no notice when the history is not bounded', () => {
+    render(<MessagesTimeline messages={[]} workLog={[]} streaming={false}
+      history={{ hasOlder: true, loadingOlder: false }} />);
+    expect(screen.queryByText(notice)).not.toBeInTheDocument();
+  });
+});
+

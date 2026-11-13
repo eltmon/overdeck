@@ -23,6 +23,8 @@ export interface OlderHistory {
   loadOlder: () => Promise<void>;
   /** Loads older pages until `messageId` is in the cache or the start is reached. */
   loadOlderUntil: (messageId: string) => Promise<boolean>;
+  /** PAN-5211: the server keeps only recent history in memory; older pages come from disk. */
+  bounded: boolean;
 }
 
 /**
@@ -88,5 +90,5 @@ export function useOlderHistory({ queryKey, pagePath, history }: {
     return false;
   }, [loadOlder, queryClient, queryKey]);
 
-  return { hasOlder: history?.hasOlder ?? false, loadingOlder, loadedOlder, error, loadOlder, loadOlderUntil };
+  return { hasOlder: history?.hasOlder ?? false, loadingOlder, loadedOlder, error, loadOlder, loadOlderUntil, bounded: history?.bounded === true };
 }
