@@ -274,6 +274,36 @@ describe('held composer messages (PAN-4279)', () => {
     expect(messagePosts(fetchMock)).toHaveLength(1);
   });
 
+  it('markSendStarted resets the clock and returns an unknown bubble to pending', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-09-27T23:00:00.000Z'));
+      const { addOptimistic, markDeliveryUnknown, markSendStarted } = useComposerStore.getState();
+      addOptimistic(conversation.name, 'hi', 0, { clientMessageId: 'client-a' });
+      const bubbleId = useComposerStore.getState().byConversation[conversation.name]!.optimistic[0]!.id;
+      markDeliveryUnknown(conversation.name, bubbleId);
+
+      vi.setSystemTime(new Date('2026-09-27T23:05:00.000Z'));
+      markSendStarted(conversation.name, 'client-a');
+
+      const bubble = useComposerStore.getState().byConversation[conversation.name]!.optimistic[0]!;
+      expect(bubble.createdAt).toBe('2026-09-27T23:05:00.000Z');
+      expect(bubble.deliveryState).toBe('pending');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('markSendStarted leaves the slice unchanged for an unknown clientMessageId', () => {
+    const { addOptimistic, markSendStarted } = useComposerStore.getState();
+    addOptimistic(conversation.name, 'hi', 0, { clientMessageId: 'client-a' });
+    const before = useComposerStore.getState().byConversation[conversation.name];
+
+    markSendStarted(conversation.name, 'client-missing');
+
+    expect(useComposerStore.getState().byConversation[conversation.name]).toEqual(before);
+  });
+
   it('retries a deliveryUnknown:false failure under a fresh clientMessageId', async () => {
     const { addOptimistic, failSend, retryFailed } = useComposerStore.getState();
     addOptimistic(conversation.name, 'hi', 0, { clientMessageId: 'c-old' });

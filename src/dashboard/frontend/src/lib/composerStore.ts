@@ -238,6 +238,11 @@ interface ComposerStore {
   acknowledgeOptimistic(conversationName: string, text: string, clientMessageId?: string): void;
   reconcileEchoes(conversationName: string, messages: ChatMessage[], subagents?: SubagentSummary[]): void;
   markDeliveryUnknown(conversationName: string, id: string): void;
+  /**
+   * PAN-5184: reset a bubble's send clock when its POST actually starts, so time
+   * spent waiting in the send queue never counts toward TURN_STALL_MS.
+   */
+  markSendStarted(conversationName: string, clientMessageId: string): void;
   /** An accepted bubble stayed unmatched too long while not streaming: move it
    * to the outbox as a 'Not found in transcript' entry (PAN-4247). */
   markNotFoundInTranscript(conversationName: string, id: string): void;
@@ -502,6 +507,18 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
       ...s,
       optimistic: s.optimistic.map((message) => message.id === id && !message.acknowledged
         ? { ...message, deliveryState: 'unknown' } : message),
+    })),
+  })),
+
+  markSendStarted: (conversationName, clientMessageId) => set((state) => ({
+    byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
+      ...s,
+      optimistic: s.optimistic.map((message) => message.clientMessageId === clientMessageId
+        ? {
+          ...message,
+          createdAt: new Date().toISOString(),
+          deliveryState: message.deliveryState === 'unknown' ? 'pending' as const : message.deliveryState,
+        } : message),
     })),
   })),
 
