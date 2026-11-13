@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5199",
   "created": "2026-11-13T20:11:44.953Z",
-  "updated": "2026-11-13T20:32:55.662Z",
+  "updated": "2026-11-13T20:33:03.352Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,11 @@
     "wrapper-sync-entries.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T20:32:55.662Z"
+    },
+    "heal-helper": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5199",
+      "claimedAt": "2026-11-13T20:33:03.352Z"
     }
   }
 }
