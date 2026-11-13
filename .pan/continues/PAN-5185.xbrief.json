@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5185",
   "created": "2026-11-13T14:58:00.032Z",
-  "updated": "2026-11-13T15:12:48.369Z",
+  "updated": "2026-11-13T15:12:54.736Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "contracts-surface.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T15:12:48.369Z"
+    },
+    "git-runner": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T15:12:54.735Z"
     }
   }
 }
