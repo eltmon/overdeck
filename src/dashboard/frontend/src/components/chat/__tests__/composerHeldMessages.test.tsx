@@ -8,6 +8,7 @@ import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@t
 import { ComposerFooter } from '../ComposerFooter';
 import { useComposerDeliveryState } from '../useComposerDeliveryState';
 import { resetComposerStore, useComposerStore } from '../../../lib/composerStore';
+import { enqueueConversationSend } from '../../../lib/composerSendQueue';
 import { useConnectionState } from '../../../lib/connectionState';
 
 const { editorState, mockToastError } = vi.hoisted(() => ({
@@ -203,5 +204,51 @@ describe('held composer messages (PAN-4279)', () => {
 
     expect(messagePosts(fetchMock)).toHaveLength(0);
     expect(heldEntries()).toHaveLength(1);
+  });
+
+  it('holdBehindHeld holds a message queued behind a held one', () => {
+    const { addOptimistic, hold, holdBehindHeld } = useComposerStore.getState();
+    addOptimistic(conversation.name, 'first', 0, { clientMessageId: 'client-a' });
+    hold(conversation.name, 'client-a');
+    addOptimistic(conversation.name, 'second', 0, { clientMessageId: 'client-b' });
+
+    expect(holdBehindHeld(conversation.name, 'client-b')).toBe(true);
+
+    const bubbleB = useComposerStore.getState().byConversation[conversation.name]?.optimistic
+      .find((message) => message.clientMessageId === 'client-b');
+    expect(bubbleB?.deliveryState).toBe('held');
+  });
+
+  it('holdBehindHeld leaves a message alone when nothing is held', () => {
+    const { addOptimistic, holdBehindHeld } = useComposerStore.getState();
+    addOptimistic(conversation.name, 'second', 0, { clientMessageId: 'client-b' });
+
+    expect(holdBehindHeld(conversation.name, 'client-b')).toBe(false);
+
+    const bubbleB = useComposerStore.getState().byConversation[conversation.name]?.optimistic
+      .find((message) => message.clientMessageId === 'client-b');
+    expect(bubbleB?.deliveryState).toBe('pending');
+  });
+
+  it('releaseHeld waits for an in-flight queued send', async () => {
+    const { addOptimistic, hold, releaseHeld } = useComposerStore.getState();
+    addOptimistic(conversation.name, 'held ping', 0, { clientMessageId: 'client-a' });
+    hold(conversation.name, 'client-a');
+
+    let resolveTask: () => void = () => {};
+    const blocker = enqueueConversationSend(conversation.name, () => new Promise<void>((resolve) => {
+      resolveTask = resolve;
+    }));
+
+    const releasePromise = releaseHeld(conversation.name);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(messagePosts(fetchMock)).toHaveLength(0);
+
+    resolveTask();
+    await blocker;
+    await releasePromise;
+
+    expect(messagePosts(fetchMock)).toHaveLength(1);
   });
 });
