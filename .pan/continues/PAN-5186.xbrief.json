@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5186",
   "created": "2026-11-13T16:27:17.519Z",
-  "updated": "2026-11-13T16:32:12.837Z",
+  "updated": "2026-11-13T16:32:20.349Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "pane-model.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T16:32:12.837Z"
+    },
+    "rpc-client": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5186",
+      "claimedAt": "2026-11-13T16:32:20.348Z"
     }
   }
 }
