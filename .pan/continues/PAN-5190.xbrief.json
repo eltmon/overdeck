@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5190",
   "created": "2026-11-13T20:35:48.124Z",
-  "updated": "2026-11-13T21:01:34.147Z",
+  "updated": "2026-11-13T21:01:43.122Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,6 +202,11 @@
     "tree-action-keys.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T21:01:34.146Z"
+    },
+    "drag-move": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T21:01:43.122Z"
     }
   }
 }
