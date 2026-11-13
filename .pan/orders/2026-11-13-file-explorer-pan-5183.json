@@ -6,7 +6,71 @@
     "laneAConcurrency": 1,
     "posture": "open"
   },
-  "items": [],
+  "items": [
+    {
+      "issue": "PAN-5185",
+      "lane": "A",
+      "order": 1,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-13T14:22:44.950Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5186",
+      "lane": "A",
+      "order": 2,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-13T14:22:44.950Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5187",
+      "lane": "A",
+      "order": 3,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-13T14:22:44.950Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5188",
+      "lane": "A",
+      "order": 4,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-13T14:22:44.950Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5189",
+      "lane": "A",
+      "order": 5,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-13T14:22:44.950Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5190",
+      "lane": "A",
+      "order": 6,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-13T14:22:44.950Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5191",
+      "lane": "A",
+      "order": 7,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-13T14:22:44.950Z",
+      "addedBy": "conv-20261113-6031"
+    }
+  ],
   "createdAt": "2026-11-13T14:22:29.232Z",
-  "updatedAt": "2026-11-13T14:22:29.232Z"
+  "updatedAt": "2026-11-13T14:22:44.951Z"
 }
