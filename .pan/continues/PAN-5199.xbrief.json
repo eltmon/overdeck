@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5199",
   "created": "2026-11-13T20:11:44.953Z",
-  "updated": "2026-11-13T20:39:17.720Z",
+  "updated": "2026-11-13T20:39:24.126Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,11 @@
     "heal-helper.ac6": {
       "status": "completed",
       "doneAt": "2026-11-13T20:39:17.720Z"
+    },
+    "porcelain-status-entries": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5199",
+      "claimedAt": "2026-11-13T20:39:24.126Z"
     }
   }
 }
