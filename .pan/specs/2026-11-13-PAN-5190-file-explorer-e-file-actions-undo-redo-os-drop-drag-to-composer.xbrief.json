@@ -4,17 +4,17 @@
     "created": "2026-11-13T19:35:44Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5190: File explorer E: file actions, undo/redo, OS drop, drag to composer",
-    "updated": "2026-11-13T19:44:42.167Z"
+    "updated": "2026-11-13T20:35:36.090Z"
   },
   "plan": {
     "id": "pan-5190",
     "title": "File explorer E: file actions, undo/redo, OS drop, drag to composer",
-    "status": "proposed",
+    "status": "running",
     "uid": "f4a7f955-e0da-44dd-9b5e-15f902c9dd23",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-13T19:35:44Z",
-    "updated": "2026-11-13T19:44:42.167Z",
+    "updated": "2026-11-13T20:35:36.090Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5190",
@@ -1184,5 +1184,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
