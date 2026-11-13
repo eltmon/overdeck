@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5176",
   "created": "2026-11-13T05:00:59.712Z",
-  "updated": "2026-11-13T05:03:30.535Z",
+  "updated": "2026-11-13T05:03:41.839Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
     "spawn-ledger-helper.ac6": {
       "status": "completed",
       "doneAt": "2026-11-13T05:03:30.534Z"
+    },
+    "idle-poller-budget-tests": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5176",
+      "claimedAt": "2026-11-13T05:03:41.839Z"
     }
   }
 }
