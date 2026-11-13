@@ -205,8 +205,8 @@ describe('commitPolyrepoWorkspaceGitignoreAsync', () => {
     expect(message).toBe('Committed polyrepo workspace .gitignore');
     const calls = mockExec.mock.calls.map(c => String(c[0]));
     expect(calls).toContain('git add .gitignore');
-    expect(calls).toContain('git diff --cached --quiet');
-    expect(calls).toContain('git commit -m "chore(workspace): add polyrepo scaffold .gitignore"');
+    expect(calls).toContain('git diff --cached --quiet -- .gitignore');
+    expect(calls).toContain('git commit -m "chore(workspace): add polyrepo scaffold .gitignore" -- .gitignore');
   });
 
   it('returns null when there is nothing to commit', async () => {

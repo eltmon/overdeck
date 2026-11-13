@@ -101,14 +101,14 @@ export async function commitPolyrepoWorkspaceGitignoreAsync(workspacePath: strin
   try {
     await execAsync('git add .gitignore', { cwd: workspacePath });
     try {
-      await execAsync('git diff --cached --quiet', { cwd: workspacePath });
+      await execAsync('git diff --cached --quiet -- .gitignore', { cwd: workspacePath });
       return null;
     } catch {
       // There are staged changes — commit them.
     }
 
     await execAsync(
-      'git commit -m "chore(workspace): add polyrepo scaffold .gitignore"',
+      'git commit -m "chore(workspace): add polyrepo scaffold .gitignore" -- .gitignore',
       {
         cwd: workspacePath,
         env: {
@@ -123,5 +123,61 @@ export async function commitPolyrepoWorkspaceGitignoreAsync(workspacePath: strin
     return 'Committed polyrepo workspace .gitignore';
   } catch (err: any) {
     return `Warning: could not commit workspace .gitignore: ${err.message}`;
+  }
+}
+
+export interface PolyrepoGitignoreHealResult {
+  /** Entries the ensure added (empty when the .gitignore was already complete). */
+  added: string[];
+  /** True when the added entries are committed in the wrapper repo. */
+  committed: boolean;
+  /** Set when the heal could not commit; the original .gitignore was restored. */
+  warning: string | null;
+}
+
+/**
+ * PAN-5199: heal an existing polyrepo wrapper before the start gate reads it.
+ * No-op without a wrapper `.git`. Never throws; a failed commit restores the
+ * original .gitignore so the tree is exactly as it was.
+ */
+export async function healPolyrepoWorkspaceGitignoreAsync(
+  workspacePath: string,
+  repos: readonly PolyrepoWorkspaceRepoRef[],
+): Promise<PolyrepoGitignoreHealResult> {
+  if (!existsSync(join(workspacePath, '.git'))) return { added: [], committed: false, warning: null };
+
+  try {
+    // Precondition: .gitignore is tracked and clean. A real wrapper always
+    // meets this, because the planning commit commits .gitignore; an
+    // uncommitted edit is never overwritten by the heal.
+    try {
+      await execAsync('git ls-files --error-unmatch -- .gitignore', { cwd: workspacePath });
+    } catch {
+      return { added: [], committed: false, warning: null };
+    }
+    const { stdout: preStatus } = await execAsync('git status --porcelain -- .gitignore', { cwd: workspacePath });
+    if (preStatus.trim().length > 0) return { added: [], committed: false, warning: null };
+
+    const { added } = ensurePolyrepoWorkspaceGitignore(workspacePath, repos);
+    if (added.length === 0) return { added: [], committed: false, warning: null };
+
+    try {
+      const commitMessage = await commitPolyrepoWorkspaceGitignoreAsync(workspacePath);
+      const { stdout: postStatus } = await execAsync('git status --porcelain -- .gitignore', { cwd: workspacePath });
+      if (postStatus.trim().length === 0) {
+        return { added, committed: true, warning: null };
+      }
+      await execAsync('git restore --source=HEAD --staged --worktree -- .gitignore', { cwd: workspacePath });
+      return { added, committed: false, warning: commitMessage ?? 'wrapper .gitignore commit did not land' };
+    } catch (err: any) {
+      try {
+        await execAsync('git restore --source=HEAD --staged --worktree -- .gitignore', { cwd: workspacePath });
+      } catch {
+        // Best effort; fall through to report the original error.
+      }
+      return { added: [], committed: false, warning: err.message };
+    }
+  } catch (err: any) {
+    return { added: [], committed: false, warning: err.message };
   }
 }
