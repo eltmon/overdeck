@@ -30,6 +30,7 @@ IDLE_BUDGET_LINUX=30
 WINDOW_SECS=30
 SETTLE_SECS=20
 HEALTH_TIMEOUT_SECS=120
+CHURN_SECS=20
 
 DENIED_TOOLS="docker tmux systemctl journalctl brew"
 GUARDED_PORTS="3010 3011 3012 8317"
@@ -157,18 +158,22 @@ const net = num(e.R_IDLE_NET);
 let spawns = null;
 if (e.R_TRACE_FROM && e.R_TRACE_TO) {
   const from = Number(e.R_TRACE_FROM), to = Number(e.R_TRACE_TO);
+  // A call is a "spawn" or "error" record; an "exit" record marks a call
+  // that already counted as failed (its shell exited 127).
   const groups = new Map();
   let count = 0, failed = 0;
   for (const line of readLines(e.R_TRACE_FILE)) {
     let rec; try { rec = JSON.parse(line); } catch { continue; }
     if (!(rec.t >= from && rec.t <= to)) continue;
-    count += 1;
-    if (rec.error) failed += 1;
-    const key = rec.program + "\u0000" + (rec.error || "");
-    groups.set(key, (groups.get(key) || 0) + 1);
+    const g = groups.get(rec.program) || { program: rec.program, count: 0, failed: 0, errors: [] };
+    if (rec.event !== "exit") { count += 1; g.count += 1; }
+    if (rec.error) {
+      failed += 1; g.failed += 1;
+      if (!g.errors.includes(rec.error)) g.errors.push(rec.error);
+    }
+    groups.set(rec.program, g);
   }
-  const top = [...groups.entries()].sort((x, y) => y[1] - x[1]).slice(0, 10)
-    .map(([key, n]) => { const [program, error] = key.split("\u0000"); return { program, error: error || null, count: n }; });
+  const top = [...groups.values()].sort((x, y) => y.count - x.count).slice(0, 10);
   spawns = { count, failed, top };
 }
 const window = Number(e.R_WINDOW);
@@ -201,7 +206,7 @@ for (const line of result.panUp.forbiddenToolLines) lines.push("           " + l
 lines.push("  idle:    " + verdict(result.idle.pass) + " booted=" + result.idle.booted + " baseline=" + show(result.idle.baselineNew) + " idle=" + show(result.idle.idleNew) + " net=" + show(result.idle.net) + " (" + show(result.idle.netPerSec) + "/s) budget=" + show(result.idle.budget));
 if (spawns) {
   lines.push("           Overdeck child_process calls in the idle window: " + spawns.count + " (" + spawns.failed + " failed)");
-  for (const g of spawns.top) lines.push("             " + g.count + "x " + g.program + (g.error ? " (" + g.error + ")" : ""));
+  for (const g of spawns.top) lines.push("             " + g.count + "x " + g.program + (g.failed ? " (" + g.failed + " failed: " + g.errors.join(", ") + ")" : ""));
 }
 lines.push("  ENOENT:  " + verdict(result.enoent.pass) + " repeats=" + repeats.length);
 for (const r of repeats) lines.push("           " + r.count + "x " + r.key);
@@ -215,7 +220,7 @@ if (e.GITHUB_STEP_SUMMARY) {
     "| --- | --- | --- |",
     "| pan up | " + verdict(result.panUp.pass) + " | rc " + show(result.panUp.rc) + ", healthy " + result.panUp.healthy + ", " + result.panUp.forbiddenToolLines.length + " forbidden-tool lines |",
     "| Idle new PIDs | " + verdict(result.idle.pass) + " | net " + show(result.idle.net) + " per " + window + " s (" + show(result.idle.netPerSec) + "/s), budget " + show(result.idle.budget) + " |",
-    "| Overdeck spawns (idle window) | info | " + (spawns ? spawns.count + " calls, " + spawns.failed + " failed" + (spawns.top.length ? "; top: " + spawns.top.slice(0, 5).map((g) => g.count + "x " + g.program + (g.error ? " (" + g.error + ")" : "")).join(", ") : "") : "n/a") + " |",
+    "| Overdeck spawns (idle window) | info | " + (spawns ? spawns.count + " calls, " + spawns.failed + " failed" + (spawns.top.length ? "; top: " + spawns.top.slice(0, 5).map((g) => g.count + "x " + g.program + (g.failed ? " (" + g.failed + " failed)" : "")).join(", ") : "") : "n/a") + " |",
     "| ENOENT repeats | " + verdict(result.enoent.pass) + " | " + repeats.length + " repeated |",
     "",
     "Subject: `" + show(result.subject) + "`" + (setupError ? ". Setup error: " + setupError : ""),
@@ -466,15 +471,19 @@ if (file && !cp.__overdeckSpawnTrace) {
       depth += 1;
       try {
         const r = orig.apply(this, a);
+        // A shell that cannot find its program exits 127: a failure too.
         if (r && typeof r.once === 'function') {
-          r.once('spawn', () => log(rec));
-          r.once('error', (e) => log({ ...rec, error: (e && e.code) || 'error' }));
+          r.once('spawn', () => log({ ...rec, event: 'spawn' }));
+          r.once('error', (e) => log({ ...rec, event: 'error', error: (e && e.code) || 'error' }));
+          r.once('exit', (code) => { if (code === 127) log({ ...rec, event: 'exit', error: 'exit 127' }); });
+        } else if (r && (r.error || r.status === 127)) {
+          log({ ...rec, event: 'error', error: r.error ? r.error.code || 'error' : 'exit 127' });
         } else {
-          log(r && r.error ? { ...rec, error: r.error.code || 'error' } : rec);
+          log({ ...rec, event: 'spawn' });
         }
         return r;
       } catch (e) {
-        log({ ...rec, error: (e && e.code) || 'error' });
+        log({ ...rec, event: 'error', error: e && e.status === 127 ? 'exit 127' : (e && e.code) || 'error' });
         throw e;
       } finally {
         depth -= 1;
@@ -499,8 +508,29 @@ if (file && !cp.__overdeckSpawnTrace) {
 TRACER
 }
 
+# Diagnostic only, never an assertion, and outside both measured windows:
+# with no Overdeck process alive, sample `ps` every 0.2 s for CHURN_SECS and
+# count new processes by command, so a noisy baseline names its source.
+# Short-lived processes between samples are missed, and ps and sleep from
+# the sampler itself appear in the list.
+sample_churn() {
+  local end
+  end=$(( $(date +%s) + CHURN_SECS ))
+  {
+    echo "== launchd jobs mentioning overdeck (darwin)"
+    if [ "$OS_NAME" = darwin ]; then launchctl print "gui/$(id -u)" 2>/dev/null | grep -i overdeck; fi
+    echo "== new processes per command in a ${CHURN_SECS} s ps sample, no Overdeck process alive"
+    while [ "$(date +%s)" -lt "$end" ]; do ps -axo pid=,ppid=,comm= 2>/dev/null; echo '--'; sleep 0.2; done \
+      | awk '$1 == "--" { n++; next } { pid = $1; $1 = ""; $2 = ""; sub(/^ +/, ""); if (!(pid in seen)) { seen[pid] = 1; if (n > 0) c[$0]++ } } END { for (k in c) printf "%6d %s\n", c[k], k }' \
+      | sort -rn | head -25
+  } >"$WORK_DIR/churn.log" 2>&1
+  echo "== top background process churn (diagnostic, see churn.log)"
+  sed -n '/^== new processes/,$p' "$WORK_DIR/churn.log" | sed -n '2,11p'
+}
+
 measure_idle() {
   local server waited=0
+  sample_churn
   echo "== baseline window (${WINDOW_SECS} s, no Overdeck process)"
   R_IDLE_BASELINE=$(window_count)
   echo "baseline new PIDs: $R_IDLE_BASELINE"
