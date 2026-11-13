@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5176",
   "created": "2026-11-13T05:00:59.712Z",
-  "updated": "2026-11-13T05:31:09.504Z",
+  "updated": "2026-11-13T05:48:13.192Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-13T05:37Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-13T05:37:52.793Z"
+    }
+  ],
   "items": {
     "spawn-ledger-helper": {
       "status": "completed",
@@ -124,9 +130,10 @@
       "doneAt": "2026-11-13T05:22:33.089Z"
     },
     "ci-bare-host-linux": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5176",
-      "claimedAt": "2026-11-13T05:22:39.920Z"
+      "claimedAt": "2026-11-13T05:22:39.920Z",
+      "doneAt": "2026-11-13T05:48:13.192Z"
     },
     "release-macos-gate": {
       "status": "completed",
@@ -149,6 +156,27 @@
     "release-macos-gate.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T05:31:09.504Z"
+    },
+    "ci-bare-host-linux.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:48:13.192Z"
+    },
+    "ci-bare-host-linux.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:48:13.192Z"
+    },
+    "ci-bare-host-linux.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:48:13.192Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-13T05:37:52Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5176\n\nPull request: https://github.com/eltmon/overdeck/pull/5179 (head `677f6a10`)\n\nSource: check_run:bare-host-linux\n\n## Failing checks (1)\n\n### bare-host-linux\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/131712778197/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43372545357/job/131712778197  \n```\nbare-host smoke: FAIL (linux, /home/runner/work/_temp/subject/overdeck-core-0.82.0.tgz)\n  pan up:  FAIL rc=0 healthy=true forbidden-tool lines=1\n             ⚠ tmux not found — the Herdr terminal backend does not need it; plain terminals in the dashboard do. Install manually: sudo apt-get update && sudo apt-get install -y tmux\n  idle:    PASS booted=true baseline=8 idle=25 net=17 (0.57/s) budget=30\n  ENOENT:  PASS repeats=0\n  result:  /home/runner/work/_temp/bare-host/result.json\n##[error]Process completed with exit code 1.\n##[group]Run actions/upload-artifact@v4\nwith:\n  name: bare-host-linux-logs\n  path: /home/runner/work/_temp/bare-host/result.json\n/home/runner/work/_temp/bare-host/*.log\n\n  if-no-files-found: warn\n  compression-level: 6\n  overwrite: false\n  include-hidden-files: false\nenv:\n  SKIP_DOCS_INDEX: 1\n  OVERDECK_TELEMETRY: 0\n##[endgroup]\n(node:13793) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.\n(Use `node --trace-deprecation ...` to show where the warning was created)\nWith the provided path, there will be 6 files uploaded\nArtifact name is valid!\nRoot directory input is valid!\nBeginning upload of artifact content to blob storage\n(node:13793) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\nUploaded bytes 4568\nFinished uploading artifact content to blob storage!\nSHA256 digest of uploaded artifact zip is 886caf54d759d8f189dfecbc77de8c5ef37f3b8055ccc6d2cf62d676aabf85c7\nFinalizing artifact upload\nArtifact bare-host-linux-logs.zip successfully finalized. Artifact ID 14013132041\nArtifact bare-host-linux-logs has been successfully uploaded! Final size is 4568 bytes. Artifact ID is 14013132041\nArtifact download URL: https://github.com/eltmon/overdeck/actions/runs/43372545357/artifacts/14013132041\nPost job cleanup.\n[command]/usr/bin/g\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
