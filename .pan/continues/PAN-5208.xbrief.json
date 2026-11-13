@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5208",
   "created": "2026-11-13T21:57:26.421Z",
-  "updated": "2026-11-13T22:05:23.104Z",
+  "updated": "2026-11-13T22:05:24.384Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,11 @@
     "appearance-choice.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T22:05:23.103Z"
+    },
+    "brand-components": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5208",
+      "claimedAt": "2026-11-13T22:05:24.383Z"
     }
   }
 }
