@@ -1,11 +1,14 @@
 /**
  * Status tab of the Flywheel rail (PAN-3964 FR-9). Renders the derived status
- * only — the last tick the loop printed, its freshness, the needs-you line,
- * and one row per feature workspace in the flywheel's project.
+ * only — the last tick the loop printed, its freshness, the needs-you items,
+ * one actionable row each, and one row per feature workspace in the
+ * flywheel's project.
  */
-import type { FlywheelDerivedStatus, FlywheelFreshness } from '@overdeck/contracts';
+import type { FlywheelDerivedStatus, FlywheelFreshness, FlywheelLastTick } from '@overdeck/contracts';
+import { needsYouItemKey, splitNeedsYouItems } from '@overdeck/contracts';
 
 import { formatAge } from '../../lib/flywheelApi';
+import { needsYouSegments } from '../../lib/flywheelNeedsYouLinks';
 import { EmptyState, StatusBadge, type Tone } from './primitives';
 
 const FRESHNESS_TONE: Record<FlywheelFreshness, Tone> = {
@@ -47,12 +50,27 @@ export function inFlightCountLabel(status: FlywheelDerivedStatus): string {
     : `${status.inFlight.length} feature workspaces`;
 }
 
+export interface NeedsYouRow {
+  key: string;
+  text: string;
+  messageId?: string;
+}
+
+/** One row per item; the server's first-raised id, else the newest tick's (PAN-5198). */
+export function needsYouRows(tick: FlywheelLastTick): NeedsYouRow[] {
+  const items = tick.needsYouItems ?? splitNeedsYouItems(tick.needsYou).map((text) => ({ text }));
+  return items.map((item) => {
+    const messageId = ('firstRaisedMessageId' in item ? item.firstRaisedMessageId : undefined) ?? tick.messageId;
+    return { key: needsYouItemKey(item.text), text: item.text, ...(messageId ? { messageId } : {}) };
+  });
+}
+
 interface FlywheelStatusPaneProps {
   status: FlywheelDerivedStatus | undefined;
   unreachable: boolean;
   nowMs: number;
   onNavigateIssue?: (issueId: string) => void;
-  onNeedsYouClick?: () => void;
+  onNeedsYouClick?: (messageId: string | undefined) => void;
 }
 
 export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue, onNeedsYouClick }: FlywheelStatusPaneProps) {
@@ -116,17 +134,68 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
             <span className="text-xs text-muted-foreground" title={tick.at}>{formatAge(tick.at, nowMs)}</span>
             {status.freshness && status.run === 'running' && <FreshnessBadge freshness={status.freshness} at={tick.at} nowMs={nowMs} />}
           </div>
-          {tick.needsYou && (
-            <button
-              type="button"
-              className="block w-full border-l-2 border-warning bg-warning/[0.08] px-3 py-2 text-left text-sm text-foreground hover:bg-warning/[0.14]"
+          {needsYouRows(tick).length > 0 && (
+            <div
+              role="group"
+              aria-label="Needs you"
               data-testid="flywheel-needs-you"
-              title="Open the question the flywheel is waiting on, or the message that raised this"
-              onClick={() => onNeedsYouClick?.()}
+              className="border-l-2 border-warning bg-warning/[0.08] px-3 py-2 text-sm text-foreground"
             >
               <span className="mr-2 text-[11px] font-medium uppercase tracking-wider text-warning-foreground">Needs you</span>
-              {tick.needsYou}
-            </button>
+              <ul>
+                {needsYouRows(tick).map((row) => (
+                  <li
+                    key={row.key}
+                    role="button"
+                    tabIndex={0}
+                    data-testid="flywheel-needs-you-item"
+                    title="Show the message that first raised this, or the question the flywheel is waiting on"
+                    className="cursor-pointer rounded-sm hover:bg-warning/[0.14]"
+                    onClick={() => onNeedsYouClick?.(row.messageId)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onNeedsYouClick?.(row.messageId);
+                      }
+                    }}
+                  >
+                    {needsYouSegments(row.text, status.inFlight).map((segment, i) => {
+                      if (segment.kind === 'issue') {
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            className="font-mono text-foreground hover:underline"
+                            data-testid="flywheel-needs-you-issue"
+                            onClick={(e) => { e.stopPropagation(); onNavigateIssue?.(segment.issueId); }}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
+                          >
+                            {segment.text}
+                          </button>
+                        );
+                      }
+                      if (segment.kind === 'pr') {
+                        return (
+                          <a
+                            key={i}
+                            href={segment.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-mono hover:underline"
+                            data-testid="flywheel-needs-you-pr"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
+                          >
+                            {segment.text}
+                          </a>
+                        );
+                      }
+                      return <span key={i}>{segment.text}</span>;
+                    })}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </section>
       )}

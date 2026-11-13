@@ -198,7 +198,7 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     });
     setup(status, { pendingInput: [{ name: 'conv-flywheel', pendingAskUserQuestion: { toolUseId: 'tu-1', askedAt: '2026-09-23T09:59:00.000Z', questions: [] } }] });
     const { client } = renderWithQuery(<FlywheelPage />);
-    const banner = await screen.findByTestId('flywheel-needs-you');
+    const banner = (await screen.findAllByTestId('flywheel-needs-you-item'))[0]!;
     await waitFor(() => expect(client.getQueryData(['conv-ask-user-question'])).toBeDefined());
 
     fireEvent.click(banner);
@@ -213,7 +213,7 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     });
     setup(status, { pendingInput: [] });
     const { client } = renderWithQuery(<FlywheelPage />);
-    const banner = await screen.findByTestId('flywheel-needs-you');
+    const banner = (await screen.findAllByTestId('flywheel-needs-you-item'))[0]!;
     await waitFor(() => expect(client.getQueryData(['conv-ask-user-question'])).toBeDefined());
 
     fireEvent.click(banner);

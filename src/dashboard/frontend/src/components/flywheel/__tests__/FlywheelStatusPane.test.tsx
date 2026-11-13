@@ -27,32 +27,74 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
     expect(screen.queryByTestId('flywheel-needs-you')).toBeNull();
   });
 
-  it('shows the needs-you callout when the tick carries one', () => {
+  it('renders one row per needs-you item, in order, inside a div (PAN-5198)', () => {
     const status = flywheelStatus({
-      lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the PAN-3920 scope', at: '2026-09-23T09:59:50.000Z' },
+      lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'waive PAN-5095 test removal; PR #7 merge; upload AAB', at: '2026-09-23T09:59:50.000Z' },
     });
     render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} />);
-    expect(screen.getByTestId('flywheel-needs-you')).toHaveTextContent('decide the PAN-3920 scope');
+    expect(screen.getByTestId('flywheel-needs-you').tagName).toBe('DIV');
+    const rows = screen.getAllByTestId('flywheel-needs-you-item');
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toHaveTextContent('waive PAN-5095 test removal');
+    expect(rows[1]).toHaveTextContent('PR #7 merge');
+    expect(rows[2]).toHaveTextContent('upload AAB');
   });
 
-  it('the needs-you banner is a button that calls onNeedsYouClick (PAN-4751)', () => {
+  it('clicking the issue control navigates and does not jump the row (PAN-5198)', () => {
+    const onNavigateIssue = vi.fn();
     const onNeedsYouClick = vi.fn();
     const status = flywheelStatus({
-      lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the PAN-3920 scope', at: '2026-09-23T09:59:50.000Z' },
+      lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'waive PAN-5095 test removal', at: '2026-09-23T09:59:50.000Z' },
     });
-    render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
-    const banner = screen.getByTestId('flywheel-needs-you');
-    expect(banner.tagName).toBe('BUTTON');
-    fireEvent.click(banner);
-    expect(onNeedsYouClick).toHaveBeenCalledTimes(1);
+    render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} onNavigateIssue={onNavigateIssue} onNeedsYouClick={onNeedsYouClick} />);
+    fireEvent.click(screen.getByTestId('flywheel-needs-you-issue'));
+    expect(onNavigateIssue).toHaveBeenCalledWith('PAN-5095');
+    expect(onNeedsYouClick).not.toHaveBeenCalled();
   });
 
-  it('the needs-you banner click does not throw without onNeedsYouClick', () => {
+  it('links a PR item only when an in-flight row carries that PR number (PAN-5198)', () => {
+    const status = flywheelStatus({
+      lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'PR #4001 merge; PR #7 merge', at: '2026-09-23T09:59:50.000Z' },
+    });
+    render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} />);
+    const links = screen.getAllByTestId('flywheel-needs-you-pr');
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute('href', 'https://github.com/eltmon/overdeck/pull/4001');
+  });
+
+  it('jumps to the item\'s first-raised message when needsYouItems is present (PAN-5198)', () => {
+    const onNeedsYouClick = vi.fn();
+    const status = flywheelStatus({
+      lastTick: {
+        tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'PR #7 merge', at: '2026-09-23T09:59:50.000Z', messageId: 'm9',
+        needsYouItems: [{ text: 'PR #7 merge', firstRaisedTick: 2, firstRaisedAt: '2026-09-23T09:30:00.000Z', firstRaisedMessageId: 'm2' }],
+      },
+    });
+    render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
+    const row = screen.getByTestId('flywheel-needs-you-item');
+    fireEvent.click(row);
+    expect(onNeedsYouClick).toHaveBeenCalledWith('m2');
+    onNeedsYouClick.mockClear();
+    fireEvent.keyDown(row, { key: 'Enter' });
+    expect(onNeedsYouClick).toHaveBeenCalledWith('m2');
+  });
+
+  it('jumps to the tick\'s messageId without needsYouItems (PAN-5198)', () => {
+    const onNeedsYouClick = vi.fn();
+    const status = flywheelStatus({
+      lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'PR #7 merge', at: '2026-09-23T09:59:50.000Z', messageId: 'm9' },
+    });
+    render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
+    fireEvent.click(screen.getByTestId('flywheel-needs-you-item'));
+    expect(onNeedsYouClick).toHaveBeenCalledWith('m9');
+  });
+
+  it('the needs-you row click does not throw without onNeedsYouClick', () => {
     const status = flywheelStatus({
       lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the PAN-3920 scope', at: '2026-09-23T09:59:50.000Z' },
     });
     render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} />);
-    expect(() => fireEvent.click(screen.getByTestId('flywheel-needs-you'))).not.toThrow();
+    expect(() => fireEvent.click(screen.getByTestId('flywheel-needs-you-item'))).not.toThrow();
   });
 
   it('renders in-flight rows with state, attention, PR, and last journal; issue ids navigate', () => {

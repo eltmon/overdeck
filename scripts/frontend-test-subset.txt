@@ -239,6 +239,7 @@ src/components/explorer/viewers/pdf/__tests__/pdfLayout.test.ts
 src/components/explorer/viewers/shared/__tests__/shared.test.tsx
 src/components/explorer/watch/__tests__/explorer-watch-hub.test.ts
 src/components/explorer/watch/__tests__/useExplorerWatch.test.tsx
+src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx
 src/components/home/__tests__/AnywhereSetUpRow.test.tsx
 src/components/home/__tests__/HomeComposer.test.tsx
 src/components/home/__tests__/HomeComposerProjectChip.test.tsx
