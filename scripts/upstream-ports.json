@@ -312,6 +312,12 @@
     "commit": "2d8a843e6b"
   },
   {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/OpenXmlOfficeViewer.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/OpenXmlOfficeViewer.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
     "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/__tests__/sheet-viewport.test.ts",
     "upstream": "t3code",
     "path": "apps/web/src/components/files/office/sheet-viewport.test.ts",
