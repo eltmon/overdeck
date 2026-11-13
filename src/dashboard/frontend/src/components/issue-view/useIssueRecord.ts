@@ -4,7 +4,7 @@ import { selectIssues, useDashboardStore } from '../../lib/store'
 import type { Issue } from '../../types'
 
 export type IssueRecordStatus = 'ready' | 'loading' | 'not-found' | 'unavailable'
-export interface IssueRecord { issue: Issue | null; status: IssueRecordStatus }
+export interface IssueHeaderRecord { issue: Issue | null; status: IssueRecordStatus }
 
 export const issueRecordQueryKey = (issueId: string) => ['issue', issueId.toUpperCase()] as const
 
@@ -36,7 +36,7 @@ export async function fetchIssueRecord(issueId: string): Promise<Issue | null> {
  * snapshot lacks (still loading, new, backlog/canceled, or aged-out) so a
  * header never waits on, or depends on, the full issue list.
  */
-export function useIssueRecord(issueId: string | null): IssueRecord {
+export function useIssueRecord(issueId: string | null): IssueHeaderRecord {
   const listed = useDashboardStore((s) => (issueId ? findListedIssue(selectIssues(s) as Issue[], issueId) : null))
   const query = useQuery({
     queryKey: issueRecordQueryKey(issueId ?? ''),
