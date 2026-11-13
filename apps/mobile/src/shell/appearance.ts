@@ -4,74 +4,33 @@
  * system-appearance change, to the dashboard theme, the status bar, and the native chrome via the
  * `OverdeckAppearance` plugin.
  *
- * Storage errors read as `system` and writes fail silently, matching `notificationPrefs.ts`'s
- * `readStorage`/`writeStorage`.
+ * The store itself (key, read, write, subscribe, resolve) lives in the frontend leaf module
+ * `src/dashboard/frontend/src/lib/appearance.ts`, shared with the `/m` web shell (PAN-5208); this
+ * module re-exports it and keeps only the native side effects.
  */
 import { SystemBars, SystemBarsStyle } from '@capacitor/core';
-import { useSyncExternalStore } from 'react';
 
 import { useTheme } from '../../../../src/dashboard/frontend/src/hooks/useTheme';
+import {
+  type Appearance,
+  onAppearanceChange,
+  readAppearance,
+  resolveAppearance,
+  type ResolvedTheme,
+} from '../../../../src/dashboard/frontend/src/lib/appearance';
 import { OverdeckAppearance } from '../native/appearance';
 
-export type Appearance = 'system' | 'light' | 'dark';
-export type ResolvedTheme = 'light' | 'dark';
-
-export const APPEARANCE_KEY = 'overdeck.appearance';
-export const APPEARANCES: readonly Appearance[] = ['system', 'light', 'dark'];
-
-function readStorage(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function writeStorage(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // Storage unavailable: the in-memory state still applies for this launch.
-  }
-}
-
-function isAppearance(value: string | null): value is Appearance {
-  return value === 'system' || value === 'light' || value === 'dark';
-}
-
-export function readAppearance(): Appearance {
-  const stored = readStorage(APPEARANCE_KEY);
-  return isAppearance(stored) ? stored : 'system';
-}
-
-const changeListeners = new Set<() => void>();
-
-/** Returns the uninstaller. */
-export function onAppearanceChange(listener: () => void): () => void {
-  changeListeners.add(listener);
-  return () => {
-    changeListeners.delete(listener);
-  };
-}
-
-function notify(): void {
-  for (const listener of changeListeners) listener();
-}
-
-export function writeAppearance(appearance: Appearance): void {
-  writeStorage(APPEARANCE_KEY, appearance);
-  notify();
-}
-
-export function useAppearance(): Appearance {
-  return useSyncExternalStore(onAppearanceChange, readAppearance);
-}
-
-export function resolveAppearance(appearance: Appearance, systemDark: boolean): ResolvedTheme {
-  if (appearance === 'light') return 'light';
-  if (appearance === 'dark') return 'dark';
-  return systemDark ? 'dark' : 'light';
-}
+export {
+  APPEARANCE_KEY,
+  APPEARANCES,
+  type Appearance,
+  onAppearanceChange,
+  readAppearance,
+  resolveAppearance,
+  type ResolvedTheme,
+  useAppearance,
+  writeAppearance,
+} from '../../../../src/dashboard/frontend/src/lib/appearance';
 
 export interface AppearanceDeps {
   setTheme(theme: ResolvedTheme): void;
