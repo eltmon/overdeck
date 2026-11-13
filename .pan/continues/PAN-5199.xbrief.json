@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5199",
   "created": "2026-11-13T20:11:44.953Z",
-  "updated": "2026-11-13T20:44:16.602Z",
+  "updated": "2026-11-13T20:44:23.683Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,11 @@
     "porcelain-status-entries.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T20:44:16.601Z"
+    },
+    "start-gate-sync-tolerance": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5199",
+      "claimedAt": "2026-11-13T20:44:23.683Z"
     }
   }
 }
