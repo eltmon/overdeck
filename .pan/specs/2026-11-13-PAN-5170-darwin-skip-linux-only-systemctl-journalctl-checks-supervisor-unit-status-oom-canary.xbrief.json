@@ -1,0 +1,418 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-13T02:22:09Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5170: darwin: skip Linux-only systemctl/journalctl checks (supervisor unit status, OOM canary)",
+    "updated": "2026-11-13T02:27:50.365Z"
+  },
+  "plan": {
+    "id": "pan-5170",
+    "title": "darwin: skip Linux-only systemctl/journalctl checks (supervisor unit status, OOM canary)",
+    "status": "proposed",
+    "uid": "50dd3d63-c3fe-4546-b201-ebefd613b7b9",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-13T02:22:09Z",
+    "updated": "2026-11-13T02:27:50.365Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5170",
+        "label": "PAN-5170",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5168",
+        "label": "PAN-5168",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5170.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "darwin",
+      "macos",
+      "platform-guard",
+      "supervisor",
+      "oom-canary",
+      "spawn-storm"
+    ],
+    "narratives": {
+      "Problem": "On macOS the restart announcer runs `systemctl --user is-failed overdeck-supervisor.service` on every pass (30 times in the first 30 s, then every 15 s), and the memory-pressure patrol's OOM canary spawns `journalctl -k` once at boot. Neither binary exists on macOS, and each failed spawn there leaves about ten dead node processes (PAN-5168). The canary also writes the full ENOENT error object into the dashboard log.",
+      "Proposal": "Add a `process.platform !== 'linux'` early return to `isSupervisorUnitFailed` (src/lib/systemd.ts) and to the OOM canary `readNewKernelJournal` (src/lib/cloister/memory-pressure-patrol.ts), which also now logs one line on a Linux failure. In the restart announcer, Linux keeps the systemd unit-failed path unchanged; every other platform probes the supervisor's `GET /health` instead and emits one error activity row when a supervisor this process has seen answer stays unreachable for 60 s. The rule lives in a pure tracker module (src/dashboard/server/services/supervisor-reachability.ts). Docs D-10 (ANYWHERE-ARCHITECTURE.md), the memory gate (PIPELINE-GATES.md) and changelog.d/pan-5170.md describe the macOS behavior. Full detail in .pan/drafts/PAN-5170.md.",
+      "NonGoals": "- Guarding `findManagedServerPid` in src/lib/tmux.ts (not a poller; runs only on conversation stop)\n- Any host-tool lookup, PATH cache, or ENOENT backoff (PAN-5168 owns it)\n- Detecting Linux without systemd or without journalctl ahead of the spawn\n- A macOS OOM replacement (kern.memorystatus_vm_pressure_level or JetsamEvent-*.ips)\n- A 'supervisor is back' recovery activity row on macOS\n- Any launchctl call from the restart announcer\n- Writing restart-status.json from the macOS supervisor check\n- Changing Linux behavior of the unit-failed check, the restart-status write, or the GAVE UP row\n- Changing isSupervisorUnitActive, systemdUserAvailable, or any other systemd.ts function"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Guard by `process.platform !== 'linux'` only; no 'systemd is present' probe on Linux.",
+        "rationale": "The issue lists the systemd-presence check as optional; on Linux a failed spawn costs one process, and the issue comment forbids a second tool cache because PAN-5168 owns host-tool lookup."
+      },
+      {
+        "summary": "On macOS, report supervisor liveness via HTTP GET /health on the supervisor port, not the pidfile.",
+        "rationale": "Only startSupervisorProcess writes supervisor.pid; a launchd-run supervisor (pan connect) has none, so a pidfile check would report a healthy supervisor dead. The HTTP probe covers both launch modes and starts no child process. The issue comment allows 'pidfile or liveness'."
+      },
+      {
+        "summary": "Report the macOS supervisor down only after this process has seen it answer once and it then stays unreachable for 60 s; once per episode.",
+        "rationale": "Plain `node dist/dashboard/server.js` runs have no supervisor, pan reload/restart cycle it, and launchd restarts after a 5 s throttle; none of these should raise an error row."
+      },
+      {
+        "summary": "The macOS path emits an activity row directly and writes no restart-status.json.",
+        "rationale": "The systemd status text (attempts: 3, restart limit, GAVE UP) is wrong for macOS; a direct emit keeps the Linux restart-status semantics untouched."
+      },
+      {
+        "summary": "Leave findManagedServerPid (src/lib/tmux.ts) unguarded.",
+        "rationale": "The issue comment limits the change to the two named checks; it is not a poller, and the parallel tmux work may touch that file."
+      }
+    ],
+    "items": [
+      {
+        "id": "guard-supervisor-unit-failed",
+        "title": "Return false from isSupervisorUnitFailed off Linux without spawning systemctl",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T02:22:09Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-5170",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/systemd.ts",
+            "src/lib/__tests__/systemd.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/systemd.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/__tests__/systemd.test.ts passes including the new darwin case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/systemd.ts `isSupervisorUnitFailed` (search `export async function isSupervisorUnitFailed`), add `if (process.platform !== 'linux') return false;` as the first statement, with the comment `// PAN-5170: no systemd on macOS, and a failed spawn there costs ~10 processes.`. Touch no other function. In src/lib/__tests__/systemd.test.ts, inside `describe('supervisor systemd unit helpers')`, add `it('returns false on darwin without running systemctl (PAN-5170)')`: call `setPlatform('darwin')`, make `execAsyncMock.mockResolvedValue({ stdout: 'failed\\n', stderr: '' })`, import `isSupervisorUnitFailed` dynamically as the neighbouring test does, assert it resolves false and `execAsyncMock` was not called. Do not use skipIf."
+        },
+        "items": [
+          {
+            "id": "guard-supervisor-unit-failed.ac1",
+            "title": "Given process.platform is 'darwin', when isSupervisorUnitFailed() runs, then it returns false and execAsyncMock is not called (new test in src/lib/__tests__/systemd.test.ts passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-supervisor-unit-failed.ac2",
+            "title": "Given process.platform is 'linux' and systemctl prints 'failed', when isSupervisorUnitFailed() runs, then it returns true (existing test 'reports failed unit state and returns false when the unit is absent' still passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-supervisor-unit-failed.ac3",
+            "title": "Given the diff to src/lib/systemd.ts, when a reviewer reads it, then it preserves every function except isSupervisorUnitFailed unchanged (isSupervisorUnitActive and systemdUserAvailable keep their current bodies)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "supervisor-reachability-tracker",
+        "title": "Add the pure supervisor reachability tracker with its 60 s down window",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T02:22:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5170",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/supervisor-reachability.ts",
+            "src/dashboard/server/services/__tests__/supervisor-reachability.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/supervisor-reachability.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "supervisor-reachability.test.ts passes all four cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/dashboard/server/services/supervisor-reachability.ts exactly as the PRD snippet: export `SUPERVISOR_DOWN_WINDOW_MS = 60_000`, `interface SupervisorDownReport { unreachableForMs: number }`, `interface SupervisorReachabilityTracker { observe(answered: boolean, nowMs: number): SupervisorDownReport | null }`, and `createSupervisorReachabilityTracker(windowMs = SUPERVISOR_DOWN_WINDOW_MS)`. Rule: a success sets seenAlive, clears the unreachable timer and the reported latch, returns null; a failure before any success returns null; the first failure after a success starts the timer at nowMs; return a report once when nowMs - start >= windowMs, then null until a success resets. Pure: no timers, no I/O, no imports beyond types. Write the four test cases listed in PRD WI-2 in src/dashboard/server/services/__tests__/supervisor-reachability.test.ts using explicit nowMs values."
+        },
+        "items": [
+          {
+            "id": "supervisor-reachability-tracker.ac1",
+            "title": "Given the tracker has never seen a success, when observe(false, t) is called for t from 0 to 600000, then every call returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-reachability-tracker.ac2",
+            "title": "Given observe(true, 0) then failures at 1000 and 59999, when observe(false, 61000) is called, then it returns { unreachableForMs: 60000 }, and a further observe(false, 120000) returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-reachability-tracker.ac3",
+            "title": "Given a reported episode, when observe(true, t) is followed by 61 s of failures, then the tracker returns a second report",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-reachability-tracker.ac4",
+            "title": "Given success at 0, failure at 1000, success at 30000, when failures occur at 40000 and 90000, then both return null because the timer restarted at 40000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "announcer-darwin-reachability",
+        "title": "Skip the systemd check off Linux in the restart announcer and report the supervisor via /health",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T02:22:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5170",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/restart-announcer.ts",
+            "src/dashboard/server/services/__tests__/restart-announcer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/restart-announcer.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "restart-announcer.test.ts passes, including the new darwin describe block",
+            "typecheck completes without errors",
+            "lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In src/dashboard/server/services/restart-announcer.ts: import createSupervisorReachabilityTracker and the tracker type from './supervisor-reachability.js' and getSupervisorUrl from '../../../lib/supervisor.js'. Add optional deps `platform?: NodeJS.Platform`, `probeSupervisor?: () => Promise<boolean>`, `supervisorUrl?: () => string` to RestartAnnouncerDeps. Add a module-level tracker that stopRestartAnnouncer() replaces with a fresh one, a module-level memoized default URL (`cachedSupervisorUrl ??= getSupervisorUrl()`), and `probeSupervisorHealth(url)` that fetches `${url}/health` with an AbortController + setTimeout(2000, unref'd, cleared in finally) and returns res.ok, false on any error. In announceNewRestart, replace the `await syncSupervisorUnitFailureStatus(...)` line with a branch: platform === 'linux' runs it unchanged; any other platform runs checkSupervisorReachable, which calls the probe (rejection = false), feeds tracker.observe(answered, now()), and on a report emits { source: 'supervisor', level: 'error', desktop: false, message: `The supervisor at ${url} has not answered for ${Math.floor(ms/1000)} s. Force Restart and the dashboard watchdog do not work until it runs again. Run \\`pan up\\` to start it.` }. The non-Linux branch never calls readSupervisorUnitFailed or writeStatus. Add one sentence about the macOS branch to the module header. Tests: in makeDeps add `platform: 'linux'` and `probeSupervisor: async () => true` (also to the TestDeps type); reset with stopRestartAnnouncer() between new tests; add describe('announceNewRestart on darwin (PAN-5170)') with the cases in PRD WI-3, building every darwin case with makeDeps(null) (the default watchdogSuccess status would itself emit a source 'supervisor' row) and injecting supervisorUrl: () => 'http://127.0.0.1:3012' so no test reads the host config.toml. Do not use AbortSignal.timeout, skipIf, or source-reading tests."
+        },
+        "items": [
+          {
+            "id": "announcer-darwin-reachability.ac1",
+            "title": "Given platform 'darwin', makeDeps(null), an answering probe, and readSupervisorUnitFailed/writeStatus as vi.fn mocks, when announceNewRestart runs, then neither mock is called and no entry is emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "announcer-darwin-reachability.ac2",
+            "title": "Given platform 'darwin', makeDeps(null), supervisorUrl 'http://127.0.0.1:3012', and a probe that answers at T then fails at T+1000 and T+61000, when announceNewRestart runs at each time, then exactly one entry is emitted with source 'supervisor', level 'error', and a message containing 'http://127.0.0.1:3012', 'has not answered for 60 s' and 'pan up', and a failed pass at T+120000 emits nothing more",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "announcer-darwin-reachability.ac3",
+            "title": "Given platform 'darwin', makeDeps(null), and a probe that never answers, when announceNewRestart runs across 10 minutes of passes, then no entry is emitted and writeStatus is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "announcer-darwin-reachability.ac4",
+            "title": "Given platform 'linux' and readSupervisorUnitFailed resolving true, when announceNewRestart runs, then the existing GAVE UP restart-status write and single give-up entry behave as before (existing test 'emits one supervisor give-up entry when the systemd unit is failed' passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "oom-canary-platform-guard",
+        "title": "Skip the journalctl OOM canary off Linux and log a Linux failure as one line",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T02:22:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5170",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/memory-pressure-patrol.ts",
+            "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/memory-pressure-patrol.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "memory-pressure-patrol.test.ts passes including the new readNewKernelJournal describe block",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/lib/cloister/memory-pressure-patrol.ts, export `interface KernelJournalDeps { platform: NodeJS.Platform; runJournalctl: (args: string[]) => Promise<string>; warn: (line: string) => void }` and make `readNewKernelJournal(deps: Partial<KernelJournalDeps> = {})` exported. First statement: `if ((deps.platform ?? process.platform) !== 'linux') return '';` (before the disabled check, the cursor stat, the spawn, or any log). The default runJournalctl wraps the existing `promisify(execFile)('journalctl', args, { timeout: 10000 })` and returns stdout; keep the cursor-file and `-n 0` logic unchanged. Replace the catch's console.warn(error object) with one string: `[memory-pressure-patrol] OOM canary disabled: journalctl failed (${String(code ?? message ?? err)})` passed to deps.warn (default `console.warn(line)`), then disable the canary. In patrolMemoryPressure change the default to `deps.readNewKernelJournal || (() => readNewKernelJournal())`. Update the function's doc comment to say Linux only (PAN-5170). Add describe('readNewKernelJournal (PAN-5170)') in tests/unit/lib/cloister/memory-pressure-patrol.test.ts with the four cases in PRD WI-4, calling __resetMemoryPressurePatrolState() in beforeEach."
+        },
+        "items": [
+          {
+            "id": "oom-canary-platform-guard.ac1",
+            "title": "Given platform 'darwin', when readNewKernelJournal runs, then it returns '' and neither runJournalctl nor warn is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oom-canary-platform-guard.ac2",
+            "title": "Given platform 'linux' and runJournalctl rejecting with code 'ENOENT', when readNewKernelJournal runs, then it returns '' and warn is called once with exactly one string argument equal to '[memory-pressure-patrol] OOM canary disabled: journalctl failed (ENOENT)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oom-canary-platform-guard.ac3",
+            "title": "Given the canary was disabled by a failure, when readNewKernelJournal runs again on 'linux', then it returns '' and runJournalctl is not called a second time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oom-canary-platform-guard.ac4",
+            "title": "Given platform 'linux' and runJournalctl resolving 'line\\n', when readNewKernelJournal runs, then it returns 'line\\n' and runJournalctl received args starting with ['-k', '--cursor-file']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-darwin-platform-guards",
+        "title": "Document the macOS supervisor check and Linux-only OOM canary, and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T02:22:09Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5170",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "docs/PIPELINE-GATES.md",
+            "changelog.d/pan-5170.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0 with changelog.d/pan-5170.md present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. (1) docs/ANYWHERE-ARCHITECTURE.md: append to the `- **D-10 macOS.**` bullet: \"The restart announcer's supervisor check runs `systemctl --user is-failed` on Linux only. On macOS it probes the supervisor's `GET /health` each pass and adds one error row to the activity feed when a supervisor it has seen answer stays unreachable for 60 s (`src/dashboard/server/services/supervisor-reachability.ts`, PAN-5170).\" (2) docs/PIPELINE-GATES.md, Memory gate bullet, after the sentence ending 'which reports the band to the activity feed.': add \"Its OOM canary reads kernel OOM kills from `journalctl -k` on Linux only; on macOS, which has no kernel journal, it never runs, and on Linux a `journalctl` failure logs one line and turns the canary off (PAN-5170).\" (3) Create changelog.d/pan-5170.md with the exact `#### Fixed` bullet from PRD WI-5. Run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "docs-darwin-platform-guards.ac1",
+            "title": "Given docs/ANYWHERE-ARCHITECTURE.md, when the D-10 macOS bullet renders, then it names systemctl --user is-failed as Linux only, the macOS GET /health probe, the 60 s unreachable report, and supervisor-reachability.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-darwin-platform-guards.ac2",
+            "title": "Given docs/PIPELINE-GATES.md, when the memory gate bullet renders, then it names journalctl -k as Linux only, says the OOM canary never runs on macOS, and says a Linux failure logs one line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-darwin-platform-guards.ac3",
+            "title": "Given changelog.d/pan-5170.md with one '#### Fixed' heading and a bullet linking #5170, when npm run lint:docs runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "supervisor-reachability-tracker",
+        "to": "announcer-darwin-reachability",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-13-PAN-5170-darwin-skip-linux-only-systemctl-journalctl-checks-supervisor-unit-status-oom-canary.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
