@@ -14,6 +14,7 @@ import chalk from "chalk";
 import { Effect } from "effect";
 import { detectPlatform } from "../platform.js";
 import { loadConfigSync } from "../config-yaml.js";
+import { findExecutableOnPath } from "../pan-cli-shim.js";
 import { ensureSemgrepInstalled, managedSemgrepPath, readSemgrepVersion, SEMGREP_VERSION } from "../semgrep/install.js";
 import { hostTerminalBackendName } from "../terminal-backends/select.js";
 import type { TerminalBackendName } from "../terminal-backends/types.js";
@@ -116,9 +117,22 @@ async function installLinuxPackage(tool: LinuxPackageTool): Promise<void> {
   await execAsync(getLinuxInstallCommand(tool, packageManager), { timeout: 120000 });
 }
 
+/** PAN-5169: an uncached, spawn-free PATH check (PAN-5168 owns any shared host-tool lookup). */
+function brewOnPath(): boolean {
+  return findExecutableOnPath("brew", process.env.PATH) !== null;
+}
+
+function brewMissingError(tool: string): Error {
+  return new Error(`Homebrew (brew) is not on PATH, so ${tool} was not installed automatically`);
+}
+
 async function getManualInstallHint(tool: LinuxPackageTool): Promise<string> {
   const plat = await Effect.runPromise(detectPlatform());
-  if (plat === "darwin") return `brew install ${tool}`;
+  if (plat === "darwin") {
+    return brewOnPath()
+      ? `brew install ${tool}`
+      : `${getLinuxManualInstallHint(tool, null)}, or install Homebrew (https://brew.sh) and run: brew install ${tool}`;
+  }
   return getLinuxManualInstallHint(tool, await detectLinuxPackageManager());
 }
 
@@ -245,6 +259,7 @@ export async function ensureHostTools(deps: EnsureHostToolsDeps = {}): Promise<v
 async function installTmux(): Promise<InstallResult> {
   const plat = await Effect.runPromise(detectPlatform());
   if (plat === "darwin") {
+    if (!brewOnPath()) throw brewMissingError("tmux");
     await execAsync("brew install tmux", { timeout: 120000 });
   } else {
     await installLinuxPackage("tmux");
@@ -258,7 +273,7 @@ async function installTtyd(): Promise<InstallResult> {
   mkdirSync(binDir, { recursive: true });
   const ttydPath = join(binDir, "ttyd");
 
-  if (plat === "darwin") {
+  if (plat === "darwin" && brewOnPath()) {
     try {
       await execAsync("brew install ttyd", { timeout: 120000 });
       return { tool: "ttyd", success: true, message: "ttyd installed via Homebrew" };
@@ -281,6 +296,7 @@ async function installTtyd(): Promise<InstallResult> {
 async function installMkcert(): Promise<InstallResult> {
   const plat = await Effect.runPromise(detectPlatform());
   if (plat === "darwin") {
+    if (!brewOnPath()) throw brewMissingError("mkcert");
     await execAsync("brew install mkcert", { timeout: 120000 });
     await execAsync("mkcert -install", { timeout: 30000 });
     return {
@@ -310,6 +326,7 @@ async function installMkcert(): Promise<InstallResult> {
 async function installJq(): Promise<InstallResult> {
   const plat = await Effect.runPromise(detectPlatform());
   if (plat === "darwin") {
+    if (!brewOnPath()) throw brewMissingError("jq");
     await execAsync("brew install jq", { timeout: 120000 });
   } else {
     await installLinuxPackage("jq");
