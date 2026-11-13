@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5208",
   "created": "2026-11-13T21:57:26.421Z",
-  "updated": "2026-11-13T22:24:47.243Z",
+  "updated": "2026-11-13T22:25:44.624Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -302,9 +302,22 @@
       "doneAt": "2026-11-13T22:24:45.942Z"
     },
     "native-sting": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5208",
-      "claimedAt": "2026-11-13T22:24:47.243Z"
+      "claimedAt": "2026-11-13T22:24:47.243Z",
+      "doneAt": "2026-11-13T22:25:44.623Z"
+    },
+    "native-sting.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T22:25:44.623Z"
+    },
+    "native-sting.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T22:25:44.623Z"
+    },
+    "native-sting.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T22:25:44.623Z"
     }
   }
 }
