@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5178",
   "created": "2026-11-13T05:44:52.973Z",
-  "updated": "2026-11-13T05:57:07.417Z",
+  "updated": "2026-11-13T05:57:13.855Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "boot-session-first.ac5": {
       "status": "completed",
       "doneAt": "2026-11-13T05:57:07.417Z"
+    },
+    "boot-deeplink-prefetch": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5178",
+      "claimedAt": "2026-11-13T05:57:13.855Z"
     }
   }
 }
