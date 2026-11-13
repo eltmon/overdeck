@@ -1775,3 +1775,67 @@ fails when a record and its file's header disagree. Run
 checkouts in `~/Projects/` to list the upstream commits that changed each
 ported file since its port. The license texts are in `licenses/`, and
 `docs/ACKNOWLEDGEMENTS.md` credits both projects.
+
+### Explorer pane, tree and search (PAN-5186)
+
+The Stage `'files'` pane is the explorer. It is keyed by `explorerRootId`, not
+by issue: the project home's **Files** button opens it on `project:<key>` (the
+project checkout), and an issue tab's **Files** button opens it on
+`issue:<ID>`. `addPane` keeps at most one explorer pane per `(deck, root)`.
+A legacy `files` pane persisted before this change migrates on deck load: one
+with an `issueId` gets `explorerRootId: issue:<ID>`, and one with neither field
+is closed. `FilesPane` is gone. Its job, the agent's changed files, is the
+explorer's **Changed** filter, which renders a tree synthesized from
+`explorerGitStatus` (working tree plus the branch's commits), so a deleted file
+still shows.
+
+Opening a file (double click, Enter, the menu's **Open**, quick open) creates a
+`'code'` pane spec: `{ paneType: 'code', label: <basename>, explorerRootId,
+explorerPath }`. A content-search hit adds `explorerRevealLine`,
+`explorerRevealColumn` and a fresh `explorerRevealNonce`, the same pattern as
+`targetMessageNonce`. An existing code pane for the same `(root, path)` is
+focused and patched instead of duplicated. PAN-5187 renders code panes; until
+then they show the Stage placeholder.
+
+The browser half lives in `src/dashboard/frontend/src/components/explorer/`:
+
+- `explorer-rpc.ts` is the only module that calls `wsTransport`; every
+  `pan.explorer*` call goes through it.
+- `explorerStore.ts` holds each root's loaded directories, expanded set,
+  dotfile toggle, Changed filter and selection. The expanded set and the
+  dotfile toggle persist in `localStorage` under `overdeck.explorer.<rootId>`.
+- `tree/` holds the natural sort (directories first, numeric collation), the
+  row projection (ported from Orca), the directory loader (at most 4
+  `explorerListDir` calls at once; Expand all stops at 2,000 folders) and the
+  virtualized `ExplorerTree`.
+- `git/` holds the decorations (ported from Orca) and the git status
+  scheduler.
+- `watch/` holds the watch hub. It keeps one `explorerWatch` subscription per
+  root, shared by every local listener, and closes it when the last listener
+  leaves. A batch with an `overflow` event, and every stream reconnect, reach
+  listeners as `resync`, and the pane then re-lists every loaded directory and
+  refetches git status.
+- `menu/` holds the right-click menu, and `search/` holds quick open, content
+  search and the shortcuts.
+
+Git status refetches 125 ms after the last watch signal, but never sooner than
+3 s after the previous fetch started, plus a 60 s safety refresh while the pane
+is mounted and the document is visible. A root that answers `NOT_A_GIT_REPO`
+stops fetching until the header's **Refresh** button. A folder takes the color
+of its dominant descendant, in the order conflicted > deleted > modified >
+renamed > added > untracked; a file also shows a one-letter badge. A file that
+changed only in the branch's commits keeps its default name color and gets a
+muted badge.
+
+The menu's read actions are Open, Copy path, Copy relative path, Find in folder
+and Download (the PAN-5188 route). Stage, Unstage and Discard changes write the
+index and the working tree, so they do not render on `project` roots: the
+primary checkout is never written. Discard asks for confirmation first.
+
+`Ctrl/Cmd+P` (quick open, by file name) and `Ctrl/Cmd+Shift+F` (content search,
+with case and regex toggles) are pane-scoped: an `onKeyDown` on the explorer
+pane's root element handles them while focus is inside the pane, and calls
+`preventDefault()` so the browser's print dialog does not open. There is no
+global binding. Quick open queries 120 ms after the last keystroke; content
+search runs 300 ms after the last change, or at once on Enter. **Find in
+folder** opens content search scoped to that folder.
