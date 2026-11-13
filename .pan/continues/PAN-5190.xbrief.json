@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5190",
   "created": "2026-11-13T20:35:48.124Z",
-  "updated": "2026-11-13T20:40:18.939Z",
+  "updated": "2026-11-13T20:40:28.187Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,11 @@
     "name-rules.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T20:40:18.939Z"
+    },
+    "actions-core": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T20:40:28.187Z"
     }
   }
 }
