@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5189",
   "created": "2026-11-13T19:51:19.231Z",
-  "updated": "2026-11-13T20:35:06.411Z",
+  "updated": "2026-11-13T20:35:14.934Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,11 @@
     "odf-viewer.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T20:35:06.410Z"
+    },
+    "notebook-viewer": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5189",
+      "claimedAt": "2026-11-13T20:35:14.933Z"
     }
   }
 }
