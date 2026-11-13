@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5211",
   "created": "2026-11-13T22:53:14.172Z",
-  "updated": "2026-11-13T23:26:16.553Z",
+  "updated": "2026-11-13T23:30:55.817Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -278,9 +278,26 @@
       "doneAt": "2026-11-13T23:26:10.316Z"
     },
     "wi14-disk-paging": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5211",
-      "claimedAt": "2026-11-13T23:26:16.553Z"
+      "claimedAt": "2026-11-13T23:26:16.553Z",
+      "doneAt": "2026-11-13T23:30:55.817Z"
+    },
+    "wi14-disk-paging.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:30:55.817Z"
+    },
+    "wi14-disk-paging.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:30:55.817Z"
+    },
+    "wi14-disk-paging.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:30:55.817Z"
+    },
+    "wi14-disk-paging.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:30:55.817Z"
     }
   }
 }
