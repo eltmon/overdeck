@@ -112,8 +112,13 @@ function extractCommand(name: string, args: string): string | undefined {
   return undefined;
 }
 
+export interface CodexAccumulatorOptions {
+  /** PAN-5211: byte offset of the first record this accumulator receives (a tail read starts above 0). */
+  readonly historyStartOffset?: number;
+}
+
 /** Incremental rollout accumulator; each JSONL record is consumed once per cached file. */
-export function createCodexConversationAccumulator(sessionFile: string) {
+export function createCodexConversationAccumulator(sessionFile: string, options: CodexAccumulatorOptions = {}) {
   const costs = createCodexSessionParser(sessionFile);
   const messages: ChatMessage[] = [];
   const workLog: WorkLogEntry[] = [];
@@ -131,6 +136,7 @@ export function createCodexConversationAccumulator(sessionFile: string) {
   let trailingAgentMessageAt: string | undefined;
   // PAN-5211: retained characters of every kept row (see tool-result-bounds.ts).
   let retained = 0;
+  const historyStart = options.historyStartOffset ?? 0;
 
   const addMessage = (message: ChatMessage): void => {
     messages.push(message);
@@ -272,6 +278,7 @@ export function createCodexConversationAccumulator(sessionFile: string) {
       planToolUseIds: new Set(),
       compactBoundaries,
       fileEditsByAssistantId: new Map(),
+      historyStartOffset: historyStart,
     };
   };
   return { push, result, retainedChars: (): number => retained };

@@ -214,4 +214,38 @@ describe('incremental Codex history', () => {
     expect(result.workLog).toHaveLength(2);
     expect(parser.retainedChars()).toBe(estimateParseResultChars(result));
   });
+
+  it('opens a transcript over tailReadBytes by reading only its tail, keeping the cumulative totals', async () => {
+    const tokenCount = (total: number) => line('event_msg', {
+      type: 'token_count', info: { total_token_usage: { input_tokens: total - 10, output_tokens: 10, total_tokens: total } },
+    });
+    let body = line('turn_context', { model: 'gpt-5.5' });
+    let total = 0;
+    for (let i = 0; Buffer.byteLength(body) < 1_000_000; i++) {
+      body += message(`message ${i} ${'p'.repeat(200)}`);
+      if (i % 20 === 0) body += tokenCount((total += 1000));
+    }
+    body += tokenCount((total += 1000));
+    await writeFile(file, body);
+    const size = Buffer.byteLength(body);
+
+    const offsets: number[] = [];
+    const read = createIncrementalTranscriptReader((path, options) => {
+      const parser = createCodexConversationAccumulator(path, options);
+      return { ...parser, push: (text, location) => { offsets.push(location!.offset); parser.push(text); } };
+    }, { tailReadBytes: 64 * 1024 });
+    const result = await read(file);
+
+    expect(offsets.length).toBeGreaterThan(0);
+    expect(Math.min(...offsets)).toBeGreaterThanOrEqual(size - 65_536);
+    expect(result.historyStartOffset).toBe(Math.min(...offsets));
+    expect(result.historyStartOffset).toBeGreaterThan(0);
+    expect(result.totalTokens).toBe(total);
+
+    offsets.length = 0;
+    await appendFile(file, message('appended one') + message('appended two'));
+    const next = await read(file);
+    expect(offsets).toEqual([size, size + Buffer.byteLength(message('appended one'))]);
+    expect(next.messages.slice(-2).map(m => m.text)).toEqual(['appended one', 'appended two']);
+  });
 });

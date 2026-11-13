@@ -5,11 +5,14 @@ import {
   RECORD_PARSE_MAX_BYTES,
   TRANSCRIPT_CACHE_MAX_RETAINED_CHARS,
   TRANSCRIPT_ENTRY_MAX_RETAINED_CHARS,
+  TRANSCRIPT_TAIL_READ_BYTES,
   scrubImageDataUrls,
 } from './conversation/tool-result-bounds.js';
 
 /** Bytes of an oversized record's start that `pushOversized` receives, decoded. */
 const OVERSIZED_HEAD_BYTES = 4096;
+/** Block size used to find the first line boundary of a tail read. */
+const TAIL_SCAN_BLOCK_BYTES = 64 * 1024;
 
 export interface Accumulator {
   push(line: string, location?: RecordLocation): void;
@@ -116,6 +119,7 @@ export function createIncrementalTranscriptReader(
   const recordParseMaxBytes = options.recordParseMaxBytes ?? RECORD_PARSE_MAX_BYTES;
   const maxEntryRetainedChars = options.maxEntryRetainedChars ?? TRANSCRIPT_ENTRY_MAX_RETAINED_CHARS;
   const maxCacheRetainedChars = options.maxCacheRetainedChars ?? TRANSCRIPT_CACHE_MAX_RETAINED_CHARS;
+  const tailReadBytes = options.tailReadBytes ?? TRANSCRIPT_TAIL_READ_BYTES;
   const cache = new Map<string, Entry>();
   const pending = new Map<string, Promise<ParseResult>>();
   let generation = 0;
@@ -151,13 +155,24 @@ export function createIncrementalTranscriptReader(
         const { bytesRead } = await handle.read(bytes, 0, length, offset);
         return bytes.subarray(0, bytesRead);
       };
+      const firstLineStartAtOrAfter = async (from: number, size: number): Promise<number> => {
+        for (let offset = from; offset < size; offset += TAIL_SCAN_BLOCK_BYTES) {
+          const block = await bytesAt(offset, Math.min(TAIL_SCAN_BLOCK_BYTES, size - offset));
+          const newline = block.indexOf(10);
+          if (newline !== -1) return offset + newline + 1;
+          if (block.length === 0) break;
+        }
+        return size;
+      };
       const prefixChanged = entry && stats.size >= entry.size && (
         !entry.head.equals(await bytesAt(0, entry.head.length)) ||
         !entry.tail.equals(await bytesAt(entry.size - entry.tail.length, entry.tail.length))
       );
       if (!entry || entry.dev !== stats.dev || entry.ino !== stats.ino || stats.size < entry.size ||
         (stats.size === entry.size && stats.mtimeMs !== entry.mtimeMs) || prefixChanged) {
-        entry = newEntry(file, stats, 0);
+        // PAN-5211: a cold open of a large transcript reads only its last tailReadBytes.
+        const start = stats.size > tailReadBytes ? await firstLineStartAtOrAfter(stats.size - tailReadBytes, stats.size) : 0;
+        entry = newEntry(file, stats, start);
       }
       if (stats.size !== entry.size || !entry.result) {
         const buffer = Buffer.alloc(Math.min(1024 * 1024, Math.max(1, stats.size - entry.size)));

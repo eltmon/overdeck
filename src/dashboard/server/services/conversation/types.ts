@@ -68,6 +68,8 @@ export interface ParseResult {
   countedUsageIds?: Set<string>;
   /** Most recent compaction summary record encountered while parsing (see CompactSummaryRecord). */
   latestCompactSummary?: CompactSummaryRecord;
+  /** PAN-5211: byte offset of the oldest record this result holds; > 0 means older history is only on disk. */
+  historyStartOffset?: number;
 }
 
 /** State carried across incremental parseConversationMessages calls. */
