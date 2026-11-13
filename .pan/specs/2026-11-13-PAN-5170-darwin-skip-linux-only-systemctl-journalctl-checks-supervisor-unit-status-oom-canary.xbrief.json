@@ -4,17 +4,17 @@
     "created": "2026-11-13T02:22:09Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5170: darwin: skip Linux-only systemctl/journalctl checks (supervisor unit status, OOM canary)",
-    "updated": "2026-11-13T02:27:50.365Z"
+    "updated": "2026-11-13T02:56:43.892Z"
   },
   "plan": {
     "id": "pan-5170",
     "title": "darwin: skip Linux-only systemctl/journalctl checks (supervisor unit status, OOM canary)",
-    "status": "proposed",
+    "status": "running",
     "uid": "50dd3d63-c3fe-4546-b201-ebefd613b7b9",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-13T02:22:09Z",
-    "updated": "2026-11-13T02:27:50.365Z",
+    "updated": "2026-11-13T02:56:43.892Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5170",
@@ -414,5 +414,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
