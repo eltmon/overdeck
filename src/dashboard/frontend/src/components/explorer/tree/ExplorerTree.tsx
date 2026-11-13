@@ -57,6 +57,8 @@ export interface ExplorerTreeProps extends Omit<HTMLAttributes<HTMLDivElement>, 
   /** The open inline edit; a rename renders its row through `renderInline` (PAN-5190). */
   inlineEdit?: InlineEdit | null
   renderInline?(props: InlineRenderProps): ReactNode
+  /** A right-click on blank tree space, outside every row (PAN-5190, D-E10). */
+  onContextMenuBlank?(): void
 }
 
 /** A focusable row: not a truncated row and not an inline name row. */
@@ -78,8 +80,10 @@ export const ExplorerTree = forwardRef<HTMLDivElement, ExplorerTreeProps>(functi
     onContextMenuRow,
     inlineEdit = null,
     renderInline,
+    onContextMenuBlank,
     className,
     onKeyDown,
+    onContextMenu,
     ...rest
   },
   forwardedRef,
@@ -214,6 +218,10 @@ export const ExplorerTree = forwardRef<HTMLDivElement, ExplorerTreeProps>(functi
       aria-multiselectable
       aria-activedescendant={focusedMounted ? rowId(focusedIndex) : undefined}
       onKeyDown={handleKeyDown}
+      onContextMenu={(event) => {
+        if (!(event.target instanceof Element) || !event.target.closest('[role="treeitem"]')) onContextMenuBlank?.()
+        onContextMenu?.(event)
+      }}
       className={`min-h-0 flex-1 overflow-auto outline-none ${className ?? ''}`}
     >
       <div style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}>

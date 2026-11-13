@@ -8,11 +8,13 @@
 // changed-files list: it shows a tree synthesized from git status (D-B8).
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ChevronsDownUp, ChevronsUpDown, Eye, EyeOff, RefreshCw } from 'lucide-react'
+import { ChevronsDownUp, ChevronsUpDown, Eye, EyeOff, FilePlus, FolderPlus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { useStageDeck } from '../Stage/StageDeckContext'
 import type { PaneWrapperProps } from '../Stage/types'
+import { useExplorerActions } from './actions/useExplorerActions'
+import { useInlineEdit } from './actions/useInlineEdit'
 import { explorerErrorMessage, listDir, parseRootId, rootLabel } from './explorer-rpc'
 import { useExplorerStore, type RootState, type SelectMode } from './explorerStore'
 import { useExplorerGitStatus } from './git/useExplorerGitStatus'
@@ -94,6 +96,7 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
   const rootKind = parsed?.kind ?? 'workspace'
   const root: RootState | undefined = useExplorerStore((s) => s.roots[rootId])
   const loaderRef = useRef<DirectoryLoader | null>(null)
+  const treeRef = useRef<HTMLDivElement | null>(null)
   const git = useExplorerGitStatus(rootId)
   const deck = useStageDeck()
   const [expanding, setExpanding] = useState(false)
@@ -239,6 +242,13 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
     [cancelPreview, openFile, rootId],
   )
 
+  // PAN-5190 D-E1, D-E2: write actions only on issue/workspace roots with the Changed filter off.
+  const writable = rootKind !== 'project' && !changedOnly
+  const actions = useExplorerActions({ rootId, writable, reloadDirs: reloadLoaded, refreshGit: git.refresh, openFile: openFileFromTree })
+  const inline = useInlineEdit({ rootId, root, rows, actions, treeRef })
+  const clearSelection = useCallback(() => useExplorerStore.getState().clearSelection(rootId), [rootId])
+  const noop = useCallback(() => {}, [])
+
   const onQuickOpen = useCallback(() => setQuickOpen(true), [])
   const onContentSearch = useCallback(() => setContentSearchScope(''), [])
   const onKeyDown = useExplorerShortcuts({ onQuickOpen, onContentSearch })
@@ -333,8 +343,8 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
     }
   } else if (!changedOnly && rootDir?.status !== 'ready') {
     body = <PaneMessage>Loading files…</PaneMessage>
-  } else if (rows.length === 0) {
-    body = <PaneMessage>{changedOnly ? 'No changes.' : 'This folder is empty.'}</PaneMessage>
+  } else if (inline.rows.length === 0 && changedOnly) {
+    body = <PaneMessage>No changes.</PaneMessage>
   } else {
     body = (
       <ExplorerContextMenu
@@ -345,20 +355,41 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
         onOpen={openFileFromTree}
         onFindInFolder={(dirPath) => setContentSearchScope(dirPath)}
         onGitChanged={git.refresh}
+        writable={writable}
+        onNewFile={() => inline.startCreate('file')}
+        onNewFolder={() => inline.startCreate('dir')}
+        onRename={inline.startRename}
+        onDuplicate={noop}
+        onDelete={noop}
       >
-        <ExplorerTree
-          aria-label={`Files in ${rootLabel(rootId)}`}
-          rows={rows}
-          decorations={git.decorations}
-          selection={root?.selection ?? []}
-          focused={root?.focused ?? null}
-          onToggle={onToggle}
-          onSelect={onSelect}
-          onOpen={openFileFromTree}
-          onPreview={previewFileFromTree}
-          onFocus={onFocus}
-          onContextMenuRow={onContextMenuRow}
-        />
+        {inline.rows.length === 0 ? (
+          // An empty root still opens the menu, so New file and New folder are reachable.
+          <div
+            tabIndex={-1}
+            onContextMenu={clearSelection}
+            className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground outline-none"
+          >
+            This folder is empty.
+          </div>
+        ) : (
+          <ExplorerTree
+            ref={treeRef}
+            aria-label={`Files in ${rootLabel(rootId)}`}
+            rows={inline.rows}
+            inlineEdit={inline.inlineEdit}
+            renderInline={inline.renderInline}
+            onContextMenuBlank={clearSelection}
+            decorations={git.decorations}
+            selection={root?.selection ?? []}
+            focused={root?.focused ?? null}
+            onToggle={onToggle}
+            onSelect={onSelect}
+            onOpen={openFileFromTree}
+            onPreview={previewFileFromTree}
+            onFocus={onFocus}
+            onContextMenuRow={onContextMenuRow}
+          />
+        )}
       </ExplorerContextMenu>
     )
   }
@@ -389,6 +420,16 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
           >
             Changed
           </button>
+          {writable && (
+            <>
+              <HeaderButton label="New file" onClick={() => inline.startCreate('file')}>
+                <FilePlus className="h-3.5 w-3.5" />
+              </HeaderButton>
+              <HeaderButton label="New folder" onClick={() => inline.startCreate('dir')}>
+                <FolderPlus className="h-3.5 w-3.5" />
+              </HeaderButton>
+            </>
+          )}
           <HeaderButton label="Refresh" onClick={onRefresh}>
             <RefreshCw className="h-3.5 w-3.5" />
           </HeaderButton>
