@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5169",
   "created": "2026-11-13T02:56:46.720Z",
-  "updated": "2026-11-13T03:08:32.886Z",
+  "updated": "2026-11-13T03:08:39.644Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,11 @@
     "permission-read-strict.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T03:08:32.886Z"
+    },
+    "pane-choice-herdr-skip": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5169",
+      "claimedAt": "2026-11-13T03:08:39.643Z"
     }
   }
 }
