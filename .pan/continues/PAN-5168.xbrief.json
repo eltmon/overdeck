@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5168",
   "created": "2026-11-13T02:56:42.362Z",
-  "updated": "2026-11-13T03:05:45.306Z",
+  "updated": "2026-11-13T03:27:45.248Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,50 @@
       "doneAt": "2026-11-13T03:05:33.267Z"
     },
     "docker-stats-gate": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5168",
-      "claimedAt": "2026-11-13T03:05:45.306Z"
+      "claimedAt": "2026-11-13T03:05:45.306Z",
+      "doneAt": "2026-11-13T03:27:45.248Z"
+    },
+    "docker-stats-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:27:45.248Z"
+    },
+    "docker-stats-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:27:45.248Z"
+    },
+    "docker-stats-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:27:45.248Z"
+    },
+    "docker-stats-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:27:45.248Z"
+    },
+    "resource-discovery-docker-gate": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:27:45.248Z"
+    },
+    "resource-discovery-docker-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:27:45.248Z"
+    },
+    "resource-discovery-docker-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:27:45.248Z"
+    },
+    "stack-health-docker-gate": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:27:45.248Z"
+    },
+    "stack-health-docker-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:27:45.248Z"
+    },
+    "stack-health-docker-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:27:45.248Z"
     }
   }
 }
