@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5176",
   "created": "2026-11-13T05:00:59.712Z",
-  "updated": "2026-11-13T08:03:59.914Z",
+  "updated": "2026-11-13T08:04:02.322Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -219,6 +219,11 @@
     "ci-known-bad-canary.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T08:03:59.913Z"
+    },
+    "budget-calibration": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5176",
+      "claimedAt": "2026-11-13T08:04:02.321Z"
     }
   },
   "feedback": [
