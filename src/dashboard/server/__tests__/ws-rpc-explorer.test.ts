@@ -128,35 +128,71 @@ describe('pan.explorerWatch', () => {
   });
 });
 
-describe('explorerRpcHandlers write stubs', () => {
-  it('pan.explorerWriteFile fails NOT_IMPLEMENTED naming PAN-5187', async () => {
-    const exit = await Effect.runPromiseExit(
+describe('explorerRpcHandlers write methods', () => {
+  // The fixture repo is shared with the read tests above, so these touch
+  // only files they create.
+  it('pan.explorerWriteFile writes through the precondition and returns the new signature', async () => {
+    const written = await Effect.runPromise(
       explorerRpcHandlers[WS_METHODS.explorerWriteFile]({
-        rootId: 'issue:PAN-5185',
-        path: 'a.ts',
-        text: 'x',
+        rootId: 'issue:x',
+        path: 'w/written.txt',
+        text: 'one\n',
         expectedSignature: null,
         allowMissing: false,
       }),
     );
-    const error = failureOf(exit);
-    expect(error.code).toBe('NOT_IMPLEMENTED');
-    expect(error.message).toContain('PAN-5187');
+    expect(written.signature).toEqual(expect.any(String));
+    const conflict = await Effect.runPromiseExit(
+      explorerRpcHandlers[WS_METHODS.explorerWriteFile]({
+        rootId: 'issue:x',
+        path: 'w/written.txt',
+        text: 'two\n',
+        expectedSignature: 'stale',
+        allowMissing: false,
+      }),
+    );
+    expect(failureOf(conflict).code).toBe('DISK_CONFLICT');
   });
 
-  it.each([
-    [WS_METHODS.explorerCreate, { rootId: 'r', path: 'a', kind: 'file' as const }],
-    [WS_METHODS.explorerRename, { rootId: 'r', from: 'a', to: 'b' }],
-    [WS_METHODS.explorerCopy, { rootId: 'r', from: 'a', to: 'b' }],
-    [WS_METHODS.explorerDelete, { rootId: 'r', paths: ['a'] }],
-    [WS_METHODS.explorerRestore, { rootId: 'r', trashId: 't' }],
-  ] as const)('%s fails NOT_IMPLEMENTED naming PAN-5187', async (method, payload) => {
-    const handler = explorerRpcHandlers[method] as (input: typeof payload) => Effect.Effect<unknown, PanRpcError>;
-    const error = failureOf(await Effect.runPromiseExit(handler(payload)));
-    expect(error.code).toBe('NOT_IMPLEMENTED');
-    expect(error.message).toContain('PAN-5187');
+  it('pan.explorerCreate, Rename and Copy reach their services', async () => {
+    const created = await Effect.runPromise(
+      explorerRpcHandlers[WS_METHODS.explorerCreate]({ rootId: 'issue:x', path: 'w/c.txt', kind: 'file' }),
+    );
+    expect(created.entry).toMatchObject({ path: 'w/c.txt', kind: 'file' });
+    const renamed = await Effect.runPromise(
+      explorerRpcHandlers[WS_METHODS.explorerRename]({ rootId: 'issue:x', from: 'w/c.txt', to: 'w/r.txt' }),
+    );
+    expect(renamed.entry.path).toBe('w/r.txt');
+    const copied = await Effect.runPromise(
+      explorerRpcHandlers[WS_METHODS.explorerCopy]({ rootId: 'issue:x', from: 'w/r.txt', to: 'w/k.txt' }),
+    );
+    expect(copied.entry.path).toBe('w/k.txt');
   });
 
+  it('pan.explorerDelete and Restore round-trip through the trash', async () => {
+    await Effect.runPromise(
+      explorerRpcHandlers[WS_METHODS.explorerCreate]({ rootId: 'issue:x', path: 'w/d.txt', kind: 'file' }),
+    );
+    const { trashIds } = await Effect.runPromise(
+      explorerRpcHandlers[WS_METHODS.explorerDelete]({ rootId: 'issue:x', paths: ['w/d.txt'] }),
+    );
+    expect(trashIds).toHaveLength(1);
+    const restored = await Effect.runPromise(
+      explorerRpcHandlers[WS_METHODS.explorerRestore]({ rootId: 'issue:x', trashId: trashIds[0]! }),
+    );
+    expect(restored.path).toBe('w/d.txt');
+  });
+
+  it('write methods refuse a project root', async () => {
+    mocks.resolveExplorerRoot.mockResolvedValueOnce(root('project'));
+    const exit = await Effect.runPromiseExit(
+      explorerRpcHandlers[WS_METHODS.explorerCreate]({ rootId: 'project:p', path: 'w/p.txt', kind: 'file' }),
+    );
+    expect(failureOf(exit).code).toBe('EDIT_WORKSPACE_REQUIRED');
+  });
+});
+
+describe('explorerRpcHandlers unshipped methods', () => {
   it('pan.explorerBeginEdit fails NOT_IMPLEMENTED naming PAN-5191', async () => {
     const exit = await Effect.runPromiseExit(
       explorerRpcHandlers[WS_METHODS.explorerBeginEdit]({ projectKey: 'overdeck', forceNew: false }),

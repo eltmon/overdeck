@@ -7,9 +7,7 @@
  * failure to a PanRpcError with an EXPLORER_ERROR_CODES code.
  *
  * A method whose service has not shipped yet answers NOT_IMPLEMENTED with a
- * message naming the issue that owns it:
- *   - write methods (delete, restore): PAN-5187
- *   - explorerBeginEdit: PAN-5191
+ * message naming the issue that owns it: explorerBeginEdit ships in PAN-5191.
  */
 import { Effect, Queue, Stream } from 'effect';
 import { PanRpcGroup, WS_METHODS, type ExplorerWatchBatch, type PanRpcError } from '@overdeck/contracts';
@@ -18,13 +16,13 @@ import { gitStage, gitStatus } from './services/explorer/git.js';
 import { listDir, readFile } from './services/explorer/read.js';
 import { resolveExplorerRoot } from './services/explorer/roots.js';
 import { invalidateFileListCache, searchContent, searchFiles } from './services/explorer/search.js';
+import { restore, trashPaths } from './services/explorer/trash.js';
 import { getExplorerWatchSupervisor } from './services/explorer/watch-supervisor.js';
 import { copy, create, rename, writeFile } from './services/explorer/write.js';
 
 /** The 14 pan.explorer* method tags. */
 type ExplorerMethodTag = Extract<(typeof WS_METHODS)[keyof typeof WS_METHODS], `pan.explorer${string}`>;
 
-const WRITE_OWNER = 'PAN-5187';
 const BEGIN_EDIT_OWNER = 'PAN-5191';
 
 const notImplemented = (method: string, owner: string) =>
@@ -54,8 +52,10 @@ export const explorerRpcHandlers = {
     run(async () => rename(await resolveExplorerRoot(input.rootId), input.from, input.to)),
   [WS_METHODS.explorerCopy]: (input) =>
     run(async () => copy(await resolveExplorerRoot(input.rootId), input.from, input.to)),
-  [WS_METHODS.explorerDelete]: () => notImplemented(WS_METHODS.explorerDelete, WRITE_OWNER),
-  [WS_METHODS.explorerRestore]: () => notImplemented(WS_METHODS.explorerRestore, WRITE_OWNER),
+  [WS_METHODS.explorerDelete]: (input) =>
+    run(async () => ({ trashIds: await trashPaths(await resolveExplorerRoot(input.rootId), input.paths) })),
+  [WS_METHODS.explorerRestore]: (input) =>
+    run(async () => restore(await resolveExplorerRoot(input.rootId), input.trashId)),
   [WS_METHODS.explorerGitStatus]: (input) =>
     run(async () => gitStatus(await resolveExplorerRoot(input.rootId))),
   [WS_METHODS.explorerGitStage]: (input) =>
