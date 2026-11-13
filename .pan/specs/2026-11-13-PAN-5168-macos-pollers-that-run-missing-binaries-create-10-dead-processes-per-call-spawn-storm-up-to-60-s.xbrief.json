@@ -4,17 +4,17 @@
     "created": "2026-11-13T02:24:27Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5168: macOS: pollers that run missing binaries create ~10 dead processes per call (spawn storm, up to ~60/s)",
-    "updated": "2026-11-13T02:33:44.567Z"
+    "updated": "2026-11-13T02:56:13.675Z"
   },
   "plan": {
     "id": "pan-5168",
     "title": "macOS: pollers that run missing binaries create ~10 dead processes per call (spawn storm, up to ~60/s)",
-    "status": "proposed",
+    "status": "running",
     "uid": "51ea1114-3a36-4c4c-a5bb-88cdd01c6b7d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-13T02:24:27Z",
-    "updated": "2026-11-13T02:33:44.567Z",
+    "updated": "2026-11-13T02:56:13.675Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5168",
@@ -740,5 +740,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
