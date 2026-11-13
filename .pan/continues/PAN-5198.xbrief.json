@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5198",
   "created": "2026-11-13T19:57:57.248Z",
-  "updated": "2026-11-13T20:37:22.631Z",
+  "updated": "2026-11-13T20:37:29.619Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,11 @@
     "skill-needs-you-contract.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T20:37:22.630Z"
+    },
+    "docs-flywheel-needs-you": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5198",
+      "claimedAt": "2026-11-13T20:37:29.619Z"
     }
   }
 }
