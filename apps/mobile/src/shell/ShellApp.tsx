@@ -12,6 +12,7 @@ import { type Connection, createConnection } from './connection';
 import { createDirectory, type ShellDirectory } from './directory';
 import { resetTransport } from '../../../../src/dashboard/frontend/src/lib/wsTransport';
 import { deriveConnectionPhase, useConnectionState } from '../../../../src/dashboard/frontend/src/lib/connectionState';
+import { LogoSting } from '../../../../src/dashboard/frontend/src/components/mobile/LogoSting';
 import { installResumeHandler, lastResumedAt } from './lifecycle';
 import { installLinkRecovery } from './linkRecovery';
 import { installLinkTelemetry } from './linkTelemetry';
@@ -319,6 +320,7 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
   // The machine view: a current, paired machine at /m (C-7: switching machines reloads the page).
   const current = paired.find((m) => m.environmentId === currentMachineId()) ?? null;
   const inMachineView = current !== null && location.pathname.startsWith('/m');
+  const hasSnapshot = useConnectionState((s) => s.hasSnapshot);
   const dialError = useSyncExternalStore(onSessionChange, lastDialError);
   const connection = services?.connection ?? null;
   /** The machine the shims route to; MachineView mounts only after it is set, so its first request finds it. */
@@ -419,6 +421,10 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     [navigate],
   );
 
+  // PAN-5208 D-10: the cold-start logo sting holds until the screen beneath has its content.
+  const stingReady = boot.kind === 'failed'
+    || (boot.kind === 'ready' && (account === null || (services !== null && (!inMachineView || hasSnapshot))));
+
   return (
     <div data-component="mobile-shell" className="fixed inset-0 flex flex-col bg-background text-foreground">
       {boot.kind === 'loading' ? null : boot.kind === 'failed' ? (
@@ -504,6 +510,8 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
           }
         />
       )}
+      {/* PAN-5208 D-9: once per app process (sessionStorage survives the machine-switch reload). */}
+      <LogoSting ready={stingReady} />
     </div>
   );
 }
