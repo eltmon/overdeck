@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5171",
   "created": "2026-11-13T03:13:45.277Z",
-  "updated": "2026-11-13T03:31:13.816Z",
+  "updated": "2026-11-13T03:31:22.490Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,11 @@
     "issue-record-hook.ac5": {
       "status": "completed",
       "doneAt": "2026-11-13T03:31:13.815Z"
+    },
+    "issue-header-title": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5171",
+      "claimedAt": "2026-11-13T03:31:22.490Z"
     }
   }
 }
