@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { loadConfigSync } from './config-yaml/load.js';
+import { hostToolNotFoundError, resolveHostTool } from './host-tools.js';
 import { OVERDECK_HOME, getCanonicalOverdeckHome } from './paths.js';
 import { getSupervisorPort, resolveSupervisorBundle, resolveSupervisorPrimaryRepoRoot } from './supervisor.js';
 
@@ -55,6 +56,9 @@ function execStartQuote(value: string): string {
 }
 
 function systemctl(command: string): Promise<{ stdout: string; stderr: string }> {
+  // PAN-5176 (D9): the restart announcer runs this on a timer, so a Linux host
+  // without systemctl must not spawn a shell for it on every pass.
+  if (resolveHostTool('systemctl') === null) return Promise.reject(hostToolNotFoundError('systemctl'));
   return execAsync(`systemctl --user ${command}`, {
     encoding: 'utf-8',
     timeout: SYSTEMCTL_TIMEOUT_MS,

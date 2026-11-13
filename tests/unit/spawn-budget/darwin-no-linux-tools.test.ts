@@ -18,6 +18,7 @@ import {
 } from '../../../src/lib/systemd.js';
 import { readNewKernelJournal } from '../../../src/lib/cloister/memory-pressure-patrol.js';
 import { announceNewRestart } from '../../../src/dashboard/server/services/restart-announcer.js';
+import { resetHostToolsForTests, setHostToolFinderForTests } from '../../../src/lib/host-tools.js';
 
 const ledger = await vi.hoisted(async () =>
   (await import('../../helpers/spawn-budget.js')).installSpawnLedger());
@@ -132,5 +133,50 @@ describe('positive control on linux', () => {
     expect(ledger.records.filter((record) => record.program === 'systemctl')).toEqual([
       { api: 'exec', program: 'systemctl', denied: true },
     ]);
+  });
+});
+
+// PAN-5176 D9 finding: the bare-host smoke saw the restart announcer run
+// `systemctl --user is-failed` through a shell on every pass on a Linux host
+// whose PATH has no systemctl. With systemctl reported missing, nothing spawns.
+describe('on linux with systemctl missing', () => {
+  const savedRuntimeDir = process.env.XDG_RUNTIME_DIR;
+
+  beforeAll(() => {
+    stubPlatform('linux');
+    delete process.env.XDG_RUNTIME_DIR;
+    setHostToolFinderForTests((name) => (name === 'systemctl' ? null : name));
+    vi.useFakeTimers({ now: new Date('2026-11-13T00:00:00Z'), toFake: ['Date'] });
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
+    resetHostToolsForTests();
+    stubPlatform('darwin');
+    if (savedRuntimeDir !== undefined) process.env.XDG_RUNTIME_DIR = savedRuntimeDir;
+  });
+
+  it('isSupervisorUnitFailed resolves false without spawning systemctl', async () => {
+    ledger.reset();
+    await expect(isSupervisorUnitFailed()).resolves.toBe(false);
+    expect(ledger.count({ programs: ['systemctl'] })).toBe(0);
+  });
+
+  it('announceNewRestart spawns no systemctl over 5 passes on the default platform', async () => {
+    ledger.reset();
+    const deps = {
+      readStatus: async () => null,
+      writeStatus: vi.fn(async () => {}),
+      emit: vi.fn(),
+      getLastAnnounced: () => null,
+      setLastAnnounced: vi.fn(),
+      now: () => Date.now(),
+      isPeer: () => false,
+    };
+    for (let pass = 0; pass < 5; pass += 1) {
+      await expect(announceNewRestart(deps)).resolves.toBe(false);
+      vi.setSystemTime(Date.now() + 61_000);
+    }
+    expect(ledger.count({ programs: ['systemctl'] })).toBe(0);
   });
 });
