@@ -1,6 +1,6 @@
 /** PAN-5188 WI-2: GET /api/explorer/download streams file bytes with single-range support and hardened headers. */
 import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readlink, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -177,6 +177,25 @@ describe('handleExplorerDownload', () => {
     expect((await download('nope.txt')).status).toBe(404);
     expect((await download('sub')).status).toBe(404);
     expect((await download('')).status).toBe(404);
+  });
+
+  it('closes the file handle when the client cancels the body mid-stream', async () => {
+    if (process.platform !== 'linux') return;
+    const big = join(dir, 'big.bin');
+    await writeFile(big, Buffer.alloc(1024 * 1024, 7));
+    const openOn = async (path: string) => {
+      const fds = await readdir('/proc/self/fd');
+      const links = await Promise.all(fds.map((fd) => readlink(`/proc/self/fd/${fd}`).catch(() => '')));
+      return links.filter((link) => link === path).length;
+    };
+    const response = HttpServerResponse.toWeb(
+      await handleExplorerDownload(fakeRequest('root=issue:PAN-1&path=big.bin'), { resolveExplorerRoot }),
+    );
+    const reader = response.body!.getReader();
+    expect((await reader.read()).done).toBe(false);
+    expect(await openOn(big)).toBe(1);
+    await reader.cancel();
+    await vi.waitFor(async () => expect(await openOn(big)).toBe(0));
   });
 
   it('answers 404 for a FIFO without hanging', async () => {
