@@ -72,6 +72,7 @@ R_PANUP_RC=''
 R_PANUP_HEALTHY=false
 R_PANUP_PASS=false
 R_IDLE_BOOTED=false
+R_IDLE_STAYED_UP=false
 R_IDLE_BASELINE=''
 R_IDLE_NEW=''
 R_IDLE_NET=''
@@ -164,7 +165,7 @@ idle_window() {
 }
 
 write_result() {
-  export R_SETUP_ERROR R_PANUP_RC R_PANUP_HEALTHY R_PANUP_PASS R_IDLE_BOOTED R_IDLE_BASELINE \
+  export R_SETUP_ERROR R_PANUP_RC R_PANUP_HEALTHY R_PANUP_PASS R_IDLE_BOOTED R_IDLE_STAYED_UP R_IDLE_BASELINE \
     R_IDLE_NEW R_IDLE_NET R_ENOENT_PASS R_TRACE_FROM R_TRACE_TO
   R_OS="$OS_NAME" R_SUBJECT="$SUBJECT" R_BUDGET="$BUDGET" R_WINDOW="$WINDOW_SECS" R_OUT="$OUT" \
     R_FORBIDDEN_FILE="$WORK_DIR/forbidden-lines.txt" R_ENOENT_FILE="$WORK_DIR/enoent-counts.txt" \
@@ -212,14 +213,14 @@ const window = Number(e.R_WINDOW);
 const rule = e.R_OS === "darwin" ? "traced-cost" : "pid-net";
 const value = rule === "traced-cost" ? (spawns ? spawns.cost : null) : net;
 const budget = num(e.R_BUDGET);
-const idlePass = bool(e.R_IDLE_BOOTED) && value !== null && budget !== null && value <= budget;
+const idlePass = bool(e.R_IDLE_BOOTED) && bool(e.R_IDLE_STAYED_UP) && value !== null && budget !== null && value <= budget;
 const result = {
   version: "1",
   os: e.R_OS || null,
   subject: e.R_SUBJECT || null,
   panUp: { rc: num(e.R_PANUP_RC), healthy: bool(e.R_PANUP_HEALTHY), forbiddenToolLines: readLines(e.R_FORBIDDEN_FILE), pass: bool(e.R_PANUP_PASS) },
   idle: {
-    booted: bool(e.R_IDLE_BOOTED), baselineNew: num(e.R_IDLE_BASELINE), idleNew: num(e.R_IDLE_NEW), net,
+    booted: bool(e.R_IDLE_BOOTED), stayedUp: bool(e.R_IDLE_STAYED_UP), baselineNew: num(e.R_IDLE_BASELINE), idleNew: num(e.R_IDLE_NEW), net,
     netPerSec: net === null ? null : Math.round((net / window) * 100) / 100, budget, rule, value, pass: idlePass, spawns,
   },
   enoent: { repeats, pass: bool(e.R_ENOENT_PASS) },
@@ -239,7 +240,7 @@ const lines = [
 if (setupError) lines.push("  setup error: " + setupError);
 lines.push("  pan up:  " + verdict(result.panUp.pass) + " rc=" + show(result.panUp.rc) + " healthy=" + result.panUp.healthy + " forbidden-tool lines=" + result.panUp.forbiddenToolLines.length);
 for (const line of result.panUp.forbiddenToolLines) lines.push("           " + line);
-lines.push("  idle:    " + verdict(result.idle.pass) + " booted=" + result.idle.booted + " rule=" + rule + " value=" + show(value) + " budget=" + show(budget));
+lines.push("  idle:    " + verdict(result.idle.pass) + " booted=" + result.idle.booted + " stayedUp=" + result.idle.stayedUp + " rule=" + rule + " value=" + show(value) + " budget=" + show(budget));
 lines.push("           PIDs: baseline=" + show(result.idle.baselineNew) + " idle=" + show(result.idle.idleNew) + " net=" + show(result.idle.net) + " (" + show(result.idle.netPerSec) + "/s)" + (rule === "pid-net" ? "" : " (reported, not asserted)"));
 if (spawns) {
   lines.push("           Overdeck child_process calls in the idle window: " + spawns.count + " (" + spawns.failed + " failed, " + spawns.spawnErrors + " failed to spawn), traced cost " + spawns.cost);
@@ -577,7 +578,7 @@ measure_idle() {
   echo "== dashboard server idle window"
   write_spawn_tracer
   bare OVERDECK_NO_RESUME=1 DASHBOARD_PORT=3010 API_PORT=3011 PORT=3011 OVERDECK_MODE=production \
-    NODE_OPTIONS="--require $WORK_DIR/tools/spawn-trace.cjs" OVERDECK_SPAWN_TRACE="$WORK_DIR/spawn-trace.log" \
+    NODE_OPTIONS="--require \"$WORK_DIR/tools/spawn-trace.cjs\"" OVERDECK_SPAWN_TRACE="$WORK_DIR/spawn-trace.log" \
     "$NODE_BIN" "$CORE/dist/dashboard/server.js" >"$WORK_DIR/server.log" 2>&1 &
   server=$!
   while [ "$waited" -lt "$HEALTH_TIMEOUT_SECS" ]; do
@@ -591,6 +592,13 @@ measure_idle() {
     idle_window
     R_IDLE_NET=$((R_IDLE_NEW - R_IDLE_BASELINE))
     echo "idle new PIDs: $R_IDLE_NEW, net $R_IDLE_NET (the verdict is in the summary below)"
+    # A dashboard that died during the window spawns nothing, so an empty
+    # trace would pass: it must still be running and healthy afterwards.
+    if kill -0 "$server" 2>/dev/null && curl -sf --max-time 5 -o /dev/null http://127.0.0.1:3011/api/health; then
+      R_IDLE_STAYED_UP=true
+    else
+      echo "the dashboard stopped or stopped answering /api/health during the idle window; see $WORK_DIR/server.log"
+    fi
   else
     echo "dashboard never answered /api/health within ${HEALTH_TIMEOUT_SECS} s; see $WORK_DIR/server.log"
   fi

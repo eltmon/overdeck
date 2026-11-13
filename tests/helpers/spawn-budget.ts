@@ -12,8 +12,9 @@
  * Calls whose program basename is in the deny list (default
  * `DENIED_HOST_TOOLS`) are recorded with `denied: true` and redirected to
  * `/nonexistent/overdeck-spawn-budget/<tool>`. The direct forms then fail with
- * a real ENOENT in every calling style; the shell forms (`exec`, `execSync`,
- * `shell: true`) exit 127. A regression therefore never runs the machine's
+ * a real ENOENT in every calling style. A shell form (`exec`, `execSync`,
+ * `shell: true`) is denied when any word of its command names a denied tool,
+ * and the whole command is replaced, so the shell exits 127. A regression therefore never runs the machine's
  * real `docker` or `tmux`. All other calls pass through and are still recorded.
  *
  * Rules for a test file that uses the ledger:
@@ -78,10 +79,12 @@ function usesShell(api: SpawnApi, args: readonly unknown[]): boolean {
   return SHELL_APIS.has(api) || Boolean(optionsArg(args)?.['shell']);
 }
 
-/** Splits a shell command into its leading whitespace, first word and rest. */
-function splitCommand(command: string): { lead: string; word: string; rest: string } {
-  const match = /^(\s*)(\S*)([\s\S]*)$/.exec(command);
-  return { lead: match?.[1] ?? '', word: match?.[2] ?? '', rest: match?.[3] ?? '' };
+/** Every word of a shell command, split at whitespace and shell operators, with quotes removed. */
+function shellWords(command: string): string[] {
+  return command
+    .split(/[\s;&|()<>`$]+/)
+    .map((word) => word.replace(/['"\\]/g, ''))
+    .filter((word) => word.length > 0);
 }
 
 export function installSpawnLedger(options?: { deny?: readonly string[] }): SpawnLedger {
@@ -102,19 +105,19 @@ export function installSpawnLedger(options?: { deny?: readonly string[] }): Spaw
     if (!active || depth > 0) return args;
     const shell = usesShell(api, args);
     const target = String(args[0] ?? '');
-    const word = shell ? splitCommand(target).word : target;
-    const program = path.basename(word);
-    const denied = deny.has(program);
+    // A shell command is denied when ANY of its words names a denied tool
+    // (`true && tmux -V`, `"tmux" -V`, `FOO=1 docker ps`): the first word
+    // alone would let a compound command run the real binary.
+    const words = shell ? shellWords(target).map((word) => path.basename(word)) : [path.basename(target)];
+    const deniedWord = words.find((word) => deny.has(word));
+    const program = deniedWord ?? words[0] ?? '';
+    const denied = deniedWord !== undefined;
     records.push({ api, program, denied });
     if (!denied) return args;
-    const redirected = `${DENY_DIR}/${program}`;
+    // A denied shell command is replaced whole, so no part of it runs and the
+    // shell exits 127; a direct call gets a real ENOENT.
     const next = [...args];
-    if (shell) {
-      const parts = splitCommand(target);
-      next[0] = `${parts.lead}${redirected}${parts.rest}`;
-    } else {
-      next[0] = redirected;
-    }
+    next[0] = `${DENY_DIR}/${program}`;
     return next;
   };
 

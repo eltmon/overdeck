@@ -70,6 +70,19 @@ describe('spawn ledger', () => {
     expect(ledger.records).toEqual([{ api: 'execFileSync', program: 'docker', denied: true }]);
   });
 
+  it('(h) denies a shell command that names a denied tool after its first word', async () => {
+    for (const command of ['true && tmux -V', '"tmux" -V', 'FOO=1 docker ps']) {
+      ledger.reset();
+      const code = await new Promise<number | null>((resolve) => {
+        exec(command, (error) => resolve(error ? Number(error.code) : 0));
+      });
+      expect(code, command).toBe(127);
+      expect(ledger.records, command).toEqual([
+        { api: 'exec', program: command.includes('docker') ? 'docker' : 'tmux', denied: true },
+      ]);
+    }
+  });
+
   it('(g) spawnsPerTick rejects with the error of a rejecting tick', async () => {
     const failure = new Error('tick broke before reaching child_process');
     await expect(spawnsPerTick(ledger, async () => { throw failure; }, { ticks: 3 })).rejects.toBe(failure);
