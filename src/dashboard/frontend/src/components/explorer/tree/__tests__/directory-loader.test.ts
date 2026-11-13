@@ -118,6 +118,21 @@ describe('expandAll', () => {
     expect((await expandAll({ start: '', load, showDotfiles: false })).expanded).toEqual(['a'])
   })
 
+  it('keeps at most four listings in flight', async () => {
+    let inFlight = 0
+    let peak = 0
+    const load = async (path: string) => {
+      inFlight += 1
+      peak = Math.max(peak, inFlight)
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      inFlight -= 1
+      return path === '' ? Array.from({ length: 10 }, (_, i) => dirEntry(`d${i}`)) : []
+    }
+    const out = await expandAll({ start: '', load, showDotfiles: true })
+    expect(out.expanded).toHaveLength(10)
+    expect(peak).toBe(4)
+  })
+
   it('stops at the cap with capped: true', async () => {
     const load = async (path: string) => (path === '' ? [dirEntry('a'), dirEntry('b'), dirEntry('c')] : [])
     expect(await expandAll({ start: '', load, showDotfiles: true, cap: 2 })).toEqual({ expanded: ['a', 'b'], capped: true })

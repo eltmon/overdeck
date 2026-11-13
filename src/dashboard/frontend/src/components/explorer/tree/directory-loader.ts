@@ -113,6 +113,8 @@ export interface ExpandAllOptions {
   load(path: string): Promise<readonly ExplorerEntry[]>
   showDotfiles: boolean
   cap?: number
+  /** Listings in flight at once (default 4, the loader's cap). */
+  maxConcurrent?: number
 }
 
 /**
@@ -122,10 +124,22 @@ export interface ExpandAllOptions {
  */
 export async function expandAll(opts: ExpandAllOptions): Promise<{ expanded: string[]; capped: boolean }> {
   const cap = opts.cap ?? 2000
+  const maxConcurrent = opts.maxConcurrent ?? 4
   const expanded: string[] = []
   let frontier = [opts.start]
   while (frontier.length > 0) {
-    const listings = await Promise.all(frontier.map((path) => opts.load(path).catch(() => [] as readonly ExplorerEntry[])))
+    // List the level with at most `maxConcurrent` calls in flight; results
+    // keep frontier order so the walk stays breadth-first and deterministic.
+    const level = frontier
+    const listings: Array<readonly ExplorerEntry[]> = new Array(level.length)
+    let nextIndex = 0
+    const worker = async (): Promise<void> => {
+      while (nextIndex < level.length) {
+        const i = nextIndex++
+        listings[i] = await opts.load(level[i]).catch(() => [] as readonly ExplorerEntry[])
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(maxConcurrent, level.length) }, worker))
     const next: string[] = []
     for (const entries of listings) {
       for (const entry of entries) {
