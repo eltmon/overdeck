@@ -84,6 +84,7 @@ const PANE_LABELS: Record<PaneType, string> = {
   docs: 'Docs',
   browser: 'Web',
   editor: 'Editor',
+  code: 'File',
 }
 
 /** Safe fallback for pane types whose wrapper has not been built yet. */
