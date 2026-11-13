@@ -9,12 +9,38 @@
  */
 import type { QueryClient } from '@tanstack/react-query'
 
+import { getIssueIdFromPath } from '../App/routes'
 import { sharedRouteCode } from '../components/chat/sharing/joinApi'
+import { fetchIssueRecord, issueRecordQueryKey } from '../components/issue-view/useIssueRecord'
 import { ensureDashboardSession } from './wsTransport'
 
 export interface BootLocation { readonly pathname: string; readonly search: string; readonly hash: string }
 
-export function startBootRequests(_queryClient: QueryClient, location: BootLocation = window.location): void {
+/** The issue a page load names: `?issue=<ID>` on any route, else `/issues/<ID>`. */
+export function deepLinkedIssueId(location: BootLocation): string | null {
+  const fromQuery = new URLSearchParams(location.search).get('issue')?.trim()
+  if (fromQuery) return fromQuery
+  const fromPath = getIssueIdFromPath(location.pathname)?.trim()
+  return fromPath ? fromPath : null
+}
+
+export function startBootRequests(queryClient: QueryClient, location: BootLocation = window.location): void {
   if (sharedRouteCode(location.hash)) return
-  void ensureDashboardSession().catch(() => {})
+  const session = ensureDashboardSession()
+  void session.catch(() => {})
+  const issueId = deepLinkedIssueId(location)
+  if (!issueId) return
+  const queryKey = issueRecordQueryKey(issueId)
+  const prefetch = queryClient.prefetchQuery({
+    queryKey,
+    queryFn: () => fetchIssueRecord(issueId),
+    staleTime: 30_000,
+  })
+  // D-4a: a first visit (#pair=, #overdeck_token=) has no credential until the
+  // session settles, so the early read may answer 401. Refetch it then.
+  void Promise.allSettled([prefetch, session]).then(([, sessionResult]) => {
+    if (sessionResult.status !== 'fulfilled') return
+    if (queryClient.getQueryState(queryKey)?.status !== 'error') return
+    void queryClient.invalidateQueries({ queryKey, exact: true })
+  })
 }
