@@ -156,6 +156,12 @@
     "commit": "2d8a843e6b"
   },
   {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/OdfViewer.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/OfficeViewer.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
     "local": "src/dashboard/frontend/src/components/explorer/viewers/font/FontViewer.tsx",
     "upstream": "t3code",
     "path": "apps/web/src/components/files/FontViewer.tsx",
