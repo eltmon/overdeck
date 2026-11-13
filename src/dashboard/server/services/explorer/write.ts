@@ -28,7 +28,8 @@
  *
  * The tree's file actions use the entry operations below them: `create`
  * (empty file or folder), `rename` (rename and move, through `moveEntry`,
- * which falls back to copy-and-remove across filesystems) and `statEntry`. They resolve paths with
+ * which falls back to copy-and-remove across filesystems), `copy` and
+ * `statEntry`. They resolve paths with
  * `resolveEntryInsideRoot`, which never follows a symlink in the last
  * segment, so they act on a link and not on its target.
  */
@@ -284,5 +285,13 @@ export async function rename(root: ExplorerRoot, from: string, to: string): Prom
     throw explorerError('NOT_FOUND', `The folder for ${JSON.stringify(to)} does not exist`);
   }
   await moveEntry(fromAbs, toAbs);
+  return { entry: await statEntry(root, to) };
+}
+
+/** Copy a file or folder to `to`, symlinks verbatim. The target must be free. */
+export async function copy(root: ExplorerRoot, from: string, to: string): Promise<ExplorerEntryResult> {
+  const { fromAbs, toAbs, target } = await sourceAndTarget(root, from, to, 'copy');
+  if (target) throw explorerError('ALREADY_EXISTS', `${JSON.stringify(to)} already exists`);
+  await cp(fromAbs, toAbs, { recursive: true, errorOnExist: true, force: false, verbatimSymlinks: true });
   return { entry: await statEntry(root, to) };
 }

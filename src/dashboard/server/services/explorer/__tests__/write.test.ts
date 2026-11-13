@@ -19,6 +19,7 @@ import { PanRpcError } from '@overdeck/contracts';
 import type { ExplorerRoot } from '../roots.js';
 import { diskSignature } from '../signature.js';
 import {
+  copy,
   create,
   MAX_EDITABLE_TEXT_BYTES,
   moveEntry,
@@ -314,5 +315,47 @@ describe('moveEntry', () => {
       code: 'EACCES',
     });
     expect(await exists(join(root.absPath, 'a.txt'))).toBe(true);
+  });
+});
+
+describe('copy', () => {
+  it('copies a file with identical bytes and keeps the source', async () => {
+    const bytes = Buffer.from([0, 1, 2, 255, 10, 13]);
+    await fsWriteFile(join(root.absPath, 'blob.bin'), bytes);
+    const { entry } = await copy(root, 'blob.bin', 'blob copy.bin');
+    expect(entry).toMatchObject({ name: 'blob copy.bin', path: 'blob copy.bin', kind: 'file', size: bytes.length });
+    expect(Buffer.compare(await readFile(join(root.absPath, 'blob copy.bin')), bytes)).toBe(0);
+    expect(Buffer.compare(await readFile(join(root.absPath, 'blob.bin')), bytes)).toBe(0);
+  });
+
+  it('copies a folder recursively', async () => {
+    await fsWriteFile(join(root.absPath, 'src/nested.txt'), 'n\n');
+    await mkdir(join(root.absPath, 'src/deep'));
+    await fsWriteFile(join(root.absPath, 'src/deep/z.ts'), 'z\n');
+    const { entry } = await copy(root, 'src', 'src2');
+    expect(entry).toMatchObject({ path: 'src2', kind: 'dir' });
+    for (const rel of ['x.ts', 'nested.txt', 'deep/z.ts']) {
+      expect(await readFile(join(root.absPath, 'src2', rel), 'utf8')).toBe(await readFile(join(root.absPath, 'src', rel), 'utf8'));
+    }
+  });
+
+  it('copies a symlink as a symlink', async () => {
+    await symlink('a.txt', join(root.absPath, 'link.txt'));
+    await copy(root, 'link.txt', 'link2.txt');
+    expect(await readlink(join(root.absPath, 'link2.txt'))).toBe('a.txt');
+  });
+
+  it('throws ALREADY_EXISTS for an occupied target and leaves it unchanged', async () => {
+    expect(await codeOf(copy(root, 'a.txt', 'src/x.ts'))).toBe('ALREADY_EXISTS');
+    expect(await readFile(join(root.absPath, 'src/x.ts'), 'utf8')).toBe('export {};\n');
+  });
+
+  it('throws INVALID_TARGET for a copy into its own subfolder', async () => {
+    expect(await codeOf(copy(root, 'src', 'src/inner'))).toBe('INVALID_TARGET');
+    expect(await exists(join(root.absPath, 'src/inner'))).toBe(false);
+  });
+
+  it('throws NOT_FOUND for a missing source', async () => {
+    expect(await codeOf(copy(root, 'nope.txt', 'b.txt'))).toBe('NOT_FOUND');
   });
 });
