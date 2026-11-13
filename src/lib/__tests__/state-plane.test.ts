@@ -11,6 +11,7 @@ import {
   isProjectMemoryPath,
   isStatePlaneOnlyDiff,
   isStatePlaneOnlyStatus,
+  parsePorcelainStatusEntries,
   parsePorcelainStatusPaths,
   PAN_RUNTIME_SUBDIRS,
   STATE_PLANE_PATHS,
@@ -188,6 +189,26 @@ describe('parsePorcelainStatusPaths', () => {
       '.pan/test/result\tcopy.json',
     ]);
     expect(isStatePlaneOnlyStatus(porcelain)).toBe(true);
+  });
+});
+
+describe('parsePorcelainStatusEntries', () => {
+  it('returns a status/path pair per entry', () => {
+    const porcelain = '?? .mcp.json\n M .claude/settings.json';
+
+    expect(parsePorcelainStatusEntries(porcelain)).toEqual([
+      { status: '??', path: '.mcp.json' },
+      { status: ' M', path: '.claude/settings.json' },
+    ]);
+  });
+
+  it('returns two entries for a rename, each carrying the rename status', () => {
+    const porcelain = 'R  a.ts -> b.ts';
+
+    expect(parsePorcelainStatusEntries(porcelain)).toEqual([
+      { status: 'R ', path: 'a.ts' },
+      { status: 'R ', path: 'b.ts' },
+    ]);
   });
 });
 
