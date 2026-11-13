@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
+import { hostToolNotFoundError, noteHostToolSpawnFailed, resolveHostTool } from './host-tools.js';
 import { buildProcessTreeIndex, collectDescendantPids, type ProcessTreeIndex } from './system-health/collector.js';
 import type { TmuxPaneRecord } from './tmux.js';
 
@@ -162,11 +163,20 @@ export function createRuntimeCensusService(deps: RuntimeCensusServiceDeps): Runt
   };
 }
 
+/** PAN-5168: skips spawning tmux when it is not on PATH. */
+export async function listHostTmuxPanes(): Promise<readonly TmuxPaneRecord[]> {
+  if (resolveHostTool('tmux') === null) throw hostToolNotFoundError('tmux');
+  const { listAllPaneRecords } = await import('./tmux.js');
+  try {
+    return await Effect.runPromise(listAllPaneRecords());
+  } catch (error) {
+    noteHostToolSpawnFailed('tmux', error);
+    throw error;
+  }
+}
+
 const runtimeCensusService = createRuntimeCensusService({
-  listPanes: async () => {
-    const { listAllPaneRecords } = await import('./tmux.js');
-    return Effect.runPromise(listAllPaneRecords());
-  },
+  listPanes: listHostTmuxPanes,
   readProcesses: readRuntimeProcessTable,
 });
 

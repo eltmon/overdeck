@@ -1549,3 +1549,54 @@ dialog go through `POST /api/agents/:id/answer-question`
 The one Deft fact already in the read model is `deftPipeline` on the derived
 issue state's facts (`src/lib/overdeck/derived-issue-state.ts`), which lets a
 Deft issue's PR derive `ready` without an Overdeck approval.
+
+## Optional host tools (PAN-5168)
+
+On macOS, a `child_process`/Effect spawn of a bare command name that is not
+on `PATH` makes libuv try `posix_spawn` once per `PATH` entry, and XNU
+creates a short-lived process for each try — roughly 10 dead processes per
+failed spawn. An idle dashboard with neither Docker nor tmux installed
+created 13–20 of these per second, rising to about 60/s with many
+conversations open, because several pollers ran on fixed timers against
+missing binaries.
+
+`src/lib/host-tools.ts` is the one cached, spawn-free PATH lookup every such
+poller goes through. It exports `resolveHostTool(name, deps?)`, a PATH-only
+lookup (`stat`/`access`, no spawn) cached per tool name and `PATH` value;
+`noteHostToolSpawnFailed(name, error, deps?)`, which a poller calls from its
+own spawn's `catch` so a tool that vanishes gets marked missing; and
+`refreshHostTools()`, which clears the cache for a fresh lookup. A tool found
+once stays cached until `refreshHostTools()` runs or a spawn failure through
+`noteHostToolSpawnFailed` triggers a fresh lookup that itself misses. A
+missing tool is re-looked-up (PATH only, never a spawn) at most once per
+`HOST_TOOL_MISSING_RECHECK_MS` (60 s) — the back-off that keeps a poller from
+spawning a missing binary on every tick. Critically, an ENOENT from
+`noteHostToolSpawnFailed` marks a tool missing only when the fresh lookup it
+triggers also misses: a missing `cwd` reports the same `spawn <cmd> ENOENT`
+shape, and that must not wrongly suppress a tool that still exists.
+
+Five pollers are gated this way: `DockerStatsCollector` (`src/lib/docker-stats.ts`),
+resource discovery's `loadDockerContainers`
+(`src/dashboard/server/services/resource-discovery-shared.ts`), stack
+health's `collectDockerContainerLifecycleSnapshot`
+(`src/lib/workspace/stack-health.ts`), the runtime census's
+`listHostTmuxPanes` (`src/lib/runtime-census.ts`), and the conversation
+liveness module's default tmux helpers
+(`src/lib/overdeck/conversation-liveness.ts`). Any new poller of an optional
+host tool follows the same rule: call `resolveHostTool` before spawning, and
+call `noteHostToolSpawnFailed` in the spawn's `catch`.
+
+The cache is per process: the dashboard server, the deacon child and the
+`pan doctor` CLI each keep their own. The dashboard re-checks on its own via
+the 60 s back-off and on every `PUT /api/settings` save
+(`applySavedSettings` in `src/dashboard/server/services/settings-saved.ts`
+calls `refreshHostTools()`); `pan doctor` prints a fresh lookup as its "Host
+tools" row.
+
+Tests opt out of the gate through one env var,
+`OVERDECK_TEST_ASSUME_HOST_TOOLS=1` (set by default in `tests/setup.ts`),
+under which `resolveHostTool` returns the bare tool name as if found — so
+existing tests that mock `child_process` for `docker`/`tmux` keep behaving as
+before. A test that needs a missing tool calls
+`setHostToolFinderForTests(() => null)` and resets with
+`resetHostToolsForTests()` in its own `afterEach`.

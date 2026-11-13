@@ -11,6 +11,7 @@ import {
   getWorkspaceStackHealth,
   inferIssueIdFromStackContainerName,
 } from '../../lib/workspace/stack-health.js';
+import type { DockerContainerLifecycle } from '../../lib/docker-stats.js';
 import { detectConcurrentRestartWriters, readRestartEvents, readRestartStatus, type RestartStatus } from '../../lib/restart-status.js';
 import { readRestartGate, type RestartGateSnapshot } from '../../lib/restart-gate-client.js';
 
@@ -176,7 +177,9 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     agent.id && agent.issueId && agent.workspace
   ));
   const noResumeModeActive = await isBootNoResumeModeActive();
-  const dockerContainers = await Effect.runPromise(collectDockerContainerLifecycleSnapshot());
+  const dockerContainers = await Effect.runPromise(
+    collectDockerContainerLifecycleSnapshot().pipe(Effect.orElseSucceed(() => [] as DockerContainerLifecycle[])),
+  );
   const issueIds = new Map<string, string>();
   for (const agent of agents) {
     issueIds.set(issueKey(agent.issueId!), agent.issueId!);

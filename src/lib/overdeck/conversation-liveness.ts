@@ -23,6 +23,7 @@
  */
 import { Effect } from 'effect';
 
+import { noteHostToolSpawnFailed, resolveHostTool } from '../host-tools.js';
 import { isHarnessProcessAlive, listSessionNames, sessionExists } from '../tmux.js';
 import { hostTerminalBackendName } from '../terminal-backends/select.js';
 import type { HerdrLivenessProbe } from '../terminal-backends/herdr.js';
@@ -47,16 +48,29 @@ async function backendOf(deps: ConversationLivenessDeps): Promise<TerminalBacken
 
 function tmuxSessionExists(name: string, deps: ConversationLivenessDeps): Promise<boolean> {
   if (deps.sessionExists) return deps.sessionExists(name);
-  return Effect.runPromise(sessionExists(name)).catch(() => false);
+  if (resolveHostTool('tmux') === null) return Promise.resolve(false); // PAN-5168: no tmux, no tmux session
+  return Effect.runPromise(sessionExists(name)).catch((error) => {
+    noteHostToolSpawnFailed('tmux', error);
+    return false;
+  });
 }
 
 function tmuxSessionNames(deps: ConversationLivenessDeps): Promise<readonly string[]> {
   if (deps.listSessionNames) return deps.listSessionNames();
-  return Effect.runPromise(listSessionNames()).catch(() => [] as string[]);
+  if (resolveHostTool('tmux') === null) return Promise.resolve([] as string[]); // PAN-5168
+  return Effect.runPromise(listSessionNames()).catch((error) => {
+    noteHostToolSpawnFailed('tmux', error);
+    return [] as string[];
+  });
 }
 
 function tmuxHarnessAlive(name: string, deps: ConversationLivenessDeps): Promise<boolean> {
-  return (deps.harnessAlive ?? isHarnessProcessAlive)(name);
+  if (deps.harnessAlive) return deps.harnessAlive(name);
+  if (resolveHostTool('tmux') === null) return Promise.resolve(false); // PAN-5168
+  return isHarnessProcessAlive(name).catch((error) => {
+    noteHostToolSpawnFailed('tmux', error);
+    return false;
+  });
 }
 
 async function probeHerdr(name: string, deps: ConversationLivenessDeps): Promise<HerdrLivenessProbe> {

@@ -830,4 +830,7 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   `src/lib/systemd.ts`, called by the restart announcer every pass) and the OOM canary
   (`readNewKernelJournal`, `src/lib/cloister/memory-pressure-patrol.ts`). `findManagedServerPid`
   (`src/lib/tmux.ts`) also calls `systemctl` unguarded, but only on conversation stop.
+- **Optional host tools resolve through `src/lib/host-tools.ts`** — a poller that spawns a bare missing
+  command on macOS creates ~10 processes per call, because libuv retries `posix_spawn` once per `PATH`
+  entry (PAN-5168).
 <!-- last-verified: 2026-11-04 -->

@@ -20,6 +20,7 @@ import { getProjectPanPaths } from '../../lib/pan-dir/paths.js';
 import { getMainDivergence, type MainDivergence } from '../../lib/state-plane.js';
 import { checkKimi } from './doctor-kimi.js';
 import { checkGrok } from './doctor-grok.js';
+import { checkHostTools } from './doctor-host-tools.js';
 import { checkSageox } from './doctor-sageox.js';
 import { checkAtlassianMcp } from './doctor-atlassian.js';
 import { checkDeployedHooksDrift } from './doctor-hooks-drift.js';
@@ -714,6 +715,8 @@ export async function collectDoctorChecks(options: DoctorOptions = {}): Promise<
       checks.push({ name, status: 'warn', message: 'Not installed (optional)', fix });
     }
   }
+
+  checks.push(checkHostTools()); // PAN-5168
 
   // Claude and GitHub CLI login state (warn-level; PAN-4282 D9, FR-24).
   checks.push(...await checkFirstRunLogins({

@@ -26,6 +26,7 @@ import {
   recordDockerContainerLifecycleSnapshot,
   type DockerContainerLifecycle,
 } from '../docker-stats.js';
+import { hostToolNotFoundError, noteHostToolSpawnFailed, resolveHostTool } from '../host-tools.js';
 import { parseIssueId } from '../issue-id.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 
@@ -375,14 +376,22 @@ export function evaluateWorkspaceStackHealth(
   return { healthy: reasons.length === 0, reasons, lastObserved, stackExpected };
 }
 
-export const collectDockerContainerLifecycleSnapshot = (): Effect.Effect<DockerContainerLifecycle[]> =>
-  Effect.tryPromise({
+export const collectDockerContainerLifecycleSnapshot = (): Effect.Effect<
+  DockerContainerLifecycle[],
+  NodeJS.ErrnoException
+> => {
+  const docker = resolveHostTool('docker');
+  if (docker === null) return Effect.fail(hostToolNotFoundError('docker'));
+  return Effect.tryPromise({
     try: () =>
-      execFileAsync('docker', ['ps', '-a', '--format', '{{json .}}'], {
+      execFileAsync(docker, ['ps', '-a', '--format', '{{json .}}'], {
         encoding: 'utf-8',
         timeout: 5_000,
       }),
-    catch: (err) => err,
+    catch: (err) => {
+      noteHostToolSpawnFailed('docker', err);
+      return err as NodeJS.ErrnoException;
+    },
   }).pipe(
     Effect.map(({ stdout }) => {
       const containers: DockerContainerLifecycle[] = [];
@@ -408,6 +417,7 @@ export const collectDockerContainerLifecycleSnapshot = (): Effect.Effect<DockerC
     }),
     Effect.orElseSucceed(() => [] as DockerContainerLifecycle[]),
   );
+};
 
 export const getWorkspaceStackHealth = (
   issueId: string,
@@ -429,7 +439,9 @@ export const getWorkspaceStackHealth = (
 
     if (!containers) {
       const observed = options.now ?? new Date();
-      containers = yield* collectDockerContainerLifecycleSnapshot();
+      containers = yield* collectDockerContainerLifecycleSnapshot().pipe(
+        Effect.orElseSucceed(() => [] as DockerContainerLifecycle[]),
+      );
       observedAt = observed.toISOString();
       recordDockerContainerLifecycleSnapshot(containers, observedAt);
     }
