@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5170",
   "created": "2026-11-13T02:57:05.197Z",
-  "updated": "2026-11-13T02:57:05.197Z",
+  "updated": "2026-11-13T02:58:40.430Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,22 @@
   "sessionHistory": [],
   "items": {
     "guard-supervisor-unit-failed": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5170",
-      "claimedAt": "2026-11-13T02:57:05.196Z"
+      "claimedAt": "2026-11-13T02:57:05.196Z",
+      "doneAt": "2026-11-13T02:58:40.429Z"
+    },
+    "guard-supervisor-unit-failed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T02:58:40.429Z"
+    },
+    "guard-supervisor-unit-failed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T02:58:40.429Z"
+    },
+    "guard-supervisor-unit-failed.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T02:58:40.429Z"
     }
   }
 }
