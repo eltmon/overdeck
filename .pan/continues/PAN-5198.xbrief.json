@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5198",
   "created": "2026-11-13T19:57:57.248Z",
-  "updated": "2026-11-13T20:06:35.641Z",
+  "updated": "2026-11-13T20:06:43.760Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
     "contracts-needs-you-item.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T20:06:35.640Z"
+    },
+    "server-first-raised": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5198",
+      "claimedAt": "2026-11-13T20:06:43.760Z"
     }
   }
 }
