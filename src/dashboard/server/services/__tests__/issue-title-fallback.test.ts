@@ -16,9 +16,10 @@ vi.mock('../../../../lib/tracker/factory.js', () => ({
 }));
 
 // Import once at module scope; vi.mock hoisting ensures mocks are wired.
-const { resolveMissingIssueTitles, resolveMissingIssue } = await import('../issue-title-fallback.js');
+const { resolveMissingIssueTitles, resolveMissingIssue, missingIssueFailureKind } = await import('../issue-title-fallback.js');
 
 const { Effect } = await import('effect');
+const { IssueNotFoundError } = await import('../../../../lib/tracker/interface.js');
 
 function issueEffect(title: string) {
   return Effect.succeed({ title });
@@ -136,5 +137,70 @@ describe('resolveMissingIssue', () => {
     expect(titles.get('PROJ-41')).toBe('Add Jira support');
     expect(mockCreateJiraTrackerForIssue).toHaveBeenCalledWith('PROJ-41');
     expect(mockCreateTracker).not.toHaveBeenCalled();
+  });
+});
+
+// PAN-5171: the tracker door distinguishes a real 404 from a tracker
+// outage so the per-issue route can return 404 vs 503 instead of folding
+// every failure into the same "null" shape.
+describe('missingIssueFailureKind', () => {
+  beforeEach(() => {
+    mockResolveTrackerTypeSync.mockReset().mockReturnValue('linear');
+    mockGetIssue.mockReset();
+    mockCreateTracker.mockClear();
+    vi.useRealTimers();
+  });
+
+  it('returns not-found when the tracker fails with IssueNotFoundError', async () => {
+    mockGetIssue.mockReturnValue(Effect.fail(new IssueNotFoundError({ id: 'MIN-6001', tracker: 'linear' })));
+
+    const issue = await resolveMissingIssue('MIN-6001');
+
+    expect(issue).toBeNull();
+    expect(missingIssueFailureKind('MIN-6001')).toBe('not-found');
+  });
+
+  it('returns unavailable when the tracker fails with any other error', async () => {
+    mockGetIssue.mockReturnValue(Effect.fail(new Error('tracker down')));
+
+    const issue = await resolveMissingIssue('MIN-6002');
+
+    expect(issue).toBeNull();
+    expect(missingIssueFailureKind('MIN-6002')).toBe('unavailable');
+  });
+
+  it('returns unavailable when the issue prefix has no tracker', async () => {
+    mockResolveTrackerTypeSync.mockReturnValue(null);
+
+    const issue = await resolveMissingIssue('XXX-6003');
+
+    expect(issue).toBeNull();
+    expect(missingIssueFailureKind('XXX-6003')).toBe('unavailable');
+  });
+
+  it('leaves missingIssueFailureKind at null for a successful lookup', async () => {
+    mockGetIssue.mockReturnValue(issueEffect('Resolved title'));
+
+    const issue = await resolveMissingIssue('MIN-6004');
+
+    expect(issue).not.toBeNull();
+    expect(missingIssueFailureKind('MIN-6004')).toBeNull();
+  });
+
+  it('clears the failure kind once FAILURE_RETRY_MS has elapsed', async () => {
+    vi.useFakeTimers();
+    try {
+      mockGetIssue.mockReturnValue(Effect.fail(new IssueNotFoundError({ id: 'MIN-6005', tracker: 'linear' })));
+
+      const issue = await resolveMissingIssue('MIN-6005');
+      expect(issue).toBeNull();
+      expect(missingIssueFailureKind('MIN-6005')).toBe('not-found');
+
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 1);
+
+      expect(missingIssueFailureKind('MIN-6005')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
