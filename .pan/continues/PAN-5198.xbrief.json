@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5198",
   "created": "2026-11-13T19:57:57.248Z",
-  "updated": "2026-11-13T20:25:59.430Z",
+  "updated": "2026-11-13T20:26:08.303Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,11 @@
     "needs-you-link-tokenizer.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T20:25:59.428Z"
+    },
+    "status-pane-rows": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5198",
+      "claimedAt": "2026-11-13T20:26:08.303Z"
     }
   }
 }
