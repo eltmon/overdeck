@@ -31,6 +31,12 @@
 # Exit codes: 0 every check passed, 1 a check failed, 2 setup error, 64 bad usage.
 set -u
 
+# PAN-5176 calibration 2026-11-13 (D14: budget = max(10, min(30, 3 x highest
+# sample)), never above 30), from green runs on PR #5179:
+#   macOS traced cost 25, 25, 25, 25, 25, 25 -> min(30, 75) = 30
+#     (the known-bad 0.81.0 scores 126 on the same runner)
+#   Linux PID net 10, 5, 6, 8 -> min(30, 30) = 30
+#     (after the systemctl fix, #5181; 15 and 16 before it)
 IDLE_BUDGET_MACOS=30
 IDLE_BUDGET_LINUX=30
 BARE_PATH_ENTRIES=6
