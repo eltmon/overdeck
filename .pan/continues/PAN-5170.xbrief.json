@@ -1,0 +1,115 @@
+{
+  "version": "1",
+  "issueId": "PAN-5170",
+  "created": "2026-11-13T02:57:05.197Z",
+  "updated": "2026-11-13T03:25:17.664Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "guard-supervisor-unit-failed": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5170",
+      "claimedAt": "2026-11-13T02:57:05.196Z",
+      "doneAt": "2026-11-13T02:58:40.429Z"
+    },
+    "guard-supervisor-unit-failed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T02:58:40.429Z"
+    },
+    "guard-supervisor-unit-failed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T02:58:40.429Z"
+    },
+    "guard-supervisor-unit-failed.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T02:58:40.429Z"
+    },
+    "supervisor-reachability-tracker": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5170",
+      "claimedAt": "2026-11-13T02:59:17.293Z",
+      "doneAt": "2026-11-13T03:03:53.186Z"
+    },
+    "supervisor-reachability-tracker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:03:53.186Z"
+    },
+    "supervisor-reachability-tracker.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:03:53.186Z"
+    },
+    "supervisor-reachability-tracker.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:03:53.186Z"
+    },
+    "supervisor-reachability-tracker.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:03:53.186Z"
+    },
+    "announcer-darwin-reachability": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5170",
+      "claimedAt": "2026-11-13T03:04:04.904Z",
+      "doneAt": "2026-11-13T03:22:35.457Z"
+    },
+    "announcer-darwin-reachability.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:22:35.457Z"
+    },
+    "announcer-darwin-reachability.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:22:35.457Z"
+    },
+    "announcer-darwin-reachability.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:22:35.457Z"
+    },
+    "announcer-darwin-reachability.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:22:35.457Z"
+    },
+    "oom-canary-platform-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5170",
+      "claimedAt": "2026-11-13T03:22:41.857Z",
+      "doneAt": "2026-11-13T03:23:42.009Z"
+    },
+    "oom-canary-platform-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:23:42.009Z"
+    },
+    "oom-canary-platform-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:23:42.009Z"
+    },
+    "oom-canary-platform-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:23:42.009Z"
+    },
+    "oom-canary-platform-guard.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:23:42.009Z"
+    },
+    "docs-darwin-platform-guards": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5170",
+      "claimedAt": "2026-11-13T03:23:47.815Z",
+      "doneAt": "2026-11-13T03:25:17.664Z"
+    },
+    "docs-darwin-platform-guards.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:25:17.664Z"
+    },
+    "docs-darwin-platform-guards.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:25:17.664Z"
+    },
+    "docs-darwin-platform-guards.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:25:17.664Z"
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { memoryFeedLevel, patrolMemoryPressure, __resetMemoryPressurePatrolState, MemoryFeedLevel } from '../../../../src/lib/cloister/memory-pressure-patrol.js';
 import type { MemoryVerdict, MemoryPressureBand } from '../../../../src/lib/cloister/memory-governor.js';
 
@@ -601,6 +601,56 @@ Out of memory: Killed process 2230723 (python) total-vm:349473036kB, anon-rss:41
       const journal = `oom-kill:constraint=CONSTRAINT_NONE,task_memcg=/user.slice/user-1000.slice/user@1000.service/app.slice/Chrome.scope,task=Chrome,pid=5956,uid=1000`;
       const kills = parseOomKills(journal);
       expect(kills[0].inOverdeckTree).toBe(false);
+    });
+  });
+
+  describe('readNewKernelJournal (PAN-5170)', () => {
+    it('returns empty without spawning or logging off Linux', async () => {
+      const { readNewKernelJournal } = await import('../../../../src/lib/cloister/memory-pressure-patrol.js');
+      const runJournalctl = vi.fn();
+      const warn = vi.fn();
+
+      await expect(readNewKernelJournal({ platform: 'darwin', runJournalctl, warn })).resolves.toBe('');
+
+      expect(runJournalctl).not.toHaveBeenCalled();
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('logs one line and disables the canary when journalctl fails on Linux', async () => {
+      const { readNewKernelJournal } = await import('../../../../src/lib/cloister/memory-pressure-patrol.js');
+      const runJournalctl = vi.fn().mockRejectedValue(
+        Object.assign(new Error('spawn journalctl ENOENT'), { code: 'ENOENT' }),
+      );
+      const warn = vi.fn();
+
+      await expect(readNewKernelJournal({ platform: 'linux', runJournalctl, warn })).resolves.toBe('');
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith('[memory-pressure-patrol] OOM canary disabled: journalctl failed (ENOENT)');
+    });
+
+    it('keeps the canary disabled after a failure without calling journalctl again', async () => {
+      const { readNewKernelJournal } = await import('../../../../src/lib/cloister/memory-pressure-patrol.js');
+      const runJournalctl = vi.fn().mockRejectedValue(
+        Object.assign(new Error('spawn journalctl ENOENT'), { code: 'ENOENT' }),
+      );
+      const warn = vi.fn();
+
+      await readNewKernelJournal({ platform: 'linux', runJournalctl, warn });
+      await expect(readNewKernelJournal({ platform: 'linux', runJournalctl, warn })).resolves.toBe('');
+
+      expect(runJournalctl).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns journalctl stdout on Linux with cursor-file args', async () => {
+      const { readNewKernelJournal } = await import('../../../../src/lib/cloister/memory-pressure-patrol.js');
+      const runJournalctl = vi.fn().mockResolvedValue('line\n');
+
+      await expect(readNewKernelJournal({ platform: 'linux', runJournalctl })).resolves.toBe('line\n');
+
+      expect(runJournalctl).toHaveBeenCalledTimes(1);
+      const args = runJournalctl.mock.calls[0][0] as string[];
+      expect(args.slice(0, 2)).toEqual(['-k', '--cursor-file']);
     });
   });
 });

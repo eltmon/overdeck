@@ -334,6 +334,15 @@ describe('supervisor systemd unit helpers', () => {
     await expect(isSupervisorUnitFailed()).resolves.toBe(false);
   });
 
+  it('returns false on darwin without running systemctl (PAN-5170)', async () => {
+    setPlatform('darwin');
+    const { isSupervisorUnitFailed } = await import('../systemd.js');
+
+    execAsyncMock.mockResolvedValue({ stdout: 'failed\n', stderr: '' });
+    await expect(isSupervisorUnitFailed()).resolves.toBe(false);
+    expect(execAsyncMock).not.toHaveBeenCalled();
+  });
+
   it('installs and starts the unit when systemd is available', async () => {
     const unitDir = mkdtempSync(join(tmpdir(), 'overdeck-systemd-start-test-'));
     const unitText = '[Unit]\nDescription=test\n\n[Service]\nType=simple\n';

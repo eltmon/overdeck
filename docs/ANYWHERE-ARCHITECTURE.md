@@ -800,7 +800,11 @@ service, lingering, then one pairing link (`.pan/drafts/PAN-4656.md`).
   `tcp://` route failed with `EHOSTUNREACH` (classified by `src/lib/anywhere/local-network.ts`)
   **and** a gateway probe (`src/lib/anywhere/local-network-probe.ts`) confirms this process's
   own access is denied; the probe is injected into `LinkSupervisorDeps.localNetworkAccess`
-  only on darwin, so linux and the phone build never run it.
+  only on darwin, so linux and the phone build never run it. The restart announcer's
+  supervisor check runs `systemctl --user is-failed` on Linux only. On macOS it probes the
+  supervisor's `GET /health` each pass and adds one error row to the activity feed when a
+  supervisor it has seen answer stays unreachable for 60 s
+  (`src/dashboard/server/services/supervisor-reachability.ts`, PAN-5170).
 
 Update all, the update dialog and `pan update` reinstall into the same runtime (PAN-4722).
 

@@ -1438,7 +1438,10 @@ Auto-resume is intentionally suppressible:
   resource governor (`assessMemoryPressure` in `cloister/memory-governor.ts`)
   runs in the deacon child and its verdict only feeds the memory-pressure
   patrol (`memory-pressure-patrol.ts`), which reports the band to the
-  activity feed. Nothing else acts on it: `preemption.ts:resumeYieldedAgents`
+  activity feed. Its OOM canary reads kernel OOM kills from `journalctl -k`
+  on Linux only; on macOS, which has no kernel journal, it never runs, and
+  on Linux a `journalctl` failure logs one line and turns the canary off
+  (PAN-5170). Nothing else acts on it: `preemption.ts:resumeYieldedAgents`
   (which would defer on a held verdict) and `shed()` (stack-stop /
   idle-agent-pause reclaim) have no production caller. The governor never
   gates conversations, `pan start`, or dashboard Start. Below the SOFT

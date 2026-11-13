@@ -13,6 +13,11 @@
  * The last announced `ts` is persisted in app-settings so a later boot doesn't
  * re-announce, and entries older than ANNOUNCE_MAX_AGE_MS are recorded without
  * being announced — a restart from hours ago is history, not news.
+ *
+ * PAN-5170: off Linux there is no systemd, so the supervisor-unit-failed check
+ * is replaced by probing the supervisor's `/health` endpoint and reporting it
+ * in the activity feed when a supervisor it has seen answer stays unreachable
+ * for 60 s.
  */
 import {
   emitActivityEntry,
@@ -23,6 +28,11 @@ import { getSetting, setSetting } from '../../../lib/overdeck/control-settings.j
 import { getConversationByTmuxSession } from '../../../lib/overdeck/conversations.js';
 import { isSupervisorUnitFailed, SUPERVISOR_UNIT_NAME } from '../../../lib/systemd.js';
 import { isPeerDashboardProcess } from '../../../lib/boot-gates.js';
+import {
+  createSupervisorReachabilityTracker,
+  type SupervisorReachabilityTracker,
+} from './supervisor-reachability.js';
+import { getSupervisorUrl } from '../../../lib/supervisor.js';
 
 export const RESTART_ANNOUNCER_LAST_TS_KEY = 'restart_announcer.last_announced_ts';
 const POLL_MS = 15_000;
@@ -30,7 +40,10 @@ const BOOTSTRAP_POLL_MS = 1_000;
 const BOOTSTRAP_FAST_POLL_COUNT = 30;
 const ANNOUNCE_MAX_AGE_MS = 60 * 60_000;
 const SUPERVISOR_UNIT_FAILED_REASON = 'supervisor-unit-failed';
+const SUPERVISOR_PROBE_TIMEOUT_MS = 2_000;
 let supervisorUnitFailureEpisodeActive = false;
+let supervisorReachability: SupervisorReachabilityTracker = createSupervisorReachabilityTracker();
+let cachedSupervisorUrl: string | null = null;
 
 /** Minimal conversation shape the announcer needs from the initiator's tmux session. */
 export type InitiatorConversationResolver = (tmuxSession: string) => { id: number; title?: string | null } | null;
@@ -131,6 +144,51 @@ export interface RestartAnnouncerDeps {
   now?: () => number;
   /** Whether this process is a peer dashboard; defaults to the boot-gate env. */
   isPeer?: () => boolean;
+  /** PAN-5170: defaults to process.platform. Off Linux the systemd check is skipped. */
+  platform?: NodeJS.Platform;
+  /** PAN-5170: GET <supervisor>/health; resolves true when it answers 2xx. */
+  probeSupervisor?: () => Promise<boolean>;
+  /** PAN-5170: supervisor base URL for the down message. */
+  supervisorUrl?: () => string;
+}
+
+/** PAN-5170: getSupervisorUrl() reads config.toml synchronously; memoize it. */
+function defaultSupervisorUrl(): string {
+  cachedSupervisorUrl ??= getSupervisorUrl();
+  return cachedSupervisorUrl;
+}
+
+async function probeSupervisorHealth(url: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SUPERVISOR_PROBE_TIMEOUT_MS);
+  timer.unref?.();
+  try {
+    const res = await fetch(`${url}/health`, { signal: controller.signal });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** PAN-5170: the darwin replacement for syncSupervisorUnitFailureStatus. */
+async function checkSupervisorReachable(deps: {
+  emit: (options: EmitActivityOptions) => void;
+  now: () => number;
+  probe: () => Promise<boolean>;
+  url: () => string;
+}): Promise<void> {
+  const answered = await deps.probe().catch(() => false);
+  const report = supervisorReachability.observe(answered, deps.now());
+  if (!report) return;
+  deps.emit({
+    source: 'supervisor',
+    level: 'error',
+    desktop: false,
+    message: `The supervisor at ${deps.url()} has not answered for ${Math.floor(report.unreachableForMs / 1000)} s. `
+      + 'Force Restart and the dashboard watchdog do not work until it runs again. Run `pan up` to start it.',
+  });
 }
 
 function isSupervisorUnitFailureStatus(status: RestartStatus | null): status is RestartStatus {
@@ -189,8 +247,15 @@ export async function announceNewRestart(deps: RestartAnnouncerDeps = {}): Promi
   const setLastAnnounced = deps.setLastAnnounced
     ?? ((ts: string) => setSetting(RESTART_ANNOUNCER_LAST_TS_KEY, ts));
   const now = deps.now ?? Date.now;
+  const platform = deps.platform ?? process.platform;
 
-  await syncSupervisorUnitFailureStatus({ readStatus, writeStatus, readSupervisorUnitFailed, now });
+  if (platform === 'linux') {
+    await syncSupervisorUnitFailureStatus({ readStatus, writeStatus, readSupervisorUnitFailed, now });
+  } else {
+    const url = deps.supervisorUrl ?? defaultSupervisorUrl;
+    const probe = deps.probeSupervisor ?? (() => probeSupervisorHealth(url()));
+    await checkSupervisorReachable({ emit, now, probe, url });
+  }
 
   const status = await readStatus();
   if (!status || status.phase === 'stopping') return false;
@@ -257,4 +322,5 @@ export function stopRestartAnnouncer(): void {
   runToken += 1;
   if (timer) clearTimeout(timer);
   timer = null;
+  supervisorReachability = createSupervisorReachabilityTracker();
 }
