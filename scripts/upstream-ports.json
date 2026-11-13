@@ -46,5 +46,11 @@
     "upstream": "orca",
     "path": "src/renderer/src/components/editor/external-changes/editor-self-write-registry.ts",
     "commit": "73771e67d01"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/code/external-change.ts",
+    "upstream": "orca",
+    "path": "src/renderer/src/hooks/editor-external-watch-event-reconciliation.ts",
+    "commit": "73771e67d01"
   }
 ]

@@ -195,6 +195,7 @@ src/components/drawer/IssueDrawer.tracker-fallback.test.tsx
 src/components/drawer/useDrawerData.absent-issue.test.tsx
 src/components/explorer/code/__tests__/autosave.test.ts
 src/components/explorer/code/__tests__/code-drafts.test.ts
+src/components/explorer/code/__tests__/external-change.test.ts
 src/components/explorer/code/__tests__/save-queue.test.ts
 src/components/explorer/code/__tests__/self-write-registry.test.ts
 src/components/home/__tests__/AnywhereSetUpRow.test.tsx
