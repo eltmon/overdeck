@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5186",
   "created": "2026-11-13T16:27:17.519Z",
-  "updated": "2026-11-13T16:44:10.636Z",
+  "updated": "2026-11-13T16:44:44.433Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,10 @@
       "doneAt": "2026-11-13T16:32:12.837Z"
     },
     "rpc-client": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5186",
-      "claimedAt": "2026-11-13T16:44:02.443Z"
+      "claimedAt": "2026-11-13T16:44:02.443Z",
+      "doneAt": "2026-11-13T16:44:44.433Z"
     },
     "explorer-store": {
       "status": "in_progress",
@@ -55,6 +56,22 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5186",
       "claimedAt": "2026-11-13T16:44:10.636Z"
+    },
+    "rpc-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:44:44.433Z"
+    },
+    "rpc-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:44:44.433Z"
+    },
+    "rpc-client.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:44:44.433Z"
+    },
+    "rpc-client.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:44:44.433Z"
     }
   }
 }
