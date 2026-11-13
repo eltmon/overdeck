@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5189",
   "created": "2026-11-13T19:51:19.231Z",
-  "updated": "2026-11-13T20:14:40.041Z",
+  "updated": "2026-11-13T20:18:06.369Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,9 +72,22 @@
       "doneAt": "2026-11-13T20:14:30.011Z"
     },
     "odf-parsing": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5189",
-      "claimedAt": "2026-11-13T20:14:40.041Z"
+      "claimedAt": "2026-11-13T20:14:40.041Z",
+      "doneAt": "2026-11-13T20:18:06.369Z"
+    },
+    "odf-parsing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:18:06.369Z"
+    },
+    "odf-parsing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:18:06.369Z"
+    },
+    "odf-parsing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:18:06.369Z"
     }
   }
 }
