@@ -1,0 +1,1437 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-13T19:48:23Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5189: File explorer D2: viewers tier 2 (Office, notebooks, Mermaid)",
+    "updated": "2026-11-13T19:49:33.247Z"
+  },
+  "plan": {
+    "id": "pan-5189",
+    "title": "File explorer D2: viewers tier 2 (Office, notebooks, Mermaid)",
+    "status": "proposed",
+    "uid": "4fab3235-5cf2-4b46-9881-0df79ded0ca2",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-13T19:48:23Z",
+    "updated": "2026-11-13T19:49:33.247Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5189",
+        "label": "PAN-5189",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5189/.pan/drafts/pan-5189.md",
+        "label": "PRD draft (.pan/drafts/pan-5189.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5189/.pan/drafts/pan-5183.md",
+        "label": "Parent PRD (.pan/drafts/pan-5183.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "file-explorer",
+      "viewers",
+      "frontend",
+      "office",
+      "notebook",
+      "mermaid",
+      "port-t3code"
+    ],
+    "narratives": {
+      "Problem": "The explorer (PAN-5183) shows images, PDFs, audio, fonts, tables, archives and SQLite through the tier-1 viewers (PAN-5188), but Word, Excel, PowerPoint, OpenDocument, Jupyter notebook and Mermaid files only get the generic binary card or raw text. Parent FR-9 requires tier-2 previews for these formats.",
+      "Proposal": "Port t3code's Office viewers (betteroffice engines for docx/xlsx/pptx; an ODF path through the office preview worker for odt/ods/odp) and its notebook preview, add a Mermaid viewer that renders strict-mode SVG into an img behind t3code's lexical guard, and add the office, notebook and mermaid rows to D1's viewer router before its text row. The notebook and Mermaid viewers do not depend on any Office item. Every failure falls back to the binary card. License and Effect checkpoints were resolved in planning (PRD D-1, D-2).",
+      "NonGoals": "- .rtf and .epub previews, legacy .doc/.xls/.ppt, Apple iWork files and video previews.\n- Editing any Office, notebook or Mermaid file inside its viewer; the code pane Preview/Edit toggle belongs to PAN-5187.\n- Running notebook code or rendering widget, JavaScript or LaTeX outputs.\n- Syntax highlighting in notebook code cells.\n- Mermaid rendering inside notebook markdown.\n- Loading fonts or engines from a CDN.\n- Mounting viewers in a pane or creating CodePane.tsx (PAN-5186, PAN-5187).\n- Server changes, new HTTP routes or new RPC methods.\n- Changing the frontend tsconfig.json lib, raising any lint ratchet, or raising any file-size cap.\n- Using ChatMarkdown or MarkdownTab for notebook markdown (not inert).\n- The phone app (apps/mobile)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Accept @betteroffice/fonts and fonts-cjk, licensed (Apache-2.0 AND OFL-1.1), and drop no Office format.",
+        "rationale": "The parent drops formats whose package is not MIT/Apache-2.0/BSD/ISC; OFL-1.1 covers only the font files and is not a code license. The rule targets copyleft code (heic-to, LGPL), and the dashboard already ships OFL fonts (Space Grotesk, Geist, DM Sans, @fontsource/jetbrains-mono). The OFL texts ship in licenses/."
+      },
+      {
+        "summary": "Keep effect/Schema in the office code; rename Schema.TaggedError to Schema.TaggedErrorClass.",
+        "rationale": "Runtime and tsc --strict probes on effect 4.0.0-beta.73 passed for every API used except TaggedError, which beta.73 names TaggedErrorClass (already used in src/lib/overdeck/merge.ts). The type-guard fallback stays as a checkpoint."
+      },
+      {
+        "summary": "Ship all five betteroffice packages including the 34 MB CJK fonts, and record before/after sizes.",
+        "rationale": "The parent names all five; assets load only when an Office file opens; no pack-size gate exists; engines never use system fonts, so without CJK faces CJK text is blank. Fallback: drop fonts-cjk if CI pack or release fails on size."
+      },
+      {
+        "summary": "Parse notebooks on the main thread from src, independent of the office worker.",
+        "rationale": "Keeps notebook and Mermaid shippable even if Office were dropped, and handles notebooks over the 5 MiB Monaco threshold that arrive as large-text reads."
+      },
+      {
+        "summary": "Render notebook markdown with react-markdown plus the inert plugin instead of MarkdownTab.",
+        "rationale": "MarkdownTab renders ChatMarkdown, which loads markdown images (remote fetches) and turns bare paths into file chips, with no plugin hook; saved notebooks are untrusted. The same typography class is reused."
+      },
+      {
+        "summary": "Render notebook code cells as plain pre blocks.",
+        "rationale": "t3code uses a @pierre/diffs virtualized highlighter at a version Overdeck does not pin; plain text is readable and avoids a dependency change."
+      },
+      {
+        "summary": "Pin mermaid 11.17.2 and render its SVG into an img data URL with securityLevel strict.",
+        "rationale": "11.17.2 is already in bun.lock transitively, so no new package tree; an SVG in an img cannot run script or fetch."
+      },
+      {
+        "summary": "Leave out .rtf and .epub.",
+        "rationale": "Parent FR-9 lists only docx, xlsx, pptx, odt, ods, odp, notebooks and Mermaid."
+      },
+      {
+        "summary": "Every tier-2 failure renders the binary card with the reason as its notice.",
+        "rationale": "The operator can always download the file; this reuses D1 BinaryCard."
+      },
+      {
+        "summary": "Rewrite toSorted/toReversed in ported files instead of raising the tsconfig lib.",
+        "rationale": "main compiles ES2022 methods but nothing on main uses ES2023 ones under lib ES2020; a local rewrite keeps the change surgical."
+      },
+      {
+        "summary": "Make the browser screenshot check conditional on CodePane mounting FileViewer.",
+        "rationale": "PAN-5187 owns CodePane and had not mounted FileViewer at planning time; the D1 plan used the same rule."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "The file count comes from porting one upstream module (t3code files/office, about 40 files with an internal worker and protocol graph) 1:1 into one new folder; items are split by engine and viewer so each lands as its own commit. The subsystem count exceeds 6 only because the lint counts each root-level file (bun.lock, each scripts/ file, each docs/ file, licenses/, changelog.d/) as its own subsystem; the code itself lives in one frontend folder. Splitting across issues would leave unreachable code in each PR, because the router row for Office needs the engines.",
+      "canonicalFilename": "2026-11-13-PAN-5189-file-explorer-d2-viewers-tier-2-office-notebooks-mermaid.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "deps",
+        "title": "Gate on PAN-5188 and add the tier-2 viewer dependencies",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:48:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5189",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/package.json",
+            "bun.lock"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bun install",
+            "cd src/dashboard/frontend && npx vite build",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "bun install exits 0",
+            "vite build exits 0",
+            "typecheck:frontend reports no new errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-5"
+          ],
+          "prdWorkItem": "WI-1"
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/pan-5189.md first; it is the executable spec. Execute WI-1 steps 1-4: gate on PAN-5188 being on main, record before sizes under PR-notes:, add the pinned dependencies, run the license sweep. Do not edit vite.config.ts (D-15 retired)."
+        },
+        "items": [
+          {
+            "id": "deps.ac1",
+            "title": "Given the branch after `pan sync-main PAN-5189`, when `test -f src/dashboard/frontend/src/components/explorer/viewers/viewer-router.ts` runs, then it exits 0; when it exits non-zero the agent stops and sends `pan tell flywheel-orchestrator` naming PAN-5188 as the blocker.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deps.ac2",
+            "title": "src/dashboard/frontend/package.json pins exactly @betteroffice/docx 0.5.1, @betteroffice/xlsx 0.5.1, @betteroffice/pptx 0.5.1, @betteroffice/fonts 0.4.0, @betteroffice/fonts-cjk 0.4.0, dompurify 3.4.16, entities 8.1.0, fast-xml-parser 5.7.3, mermaid 11.17.2 and saxes 6.0.0 in dependencies, and @types/mdast 4.0.4 in devDependencies; `bun install` exits 0 and bun.lock is committed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deps.ac3",
+            "title": "Given the new dependencies, when `cd src/dashboard/frontend && npx vite build` runs, then it exits 0, and `git diff origin/main -- src/dashboard/frontend/vite.config.ts` prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deps.ac4",
+            "title": "The item commit body contains a PR-notes: block with the before sizes (`du -sm dist/dashboard/public`, and the `npm pack --dry-run --json` unpackedSize and packed size) and a license table for every package bun.lock gained, in which every license is MIT, ISC, Apache-2.0, a BSD variant, 0BSD, (MPL-2.0 OR Apache-2.0), or (Apache-2.0 AND OFL-1.1) for the two font packages.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "image-dimensions",
+        "title": "Port the image dimensions helper",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:48:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5189",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/shared/imageDimensions.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/shared/__tests__/imageDimensions.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/shared/__tests__/imageDimensions.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "imageDimensions.test.ts passes",
+            "typecheck:frontend reports no new errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-8",
+            "FR-11"
+          ],
+          "prdWorkItem": "WI-2"
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/pan-5189.md first; it is the executable spec. Execute WI-2: port t3code packages/shared/src/imageDimensions.ts unchanged in logic."
+        },
+        "items": [
+          {
+            "id": "image-dimensions.ac1",
+            "title": "Given the bytes of a 1x1 PNG built in the test, when readImageDimensions runs, then it returns width 1 and height 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "image-dimensions.ac2",
+            "title": "Given 16 zero bytes, when readImageDimensions runs, then it returns null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "image-dimensions.ac3",
+            "title": "`head -2 viewers/shared/imageDimensions.ts` prints the t3code port header naming packages/shared/src/imageDimensions.ts @ 2d8a843e6b.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "office-archive",
+        "title": "Port the office protocol and split archive bounding into four files",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:48:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5189",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/office/officePreviewProtocol.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/officeXml.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/wordArchive.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/sheetArchive.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/officeArchive.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/links.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/LICENSE.opencode",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/__tests__/officeArchive.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/office/__tests__/officeArchive.test.ts",
+            "npm run typecheck:frontend",
+            "wc -l src/dashboard/frontend/src/components/explorer/viewers/office/*.ts"
+          ],
+          "expected_outputs": [
+            "officeArchive.test.ts passes with 6 cases",
+            "typecheck:frontend reports no new errors",
+            "each split file is at most 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-11",
+            "FR-12"
+          ],
+          "prdWorkItem": "WI-3",
+          "foundationFor": [
+            "odf-parsing",
+            "engine-shared",
+            "ooxml-viewer"
+          ]
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/pan-5189.md first; it is the executable spec. Execute WI-3 steps 1-4: protocol per PRD 6.3, split officeArchive.ts along the seams named in WI-3 step 2 without changing logic, port links.ts, copy LICENSE.opencode."
+        },
+        "items": [
+          {
+            "id": "office-archive.ac1",
+            "title": "officePreviewProtocol.ts contains the OfficeDocumentKind union of exactly docx, xlsx, pptx, odt, ods, odp and the OFFICE_DOCUMENT_KINDS set, and its OfficeWorkerResult union contains no notebook variant.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "office-archive.ac2",
+            "title": "Given the five ported t3code officeArchive.test.ts cases plus a 16-byte non-zip buffer, when officeArchive.test.ts runs, then prepareOffice keeps the long document, lists, styles and header content, and boundedArchive rejects the non-zip buffer with an Error.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "office-archive.ac3",
+            "title": "`wc -l` prints at most 1000 lines for each of officeXml.ts, wordArchive.ts, sheetArchive.ts and officeArchive.ts, and the first two lines of each contain the port header naming apps/web/src/components/files/officeArchive.ts @ 2d8a843e6b.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "office-archive.ac4",
+            "title": "engine/LICENSE.opencode is byte-identical to t3code apps/web/src/components/files/office/LICENSE.opencode (`cmp` exits 0).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "odf-parsing",
+        "title": "Port ODF parsing and the office preview worker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:48:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5189",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/office/extendedDocumentPreview.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/officePreview.worker.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/__tests__/extendedDocumentPreview.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/office/__tests__/extendedDocumentPreview.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "extendedDocumentPreview.test.ts passes",
+            "typecheck:frontend reports no new errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-11"
+          ],
+          "prdWorkItem": "WI-4"
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/pan-5189.md first; it is the executable spec. Execute WI-4 steps 1-2: port extendedDocumentPreview.ts without the epub, rtf and notebook functions (D-9, D-4), and port the worker without its ipynb/rtf/epub branches."
+        },
+        "items": [
+          {
+            "id": "odf-parsing.ac1",
+            "title": "Given an odt built with jszip whose content.xml holds a text:p \"Hello ODF\", when openDocument(archive, \"odt\") runs, then it returns type \"document\" with a page whose html contains \"Hello ODF\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "odf-parsing.ac2",
+            "title": "Given an ods with sheet \"Sheet1\" holding one row of cells a and b, when openDocument(archive, \"ods\") runs, then it returns type \"ods\" with sheets[0].name \"Sheet1\" and sheets[0].rows[0] equal to [\"a\",\"b\"].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "odf-parsing.ac3",
+            "title": "`git grep -n \"openEpub\\|openRtf\\|openNotebook\" -- src/dashboard/frontend/src/components/explorer/viewers/office` prints nothing, and officePreview.worker.ts dynamically imports only openDocument from ./extendedDocumentPreview.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "document-pages",
+        "title": "Port document pages with HTML sanitizing and the sandboxed iframe",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:48:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5189",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/office/DocumentPages.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/__tests__/DocumentPages.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/office/__tests__/DocumentPages.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "DocumentPages.test.tsx passes",
+            "typecheck:frontend reports no new errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-8",
+            "NFR-3",
+            "FR-11"
+          ],
+          "prdWorkItem": "WI-5"
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/pan-5189.md first; it is the executable spec. Execute WI-5: port DocumentPages.tsx per PRD 6.2 (theme hook, observeResize, ViewerAction) keeping the sanitizer lists, data-URL filter, CSP and sandbox values unchanged."
+        },
+        "items": [
+          {
+            "id": "document-pages.ac1",
+            "title": "Given HTML with an onclick handler, a script tag, an https image and a data:image/png image, when sanitizeDocumentHtml runs, then the result contains no \"script\", no \"onclick\", no \"https:\" and exactly one \"<img\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "document-pages.ac2",
+            "title": "Given html \"<p>hi</p>\", when DocumentPages renders, then it renders an iframe whose sandbox attribute is \"\" and whose srcdoc contains \"default-src 'none'\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "document-pages.ac3",
+            "title": "Given the output prop, when DocumentPages renders, then the iframe sandbox attribute is \"allow-same-origin\" and never contains \"allow-scripts\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "engine-shared",
+        "title": "Port the office engine shared modules with the TaggedErrorClass rename",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:48:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5189",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/worker-rpc.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/fonts.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/image-bitmap.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/vector-pictures.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/OfficePages.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/__tests__/worker-rpc.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/office/engine/__tests__/worker-rpc.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "worker-rpc.test.ts passes",
+            "typecheck:frontend reports no new errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-11"
+          ],
+          "prdWorkItem": "WI-6",
+          "foundationFor": [
+            "word-engine",
+            "sheet-engine",
+            "slide-engine"
+          ]
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/pan-5189.md first; it is the executable spec. Execute WI-6: port worker-rpc.ts, fonts.ts, image-bitmap.ts, vector-pictures.ts and OfficePages.tsx from t3code office/ per PRD 6.2 and D-2."
+        },
+        "items": [
+          {
+            "id": "engine-shared.ac1",
+            "title": "Given a Fake Worker, when createWorkerClient(fake).call(\"m\", 1) runs and the fake replies {id:1, ok:true, value:5, transferred:[]}, then the posted request matches {id:1, method:\"m\", input:1} and the call resolves with 5.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "engine-shared.ac2",
+            "title": "Given fake timers and call 1 pending, when the fake replies {id:1, ok:false, superseded:true, message:\"x\"}, then that call rejects with an error whose _tag is \"SupersededError\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "engine-shared.ac3",
+            "title": "Given the fake emits an error event, when a new call is made, then it rejects.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "engine-shared.ac4",
+            "title": "`git grep -n \"Schema.TaggedError<\" -- src/dashboard/frontend/src/components/explorer` prints nothing, and worker-rpc.ts declares both error classes with Schema.TaggedErrorClass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "word-engine",
+        "title": "Port the Word engine",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:48:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5189",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/WordDocument.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/document.worker.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/word-*.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/__tests__/WordDocument.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/office/engine/__tests__/WordDocument.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "WordDocument.test.tsx passes",
+            "typecheck:frontend reports no new errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-11"
+          ],
+          "prdWorkItem": "WI-7"
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/pan-5189.md first; it is the executable spec. Execute WI-7: port the seven Word engine files per PRD 6.2."
+        },
+        "items": [
+          {
+            "id": "word-engine.ac1",
+            "title": "Given a Fake Worker, when WordDocument renders with an 8-byte buffer, then it creates exactly one worker whose URL ends with document.worker.ts and posts a request with method \"open\" whose input.bytes is in the transfer list; when happy-dom throws before the first postMessage, the test asserts only the worker creation and the commit body contains a PR-notes: line saying so.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "word-engine.ac2",
+            "title": "For each of the seven Word files (WordDocument.tsx, document.worker.ts, word-document.ts, word-glyphs.ts, word-images.ts, word-protocol.ts, word-text.ts), `head -2` prints the t3code port header naming apps/web/src/components/files/office/<name> @ 2d8a843e6b.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "word-engine.ac3",
+            "title": "`git grep -n \"~/\" -- src/dashboard/frontend/src/components/explorer/viewers/office` prints nothing, and WordDocument.tsx contains an import of Tooltip from components/shared/Tooltip.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sheet-engine",
+        "title": "Port the spreadsheet engine",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:48:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5189",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/Spreadsheet.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/spreadsheet.worker.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/sheet-*.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/__tests__/sheet-viewport.test.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/__tests__/sheet-cells.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/office/engine/__tests__/sheet-viewport.test.ts src/components/explorer/viewers/office/engine/__tests__/sheet-cells.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "sheet-viewport.test.ts passes (and sheet-cells.test.ts, or its checkpoint is recorded)",
+            "typecheck:frontend reports no new errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-11"
+          ],
+          "prdWorkItem": "WI-8"
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/pan-5189.md first; it is the executable spec. Execute WI-8: port the nine spreadsheet engine files and the two upstream unit tests per PRD 6.2, applying the WI-8 checkpoint."
+        },
+        "items": [
+          {
+            "id": "sheet-engine.ac1",
+            "title": "Given the ported t3code sheet-viewport cases, when sheet-viewport.test.ts runs, then cachedViewport keeps each viewport inside the cached bitmap as upstream expects.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sheet-engine.ac2",
+            "title": "Given the ported coverMerges cases, when sheet-cells.test.ts runs, then it expands a 15,000-merge chain; or, when importing @betteroffice/xlsx/headless fails under happy-dom, the file is deleted and the commit body contains a PR-notes: line saying so.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sheet-engine.ac3",
+            "title": "`wc -l` prints at most 1000 for Spreadsheet.tsx, and the first two lines of each of the nine sheet files contain the port header naming apps/web/src/components/files/office/<name>.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "slide-engine",
+        "title": "Port the presentation engine",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:48:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5189",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/Presentation.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/presentation.worker.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/slide-*.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/engine/__tests__/Presentation.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/office/engine/__tests__/Presentation.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "Presentation.test.tsx passes",
+            "typecheck:frontend reports no new errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-11"
+          ],
+          "prdWorkItem": "WI-9"
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/pan-5189.md first; it is the executable spec. Execute WI-9: port the five presentation engine files per PRD 6.2."
+        },
+        "items": [
+          {
+            "id": "slide-engine.ac1",
+            "title": "Given a Fake Worker, when Presentation renders with an 8-byte buffer, then it creates one worker whose URL ends with presentation.worker.ts and posts a request with method \"open\" (same happy-dom checkpoint as word-engine).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slide-engine.ac2",
+            "title": "slide-text.ts contains its effect/Schema decoders and `npm run typecheck:frontend` exits 0; when a Schema block fails to compile, the commit body contains a PR-notes: line naming the D-2 type-guard fallback taken.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slide-engine.ac3",
+            "title": "For each of the five presentation files, `head -2` prints the port header naming apps/web/src/components/files/office/<name> @ 2d8a843e6b.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ooxml-viewer",
+        "title": "Port the OOXML viewer with the binary-card fallback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:48:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5189",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/office/OpenXmlOfficeViewer.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/__tests__/OpenXmlOfficeViewer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/office/__tests__/OpenXmlOfficeViewer.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "OpenXmlOfficeViewer.test.tsx passes",
+            "typecheck:frontend reports no new errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "FR-10",
+            "NFR-4",
+            "FR-11"
+          ],
+          "prdWorkItem": "WI-10"
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/pan-5189.md first; it is the executable spec. Execute WI-10: port OpenXmlOfficeViewer.tsx with the PRD 6.5 props and the D-11 fallback."
+        },
+        "items": [
+          {
+            "id": "ooxml-viewer.ac1",
+            "title": "Given fetch returns 8 bytes, when the viewer mounts with kind docx, then it posts {type:\"open\", kind:\"docx\"} with the fetched ArrayBuffer in the transfer list.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ooxml-viewer.ac2",
+            "title": "Given the worker replies {type:\"docx\", truncated:true}, when the viewer renders, then the mocked WordDocument marker renders and the text \"Preview limited. Download the file to read all of it.\" is shown.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ooxml-viewer.ac3",
+            "title": "Given the worker replies {type:\"error\", message:\"Damaged\"}, when the viewer renders, then a Download link and \"Damaged\" are shown.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ooxml-viewer.ac4",
+            "title": "Given fake timers and no worker reply, when 30,000 ms pass, then \"This document took too long to preview\" is shown; and given size over 50 MB, the binary card renders without calling fetch.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "odf-viewer",
+        "title": "Port the ODF viewer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:48:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5189",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/office/OdfViewer.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/office/__tests__/OdfViewer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/office/__tests__/OdfViewer.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "OdfViewer.test.tsx passes",
+            "typecheck:frontend reports no new errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-10",
+            "FR-11"
+          ],
+          "prdWorkItem": "WI-11"
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/pan-5189.md first; it is the executable spec. Execute WI-11: port ExtendedOfficeViewer from t3code OfficeViewer.tsx as OdfViewer.tsx without the notebook branch or the OOXML dispatch."
+        },
+        "items": [
+          {
+            "id": "odf-viewer.ac1",
+            "title": "Given kind odt, when OdfViewer mounts, then it posts {type:\"open\", kind:\"odt\"} to the office preview worker.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "odf-viewer.ac2",
+            "title": "Given a document reply with one page, when OdfViewer renders, then the mocked DocumentPages marker renders.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "odf-viewer.ac3",
+            "title": "Given an ods reply with sheet \"S1\", when OdfViewer renders, then a native select with an option \"S1\" renders.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "odf-viewer.ac4",
+            "title": "Given an error reply, when OdfViewer renders, then a Download link renders with the error message as its notice.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "notebook-viewer",
+        "title": "Add the inert read-only notebook viewer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:48:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5189",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/notebook/notebookParse.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/notebook/NotebookMarkdown.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/notebook/NotebookPreview.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/notebook/NotebookViewer.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/notebook/__tests__/notebookParse.test.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/notebook/__tests__/NotebookViewer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/notebook/__tests__/notebookParse.test.ts src/components/explorer/viewers/notebook/__tests__/NotebookViewer.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "both notebook test files pass",
+            "typecheck:frontend reports no new errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-10",
+            "NFR-3",
+            "FR-11"
+          ],
+          "prdWorkItem": "WI-12"
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/pan-5189.md first; it is the executable spec. Execute WI-12 steps 1-4 (D-4, D-5, D-6): notebookParse.ts from extendedDocumentPreview.ts, NotebookMarkdown with react-markdown and the inert plugin, NotebookPreview port, NotebookViewer fetching via readBounded at 8 MiB."
+        },
+        "items": [
+          {
+            "id": "notebook-viewer.ac1",
+            "title": "Given a v4 notebook with a markdown cell and a code cell with an image/png output, when openNotebook runs, then it returns two cells and the second has one image output whose text starts with \"data:image/png;base64,\"; given nbformat 3, it throws \"Preview supports version 4 notebooks with up to 500 cells.\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "notebook-viewer.ac2",
+            "title": "Given a markdown cell \"![x](https://e.com/t.png) [link](https://e.com)\", when NotebookViewer renders, then no img element and no a element render and the text \"link\" is shown.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "notebook-viewer.ac3",
+            "title": "Given a code cell \"print(1)\", when NotebookViewer renders, then it renders inside a pre element and the notice \"Saved outputs only. Code is never executed.\" is shown.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "notebook-viewer.ac4",
+            "title": "Given a body that is not JSON, when NotebookViewer renders, then a Download link renders.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mermaid-viewer",
+        "title": "Add the Mermaid viewer with the lexical guard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:48:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5189",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/mermaid/MermaidViewer.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/mermaid/__tests__/MermaidViewer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/mermaid/__tests__/MermaidViewer.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "MermaidViewer.test.tsx passes",
+            "typecheck:frontend reports no new errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "NFR-1",
+            "NFR-3",
+            "FR-11"
+          ],
+          "prdWorkItem": "WI-12m"
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/pan-5189.md first; it is the executable spec. Execute WI-12m per D-7 and D-8."
+        },
+        "items": [
+          {
+            "id": "mermaid-viewer.ac1",
+            "title": "Given text \"graph TD; A-->B\" and a mocked mermaid, when MermaidViewer renders, then it renders an img whose src starts with \"data:image/svg+xml\" and mermaid.initialize was called with securityLevel \"strict\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mermaid-viewer.ac2",
+            "title": "Given text starting with \"%%{init\" or containing \"<img\", when MermaidViewer renders, then the guard notice is shown and mermaid.render is never called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mermaid-viewer.ac3",
+            "title": "Given mermaid.render rejects with Error(\"Parse error on line 1\"), when MermaidViewer renders, then a Download link and \"Parse error on line 1\" are shown.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mermaid-viewer.ac4",
+            "title": "MermaidViewer.tsx contains no static import of mermaid, only `await import(\"mermaid\")`, and its first two lines contain the port header naming apps/web/src/components/files/MermaidViewer.tsx.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "router-and-host",
+        "title": "Route tier-2 files to their viewers and verify the build",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:48:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5189",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/viewers/viewer-router.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/FileViewer.tsx",
+            "src/dashboard/frontend/src/components/explorer/viewers/__tests__/viewer-router.test.ts",
+            "src/dashboard/frontend/src/components/explorer/viewers/__tests__/FileViewer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/viewers/__tests__/viewer-router.test.ts src/components/explorer/viewers/__tests__/FileViewer.test.tsx",
+            "npm run typecheck:frontend",
+            "npm run build",
+            "ls dist/dashboard/public/assets | grep -cE '\\.wasm$'"
+          ],
+          "expected_outputs": [
+            "both router and host test files pass",
+            "npm run build exits 0",
+            "at least 7 wasm assets are listed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2",
+            "NFR-5"
+          ],
+          "prdWorkItem": "WI-13"
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/pan-5189.md first; it is the executable spec. Execute WI-13 steps 1-4: PRD 6.4 exactly, then build verification and the after-size record (WI-14 was folded in here). Apply the D-3 size fallback only if CI pack or release fails on size."
+        },
+        "items": [
+          {
+            "id": "router-and-host.ac1",
+            "title": "Given the D-10 rows, when viewer-router.test.ts runs, then every D1 row still returns its D1 choice, docx/.XLSX/pptx/odt/ods/odp return office, a text ipynb returns notebook with textEditable true, a large ipynb returns notebook with textEditable false, a binary ipynb returns binary, a text .mmd/.mermaid returns mermaid with textEditable true, and a large .mmd returns large-text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "router-and-host.ac2",
+            "title": "officeKindOf returns \"docx\" for \"x/A.DOCX\", \"odp\" for \"a.odp\" and null for \"a.txt\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "router-and-host.ac3",
+            "title": "Given mocked viewers, when FileViewer renders a.docx, a.ods, a text n.ipynb and a text d.mmd, then it renders the OOXML marker with kind docx, the ODF marker with kind ods, the notebook marker and the Mermaid marker carrying the file text, each with a downloadUrl containing inline=0; FileViewer.tsx imports the four tier-2 viewers only via lazy(() => import(...)).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "router-and-host.ac4",
+            "title": "Given `npm run build`, when it exits 0, then dist/dashboard/public/assets holds at least 7 .wasm files and files matching Carlito and NotoSansSC, and the item commit body contains a PR-notes: block with the after du -sm, unpackedSize and packed size next to the before numbers.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "port-records",
+        "title": "Record the ports, ship the license texts and list the new tests for CI",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:48:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5189",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/upstream-ports.json",
+            "scripts/frontend-test-subset.txt",
+            "licenses/opencode-*",
+            "licenses/betteroffice-fonts-OFL.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:upstream-ports",
+            "npx vitest run tests/unit/scripts/upstream-ports.test.ts"
+          ],
+          "expected_outputs": [
+            "lint:upstream-ports prints \"upstream-ports: <n> records OK\"",
+            "upstream-ports.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "FR-12"
+          ],
+          "prdWorkItem": "WI-15"
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/pan-5189.md first; it is the executable spec. Execute WI-15 steps 1-4."
+        },
+        "items": [
+          {
+            "id": "port-records.ac1",
+            "title": "Given every ported file in PRD 6.1, when `npm run lint:upstream-ports` runs, then it exits 0 and each of those files has a record with upstream t3code and commit 2d8a843e6b (NotebookViewer.tsx has none).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "port-records.ac2",
+            "title": "licenses/opencode-LICENSE is byte-identical to t3code office/LICENSE.opencode, and licenses/betteroffice-fonts-OFL.txt contains one \"==== <file> ====\" section per OFL text from @betteroffice/fonts/LICENSES and OFL-NotoCJK.txt.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "port-records.ac3",
+            "title": "scripts/frontend-test-subset.txt contains every new frontend test file from the image-dimensions through router-and-host items, in sorted order, relative to src/dashboard/frontend.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document tier-2 viewers, acknowledgements and the changelog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:48:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5189",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/ACKNOWLEDGEMENTS.md",
+            "changelog.d/pan-5189.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-12",
+            "NFR-5"
+          ],
+          "prdWorkItem": "WI-16"
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/pan-5189.md first; it is the executable spec. Execute WI-16 steps 1-4, then before pan done copy every PR-notes: block on the branch into the PR description (PRD section 5 evidence carrier)."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains the heading \"### Viewers tier 2: Office, notebooks and Mermaid (PAN-5189)\" after the PAN-5188 viewers section, stating the router rows, the engine and ODF paths, the 50 MB / 30 s bounds, that notebook code never runs, the Mermaid image and guard, the binary-card fallback and that the WASM and fonts load only when an Office file opens.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/ACKNOWLEDGEMENTS.md contains @betteroffice/docx, @betteroffice/xlsx, @betteroffice/pptx, @betteroffice/fonts, @betteroffice/fonts-cjk, mermaid, dompurify, fast-xml-parser, entities and saxes with their licenses, names opencode with licenses/opencode-LICENSE, and points to licenses/betteroffice-fonts-OFL.txt.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "changelog.d/pan-5189.md holds the WI-16 \"#### New\" entry linking #5189, and `npm run lint:docs` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "Given `pan done`, when the PR description is written, then it contains every PR-notes: block from `git log origin/main..HEAD --format=%B`, including the license outcome (PRD D-1, all five betteroffice packages kept) and the Effect outcome (PRD D-2, TaggedError renamed, any fallback named), which is parent AC-10.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "browser-check",
+        "title": "Screenshot tier-2 files in code panes when a code pane mounts the host",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:48:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5189",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".tmp/uat-5189/sample.docx",
+            ".tmp/uat-5189/sample.ipynb"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "test -f src/dashboard/frontend/src/components/explorer/code/CodePane.tsx"
+          ],
+          "expected_outputs": [
+            "the command exits 0 when the browser check applies, non-zero when the item is cancelled"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-6",
+            "FR-9"
+          ],
+          "prdWorkItem": "WI-17"
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/pan-5189.md first; it is the executable spec. Execute WI-17: apply its decision rule. A cancelled item needs `pan task cancel PAN-5189 browser-check` because it has no Item: commit."
+        },
+        "items": [
+          {
+            "id": "browser-check.ac1",
+            "title": "Given CodePane.tsx imports ../viewers/FileViewer, when sample.docx, sample.ipynb and docs/overdeck-db-erd.mmd open in code panes in an isolated Playwright profile, then three screenshots attached to the PR show the text \"Hello Word\", the \"Title\" heading and the rendered ERD diagram, and .tmp/uat-5189/ is deleted afterwards.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-check.ac2",
+            "title": "Given CodePane.tsx is absent or does not import FileViewer, when the item is evaluated, then `pan task show PAN-5189 browser-check` reports cancelled and the PR description contains \"Tier-2 viewers not mounted yet: PAN-5187 mounts FileViewer in CodePane; the viewers are proven by Vitest render tests.\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "deps",
+        "to": "image-dimensions",
+        "type": "blocks"
+      },
+      {
+        "from": "deps",
+        "to": "office-archive",
+        "type": "blocks"
+      },
+      {
+        "from": "deps",
+        "to": "odf-parsing",
+        "type": "blocks"
+      },
+      {
+        "from": "deps",
+        "to": "document-pages",
+        "type": "blocks"
+      },
+      {
+        "from": "deps",
+        "to": "engine-shared",
+        "type": "blocks"
+      },
+      {
+        "from": "deps",
+        "to": "notebook-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "deps",
+        "to": "mermaid-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "image-dimensions",
+        "to": "odf-parsing",
+        "type": "blocks"
+      },
+      {
+        "from": "image-dimensions",
+        "to": "engine-shared",
+        "type": "blocks"
+      },
+      {
+        "from": "image-dimensions",
+        "to": "notebook-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "office-archive",
+        "to": "odf-parsing",
+        "type": "blocks"
+      },
+      {
+        "from": "office-archive",
+        "to": "engine-shared",
+        "type": "blocks"
+      },
+      {
+        "from": "office-archive",
+        "to": "ooxml-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "odf-parsing",
+        "to": "ooxml-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "odf-parsing",
+        "to": "odf-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "document-pages",
+        "to": "odf-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "document-pages",
+        "to": "notebook-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "engine-shared",
+        "to": "word-engine",
+        "type": "blocks"
+      },
+      {
+        "from": "engine-shared",
+        "to": "sheet-engine",
+        "type": "blocks"
+      },
+      {
+        "from": "engine-shared",
+        "to": "slide-engine",
+        "type": "blocks"
+      },
+      {
+        "from": "word-engine",
+        "to": "ooxml-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "sheet-engine",
+        "to": "ooxml-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "slide-engine",
+        "to": "ooxml-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "ooxml-viewer",
+        "to": "router-and-host",
+        "type": "blocks"
+      },
+      {
+        "from": "odf-viewer",
+        "to": "router-and-host",
+        "type": "blocks"
+      },
+      {
+        "from": "notebook-viewer",
+        "to": "router-and-host",
+        "type": "blocks"
+      },
+      {
+        "from": "mermaid-viewer",
+        "to": "router-and-host",
+        "type": "blocks"
+      },
+      {
+        "from": "router-and-host",
+        "to": "port-records",
+        "type": "blocks"
+      },
+      {
+        "from": "router-and-host",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "router-and-host",
+        "to": "browser-check",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
