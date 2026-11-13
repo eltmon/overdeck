@@ -17,7 +17,7 @@ import styles from '../../Stage/stage.module.css'
 import type { PaneWrapperProps } from '../../Stage/types'
 import { explorerErrorCode, explorerErrorMessage, readFile } from '../explorer-rpc'
 import { codePaneLabel, openCodePane } from '../openCodePane'
-import { draftKey, useCodeDrafts } from './code-drafts'
+import { draftKey, isDraftDirty, useCodeDrafts } from './code-drafts'
 import { MonacoCodeEditor, type CodeEditorInstance, type CodePosition } from './MonacoCodeEditor'
 import { ChangesView } from './ChangesView'
 import { CodePaneHeader, isMarkdownPath, type CodePaneView } from './CodePaneHeader'
@@ -156,7 +156,9 @@ function CodePaneForFile({
     let cancelled = false
     readDisk(rootId, path)
       .then((read) => {
-        if (cancelled) return
+        // Reload from disk may have cleaned the draft while this read ran; a
+        // refused save of edits that no longer exist needs no banner.
+        if (cancelled || !isDraftDirty(useCodeDrafts.getState().drafts[key])) return
         setExternal(read.missing ? { kind: 'deleted' } : { kind: 'changed', diskText: read.text, diskSignature: read.signature })
       })
       .catch((error: unknown) => {
@@ -168,7 +170,7 @@ function CodePaneForFile({
     return () => {
       cancelled = true
     }
-  }, [conflict, rootId, path, setExternal, clearConflict])
+  }, [conflict, rootId, path, key, setExternal, clearConflict])
 
   const externalState = external.state
   const resolveChange = useCallback(

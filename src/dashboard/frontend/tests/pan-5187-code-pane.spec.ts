@@ -57,6 +57,17 @@ function seedProject(home: string): void {
     );
   }
 
+  // Real-world TypeScript: a relative import, a Node global and JSX. Without
+  // project context, Monaco's semantic checks would flag all three.
+  writeFileSync(
+    path.join(fixture, 'real.ts'),
+    "import { a } from './a'\nimport type { Stats } from 'node:fs'\nexport const port: number = Number(process.env.PORT ?? a(1).length)\nexport type S = Stats\n",
+  );
+  writeFileSync(
+    path.join(fixture, 'view.tsx'),
+    "import { useState } from 'react'\nexport function View() {\n  const [n] = useState(0)\n  return <div className=\"x\">{n}</div>\n}\n",
+  );
+
   // D-C5: a text file just under the 5 MiB editable limit (4.9 MiB).
   const line = '// filler line for the 4.9 MiB save check, padded to a fixed width.......\n';
   writeFileSync(path.join(fixture, 'big.ts'), line.repeat(Math.floor((4.9 * 1024 * 1024) / line.length)));
@@ -88,6 +99,17 @@ async function openDeck(page: Page): Promise<void> {
 
 const treeItem = (page: Page, name: string) => page.getByRole('treeitem').filter({ hasText: name }).first();
 const codeTabs = (page: Page) => page.getByRole('tab').filter({ hasText: /\b[abc]\.ts/ });
+
+// Uncaught page errors (a worker that failed to start, a disposed diff
+// editor) fail every test here.
+const pageErrors: string[] = [];
+test.beforeEach(({ page }) => {
+  pageErrors.length = 0;
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+});
+test.afterEach(() => {
+  expect(pageErrors).toEqual([]);
+});
 
 test.beforeAll(async () => {
   const home = mkdtempSync(path.join(tmpdir(), 'overdeck-e2e-home-'));
@@ -145,6 +167,15 @@ test('single clicks reuse one italic preview tab, and typing autosaves to disk a
   await expect(tab.locator('span.italic')).toHaveCount(0);
   await expect(tab.getByLabel('Unsaved changes')).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('autosaved.png') });
+
+  // The pane's own save never raises the banner: save again, keep typing so
+  // the pane is dirty while the watcher echo of that save is handled.
+  await page.keyboard.insertText(' A');
+  await page.waitForTimeout(1100);
+  await page.keyboard.insertText('B');
+  await page.waitForTimeout(800);
+  await expect(tab.getByLabel('Unsaved changes')).toBeVisible();
+  await expect(page.getByTestId('external-change-banner')).toHaveCount(0);
 });
 
 test('an external change raises the banner on a dirty pane and reloads a clean one', async ({ page }) => {
@@ -200,9 +231,30 @@ test('a 4.9 MiB file saves through one WebSocket frame (D-C5)', async ({ page })
   await expect(page.getByTestId('external-change-banner')).toHaveCount(0);
 });
 
+test('real TypeScript and TSX files show no false error squiggles', async ({ page }) => {
+  await openDeck(page);
+  await treeItem(page, 'uat-fixture').click();
+  for (const name of ['real.ts', 'view.tsx']) {
+    await page.getByRole('tab').filter({ hasText: 'Files' }).first().click();
+    await treeItem(page, name).dblclick();
+    const editor = page.locator('.monaco-editor').first();
+    await expect(editor.locator('.view-lines')).toContainText('export');
+    // Give the TypeScript worker time to publish diagnostics.
+    await page.waitForTimeout(3000);
+    await page.screenshot({ path: test.info().outputPath(`squiggles-${name}.png`) });
+    await expect(editor.locator('.squiggly-error')).toHaveCount(0);
+  }
+});
+
 test('the Context page editor still mounts Monaco with the shared setup', async ({ page }) => {
+  // NFR-8: the code pane chunk (with Monaco's all-language bundle) is not loaded here.
+  const codePaneChunks: string[] = [];
+  page.on('request', (request) => {
+    if (/\/CodePane-[^/]*\.js/.test(request.url())) codePaneChunks.push(request.url());
+  });
   await page.goto(`${dashboard.baseUrl}/context`, { waitUntil: 'domcontentloaded' });
   const editor = page.locator('.monaco-editor').first();
   await expect(editor).toBeVisible({ timeout: 30_000 });
   await page.screenshot({ path: test.info().outputPath('context-editor.png') });
+  expect(codePaneChunks).toEqual([]);
 });

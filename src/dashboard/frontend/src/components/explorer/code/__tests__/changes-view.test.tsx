@@ -65,7 +65,10 @@ vi.mock('@monaco-editor/react', async () => {
           revealPositionInCenter: () => {},
           focus: () => {},
         }
-        props.onMount({ getModifiedEditor: () => modifiedEditor }, { KeyMod: { CtrlCmd: 1 }, KeyCode: { KeyS: 2 } })
+        props.onMount(
+          { getModifiedEditor: () => modifiedEditor, getModel: () => null, setModel: () => {} },
+          { KeyMod: { CtrlCmd: 1 }, KeyCode: { KeyS: 2 } },
+        )
       }, [])
       return (
         <div data-testid="diff" data-original-path={props.originalModelPath} data-modified-path={props.modifiedModelPath}>

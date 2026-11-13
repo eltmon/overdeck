@@ -43,6 +43,7 @@ vi.mock('@monaco-editor/react', () => ({
 
 const { ExternalChangeBanner, CHANGED_TEXT, DELETED_TEXT } = await import('../ExternalChangeBanner')
 const { CodePane } = await import('../CodePane')
+const { PanRpcError } = await import('@overdeck/contracts')
 const { draftKey, useCodeDrafts } = await import('../code-drafts')
 
 describe('ExternalChangeBanner', () => {
@@ -162,6 +163,28 @@ describe('CodePane external-change actions', () => {
       allowMissing: true,
     })
     expect(screen.queryByTestId('external-change-banner')).toBeNull()
+  })
+
+  it('a refused save whose re-read lands after Reload from disk raises no banner', async () => {
+    await renderChanged()
+    let resolveRead!: (result: ExplorerReadFileResult) => void
+    mocks.readFile.mockImplementationOnce(
+      () => new Promise<ExplorerReadFileResult>((resolve) => {
+        resolveRead = resolve
+      }),
+    )
+    mocks.writeFile.mockRejectedValueOnce(new PanRpcError({ code: 'DISK_CONFLICT', message: 'changed' }))
+    // The pending autosave of the unsaved edit is refused while the banner shows.
+    await act(async () => {
+      fireEvent.keyDown(screen.getByTestId('code-pane'), { key: 's', ctrlKey: true })
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Reload from disk' }))
+    expect(screen.queryByTestId('external-change-banner')).toBeNull()
+    await act(async () => {
+      resolveRead(diskRead('theirs\n', 'sig-theirs'))
+    })
+    expect(screen.queryByTestId('external-change-banner')).toBeNull()
+    expect(draft()).toEqual({ text: 'theirs\n', baseText: 'theirs\n', baseSignature: 'sig-theirs' })
   })
 
   it('a rename on disk offers Open, which opens the new path', async () => {

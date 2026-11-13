@@ -4,18 +4,26 @@
  * Only the code pane imports this module, and the Stage loads the code pane
  * with React.lazy, so `editor.main.js` (every Monaco language plus the
  * css/html/json/typescript language services) stays out of every other
- * chunk. Keybindings are registered per editor with `addAction`, never
+ * chunk. TypeScript and JavaScript show syntax errors only (no project
+ * context exists for semantic checks). Keybindings are registered per editor with `addAction`, never
  * `addCommand` (global across editors) or a window listener.
  */
 import Editor, { type OnMount } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js'
-import 'monaco-editor/esm/vs/editor/editor.main.js'
+import { typescript } from 'monaco-editor/esm/vs/editor/editor.main.js'
 import { useCallback, useMemo, useRef } from 'react'
 import { useTheme } from '../../../hooks/useTheme'
 import { ensureMonaco } from '../../../lib/monaco-setup'
 import { monacoLanguageForPath } from './monaco-language'
 
 ensureMonaco()
+
+// The TypeScript service sees one file at a time with no project, node_modules
+// or tsconfig, so its semantic checks flag every import, Node global and JSX
+// element of real code. Keep syntax errors, drop the semantic noise.
+const SYNTAX_ONLY = { noSemanticValidation: true, noSyntaxValidation: false, noSuggestionDiagnostics: true }
+typescript.typescriptDefaults.setDiagnosticsOptions(SYNTAX_ONLY)
+typescript.javascriptDefaults.setDiagnosticsOptions(SYNTAX_ONLY)
 
 export type CodeEditorInstance = monaco.editor.IStandaloneCodeEditor
 export type CodePosition = monaco.IPosition

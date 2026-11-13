@@ -42,6 +42,24 @@ export function ChangesView(props: ChangesViewProps) {
   const against = original !== undefined ? 'disk' : 'HEAD'
   const latest = useRef(props)
   latest.current = props
+  const diffRef = useRef<Parameters<DiffOnMount>[0] | null>(null)
+
+  // @monaco-editor/react disposes the diff's models before the diff editor,
+  // which throws "TextModel got disposed before DiffEditorWidget model got
+  // reset". This cleanup runs first (a parent's cleanup precedes its
+  // children's on unmount): detach the models, then dispose them; the library
+  // then finds no model and only disposes the editor.
+  useEffect(
+    () => () => {
+      const diffEditor = diffRef.current
+      const models = diffEditor?.getModel()
+      diffEditor?.setModel(null)
+      models?.original.dispose()
+      models?.modified.dispose()
+      diffRef.current = null
+    },
+    [],
+  )
 
   useEffect(() => {
     if (against === 'disk') return
@@ -61,6 +79,7 @@ export function ChangesView(props: ChangesViewProps) {
   }, [rootId, path, against])
 
   const handleMount = useCallback<DiffOnMount>((diffEditor, monaco) => {
+    diffRef.current = diffEditor
     const editor = diffEditor.getModifiedEditor()
     editor.onDidChangeModelContent(() => latest.current.onChange(editor.getValue()))
     editor.onDidBlurEditorText(() => latest.current.onBlur())
