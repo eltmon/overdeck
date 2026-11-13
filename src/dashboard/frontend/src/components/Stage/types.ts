@@ -47,7 +47,7 @@ export interface StageApi {
 export interface StageContext {
   workspaceId: WorkspaceId
   openPane: (spec: PaneSpec) => void
-  /** The workspace's agent id — used for diff/files queries (FilesPane). */
+  /** The workspace's agent id. */
   agentId?: string
   /**
    * Resolve an agent pane's backing conversation/session. Supplied by the

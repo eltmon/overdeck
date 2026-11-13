@@ -83,15 +83,16 @@ export function IssueOverview({
   // PAN-1561: terminal actions open the drawer stacked below, not a tab.
   const openTerminal = () => api.toggleTerminal()
 
-  // Issue-scoped action panes carry this issue's id (and agent for Files) so
-  // they query the right workspace, not the project deck key.
+  // Issue-scoped action panes carry this issue's id so they query the right
+  // workspace, not the project deck key. Files also carries its explorer root
+  // (the issue workspace, PAN-5186).
   const ISSUE_PANE_LABELS: Partial<Record<PaneType, string>> = {
     files: 'Files', commits: 'Commits', plan: 'Plan', docs: 'Docs',
   }
   const onAction = (t: PaneType) => {
     if (t === 'terminal') return api.toggleTerminal()
     if (t === 'browser') return api.openPane({ paneType: 'browser', label: 'Web' })
-    api.openPane({ paneType: t, label: ISSUE_PANE_LABELS[t] ?? 'Pane', issueId, agentId })
+    api.openPane({ paneType: t, label: ISSUE_PANE_LABELS[t] ?? 'Pane', issueId, agentId, ...(t === 'files' ? { explorerRootId: `issue:${issueId}` } : {}) })
   }
 
   const launcher = (

@@ -14,6 +14,7 @@ import { readLastUsedAgent, writeLastUsedAgent } from './HomePane/launcherOrderi
 import { writePendingTerminal } from '../home/pendingTerminal'
 import type { TimelineConversation } from './HomePane/timeline-utils'
 import type { StageApi } from './types'
+import type { PaneType } from '../../lib/panesStore'
 import { ProjectReleasePanel } from './HomePane/ProjectReleasePanel'
 import { ProjectOverview, projectTotalCost, type IssueCostBreakdown } from '../CommandDeck/ProjectOverview'
 import { ProjectSettingsDisclosure } from '../CommandDeck/ProjectSettingsDisclosure'
@@ -103,6 +104,15 @@ export function ProjectHome({
   const mainCheckout = useOpenMainCheckout()
   const openMainCheckout = projectKey ? () => void mainCheckout.open(projectKey) : undefined
 
+  // Without a project key (the no-project deck) there is no root to explore.
+  const dockActions: PaneType[] = projectKey ? ['terminal', 'files', 'browser'] : ['terminal', 'browser']
+  const onDockOpen = (t: PaneType) =>
+    t === 'terminal'
+      ? api.toggleTerminal()
+      : t === 'files' && projectKey
+        ? api.openPane({ paneType: 'files', label: 'Files', explorerRootId: `project:${projectKey}` })
+        : api.openPane({ paneType: 'browser', label: 'Web' })
+
   const onAgentSelected = async (id: string, message?: string) => {
     if (launchBusy) return
     writeLastUsedAgent(api.deckKey, id)
@@ -174,15 +184,11 @@ export function ProjectHome({
         launcher={launcher}
         agentDock={<AgentDock onSelectAgent={onAgentSelected} />}
         actionDock={
-          // Project scope: only project-appropriate actions. Files/Commits/Plan/
-          // Docs are issue-scoped and live on issue tabs (PAN-1561).
+          // Project scope: Terminal, Files (the explorer on the project checkout,
+          // PAN-5186) and Web. Commits/Plan/Docs are issue-scoped (PAN-1561).
           <ActionDock
-            actions={['terminal', 'browser']}
-            onOpen={(t) =>
-              t === 'terminal'
-                ? api.toggleTerminal()
-                : api.openPane({ paneType: 'browser', label: 'Web' })
-            }
+            actions={dockActions}
+            onOpen={onDockOpen}
             onOpenMainCheckout={openMainCheckout}
             mainCheckoutBusy={mainCheckout.opening}
           />
@@ -231,15 +237,11 @@ export function ProjectHome({
       launcher={launcher}
       agentDock={<AgentDock onSelectAgent={onAgentSelected} />}
       actionDock={
-        // Project scope: only project-appropriate actions. Files/Commits/Plan/
-        // Docs are issue-scoped and live on issue tabs (PAN-1561).
+        // Project scope: Terminal, Files (the explorer on the project checkout,
+        // PAN-5186) and Web. Commits/Plan/Docs are issue-scoped (PAN-1561).
         <ActionDock
-          actions={['terminal', 'browser']}
-          onOpen={(t) =>
-            t === 'terminal'
-              ? api.toggleTerminal()
-              : api.openPane({ paneType: 'browser', label: 'Web' })
-          }
+          actions={dockActions}
+          onOpen={onDockOpen}
           onOpenMainCheckout={openMainCheckout}
           mainCheckoutBusy={mainCheckout.opening}
         />

@@ -27,6 +27,7 @@ export type PaneType =
   | 'docs'
   | 'browser'
   | 'editor'
+  | 'code'
 
 export interface WorkspacePane {
   paneId: PaneId
@@ -37,7 +38,7 @@ export interface WorkspacePane {
   isPermanent?: boolean
   // issue pane — an issue tab opened inside a project-scoped deck (PAN-1561)
   issueId?: string
-  // agent id backing an issue-scoped pane (e.g. FilesPane diff target, PAN-1561)
+  // agent id backing an issue-scoped pane (PAN-1561)
   agentId?: string
   // agent pane
   conversationId?: string
@@ -63,6 +64,14 @@ export interface WorkspacePane {
   // editor pane (PAN-4658) — the conversation whose composer receives citations
   // from this pane's Preview; absent = Preview offers no Cite.
   citeConversationName?: string
+  // files (explorer) and code panes (PAN-5183, PAN-5186)
+  explorerRootId?: string
+  explorerPath?: string
+  // code pane reveal target, set by content search; the nonce re-triggers a
+  // reveal of the same line (same pattern as targetMessageNonce)
+  explorerRevealLine?: number
+  explorerRevealColumn?: number
+  explorerRevealNonce?: number
 }
 
 /** Fields a caller supplies when opening a pane; paneId/createdAt are generated. */
@@ -322,13 +331,17 @@ export const usePanesStore = create<PanesStore>((set, get) => ({
     // the issue-scoped singleton panes (files/commits/plan/docs) key on
     // (type, issueId) so each issue gets at most one. Browser panes are exempt —
     // multiple are legitimate (different URLs).
-    const SINGLETON_TYPES: PaneType[] = ['files', 'commits', 'plan', 'docs']
+    // Explorer panes key on their root, code panes on (root, path) (PAN-5186).
+    const SINGLETON_TYPES: PaneType[] = ['commits', 'plan', 'docs']
     const existingPanes = get().panesByWorkspace[workspaceId] ?? []
     const dup = existingPanes.find(
       (p) =>
         (spec.paneType === 'agent' && p.paneType === 'agent' && !!spec.conversationId && p.conversationId === spec.conversationId) ||
         (spec.paneType === 'issue' && p.paneType === 'issue' && !!spec.issueId && p.issueId === spec.issueId) ||
-        (SINGLETON_TYPES.includes(spec.paneType) && p.paneType === spec.paneType && p.issueId === spec.issueId),
+        (SINGLETON_TYPES.includes(spec.paneType) && p.paneType === spec.paneType && p.issueId === spec.issueId) ||
+        (spec.paneType === 'files' && p.paneType === 'files' && !!spec.explorerRootId && p.explorerRootId === spec.explorerRootId) ||
+        (spec.paneType === 'code' && p.paneType === 'code' && !!spec.explorerRootId && !!spec.explorerPath &&
+          p.explorerRootId === spec.explorerRootId && p.explorerPath === spec.explorerPath),
     )
     if (dup) {
       set((s) => ({
