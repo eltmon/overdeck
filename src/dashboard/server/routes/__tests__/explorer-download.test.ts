@@ -23,9 +23,9 @@ const BODY = 'hello, explorer';
 let dir: string;
 let root: ExplorerRoot;
 
-function fakeRequest(query: string, headers: Record<string, string> = {}, credential = true) {
+function fakeRequest(query: string, headers: Record<string, string> = {}, credential = true, method = 'GET') {
   return {
-    method: 'GET',
+    method,
     url: `/api/explorer/download?${query}`,
     headers: credential ? { [INTERNAL_TOKEN_HEADER]: TOKEN, ...headers } : headers,
     remoteAddress: Option.none(),
@@ -208,6 +208,27 @@ describe('handleExplorerDownload', () => {
     expect(await openOn(big)).toBe(1);
     await reader.cancel();
     await vi.waitFor(async () => expect(await openOn(big)).toBe(0));
+  });
+
+  it('answers HEAD with headers only, without opening the file or spawning tar', async () => {
+    const spawn = vi.fn();
+    const file = await handleExplorerDownload(fakeRequest('root=issue:PAN-1&path=note.txt', { range: 'bytes=0-1' }, true, 'HEAD'), {
+      resolveExplorerRoot,
+      spawn: spawn as never,
+    });
+    expect(file.status).toBe(200);
+    expect(file.headers['content-length']).toBe(String(BODY.length));
+    expect(file.headers['content-security-policy']).toBe(DOWNLOAD_CSP);
+    expect(file.body._tag).toBe('Empty');
+
+    const folder = await handleExplorerDownload(fakeRequest('root=issue:PAN-1&path=sub', {}, true, 'HEAD'), {
+      resolveExplorerRoot,
+      spawn: spawn as never,
+    });
+    expect(folder.status).toBe(200);
+    expect(folder.headers['content-type']).toBe('application/gzip');
+    expect(folder.body._tag).toBe('Empty');
+    expect(spawn).not.toHaveBeenCalled();
   });
 
   it('answers 404 for a FIFO without hanging', async () => {

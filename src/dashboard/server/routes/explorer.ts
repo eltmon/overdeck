@@ -79,6 +79,16 @@ function headerValue(request: HttpServerRequest.HttpServerRequest, name: string)
   return Array.isArray(value) ? value[0] : value;
 }
 
+function folderHeaders(name: string): Record<string, string> {
+  return {
+    'Content-Type': 'application/gzip',
+    'Content-Disposition': contentDisposition('attachment', `${name}.tar.gz`),
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': DOWNLOAD_CSP,
+    'Cache-Control': 'no-store',
+  };
+}
+
 export async function handleExplorerDownload(
   request: HttpServerRequest.HttpServerRequest,
   deps: Partial<ExplorerRouteDeps> = {},
@@ -97,22 +107,23 @@ export async function handleExplorerDownload(
     const root = await resolveRoot(rootId);
     const abs = await resolveInside(root, relPath, { forWrite: false, allowRoot: true });
     const target = await stat(abs);
+    // The router answers HEAD with this GET handler and the Node adapter never
+    // reads a HEAD body, so HEAD returns headers before any open or spawn: an
+    // unread body would leak the file handle or leave tar blocked on its pipe.
+    const head = request.method === 'HEAD';
     if (target.isDirectory()) {
-      const name = basename(abs);
+      const headers = folderHeaders(basename(abs));
+      if (head) return HttpServerResponse.empty({ status: 200, headers });
       const bytes = await archiveFolder(root, abs, { spawn: spawnTar });
       return HttpServerResponse.stream(Stream.fromAsyncIterable<Uint8Array, unknown>(bytes, (error) => error), {
-        headers: {
-          'Content-Type': 'application/gzip',
-          'Content-Disposition': contentDisposition('attachment', `${name}.tar.gz`),
-          'X-Content-Type-Options': 'nosniff',
-          'Content-Security-Policy': DOWNLOAD_CSP,
-          'Cache-Control': 'no-store',
-        },
+        headers,
       });
     }
     if (!target.isFile()) {
       throw explorerError('NOT_FOUND', `${JSON.stringify(relPath)} is not a regular file`);
     }
+    // Range applies to GET only (RFC 9110), so HEAD describes the full file.
+    if (head) return HttpServerResponse.empty({ status: 200, headers: downloadHeaders(relPath, { inline, size: target.size }) });
     return await streamFile(abs, relPath, inline, headerValue(request, 'range'));
   } catch (error) {
     return explorerErrorResponse(error);
