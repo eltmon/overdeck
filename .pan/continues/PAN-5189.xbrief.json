@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5189",
   "created": "2026-11-13T19:51:19.231Z",
-  "updated": "2026-11-13T21:20:25.901Z",
+  "updated": "2026-11-13T21:20:36.438Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -248,6 +248,11 @@
     "slide-engine.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T21:20:25.901Z"
+    },
+    "ooxml-viewer": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5189",
+      "claimedAt": "2026-11-13T21:20:36.438Z"
     }
   }
 }
