@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5188",
   "created": "2026-11-13T17:44:21.691Z",
-  "updated": "2026-11-13T18:29:29.405Z",
+  "updated": "2026-11-13T18:29:36.354Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -250,6 +250,11 @@
     "pdf-viewer.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T18:29:29.405Z"
+    },
+    "image-viewer": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:29:36.353Z"
     }
   }
 }
