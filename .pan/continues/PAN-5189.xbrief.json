@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5189",
   "created": "2026-11-13T19:51:19.231Z",
-  "updated": "2026-11-13T21:50:37.672Z",
+  "updated": "2026-11-13T23:17:51.741Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -334,9 +334,14 @@
       "doneAt": "2026-11-13T21:50:30.239Z"
     },
     "browser-check": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5189",
-      "claimedAt": "2026-11-13T21:50:37.672Z"
+      "claimedAt": "2026-11-13T21:50:37.672Z",
+      "doneAt": "2026-11-13T23:17:51.741Z"
+    },
+    "browser-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:17:51.741Z"
     }
   }
 }
