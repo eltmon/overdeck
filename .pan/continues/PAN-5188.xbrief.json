@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5188",
   "created": "2026-11-13T17:44:21.691Z",
-  "updated": "2026-11-13T18:39:41.751Z",
+  "updated": "2026-11-13T18:48:31.295Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -333,9 +333,18 @@
       "claimedAt": "2026-11-13T18:38:43.264Z"
     },
     "port-records-ci-list": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5188",
-      "claimedAt": "2026-11-13T18:39:41.750Z"
+      "claimedAt": "2026-11-13T18:39:41.750Z",
+      "doneAt": "2026-11-13T18:48:31.295Z"
+    },
+    "port-records-ci-list.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:48:31.295Z"
+    },
+    "port-records-ci-list.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:48:31.295Z"
     }
   }
 }
