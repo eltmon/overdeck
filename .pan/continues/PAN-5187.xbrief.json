@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5187",
   "created": "2026-11-13T16:27:22.124Z",
-  "updated": "2026-11-13T18:25:32.284Z",
+  "updated": "2026-11-13T18:25:41.795Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -145,7 +145,9 @@
       "doneAt": "2026-11-13T18:25:32.283Z"
     },
     "f-code-pane-save": {
-      "status": "pending"
+      "status": "pending",
+      "claimedBy": "agent-pan-5187",
+      "claimedAt": "2026-11-13T18:25:41.795Z"
     },
     "f-external-change-wiring": {
       "status": "pending"
