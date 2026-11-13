@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5187",
   "created": "2026-11-13T16:27:22.124Z",
-  "updated": "2026-11-13T16:53:09.888Z",
+  "updated": "2026-11-13T16:53:11.533Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,11 @@
     "s-trash.ac5": {
       "status": "completed",
       "doneAt": "2026-11-13T16:53:09.888Z"
+    },
+    "s-read-head": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5187",
+      "claimedAt": "2026-11-13T16:53:11.533Z"
     }
   }
 }
