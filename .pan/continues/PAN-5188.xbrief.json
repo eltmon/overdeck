@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5188",
   "created": "2026-11-13T17:44:21.691Z",
-  "updated": "2026-11-13T18:05:26.855Z",
+  "updated": "2026-11-13T18:05:31.078Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,11 @@
     "folder-download.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T18:05:26.855Z"
+    },
+    "upload-csrf-guard": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:05:31.077Z"
     }
   }
 }
