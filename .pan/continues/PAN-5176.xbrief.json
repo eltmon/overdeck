@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5176",
   "created": "2026-11-13T05:00:59.712Z",
-  "updated": "2026-11-13T05:07:42.434Z",
+  "updated": "2026-11-13T05:14:41.415Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,9 +80,22 @@
       "doneAt": "2026-11-13T05:07:35.932Z"
     },
     "herdr-conversation-poll-test": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5176",
-      "claimedAt": "2026-11-13T05:07:42.433Z"
+      "claimedAt": "2026-11-13T05:07:42.433Z",
+      "doneAt": "2026-11-13T05:14:41.415Z"
+    },
+    "herdr-conversation-poll-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:14:41.415Z"
+    },
+    "herdr-conversation-poll-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:14:41.415Z"
+    },
+    "herdr-conversation-poll-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:14:41.415Z"
     }
   }
 }
