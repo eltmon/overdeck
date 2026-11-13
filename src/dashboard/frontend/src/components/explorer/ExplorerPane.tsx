@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 
 import { useStageDeck } from '../Stage/StageDeckContext'
 import type { PaneWrapperProps } from '../Stage/types'
+import { useDeleteFlow } from './actions/useDeleteFlow'
 import { useExplorerActions } from './actions/useExplorerActions'
 import { useInlineEdit } from './actions/useInlineEdit'
 import { explorerErrorMessage, listDir, parseRootId, rootLabel } from './explorer-rpc'
@@ -247,7 +248,14 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
   const actions = useExplorerActions({ rootId, writable, reloadDirs: reloadLoaded, refreshGit: git.refresh, openFile: openFileFromTree })
   const inline = useInlineEdit({ rootId, root, rows, actions, treeRef })
   const clearSelection = useCallback(() => useExplorerStore.getState().clearSelection(rootId), [rootId])
-  const noop = useCallback(() => {}, [])
+  const requestDelete = useDeleteFlow(actions, rootId)
+  const onDuplicate = useCallback(
+    (path: string) => {
+      const siblings = useExplorerStore.getState().roots[rootId]?.dirs[parentPath(path)]?.entries ?? []
+      void actions.duplicate(path, siblings.map((e) => e.name))
+    },
+    [actions, rootId],
+  )
 
   const onQuickOpen = useCallback(() => setQuickOpen(true), [])
   const onContentSearch = useCallback(() => setContentSearchScope(''), [])
@@ -359,8 +367,8 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
         onNewFile={() => inline.startCreate('file')}
         onNewFolder={() => inline.startCreate('dir')}
         onRename={inline.startRename}
-        onDuplicate={noop}
-        onDelete={noop}
+        onDuplicate={onDuplicate}
+        onDelete={(paths) => void requestDelete(paths)}
       >
         {inline.rows.length === 0 ? (
           // An empty root still opens the menu, so New file and New folder are reachable.
