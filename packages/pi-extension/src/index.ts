@@ -716,7 +716,7 @@ export async function handleTurnEnd(env: HookEnv, event: TurnEndEvent, options: 
     const sessionId = await sessionIdFor(env)
     if (sessionId) {
       const state = await readAgentState(env)
-      const model = typeof state['model'] === 'string' ? state['model'] : 'unknown'
+      const model = event.model ?? (typeof state['model'] === 'string' ? state['model'] : 'unknown')
       await appendSessionIndexEntry(paths.sessionsIndexPath, sessionId, ts, model, 'turn-end', event.sessionLogPath)
     }
     lastRecordedSessionPath = event.sessionLogPath
