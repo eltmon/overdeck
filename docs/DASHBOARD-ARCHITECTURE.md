@@ -1678,26 +1678,27 @@ t3code).
 | `pan.explorerSearchFiles` | read | PAN-5185 | Fuzzy file-name search over tracked and untracked, non-ignored files (30 s cache) |
 | `pan.explorerSearchContent` | read | PAN-5185 | `git grep`, literal or regex, with UTF-16 columns |
 | `pan.explorerWatch` | stream | PAN-5185 | Batches of change events for a root |
-| `pan.explorerWriteFile` | write | PAN-5187 | Stub: `NOT_IMPLEMENTED` |
-| `pan.explorerCreate` | write | PAN-5187 | Stub: `NOT_IMPLEMENTED` |
-| `pan.explorerRename` | write | PAN-5187 | Stub: `NOT_IMPLEMENTED` |
-| `pan.explorerCopy` | write | PAN-5187 | Stub: `NOT_IMPLEMENTED` |
-| `pan.explorerDelete` | write | PAN-5187 | Stub: `NOT_IMPLEMENTED` |
-| `pan.explorerRestore` | write | PAN-5187 | Stub: `NOT_IMPLEMENTED` |
+| `pan.explorerWriteFile` | write | PAN-5187 | Save text with the disk-signature precondition, atomically |
+| `pan.explorerCreate` | write | PAN-5187 | Create an empty file or a folder |
+| `pan.explorerRename` | write | PAN-5187 | Rename or move a file or folder |
+| `pan.explorerCopy` | write | PAN-5187 | Copy a file or folder |
+| `pan.explorerDelete` | write | PAN-5187 | Move paths to the Overdeck trash |
+| `pan.explorerRestore` | write | PAN-5187 | Move a trash entry back to its path |
 | `pan.explorerBeginEdit` | write | PAN-5191 | Stub: `NOT_IMPLEMENTED` |
 
 Errors are `PanRpcError`s whose `code` is one of `EXPLORER_ERROR_CODES`:
 `ROOT_NOT_FOUND`, `PATH_OUTSIDE_ROOT`, `PATH_IN_GIT_DIR`, `NOT_FOUND`,
 `ALREADY_EXISTS`, `DISK_CONFLICT`, `EDIT_WORKSPACE_REQUIRED`, `FILE_TOO_LARGE`,
 `NOT_A_GIT_REPO`, `NOTHING_TO_COMMIT`, `NOT_IMPLEMENTED`, `INVALID_QUERY` (a
-regex git rejects) and `EXPLORER_FAILED` (anything else, with the cause in the
+regex git rejects), `INVALID_TARGET` (a move or copy of a folder into itself)
+and `EXPLORER_FAILED` (anything else, with the cause in the
 message). A stub's message names the issue that ships it.
 
 Discard never removes a file that is not in `HEAD`. A request that names such a
 file, or a directory holding an index entry that is not in `HEAD`, fails as a
 whole with `NOT_IMPLEMENTED` before git runs, because `git restore` in its
-default no-overlay mode would delete it. Removing those files waits for the
-Overdeck trash in PAN-5187. Git actions also refuse a root that is not the top
+default no-overlay mode would delete it. Moving those files to the Overdeck
+trash (PAN-5187's `trashPaths`) instead is tracked in #5195. Git actions also refuse a root that is not the top
 level of its checkout, so git can never fall through to an enclosing
 repository's index.
 
@@ -1794,8 +1795,8 @@ Opening a file (double click, Enter, the menu's **Open**, quick open) creates a
 explorerPath }`. A content-search hit adds `explorerRevealLine`,
 `explorerRevealColumn` and a fresh `explorerRevealNonce`, the same pattern as
 `targetMessageNonce`. An existing code pane for the same `(root, path)` is
-focused and patched instead of duplicated. PAN-5187 renders code panes; until
-then they show the Stage placeholder.
+focused and patched instead of duplicated. PAN-5187 renders code panes and
+adds preview tabs; see the next section.
 
 The browser half lives in `src/dashboard/frontend/src/components/explorer/`:
 
@@ -1839,3 +1840,111 @@ pane's root element handles them while focus is inside the pane, and calls
 global binding. Quick open queries 120 ms after the last keystroke; content
 search runs 300 ms after the last change, or at once on Enter. **Find in
 folder** opens content search scoped to that folder.
+
+### Code pane, saves and conflicts (PAN-5187)
+
+A `'code'` pane shows one file of an explorer root in Monaco. The Stage renders
+it through `components/explorer/code/CodePaneSlot.tsx`, which lazy-loads
+`CodePane` and with it Monaco's all-language bundle (`editor.main.js`), so no
+other page pays for it; `lib/monaco-setup.ts` gives every Monaco editor its
+local web workers and never loads from a CDN. The slot keys the pane by root
+and path, so a retargeted preview tab mounts a fresh pane. The language comes
+from the path against Monaco's own language list (`monaco-language.ts`), not
+from the server's Shiki id. A `project` root opens read-only with the note
+"Read-only: the main checkout is never edited directly." Binary and large
+files show a fallback that PAN-5188 replaces with its viewers.
+
+**Preview tabs.** Every caller opens files through `openCodePane(deck,
+{ rootId, path, line?, column?, preview? })`. A single click on a file row in
+the tree passes `preview: true`: it reuses the root's one preview pane
+(`explorerPreview: true`, italic tab label) instead of adding a tab per file.
+A double click, Enter, quick open, the first edit and the header's **Keep
+open** make the pane permanent. In an unsplit deck a preview open activates
+the code tab, so the tree leaves the screen until its tab is selected again.
+
+**Drafts.** The pane's text lives in `code-drafts.ts`, a zustand store keyed by
+`(rootId, path)` and never persisted, so unsaved edits survive the pane
+unmounting. A draft has a base: the text and disk signature last loaded or
+saved. It is dirty when its text differs from the base text, which puts a `●`
+on the tab. A clean draft is dropped when the last pane of its file closes.
+
+**Saving.** One app-wide save queue (`save-queue.ts`, ported from Orca's save
+slots) keeps one write in flight per file; a later request joins the waiting
+one with the newest text and the strongest intent (Overwrite, then an explicit
+save, then autosave). Each pane saves 1,000 ms after the last keystroke, at
+once when the editor loses focus, at once on `Ctrl/Cmd+S` (registered per
+editor with `addAction`, plus an `onKeyDown` on the pane root), and on close
+when the autosave timer is armed. Every write sends the base signature, which
+is read when the write starts. An explicit save may recreate a missing file;
+autosave may not.
+
+`pan.explorerWriteFile` applies this precondition:
+
+| File on disk | `expectedSignature` | `allowMissing` | Result |
+| --- | --- | --- | --- |
+| exists | `null` | any | write (explicit Overwrite) |
+| exists | equals current signature | any | write |
+| exists | differs | any | `DISK_CONFLICT` |
+| missing | `null` | any | create the file and missing parent folders |
+| missing | a string | `true` | create the file and missing parent folders |
+| missing | a string | `false` | `DISK_CONFLICT` |
+
+The check and the rename are two steps, so a process that writes between them
+is overwritten; Orca has the same window.
+
+**External changes.** Each pane subscribes through the watch hub and runs
+`external-change.ts` (decision logic ported from Orca). An update of its path,
+an overflow or a reconnect re-reads the file 250 ms after the last event. A
+save in flight defers the re-read until it settles, and a re-read that a save
+started or finished during is repeated. The pane records every save it makes
+in `self-write-registry.ts` for 750 ms, so the watcher echo of its own write
+never raises a banner. After the re-read: disk equal to the base or to a
+recent self-write changes nothing; a clean pane reloads; a dirty pane shows
+the **changed** banner with **Compare** (a diff of the disk text against the
+draft), **Reload from disk**, **Keep my edits** (the disk content becomes the
+base, so the next save succeeds) and **Overwrite**. A save refused with
+`DISK_CONFLICT` re-reads and shows the same banner. A delete opens a 500 ms
+window: a create of the same path in it is another editor's atomic save, and a
+create of the same file name elsewhere marks the pane **renamed** with an
+**Open** button. When the window closes and the file is still missing, the
+pane is marked **deleted**; saving recreates it.
+
+The header holds the path, Edit / Preview for markdown files (`MarkdownTab`
+renders the live draft), **Wrap** (on by default, also `Alt+Z`), **Changes**
+(a Monaco diff of `HEAD` against the draft, editable on the right, keeping the
+cursor) and **Keep open**.
+
+### Write services and the trash (PAN-5187)
+
+`services/explorer/write.ts` holds `writeFile` (the table above; text over
+5 MiB is `FILE_TOO_LARGE`; a temp file next to the target is written, fsynced,
+given the old mode and renamed over it; a symlink inside the root is followed,
+so the link stays a link; a dangling link is `NOT_FOUND`), `create` (an empty
+file or a folder, with missing parents), `rename` (rename and move; the target
+folder must exist; a case-only rename is allowed), `copy`, and `moveEntry`,
+which falls back to copy-then-remove when `rename` fails with `EXDEV`. Entry
+operations resolve the last path segment without following a symlink, so they
+act on a link and not on its target. Moving or copying a folder into itself is
+`INVALID_TARGET`.
+
+`services/explorer/trash.ts` holds delete and restore. Deleted entries move to
+the Overdeck trash under `getOverdeckHome()`:
+
+```
+trash/<root-slug>/<stamp>-<n>/
+  .overdeck-trash.json   { "rootId": "issue:PAN-1", "path": "src/a.ts", "trashedAt": "2026-11-13T14:27:11.946Z" }
+  files/<path>           the moved file or folder
+```
+
+`<root-slug>` is the root id with every character outside `[A-Za-z0-9._-]`
+replaced by `-`, `<stamp>` is compact UTC (`20261113T142711946Z`), and `<n>`
+is the path's index in the call, raised past an existing directory. The trash
+id is `<root-slug>/<stamp>-<n>`. A delete resolves and checks every path before
+it moves any, and drops paths nested under another path of the call.
+
+Restore trusts nothing from the client: the id must match
+`<slug>/<stamp>-<n>` with the request root's slug, the manifest's `rootId` must
+be the request root, the manifest path is resolved again for write (so an
+edited manifest cannot leave the root or enter `.git`), and an occupied path is
+`ALREADY_EXISTS`. Entries older than 7 days are pruned at the start of every
+delete; a prune failure is logged and never blocks the delete.
