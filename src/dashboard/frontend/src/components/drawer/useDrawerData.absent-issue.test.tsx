@@ -64,15 +64,19 @@ describe('useIssueData absent-issue hydration (PAN-4717)', () => {
     vi.unstubAllGlobals();
   });
 
-  it('returns a null issue and subscribes to the issue-scoped stream for an issue absent from the snapshot', () => {
+  it('returns a null issue and subscribes to the issue-scoped stream for an issue absent from the snapshot', async () => {
     const { result } = renderHook(() => useIssueData('PAN-3659'), { wrapper });
 
     expect(result.current.issue).toBeNull();
+    expect(result.current.issueStatus).toBe('loading');
     expect(wsTransportMock.subscribe).toHaveBeenCalledTimes(1);
     const [connect] = wsTransportMock.subscribe.mock.calls[0]!;
     const subscribeIssueEvents = vi.fn(() => ({}));
     connect({ [WS_METHODS.subscribeIssueEvents]: subscribeIssueEvents });
     expect(subscribeIssueEvents).toHaveBeenCalledWith({ issueId: 'PAN-3659' });
+
+    await waitFor(() => expect(result.current.issueStatus).toBe('unavailable'));
+    expect(result.current.issue).toBeNull();
   });
 
   it('hydrates the issue once a backfill issues.delta event adds its row', async () => {
