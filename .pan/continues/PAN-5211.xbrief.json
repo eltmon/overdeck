@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5211",
   "created": "2026-11-13T22:53:14.172Z",
-  "updated": "2026-11-13T23:20:04.373Z",
+  "updated": "2026-11-13T23:20:10.009Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -218,6 +218,11 @@
     "wi9-codex-window.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T23:20:04.373Z"
+    },
+    "wi10-oversized-records": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5211",
+      "claimedAt": "2026-11-13T23:20:10.009Z"
     }
   }
 }
