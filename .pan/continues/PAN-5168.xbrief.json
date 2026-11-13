@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5168",
   "created": "2026-11-13T02:56:42.362Z",
-  "updated": "2026-11-13T03:27:58.522Z",
+  "updated": "2026-11-13T03:33:34.945Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -86,9 +86,22 @@
       "doneAt": "2026-11-13T03:27:45.248Z"
     },
     "runtime-census-tmux-gate": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5168",
-      "claimedAt": "2026-11-13T03:27:58.522Z"
+      "claimedAt": "2026-11-13T03:27:58.522Z",
+      "doneAt": "2026-11-13T03:33:34.944Z"
+    },
+    "runtime-census-tmux-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:33:34.944Z"
+    },
+    "runtime-census-tmux-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:33:34.944Z"
+    },
+    "runtime-census-tmux-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:33:34.944Z"
     }
   }
 }
