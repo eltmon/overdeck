@@ -189,7 +189,7 @@ export default function MobileApp({ headerSlot }: { headerSlot?: ReactNode } = {
           {!fullScreen && (
             <nav
               aria-label="Phone sections"
-              className="flex shrink-0 border-t border-border bg-card/90 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+              className="flex shrink-0 border-t border-border bg-card pb-[env(safe-area-inset-bottom)]"
             >
               {TABS.map(({ tab, label, icon: Icon }) => (
                 <button

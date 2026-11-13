@@ -72,7 +72,7 @@ export const MOBILE_ROW_AGE_CLASS = 'shrink-0 text-xs tabular-nums text-muted-fo
 /** The phone screens' top bar, with the safe-area inset above it. */
 export function MobileScreenHeader({ leading, title, trailing }: { leading?: ReactNode; title?: string; trailing?: ReactNode }) {
   return (
-    <header className="flex min-h-12 shrink-0 items-center gap-3 border-b border-border bg-card/80 px-4 pt-[env(safe-area-inset-top)] backdrop-blur">
+    <header className="flex min-h-12 shrink-0 items-center gap-3 border-b border-border bg-card px-4 pt-[env(safe-area-inset-top)]">
       {leading}
       {title ? <h1 className="text-base font-medium text-foreground">{title}</h1> : null}
       {trailing ? <div className="ml-auto flex items-center gap-1">{trailing}</div> : null}

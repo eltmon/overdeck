@@ -107,7 +107,7 @@ export function MobileSettingsSheet({ open, onClose, prompt }: { open: boolean; 
 
   return (
     <>
-      <div data-component="mobile-settings-scrim" className="fixed inset-0 z-50 bg-background/60" onClick={onClose} />
+      <div data-component="mobile-settings-scrim" className="fixed inset-0 z-50 bg-black/50" onClick={onClose} />
       <div
         role="dialog"
         aria-modal="true"
