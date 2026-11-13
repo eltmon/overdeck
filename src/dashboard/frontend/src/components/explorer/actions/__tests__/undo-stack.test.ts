@@ -9,6 +9,7 @@ import {
   commitOp,
   hasRedo,
   hasUndo,
+  peekLabel,
   redo,
   undo,
   undoEntry,
@@ -167,5 +168,17 @@ describe('undo-stack', () => {
     expect(calls).toEqual(['undo b'])
     expect(hasUndo(ROOT)).toBe(true)
     expect(hasUndo('workspace:w1')).toBe(false)
+  })
+
+  it('peekLabel names the next undo, the next redo, or a given op', async () => {
+    const { step } = recorder()
+    const first = commitOp(ROOT, { label: 'first', steps: [step('a')] })
+    commitOp(ROOT, { label: 'second', steps: [step('b')] })
+    expect(peekLabel(ROOT, 'past')).toBe('second')
+    expect(peekLabel(ROOT, 'past', first)).toBe('first')
+    expect(peekLabel(ROOT, 'future')).toBeNull()
+    await undo(ROOT)
+    expect(peekLabel(ROOT, 'future')).toBe('second')
+    expect(peekLabel('workspace:none', 'past')).toBeNull()
   })
 })

@@ -153,6 +153,17 @@ export async function undoEntry(rootId: string, opId: string): Promise<string | 
   return op.label
 }
 
+/**
+ * The label of the op the next `undo` (`'past'`) or `redo` (`'future'`) would
+ * run, or of the op `opId` when given; null when there is none. Callers read
+ * it before running the op, so an error toast can name the op.
+ */
+export function peekLabel(rootId: string, stack: 'past' | 'future', opId?: string): string | null {
+  const ops = histories.get(rootId)?.[stack] ?? []
+  const op = opId === undefined ? ops.at(-1) : ops.find((candidate) => candidate.id === opId)
+  return op?.label ?? null
+}
+
 export function hasUndo(rootId: string): boolean {
   return (histories.get(rootId)?.past.length ?? 0) > 0
 }
