@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5186",
   "created": "2026-11-13T16:27:17.519Z",
-  "updated": "2026-11-13T17:05:23.989Z",
+  "updated": "2026-11-13T17:05:42.750Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -266,9 +266,22 @@
       "doneAt": "2026-11-13T16:52:03.137Z"
     },
     "search-shortcuts": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5186",
-      "claimedAt": "2026-11-13T17:05:23.989Z"
+      "claimedAt": "2026-11-13T17:05:23.989Z",
+      "doneAt": "2026-11-13T17:05:42.749Z"
+    },
+    "search-shortcuts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:05:42.749Z"
+    },
+    "search-shortcuts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:05:42.749Z"
+    },
+    "search-shortcuts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:05:42.749Z"
     }
   }
 }
