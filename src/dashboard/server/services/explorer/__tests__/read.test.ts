@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PanRpcError, type ExplorerEntry } from '@overdeck/contracts';
-import { listDir, readFile } from '../read.js';
+import { listDir, readFile as readExplorerFile } from '../read.js';
 import type { ExplorerRoot } from '../roots.js';
 import { diskSignature } from '../signature.js';
 import { makeFixtureRepo, type FixtureRepo } from './fixture-repo.js';
@@ -85,49 +85,49 @@ describe('listDir', () => {
   });
 });
 
-describe('readFile', () => {
+describe('readFile (explorer service)', () => {
   it('reads text with its signature and language', async () => {
-    const result = await readFile(rootAt(repo.dir), 'a.txt');
+    const result = await readExplorerFile(rootAt(repo.dir), 'a.txt');
     expect(result).toMatchObject({ kind: 'text', text: 'alpha\n', size: 6, lang: 'plaintext', writable: true });
     expect(result.signature).toBe(diskSignature('alpha\n'));
-    expect((await readFile(rootAt(repo.dir), 'src/x.ts')).lang).toBe('typescript');
+    expect((await readExplorerFile(rootAt(repo.dir), 'src/x.ts')).lang).toBe('typescript');
   });
 
   it('classifies a file with a NUL byte as binary', async () => {
-    const result = await readFile(rootAt(repo.dir), 'bin.dat');
+    const result = await readExplorerFile(rootAt(repo.dir), 'bin.dat');
     expect(result.kind).toBe('binary');
     expect(result.text).toBeUndefined();
     expect(result.signature).toBe('');
   });
 
   it('classifies a file over largeTextBytes as large-text', async () => {
-    const result = await readFile(rootAt(repo.dir), 'big.txt', { largeTextBytes: 10 });
+    const result = await readExplorerFile(rootAt(repo.dir), 'big.txt', { largeTextBytes: 10 });
     expect(result.kind).toBe('large-text');
     expect(result.text).toBeUndefined();
     expect(result.size).toBe(20);
   });
 
   it('reports a read-only root as not writable', async () => {
-    expect((await readFile(rootAt(repo.dir, false), 'a.txt')).writable).toBe(false);
+    expect((await readExplorerFile(rootAt(repo.dir, false), 'a.txt')).writable).toBe(false);
   });
 
   it('reads the committed version with ref HEAD', async () => {
     await writeFile(join(repo.dir, 'a.txt'), 'changed on disk\n');
     await writeFile(join(repo.dir, 'untracked.txt'), 'new\n');
-    const head = await readFile(rootAt(repo.dir), 'a.txt', { ref: 'HEAD' });
+    const head = await readExplorerFile(rootAt(repo.dir), 'a.txt', { ref: 'HEAD' });
     expect(head).toMatchObject({ kind: 'text', text: 'alpha\n', size: 6, mtimeMs: 0, writable: false });
     expect(head.signature).toBe(diskSignature('alpha\n'));
-    const untracked = await readFile(rootAt(repo.dir), 'untracked.txt', { ref: 'HEAD' });
+    const untracked = await readExplorerFile(rootAt(repo.dir), 'untracked.txt', { ref: 'HEAD' });
     expect(untracked).toMatchObject({ kind: 'text', text: '', size: 0, writable: false });
-    const binary = await readFile(rootAt(repo.dir), 'bin.dat', { ref: 'HEAD' });
+    const binary = await readExplorerFile(rootAt(repo.dir), 'bin.dat', { ref: 'HEAD' });
     expect(binary.kind).toBe('binary');
   });
 
   it('rejects a directory with NOT_FOUND', async () => {
-    expect(await codeOf(readFile(rootAt(repo.dir), 'src'))).toBe('NOT_FOUND');
+    expect(await codeOf(readExplorerFile(rootAt(repo.dir), 'src'))).toBe('NOT_FOUND');
   });
 
   it('rejects a missing file with NOT_FOUND', async () => {
-    expect(await codeOf(readFile(rootAt(repo.dir), 'nope.txt'))).toBe('NOT_FOUND');
+    expect(await codeOf(readExplorerFile(rootAt(repo.dir), 'nope.txt'))).toBe('NOT_FOUND');
   });
 });
