@@ -251,4 +251,26 @@ describe('held composer messages (PAN-4279)', () => {
 
     expect(messagePosts(fetchMock)).toHaveLength(1);
   });
+
+  it('retryFailed waits for an in-flight queued send', async () => {
+    const { holdSend, retryFailed } = useComposerStore.getState();
+    holdSend(conversation.name, 'queued retry', { clientMessageId: 'client-retry' });
+    const [failed] = heldEntries();
+
+    let resolveTask: () => void = () => {};
+    const blocker = enqueueConversationSend(conversation.name, () => new Promise<void>((resolve) => {
+      resolveTask = resolve;
+    }));
+
+    const retryPromise = retryFailed(conversation.name, failed!.id, 'queued retry', 0);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(messagePosts(fetchMock)).toHaveLength(0);
+
+    resolveTask();
+    await blocker;
+    await retryPromise;
+
+    expect(messagePosts(fetchMock)).toHaveLength(1);
+  });
 });

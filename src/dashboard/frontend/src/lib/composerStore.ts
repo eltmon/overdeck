@@ -684,8 +684,9 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     }
     removeFailed(conversationName, failedId);
     try {
-      const result = await sendConversationMessage(conversationName, text, agentId, failed.deliverAs, undefined,
-        isFreshIdentity || neverSent ? { clientMessageId } : { clientMessageId, retry: true });
+      // PAN-5184: a retry waits behind in-flight composer sends of this conversation.
+      const result = await enqueueConversationSend(conversationName, () => sendConversationMessage(conversationName, text, agentId, failed.deliverAs, undefined,
+        isFreshIdentity || neverSent ? { clientMessageId } : { clientMessageId, retry: true }));
       if (kind === 'prompt') get().acknowledgeOptimistic(conversationName, text, clientMessageId);
       if (kind === 'command' && result && result.kind !== 'ui') {
         addCommandResult(conversationName, text, result);
