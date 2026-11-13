@@ -4,17 +4,17 @@
     "created": "2026-11-13T02:26:13Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5169: herdr backend: conversation list still polls tmux capture-pane, and pan up requires tmux",
-    "updated": "2026-11-13T02:33:01.724Z"
+    "updated": "2026-11-13T02:56:28.768Z"
   },
   "plan": {
     "id": "pan-5169",
     "title": "herdr backend: conversation list still polls tmux capture-pane, and pan up requires tmux",
-    "status": "proposed",
+    "status": "running",
     "uid": "a7451931-338e-4e48-98ed-9ac9ef3d51e7",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-13T02:26:13Z",
-    "updated": "2026-11-13T02:33:01.724Z",
+    "updated": "2026-11-13T02:56:28.768Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5169",
@@ -641,5 +641,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
