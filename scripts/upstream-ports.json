@@ -186,6 +186,48 @@
     "commit": "2d8a843e6b"
   },
   {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/word-protocol.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/word-protocol.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/word-glyphs.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/word-glyphs.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/word-images.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/word-images.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/word-text.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/word-text.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/word-document.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/word-document.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/document.worker.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/document.worker.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/WordDocument.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/WordDocument.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
     "local": "src/dashboard/frontend/src/components/explorer/viewers/font/FontViewer.tsx",
     "upstream": "t3code",
     "path": "apps/web/src/components/files/FontViewer.tsx",
