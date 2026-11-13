@@ -5,7 +5,9 @@ import {
   findLastTick,
   formatTickMarker,
   parseTickMarker,
+  resolveNeedsYouItems,
   type TickMarker,
+  type TickMarkerMessage,
 } from '../../../../src/lib/flywheel/tick-marker.js';
 
 const fixtures: TickMarker[] = [
@@ -85,5 +87,72 @@ describe('tick marker (PAN-3964 FR-2)', () => {
     expect(findLastTick(messages)).toEqual({
       tick: 1, pick: 'PAN-1', phase: 'launch', inFlight: ['PAN-1'], needsYou: null, at: '2026-09-23T10:00:00Z', messageId: 'msg-1',
     });
+  });
+});
+
+function tickMessage(tick: number, needsYou: string | null, id?: string, createdAt?: string): TickMarkerMessage {
+  return {
+    role: 'assistant',
+    text: formatTickMarker({ tick, pick: null, phase: 'watch', inFlight: [], needsYou }),
+    createdAt: createdAt ?? `2026-09-23T10:${String(tick).padStart(2, '0')}:00Z`,
+    ...(id ? { id } : {}),
+  };
+}
+
+describe('resolveNeedsYouItems (PAN-5198)', () => {
+  it('extends an item back through consecutive ticks that carry it', () => {
+    const messages = [
+      tickMessage(1, null, 'm1'),
+      tickMessage(2, 'merge PR #7', 'm2'),
+      tickMessage(3, 'merge PR #7', 'm3'),
+      tickMessage(4, 'merge PR #7', 'm4'),
+      tickMessage(5, 'merge PR #7', 'm5'),
+    ];
+    expect(resolveNeedsYouItems(messages)).toEqual([
+      { text: 'merge PR #7', firstRaisedTick: 2, firstRaisedAt: tickMessage(2, 'merge PR #7', 'm2').createdAt, firstRaisedMessageId: 'm2' },
+    ]);
+  });
+
+  it('a run ends at the first older tick lacking the item', () => {
+    const messages = [tickMessage(1, 'a'), tickMessage(2, 'b'), tickMessage(3, 'a; b')];
+    const items = resolveNeedsYouItems(messages);
+    expect(items.find((i) => i.text === 'a')?.firstRaisedTick).toBe(3);
+    expect(items.find((i) => i.text === 'b')?.firstRaisedTick).toBe(2);
+  });
+
+  it('matches case- and space-insensitively but keeps the newest spelling', () => {
+    const messages = [tickMessage(1, 'A thing'), tickMessage(2, ' a THING ')];
+    expect(resolveNeedsYouItems(messages)).toEqual([
+      { text: 'a THING', firstRaisedTick: 1, firstRaisedAt: tickMessage(1, 'A thing').createdAt },
+    ]);
+  });
+
+  it('a non-tick user message between ticks neither breaks nor extends a run', () => {
+    const messages = [
+      tickMessage(2, 'a', 'm2'),
+      { role: 'user', text: 'flywheel-tick: tick=99 pick=none phase=watch in-flight=none needs-you=a', createdAt: '2026-09-23T10:02:30Z' },
+      tickMessage(3, 'a', 'm3'),
+    ];
+    expect(resolveNeedsYouItems(messages)).toEqual([
+      { text: 'a', firstRaisedTick: 2, firstRaisedAt: tickMessage(2, 'a', 'm2').createdAt, firstRaisedMessageId: 'm2' },
+    ]);
+  });
+
+  it('returns [] when the newest tick has needs-you=none or there is no tick', () => {
+    expect(resolveNeedsYouItems([tickMessage(1, null)])).toEqual([]);
+    expect(resolveNeedsYouItems([])).toEqual([]);
+  });
+
+  it('an item absent from the newest tick produces no entry', () => {
+    const messages = [tickMessage(1, 'a; b'), tickMessage(2, 'a')];
+    expect(resolveNeedsYouItems(messages)).toEqual([
+      { text: 'a', firstRaisedTick: 1, firstRaisedAt: tickMessage(1, 'a; b').createdAt },
+    ]);
+  });
+
+  it('a first-raised message without an id has no firstRaisedMessageId key', () => {
+    const messages = [tickMessage(1, 'a')];
+    const [item] = resolveNeedsYouItems(messages);
+    expect(item).not.toHaveProperty('firstRaisedMessageId');
   });
 });

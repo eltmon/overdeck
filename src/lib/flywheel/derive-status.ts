@@ -42,7 +42,7 @@ import {
   FLYWHEEL_FRESHNESS_BREATHING_MS,
   FLYWHEEL_FRESHNESS_LIVE_MS,
 } from './constants.js';
-import { findLastTick, type TickMarkerMessage } from './tick-marker.js';
+import { findLastTick, resolveNeedsYouItems, type TickMarkerMessage } from './tick-marker.js';
 
 export interface FlywheelWorkspace {
   issueId: string;
@@ -282,7 +282,8 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
     : null;
 
   const messages = conv ? await (deps.readTranscript ?? readFlywheelTranscript)(conv) : [];
-  const lastTick = findLastTick(messages);
+  const newestTick = findLastTick(messages);
+  const lastTick = newestTick ? { ...newestTick, needsYouItems: resolveNeedsYouItems(messages) } : null;
 
   const { projectRoot, planHome } = await resolveRoots(conv?.cwd ?? options.projectRoot ?? process.cwd(), deps);
   const panDir = join(planHome, '.pan');

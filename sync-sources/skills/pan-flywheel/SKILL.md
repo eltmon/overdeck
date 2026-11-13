@@ -267,7 +267,12 @@ flywheel-tick: tick=3 pick=PAN-3964 phase=watch in-flight=PAN-3964,PAN-3920 need
   `stopping`.
 - `in-flight` is a comma-separated list of the issues moving now, or `none`.
 - `needs-you` is `none` or a short plain sentence for the operator. It is
-  always the last key and may contain spaces.
+  always the last key and may contain spaces. Separate several items with
+  `; `; the Flywheel page shows one row per item and links each row to the
+  tick that first raised it. Keep an item's wording identical from tick to
+  tick until it is resolved: the page matches items by exact text, so a
+  reworded item looks newly raised. Write a pull request outside this
+  project as `owner/repo#<n>`, so the page can link it.
 
 The Flywheel page and `pan flywheel status` parse this line from the
 transcript; it is the only status this loop reports. Never `curl` or POST a

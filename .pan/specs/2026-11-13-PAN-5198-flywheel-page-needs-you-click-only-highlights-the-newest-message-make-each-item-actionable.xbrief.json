@@ -1,0 +1,582 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-13T19:51:49Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5198: Flywheel page: Needs-you click only highlights the newest message; make each item actionable",
+    "updated": "2026-11-13T19:57:35.567Z"
+  },
+  "plan": {
+    "id": "pan-5198",
+    "title": "Flywheel page: Needs-you click only highlights the newest message; make each item actionable",
+    "status": "running",
+    "uid": "cda3e7cc-0815-4e7d-a85d-dcf1f415326e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-13T19:51:49Z",
+    "updated": "2026-11-13T19:57:35.567Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5198",
+        "label": "PAN-5198",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5198.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "dashboard",
+      "frontend",
+      "needs-you"
+    ],
+    "narratives": {
+      "Problem": "On the Flywheel page, clicking the Needs you block jumps to the newest tick message, which is already on screen and never explains the items because the loop repeats them every tick. The whole line is one button, so no issue, PR or step inside it can be opened.",
+      "Proposal": "The status deriver splits the newest tick's needs-you line on \";\" and, from the transcript it already reads, finds each item's first-raised tick (the oldest tick of the item's current unbroken run), returned as lastTick.needsYouItems. The Status pane renders one row per item; issue IDs open the issue drawer, PR references link when their repo is known, and clicking a row jumps the conversation to the first-raised message after a pending question keeps priority. The skill tells the loop to qualify cross-repo PRs; docs and changelog describe it.",
+      "NonGoals": "- No new route, stored field, SQLite row or file write; the page stays a derived view.\n- No change to NeedsYouIndicator's count or the reveal mechanism (flywheelReveal).\n- No change to resolveNeedsYouAction(), useOlderHistory/MessagesTimeline jump paging, or its 100-page cap.\n- No guessing of a PR's repository: a bare #<n> with no in-flight match is plain text, never a link to the flywheel project's repo.\n- No change to pan flywheel status text output.\n- No needs-you rows for in-flight rows with attention needs-you; they keep their table badge.\n- No apps/mobile change.\n- No fuzzy item matching: the issue fixes the rule (trim + lower-case); reworded items are fixed at the source by the skill item.\n- An unreachable jump target (past 100 pages or before the session file) keeps today's silent no-scroll."
+    },
+    "autoDecisions": [
+      {
+        "summary": "First-raised resolution runs on the server in deriveFlywheelStatus and ships as optional lastTick.needsYouItems; no new route",
+        "rationale": "The issue asks to reuse the derived status read path; the transcript is already parsed there, and an optional field keeps older fixtures and servers rendering."
+      },
+      {
+        "summary": "Bare PR references (PR #n, #n) link only through an in-flight row with that PR number; owner/repo#n links to GitHub; anything else stays plain text",
+        "rationale": "The report's own \"PR #7\" is an overdeck-landing PR (verified in the flywheel transcript), so linking bare numbers to the flywheel project repo would open the wrong PR."
+      },
+      {
+        "summary": "Issue IDs match \\b[A-Z]{2,}-\\d+\\b, not only PAN-<n>",
+        "rationale": "The flywheel can drive other projects (MIN, KRUX); project prefixes are letters only per conventions (PAN-4860)."
+      },
+      {
+        "summary": "Rows are <li role=\"button\" tabIndex=0> with Enter/Space handling; links stop propagation",
+        "rationale": "Links cannot nest inside a <button>; role=button rows are an existing pattern (PipelineRow.tsx)."
+      },
+      {
+        "summary": "Add a skill rule: separate needs-you items with \"; \" and write cross-repo PRs as owner/repo#<n>",
+        "rationale": "Makes the ; split an explicit contract and lets future cross-repo PRs link correctly."
+      },
+      {
+        "summary": "A run spans tick-number resets and ends at the oldest readable tick in the current session file",
+        "rationale": "Only presence in consecutive tick messages defines the run; earlier session files are not read by resolveSessionFile."
+      },
+      {
+        "summary": "Keep the mandated exact match and add a skill rule that item wording stays identical across ticks",
+        "rationale": "The live-transcript probe showed the loop rewords items (\"approve merging overdeck-landing PR #7\" -> \"PR #7 merge\"), ending runs early; the issue fixes the match rule, so the cause is fixed in the skill instead."
+      },
+      {
+        "summary": "The live-browser UAT check stays PRD AC-8 for the UAT role, not an xBRIEF checklist item",
+        "rationale": "It needs a running flywheel with a multi-tick run, which a work agent cannot reproduce in its workspace; pending .acN items would block pan done."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One small vertical feature (16 files, about 300 changed lines): the contract field, the server resolver that fills it, the pane and page that read it, the skill rule that feeds it and its docs. The subsystem count comes from the repo layout (contracts, lib, tests, three frontend folders, the test-subset list, skill, docs), not from scope. Sibling issues would ship a schema field with no reader or a UI with no data, so none of them could pass UAT alone.",
+      "canonicalFilename": "2026-11-13-PAN-5198-flywheel-page-needs-you-click-only-highlights-the-newest-message-make-each-item-actionable.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "contracts-needs-you-item",
+        "title": "Add the FlywheelNeedsYouItem schema and the needs-you split helpers to contracts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:51:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5198",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "server-first-raised",
+            "status-pane-rows",
+            "page-row-jump"
+          ],
+          "files_scope": [
+            "packages/contracts/src/flywheel-derived.ts",
+            "packages/contracts/src/flywheel-derived.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/flywheel-derived.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "flywheel-derived.test.ts passes including the splitNeedsYouItems (PAN-5198) describe block",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-5198.md). In packages/contracts/src/flywheel-derived.ts, above FlywheelLastTick, add the FlywheelNeedsYouItem Schema.Struct { text, firstRaisedTick, firstRaisedAt, firstRaisedMessageId?: optional } and its type, plus needsYouItemKey(text) = text.trim().toLowerCase() and splitNeedsYouItems(needsYou) (split on \";\", trim, drop empty, one entry per key keeping the first spelling; null/undefined/\"\" -> []). Add needsYouItems: Schema.optional(Schema.Array(FlywheelNeedsYouItem)) to FlywheelLastTick after messageId. Copy the exact code from the PRD. Add the tests the PRD lists to flywheel-derived.test.ts."
+        },
+        "items": [
+          {
+            "id": "contracts-needs-you-item.ac1",
+            "title": "Given the line \"a; b ;; c\", when splitNeedsYouItems runs, then it returns [\"a\",\"b\",\"c\"]; null, undefined and \"\" return []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-needs-you-item.ac2",
+            "title": "Given \"Merge PR #7; merge pr #7 \", when splitNeedsYouItems runs, then it returns [\"Merge PR #7\"] (duplicates by key collapse to the first spelling)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-needs-you-item.ac3",
+            "title": "Given a status whose lastTick has needsYouItems and one whose lastTick omits it, when decodeFlywheelDerivedStatus runs, then both decode without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-first-raised",
+        "title": "Resolve each needs-you item's first-raised tick in the status deriver",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:51:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5198",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/flywheel/tick-marker.ts",
+            "src/lib/flywheel/derive-status.ts",
+            "tests/unit/lib/flywheel/tick-marker.test.ts",
+            "tests/unit/lib/flywheel/derive-status.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/flywheel/tick-marker.test.ts tests/unit/lib/flywheel/derive-status.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tick-marker.test.ts and derive-status.test.ts pass including the resolveNeedsYouItems (PAN-5198) cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add resolveNeedsYouItems(messages) to src/lib/flywheel/tick-marker.ts exactly as the PRD shows: walk assistant tick messages newest first (same filter as findLastTick), take the newest tick's items via splitNeedsYouItems, and for each older tick extend an item's first-raised tick while the tick contains the item key, closing the item at the first tick that lacks it; break once no item is open. Change the contracts import to a value import. In derive-status.ts replace `const lastTick = findLastTick(messages);` with newestTick + `{ ...newestTick, needsYouItems: resolveNeedsYouItems(messages) }`. Do not change actions.ts. Add the seven tick-marker cases and one derive-status case from the PRD."
+        },
+        "items": [
+          {
+            "id": "server-first-raised.ac1",
+            "title": "Given tick messages t1 (needs-you=none) and t2..t5 (needs-you=merge PR #7) with ids m1..m5, when resolveNeedsYouItems runs, then it returns one item with firstRaisedTick 2 and firstRaisedMessageId \"m2\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-first-raised.ac2",
+            "title": "Given t1 \"a\", t2 \"b\", t3 \"a; b\", when resolveNeedsYouItems runs, then item \"a\" is first raised at tick 3 and item \"b\" at tick 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-first-raised.ac3",
+            "title": "Given the newest tick has needs-you=none or the transcript has no tick, when resolveNeedsYouItems runs, then it returns an empty array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-first-raised.ac4",
+            "title": "Given t1 \"a; b\" and t2 \"a\", when resolveNeedsYouItems runs, then it returns only item \"a\" (an item absent from the newest tick produces no entry)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-first-raised.ac5",
+            "title": "Given a transcript with three ticks, when deriveFlywheelStatus runs, then status.lastTick.needsYouItems carries each newest-tick item with its first-raised tick",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "needs-you-link-tokenizer",
+        "title": "Add the needs-you reference tokenizer for issue IDs and PR references",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:51:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5198",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/flywheelNeedsYouLinks.ts",
+            "src/dashboard/frontend/src/lib/__tests__/flywheelNeedsYouLinks.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/flywheelNeedsYouLinks.test.ts",
+            "grep -n \"src/lib/__tests__/flywheelNeedsYouLinks.test.ts\" scripts/frontend-test-subset.txt"
+          ],
+          "expected_outputs": [
+            "flywheelNeedsYouLinks.test.ts passes",
+            "the grep prints the subset line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create src/dashboard/frontend/src/lib/flywheelNeedsYouLinks.ts exporting NeedsYouSegment and needsYouSegments(text, inFlight) with the PRD regex REF_RE. Qualified owner/repo#n -> pr https://github.com/<repo>/pull/<n>; PR #n or #n -> pr with the url of the first inFlight row whose pr.number === n, else plain text; [A-Z]{2,}-\\d+ -> issue. Merge adjacent text. Import only types from @overdeck/contracts (never flywheelApi, lint:circular). Add the five PRD test cases and append the test path to scripts/frontend-test-subset.txt right after src/lib/__tests__/flywheelNeedsYou.test.ts."
+        },
+        "items": [
+          {
+            "id": "needs-you-link-tokenizer.ac1",
+            "title": "Given \"waive PAN-5095 test removal\", when needsYouSegments runs, then it returns text, an issue segment with issueId \"PAN-5095\", and text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-link-tokenizer.ac2",
+            "title": "Given \"PR #5127 merge\" and an in-flight row whose pr.number is 5127, when needsYouSegments runs, then the pr segment carries that row's pr.url",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-link-tokenizer.ac3",
+            "title": "Given \"PR #7 merge\" and no in-flight row with PR 7, when needsYouSegments runs, then it returns a single text segment \"PR #7 merge\" and no pr segment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-link-tokenizer.ac4",
+            "title": "Given \"eltmon/overdeck-landing#7 merge\", when needsYouSegments runs, then it returns a pr segment with url https://github.com/eltmon/overdeck-landing/pull/7",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "status-pane-rows",
+        "title": "Render one actionable row per needs-you item in FlywheelStatusPane",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:51:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5198",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelStatusPane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx",
+            "scripts/frontend-test-subset.txt",
+            "src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx src/pages/__tests__/FlywheelPage.test.tsx",
+            "grep -n \"src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx\" scripts/frontend-test-subset.txt",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "FlywheelStatusPane.test.tsx and FlywheelPage.test.tsx pass",
+            "the grep prints the subset line",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 and decision D-4/D-5. Change onNeedsYouClick to (messageId: string | undefined) => void. Export NeedsYouRow and needsYouRows(tick) (needsYouItems, else splitNeedsYouItems(needsYou); messageId = firstRaisedMessageId ?? tick.messageId). Replace the single <button data-testid=\"flywheel-needs-you\"> with <div role=\"group\" aria-label=\"Needs you\" data-testid=\"flywheel-needs-you\"> containing the Needs you label and a <ul> of <li role=\"button\" tabIndex={0} data-testid=\"flywheel-needs-you-item\"> rows; Enter/Space and click call onNeedsYouClick(row.messageId). Render segments from needsYouSegments(row.text, status.inFlight): issue -> <button data-testid=\"flywheel-needs-you-issue\"> calling onNavigateIssue; pr -> <a target=\"_blank\" rel=\"noreferrer\" data-testid=\"flywheel-needs-you-pr\">; both stopPropagation on click and keydown. Render the block only when rows exist. Rewrite the needs-you tests per the PRD and append the test path to scripts/frontend-test-subset.txt in sorted position. Also update the two PAN-4751 tests in src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx (lines 195 and 210) to click (await screen.findAllByTestId(\"flywheel-needs-you-item\"))[0] instead of flywheel-needs-you, keeping every assertion, so FlywheelPage.test.tsx stays green at the end of this item."
+        },
+        "items": [
+          {
+            "id": "status-pane-rows.ac1",
+            "title": "Given needsYou \"waive PAN-5095 test removal; PR #7 merge; upload AAB\", when the pane renders, then it renders three flywheel-needs-you-item rows in that order inside a DIV with data-testid flywheel-needs-you",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-pane-rows.ac2",
+            "title": "Given that line, when the PAN-5095 issue control is clicked, then onNavigateIssue is called with \"PAN-5095\" and onNeedsYouClick is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-pane-rows.ac3",
+            "title": "Given an in-flight row with pr.number 4001 and the item \"PR #4001 merge\", when the pane renders, then a flywheel-needs-you-pr link has href https://github.com/eltmon/overdeck/pull/4001, and \"PR #7 merge\" renders no flywheel-needs-you-pr link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-pane-rows.ac4",
+            "title": "Given needsYouItems with firstRaisedMessageId \"m2\" and lastTick.messageId \"m9\", when the row is clicked or receives Enter, then onNeedsYouClick is called with \"m2\"; without needsYouItems it is called with \"m9\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-row-jump",
+        "title": "Make FlywheelPage jump to the clicked row's first-raised message",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:51:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5198",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/FlywheelPage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/pages/__tests__/FlywheelPage.test.tsx src/lib/__tests__/flywheelNeedsYou.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "FlywheelPage.test.tsx and flywheelNeedsYou.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. handleNeedsYouClick takes (messageId?: string); it runs resolveNeedsYouAction first and on reopen-question calls requestReopen and returns; otherwise setTickJump with messageId ?? status?.lastTick?.messageId. Do not change resolveNeedsYouAction or the reveal effect. In FlywheelPage.test.tsx (status-pane-rows already moved the PAN-4751 tests to click a row), add the first-raised jump test and its pending-question variant from the PRD."
+        },
+        "items": [
+          {
+            "id": "page-row-jump.ac1",
+            "title": "Given lastTick.messageId \"msg-9\", needsYouItems firstRaisedMessageId \"msg-2\" and no pending question, when the row is clicked, then the conversation pane receives data-target-id \"msg-2\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-row-jump.ac2",
+            "title": "Given the same status and an unanswered conv-flywheel question, when the row is clicked, then reopenNonce becomes 1 and data-target-id stays empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-row-jump.ac3",
+            "title": "Given the PAN-4751 tests already clicking a needs-you row, when FlywheelPage.test.tsx runs, then the nonce increments and handled-state assertions still pass with the new handler signature",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-needs-you-contract",
+        "title": "Tell the pan-flywheel skill to separate needs-you items, keep their wording stable, and qualify cross-repo PRs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:51:49Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5198",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-flywheel/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"owner/repo#<n>\" sync-sources/skills/pan-flywheel/SKILL.md",
+            "grep -n \"wording identical\" sync-sources/skills/pan-flywheel/SKILL.md",
+            "npx vitest run tests/unit/prompts/prompt-invariants.test.ts tests/unit/evals/prompt-rails.test.ts tests/unit/flywheel/no-loss.test.ts"
+          ],
+          "expected_outputs": [
+            "both greps print the new needs-you sentences",
+            "the three prompt test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Replace the needs-you bullet (around line 269) with the PRD text: items separated by \"; \", the page shows one row per item linked to the tick that first raised it, keep an item's wording identical from tick to tick until it is resolved (the page matches by exact text, so a reworded item looks newly raised), and a pull request outside this project is written as owner/repo#<n>. The commit must carry a \"Prompt-Change: needs-you items are ;-separated and cross-repo PRs are owner/repo#n\" trailer (scripts/check-prompt-change-trailer.sh line 54) in addition to the Item: trailer."
+        },
+        "items": [
+          {
+            "id": "skill-needs-you-contract.ac1",
+            "title": "Given the edited SKILL.md, when grep searches for \"owner/repo#<n>\", \"Separate several items with\" and \"wording identical\", then all three match inside the needs-you bullet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-needs-you-contract.ac2",
+            "title": "Given the commit that changes SKILL.md, when its message is read, then it carries a Prompt-Change: trailer line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-needs-you-contract.ac3",
+            "title": "Given the edit, when the prompt-invariants, prompt-rails and flywheel no-loss tests run, then they exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-flywheel-needs-you",
+        "title": "Document the needs-you rows in docs/FLYWHEEL.md and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:51:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5198",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/FLYWHEEL.md",
+            "changelog.d/pan-5198.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"needsYouItems\" docs/FLYWHEEL.md",
+            "grep -n \"first-raised\" docs/FLYWHEEL.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "both greps print matches in docs/FLYWHEEL.md",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In docs/FLYWHEEL.md: extend the \"Last tick, pick, phase, needs-you\" Sources row with lastTick.needsYouItems and resolveNeedsYouItems(); rename the \"Needs-you banner\" row to \"Needs-you block\" and replace its text with the PRD wording (one row per item, issue IDs open the drawer, PRs link only when the repo is known, row click reopens a pending question or scrolls to the first-raised tick message, newest as fallback); append the ; separator and owner/repo#<n> rule to the tick-marker needs-you row. Create changelog.d/pan-5198.md with the exact #### Improved bullet from the PRD."
+        },
+        "items": [
+          {
+            "id": "docs-flywheel-needs-you.ac1",
+            "title": "Given docs/FLYWHEEL.md, when grep searches for \"needsYouItems\" and \"Needs-you block\", then the Sources table rows describe one row per item and the first-raised tick jump",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-flywheel-needs-you.ac2",
+            "title": "Given docs/FLYWHEEL.md, when the tick-marker needs-you row is read, then it states that items are separated by \"; \" and cross-repo PRs are written owner/repo#<n>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-flywheel-needs-you.ac3",
+            "title": "Given changelog.d/pan-5198.md, when npm run lint:docs runs, then it exits 0 and the file contains an \"#### Improved\" heading with a #5198 link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-needs-you-item",
+        "to": "server-first-raised",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-needs-you-item",
+        "to": "status-pane-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "needs-you-link-tokenizer",
+        "to": "status-pane-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "status-pane-rows",
+        "to": "page-row-jump",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
