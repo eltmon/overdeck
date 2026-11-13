@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5189",
   "created": "2026-11-13T19:51:19.231Z",
-  "updated": "2026-11-13T21:20:36.438Z",
+  "updated": "2026-11-13T21:25:11.034Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -250,9 +250,26 @@
       "doneAt": "2026-11-13T21:20:25.901Z"
     },
     "ooxml-viewer": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5189",
-      "claimedAt": "2026-11-13T21:20:36.438Z"
+      "claimedAt": "2026-11-13T21:20:36.438Z",
+      "doneAt": "2026-11-13T21:25:11.033Z"
+    },
+    "ooxml-viewer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:25:11.033Z"
+    },
+    "ooxml-viewer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:25:11.033Z"
+    },
+    "ooxml-viewer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:25:11.033Z"
+    },
+    "ooxml-viewer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:25:11.033Z"
     }
   }
 }
