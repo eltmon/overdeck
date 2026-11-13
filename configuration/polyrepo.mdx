@@ -137,6 +137,12 @@ A polyrepo workspace root is a plain container directory with no `package.json`,
 
 Leave `package_manager` unset on a repo when a devcontainer installs that repo's dependencies (for example a pnpm init service) — a host install can conflict with the container's pnpm store. A failed per-repo install fails workspace creation; re-running the command resumes setup.
 
+## The workspace root repository
+
+The workspace root is itself a small git repository (no remote) that holds the sub-repo worktrees alongside Overdeck's own files: the synced skills and agent template (`.claude/`, `.mcp.json`), Hume config (`.hume-config`), and env (`.env`). Overdeck lists these in the root `.gitignore` so they never count as uncommitted work.
+
+If a workspace was created before Overdeck started writing these entries, the next `pan start <issue>` for that workspace repairs its `.gitignore` automatically — no manual step needed. Anything else left uncommitted at the workspace root still stops a start, exactly as before.
+
 ## Template Placeholders
 
 | Placeholder | Example | Description |
