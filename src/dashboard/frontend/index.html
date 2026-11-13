@@ -15,8 +15,17 @@
       // Flash prevention: Apply theme class before React mounts.
       // Default is dark — add .dark unless user chose light.
       (function() {
-        var theme = localStorage.getItem('overdeck.ui.theme') || 'dark';
-        if (theme === 'dark') {
+        var p = location.pathname;
+        var dark;
+        if (p === '/m' || p.indexOf('/m/') === 0) {
+          // PAN-5208: the /m shell follows the phone appearance (keep in step with src/lib/appearance.ts).
+          var a = 'system';
+          try { a = localStorage.getItem('overdeck.appearance') || 'system'; } catch (e) {}
+          dark = a === 'dark' || (a !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        } else {
+          dark = (localStorage.getItem('overdeck.ui.theme') || 'dark') === 'dark';
+        }
+        if (dark) {
           document.documentElement.classList.add('dark');
         }
       })();
