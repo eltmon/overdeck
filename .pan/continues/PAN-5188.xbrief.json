@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5188",
   "created": "2026-11-13T17:44:21.691Z",
-  "updated": "2026-11-13T17:59:05.476Z",
+  "updated": "2026-11-13T18:01:44.063Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,11 @@
     "download-file-route.ac5": {
       "status": "completed",
       "doneAt": "2026-11-13T17:59:05.476Z"
+    },
+    "folder-download": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:01:44.063Z"
     }
   }
 }
