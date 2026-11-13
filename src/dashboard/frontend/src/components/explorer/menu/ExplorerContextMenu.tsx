@@ -1,0 +1,152 @@
+// The explorer's right-click menu: read actions and git actions (PAN-5186,
+// WI-B10; FR-5). Write actions (new, rename, delete, …) are PAN-5190's.
+//
+// Git actions write the index and the working tree, so they never render on a
+// `project` root: the primary checkout is never written (D-B7). Download links
+// the PAN-5188 route, which answers 404 until that issue merges (D-B6).
+
+import type { ReactNode } from 'react'
+import { toast } from 'sonner'
+
+import { useConfirm } from '../../DialogProvider'
+import {
+  ContextMenuContent,
+  ContextMenuDestructiveItem,
+  ContextMenuItem,
+  ContextMenuRoot,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '../../shared/ContextMenu'
+import { explorerDownloadUrl, explorerErrorMessage, gitStage, type ExplorerRootKind, type GitStageAction } from '../explorer-rpc'
+import type { Decorations, FileDecoration } from '../git/git-decoration'
+import { parentPath } from '../tree/explorer-tree-model'
+
+export interface ExplorerMenuTarget {
+  path: string
+  kind: 'file' | 'dir' | 'symlink'
+  /** Absolute path on the server's disk, when the containing listing is loaded. */
+  absPath: string | null
+}
+
+export interface ExplorerContextMenuProps {
+  rootId: string
+  rootKind: ExplorerRootKind
+  targets: readonly ExplorerMenuTarget[]
+  decorations: Decorations
+  onOpen(path: string): void
+  onFindInFolder(dirPath: string): void
+  onGitChanged(): void
+  children: ReactNode
+}
+
+/** Working-tree changes at or under a target (a folder covers its descendants). */
+function workingChanges(target: ExplorerMenuTarget, decorations: Decorations): FileDecoration[] {
+  const out: FileDecoration[] = []
+  const prefix = target.path === '' ? '' : `${target.path}/`
+  for (const [path, decoration] of decorations.files) {
+    if (decoration.committedOnly) continue
+    if (path === target.path || (target.kind === 'dir' && path.startsWith(prefix))) out.push(decoration)
+  }
+  return out
+}
+
+function downloadViaAnchor(url: string): void {
+  const a = document.createElement('a')
+  a.href = url
+  a.download = ''
+  a.rel = 'noopener'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+}
+
+async function copyText(text: string, done: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text)
+    toast.success(done)
+  } catch (e) {
+    toast.error(`Couldn't copy: ${explorerErrorMessage(e)}`)
+  }
+}
+
+export function ExplorerContextMenu({
+  rootId,
+  rootKind,
+  targets,
+  decorations,
+  onOpen,
+  onFindInFolder,
+  onGitChanged,
+  children,
+}: ExplorerContextMenuProps) {
+  const confirm = useConfirm()
+  const single = targets.length === 1 ? targets[0] : null
+  const paths = targets.map((t) => t.path)
+  const changes = targets.flatMap((t) => workingChanges(t, decorations))
+  const canStage = changes.some((c) => !c.staged)
+  const canUnstage = changes.some((c) => c.staged)
+  const canDiscard = changes.length > 0
+
+  const runGit = async (action: GitStageAction) => {
+    try {
+      await gitStage(rootId, paths, action)
+      onGitChanged()
+    } catch (e) {
+      toast.error(explorerErrorMessage(e))
+    }
+  }
+
+  const discard = async () => {
+    const ok = await confirm({
+      title: 'Discard changes?',
+      message: paths.join('\n'),
+      confirmLabel: 'Discard',
+      variant: 'destructive',
+    })
+    if (ok) await runGit('discard')
+  }
+
+  const findInFolderPath = single ? (single.kind === 'dir' ? single.path : parentPath(single.path)) : ''
+
+  return (
+    <ContextMenuRoot>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuContent>
+        {single && single.kind !== 'dir' && <ContextMenuItem onSelect={() => onOpen(single.path)}>Open</ContextMenuItem>}
+        {targets.length > 0 && (
+          <>
+            <ContextMenuItem
+              disabled={targets.some((t) => t.absPath === null)}
+              onSelect={() => void copyText(targets.map((t) => t.absPath ?? t.path).join('\n'), 'Copied path')}
+            >
+              Copy path
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => void copyText(paths.join('\n'), 'Copied relative path')}>
+              Copy relative path
+            </ContextMenuItem>
+          </>
+        )}
+        {targets.length <= 1 && (
+          <ContextMenuItem onSelect={() => onFindInFolder(findInFolderPath)}>Find in folder</ContextMenuItem>
+        )}
+        {single && (
+          <ContextMenuItem onSelect={() => downloadViaAnchor(explorerDownloadUrl(rootId, single.path))}>Download</ContextMenuItem>
+        )}
+        {rootKind !== 'project' && targets.length > 0 && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem disabled={!canStage} onSelect={() => void runGit('stage')}>
+              Stage
+            </ContextMenuItem>
+            <ContextMenuItem disabled={!canUnstage} onSelect={() => void runGit('unstage')}>
+              Unstage
+            </ContextMenuItem>
+            <ContextMenuDestructiveItem disabled={!canDiscard} onSelect={() => void discard()}>
+              Discard changes
+            </ContextMenuDestructiveItem>
+          </>
+        )}
+      </ContextMenuContent>
+    </ContextMenuRoot>
+  )
+}
