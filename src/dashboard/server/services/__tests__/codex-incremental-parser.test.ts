@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { appendFile, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
+import { appendFile, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createCodexConversationAccumulator } from '../codex-conversation-parser.js';
-import { createIncrementalTranscriptReader } from '../incremental-transcript-reader.js';
+import { createIncrementalTranscriptReader, type Accumulator } from '../incremental-transcript-reader.js';
+import type { RecordLocation } from '../conversation/types.js';
 import { parseCodexSession } from '../../../../lib/cost-parsers/codex-parser.js';
 
 const line = (type: string, payload: object) => JSON.stringify({ type, timestamp: '2026-09-09T00:00:00Z', payload }) + '\n';
@@ -85,5 +86,85 @@ describe('incremental Codex history', () => {
     }
     expect((await read(file)).messages).toEqual(first.messages);
     expect(create).toHaveBeenCalledTimes(10);
+  });
+
+  it('passes each pushed line its exact byte location, across a chunk boundary and after an append', async () => {
+    const pushed: Array<{ text: string; location?: RecordLocation }> = [];
+    const read = createIncrementalTranscriptReader((path) => {
+      const parser = createCodexConversationAccumulator(path);
+      return { ...parser, push: (text, location) => { pushed.push({ text, location }); parser.push(text); } };
+    });
+    // The first message straddles the 1 MiB read-chunk boundary; the 🌍 makes byte and char offsets differ.
+    await writeFile(file, message('🌍 head') + message('y'.repeat(1024 * 1024 - 40)) + message('after boundary 🌍'));
+    await read(file);
+    await appendFile(file, message('appended 🌍') + message('last'));
+    await read(file);
+
+    const bytes = await readFile(file);
+    expect(pushed).toHaveLength(5);
+    let expectedOffset = 0;
+    for (const { text, location } of pushed) {
+      expect(location).toBeDefined();
+      expect(location!.offset).toBe(expectedOffset);
+      expect(bytes.subarray(location!.offset, location!.offset + location!.length).toString('utf8')).toBe(text);
+      expectedOffset += location!.length + 1;
+    }
+    expect(expectedOffset).toBe(bytes.length);
+  });
+
+  it('keeps offsets exact when a record without a final newline is closed by a later append', async () => {
+    const pushed: Array<{ text: string; location?: RecordLocation }> = [];
+    const read = createIncrementalTranscriptReader((path) => {
+      const parser = createCodexConversationAccumulator(path);
+      return { ...parser, push: (text, location) => { pushed.push({ text, location }); parser.push(text); } };
+    });
+    await writeFile(file, message('first') + message('no newline').trimEnd());
+    await read(file);
+    await appendFile(file, '\n' + message('next'));
+    const result = await read(file);
+
+    const bytes = await readFile(file);
+    expect(result.messages.map(m => m.text)).toEqual(['first', 'no newline', 'next']);
+    expect(pushed).toHaveLength(3);
+    for (const { text, location } of pushed) {
+      expect(bytes.subarray(location!.offset, location!.offset + location!.length).toString('utf8')).toBe(text);
+    }
+  });
+
+  it('pushes a line holding an image data URL already scrubbed', async () => {
+    const pushed: string[] = [];
+    const read = createIncrementalTranscriptReader((path) => {
+      const parser = createCodexConversationAccumulator(path);
+      return { ...parser, push: (text) => { pushed.push(text); parser.push(text); } };
+    });
+    const image = `data:image/png;base64,${Buffer.alloc(30_000, 1).toString('base64')}`;
+    await writeFile(file, line('response_item', {
+      type: 'custom_tool_call_output', call_id: 'c1',
+      output: [{ type: 'input_text', text: 'shot' }, { type: 'input_image', image_url: image, detail: 'high' }],
+    }));
+    await read(file);
+
+    expect(pushed).toHaveLength(1);
+    expect(pushed[0]).toContain('[image: png, ');
+    expect(pushed[0]).not.toContain('data:image');
+  });
+
+  it('sends a line over recordParseMaxBytes to pushOversized, not push', async () => {
+    const push = vi.fn();
+    const pushOversized = vi.fn();
+    const read = createIncrementalTranscriptReader((path): Accumulator => {
+      const parser = createCodexConversationAccumulator(path);
+      return { ...parser, push: (text) => { push(text); parser.push(text); }, pushOversized };
+    }, { recordParseMaxBytes: 1024 });
+    const big = message('z'.repeat(4096));
+    await writeFile(file, message('small') + big);
+    await read(file);
+
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(pushOversized).toHaveBeenCalledTimes(1);
+    const [head, location] = pushOversized.mock.calls[0] as [string, RecordLocation];
+    expect(location).toEqual({ offset: Buffer.byteLength(message('small')), length: Buffer.byteLength(big) - 1 });
+    expect(head.length).toBeLessThanOrEqual(4096);
+    expect(big.startsWith(head)).toBe(true);
   });
 });

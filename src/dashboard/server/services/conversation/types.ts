@@ -8,6 +8,12 @@ export interface CompactSummaryRecord {
   timestamp?: string;
 }
 
+/** PAN-5211: byte offset and byte length of one JSONL line on disk (before scrubbing). */
+export interface RecordLocation {
+  readonly offset: number;
+  readonly length: number;
+}
+
 export interface ParseResult {
   /** Worker-local accumulator generation; changes when a transcript is rebuilt. */
   transcriptGeneration?: number;
