@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5198",
   "created": "2026-11-13T19:57:57.248Z",
-  "updated": "2026-11-13T20:13:27.462Z",
+  "updated": "2026-11-13T20:25:59.430Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,9 +54,26 @@
       "doneAt": "2026-11-13T20:13:07.432Z"
     },
     "needs-you-link-tokenizer": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5198",
-      "claimedAt": "2026-11-13T20:13:27.462Z"
+      "claimedAt": "2026-11-13T20:13:27.462Z",
+      "doneAt": "2026-11-13T20:25:59.428Z"
+    },
+    "needs-you-link-tokenizer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:25:59.428Z"
+    },
+    "needs-you-link-tokenizer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:25:59.428Z"
+    },
+    "needs-you-link-tokenizer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:25:59.428Z"
+    },
+    "needs-you-link-tokenizer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:25:59.428Z"
     }
   }
 }
