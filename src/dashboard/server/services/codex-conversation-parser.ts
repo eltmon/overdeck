@@ -38,7 +38,11 @@ import type { ParseResult } from './conversation-service.js';
 import { createCodexSessionParser } from '../../../lib/cost-parsers/codex-parser.js';
 import { readCodexRolloutMessage } from '../../../lib/codex-rollout-message.js';
 import { createIncrementalTranscriptReader } from './incremental-transcript-reader.js';
-import { boundToolResultText } from './conversation/tool-result-bounds.js';
+import {
+  boundToolResultText,
+  estimateMessageChars,
+  estimateWorkLogEntryChars,
+} from './conversation/tool-result-bounds.js';
 
 interface CodexTokenUsage {
   input_tokens?: number;
@@ -125,6 +129,21 @@ export function createCodexConversationAccumulator(sessionFile: string) {
   // completed-looking assistant message does NOT mean the turn ended — only a
   // message with no tool activity after it does (PAN-3770 spinner fix).
   let trailingAgentMessageAt: string | undefined;
+  // PAN-5211: retained characters of every kept row (see tool-result-bounds.ts).
+  let retained = 0;
+
+  const addMessage = (message: ChatMessage): void => {
+    messages.push(message);
+    retained += estimateMessageChars(message);
+  };
+  const addWork = (wl: WorkLogEntry): void => {
+    workLog.push(wl);
+    retained += estimateWorkLogEntryChars(wl);
+  };
+  const replaceWork = (position: number, next: WorkLogEntry): void => {
+    retained += estimateWorkLogEntryChars(next) - estimateWorkLogEntryChars(workLog[position]!);
+    workLog[position] = next;
+  };
 
   const push = (line: string): void => {
     costs.push(line);
@@ -149,7 +168,7 @@ export function createCodexConversationAccumulator(sessionFile: string) {
         // turn ended — Codex narrates mid-turn, so only a message with no tool
         // activity after it does. The tool branches below clear this.
         trailingAgentMessageAt = isUser ? undefined : createdAt;
-        messages.push({
+        addMessage({
           id: `codex-${isUser ? 'user' : 'agent'}-${sequence}`,
           role: rolloutMessage.role,
           text: rolloutMessage.text,
@@ -190,7 +209,7 @@ export function createCodexConversationAccumulator(sessionFile: string) {
           sequence,
           ...(command ? { command } : args ? { detail: args } : {}),
         };
-        workLog.push(wl);
+        addWork(wl);
         if (callId) toolCallsByCallId.set(callId, droppedWorkLogRows + workLog.length - 1);
       } else if (ptype === 'function_call_output' || ptype === 'custom_tool_call_output') {
         const callId = typeof payload.call_id === 'string' ? payload.call_id : '';
@@ -201,12 +220,12 @@ export function createCodexConversationAccumulator(sessionFile: string) {
         const wl = position >= 0 ? workLog[position] : undefined;
         if (wl) {
           // A replaced entry is a new object, so earlier result() snapshots keep their own entry.
-          if (output) workLog[position] = { ...wl, result: output };
+          if (output) replaceWork(position, { ...wl, result: output });
           toolCallsByCallId.delete(callId);
         } else if (output) {
           // Output with no matching call (truncated/rotated) — stand-alone entry.
           sequence += 1;
-          workLog.push({
+          addWork({
             id: callId || `codex-tool-out-${sequence}`,
             createdAt,
             label: 'Tool result',
@@ -255,7 +274,7 @@ export function createCodexConversationAccumulator(sessionFile: string) {
       fileEditsByAssistantId: new Map(),
     };
   };
-  return { push, result };
+  return { push, result, retainedChars: (): number => retained };
 }
 
 export const parseCodexConversationMessages = createIncrementalTranscriptReader(createCodexConversationAccumulator);

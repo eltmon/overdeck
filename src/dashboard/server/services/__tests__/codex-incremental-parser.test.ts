@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createCodexConversationAccumulator } from '../codex-conversation-parser.js';
 import { createIncrementalTranscriptReader, type Accumulator } from '../incremental-transcript-reader.js';
-import type { RecordLocation } from '../conversation/types.js';
+import type { ParseResult, RecordLocation } from '../conversation/types.js';
+import { estimateParseResultChars } from '../conversation/tool-result-bounds.js';
 import { parseCodexSession } from '../../../../lib/cost-parsers/codex-parser.js';
 
 const line = (type: string, payload: object) => JSON.stringify({ type, timestamp: '2026-09-09T00:00:00Z', payload }) + '\n';
@@ -166,5 +167,51 @@ describe('incremental Codex history', () => {
     expect(location).toEqual({ offset: Buffer.byteLength(message('small')), length: Buffer.byteLength(big) - 1 });
     expect(head.length).toBeLessThanOrEqual(4096);
     expect(big.startsWith(head)).toBe(true);
+  });
+
+  it('evicts the oldest file by summed retained characters and re-parses it from byte 0', async () => {
+    const pushes: Array<{ path: string; offset?: number }> = [];
+    const read = createIncrementalTranscriptReader((path) => {
+      const parser = createCodexConversationAccumulator(path);
+      return { ...parser, push: (text, location) => { pushes.push({ path, offset: location?.offset }); parser.push(text); } };
+    }, { maxCacheRetainedChars: 2_500 });
+    const files = ['a', 'b', 'c'].map((name) => join(dir, `${name}.jsonl`));
+    for (const path of files) await writeFile(path, message('m'.repeat(1_000)));
+    for (const path of files) await read(path);
+
+    pushes.length = 0;
+    await read(files[2]!);
+    await read(files[1]!);
+    expect(pushes).toEqual([]);
+    await read(files[0]!);
+    expect(pushes).toEqual([{ path: files[0], offset: 0 }]);
+  });
+
+  it('returns an entry over the hard cap without caching it', async () => {
+    const create = vi.fn((path: string): Accumulator => {
+      const parser = createCodexConversationAccumulator(path);
+      return { ...parser, retainedChars: () => 1_000_000 };
+    });
+    const read = createIncrementalTranscriptReader(create, { maxEntryRetainedChars: 10_000 });
+    await writeFile(file, message('kept'));
+
+    const first = await read(file);
+    const second = await read(file);
+
+    expect(first.messages.map(m => m.text)).toEqual(['kept']);
+    expect(second.messages.map(m => m.text)).toEqual(['kept']);
+    expect(create).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports retainedChars equal to the estimate of its result', () => {
+    const parser = createCodexConversationAccumulator(file);
+    for (const text of [message('hello'), message('world')]) parser.push(text.trimEnd());
+    parser.push(line('response_item', { type: 'function_call', name: 'exec_command', arguments: '{"cmd":"ls -la"}', call_id: 'c1' }).trimEnd());
+    parser.push(line('response_item', { type: 'function_call_output', call_id: 'c1', output: 'total 0' }).trimEnd());
+    parser.push(line('response_item', { type: 'custom_tool_call_output', call_id: 'orphan', output: 'stray' }).trimEnd());
+
+    const result: ParseResult = parser.result(0, 0);
+    expect(result.workLog).toHaveLength(2);
+    expect(parser.retainedChars()).toBe(estimateParseResultChars(result));
   });
 });

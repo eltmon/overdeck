@@ -1,7 +1,12 @@
 /** Bounded worker-local parser state: append reads avoid decoding the history again. */
 import { open } from 'node:fs/promises';
 import type { ParseResult, RecordLocation } from './conversation/types.js';
-import { RECORD_PARSE_MAX_BYTES, scrubImageDataUrls } from './conversation/tool-result-bounds.js';
+import {
+  RECORD_PARSE_MAX_BYTES,
+  TRANSCRIPT_CACHE_MAX_RETAINED_CHARS,
+  TRANSCRIPT_ENTRY_MAX_RETAINED_CHARS,
+  scrubImageDataUrls,
+} from './conversation/tool-result-bounds.js';
 
 /** Bytes of an oversized record's start that `pushOversized` receives, decoded. */
 const OVERSIZED_HEAD_BYTES = 4096;
@@ -11,6 +16,8 @@ export interface Accumulator {
   /** PAN-5211: a record over `recordParseMaxBytes` after the scrub; only its first bytes are decoded. */
   pushOversized?(head: string, location: RecordLocation): void;
   result(size: number, mtimeMs: number): ParseResult;
+  /** PAN-5211: retained characters of the rows this accumulator holds. */
+  retainedChars(): number;
 }
 
 export interface AccumulatorOptions {
@@ -107,10 +114,11 @@ export function createIncrementalTranscriptReader(
   options: IncrementalTranscriptReaderOptions = {},
 ) {
   const recordParseMaxBytes = options.recordParseMaxBytes ?? RECORD_PARSE_MAX_BYTES;
+  const maxEntryRetainedChars = options.maxEntryRetainedChars ?? TRANSCRIPT_ENTRY_MAX_RETAINED_CHARS;
+  const maxCacheRetainedChars = options.maxCacheRetainedChars ?? TRANSCRIPT_CACHE_MAX_RETAINED_CHARS;
   const cache = new Map<string, Entry>();
   const pending = new Map<string, Promise<ParseResult>>();
   let generation = 0;
-  const maxBytes = 32 * 1024 * 1024;
   const maxFiles = 8;
 
   const newEntry = (file: string, stats: { dev: number; ino: number; mtimeMs: number }, start: number): Entry => {
@@ -167,11 +175,16 @@ export function createIncrementalTranscriptReader(
         entry.tail = await bytesAt(Math.max(0, stats.size - 4096), Math.min(4096, stats.size));
         entry.result = { ...entry.parser.result(stats.size, stats.mtimeMs), transcriptGeneration: entry.generation };
       }
+      // PAN-5211: an entry over the hard cap is returned but never cached, so no single
+      // transcript can hold more than the cap between reads.
+      if (entry.parser.retainedChars() > maxEntryRetainedChars) return entry.result!;
       cache.set(file, entry);
-      let bytes = [...cache.values()].reduce((sum, item) => sum + item.size, 0);
+      let retained = 0;
+      for (const item of cache.values()) retained += item.parser.retainedChars();
       for (const [key, item] of cache) {
-        if (cache.size <= maxFiles && (bytes <= maxBytes || cache.size === 1)) break;
-        bytes -= item.size;
+        if (cache.size <= maxFiles && retained <= maxCacheRetainedChars) break;
+        if (key === file) continue;
+        retained -= item.parser.retainedChars();
         cache.delete(key);
       }
       return entry.result!;
