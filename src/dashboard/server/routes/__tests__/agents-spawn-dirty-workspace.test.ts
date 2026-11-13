@@ -45,6 +45,43 @@ describe('isOnlyOverdeckRuntimeWorkspaceChanges', () => {
   });
 });
 
+describe('isOnlyOverdeckRuntimeWorkspaceChanges in a polyrepo wrapper (PAN-5199)', () => {
+  const MIN_1141_PORCELAIN = [
+    '?? .claude/.caveman-variant',
+    '?? .claude/.overdeck-manifest.json',
+    '?? .claude/agents/pan-work-agent.md',
+    '?? .claude/commands/work-issue.md',
+    '?? .claude/mcp.json',
+    '?? .claude/settings.json',
+    '?? .claude/skills/bug-fix/SKILL.md',
+    '?? .hume-config',
+    '?? .mcp.json',
+  ].join('\n');
+
+  it.each([
+    ['the MIN-1141 wrapper porcelain', MIN_1141_PORCELAIN],
+    ['an untracked generated .env', '?? .env'],
+  ])('allows %s', (_label, porcelain) => {
+    expect(isOnlyOverdeckRuntimeWorkspaceChanges(porcelain, { polyrepoWrapper: true })).toBe(true);
+  });
+
+  it.each([
+    ['the MIN-1141 porcelain plus a real note', `${MIN_1141_PORCELAIN}\n?? notes.txt`],
+    ['a tracked edit to a sync path', ' M .claude/settings.json'],
+    ['a staged sync path', 'A  .mcp.json'],
+    ['an unrelated staged file left by the heal', 'A  notes.txt'],
+  ])('rejects %s', (_label, porcelain) => {
+    expect(isOnlyOverdeckRuntimeWorkspaceChanges(porcelain, { polyrepoWrapper: true })).toBe(false);
+  });
+
+  it.each([
+    ['an untracked agent file in a monorepo', '?? .claude/agents/my-agent.md'],
+    ['an untracked .mcp.json in a monorepo', '?? .mcp.json'],
+  ])('rejects %s without the polyrepoWrapper option', (_label, porcelain) => {
+    expect(isOnlyOverdeckRuntimeWorkspaceChanges(porcelain)).toBe(false);
+  });
+});
+
 describe('emitDirtyWorkspaceRefusalActivity', () => {
   beforeEach(() => {
     vi.clearAllMocks();

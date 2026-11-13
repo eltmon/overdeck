@@ -37,7 +37,8 @@ import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../../li
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { ProviderHealthError, validateProviderHealth } from '../../../../lib/provider-health.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/projects.js';
-import { isGeneratedGitHookPath, isOverdeckWorkspaceRuntimePath, parsePorcelainStatusPaths } from '../../../../lib/state-plane.js';
+import { isGeneratedGitHookPath, isOverdeckWorkspaceRuntimePath, parsePorcelainStatusEntries } from '../../../../lib/state-plane.js';
+import { isOverdeckWorkspaceSyncPath } from '../../../../lib/workspace-sync-paths.js';
 import { assertWorkspaceStackHealthyForSpawn } from '../../../../lib/agents/spawn-prep.js';
 import { resolveIssueStackDiskHold } from '../../../../lib/workspace/disk-cost.js';
 import { getWorkspaceStackHealth } from '../../../../lib/workspace/stack-health.js';
@@ -99,11 +100,19 @@ export function emitDirtyWorkspaceRefusalActivity(issueId: string, porcelain: st
  * True when git porcelain contains only Overdeck-owned workspace runtime files
  * (PAN-3042; shared predicate since PAN-3245) or generated git-hook output — the
  * `.husky/_/pre-rebase` guard that worktree creation writes made every fresh
- * workspace read as dirty and 409 the planning auto-handoff (PAN-3266).
+ * workspace read as dirty and 409 the planning auto-handoff (PAN-3266). In a
+ * polyrepo wrapper, also tolerates untracked Overdeck sync output written
+ * before its .gitignore carried it (PAN-5199); monorepos and tracked edits
+ * to sync paths stay refused.
  */
-export function isOnlyOverdeckRuntimeWorkspaceChanges(porcelain: string): boolean {
-  return parsePorcelainStatusPaths(porcelain)
-    .every((path) => isOverdeckWorkspaceRuntimePath(path) || isGeneratedGitHookPath(path));
+export function isOnlyOverdeckRuntimeWorkspaceChanges(
+  porcelain: string,
+  options: { polyrepoWrapper?: boolean } = {},
+): boolean {
+  return parsePorcelainStatusEntries(porcelain).every(({ status, path }) =>
+    isOverdeckWorkspaceRuntimePath(path)
+    || isGeneratedGitHookPath(path)
+    || (options.polyrepoWrapper === true && status === '??' && isOverdeckWorkspaceSyncPath(path)));
 }
 
 export function spawnGuardrailResourcesHint(hint?: string): string {
