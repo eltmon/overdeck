@@ -228,6 +228,72 @@
     "commit": "2d8a843e6b"
   },
   {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/sheet-sizing.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/sheet-sizing.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/sheet-viewport.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/sheet-viewport.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/sheet-protocol.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/sheet-protocol.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/sheet-fonts.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/sheet-fonts.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/sheet-cells.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/sheet-cells.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/sheet-frame.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/sheet-frame.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/sheet-paint.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/sheet-paint.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/spreadsheet.worker.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/spreadsheet.worker.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/Spreadsheet.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/Spreadsheet.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/__tests__/sheet-viewport.test.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/sheet-viewport.test.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/__tests__/sheet-cells.test.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/sheet-cells.test.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
     "local": "src/dashboard/frontend/src/components/explorer/viewers/font/FontViewer.tsx",
     "upstream": "t3code",
     "path": "apps/web/src/components/files/FontViewer.tsx",
