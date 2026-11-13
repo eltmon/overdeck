@@ -99,6 +99,61 @@ export function boundToolResultText(text: string, maxChars: number = TOOL_RESULT
   return { text, bounded: false };
 }
 
+const DATA_IMAGE_PREFIX = Buffer.from('data:image/', 'latin1');
+const BASE64_MARKER = Buffer.from(';base64,', 'latin1');
+const MAX_IMAGE_FORMAT_BYTES = 32;
+
+function isFormatByte(b: number): boolean {
+  return (b >= 0x41 && b <= 0x5a) || (b >= 0x61 && b <= 0x7a) || (b >= 0x30 && b <= 0x39)
+    || b === 0x2e || b === 0x2b || b === 0x2d; // . + -
+}
+
+function isBase64Byte(b: number): boolean {
+  return (b >= 0x41 && b <= 0x5a) || (b >= 0x61 && b <= 0x7a) || (b >= 0x30 && b <= 0x39)
+    || b === 0x2b || b === 0x2f || b === 0x3d; // + / =
+}
+
+/**
+ * Replace every `data:image/<format>;base64,<payload>` in a raw transcript line with its ASCII image
+ * placeholder, before the line is decoded or parsed. The placeholder holds no `"` or `\`, so JSON stays
+ * valid. A line with no base64 image data URL comes back as the same `Buffer`.
+ */
+export function scrubImageDataUrls(line: Buffer): Buffer {
+  let match = line.indexOf(DATA_IMAGE_PREFIX);
+  if (match < 0) return line;
+  const parts: Buffer[] = [];
+  let kept = 0;
+  while (match >= 0) {
+    const formatStart = match + DATA_IMAGE_PREFIX.length;
+    let formatEnd = formatStart;
+    while (formatEnd < line.length && formatEnd - formatStart < MAX_IMAGE_FORMAT_BYTES && isFormatByte(line[formatEnd]!)) {
+      formatEnd += 1;
+    }
+    const markerEnd = formatEnd + BASE64_MARKER.length;
+    if (
+      formatEnd === formatStart
+      || markerEnd > line.length
+      || line.compare(BASE64_MARKER, 0, BASE64_MARKER.length, formatEnd, markerEnd) !== 0
+    ) {
+      match = line.indexOf(DATA_IMAGE_PREFIX, formatStart);
+      continue;
+    }
+    let payloadEnd = markerEnd;
+    while (payloadEnd < line.length && isBase64Byte(line[payloadEnd]!)) payloadEnd += 1;
+    let pad = 0;
+    while (pad < 2 && payloadEnd - pad > markerEnd && line[payloadEnd - pad - 1] === 0x3d) pad += 1;
+    const payloadLen = payloadEnd - markerEnd;
+    const format = line.toString('latin1', formatStart, formatEnd);
+    parts.push(line.subarray(kept, match));
+    parts.push(Buffer.from(imagePlaceholder(format, Math.floor((payloadLen * 3) / 4) - pad), 'latin1'));
+    kept = payloadEnd;
+    match = line.indexOf(DATA_IMAGE_PREFIX, payloadEnd);
+  }
+  if (parts.length === 0) return line;
+  parts.push(line.subarray(kept));
+  return Buffer.concat(parts);
+}
+
 function stringLength(value: string | undefined): number {
   return value === undefined ? 0 : value.length;
 }

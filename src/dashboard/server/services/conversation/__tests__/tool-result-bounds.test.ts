@@ -8,6 +8,7 @@ import {
   estimateWorkLogEntryChars,
   imagePlaceholder,
   ROW_OVERHEAD_CHARS,
+  scrubImageDataUrls,
 } from '../tool-result-bounds.js';
 
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
@@ -124,5 +125,52 @@ describe('retained-characters estimate', () => {
     expect(estimateParseResultChars({ messages: [message], workLog: [entry] })).toBe(
       estimateMessageChars(message) + estimateWorkLogEntryChars(entry),
     );
+  });
+});
+
+describe('scrubImageDataUrls', () => {
+  function codexOutputLine(output: unknown[]): string {
+    return JSON.stringify({
+      timestamp: '2026-11-10T12:00:00.000Z',
+      type: 'response_item',
+      payload: { type: 'custom_tool_call_output', call_id: 'call_abc', output: JSON.stringify(output) },
+    });
+  }
+
+  it('scrubs two 1 MB data URLs from a custom_tool_call_output line to parseable JSON', () => {
+    const decoded = 1024 * 1024;
+    const textItem = { type: 'input_text', text: 'Took two screenshots' };
+    const line = Buffer.from(codexOutputLine([
+      textItem,
+      { type: 'input_image', image_url: `data:image/png;base64,${base64Of(decoded)}`, detail: 'high' },
+      { type: 'input_image', image_url: `data:image/png;base64,${base64Of(decoded + 1)}`, detail: 'high' },
+    ]), 'utf8');
+
+    const scrubbed = scrubImageDataUrls(line);
+    const record = JSON.parse(scrubbed.toString('utf8')) as { payload: { output: string } };
+    const output = JSON.parse(record.payload.output) as Array<Record<string, string>>;
+
+    expect(output[0]).toEqual(textItem);
+    expect(output[1]!.image_url).toBe('[image: png, 1024 KB]');
+    expect(output[2]!.image_url).toBe('[image: png, 1024 KB]');
+    expect(scrubbed.length).toBeLessThan(2048 + textItem.text.length);
+  });
+
+  it('returns a line with no image as the same Buffer', () => {
+    const line = Buffer.from(codexOutputLine([{ type: 'input_text', text: 'plain' }]), 'utf8');
+    expect(scrubImageDataUrls(line)).toBe(line);
+  });
+
+  it('keeps a multi-byte character next to a data URL intact', () => {
+    const line = Buffer.from(`{"a":"🌍data:image/png;base64,${base64Of(3000)}🌍"}`, 'utf8');
+
+    const scrubbed = scrubImageDataUrls(line);
+
+    expect(JSON.parse(scrubbed.toString('utf8'))).toEqual({ a: '🌍[image: png, 3 KB]🌍' });
+  });
+
+  it('leaves a non-base64 SVG data URL unchanged', () => {
+    const line = Buffer.from('{"a":"data:image/svg+xml;utf8,<svg></svg>"}', 'utf8');
+    expect(scrubImageDataUrls(line)).toBe(line);
   });
 });
