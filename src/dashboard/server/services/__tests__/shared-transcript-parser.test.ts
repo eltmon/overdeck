@@ -122,3 +122,35 @@ describe('shared transcript parser', () => {
     });
   });
 });
+
+describe('shared transcript parser retained-character budget (PAN-5211)', () => {
+  beforeEach(() => {
+    mocks.stat.mockReset();
+    mocks.job.mockReset();
+  });
+
+  const message = (text: string) => ({ id: 'm', role: 'user' as const, text, createdAt: '2026-11-13T00:00:00.000Z' });
+
+  it('returns an over-cap result but dispatches again on the next call with an unchanged signature', async () => {
+    mocks.stat.mockResolvedValue({ dev: 9, ino: 9, size: 100, mtimeMs: 1 });
+    const huge = { messages: [message('h'.repeat(17 * 1024 * 1024))], workLog: [] };
+    mocks.job.mockResolvedValue(huge);
+    const parse = sharedTranscriptParser('codex');
+
+    expect(await parse('/huge.jsonl')).toBe(huge);
+    expect(await parse('/huge.jsonl')).toBe(huge);
+    expect(mocks.job).toHaveBeenCalledTimes(2);
+  });
+
+  it('reuses a result under the cap', async () => {
+    mocks.stat.mockResolvedValue({ dev: 10, ino: 10, size: 100, mtimeMs: 1 });
+    const small = { messages: [message('small')], workLog: [] };
+    mocks.job.mockResolvedValue(small);
+    const parse = sharedTranscriptParser('codex');
+
+    expect(await parse('/small.jsonl')).toBe(small);
+    expect(await parse('/small.jsonl')).toBe(small);
+    expect(mocks.job).toHaveBeenCalledTimes(1);
+  });
+});
+
