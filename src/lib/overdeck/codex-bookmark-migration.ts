@@ -56,7 +56,9 @@ export async function migrateCodexCounterBookmarks(
 ): Promise<void> {
   if (migrated.has(name)) return;
   const conv = getConversationByName(name);
-  if (!conv || conv.harness !== 'codex') return;
+  // Only the Codex parser ever produced `codex-(user|agent)-<n>` ids, so the id pattern selects
+  // Codex conversations without a harness check.
+  if (!conv) return;
   migrated.add(name);
   try {
     const wanted = new Set(listConversationBookmarks(name).map((b) => b.messageId).filter((id) => COUNTER_ID_RE.test(id)));
