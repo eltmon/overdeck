@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5208",
   "created": "2026-11-13T21:57:26.421Z",
-  "updated": "2026-11-13T22:21:38.640Z",
+  "updated": "2026-11-13T22:22:39.570Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -278,6 +278,11 @@
     "pipeline-rows.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T22:21:38.639Z"
+    },
+    "native-screens": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5208",
+      "claimedAt": "2026-11-13T22:22:39.570Z"
     }
   }
 }
