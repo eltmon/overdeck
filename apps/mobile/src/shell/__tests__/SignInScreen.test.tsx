@@ -28,3 +28,11 @@ describe('SignInScreen signed-out notice (PAN-5107)', () => {
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeTruthy();
   });
 });
+
+describe('SignInScreen brand (PAN-5208)', () => {
+  it('shows the Overdeck lockup', () => {
+    const { container } = render(<SignInScreen onSignIn={async () => {}} error={null} />);
+    expect(screen.getByRole('heading', { name: 'Overdeck' })).toBeTruthy();
+    expect(container.querySelector('[data-component="overdeck-lockup"]')).not.toBeNull();
+  });
+});

@@ -11,6 +11,7 @@ import type { PushPermission } from '../native/push';
 import type { DeleteAccountResult } from './accountDeletion';
 import { DELETE_CONFIRM_WORD, DELETE_IRREVERSIBLE, DELETE_STATEMENT } from './accountDeletionCopy';
 import { AppearanceChoice } from '../../../../src/dashboard/frontend/src/components/mobile/AppearanceChoice';
+import { MobileScreenHeader } from '../../../../src/dashboard/frontend/src/components/mobile/brand';
 import type { Appearance } from './appearance';
 import { APP_VERSION } from './config';
 import { isPaused, type PauseChoice } from './notificationPrefs';
@@ -87,89 +88,92 @@ export function SettingsScreen({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   return (
-    <section
-      data-component="settings-screen"
-      className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-[env(safe-area-inset-bottom)] pt-[calc(env(safe-area-inset-top)+1rem)]"
-    >
-      <button type="button" onClick={onBack} className="min-h-11 self-start text-sm text-foreground">
-        ‹ Machines
-      </button>
-      <h2 className="text-base font-medium text-foreground">Settings</h2>
-      <div className="flex flex-col gap-1 text-sm">
-        <span className="text-muted-foreground">Signed in to overdeck.ai</span>
-        <span className="text-foreground">{account.label || 'This phone'}</span>
-        <span className="font-mono text-xs text-muted-foreground">{account.deviceId}</span>
-      </div>
-      <AppearanceChoice
-        value={appearance}
-        onChange={onAppearanceChange}
-        note="System follows this phone's light or dark setting. Stored on this phone only."
-      />
-      {notifications ? (
-        <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium text-foreground">Notifications</h3>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={notifications.enabled}
-            onClick={() => notifications.onChange(!notifications.enabled)}
-            className="flex min-h-11 items-center justify-between gap-3 border-b border-border text-sm text-foreground"
-          >
-            <span>Notifications</span>
-            <span className="text-muted-foreground">{notifications.enabled ? 'On' : 'Off'}</span>
+    <section data-component="settings-screen" className="flex min-h-0 flex-1 flex-col">
+      <MobileScreenHeader
+        leading={
+          <button type="button" onClick={onBack} className="-ml-1 min-h-11 pr-1 text-sm text-foreground">
+            ‹ Machines
           </button>
-          <p className="text-xs text-muted-foreground">
-            {notificationsHint(notifications)}
-          </p>
-          <NotificationPrefsSection notifications={notifications} />
+        }
+        title="Settings"
+      />
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-[env(safe-area-inset-bottom)] pt-4">
+        <div className="flex flex-col gap-1 text-sm">
+          <span className="text-muted-foreground">Signed in to overdeck.ai</span>
+          <span className="text-foreground">{account.label || 'This phone'}</span>
+          <span className="font-mono text-xs text-muted-foreground">{account.deviceId}</span>
         </div>
-      ) : null}
-      <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium text-foreground">Paired machines</h3>
-        {machines.length === 0 ? <p className="text-sm text-muted-foreground">No paired machines.</p> : null}
-        <ul className="flex flex-col">
-          {machines.map((machine) => (
-            <li key={machine.environmentId} className="flex min-h-11 items-center justify-between gap-3 border-b border-border">
-              <span className="truncate text-sm text-foreground">{machine.label}</span>
-              <button type="button" onClick={() => onForget(machine.environmentId)} className="min-h-11 px-2 text-sm text-foreground">
-                Forget
-              </button>
-            </li>
-          ))}
-        </ul>
-        <p className="text-xs text-muted-foreground">
-          Forget removes a machine from this phone only. Remove the phone on the machine in Settings → Anywhere.
-        </p>
-      </div>
-      {liveActivity?.available ? <LiveActivityRow setting={liveActivity} /> : null}
-      <p className="text-xs text-muted-foreground">Overdeck {APP_VERSION}</p>
-      <button
-        type="button"
-        disabled={signingOut}
-        onClick={() => {
-          setSigningOut(true);
-          void onSignOut().finally(() => setSigningOut(false));
-        }}
-        className="min-h-11 w-full rounded-sm border border-border px-3 text-sm font-medium text-destructive disabled:opacity-50"
-      >
-        {signingOut ? 'Signing out…' : 'Sign out'}
-      </button>
-      {onDeleteAccount ? (
+        <AppearanceChoice
+          value={appearance}
+          onChange={onAppearanceChange}
+          note="System follows this phone's light or dark setting. Stored on this phone only."
+        />
+        {notifications ? (
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium text-foreground">Notifications</h3>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={notifications.enabled}
+              onClick={() => notifications.onChange(!notifications.enabled)}
+              className="flex min-h-11 items-center justify-between gap-3 border-b border-border text-sm text-foreground"
+            >
+              <span>Notifications</span>
+              <span className="text-muted-foreground">{notifications.enabled ? 'On' : 'Off'}</span>
+            </button>
+            <p className="text-xs text-muted-foreground">
+              {notificationsHint(notifications)}
+            </p>
+            <NotificationPrefsSection notifications={notifications} />
+          </div>
+        ) : null}
+        <div className="flex flex-col gap-2">
+          <h3 className="text-sm font-medium text-foreground">Paired machines</h3>
+          {machines.length === 0 ? <p className="text-sm text-muted-foreground">No paired machines.</p> : null}
+          <ul className="flex flex-col">
+            {machines.map((machine) => (
+              <li key={machine.environmentId} className="flex min-h-11 items-center justify-between gap-3 border-b border-border">
+                <span className="truncate text-sm text-foreground">{machine.label}</span>
+                <button type="button" onClick={() => onForget(machine.environmentId)} className="min-h-11 px-2 text-sm text-foreground">
+                  Forget
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted-foreground">
+            Forget removes a machine from this phone only. Remove the phone on the machine in Settings → Anywhere.
+          </p>
+        </div>
+        {liveActivity?.available ? <LiveActivityRow setting={liveActivity} /> : null}
+        <p className="text-xs text-muted-foreground">Overdeck {APP_VERSION}</p>
         <button
           type="button"
-          onClick={() => setDeleteDialogOpen(true)}
-          className="min-h-11 w-full rounded-sm border border-border px-3 text-sm font-medium text-destructive"
+          disabled={signingOut}
+          onClick={() => {
+            setSigningOut(true);
+            void onSignOut().finally(() => setSigningOut(false));
+          }}
+          className="min-h-11 w-full rounded-sm border border-border px-3 text-sm font-medium text-destructive disabled:opacity-50"
         >
-          Delete account
+          {signingOut ? 'Signing out…' : 'Sign out'}
         </button>
-      ) : null}
-      {deleteDialogOpen && onDeleteAccount ? (
-        <DeleteAccountDialog
-          onConfirm={onDeleteAccount}
-          onOpenAccountPage={onOpenAccountPage}
-          onClose={() => setDeleteDialogOpen(false)}
-        />
-      ) : null}
+        {onDeleteAccount ? (
+          <button
+            type="button"
+            onClick={() => setDeleteDialogOpen(true)}
+            className="min-h-11 w-full rounded-sm border border-border px-3 text-sm font-medium text-destructive"
+          >
+            Delete account
+          </button>
+        ) : null}
+        {deleteDialogOpen && onDeleteAccount ? (
+          <DeleteAccountDialog
+            onConfirm={onDeleteAccount}
+            onOpenAccountPage={onOpenAccountPage}
+            onClose={() => setDeleteDialogOpen(false)}
+          />
+        ) : null}
+      </div>
     </section>
   );
 }
