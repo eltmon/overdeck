@@ -92,6 +92,25 @@ describe('MobileConversations', () => {
     expect(onOpen).toHaveBeenCalledWith('@env-a/conv-9');
   });
 
+  it('PAN-5208: group toggles show a chevron icon, not a text glyph', async () => {
+    stubFetch([row(1, 'Seven', '2026-11-01T00:00:00.000Z')], [{ key: 'alpha', name: 'Alpha', path: '/p/alpha' }]);
+    renderWithQuery(<MobileConversations conversationId={null} onOpen={() => {}} onBack={() => {}} />);
+    for (const label of ['Alpha', 'No project']) {
+      const header = await findGroupHeader(label);
+      expect(header.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+      expect(header.textContent).not.toMatch(/[▸▾]/);
+    }
+    const plus = screen.getByRole('button', { name: 'New conversation in Alpha' });
+    expect(plus.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  it('PAN-5208: shows the empty state with its title when there are no conversations', async () => {
+    stubFetch([]);
+    const { container } = renderWithQuery(<MobileConversations conversationId={null} onOpen={() => {}} onBack={() => {}} />);
+    await screen.findByText('No conversations.');
+    expect(container.querySelector('[data-component="mobile-empty-state"]')?.textContent).toContain('No conversations.');
+  });
+
   it('renders every group collapsed on first load', async () => {
     stubFetch([row(1, 'Seven', '2026-11-01T00:00:00.000Z')], [{ key: 'alpha', name: 'Alpha', path: '/p/alpha' }]);
     renderWithQuery(<MobileConversations conversationId={null} onOpen={() => {}} onBack={() => {}} />);
