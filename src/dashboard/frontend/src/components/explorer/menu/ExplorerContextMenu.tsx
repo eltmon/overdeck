@@ -21,6 +21,7 @@ import {
 } from '../../shared/ContextMenu'
 import { explorerDownloadUrl, explorerErrorMessage, gitStage, type ExplorerRootKind, type GitStageAction } from '../explorer-rpc'
 import type { Decorations, FileDecoration } from '../git/git-decoration'
+import { INLINE_NAME_INPUT_ATTR } from '../actions/InlineNameRow'
 import { parentPath } from '../tree/explorer-tree-model'
 
 export interface ExplorerMenuTarget {
@@ -95,9 +96,12 @@ export function ExplorerContextMenu({
   children,
 }: ExplorerContextMenuProps) {
   const confirm = useConfirm()
-  // Radix returns focus to the trigger (the tree) when the menu closes, which
-  // would blur a just-opened inline name input and cancel it.
+  // An item that opens an inline name input renders it while the menu's focus
+  // trap is still active, so the input's own focus does not stick, and Radix
+  // would then return focus to the trigger (the tree). Once the menu content
+  // has unmounted, focus the input instead.
   const startsInlineEditRef = useRef(false)
+  const triggerRef = useRef<HTMLElement | null>(null)
   const startInlineEdit = (start: () => void) => () => {
     startsInlineEditRef.current = true
     start()
@@ -135,12 +139,15 @@ export function ExplorerContextMenu({
 
   return (
     <ContextMenuRoot>
-      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuTrigger asChild ref={triggerRef}>
+        {children}
+      </ContextMenuTrigger>
       <ContextMenuContent
         onCloseAutoFocus={(event) => {
           if (!startsInlineEditRef.current) return
           event.preventDefault()
           startsInlineEditRef.current = false
+          triggerRef.current?.querySelector<HTMLInputElement>(`[${INLINE_NAME_INPUT_ATTR}]`)?.focus()
         }}
       >
         {single && single.kind !== 'dir' && <ContextMenuItem onSelect={() => onOpen(single.path)}>Open</ContextMenuItem>}

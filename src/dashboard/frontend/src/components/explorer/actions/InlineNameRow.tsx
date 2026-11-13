@@ -14,6 +14,9 @@ import { File, Folder } from 'lucide-react'
 import { INDENT_PX, ROW_HEIGHT } from '../tree/ExplorerRow'
 import { validateEntryName } from './name-rules'
 
+/** Marks the input, so the context menu can focus it once the menu has closed. */
+export const INLINE_NAME_INPUT_ATTR = 'data-explorer-inline-name'
+
 export interface InlineNameRowProps {
   depth: number
   kind: 'file' | 'dir'
@@ -108,6 +111,7 @@ export function InlineNameRow({ depth, kind, initialValue, siblings, current, on
       <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
       <input
         ref={inputRef}
+        {...{ [INLINE_NAME_INPUT_ATTR]: '' }}
         value={value}
         disabled={pending}
         aria-label={current === undefined ? (kind === 'dir' ? 'New folder name' : 'New file name') : `Rename ${current}`}
