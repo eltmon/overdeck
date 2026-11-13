@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5170",
   "created": "2026-11-13T02:57:05.197Z",
-  "updated": "2026-11-13T03:23:47.815Z",
+  "updated": "2026-11-13T03:25:17.664Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,9 +94,22 @@
       "doneAt": "2026-11-13T03:23:42.009Z"
     },
     "docs-darwin-platform-guards": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5170",
-      "claimedAt": "2026-11-13T03:23:47.815Z"
+      "claimedAt": "2026-11-13T03:23:47.815Z",
+      "doneAt": "2026-11-13T03:25:17.664Z"
+    },
+    "docs-darwin-platform-guards.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:25:17.664Z"
+    },
+    "docs-darwin-platform-guards.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:25:17.664Z"
+    },
+    "docs-darwin-platform-guards.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:25:17.664Z"
     }
   }
 }
