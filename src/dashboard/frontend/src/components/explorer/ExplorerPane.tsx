@@ -16,6 +16,7 @@ import type { PaneWrapperProps } from '../Stage/types'
 import { useDeleteFlow } from './actions/useDeleteFlow'
 import { useExplorerActions } from './actions/useExplorerActions'
 import { useInlineEdit } from './actions/useInlineEdit'
+import { useTreeActionKeys } from './actions/useTreeActionKeys'
 import { explorerErrorMessage, listDir, parseRootId, rootLabel } from './explorer-rpc'
 import { useExplorerStore, type RootState, type SelectMode } from './explorerStore'
 import { useExplorerGitStatus } from './git/useExplorerGitStatus'
@@ -256,6 +257,15 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
     },
     [actions, rootId],
   )
+  const onTreeKeyDown = useTreeActionKeys({
+    writable,
+    isProjectRoot: rootKind === 'project',
+    getSelection: useCallback(() => useExplorerStore.getState().roots[rootId]?.selection ?? [], [rootId]),
+    startRename: inline.startRename,
+    requestDelete: useCallback((paths: readonly string[]) => void requestDelete(paths), [requestDelete]),
+    undo: actions.undo,
+    redo: actions.redo,
+  })
 
   const onQuickOpen = useCallback(() => setQuickOpen(true), [])
   const onContentSearch = useCallback(() => setContentSearchScope(''), [])
@@ -387,6 +397,7 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
             inlineEdit={inline.inlineEdit}
             renderInline={inline.renderInline}
             onContextMenuBlank={clearSelection}
+            onKeyDown={onTreeKeyDown}
             decorations={git.decorations}
             selection={root?.selection ?? []}
             focused={root?.focused ?? null}
