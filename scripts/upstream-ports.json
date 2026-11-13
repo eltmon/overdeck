@@ -40,5 +40,11 @@
     "upstream": "orca",
     "path": "src/renderer/src/components/editor/save/queue/editor-save-slots.ts",
     "commit": "73771e67d01"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/code/self-write-registry.ts",
+    "upstream": "orca",
+    "path": "src/renderer/src/components/editor/external-changes/editor-self-write-registry.ts",
+    "commit": "73771e67d01"
   }
 ]
