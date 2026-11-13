@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5211",
   "created": "2026-11-13T22:53:14.172Z",
-  "updated": "2026-11-13T23:03:26.850Z",
+  "updated": "2026-11-13T23:03:36.226Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,11 @@
     "wi6-codex-bounded-results.ac2": {
       "status": "completed",
       "doneAt": "2026-11-13T23:03:26.850Z"
+    },
+    "wi11-pi-bounds": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5211",
+      "claimedAt": "2026-11-13T23:03:36.225Z"
     }
   }
 }
