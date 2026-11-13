@@ -2,9 +2,12 @@
 //
 // Queries explorerSearchFiles 120 ms after the last keystroke, never for an
 // empty query, and drops answers to stale queries with a request sequence
-// number (D-B14). Props only, so PAN-5187 can mount it in a code pane.
+// number (D-B14). Props only, so PAN-5187 can mount it in a code pane. It
+// portals to document.body so a clipping or transformed Stage ancestor cannot
+// confine the overlay; React events still bubble to the mounting pane.
 
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { Command } from 'cmdk'
 import { FileText, Search } from 'lucide-react'
 
@@ -88,7 +91,7 @@ export function QuickOpen({ rootId, open, onClose, onPick }: QuickOpenProps) {
         ? 'Searching…'
         : `No files match "${query.trim()}"`
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[15vh]" onClick={onClose} onKeyDown={onKeyDown}>
       <div className="absolute inset-0 bg-black/50" />
       <div
@@ -132,6 +135,7 @@ export function QuickOpen({ rootId, open, onClose, onPick }: QuickOpenProps) {
           </Command.List>
         </Command>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
