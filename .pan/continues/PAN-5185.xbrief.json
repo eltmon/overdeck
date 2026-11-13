@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5185",
   "created": "2026-11-13T14:58:00.032Z",
-  "updated": "2026-11-13T15:36:52.465Z",
+  "updated": "2026-11-13T15:36:59.309Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -274,6 +274,11 @@
     "watch-supervisor.ac6": {
       "status": "completed",
       "doneAt": "2026-11-13T15:36:52.464Z"
+    },
+    "rpc-handlers": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T15:36:59.308Z"
     }
   }
 }
