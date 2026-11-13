@@ -4,17 +4,17 @@
     "created": "2026-11-13T14:42:32Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5188: File explorer D1: viewers tier 1 and the download/upload routes",
-    "updated": "2026-11-13T14:53:44.029Z"
+    "updated": "2026-11-13T17:43:57.187Z"
   },
   "plan": {
     "id": "pan-5188",
     "title": "File explorer D1: viewers tier 1 and the download/upload routes",
-    "status": "proposed",
+    "status": "running",
     "uid": "cea5866b-b3ab-42cc-ad17-0e9dc81ac797",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-13T14:42:32Z",
-    "updated": "2026-11-13T14:53:44.029Z",
+    "updated": "2026-11-13T17:43:57.187Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5188",
@@ -1499,5 +1499,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
