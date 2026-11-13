@@ -79,7 +79,7 @@ type DashboardContextSyncResponse = ContextSyncResponse & {
 
 type RuleScope = 'universal' | 'dev';
 
-const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', 'grok'];
+const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', 'grok'];
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 const execFileAsync = promisify(execFile);
 const decodePreviewRequest = Schema.decodeUnknownSync(ContextPreviewRequest);
@@ -273,7 +273,7 @@ async function buildSyncTargets(projects: ProjectEntry[]): Promise<ContextSyncTa
   void projects;
   return [
     await describeSyncTarget('claude-code', 'global', undefined, 'Claude · managed launch', claudeGlobalContextFile(), 'claude-append-system-prompt'),
-    await describeSyncTarget('ohmypi', 'global', undefined, 'Pi · managed launch', piGlobalContextFile(), 'pi-append-system-prompt'),
+    await describeSyncTarget('ohmypi', 'global', undefined, 'Oh My Pi · managed launch', piGlobalContextFile(), 'pi-append-system-prompt'),
     await describeSyncTarget('codex', 'global', undefined, 'Codex · managed launch', codexGlobalContextFile(), 'codex-developer-instructions'),
   ];
 }
@@ -518,6 +518,7 @@ export async function previewContextLayers(
     operation: 'preview',
     previews: {
       'claude-code': previews['claude-code'],
+      pi: previews.pi,
       ohmypi: previews.ohmypi,
       codex: previews.codex,
       acp: previews.acp,

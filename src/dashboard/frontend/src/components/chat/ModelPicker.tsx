@@ -204,7 +204,7 @@ function formatCost(costPer1M: number | null, provider?: string): string {
 }
 
 function isHarness(value: unknown): value is Harness {
-  return value === 'claude-code' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'opencode' || value === 'muse' || value === 'prime-agent' || value === 'grok';
+  return value === 'claude-code' || value === 'pi' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'opencode' || value === 'muse' || value === 'prime-agent' || value === 'grok';
 }
 
 function providerDefaultHarness(provider: string, providerHarnesses: ProviderHarnesses): Harness {
@@ -463,6 +463,12 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
           />
         )}
         <span className={styles.pickerLabel}>{label}</span>
+        {effectiveHarness === 'pi' && (
+          <span className={styles.harnessIndicator} title="Pi harness active">
+            <HarnessLogo harness="pi" className={styles.harnessIndicatorIcon} />
+            Pi
+          </span>
+        )}
         {effectiveHarness === 'ohmypi' && (
           <span className={styles.harnessIndicator} title="oh-my-pi harness active">
             <HarnessLogo harness="ohmypi" className={styles.harnessIndicatorIcon} />

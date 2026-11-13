@@ -60,6 +60,7 @@ export interface ProviderFocusRequest {
 
 const HARNESS_LABELS: Record<Harness, string> = {
   'claude-code': 'Claude Code',
+  pi: 'Pi',
   ohmypi: 'oh-my-pi',
   codex: 'Codex',
   acp: 'ACP',
@@ -106,7 +107,7 @@ function harnessOptionsFor(provider: Provider | 'openrouter'): Harness[] {
   if (provider === 'opencode' || provider === 'opencode-go') return ['opencode'];
   if (provider === 'grok') return ['grok'];
   if (provider === 'meta') return ['muse'];
-  const shared: Harness[] = ['claude-code', 'ohmypi', 'codex'];
+  const shared: Harness[] = ['claude-code', 'pi', 'ohmypi', 'codex'];
   const options: Harness[] = provider === 'kimi' ? [...shared, 'acp', 'kimi-code'] : shared;
   return PRIME_AGENT_PROVIDERS.has(provider) ? [...options, 'prime-agent'] : options;
 }

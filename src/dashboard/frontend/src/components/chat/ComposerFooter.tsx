@@ -137,7 +137,7 @@ function ComposerFooterInput({
   // call — silently rewriting the conversation's runtime. Default to
   // 'claude-code' (the safe runtime) when the conversation has no stored
   // harness; do NOT consult localStorage.
-  const [harness, setHarness] = useState<Harness>((conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) ?? 'claude-code');
+  const [harness, setHarness] = useState<Harness>(conversation.harness ?? 'claude-code');
   const [deliverAs, setDeliverAs] = useState<DeliverAs>('auto');
   const [compactPending, setCompactPending] = useState(false);
   // `sending`, pending attachments, and their upload pump live in the module-level
@@ -663,7 +663,7 @@ function ComposerFooterInput({
     // back. In-flight uploads attach to their owning conversation; the send's
     // own finally clears its sending flag by submitConversationName.
     setModel(conversation.model ?? getDefaultConversationModel());
-    setHarness((conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) ?? 'claude-code');
+    setHarness(conversation.harness ?? 'claude-code');
     // PAN-4292: a delivery mode belongs to the conversation it was picked in.
     // A Steer or Follow-up choice must not carry over to the next conversation
     // this reused pane shows.

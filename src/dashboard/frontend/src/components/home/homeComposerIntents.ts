@@ -11,6 +11,7 @@ import type { UiMode } from '../../lib/simple/uiMode';
 
 export const HOME_AGENT_LABELS: Record<Harness, string> = {
   'claude-code': 'Claude Code',
+  pi: 'Pi',
   ohmypi: 'oh-my-pi',
   codex: 'Codex',
   acp: 'ACP',
