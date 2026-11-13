@@ -1,0 +1,744 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-13T02:24:27Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5168: macOS: pollers that run missing binaries create ~10 dead processes per call (spawn storm, up to ~60/s)",
+    "updated": "2026-11-13T02:33:44.567Z"
+  },
+  "plan": {
+    "id": "pan-5168",
+    "title": "macOS: pollers that run missing binaries create ~10 dead processes per call (spawn storm, up to ~60/s)",
+    "status": "proposed",
+    "uid": "51ea1114-3a36-4c4c-a5bb-88cdd01c6b7d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-13T02:24:27Z",
+    "updated": "2026-11-13T02:33:44.567Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5168",
+        "label": "PAN-5168",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5169",
+        "label": "PAN-5169 (sibling: herdr routing, ensureHostTools)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5170",
+        "label": "PAN-5170 (sibling: systemctl/journalctl platform guards)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5168.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "macos",
+      "performance",
+      "host-tools",
+      "pollers",
+      "docker",
+      "tmux"
+    ],
+    "metadata": {
+      "sizeJustification": "Nine small vertical slices over one shared module; 20 files and 5 subsystems (lib, dashboard server, cli, tests, docs).",
+      "canonicalFilename": "2026-11-13-PAN-5168-macos-pollers-that-run-missing-binaries-create-10-dead-processes-per-call-spawn-storm-up-to-60-s.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "On macOS, Node's libuv tries posix_spawn once per PATH entry for a bare command name, and XNU creates a short-lived process for each try. Pollers that run a missing docker or tmux on a fixed interval therefore create about 10 dead processes per call. An idle dashboard with no Docker and no tmux created 13-20 processes per second, and about 60 per second with many conversations. Verified pollers: the two DockerStatsCollector instances (docker stats + docker ps every 5 s each), resource discovery's loadDockerContainers, the stack-health lifecycle snapshot, the runtime census's tmux list-panes (3 s TTL), and the conversation-liveness tmux fallback (once per conversation per poll under herdr).",
+      "Proposal": "Add src/lib/host-tools.ts: a synchronous, spawn-free, cached PATH lookup built on findExecutableOnPath. A found tool stays cached until refreshHostTools() or a spawn ENOENT that a fresh lookup confirms. A missing tool is cached as null and looked up again (no spawn) every 60 s. Pollers call resolveHostTool before they spawn, skip the tick when it returns null, spawn the resolved absolute path (docker), and pass spawn errors to noteHostToolSpawnFailed. Gates go into the five pollers only (docker stats, resource discovery, stack health, runtime census, conversation-liveness tmux helpers), never into tmuxExecAsync or systemctl(). pan doctor prints a Host tools row from a fresh lookup. PUT /api/settings re-checks through a new applySavedSettings helper, which also shrinks the capped settings.ts route file. Tests keep their behavior through OVERDECK_TEST_ASSUME_HOST_TOOLS=1 set in tests/setup.ts, plus a per-test finder override that each test file resets in its own afterEach; tests/setup.ts imports nothing from src/.",
+      "NonGoals": "- Routing conversation pane reads (capturePane, readConversationInputTarget, conversationNeedsTerminal) away from tmux under herdr — PAN-5169 owns it\n- Changing ensureHostTools, isToolInstalled, or brew install behavior in src/lib/prereqs/registry.ts — PAN-5169 owns it\n- Platform guards for systemctl (src/lib/systemd.ts) and the journalctl OOM canary (src/lib/cloister/memory-pressure-patrol.ts) — PAN-5170 owns them\n- A second tool cache or a second PATH lookup helper anywhere\n- Gating tmuxExecAsync, systemctl(), or any agent/conversation launch path; src/lib/tmux.ts is not edited; only the five named pollers are gated\n- Gating on-demand docker calls (workspace create/remove, container and prune routes, doctor's own docker checks)\n- Gating the deacon hygiene patrols (idle-stack-reaper.ts, bridge-pool-patrol.ts, merged-docker-reconcile.ts): they run docker through a shell every 60 s or slower, so each call costs about one process\n- Changing herdr probing, backend selection, or the legacy-tmux fallback in conversation-liveness.ts beyond the missing-tool gate\n- Merging the two DockerStatsCollector singletons into one\n- Handling a docker CLI that is present while the daemon is down\n- Handling a binary that is on PATH but fails exec with ENOENT (for example a broken shebang interpreter)\n- A dashboard HTTP route that lets pan doctor reset the server's cache\n- Switching tmux spawns to absolute paths\n- Raising any scripts/file-size-allowlist.txt cap"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Build the lookup on findExecutableOnPath (src/lib/pan-cli-shim.ts), not resolveExecutableDetailed (src/lib/harness-binary.ts).",
+        "rationale": "resolveExecutableDetailed spawns npm prefix -g and a login shell on a miss, which is the cost this issue removes; a PATH-only lookup matches what libuv's spawn would find."
+      },
+      {
+        "summary": "Missing tools are looked up again on a fixed 60 s interval (stat only, no spawn); a found tool stays cached until refreshHostTools() or a confirmed ENOENT.",
+        "rationale": "The issue asks to resolve once, skip missing tools, and back off after ENOENT. A PATH lookup costs a few stat calls, so a fixed interval is cheap and lets a newly installed tool appear within a minute without an exponential schedule."
+      },
+      {
+        "summary": "An ENOENT marks a tool missing only when a fresh PATH lookup also misses.",
+        "rationale": "Node reports a missing cwd as 'spawn <cmd> ENOENT' too; marking the tool missing on that error would suppress a tool that exists."
+      },
+      {
+        "summary": "pan doctor's re-check is its own fresh lookup through the shared module (a Host tools row); no HTTP route resets the dashboard's cache.",
+        "rationale": "The doctor CLI, the dashboard server, and the deacon child are separate processes. A route would add route-scope and no-loss-matrix work for little value, because the dashboard re-checks missing tools every 60 s on its own."
+      },
+      {
+        "summary": "The settings-change re-check runs on PUT /api/settings through a new services/settings-saved.ts helper that also holds the route's three existing post-save calls.",
+        "rationale": "routes/settings.ts is at its file-size cap (1104/1104), so it cannot gain an import; folding the calls into a helper shrinks it."
+      },
+      {
+        "summary": "The tmux gates go into the runtime census's default listPanes and the default tmux helpers of conversation-liveness.ts, not into tmuxExecAsync.",
+        "rationale": "tmux.ts is at its cap (1167/1167), tmuxExecAsync also serves launch paths, and PAN-5169 owns the conversation pane reads. The census is the remaining tmux poller under herdr, and a rejected listPanes keeps today's tmuxAvailable:false semantics. The liveness fallback asks tmux once per conversation per poll under herdr; with tmux missing no tmux session can exist, so answering false without a spawn is exact."
+      },
+      {
+        "summary": "Tests keep their behavior through OVERDECK_TEST_ASSUME_HOST_TOOLS=1 in tests/setup.ts (no src/ import there) plus setHostToolFinderForTests for missing-tool cases, which each test file resets in its own afterEach.",
+        "rationale": "CI's test shards do not install tmux, and many tests mock child_process for tmux/docker; a real PATH lookup would skip their mocked spawns. An env var survives vi.resetModules(), unlike module state, and matches the existing OVERDECK_TERMINAL_BACKEND test default."
+      },
+      {
+        "summary": "Docker pollers spawn the resolved absolute path; tmux stays spawned by bare name.",
+        "rationale": "The absolute path also removes libuv's per-PATH-entry failed tries when docker is present. Other tmux command lines (pty.spawn, Herdr) use the bare name, so tmux stays consistent with them."
+      },
+      {
+        "summary": "HostToolName includes systemctl, journalctl, and brew, but PAN-5168 wires only docker and tmux call sites.",
+        "rationale": "The coordination comment names those tools for the shared module so PAN-5169/PAN-5170 can adopt it later; their call sites belong to those sibling issues."
+      }
+    ],
+    "items": [
+      {
+        "id": "host-tools-module",
+        "title": "Add src/lib/host-tools.ts cached spawn-free PATH lookup with the test seam",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T02:24:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5168",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "docker-stats-gate",
+            "resource-discovery-docker-gate",
+            "stack-health-docker-gate",
+            "runtime-census-tmux-gate",
+            "doctor-host-tools-row",
+            "settings-save-refresh",
+            "conversation-liveness-tmux-gate"
+          ],
+          "files_scope": [
+            "src/lib/host-tools.ts",
+            "tests/unit/lib/host-tools.test.ts",
+            "tests/setup.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/host-tools.test.ts tests/unit/lib/runtime-census.test.ts tests/unit/cli/doctor-pan-path.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular",
+            "npm run lint:effect-facades"
+          ],
+          "expected_outputs": [
+            "host-tools.test.ts passes all eleven cases; runtime-census.test.ts and doctor-pan-path.test.ts still pass with the new env default",
+            "typecheck completes without errors",
+            "lint:circular and lint:effect-facades pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "acJustification": "Six criteria: the foundation carries the cache, ENOENT, error-shape, env-seam, real-PATH and setup/circularity checks that every downstream gate depends on."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 exactly. Create src/lib/host-tools.ts that exports: type HostToolName = 'docker'|'tmux'|'systemctl'|'journalctl'|'brew'; HOST_TOOL_MISSING_RECHECK_MS = 60_000; interface HostToolDeps { find?, pathEnv?, now? }; resolveHostTool(name, deps?) returning string|null; noteHostToolSpawnFailed(name, error, deps?); refreshHostTools(); isSpawnNotFoundError(error) (walks .cause up to 4 levels: code === 'ENOENT', or reason._tag === 'NotFound'); hostToolNotFoundError(name), a Node-shaped ENOENT error with code/errno/syscall/path; setHostToolFinderForTests(find|null), which also clears the cache; resetHostToolsForTests(). Cache entries are keyed by tool name and store {path, pathEnv, recheckAt}; an entry whose pathEnv differs from the current PATH is stale. Lookup precedence: deps.find, then the test finder, then OVERDECK_TEST_ASSUME_HOST_TOOLS === '1' (returns the bare name), then findExecutableOnPath(name, pathEnv) from ./pan-cli-shim.js. noteHostToolSpawnFailed ignores non-ENOENT errors; on ENOENT it deletes the entry and calls resolveHostTool again, so the tool is marked missing only when the fresh lookup misses. Import only ./pan-cli-shim.js. The module is plain sync code with no Effect. In tests/setup.ts set process.env.OVERDECK_TEST_ASSUME_HOST_TOOLS = '1' next to the OVERDECK_TERMINAL_BACKEND default, with a PAN-5168 comment. Do NOT add any src/ import to tests/setup.ts. Each test file that calls setHostToolFinderForTests resets in its own afterEach. Write the eleven tests named in PRD WI-1: nine use injected find/pathEnv/now (no real waits); two exercise the real findExecutableOnPath route with vi.stubEnv('OVERDECK_TEST_ASSUME_HOST_TOOLS', '') against a fresh mkdtempSync directory (empty -> null; with an 0o755 file named docker -> join(dir, 'docker')). Error shapes were verified during planning: Effect.runPromise rejects with the TmuxError itself (.cause.code === 'ENOENT'), and a failed ChildProcess.make spawn rejects with a PlatformError whose reason._tag === 'NotFound' and .cause.code === 'ENOENT'."
+        },
+        "items": [
+          {
+            "id": "host-tools-module.ac1",
+            "title": "Given a finder that returns null, when resolveHostTool('docker', {find, now}) runs at now=0, 59999 and 60000, then it returns null each time and the finder is called once by 59999 and twice at 60000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-tools-module.ac2",
+            "title": "Given a found tool, when noteHostToolSpawnFailed receives a Node ENOENT and the fresh lookup returns null, then the next resolveHostTool returns null; when the fresh lookup still finds the tool, it returns the path; a non-ENOENT error leaves the cached path untouched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-tools-module.ac3",
+            "title": "isSpawnNotFoundError returns true for an Effect PlatformError.systemError with _tag 'NotFound' and for a TmuxError whose cause has code 'ENOENT', and returns false for { code: 1 }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-tools-module.ac4",
+            "title": "Given OVERDECK_TEST_ASSUME_HOST_TOOLS=1 and no injected finder, resolveHostTool('tmux') returns the bare string 'tmux'; refreshHostTools() causes the next call to invoke the finder again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-tools-module.ac6",
+            "title": "Given OVERDECK_TEST_ASSUME_HOST_TOOLS is stubbed to '' and no finder is injected, when resolveHostTool('docker', { pathEnv: <empty temp dir> }) runs it returns null, and after an executable file named docker is written into that dir and refreshHostTools() runs it returns join(dir, 'docker')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-tools-module.ac5",
+            "title": "tests/setup.ts sets OVERDECK_TEST_ASSUME_HOST_TOOLS to '1' and imports nothing from src/, setHostToolFinderForTests clears the cache, and npm run lint:circular exits 0 with the new module",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docker-stats-gate",
+        "title": "DockerStatsCollector skips a missing docker and spawns the resolved path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T02:24:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5168",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/docker-stats.ts",
+            "src/lib/__tests__/docker-stats.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/docker-stats.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/__tests__/docker-stats.test.ts passes, including the three PAN-5168 spawn-count tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2. In runDockerForOutput (src/lib/docker-stats.ts), call resolveHostTool('docker') at the start of each call. When it returns null, return Effect.succeed('') without calling ChildProcess.make. Otherwise call ChildProcess.make(<resolved path>, [...args], { stderr: 'ignore' }), and change the final Effect.catch so it calls noteHostToolSpawnFailed('docker', error) before succeeding with ''. Change 'private collect()' to a public collect() with the doc comment from the PRD; leave start() unchanged. Add the three regression tests from PRD WI-2 using Layer.succeed(ChildProcessSpawner, ChildProcessSpawner.make(...)) that records each StandardCommand, plus setHostToolFinderForTests. Implementation checkpoint: if a fake spawner cannot drive collect(), export runDockerForOutput for tests and assert the same counts on it, and say so in the commit message. Also add the PATH-stubbed regression from the issue: with no injected finder, vi.stubEnv('OVERDECK_TEST_ASSUME_HOST_TOOLS', '') and vi.stubEnv('PATH', <empty mkdtempSync dir>), resetHostToolsForTests(), then two collect() ticks record 0 spawns. Reset with resetHostToolsForTests() and vi.unstubAllEnvs() in afterEach."
+        },
+        "items": [
+          {
+            "id": "docker-stats-gate.ac1",
+            "title": "Given setHostToolFinderForTests(() => null), when collect() runs three times with a counting ChildProcessSpawner layer, then 0 commands are spawned and getStats() returns []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docker-stats-gate.ac2",
+            "title": "Given a finder that returns '/fake/bin/docker', when collect() runs once, then exactly 2 commands are spawned and each StandardCommand.command equals '/fake/bin/docker'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docker-stats-gate.ac3",
+            "title": "Given the spawner fails with a PlatformError NotFound and the finder returns null after the first lookup, when collect() runs twice, then tick 1 records 2 spawns and tick 2 records 0 more",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docker-stats-gate.ac4",
+            "title": "Given no injected finder, OVERDECK_TEST_ASSUME_HOST_TOOLS stubbed to '' and PATH stubbed to an empty temp directory, when collect() runs twice, then 0 commands are spawned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resource-discovery-docker-gate",
+        "title": "Resource discovery loadDockerContainers skips a missing docker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T02:24:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5168",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/resource-discovery-shared.ts",
+            "tests/unit/dashboard/server/services/resource-discovery-docker-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/resource-discovery-docker-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "resource-discovery-docker-gate.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3. In loadDockerContainers() in src/dashboard/server/services/resource-discovery-shared.ts, resolve docker with resolveHostTool('docker') before the try block and return [] when it is null. Spawn execFileAsync(<resolved path>, ['ps', '--format', '{{.Names}}'], ...). In the catch, call noteHostToolSpawnFailed('docker', error) and keep returning []. Export loadDockerContainers. Write the new test file, which mocks node:child_process execFile in the style of tests/unit/lib/runtime-census.test.ts and counts calls."
+        },
+        "items": [
+          {
+            "id": "resource-discovery-docker-gate.ac1",
+            "title": "Given setHostToolFinderForTests(() => null), when loadDockerContainers() runs, then it returns [] and the mocked execFile is called 0 times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resource-discovery-docker-gate.ac2",
+            "title": "Given a finder that returns '/fake/bin/docker' and execFile output 'a\\nb\\n', when loadDockerContainers() runs, then execFile receives '/fake/bin/docker' as its file argument and the function returns ['a', 'b']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stack-health-docker-gate",
+        "title": "Stack-health lifecycle snapshot fails fast without spawning when docker is missing",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T02:24:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5168",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace/stack-health.ts",
+            "src/lib/workspace/__tests__/stack-health.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/workspace/__tests__/stack-health.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "stack-health.test.ts passes, including the two PAN-5168 cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4. In collectDockerContainerLifecycleSnapshot (src/lib/workspace/stack-health.ts), resolve docker first. When it is null, return Effect.fail(hostToolNotFoundError('docker')) without calling execFileAsync. Otherwise spawn execFileAsync(<resolved path>, ['ps', '-a', '--format', '{{json .}}'], ...), and in the tryPromise catch call noteHostToolSpawnFailed('docker', err) before returning err. Add two tests to the existing stack-health test file using setHostToolFinderForTests and a mocked execFile."
+        },
+        "items": [
+          {
+            "id": "stack-health-docker-gate.ac1",
+            "title": "Given setHostToolFinderForTests(() => null), when Effect.runPromiseExit(collectDockerContainerLifecycleSnapshot()) runs, then the exit is a failure whose error has code 'ENOENT' and the mocked execFile is called 0 times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stack-health-docker-gate.ac2",
+            "title": "Given a finder that returns '/fake/bin/docker', when the snapshot runs, then execFile receives '/fake/bin/docker' and the parsed containers are returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runtime-census-tmux-gate",
+        "title": "Runtime census default listPanes skips a missing tmux without spawning",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T02:24:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5168",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtime-census.ts",
+            "tests/unit/lib/runtime-census.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/runtime-census.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "runtime-census.test.ts passes, including the missing-tmux cases",
+            "typecheck completes without errors",
+            "lint:circular passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5. In src/lib/runtime-census.ts, extract the default listPanes closure of runtimeCensusService into an exported async function listHostTmuxPanes(). It throws hostToolNotFoundError('tmux') when resolveHostTool('tmux') is null. Otherwise it imports listAllPaneRecords from ./tmux.js, awaits Effect.runPromise(listAllPaneRecords()), and on rejection calls noteHostToolSpawnFailed('tmux', error) and rethrows (the rejected value is the TmuxError itself, whose .cause carries the ENOENT; verified during planning). Pass listHostTmuxPanes as listPanes. Do not edit src/lib/tmux.ts or src/lib/host-tools.ts. Add the two tests from PRD WI-5, and call resetHostToolsForTests() in afterEach."
+        },
+        "items": [
+          {
+            "id": "runtime-census-tmux-gate.ac1",
+            "title": "Given setHostToolFinderForTests(() => null), when listHostTmuxPanes() runs, then it rejects with an error whose code is 'ENOENT' and the mocked execFile is called 0 times for tmux",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-census-tmux-gate.ac2",
+            "title": "Given tmux is missing, when createRuntimeCensusService({ listPanes: listHostTmuxPanes, readProcesses: async () => [] }).get() resolves, then the census reports tmuxAvailable: false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-census-tmux-gate.ac3",
+            "title": "Given the existing mocked tmux list-panes output, when refreshRuntimeCensus() runs under OVERDECK_TEST_ASSUME_HOST_TOOLS=1, then the existing runtime-census tests still pass and git diff origin/main -- src/lib/tmux.ts is empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-liveness-tmux-gate",
+        "title": "Conversation liveness default tmux helpers skip a missing tmux",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T02:24:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5168",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-liveness.ts",
+            "src/lib/overdeck/__tests__/conversation-liveness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-liveness.test.ts src/lib/overdeck/__tests__/conversation-list-repair-door.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-liveness.test.ts passes, including the three PAN-5168 cases; conversation-list-repair-door.test.ts still passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5b. In src/lib/overdeck/conversation-liveness.ts, gate only the default (non-injected) branches of tmuxSessionExists, tmuxSessionNames and tmuxHarnessAlive: an injected deps.sessionExists / deps.listSessionNames / deps.harnessAlive is checked first and still wins; then, when resolveHostTool('tmux') is null, return false / [] / false without calling the tmux.js functions; otherwise call them as today, and in the existing catch call noteHostToolSpawnFailed('tmux', error) before returning the same fallback value (tmuxHarnessAlive gets a .catch that returns false only if it did not have one; keep its success semantics unchanged). Do not change the herdr probing, the backend selection, or closeConversationPane. Add the three tests named in PRD WI-5b, mocking ../tmux.js, with resetHostToolsForTests() in afterEach."
+        },
+        "items": [
+          {
+            "id": "conversation-liveness-tmux-gate.ac1",
+            "title": "Given backend 'herdr', a probeHerdr seam that returns { kind: 'absent' }, and setHostToolFinderForTests(() => null), when conversationSessionAlive('conv-x', { backend: 'herdr', probeHerdr }) runs, then it returns false and the mocked tmux sessionExists is called 0 times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-liveness-tmux-gate.ac2",
+            "title": "Given backend 'herdr', a listHerdr seam that returns one live 'conv-a' agent, and tmux missing, when listLiveConversationSessions runs, then it returns a set containing only 'conv-a' and the mocked tmux listSessionNames is called 0 times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-liveness-tmux-gate.ac3",
+            "title": "Given tmux missing and an injected deps.sessionExists that returns true, when conversationSessionAlive runs on the tmux backend, then it returns true (the injected seam still wins)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-host-tools-row",
+        "title": "pan doctor prints a Host tools row from a fresh lookup",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T02:24:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5168",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-host-tools.ts",
+            "src/cli/commands/doctor.ts",
+            "tests/unit/cli/doctor-host-tools.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/doctor-host-tools.test.ts",
+            "npm run typecheck",
+            "wc -l src/cli/commands/doctor.ts"
+          ],
+          "expected_outputs": [
+            "doctor-host-tools.test.ts passes",
+            "typecheck completes without errors",
+            "doctor.ts line count is 1000 or less"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6. Create src/cli/commands/doctor-host-tools.ts exporting checkHostTools(deps?: HostToolDeps): CheckResult, using the local CheckResult interface pattern from src/cli/commands/doctor-grok.ts. It calls refreshHostTools(), then resolveHostTool for docker, tmux, systemctl, journalctl and brew, and returns { name: 'Host tools', status: 'ok', message }. The message lists each tool as '<name> <path>' or '<name> missing', joined by ', '. When any tool is missing, it appends ' — dashboard pollers skip missing tools and look again every 60 s.' In collectDoctorChecks in src/cli/commands/doctor.ts, add 'checks.push(checkHostTools()); // PAN-5168' right after the optional-commands loop, plus the import. Leave the existing checkCommand rows unchanged."
+        },
+        "items": [
+          {
+            "id": "doctor-host-tools-row.ac1",
+            "title": "Given a finder that returns '/usr/bin/docker' for docker and null for the rest, when checkHostTools({ find }) runs, then it returns status 'ok', name 'Host tools', and a message containing 'docker /usr/bin/docker', 'tmux missing' and 'look again every 60 s'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-host-tools-row.ac2",
+            "title": "Given a finder that finds every tool, when checkHostTools runs, then the message names all five paths and does not contain 'missing'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-host-tools-row.ac3",
+            "title": "collectDoctorChecks includes a check named 'Host tools', and wc -l src/cli/commands/doctor.ts prints 1000 or less",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-save-refresh",
+        "title": "PUT /api/settings re-checks host tools through an applySavedSettings helper",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T02:24:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5168",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/settings-saved.ts",
+            "src/dashboard/server/routes/settings.ts",
+            "tests/unit/dashboard/server/services/settings-saved.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/settings-saved.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "settings-saved.test.ts passes",
+            "typecheck completes without errors",
+            "lint:file-size passes with routes/settings.ts at 1104 lines or less",
+            "lint:circular passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7. Create src/dashboard/server/services/settings-saved.ts exporting async applySavedSettings(): it awaits refreshTtsRuntimeConfig() (./tts-runtime-config.js), syncTtsPlaybackWithConfig() (./tts-playback.js) and syncConversationSearchWatcher() (./conversation-search-watcher.js) in that order, then calls refreshHostTools() from ../../../lib/host-tools.js. In putSettingsRoute in src/dashboard/server/routes/settings.ts, replace the three consecutive awaits after saveSettingsApi(newSettings) with 'await applySavedSettings();'. Remove the refreshTtsRuntimeConfig and syncTtsPlaybackWithConfig imports if nothing else in settings.ts uses them; keep syncConversationSearchWatcher, which the reindex route still uses. Add the import of applySavedSettings. The new test mocks the three service modules and asserts call order plus a fresh host-tool lookup afterwards."
+        },
+        "items": [
+          {
+            "id": "settings-save-refresh.ac1",
+            "title": "Given the three service modules are mocked, when applySavedSettings() resolves, then refreshTtsRuntimeConfig, syncTtsPlaybackWithConfig and syncConversationSearchWatcher were each called once in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-save-refresh.ac2",
+            "title": "Given resolveHostTool('docker') was cached by a counting test finder, when applySavedSettings() resolves and resolveHostTool('docker') runs again, then the finder call count increases by one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-save-refresh.ac3",
+            "title": "putSettingsRoute calls applySavedSettings() after saveSettingsApi, and wc -l src/dashboard/server/routes/settings.ts prints 1104 or less",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-host-tools",
+        "title": "Document optional host tools in DASHBOARD-ARCHITECTURE, troubleshooting, changelog.d and the codebase map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T02:24:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5168",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "reference/troubleshooting.mdx",
+            "changelog.d/pan-5168.md",
+            ".overdeck/context/codebase/concerns.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npm run lint:last-verified",
+            "grep -n 'Optional host tools (PAN-5168)' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "lint:last-verified passes",
+            "grep prints the new section heading"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-8",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-8. (1) docs/DASHBOARD-ARCHITECTURE.md: append a section '## Optional host tools (PAN-5168)'. It explains the macOS failed-spawn cost (one process per PATH entry), names src/lib/host-tools.ts and its exports, the five gated pollers (DockerStatsCollector, resource-discovery loadDockerContainers, stack-health collectDockerContainerLifecycleSnapshot, runtime census listHostTmuxPanes, and the conversation-liveness default tmux helpers), the 60 s re-check for missing tools, the rule that an ENOENT marks a tool missing only when a fresh lookup also misses, the per-process cache, the settings-save and pan doctor re-checks, the OVERDECK_TEST_ASSUME_HOST_TOOLS test seam, and the rule that a new poller calls resolveHostTool before spawning and noteHostToolSpawnFailed on error. (2) reference/troubleshooting.mdx: add '## Docker or tmux installed, but the dashboard still shows nothing', saying the dashboard looks again within 60 s or after a settings save, and that pan doctor's 'Host tools' row shows what this machine resolves. (3) changelog.d/pan-5168.md: one '#### Fixed' heading with one bullet: an idle dashboard on a Mac without Docker or tmux no longer creates a stream of short-lived processes, linking [#5168](https://github.com/eltmon/overdeck/issues/5168); follow changelog.d/README.md formatting. (4) .overdeck/context/codebase/concerns.md: add one bullet that optional host tools resolve through src/lib/host-tools.ts and that a poller spawning a bare missing command on macOS creates ~10 processes per call (PAN-5168); keep the single <!-- last-verified: --> line unchanged at the end of the file."
+        },
+        "items": [
+          {
+            "id": "docs-host-tools.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a heading 'Optional host tools (PAN-5168)' whose section names src/lib/host-tools.ts, resolveHostTool, noteHostToolSpawnFailed, the 60 s re-check and OVERDECK_TEST_ASSUME_HOST_TOOLS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-host-tools.ac2",
+            "title": "reference/troubleshooting.mdx contains the heading 'Docker or tmux installed, but the dashboard still shows nothing', and its section mentions the 60 s re-check and the pan doctor 'Host tools' row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-host-tools.ac3",
+            "title": "changelog.d/pan-5168.md has exactly one '#### Fixed' heading and one bullet linking issue 5168, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-host-tools.ac4",
+            "title": ".overdeck/context/codebase/concerns.md mentions src/lib/host-tools.ts and still ends with exactly one last-verified line, and npm run lint:last-verified exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "host-tools-module",
+        "to": "docker-stats-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "host-tools-module",
+        "to": "resource-discovery-docker-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "host-tools-module",
+        "to": "stack-health-docker-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "host-tools-module",
+        "to": "runtime-census-tmux-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "host-tools-module",
+        "to": "conversation-liveness-tmux-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "host-tools-module",
+        "to": "doctor-host-tools-row",
+        "type": "blocks"
+      },
+      {
+        "from": "host-tools-module",
+        "to": "settings-save-refresh",
+        "type": "blocks"
+      },
+      {
+        "from": "host-tools-module",
+        "to": "docs-host-tools",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
