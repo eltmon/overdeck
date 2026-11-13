@@ -7,6 +7,8 @@ import { Effect, Schedule, Duration, Stream } from 'effect';
 import { ChildProcess } from 'effect/unstable/process';
 import { ChildProcessSpawner } from 'effect/unstable/process/ChildProcessSpawner';
 
+import { noteHostToolSpawnFailed, resolveHostTool } from './host-tools.js';
+
 export interface ContainerStats {
   id: string;
   name: string;
@@ -109,13 +111,16 @@ function parseNetIO(s: string): { in: number; out: number } {
 }
 
 // Run a docker subcommand and return its stdout as a string.
-// Returns "" on any failure (docker unavailable, timeout, non-zero exit).
-function runDockerForOutput(
+// Returns "" on any failure (docker unavailable, timeout, non-zero exit) and
+// on a missing docker binary, where it also spawns nothing (PAN-5168).
+export function runDockerForOutput(
   args: readonly string[],
   timeoutMs = 10000,
 ): Effect.Effect<string, never, ChildProcessSpawner> {
+  const docker = resolveHostTool('docker');
+  if (docker === null) return Effect.succeed('');
   return Effect.gen(function* () {
-    const handle = yield* ChildProcess.make('docker', [...args], { stderr: 'ignore' });
+    const handle = yield* ChildProcess.make(docker, [...args], { stderr: 'ignore' });
     const chunks: Uint8Array[] = [];
     yield* Stream.runForEach(
       handle.stdout,
@@ -126,7 +131,7 @@ function runDockerForOutput(
   }).pipe(
     Effect.scoped,
     Effect.timeout(Duration.millis(timeoutMs)),
-    Effect.catch(() => Effect.succeed('')),
+    Effect.catch((error) => Effect.sync(() => { noteHostToolSpawnFailed('docker', error); return ''; })),
   );
 }
 
@@ -135,7 +140,8 @@ export class DockerStatsCollector {
   private current = new Map<string, ContainerStats>();
   private containerStatuses = new Map<string, string>(); // name → status string
 
-  private collect(): Effect.Effect<void, never, ChildProcessSpawner> {
+  /** One poll tick (public for the PAN-5168 spawn-count test). */
+  collect(): Effect.Effect<void, never, ChildProcessSpawner> {
     const self = this;
     return Effect.gen(function* () {
       const [statsOut, psOut] = yield* Effect.all([

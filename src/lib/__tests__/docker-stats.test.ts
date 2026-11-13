@@ -7,7 +7,17 @@
  * exec mocked.
  */
 
-import { describe, it, expect } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { Effect, Layer, Sink, Stream } from 'effect';
+import { ChildProcess, ChildProcessSpawner } from 'effect/unstable/process';
+import { systemError } from 'effect/PlatformError';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { resetHostToolsForTests, setHostToolFinderForTests } from '../host-tools.js';
+import { DockerStatsCollector } from '../docker-stats.js';
 
 describe('DockerStatsCollector', () => {
   // Test parsing logic by testing the exported class through mock exec calls
@@ -195,5 +205,105 @@ describe('DockerStatsCollector', () => {
       expect(hist.cpuPercent[0]).toBe(10); // first 10 samples trimmed (70-60=10)
       expect(hist.cpuPercent[59]).toBe(69);
     });
+  });
+});
+
+describe('DockerStatsCollector.collect() host-tools gate (PAN-5168)', () => {
+  afterEach(() => {
+    resetHostToolsForTests();
+  });
+
+  function makeFakeHandle(): ChildProcessSpawner.ChildProcessHandle {
+    return ChildProcessSpawner.makeHandle({
+      pid: ChildProcessSpawner.ProcessId(1),
+      exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(0)),
+      isRunning: Effect.succeed(false),
+      kill: () => Effect.void,
+      stdin: Sink.drain,
+      stdout: Stream.empty,
+      stderr: Stream.empty,
+      all: Stream.empty,
+      getInputFd: () => Sink.drain,
+      getOutputFd: () => Stream.empty,
+      unref: Effect.succeed(Effect.void),
+    });
+  }
+
+  function countingSpawnerLayer(
+    spawned: string[],
+    handler: (command: ChildProcess.Command) => Effect.Effect<ChildProcessSpawner.ChildProcessHandle, unknown>,
+  ): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner> {
+    return Layer.succeed(
+      ChildProcessSpawner.ChildProcessSpawner,
+      ChildProcessSpawner.make((command) => {
+        if (command._tag === 'StandardCommand') spawned.push(command.command);
+        return handler(command);
+      }),
+    );
+  }
+
+  it('with docker missing, collect() spawns 0 processes per tick', async () => {
+    setHostToolFinderForTests(() => null);
+    const spawned: string[] = [];
+    const layer = countingSpawnerLayer(spawned, () => Effect.succeed(makeFakeHandle()));
+    const collector = new DockerStatsCollector();
+
+    await Effect.runPromise(Effect.provide(collector.collect(), layer));
+    await Effect.runPromise(Effect.provide(collector.collect(), layer));
+    await Effect.runPromise(Effect.provide(collector.collect(), layer));
+
+    expect(spawned).toHaveLength(0);
+    expect(collector.getStats()).toEqual([]);
+  });
+
+  it('with docker present, collect() spawns the resolved absolute path', async () => {
+    setHostToolFinderForTests(() => '/fake/bin/docker');
+    const spawned: string[] = [];
+    const layer = countingSpawnerLayer(spawned, () => Effect.succeed(makeFakeHandle()));
+    const collector = new DockerStatsCollector();
+
+    await Effect.runPromise(Effect.provide(collector.collect(), layer));
+
+    expect(spawned).toHaveLength(2);
+    for (const command of spawned) expect(command).toBe('/fake/bin/docker');
+  });
+
+  it('a spawn ENOENT stops the next tick from spawning', async () => {
+    let lookups = 0;
+    setHostToolFinderForTests(() => {
+      lookups++;
+      return lookups === 1 ? '/fake/bin/docker' : null;
+    });
+    const spawned: string[] = [];
+    const layer = countingSpawnerLayer(spawned, () =>
+      Effect.fail(systemError({ _tag: 'NotFound', module: 'ChildProcess', method: 'spawn', cause: { code: 'ENOENT' } })),
+    );
+    const collector = new DockerStatsCollector();
+
+    await Effect.runPromise(Effect.provide(collector.collect(), layer));
+    expect(spawned).toHaveLength(2);
+
+    await Effect.runPromise(Effect.provide(collector.collect(), layer));
+    expect(spawned).toHaveLength(2);
+  });
+
+  it('with a real empty PATH, collect() spawns 0 processes', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'docker-stats-empty-path-'));
+    try {
+      vi.stubEnv('OVERDECK_TEST_ASSUME_HOST_TOOLS', '');
+      vi.stubEnv('PATH', dir);
+      resetHostToolsForTests();
+      const spawned: string[] = [];
+      const layer = countingSpawnerLayer(spawned, () => Effect.succeed(makeFakeHandle()));
+      const collector = new DockerStatsCollector();
+
+      await Effect.runPromise(Effect.provide(collector.collect(), layer));
+      await Effect.runPromise(Effect.provide(collector.collect(), layer));
+
+      expect(spawned).toHaveLength(0);
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
