@@ -102,6 +102,37 @@ the focused file with `--detectAsyncLeaks` to verify that no work remains after
 the test finishes. Do not disable unhandled-error reporting or reduce the
 repository's two-worker CI concurrency to hide a leak.
 
+#### Spawn budgets (PAN-5176)
+
+`tests/helpers/spawn-budget.ts` counts process spawns at the `node:child_process`
+boundary. `installSpawnLedger()` wraps the real `spawn`, `execFile`, `exec`,
+`spawnSync`, `execFileSync` and `execSync`, so it sees calls from `src` modules,
+from Effect's `NodeServices.layer` spawner and from `promisify(execFile)`. A
+nested call, such as `exec` calling `execFile` inside Node, counts once.
+
+The ledger must be installed in `vi.hoisted`, before the subject is imported.
+Modules capture `promisify(execFile)` when they load, so a ledger installed in
+`beforeAll` misses those calls. A file that uses the ledger must not
+`vi.mock('child_process')`, and it calls `ledger.restore()` in `afterAll`.
+
+The ledger denies the host tools a bare host lacks (`DENIED_HOST_TOOLS`:
+`docker`, `tmux`, `systemctl`, `journalctl`, `brew`). It records the call and
+redirects it to `/nonexistent/overdeck-spawn-budget/<tool>`, so the call fails
+with a real `ENOENT` (or exit 127 for shell forms) and the machine's real binary
+never runs. Other programs run unchanged and are still recorded.
+
+`spawnsPerTick` does not catch: a tick that rejects fails the test instead of
+reporting 0 spawns.
+
+```ts
+const ledger = await vi.hoisted(async () =>
+  (await import('../../helpers/spawn-budget.js')).installSpawnLedger());
+afterAll(() => ledger.restore());
+const perTick = await spawnsPerTick(ledger, () => poller.tick(),
+  { ticks: 3, programs: [...DENIED_HOST_TOOLS] });
+expectSpawnBudget(perTick, { max: 0, label: 'poller' });
+```
+
 ### Shared worker home and the internal token
 
 `tests/setup/overdeck-home.ts` sets `OVERDECK_HOME` to
