@@ -129,6 +129,11 @@ the default session name.
 the session server runs. All three skip under an explicit tmux policy, `CI`, Vitest, or
 `pan install --skip-herdr`.
 
+`pan up` requires tmux only under the tmux backend. Under Herdr a missing tmux prints a warning
+and `pan up` keeps starting; it does not try to install tmux. On macOS, no installer runs
+`brew install` when `brew` is not on PATH; the manual hint names a download URL instead
+(PAN-5169).
+
 | Piece | Where | Notes |
 | --- | --- | --- |
 | Binary | `~/.local/bin/herdr` | Vendor installer (`https://herdr.dev/install.sh`); stable channel. `pan install` updates when `https://herdr.dev/latest.json` is newer; `pan sync` only when no session server runs for this home. |
@@ -601,8 +606,15 @@ with a 90 s spawn grace (Herdr's 60 s detection window plus the 30 s tmux grace)
 tmux census only for a conversation Herdr does not hold. When Herdr does not answer it marks
 nothing. Readiness reads the pane through `readAgentPaneText` (Herdr `pane.read` with
 `source: visible`, or tmux `capture-pane`): `recent` is empty while a full-screen TUI (omp, kimi,
-muse, the codex TUI) draws on the alternate screen, so the agent TUI waiters read `visible` too. The numbered-menu capture in `conversation-pane-choice.ts` stays tmux-only. Claude Code
-readiness (`waitForClaudeReady`) does not count a `❯` while a known blocking startup dialog
+muse, the codex TUI) draws on the alternate screen, so the agent TUI waiters read `visible` too. The numbered-menu capture in `conversation-pane-choice.ts` stays tmux-only, and a Herdr host skips it (PAN-5169).
+
+The polled conversation pane reads — the input target, the needs-terminal check and the pane
+permission prompt — call `resolveAgentPaneIo` with `legacyTmuxFallback: false` (PAN-5169). On a
+Herdr host they read only Herdr and never fall back to tmux: a conversation Herdr does not hold
+reads `inputTarget: 'unknown'`, `needsTerminal: false` and no pane permission. On a tmux host
+they read tmux as before. Liveness keeps its legacy tmux fallback.
+
+Claude Code readiness (`waitForClaudeReady`) does not count a `❯` while a known blocking startup dialog
 title is on screen (today: "Make auto mode your default permission mode?"); if the dialog is
 still there at the 30 s deadline, the conversation start fails with a spawn error naming the
 dialog instead of sending the first message into it (PAN-4738).

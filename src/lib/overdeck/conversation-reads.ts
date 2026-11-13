@@ -21,7 +21,8 @@ import { scanPendingInputs, type PendingAskUserQuestionSnapshot, type PendingInp
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { loadConfigSync } from '../config-yaml.js';
 import { isBackgroundFeatureEnabled } from '../background-ai/features.js';
-import { capturePane, listSessionNames } from '../tmux.js';
+import { resolveAgentPaneIo } from '../terminal-backends/agent-pane-io.js';
+import { listSessionNames } from '../tmux.js';
 import { paneShowsClaudeBootBlockingScreen } from '../cloister/modal-detector.js';
 import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { resolveDiscoveredSessionFile } from '../conversations/discovered-session-file.js';
@@ -204,8 +205,14 @@ export function conversationTranscriptMissing(
   return !sessionFile || !existsSync(sessionFile);
 }
 
-const captureVisiblePane = (sessionName: string): Promise<string> =>
-  capturePane(sessionName, 0);
+/** Herdr `pane.read` lines for the visible screen; tmux keeps `-S -0` (visible only, no scrollback). */
+const HERDR_VISIBLE_SCREEN_LINES = 60;
+
+/** PAN-5169: the visible screen on the host's backend; on Herdr never tmux (throws when Herdr holds no pane). */
+const captureVisiblePane = async (sessionName: string): Promise<string> => {
+  const io = await resolveAgentPaneIo(sessionName, undefined, { legacyTmuxFallback: false });
+  return io.read(io.backend === 'tmux' ? 0 : HERDR_VISIBLE_SCREEN_LINES);
+};
 
 /**
  * An alive claude-code session with no transcript file yet may be parked on a
@@ -420,7 +427,7 @@ export async function getConversationsPendingInputFeed(
         // is pane-only too. One pane read serves both checks on tmux; when a
         // permission is pending the pane-choice check is skipped so one
         // decision surface shows at a time.
-        const permission = await readConversationPermission(conv);
+        const permission = await readConversationPermission(conv, { legacyTmuxFallback: false }); // PAN-5169
         const pendingPermission = permission.pendingPermission;
         let paneChoice: PendingPaneChoice | null = null;
         if (!pending && !pendingPlan && !pendingPermission) {
@@ -520,7 +527,7 @@ export async function getConversationRead(
     // for one) blocks the conversation whatever else is pending.
     let pendingPermission: PendingPermission | null = null;
     if (sessionAlive) {
-      pendingPermission = await conversationPendingPermission(conv);
+      pendingPermission = await conversationPendingPermission(conv, { legacyTmuxFallback: false }); // PAN-5169
       if (pendingPermission) {
         pendingInputKinds = [...pendingInputKinds, 'permissionRequest'];
         pendingInputCount = pendingInputKinds.length;

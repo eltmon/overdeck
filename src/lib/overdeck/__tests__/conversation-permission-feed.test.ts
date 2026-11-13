@@ -14,11 +14,14 @@ process.env.OVERDECK_HOME = TEST_HOME;
 
 const paneRead = vi.hoisted(() => vi.fn<(lines: number) => Promise<string>>());
 const paneChoice = vi.hoisted(() => vi.fn());
+const resolveAgentPaneIo = vi.hoisted(() =>
+  vi.fn(async () => ({ backend: 'tmux' as const, read: paneRead, sendKey: vi.fn() })),
+);
 vi.mock('../../../dashboard/server/event-store.js', () => ({
   getEventStore: vi.fn(() => ({ emitOnly: vi.fn() })),
 }));
 vi.mock('../../terminal-backends/agent-pane-io.js', () => ({
-  resolveAgentPaneIo: vi.fn(async () => ({ backend: 'tmux', read: paneRead, sendKey: vi.fn() })),
+  resolveAgentPaneIo,
 }));
 vi.mock('../conversation-pane-choice.js', () => ({ claudeConversationPaneChoice: paneChoice }));
 vi.mock('../conversation-input-target.js', () => ({ readConversationInputTarget: vi.fn(async () => undefined) }));
@@ -62,6 +65,7 @@ beforeEach(() => {
   paneRead.mockReset();
   paneChoice.mockReset();
   paneChoice.mockResolvedValue(null);
+  resolveAgentPaneIo.mockClear();
 });
 
 afterAll(() => {
@@ -266,5 +270,19 @@ describe('pending-input feed and conversation read', () => {
     expect(body.pendingInputCount).toBe(1);
     expect(body.pendingPermission).toMatchObject({ answerable: true, reason: expect.stringMatching(/^Dangerous/) });
     expect(paneChoice).not.toHaveBeenCalled();
+  });
+
+  it('PAN-5169: both polled permission reads pass legacyTmuxFallback: false to resolveAgentPaneIo', async () => {
+    paneRead.mockResolvedValue(fixture('permission-dangerous-rm.txt'));
+    await getConversationsPendingInputFeed(feedDeps);
+    await getConversationRead('perm-feed', {
+      resolveSessionFile: async () => null,
+      tmuxSessionExists: async () => true,
+    });
+    expect(resolveAgentPaneIo.mock.calls.length).toBeGreaterThan(0);
+    for (const call of resolveAgentPaneIo.mock.calls) {
+      expect(call[0]).toBe('conv-perm-feed');
+      expect(call[2]).toEqual({ legacyTmuxFallback: false });
+    }
   });
 });

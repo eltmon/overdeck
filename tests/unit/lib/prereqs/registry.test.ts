@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Simulate real tmux CLI behavior: `tmux -V` succeeds, `tmux --version` exits 1
 // with a usage error. The regression (pan up saying "tmux not found. Installing..."
@@ -41,8 +41,11 @@ vi.mock("../../../../src/lib/semgrep/install.js", () => ({
   SEMGREP_VERSION: "1.180.0",
 }));
 
+import { exec } from "node:child_process";
+
 import {
   detectLinuxPackageManager,
+  ensureHostTools,
   getLinuxInstallCommand,
   getLinuxManualInstallHint,
   isToolInstalled,
@@ -146,5 +149,53 @@ describe("semgrep prerequisite (PAN-4585)", () => {
     readSemgrepVersionMock.mockClear();
     await expect(isToolInstalled("semgrep")).resolves.toBe(false);
     expect(readSemgrepVersionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("ensureHostTools (PAN-5169)", () => {
+  const originalExecFileImpl = execFileMock.getMockImplementation();
+
+  beforeEach(() => {
+    execFileMock.mockImplementation(
+      (
+        cmd: string,
+        args: string[],
+        _opts: unknown,
+        cb: (err: Error | null, stdout?: string, stderr?: string) => void,
+      ) => {
+        if (cmd === "tmux") {
+          cb(Object.assign(new Error("spawn tmux ENOENT"), { code: "ENOENT" }));
+        } else {
+          cb(null, "", "");
+        }
+      },
+    );
+  });
+
+  afterEach(() => {
+    execFileMock.mockImplementation(originalExecFileImpl!);
+    vi.mocked(exec).mockReset();
+    vi.restoreAllMocks();
+  });
+
+  it("warns and does not exit under the herdr backend when tmux is missing", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    await ensureHostTools({ backend: "herdr" });
+    expect(exitSpy).not.toHaveBeenCalled();
+    const execCalls = vi.mocked(exec).mock.calls;
+    expect(execCalls.every(([command]) => !String(command).includes("tmux"))).toBe(true);
+    expect(logSpy.mock.calls.some(([msg]) => String(msg).includes("tmux not found — the Herdr terminal backend does not need it"))).toBe(true);
+  });
+
+  it("exits 1 under the tmux backend when tmux is missing and the installer fails", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    vi.mocked(exec).mockImplementation(
+      ((_cmd: string, _opts: unknown, cb: (err: Error | null) => void) => {
+        cb(new Error("install failed"));
+      }) as never,
+    );
+    await ensureHostTools({ backend: "tmux" });
+    expect(exitSpy).toHaveBeenCalledWith(1);
   });
 });

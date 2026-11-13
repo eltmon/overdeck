@@ -4,6 +4,8 @@
  * session has a `subagents/` directory — without one Claude Code draws no
  * selector, and input goes to main — so list enrichment never reads a pane
  * for dead sessions, other harnesses, or conversations without subagents.
+ * On a Herdr host the read is strict (PAN-5169): it never falls back to
+ * tmux, and a pane Herdr does not hold reads as `'unknown'`.
  */
 
 import { stat } from 'node:fs/promises';
@@ -32,7 +34,10 @@ export async function readConversationInputTarget(
   if (!sessionAlive || (conv.harness ?? 'claude-code') !== 'claude-code' || !sessionFile) return undefined;
   const hasSubagentsDir = deps.hasSubagentsDir ?? sessionHasSubagentsDir;
   if (!(await hasSubagentsDir(sessionFile))) return undefined;
-  const read = deps.read ?? (async (agentId: string) => (await resolveAgentPaneIo(agentId)).read(PANE_READ_LINES));
+  // PAN-5169: strict — a Herdr host never reads this pane through tmux; no Herdr pane reads as 'unknown'.
+  const read =
+    deps.read ??
+    (async (agentId: string) => (await resolveAgentPaneIo(agentId, undefined, { legacyTmuxFallback: false })).read(PANE_READ_LINES));
   try {
     return inputTargetFromSelector(parseAgentSelector(await read(conv.tmuxSession)));
   } catch {

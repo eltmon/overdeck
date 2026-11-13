@@ -87,10 +87,10 @@ The Herdr step is skipped under `CI`, under Vitest, when the backend is
 explicitly tmux, and with `pan install --skip-herdr`. Re-running either command
 is safe: with everything in place it installs nothing and writes nothing.
 
-Under Herdr, tmux is optional: `pan install`'s prerequisite gate warns instead
-of failing when it is missing, and `pan doctor` reports it as a warning, not
-an error. Only plain terminals in the dashboard terminal drawer need tmux
-under Herdr — agents don't.
+Under Herdr, tmux is optional: `pan up` warns and keeps starting when it is
+missing, `pan install`'s prerequisite gate warns instead of failing, and `pan
+doctor` reports it as a warning, not an error. Only plain terminals in the
+dashboard terminal drawer need tmux under Herdr — agents don't.
 
 ## Updates
 

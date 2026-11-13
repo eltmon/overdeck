@@ -1,0 +1,184 @@
+{
+  "version": "1",
+  "issueId": "PAN-5169",
+  "created": "2026-11-13T02:56:46.720Z",
+  "updated": "2026-11-13T03:43:57.606Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-13T03:43Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-13T03:43:57.606Z"
+    }
+  ],
+  "items": {
+    "pane-io-strict": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5169",
+      "claimedAt": "2026-11-13T02:56:46.720Z",
+      "doneAt": "2026-11-13T02:59:08.584Z"
+    },
+    "pane-io-strict.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T02:59:08.584Z"
+    },
+    "pane-io-strict.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T02:59:08.584Z"
+    },
+    "pane-io-strict.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T02:59:08.584Z"
+    },
+    "pane-io-strict.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T02:59:08.584Z"
+    },
+    "needs-terminal-strict": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5169",
+      "claimedAt": "2026-11-13T02:59:17.531Z",
+      "doneAt": "2026-11-13T03:02:20.993Z"
+    },
+    "needs-terminal-strict.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:02:20.993Z"
+    },
+    "needs-terminal-strict.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:02:20.993Z"
+    },
+    "needs-terminal-strict.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:02:20.993Z"
+    },
+    "needs-terminal-strict.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:02:20.993Z"
+    },
+    "input-target-strict": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5169",
+      "claimedAt": "2026-11-13T03:02:35.368Z",
+      "doneAt": "2026-11-13T03:04:41.506Z"
+    },
+    "input-target-strict.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:04:41.506Z"
+    },
+    "input-target-strict.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:04:41.506Z"
+    },
+    "permission-read-strict": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5169",
+      "claimedAt": "2026-11-13T03:04:47.742Z",
+      "doneAt": "2026-11-13T03:08:32.886Z"
+    },
+    "permission-read-strict.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:08:32.886Z"
+    },
+    "permission-read-strict.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:08:32.886Z"
+    },
+    "permission-read-strict.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:08:32.886Z"
+    },
+    "permission-read-strict.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:08:32.886Z"
+    },
+    "pane-choice-herdr-skip": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5169",
+      "claimedAt": "2026-11-13T03:08:39.643Z",
+      "doneAt": "2026-11-13T03:10:37.499Z"
+    },
+    "pane-choice-herdr-skip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:10:37.499Z"
+    },
+    "pane-choice-herdr-skip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:10:37.499Z"
+    },
+    "pane-choice-herdr-skip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:10:37.499Z"
+    },
+    "pane-choice-herdr-skip.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:10:37.499Z"
+    },
+    "host-tools-backend": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5169",
+      "claimedAt": "2026-11-13T03:10:47.265Z",
+      "doneAt": "2026-11-13T03:25:04.759Z"
+    },
+    "host-tools-backend.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:25:04.759Z"
+    },
+    "host-tools-backend.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:25:04.759Z"
+    },
+    "host-tools-backend.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:25:04.759Z"
+    },
+    "brew-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5169",
+      "claimedAt": "2026-11-13T03:25:17.211Z",
+      "doneAt": "2026-11-13T03:29:36.076Z"
+    },
+    "brew-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:29:36.076Z"
+    },
+    "brew-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:29:36.076Z"
+    },
+    "brew-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:29:36.076Z"
+    },
+    "docs-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5169",
+      "claimedAt": "2026-11-13T03:29:45.531Z",
+      "doneAt": "2026-11-13T03:31:38.831Z"
+    },
+    "docs-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:31:38.831Z"
+    },
+    "docs-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:31:38.831Z"
+    },
+    "docs-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T03:31:38.831Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-13T03:43:57Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5169\n\nPull request: https://github.com/eltmon/overdeck/pull/5173 (head `71cc081c`)\n\nSource: check_run:test-shard (2/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (2/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/131671352800/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43360121399/job/131671352800  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/integration/services/share/rate-limit.test.ts\u001b[2m > \u001b[22mroom-creation rate limit on real workerd (PAN-4482 WI-7)\u001b[2m > \u001b[22mthe committed limit is 10 rooms per 60 s per GitHub id\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected 201 to be 429 // Object.is equality\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- 429\u001b[39m\n\u001b[31m+ 201\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m tests/integration/services/share/rate-limit.test.ts:\u001b[2m61:28\u001b[22m\u001b[39m\n    \u001b[90m 59|\u001b[39m\n    \u001b[90m 60|\u001b[39m     \u001b[35mconst\u001b[39m refused \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mcreateRoom\u001b[39m(\u001b[33mOWNER\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'c-10'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m 61|\u001b[39m     \u001b[34mexpect\u001b[39m(refused\u001b[33m.\u001b[39mstatus)\u001b[33m.\u001b[39m\u001b[34mtoBe\u001b[39m(\u001b[34m429\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                            \u001b[31m^\u001b[39m\n    \u001b[90m 62|\u001b[39m     \u001b[34mexpect\u001b[39m(refused\u001b[33m.\u001b[39mheaders\u001b[33m.\u001b[39m\u001b[35mget\u001b[39m(\u001b[32m'Retry-After'\u001b[39m))\u001b[33m.\u001b[39m\u001b[34mtoBe\u001b[39m(\u001b[32m'60'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m 63|\u001b[39m     \u001b[34mexpect\u001b[39m(\u001b[35mawait\u001b[39m refused\u001b[33m.\u001b[39m\u001b[34mjson\u001b[39m())\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m({ error\u001b[33m:\u001b[39m \u001b[32m'rate_limited'\u001b[39m })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/integration/services/share/rate-limit.test.ts\u001b[2m > \u001b[22mroom-creation rate limit on real workerd (PAN-4482 WI-7)\u001b[2m > \u001b[22mthe committed limit is 10 rooms per 60 s per GitHub id\n\u001b[31m\u001b[1mAssertionError\u001b[22m: room 1: expected 429 to be 201 // Object.is equality\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- 201\u001b[39m\n\u001b[31m+ 429\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m tests/integration/services/share/rate-limit.test.ts:\u001b[2m57:43\u001b[22m\u001b[39m\n    \u001b[90m 55|\u001b[39m       \u001b[35mconst\u001b[39m res \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mcreateRoom\u001b[39m(\u001b[33mOWNER\u001b[39m\u001b[33m,\u001b[39m \u001b[32m`c-\u001b[39m\u001b\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m641 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m1 skipped\u001b[39m\u001b[90m (643)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
+}

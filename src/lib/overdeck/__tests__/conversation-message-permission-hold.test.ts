@@ -13,8 +13,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EnsureMainResult } from '../../agents/input-target.js';
 
 const pane = vi.hoisted(() => ({ text: '' }));
+const resolveAgentPaneIo = vi.hoisted(() =>
+  vi.fn(async () => ({ backend: 'herdr' as const, read: async () => pane.text, sendKey: vi.fn() })),
+);
 vi.mock('../../terminal-backends/agent-pane-io.js', () => ({
-  resolveAgentPaneIo: vi.fn(async () => ({ backend: 'herdr', read: async () => pane.text, sendKey: vi.fn() })),
+  resolveAgentPaneIo,
 }));
 vi.mock('../../agents.js', () => ({
   deliverAgentMessage: vi.fn(async () => ({ ok: true, path: 'herdr' })),
@@ -41,6 +44,7 @@ beforeEach(() => {
   testHome = mkdtempSync(join(tmpdir(), 'pan-conv-message-permission-hold-'));
   process.env.OVERDECK_HOME = testHome;
   vi.spyOn(console, 'log').mockImplementation(() => {});
+  resolveAgentPaneIo.mockClear();
 });
 
 afterEach(async () => {
@@ -132,5 +136,15 @@ describe('handleConversationMessage permission hold', () => {
     expect(response.status).toBe(200);
     expect(ensure).toHaveBeenCalledTimes(1);
     expect(deliver).toHaveBeenCalledWith('conv-hold', 'Look like a lot of stuff has been merged?', 'conversation-message', expect.anything());
+  });
+
+  it('PAN-5169: the permission hold keeps the default tmux fallback, never legacyTmuxFallback: false', async () => {
+    pane.text = fixture('permission-bash.txt');
+    await send();
+    expect(resolveAgentPaneIo.mock.calls.length).toBeGreaterThan(0);
+    for (const call of resolveAgentPaneIo.mock.calls) {
+      const options = call[2] as { legacyTmuxFallback?: boolean } | undefined;
+      expect(options?.legacyTmuxFallback).not.toBe(false);
+    }
   });
 });
