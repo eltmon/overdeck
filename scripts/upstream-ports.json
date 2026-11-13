@@ -126,6 +126,36 @@
     "commit": "2d8a843e6b"
   },
   {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/worker-rpc.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/worker-rpc.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/fonts.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/fonts.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/image-bitmap.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/image-bitmap.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/vector-pictures.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/vector-pictures.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/OfficePages.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/OfficePages.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
     "local": "src/dashboard/frontend/src/components/explorer/viewers/font/FontViewer.tsx",
     "upstream": "t3code",
     "path": "apps/web/src/components/files/FontViewer.tsx",
