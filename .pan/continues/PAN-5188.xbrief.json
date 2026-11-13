@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5188",
   "created": "2026-11-13T17:44:21.691Z",
-  "updated": "2026-11-13T18:48:31.295Z",
+  "updated": "2026-11-13T18:48:36.640Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -345,6 +345,11 @@
     "port-records-ci-list.ac2": {
       "status": "completed",
       "doneAt": "2026-11-13T18:48:31.295Z"
+    },
+    "docs-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5188",
+      "claimedAt": "2026-11-13T18:48:36.640Z"
     }
   }
 }
