@@ -10,13 +10,16 @@
  * Rules:
  * - An overflow event (D-C21), or a create/update/rename-onto of the
  *   pane's path, re-reads the file 250 ms after the last such event.
- * - A re-read waits for a save in flight to settle first (D-C18).
+ * - A re-read waits for a save in flight to settle first (D-C18), and is
+ *   repeated if a save starts or the base moves while it runs.
  * - After a re-read: missing → deleted; the base signature or a recent
  *   self-write signature → nothing (a stale mark is cleared); a clean pane
  *   reloads; a dirty pane is marked changed.
  * - A delete of the path opens a 500 ms window (D-C20). A create of the
  *   same path in it is an atomic save by another editor: it re-reads. A
  *   create of another path with the same basename marks the pane renamed.
+ *   Deletes in a batch are handled first, since a move may list its create
+ *   before its delete.
  *   When the window closes the file is re-read: still missing → deleted.
  * - A rename event whose oldPath is the pane's path marks it renamed.
  */
@@ -85,16 +88,26 @@ export function createExternalChangeController(deps: ExternalChangeDeps): Extern
   };
 
   const readNow = async () => {
-    if (deps.isSaveInFlight()) await deps.whenSaveIdle();
-    if (disposed) return;
-    let read: DiskRead;
-    try {
-      read = await deps.reread();
-    } catch (error) {
-      console.warn('[explorer-code] re-read after an external change failed', error);
-      return;
+    // A save that starts during the read can land on disk first, and one
+    // that finishes during it moves the base: either way the read cannot be
+    // judged against the current base, so read again once the save settles.
+    for (;;) {
+      if (deps.isSaveInFlight()) await deps.whenSaveIdle();
+      if (disposed) return;
+      const baseBefore = deps.getBaseSignature();
+      let read: DiskRead;
+      try {
+        read = await deps.reread();
+      } catch (error) {
+        console.warn('[explorer-code] re-read after an external change failed', error);
+        return;
+      }
+      if (disposed) return;
+      if (!deps.isSaveInFlight() && deps.getBaseSignature() === baseBefore) {
+        apply(read);
+        return;
+      }
     }
-    if (!disposed) apply(read);
   };
 
   const scheduleReread = () => {
@@ -159,7 +172,11 @@ export function createExternalChangeController(deps: ExternalChangeDeps): Extern
     handle(events) {
       if (disposed) return;
       const path = deps.getPath();
-      for (const event of events) handleOne(event, path);
+      // Deletes first: a move can list the create before the delete in one
+      // batch. The watcher already drops a create then delete of one path
+      // within a batch, so this never reorders an atomic save.
+      for (const event of events) if (event.kind === 'delete') handleOne(event, path);
+      for (const event of events) if (event.kind !== 'delete') handleOne(event, path);
     },
     dispose() {
       disposed = true;

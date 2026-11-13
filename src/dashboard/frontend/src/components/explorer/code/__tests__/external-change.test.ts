@@ -107,6 +107,44 @@ describe('updates', () => {
     expect(reloads).toEqual([]);
   });
 
+  it('reads again when a save starts during the re-read', async () => {
+    const { controller, state, reread, states, reloads } = harness({ dirty: true });
+    let settle!: () => void;
+    reread.mockImplementationOnce(async () => {
+      // The pane's own save starts while the read is pending and lands first.
+      state.inFlight = true;
+      state.idle = new Promise<void>((resolve) => {
+        settle = resolve;
+      });
+      return { missing: false, text: 'mine', signature: 'mine-sig' };
+    });
+    controller.handle([ev('update', 'src/a.ts')]);
+    await vi.advanceTimersByTimeAsync(REREAD_DELAY_MS);
+    expect(states).toEqual([]);
+    state.inFlight = false;
+    state.base = 'mine-sig';
+    state.disk = { missing: false, text: 'mine', signature: 'mine-sig' };
+    settle();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reread).toHaveBeenCalledTimes(2);
+    expect(states).toEqual([]);
+    expect(reloads).toEqual([]);
+  });
+
+  it('reads again when a save finishes during the re-read, so stale disk text is never reloaded', async () => {
+    const { controller, state, reread, reloads } = harness();
+    reread.mockImplementationOnce(async () => {
+      // The read saw the old disk text, then a save moved the base.
+      state.base = 'new-sig';
+      return { missing: false, text: 'old', signature: 'old-sig' };
+    });
+    state.disk = { missing: false, text: 'new', signature: 'new-sig' };
+    controller.handle([ev('update', 'src/a.ts')]);
+    await vi.advanceTimersByTimeAsync(REREAD_DELAY_MS);
+    expect(reread).toHaveBeenCalledTimes(2);
+    expect(reloads).toEqual([]);
+  });
+
   it('re-reads after an overflow event', async () => {
     const { controller, reread } = harness();
     controller.handle([ev('overflow', '')]);
@@ -122,6 +160,14 @@ describe('deletes and renames', () => {
     await vi.advanceTimersByTimeAsync(DELETE_WINDOW_MS - 100);
     controller.handle([ev('create', 'lib/a.ts')]);
     await vi.advanceTimersByTimeAsync(DELETE_WINDOW_MS);
+    expect(states).toEqual([{ kind: 'renamed', newPath: 'lib/a.ts' }]);
+    expect(reread).not.toHaveBeenCalled();
+  });
+
+  it('marks renamed when one batch lists the create before the delete', async () => {
+    const { controller, states, reread } = harness();
+    controller.handle([ev('create', 'lib/a.ts'), ev('delete', 'src/a.ts')]);
+    await vi.advanceTimersByTimeAsync(DELETE_WINDOW_MS * 2);
     expect(states).toEqual([{ kind: 'renamed', newPath: 'lib/a.ts' }]);
     expect(reread).not.toHaveBeenCalled();
   });
