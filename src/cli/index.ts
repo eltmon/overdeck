@@ -620,9 +620,9 @@ defineUpCommand(program)
     // server from even spawning, and the dashboard does not depend on synced
     // content to boot. Deferring it shaves that ~22s off time-to-available.
 
-    // Ensure host tools every agent/conversation session needs are installed:
-    // tmux is fatal if missing; the work
-    // pipeline needs it). See ensureHostTools in the prereq registry.
+    // Ensure host tools: tmux is required (fatal if it cannot be installed) only
+    // under the tmux terminal backend; under Herdr a missing tmux warns. See
+    // ensureHostTools in the prereq registry.
     {
       const { ensureHostTools } = await import('../lib/prereqs/registry.js');
       await ensureHostTools();
