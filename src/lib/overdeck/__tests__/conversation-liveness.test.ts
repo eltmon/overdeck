@@ -1,5 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+const mocks = vi.hoisted(() => ({
+  isHarnessProcessAlive: vi.fn(async () => false),
+  listSessionNames: vi.fn(),
+  sessionExists: vi.fn(),
+}));
+vi.mock('../../tmux.js', () => ({
+  isHarnessProcessAlive: mocks.isHarnessProcessAlive,
+  listSessionNames: mocks.listSessionNames,
+  sessionExists: mocks.sessionExists,
+}));
+
 import {
   conversationHarnessAlive,
   conversationSessionAlive,
@@ -7,6 +18,7 @@ import {
   waitForConversationSession,
   type ConversationLivenessDeps,
 } from '../conversation-liveness.js';
+import { resetHostToolsForTests, setHostToolFinderForTests } from '../../host-tools.js';
 import type { HerdrLivenessProbe } from '../../terminal-backends/herdr.js';
 
 function herdr(probe: HerdrLivenessProbe, extra: Partial<ConversationLivenessDeps> = {}): ConversationLivenessDeps {
@@ -19,6 +31,13 @@ function herdr(probe: HerdrLivenessProbe, extra: Partial<ConversationLivenessDep
     ...extra,
   };
 }
+
+afterEach(() => {
+  resetHostToolsForTests();
+  mocks.isHarnessProcessAlive.mockClear();
+  mocks.listSessionNames.mockClear();
+  mocks.sessionExists.mockClear();
+});
 
 describe('conversationSessionAlive (PAN-3921)', () => {
   it('reads a Herdr alive or indeterminate probe as alive', async () => {
@@ -138,5 +157,43 @@ describe('waitForConversationSession (PAN-3921)', () => {
     const assertion = expect(waiting).rejects.toThrow('Timed out waiting for conversation session conv-x');
     await vi.advanceTimersByTimeAsync(5_250);
     await assertion;
+  });
+});
+
+describe('host-tools gate (PAN-5168)', () => {
+  it('under herdr with tmux missing, an absent Herdr probe gives conversationSessionAlive false and spawns no tmux', async () => {
+    setHostToolFinderForTests(() => null);
+
+    const alive = await conversationSessionAlive('conv-x', {
+      backend: 'herdr',
+      probeHerdr: async () => ({ kind: 'absent' }),
+    });
+
+    expect(alive).toBe(false);
+    expect(mocks.sessionExists).not.toHaveBeenCalled();
+  });
+
+  it('listLiveConversationSessions under herdr with tmux missing returns only the Herdr names', async () => {
+    setHostToolFinderForTests(() => null);
+
+    const names = await listLiveConversationSessions({
+      backend: 'herdr',
+      listHerdr: async () => [{ agentId: 'conv-a', state: 'idle' }],
+    });
+
+    expect(names && [...names]).toEqual(['conv-a']);
+    expect(mocks.listSessionNames).not.toHaveBeenCalled();
+  });
+
+  it('an injected deps.sessionExists still wins when tmux is missing', async () => {
+    setHostToolFinderForTests(() => null);
+
+    const alive = await conversationSessionAlive('conv-x', {
+      backend: 'tmux',
+      probeHerdr: async () => ({ kind: 'absent' }),
+      sessionExists: async () => true,
+    });
+
+    expect(alive).toBe(true);
   });
 });
