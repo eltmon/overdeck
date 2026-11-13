@@ -1,6 +1,6 @@
-// Adapted from opencode (MIT). Copyright (c) 2025 opencode. See LICENSE.opencode.
 // Ported from t3code (MIT, Copyright (c) 2026 T3 Tools Inc.)
 // upstream: apps/web/src/components/files/office/worker-rpc.ts @ 2d8a843e6b
+// Adapted from opencode (MIT). Copyright (c) 2025 opencode. See LICENSE.opencode.
 // The engines run in a worker per open file, so no layout, recalculation or painting holds the window. These are the
 // two ends of that worker's protocol: typed calls by method name, a key that lets a newer call replace a queued one
 // (as the markdown worker's queue does), transferable payloads, and a worker that fails every pending call when it dies.

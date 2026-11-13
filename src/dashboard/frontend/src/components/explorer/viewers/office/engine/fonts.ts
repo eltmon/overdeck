@@ -1,6 +1,6 @@
-// Adapted from opencode (MIT). Copyright (c) 2025 opencode. See LICENSE.opencode.
 // Ported from t3code (MIT, Copyright (c) 2026 T3 Tools Inc.)
 // upstream: apps/web/src/components/files/office/fonts.ts @ 2d8a843e6b
+// Adapted from opencode (MIT). Copyright (c) 2025 opencode. See LICENSE.opencode.
 import type { BundledFontProvider } from '@betteroffice/docx/layout';
 import {
   loadBundledFontBytes,
