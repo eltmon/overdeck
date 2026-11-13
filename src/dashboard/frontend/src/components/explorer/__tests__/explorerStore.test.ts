@@ -111,3 +111,35 @@ describe('explorerStore directories', () => {
     expect(root().dirs['']).toBeUndefined()
   })
 })
+
+describe('explorerStore renamePaths and clearSelection (PAN-5190)', () => {
+  const dir = { status: 'ready' as const, entries: [], truncated: false, absPath: null }
+
+  it('rewrites expanded, selection, anchor and focused, and drops listings at or under the old path', () => {
+    state().ensureRoot(ROOT)
+    state().setExpandedMany(ROOT, ['src', 'src/x', 'srcx', 'lib'])
+    state().setDir(ROOT, '', dir)
+    state().setDir(ROOT, 'src', dir)
+    state().setDir(ROOT, 'src/x', dir)
+    state().setDir(ROOT, 'srcx', dir)
+    state().select(ROOT, 'src/x/a.ts', 'replace', ['src/x/a.ts'])
+
+    state().renamePaths(ROOT, 'src', 'lib')
+
+    expect(root().expanded).toEqual(['lib', 'lib/x', 'srcx'])
+    expect(root().selection).toEqual(['lib/x/a.ts'])
+    expect(root().anchor).toBe('lib/x/a.ts')
+    expect(root().focused).toBe('lib/x/a.ts')
+    expect(Object.keys(root().dirs).sort()).toEqual(['', 'srcx'])
+    expect(JSON.parse(localStorage.getItem(`overdeck.explorer.${ROOT}`) ?? '{}').expanded).toEqual(['lib', 'lib/x', 'srcx'])
+  })
+
+  it('clearSelection empties the selection and anchor and keeps focus', () => {
+    state().ensureRoot(ROOT)
+    state().select(ROOT, 'a.ts', 'replace', ['a.ts'])
+    state().clearSelection(ROOT)
+    expect(root().selection).toEqual([])
+    expect(root().anchor).toBeNull()
+    expect(root().focused).toBe('a.ts')
+  })
+})

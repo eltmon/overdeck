@@ -7,12 +7,18 @@
 // 'code' panes (rendered by PAN-5187). The Changed filter replaces the old
 // changed-files list: it shows a tree synthesized from git status (D-B8).
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ChevronsDownUp, ChevronsUpDown, Eye, EyeOff, RefreshCw } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
+import { ChevronsDownUp, ChevronsUpDown, Eye, EyeOff, FilePlus, FolderPlus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { useStageDeck } from '../Stage/StageDeckContext'
 import type { PaneWrapperProps } from '../Stage/types'
+import { useDeleteFlow } from './actions/useDeleteFlow'
+import { useExplorerActions } from './actions/useExplorerActions'
+import { useInlineEdit } from './actions/useInlineEdit'
+import { snapshotDroppedItems, uploadDroppedItems } from './actions/useOsFileDrop'
+import { useTreeActionKeys } from './actions/useTreeActionKeys'
+import { startRowDrag, useTreeDropZone } from './actions/useTreeDragMove'
 import { explorerErrorMessage, listDir, parseRootId, rootLabel } from './explorer-rpc'
 import { useExplorerStore, type RootState, type SelectMode } from './explorerStore'
 import { useExplorerGitStatus } from './git/useExplorerGitStatus'
@@ -94,6 +100,7 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
   const rootKind = parsed?.kind ?? 'workspace'
   const root: RootState | undefined = useExplorerStore((s) => s.roots[rootId])
   const loaderRef = useRef<DirectoryLoader | null>(null)
+  const treeRef = useRef<HTMLDivElement | null>(null)
   const git = useExplorerGitStatus(rootId)
   const deck = useStageDeck()
   const [expanding, setExpanding] = useState(false)
@@ -239,6 +246,47 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
     [cancelPreview, openFile, rootId],
   )
 
+  // PAN-5190 D-E1, D-E2: write actions only on issue/workspace roots with the Changed filter off.
+  const writable = rootKind !== 'project' && !changedOnly
+  const actions = useExplorerActions({ rootId, writable, reloadDirs: reloadLoaded, refreshGit: git.refresh, openFile: openFileFromTree })
+  const inline = useInlineEdit({ rootId, root, rows, actions, treeRef })
+  const clearSelection = useCallback(() => useExplorerStore.getState().clearSelection(rootId), [rootId])
+  const requestDelete = useDeleteFlow(actions, rootId)
+  const onDuplicate = useCallback(
+    (path: string) => {
+      const siblings = useExplorerStore.getState().roots[rootId]?.dirs[parentPath(path)]?.entries ?? []
+      void actions.duplicate(path, siblings.map((e) => e.name))
+    },
+    [actions, rootId],
+  )
+  const dropZone = useTreeDropZone({
+    rootId,
+    writable,
+    changedOnly,
+    getRow: (path) => rowByPath.get(path),
+    expand: (path) => useExplorerStore.getState().setExpanded(rootId, path, true),
+    onMove: (paths, dir) => void actions.move(paths, dir),
+    onFiles: (dt, dir) => {
+      if (rootKind === 'project') toast.error("The main checkout is read-only, so files can't be added here.")
+      else if (changedOnly) toast.error('Turn off the Changed filter to add files.')
+      else void uploadDroppedItems(snapshotDroppedItems(dt), dir, actions)
+    },
+  })
+  const onRowDragStart = useCallback(
+    (event: DragEvent, row: TreeRow) =>
+      startRowDrag(event.dataTransfer, rootId, row.path, useExplorerStore.getState().roots[rootId]?.selection ?? []),
+    [rootId],
+  )
+  const onTreeKeyDown = useTreeActionKeys({
+    writable,
+    isProjectRoot: rootKind === 'project',
+    getSelection: useCallback(() => useExplorerStore.getState().roots[rootId]?.selection ?? [], [rootId]),
+    startRename: inline.startRename,
+    requestDelete: useCallback((paths: readonly string[]) => void requestDelete(paths), [requestDelete]),
+    undo: actions.undo,
+    redo: actions.redo,
+  })
+
   const onQuickOpen = useCallback(() => setQuickOpen(true), [])
   const onContentSearch = useCallback(() => setContentSearchScope(''), [])
   const onKeyDown = useExplorerShortcuts({ onQuickOpen, onContentSearch })
@@ -333,8 +381,8 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
     }
   } else if (!changedOnly && rootDir?.status !== 'ready') {
     body = <PaneMessage>Loading files…</PaneMessage>
-  } else if (rows.length === 0) {
-    body = <PaneMessage>{changedOnly ? 'No changes.' : 'This folder is empty.'}</PaneMessage>
+  } else if (inline.rows.length === 0 && changedOnly) {
+    body = <PaneMessage>No changes.</PaneMessage>
   } else {
     body = (
       <ExplorerContextMenu
@@ -345,23 +393,57 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
         onOpen={openFileFromTree}
         onFindInFolder={(dirPath) => setContentSearchScope(dirPath)}
         onGitChanged={git.refresh}
+        writable={writable}
+        onNewFile={() => inline.startCreate('file')}
+        onNewFolder={() => inline.startCreate('dir')}
+        onRename={inline.startRename}
+        onDuplicate={onDuplicate}
+        onDelete={(paths) => void requestDelete(paths)}
       >
-        <ExplorerTree
-          aria-label={`Files in ${rootLabel(rootId)}`}
-          rows={rows}
-          decorations={git.decorations}
-          selection={root?.selection ?? []}
-          focused={root?.focused ?? null}
-          onToggle={onToggle}
-          onSelect={onSelect}
-          onOpen={openFileFromTree}
-          onPreview={previewFileFromTree}
-          onFocus={onFocus}
-          onContextMenuRow={onContextMenuRow}
-        />
+        {inline.rows.length === 0 ? (
+          // An empty root still opens the menu, so New file and New folder are reachable.
+          <div
+            tabIndex={-1}
+            onContextMenu={clearSelection}
+            className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground outline-none"
+          >
+            This folder is empty.
+          </div>
+        ) : (
+          <ExplorerTree
+            ref={treeRef}
+            aria-label={`Files in ${rootLabel(rootId)}`}
+            rows={inline.rows}
+            inlineEdit={inline.inlineEdit}
+            renderInline={inline.renderInline}
+            onContextMenuBlank={clearSelection}
+            onKeyDown={onTreeKeyDown}
+            onRowDragStart={onRowDragStart}
+            dropDir={dropZone.dropDir}
+            decorations={git.decorations}
+            selection={root?.selection ?? []}
+            focused={root?.focused ?? null}
+            onToggle={onToggle}
+            onSelect={onSelect}
+            onOpen={openFileFromTree}
+            onPreview={previewFileFromTree}
+            onFocus={onFocus}
+            onContextMenuRow={onContextMenuRow}
+          />
+        )}
       </ExplorerContextMenu>
     )
   }
+
+  // The drop zone wraps the tree body and the empty-folder message (D-E10, D-E14).
+  const zonedBody = (
+    <div
+      {...dropZone.zoneProps}
+      className={`flex min-h-0 flex-1 flex-col ${dropZone.dropDir === '' ? 'ring-1 ring-inset ring-ring' : ''}`}
+    >
+      {body}
+    </div>
+  )
 
   const branch = git.result?.branch
 
@@ -389,6 +471,16 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
           >
             Changed
           </button>
+          {writable && (
+            <>
+              <HeaderButton label="New file" onClick={() => inline.startCreate('file')}>
+                <FilePlus className="h-3.5 w-3.5" />
+              </HeaderButton>
+              <HeaderButton label="New folder" onClick={() => inline.startCreate('dir')}>
+                <FolderPlus className="h-3.5 w-3.5" />
+              </HeaderButton>
+            </>
+          )}
           <HeaderButton label="Refresh" onClick={onRefresh}>
             <RefreshCw className="h-3.5 w-3.5" />
           </HeaderButton>
@@ -406,11 +498,11 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
       )}
       {/* PAN-5191 edit-workspace banner slot */}
       {contentSearchScope === null ? (
-        body
+        zonedBody
       ) : (
         <>
           {/* The tree keeps the upper half; search takes the lower half. */}
-          <div className="flex min-h-0 flex-1 flex-col">{body}</div>
+          <div className="flex min-h-0 flex-1 flex-col">{zonedBody}</div>
           <ContentSearch
             rootId={rootId}
             scopePath={contentSearchScope || undefined}

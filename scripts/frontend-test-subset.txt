@@ -136,6 +136,7 @@ src/components/chat/__tests__/ChatMarkdown.issue-links.test.tsx
 src/components/chat/__tests__/ChatMarkdown.pull-request-links.test.tsx
 src/components/chat/__tests__/ComposerFooter.citations.test.tsx
 src/components/chat/__tests__/ComposerFooter.native.test.tsx
+src/components/chat/__tests__/ComposerFooter.path-drop.test.tsx
 src/components/chat/__tests__/ComposerFooter.schedule.test.tsx
 src/components/chat/__tests__/ComposerFooter.send-queue.test.tsx
 src/components/chat/__tests__/ComposerFooter.streaming-render-count.test.tsx
@@ -156,6 +157,7 @@ src/components/chat/__tests__/ScheduledMessageRow.test.tsx
 src/components/chat/__tests__/VaultBrowseCopy.test.tsx
 src/components/chat/__tests__/VaultContinueDialog.test.tsx
 src/components/chat/__tests__/composerHeldMessages.test.tsx
+src/components/chat/__tests__/composerPathDrop.test.ts
 src/components/chat/__tests__/conversationHistory.test.ts
 src/components/chat/__tests__/conversationMachineState.test.ts
 src/components/chat/__tests__/heldKickoff.test.tsx
@@ -203,6 +205,15 @@ src/components/explorer/__tests__/explorer-rpc.test.ts
 src/components/explorer/__tests__/explorerStore.test.ts
 src/components/explorer/__tests__/openCodePane.preview.test.ts
 src/components/explorer/__tests__/openCodePane.test.ts
+src/components/explorer/actions/__tests__/InlineNameRow.test.tsx
+src/components/explorer/actions/__tests__/inline-edit.test.ts
+src/components/explorer/actions/__tests__/name-rules.test.ts
+src/components/explorer/actions/__tests__/undo-stack.test.ts
+src/components/explorer/actions/__tests__/useDeleteFlow.test.tsx
+src/components/explorer/actions/__tests__/useExplorerActions.test.ts
+src/components/explorer/actions/__tests__/useOsFileDrop.test.ts
+src/components/explorer/actions/__tests__/useTreeActionKeys.test.ts
+src/components/explorer/actions/__tests__/useTreeDragMove.test.tsx
 src/components/explorer/code/__tests__/CodePane.save.test.tsx
 src/components/explorer/code/__tests__/CodePane.test.tsx
 src/components/explorer/code/__tests__/CodePaneHeader.test.tsx
@@ -263,12 +274,17 @@ src/components/home/__tests__/useTypeToFocus.test.tsx
 src/components/issue-view/IssueHeaderTitle.test.tsx
 src/components/issue-view/useIssueRecord.test.tsx
 src/components/merge-train/__tests__/MergeTrainView.test.tsx
+src/components/mobile/__tests__/AppearanceChoice.test.tsx
+src/components/mobile/__tests__/LogoSting.test.tsx
 src/components/mobile/__tests__/MobileApp.test.tsx
+src/components/mobile/__tests__/MobileChrome.test.tsx
 src/components/mobile/__tests__/MobileConversations.test.tsx
 src/components/mobile/__tests__/MobileIssueSheet.test.tsx
 src/components/mobile/__tests__/MobileNeedsYou.test.tsx
 src/components/mobile/__tests__/MobilePipeline.test.tsx
+src/components/mobile/__tests__/brand.test.tsx
 src/components/mobile/__tests__/conversationGroups.test.ts
+src/components/mobile/__tests__/useMobileAppearance.test.ts
 src/components/newConversation/__tests__/ConversationSkillsField.test.tsx
 src/components/newConversation/__tests__/IssuePickerField.test.tsx
 src/components/newConversation/__tests__/MachineField.test.tsx
@@ -305,6 +321,8 @@ src/components/terminal/terminalControlFrames.test.ts
 src/components/workspace/new/__tests__/smartField.test.ts
 src/components/workspace/new/__tests__/useWorkspaceCreateIntent.test.ts
 src/hooks/__tests__/useColorTheme.test.ts
+src/hooks/__tests__/useTheme.test.ts
+src/lib/__tests__/appearance.test.ts
 src/lib/__tests__/bootRequests.test.ts
 src/lib/__tests__/citationFormat.test.ts
 src/lib/__tests__/colorThemeEditor.test.ts
@@ -312,6 +330,7 @@ src/lib/__tests__/composerCitations.test.ts
 src/lib/__tests__/composerDraft.test.ts
 src/lib/__tests__/composerSendQueue.test.ts
 src/lib/__tests__/connectionState.test.ts
+src/lib/__tests__/explorer-drag-paths.test.ts
 src/lib/__tests__/flywheelNeedsYou.test.ts
 src/lib/__tests__/flywheelNeedsYouLinks.test.ts
 src/lib/__tests__/issueActions.menu-by-state.test.ts

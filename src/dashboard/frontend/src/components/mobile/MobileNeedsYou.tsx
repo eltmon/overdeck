@@ -14,6 +14,7 @@ import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import { buildPendingAnswerRequest, postPendingAnswer, type PendingAnswerTarget } from '../../lib/pendingInputAnswer';
 import { describePendingInput } from '../../lib/pendingInput';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
+import { MOBILE_ROW_AGE_CLASS, MOBILE_ROW_CLASS, MOBILE_ROW_META_CLASS, MOBILE_ROW_TITLE_CLASS, MobileEmptyState } from './brand';
 
 type PendingQuestion = NonNullable<Decision['pendingAskUserQuestion']>;
 
@@ -233,7 +234,7 @@ export function MobileNeedsYou({ subjectId }: { subjectId: string | null }) {
         <p className="border-b border-border px-4 py-3 text-sm text-muted-foreground">This question was already answered.</p>
       ) : null}
       {rows.length === 0 ? (
-        <p className="px-4 py-6 text-sm text-muted-foreground">Nothing needs you.</p>
+        <MobileEmptyState title="Nothing needs you." detail="Agent questions and approvals show up here." />
       ) : (
         <ul className="divide-y divide-border">
           {rows.map((decision) => {
@@ -250,17 +251,28 @@ export function MobileNeedsYou({ subjectId }: { subjectId: string | null }) {
                   type="button"
                   aria-expanded={pending ? open : undefined}
                   onClick={() => pending && setExpandedId(open ? null : decision.id)}
-                  className="flex min-h-11 w-full items-start justify-between gap-3 px-4 py-3 text-left"
+                  className={MOBILE_ROW_CLASS}
                 >
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium text-foreground">
-                      {decision.issueId && decision.issueId !== decision.label ? `${decision.issueId} · ${decision.label}` : decision.label}
+                    <span className="flex min-w-0 items-center gap-2">
+                      {decision.blocking ? (
+                        <>
+                          {/* PAN-5208 D-16: the row's one colored signal. */}
+                          <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-state-needs-you" />
+                          <span className="sr-only">Blocking</span>
+                        </>
+                      ) : null}
+                      <span className={MOBILE_ROW_TITLE_CLASS}>
+                        {decision.issueId && decision.issueId !== decision.label ? `${decision.issueId} · ${decision.label}` : decision.label}
+                      </span>
                     </span>
-                    <span className="block text-xs text-muted-foreground">
+                    <span className={MOBILE_ROW_META_CLASS}>
                       {describePendingInput(decision.kinds, decision.turnEndAssessment)}
+                      {/* An unreachable-machine row already names the machine in its title. */}
+                      {decision.machineLabel && !decision.unreachableMachine ? ` · on ${decision.machineLabel}` : ''}
                     </span>
                   </span>
-                  <span className="shrink-0 text-xs text-muted-foreground">{formatRelativeTime(decision.since, now)}</span>
+                  <span className={MOBILE_ROW_AGE_CLASS}>{formatRelativeTime(decision.since, now)}</span>
                 </button>
                 {pending ? (open ? <QuestionCard key={pending.toolUseId} decision={decision} pending={pending} error={errors[pending.toolUseId]} onError={setError} /> : null) : <ReadOnlyAction decision={decision} />}
               </li>

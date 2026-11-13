@@ -1,0 +1,1523 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-13T21:47:06Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5208: Phone app: visual pass, faint logo watermark, logo sting on first load, appearance setting in /m",
+    "updated": "2026-11-13T21:57:08.091Z"
+  },
+  "plan": {
+    "id": "pan-5208",
+    "title": "Phone app: visual pass, faint logo watermark, logo sting on first load, appearance setting in /m",
+    "status": "running",
+    "uid": "5189b593-e928-4da6-981b-72ebd96fba67",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-13T21:47:06Z",
+    "updated": "2026-11-13T21:57:08.091Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5208",
+        "label": "PAN-5208",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5208.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "mobile",
+      "phone-app",
+      "frontend",
+      "design",
+      "appearance",
+      "animation"
+    ],
+    "metadata": {
+      "sizeJustification": "One operator-visible visual pass across the two phone surfaces (/m web shell and the Capacitor app), which must ship one visual language together: both import the same new brand, appearance and sting components, so splitting would ship a half-restyled app or two diverging styles. Most extra files are co-located tests, acceptance PNG globs and the three existing Playwright specs that only gain a one-line sessionStorage seed.",
+      "canonicalFilename": "2026-11-13-PAN-5208-phone-app-visual-pass-faint-logo-watermark-logo-sting-on-first-load-appearance-setting-in-m.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The phone app (/m and the Capacitor app) looks unfinished: a plain text header crowded by two wrapped hint strings, text-only tabs, one-line grey empty states, no brand mark, and no appearance control in /m (PAN-5041's System/Light/Dark exists only in the native Settings screen).",
+      "Proposal": "Share the appearance store from a frontend leaf module (src/dashboard/frontend/src/lib/appearance.ts) and add a /m controller that applies it without writing overdeck.ui.theme or calling /api/settings/ui-theme; a shared AppearanceChoice used by native Settings and a new /m settings sheet; shared brand pieces (lockup, watermark, empty state, row classes, screen header) used by both surfaces; a WAAPI logo sting overlay that plays once per sessionStorage lifetime, skips on tap, and is static under reduced motion; restyled /m header, tab bar, rows, empty states and native machine list/sign-in/settings; a dismissible hints banner; before/after screenshots at iPhone 14 and Pixel 7, light and dark.",
+      "NonGoals": "- No restyle of PairScreen, RemovedScreen, MobilePairScreen, MobileIssueSheet, the question card body, or ConversationPanel\n- No change to data-theme (Broadsheet/Ledger) in either surface\n- No Settings button in the native MobileApp header; native appearance stays in the native Settings screen\n- No sting on warm resume of the native app, on later /m loads in the same tab session, or on a /m deep-link open\n- No guide rings, halo, tagline or mono label from the video recipe; no GSAP or any new npm dependency\n- No change to the desktop dashboard theme behavior, toggleTheme, setTheme, or the /api/settings/ui-theme route\n- /m must never write localStorage['overdeck.ui.theme'] or send PUT /api/settings/ui-theme\n- No change to PAN-5045 grouping logic, ordering or its storage key\n- No badge count on the tab bar\n- No native iOS/Android code changes"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The /m Settings button and sheet render only in the web shell; the native app keeps appearance in its own Settings screen.",
+        "rationale": "Native Settings already owns appearance plus the native chrome sync (PAN-5041); one entry point per surface avoids two screens for one setting."
+      },
+      {
+        "summary": "/m defaults to System when overdeck.appearance is unset.",
+        "rationale": "The issue requires the native shell's storage key and semantics, and the native default is System."
+      },
+      {
+        "summary": "The sting fades at the later of a 1.3 s minimum and the moment content is ready, capped at 2.3 s; a /m deep-link open skips it and still marks it played.",
+        "rationale": "The issue says the sting never delays usable content; the minimum keeps the brand moment visible on a warm cache, and a notification-style deep link should land straight on its subject."
+      },
+      {
+        "summary": "Under reduced motion the sting shows the settled lockup for 600 ms and is removed without a fade.",
+        "rationale": "The issue asks for the settled logo without motion; a short hold keeps the brand moment without delaying content."
+      },
+      {
+        "summary": "Visual-pass scope is the /m header, tab bar, banner, three tab lists and empty states, plus native MachinesScreen, SignInScreen and SettingsScreen; other screens keep their layout.",
+        "rationale": "These are the screens the issue names (header, rows, empty states, tab bar, machine list, Settings); the rest are flows the operator did not mention."
+      },
+      {
+        "summary": "Ship as one PR with plan.metadata.sizeJustification instead of sibling issues.",
+        "rationale": "Both surfaces must land one shared visual language together; the shared components make the work inseparable."
+      },
+      {
+        "summary": "Native machine-list screenshots come from the iOS Simulator or an Android emulator, else a recorded deviation.",
+        "rationale": "There is no browser harness for the native shell; the /m screenshots are always produced."
+      }
+    ],
+    "items": [
+      {
+        "id": "baseline-screens",
+        "title": "Capture the before screenshots of /m with a new screenshot spec",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T21:47:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5208",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-5208-mobile-screens.spec.ts",
+            "apps/mobile/acceptance/pan-5208-before-*.png"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-5208-mobile-screens.spec.ts",
+            "ls apps/mobile/acceptance/pan-5208-before-*.png | wc -l"
+          ],
+          "expected_outputs": [
+            "the playwright spec reports 2 passed",
+            "the ls count prints 12"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create src/dashboard/frontend/tests/pan-5208-mobile-screens.spec.ts modeled on tests/pan-5045-mobile-conversation-groups.spec.ts (isolated dashboard fixture, page.route fixtures, seeded pipeline snapshot as in tests/pan-4661-mobile-pipeline.spec.ts). One test per device (IPHONE_14 390x844 dsf 3; PIXEL_7 412x915 dsf 2.625; hasTouch, isMobile), each opening a light and a dark context (colorScheme, reducedMotion 'reduce', addInitScript seeding localStorage['overdeck.ui.theme'] to the scheme and sessionStorage['overdeck.logoSting.played']='1'), screenshotting Needs you, Conversations and Pipeline into test-results/pan-5208/<device>-<theme>-<tab>.png. Run it on the UNCHANGED tree (npm run build first) BEFORE any other item lands and copy the 12 PNGs to apps/mobile/acceptance/pan-5208-before-<device>-<theme>-<tab>.png. Do not add the spec to test:playwright here (that is browser-checks). Use an isolated browser context; never the operator's live dashboard."
+        },
+        "items": [
+          {
+            "id": "baseline-screens.ac1",
+            "title": "Given the tree before any PAN-5208 UI change, when the spec runs, then it produces 12 PNGs named <device>-<theme>-<tab>.png for iphone14/pixel7 x light/dark x needs-you/conversations/pipeline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "baseline-screens.ac2",
+            "title": "apps/mobile/acceptance/ contains exactly 12 files matching pan-5208-before-*.png, committed in a commit whose parent has no change to src/dashboard/frontend/src/components/mobile/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "baseline-screens.ac3",
+            "title": "When the spec runs, then each browser context performs at most 3 page loads (page.goto or page.reload)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "appearance-core",
+        "title": "Move the appearance store into a shared frontend module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T21:47:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5208",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/appearance.ts",
+            "src/dashboard/frontend/src/lib/__tests__/appearance.test.ts",
+            "apps/mobile/src/shell/appearance.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/lib/__tests__/appearance.test.ts",
+            "npm --prefix apps/mobile test -- src/shell/__tests__/appearance.test.ts src/__tests__/appearance-boot.test.ts",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "appearance.test.ts passes",
+            "both mobile appearance tests pass unchanged",
+            "typecheck:mobile exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "appearance-choice",
+            "m-appearance-controller",
+            "m-settings-sheet"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 and D-1. Create src/dashboard/frontend/src/lib/appearance.ts holding Appearance, ResolvedTheme, APPEARANCE_KEY, APPEARANCES, readAppearance, writeAppearance, onAppearanceChange, useAppearance, resolveAppearance (bodies moved verbatim from apps/mobile/src/shell/appearance.ts lines 19-78) plus isMobileShellPath(pathname) = pathname === '/m' || pathname.startsWith('/m/'). The module imports only react (useSyncExternalStore) — never hooks/useTheme. apps/mobile/src/shell/appearance.ts re-exports those names from the frontend module and keeps AppearanceDeps, installAppearance, defaultAppearanceDeps. Add src/dashboard/frontend/src/lib/__tests__/appearance.test.ts."
+        },
+        "items": [
+          {
+            "id": "appearance-core.ac1",
+            "title": "readAppearance returns 'system' for a missing key, for the value 'blue', and when localStorage.getItem throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appearance-core.ac2",
+            "title": "writeAppearance('light') stores 'light' under overdeck.appearance and calls a subscribed listener exactly once; after unsubscribe the listener is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appearance-core.ac3",
+            "title": "isMobileShellPath returns true for '/m', '/m/', '/m/pipeline' and false for '/', '/mobile', '/settings'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appearance-core.ac4",
+            "title": "apps/mobile/src/shell/appearance.ts contains no readStorage function and apps/mobile/src/shell/__tests__/appearance.test.ts passes without edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "appearance-choice",
+        "title": "Extract the Appearance radiogroup into a shared component",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T21:47:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5208",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/AppearanceChoice.tsx",
+            "apps/mobile/src/shell/SettingsScreen.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/shell/__tests__/SettingsScreen.test.tsx",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "SettingsScreen.test.tsx passes unchanged",
+            "typecheck:mobile exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create src/dashboard/frontend/src/components/mobile/AppearanceChoice.tsx: AppearanceChoice({ value, onChange, note }) rendering today's SettingsScreen AppearanceSection DOM (div[data-component=appearance-setting], h3 'Appearance' with a useId() id, role=radiogroup aria-labelledby, three role=radio buttons System/Light/Dark with aria-checked and a trailing check mark, then the note paragraph). Types come from lib/appearance.ts. In apps/mobile/src/shell/SettingsScreen.tsx delete AppearanceSection and APPEARANCE_LABEL and render <AppearanceChoice value={appearance} onChange={onAppearanceChange} note=\"System follows this phone's light or dark setting. Stored on this phone only.\" />."
+        },
+        "items": [
+          {
+            "id": "appearance-choice.ac1",
+            "title": "SettingsScreen renders a radiogroup named Appearance with radios System, Light, Dark and the checked one has aria-checked=true (existing SettingsScreen.test.tsx passes without edits)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appearance-choice.ac2",
+            "title": "grep -n 'function AppearanceSection' apps/mobile/src/shell/SettingsScreen.tsx produces no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appearance-choice.ac3",
+            "title": "Given two AppearanceChoice instances on one page, then each radiogroup's aria-labelledby resolves to its own heading id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "brand-components",
+        "title": "Add the shared brand pieces: lockup, watermark, empty state, row classes, screen header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T21:47:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5208",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/brand.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/brand.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/components/mobile/__tests__/brand.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "brand.test.tsx passes",
+            "typecheck:frontend exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-13",
+            "NFR-3",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "logo-sting",
+            "m-header-tabbar",
+            "needs-you-rows",
+            "conversation-rows",
+            "pipeline-rows",
+            "native-screens"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4, D-13, D-14. Create src/dashboard/frontend/src/components/mobile/brand.tsx exporting MARK_CLASSES, OverdeckLockup, LogoWatermark, MobileEmptyState, MOBILE_ROW_CLASS, MOBILE_ROW_TITLE_CLASS, MOBILE_ROW_META_CLASS, MOBILE_ROW_AGE_CLASS and MobileScreenHeader exactly as the PRD specifies (LogoWatermark wraps the existing OverdeckMark from components/OverdeckMark.tsx), plus icon re-exports `export { Plus as PlusIcon, Settings as SettingsIcon } from 'lucide-react'` — lucide-react resolves only from src/dashboard/frontend/node_modules, so apps/mobile/src must import icons through brand.tsx. Token classes only, font-medium max except the wordmark's 600. Add src/dashboard/frontend/src/components/mobile/__tests__/brand.test.tsx."
+        },
+        "items": [
+          {
+            "id": "brand-components.ac1",
+            "title": "LogoWatermark renders [data-component=logo-watermark] with aria-hidden=true and classes pointer-events-none and absolute, and its svg carries opacity-[0.05] and dark:opacity-[0.04]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "brand-components.ac2",
+            "title": "OverdeckLockup renders the text Overdeck and three circles with r 12.5, 4.5 and 3.4",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "brand-components.ac3",
+            "title": "MobileEmptyState renders [data-component=mobile-empty-state] containing the given title and detail",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "brand-components.ac4",
+            "title": "MobileScreenHeader renders a header element with the safe-area top padding class pt-[env(safe-area-inset-top)]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "logo-sting",
+        "title": "Build the LogoSting overlay with WAAPI, once per session",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T21:47:06Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5208",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/LogoSting.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/LogoSting.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/components/mobile/__tests__/LogoSting.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "LogoSting.test.tsx passes with every case listed in PRD WI-5",
+            "typecheck:frontend exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-11",
+            "FR-12",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5, D-9..D-13. Create src/dashboard/frontend/src/components/mobile/LogoSting.tsx exporting LOGO_STING_KEY='overdeck.logoSting.played', MIN_STING_MS=1300, STING_MS=2300, FADE_MS=250, REDUCED_HOLD_MS=600 and LogoSting({ ready, skip }). Initial phase from a pure sessionStorage read ('done' when skip or already played; StrictMode-safe); a mount effect always writes the key. The fade starts at max(MIN_STING_MS, time ready first became true, measured with Date.now()), capped by the STING_MS timer. Five WAAPI animations per the D-12 table when Element.prototype.animate exists and reduced motion is off; ring uses pathLength=1 in a rotate(-90 20 20) group; satellite arc = five translate keyframes; wordmark = HTML span with clip-path inset. Removal is setTimeout-driven only. pointerdown skips. Reduced motion (matchMedia in JS): no animate calls, removed after REDUCED_HOLD_MS with no fade. Overlay: fixed inset-0 z-[60] bg-background aria-hidden data-component=logo-sting data-state. Add src/dashboard/frontend/src/components/mobile/__tests__/LogoSting.test.tsx with fake timers (vi.useFakeTimers + vi.advanceTimersByTime; never real waits)."
+        },
+        "items": [
+          {
+            "id": "logo-sting.ac1",
+            "title": "Given an empty sessionStorage, when LogoSting mounts, then [data-component=logo-sting][data-state=playing] renders and sessionStorage['overdeck.logoSting.played'] becomes '1' (a second mount then renders nothing); after advancing STING_MS with ready=false the state is fading and after a further FADE_MS the element is removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "logo-sting.ac2",
+            "title": "Given prefers-reduced-motion: reduce, when LogoSting mounts, then Element.prototype.animate is never called and the overlay is removed after REDUCED_HOLD_MS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "logo-sting.ac3",
+            "title": "Given reduced motion off and a stubbed Element.prototype.animate, when LogoSting mounts, then animate is called 5 times; a pointerdown before STING_MS switches data-state to fading",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "logo-sting.ac4",
+            "title": "Given ready=true from the first render, the state is still playing at MIN_STING_MS-1 ms and becomes fading at MIN_STING_MS; given ready turning true at 1800 ms, it becomes fading at 1800 ms; given skip=true nothing renders and the key is '1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "logo-sting.ac5",
+            "title": "Given sessionStorage.getItem throws, when LogoSting mounts, then the overlay still renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "m-appearance-controller",
+        "title": "Apply the phone appearance in the /m web shell without touching the desktop theme",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T21:47:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5208",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/hooks/useTheme.ts",
+            "src/dashboard/frontend/src/hooks/__tests__/useTheme.test.ts",
+            "src/dashboard/frontend/index.html",
+            "src/dashboard/frontend/src/components/mobile/useMobileAppearance.ts",
+            "src/dashboard/frontend/src/components/mobile/__tests__/useMobileAppearance.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/hooks/__tests__/useTheme.test.ts src/components/mobile/__tests__/useMobileAppearance.test.ts",
+            "npm run typecheck:frontend",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck:frontend exits 0",
+            "lint exits 0 (no new circular import)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6, D-2..D-6. In src/dashboard/frontend/src/hooks/useTheme.ts add setLocalTheme (apply class, set state; no storage, no sync) and the module-load guard: when !isNativeShell() && isMobileShellPath(location.pathname) skip applyTheme(getStoredTheme()) and the load sync, and initialise theme/resolvedTheme from resolveAppearance(readAppearance(), systemDark). Import from ../lib/appearance (leaf; no cycle). In src/dashboard/frontend/index.html resolve overdeck.appearance in the flash script on /m paths (PRD snippet). Create src/dashboard/frontend/src/components/mobile/useMobileAppearance.ts (useLayoutEffect; no-op in the native shell) and its test. Extend src/dashboard/frontend/src/hooks/__tests__/useTheme.test.ts."
+        },
+        "items": [
+          {
+            "id": "m-appearance-controller.ac1",
+            "title": "When setLocalTheme('light') runs, then the dark class is removed, localStorage['overdeck.ui.theme'] keeps its prior value, no fetch is sent, and resolvedTheme becomes 'light'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m-appearance-controller.ac2",
+            "title": "Given the path /m, overdeck.ui.theme='dark' and overdeck.appearance='light', when useTheme.ts is imported, then no fetch is made and <html> has no dark class; on path / the existing load sync still calls fetch once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m-appearance-controller.ac3",
+            "title": "Given overdeck.appearance='dark', when useMobileAppearance runs, then <html> gets the dark class; writeAppearance('light') removes it; a prefers-color-scheme change with 'system' stored re-resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m-appearance-controller.ac4",
+            "title": "Given __OVERDECK_NATIVE__ = true, when useMobileAppearance runs, then the dark class and useTheme state are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "m-settings-sheet",
+        "title": "Add the /m settings sheet with appearance, install and notification controls",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T21:47:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5208",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileChrome.tsx",
+            "src/dashboard/frontend/src/components/mobile/MobileApp.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileChrome.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/components/mobile/__tests__/MobileChrome.test.tsx src/components/mobile/__tests__/MobileApp.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck:frontend exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 steps 1-2, D-7, D-8. Create src/dashboard/frontend/src/components/mobile/MobileChrome.tsx: move BeforeInstallPromptEvent, isStandalone, isIosSafari out of MobileApp.tsx unchanged (exported) and split InstallAffordance into useInstallPrompt() (today's state + beforeinstallprompt listener, returning { installEvent, install, standalone, iosSafari }) and a view InstallAffordance({ prompt }) with today's output; MobileApp calls useInstallPrompt() once, unconditionally, and passes the object down, because the event fires once near load and a later-mounted sheet would miss it. Add MobileSettingsSheet({ open, onClose, prompt }): role=dialog aria-modal aria-label=Settings bottom sheet over a scrim; AppearanceChoice bound to useAppearance()/writeAppearance with note 'System follows this device's light or dark setting. Stored in this browser only.'; h3 Install + <InstallAffordance prompt={prompt} /> (or 'Installed' when prompt.standalone); h3 Notifications + <TurnOnNotificationsButton />; Close button (lucide X); Escape and scrim tap close; safe-area bottom padding. Add src/dashboard/frontend/src/components/mobile/__tests__/MobileChrome.test.tsx."
+        },
+        "items": [
+          {
+            "id": "m-settings-sheet.ac1",
+            "title": "Given open=true, MobileSettingsSheet renders role=dialog named Settings containing a radiogroup named Appearance and headings Install and Notifications",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m-settings-sheet.ac2",
+            "title": "Clicking the Light radio stores 'light' under overdeck.appearance; pressing Escape or clicking Close calls onClose once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m-settings-sheet.ac3",
+            "title": "Given a beforeinstallprompt event dispatched before the sheet opens, when Settings opens, then the sheet renders a button named Install app",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m-settings-sheet.ac4",
+            "title": "grep for the definitions of InstallAffordance, isStandalone and isIosSafari returns matches only in MobileChrome.tsx, none in MobileApp.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "m-header-tabbar",
+        "title": "Restyle the /m header with the lockup and Settings button and the tab bar with icons",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T21:47:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5208",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileApp.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileApp.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/components/mobile/__tests__/MobileApp.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "MobileApp.test.tsx passes",
+            "typecheck:frontend exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 steps 3-4. In src/dashboard/frontend/src/components/mobile/MobileApp.tsx call useMobileAppearance(); render MobileScreenHeader with OverdeckLockup leading and, on the web, a 44px Settings icon button (lucide Settings, aria-label Settings) that opens MobileSettingsSheet; in the native shell the trailing slot is headerSlot and no Settings button or sheet renders. TABS gain icons Inbox, MessageSquare, ListOrdered (aria-hidden, h-5 w-5) above an 11px label; keep nav aria-label 'Phone sections', the button names and aria-current; nav gets border-t bg-card/90 backdrop-blur and the safe-area bottom padding. Header no longer contains InstallAffordance or TurnOnNotificationsButton (the banner item re-homes them). Update the existing 'Install app' case in MobileApp.test.tsx to dispatch beforeinstallprompt first, then open Settings, then find Install app in the dialog."
+        },
+        "items": [
+          {
+            "id": "m-header-tabbar.ac1",
+            "title": "The web /m header renders the text Overdeck and a button named Settings; clicking it renders a dialog named Settings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m-header-tabbar.ac2",
+            "title": "With __OVERDECK_NATIVE__ = true the header renders the headerSlot button 'desk ▾' and no button named Settings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m-header-tabbar.ac3",
+            "title": "Each of the three tab buttons (Needs you, Conversations, Pipeline) contains an svg with aria-hidden=true and the active one keeps aria-current=page",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m-header-tabbar.ac4",
+            "title": "The header element contains no button named Install app and no text 'Notifications unavailable'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "m-hints-banner",
+        "title": "Move the install and notification hints into one dismissible banner",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T21:47:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5208",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileChrome.tsx",
+            "src/dashboard/frontend/src/components/mobile/MobileApp.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileChrome.test.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileApp.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/components/mobile/__tests__/MobileChrome.test.tsx src/components/mobile/__tests__/MobileApp.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck:frontend exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8, D-8. In src/dashboard/frontend/src/components/mobile/MobileChrome.tsx add MobileHintsBanner (region 'Setup hints', data-component=mobile-hints-banner, rounded-md border bg-card) with <InstallAffordance prompt={prompt} />, non-compact TurnOnNotificationsButton and a Dismiss icon button (lucide X, accessible name Dismiss). Hidden when localStorage['overdeck.m.hintsDismissed']==='1', or when prompt.standalone and the push status (useQuery PUSH_STATUS_QUERY_KEY/loadPushStatus, enabled: pushSupport().ok) has a thisDevice web-push subscription. Storage errors read as not dismissed. Render it in MobileApp between header and content when !native && !fullScreen."
+        },
+        "items": [
+          {
+            "id": "m-hints-banner.ac1",
+            "title": "Given no stored dismissal, when /m renders and a beforeinstallprompt event fires, then the Setup hints region shows a button named Install app",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m-hints-banner.ac2",
+            "title": "Clicking Dismiss removes the region and writes overdeck.m.hintsDismissed='1'; a stored '1' renders no region on mount",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m-hints-banner.ac3",
+            "title": "Given display-mode standalone and a push status with a thisDevice subscription, then no Setup hints region renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m-hints-banner.ac4",
+            "title": "Given localStorage.getItem throws, then the region still renders; in the native shell it never renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "m-watermark-sting",
+        "title": "Show the watermark behind the /m landing pages and mount the sting on the web",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T21:47:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5208",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileApp.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileApp.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/components/mobile/__tests__/MobileApp.test.tsx"
+          ],
+          "expected_outputs": [
+            "MobileApp.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9, D-9, D-14. In src/dashboard/frontend/src/components/mobile/MobileApp.tsx wrap <main> in <div className=\"relative min-h-0 flex-1\"> with {!fullScreen && <LogoWatermark />} first and <main className=\"relative h-full overflow-y-auto\"> second (main stays the scroller; MobileNeedsYou scrolls via closest('main')). Render {!native && <LogoSting ready={sessionAuthFailed || hasSnapshot} skip={initialDeepLink} />} as the last child of the root div, with hasSnapshot from useConnectionState and initialDeepLink = useState(() => route.subjectId !== null || route.conversationId !== null || route.issueId !== null)[0]. In MobileApp.test.tsx set sessionStorage['overdeck.logoSting.played']='1' in beforeEach where a case must not see the sting, and add the new cases."
+        },
+        "items": [
+          {
+            "id": "m-watermark-sting.ac1",
+            "title": "On /m, /m?tab=conversations and /m/pipeline, [data-component=logo-watermark] renders and is not a descendant of main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m-watermark-sting.ac2",
+            "title": "On /m?conversation=x and /m/pipeline?issue=PAN-7 no [data-component=logo-watermark] renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m-watermark-sting.ac3",
+            "title": "With an empty sessionStorage the web render on /m contains [data-component=logo-sting]; a first render on /m?conversation=x contains none and sets the played key; the native render (__OVERDECK_NATIVE__ = true) contains none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m-watermark-sting.ac4",
+            "title": "main keeps the overflow-y-auto class and every pre-existing MobileApp.test.tsx case passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "needs-you-rows",
+        "title": "Restyle Needs-you rows and its empty state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T21:47:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5208",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileNeedsYou.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileNeedsYou.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/components/mobile/__tests__/MobileNeedsYou.test.tsx"
+          ],
+          "expected_outputs": [
+            "MobileNeedsYou.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10, D-16. In src/dashboard/frontend/src/components/mobile/MobileNeedsYou.tsx use the brand row classes; blocking decisions get a 6px bg-state-needs-you dot before the title with sr-only text 'Blocking'; secondary line = describePendingInput(...) plus ' · on <machineLabel>' when set; age right. Empty state: <MobileEmptyState title=\"Nothing needs you.\" detail=\"Agent questions and approvals show up here.\" />. QuestionCard and ReadOnlyAction behavior unchanged."
+        },
+        "items": [
+          {
+            "id": "needs-you-rows.ac1",
+            "title": "With no decisions, [data-component=mobile-empty-state] renders containing 'Nothing needs you.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-rows.ac2",
+            "title": "A decision with blocking=true renders the text Blocking inside its row; one with blocking=false does not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-rows.ac3",
+            "title": "A decision with machineLabel 'desk' shows 'on desk' in its secondary line, and every pre-existing case passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-rows",
+        "title": "Restyle conversation group headers, rows and the empty state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T21:47:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5208",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileConversations.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileConversations.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/components/mobile/__tests__/MobileConversations.test.tsx src/components/mobile/__tests__/conversationGroups.test.ts"
+          ],
+          "expected_outputs": [
+            "both test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11, D-16. In src/dashboard/frontend/src/components/mobile/MobileConversations.tsx replace the ▾/▸ glyphs with lucide ChevronRight (aria-hidden, rotate-90 when open), the + text with lucide Plus (aria-hidden) keeping aria-label 'New conversation in <label>', apply the brand row classes, and use <MobileEmptyState title=\"No conversations.\" detail=\"Conversations you start on any machine show up here.\" />. PAN-5045 grouping, collapse storage key, ordering and create flow unchanged."
+        },
+        "items": [
+          {
+            "id": "conversation-rows.ac1",
+            "title": "Each group toggle button contains an svg with aria-hidden=true and no '▸' or '▾' text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-rows.ac2",
+            "title": "When the button named 'New conversation in <project>' is clicked, then it sends POST /api/conversations with that projectKey as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-rows.ac3",
+            "title": "With no conversations, [data-component=mobile-empty-state] renders containing 'No conversations.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipeline-rows",
+        "title": "Restyle pipeline rows with project and age, and the empty state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T21:47:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5208",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobilePipeline.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobilePipeline.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/components/mobile/__tests__/MobilePipeline.test.tsx"
+          ],
+          "expected_outputs": [
+            "MobilePipeline.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12, D-16. In src/dashboard/frontend/src/components/mobile/MobilePipeline.tsx: line 1 = font-mono identifier plus ' · <issue.project.name>' (non-mono) when set; title line-clamp-2; right column = formatRelativeTime(issue.updatedAt, now) above NeedsYouMark when it applies; brand row classes. Empty: <MobileEmptyState title=\"No active issues.\" detail=\"Issues being planned, worked or reviewed show up here.\" />. Loading text unchanged."
+        },
+        "items": [
+          {
+            "id": "pipeline-rows.ac1",
+            "title": "An issue with project { name: 'overdeck' } renders the text overdeck in its row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-rows.ac2",
+            "title": "An issue whose updatedAt is 5 minutes before now renders the formatRelativeTime output for that time in its row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-rows.ac3",
+            "title": "With a snapshot and no active issues, [data-component=mobile-empty-state] renders containing 'No active issues.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "native-screens",
+        "title": "Restyle the native machine list, sign-in and settings headers with the shared brand pieces",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T21:47:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5208",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/MachinesScreen.tsx",
+            "apps/mobile/src/shell/SignInScreen.tsx",
+            "apps/mobile/src/shell/SettingsScreen.tsx",
+            "apps/mobile/src/shell/__tests__/MachinesScreen.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/shell/__tests__/MachinesScreen.test.tsx src/shell/__tests__/SignInScreen.test.tsx src/shell/__tests__/SettingsScreen.test.tsx",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck:mobile exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13 steps 1-3. apps/mobile/src/shell/MachinesScreen.tsx: MobileScreenHeader with OverdeckLockup leading and Pair a machine (PlusIcon from brand.tsx) / Settings (SettingsIcon from brand.tsx; never import lucide-react directly from apps/mobile/src) buttons keeping their accessible names; the watermark wrapper (relative min-h-0 flex-1, LogoWatermark first) around the scrolling <ul>; brand row classes (online dot and Paired badge unchanged); when state === 'online' and there are no rows render <MobileEmptyState title=\"No machines yet.\" detail=\"Pair a machine to see it here.\" />. SignInScreen.tsx: OverdeckLockup centered above the content. SettingsScreen.tsx: top '‹ Machines' and 'Settings' become MobileScreenHeader (leading back button, title Settings); sections keep their DOM."
+        },
+        "items": [
+          {
+            "id": "native-screens.ac1",
+            "title": "Given an online directory with no machines, MachinesScreen renders 'No machines yet.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-screens.ac2",
+            "title": "MachinesScreen renders [data-component=logo-watermark] outside the ul and keeps buttons named 'Pair a machine' and 'Settings'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-screens.ac3",
+            "title": "SignInScreen renders the text Overdeck from OverdeckLockup and SettingsScreen renders a button '‹ Machines' inside a header element; existing SignInScreen and SettingsScreen tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-screens.ac4",
+            "title": "grep -rn \"from 'lucide-react'\" apps/mobile/src produces no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "native-sting",
+        "title": "Play the logo sting on a cold start of the native app",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T21:47:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5208",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/ShellApp.tsx",
+            "apps/mobile/src/shell/__tests__/ShellApp.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/shell/__tests__/ShellApp.test.tsx",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "ShellApp.test.tsx passes",
+            "typecheck:mobile exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13 step 4, D-9. In apps/mobile/src/shell/ShellApp.tsx render <LogoSting ready={stingReady} /> (from the frontend components/mobile/LogoSting) as the last child of div[data-component=mobile-shell], in every boot state, with stingReady = boot.kind === 'failed' || (boot.kind === 'ready' && (account === null || (services !== null && (!inMachineView || hasSnapshot)))) and hasSnapshot from useConnectionState (PRD D-10; use the component's existing variables that drive those render branches). sessionStorage survives the machine-switch reload, so it plays once per app process. Add cases to apps/mobile/src/shell/__tests__/ShellApp.test.tsx."
+        },
+        "items": [
+          {
+            "id": "native-sting.ac1",
+            "title": "Given an empty sessionStorage, the first ShellApp render contains [data-component=logo-sting]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-sting.ac2",
+            "title": "Given sessionStorage['overdeck.logoSting.played']='1', ShellApp renders no [data-component=logo-sting]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-sting.ac3",
+            "title": "Every pre-existing ShellApp.test.tsx case passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "browser-checks",
+        "title": "Add browser checks for sting, reduced motion and /m appearance, and list new tests in CI",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T21:47:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5208",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-5208-mobile-screens.spec.ts",
+            "src/dashboard/frontend/tests/pan-2355-mobile.spec.ts",
+            "src/dashboard/frontend/tests/pan-4661-mobile-pipeline.spec.ts",
+            "src/dashboard/frontend/tests/pan-5045-mobile-conversation-groups.spec.ts",
+            "src/dashboard/frontend/package.json",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-2355-mobile.spec.ts tests/pan-4661-mobile-pipeline.spec.ts tests/pan-5045-mobile-conversation-groups.spec.ts tests/pan-5208-mobile-screens.spec.ts",
+            "npm run test:frontend-subset"
+          ],
+          "expected_outputs": [
+            "all four Playwright specs pass",
+            "the frontend subset run passes and lists LogoSting.test.tsx"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-10",
+            "FR-11",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14. (1) In src/dashboard/frontend/tests/pan-2355-mobile.spec.ts, pan-4661-mobile-pipeline.spec.ts and pan-5045-mobile-conversation-groups.spec.ts add context.addInitScript(() => sessionStorage.setItem('overdeck.logoSting.played','1')) after each browser.newContext. (2) In pan-5208-mobile-screens.spec.ts seed overdeck.appearance instead of overdeck.ui.theme and add the three tests from the PRD (sting once per session, reduced motion no animations, appearance via Settings persists and sends no PUT /api/settings/ui-theme); use getByRole exact: true for Light/Dark/Settings. (3) Add the spec to test:playwright in src/dashboard/frontend/package.json. (4) Add the five new frontend test files to scripts/frontend-test-subset.txt in sorted position. Keep each test at 3 page loads or fewer; isolated contexts only."
+        },
+        "items": [
+          {
+            "id": "browser-checks.ac1",
+            "title": "Given a fresh context with reducedMotion no-preference, when /m loads, then [data-component=logo-sting] is visible, detaches within 5000 ms, and after page.reload() has count 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-checks.ac2",
+            "title": "Given reducedMotion reduce, when /m loads, then document.getAnimations() has no animation whose effect target is inside [data-component=logo-sting] while the overlay exists and the overlay detaches within 2000 ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-checks.ac3",
+            "title": "Tapping Settings then Dark gives <html> the dark class, the class survives a reload, and no recorded request is PUT /api/settings/ui-theme",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-checks.ac4",
+            "title": "scripts/frontend-test-subset.txt contains LogoSting.test.tsx, MobileChrome.test.tsx, brand.test.tsx, useMobileAppearance.test.ts and lib/__tests__/appearance.test.ts in sorted position, and the test:playwright script contains tests/pan-5208-mobile-screens.spec.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "after-evidence",
+        "title": "Capture after screenshots and the native machine list, and write the acceptance file",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T21:47:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5208",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/acceptance/PAN-5208.md",
+            "apps/mobile/acceptance/pan-5208-after-*.png",
+            "apps/mobile/acceptance/pan-5208-native-*.png"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx playwright test tests/pan-5208-mobile-screens.spec.ts",
+            "ls apps/mobile/acceptance/pan-5208-after-*.png | wc -l"
+          ],
+          "expected_outputs": [
+            "the spec passes",
+            "the ls count prints 12"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-9",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15, D-17. Run pan-5208-mobile-screens.spec.ts on the finished tree and copy the 12 PNGs to apps/mobile/acceptance/pan-5208-after-<device>-<theme>-<tab>.png. Capture the native machine list light and dark: implementation checkpoint — try the iOS Simulator on the Mac rig, then an Android emulator (apps/mobile/README.md); if neither is reachable, record the deviation and cite the MachinesScreen.test.tsx evidence instead. Write apps/mobile/acceptance/PAN-5208.md (never a section in ACCEPTANCE.md) with a 12-row before/after table, the native evidence or deviation, and the commands run. Link the table from the PR body."
+        },
+        "items": [
+          {
+            "id": "after-evidence.ac1",
+            "title": "apps/mobile/acceptance/PAN-5208.md contains a table with 12 rows, each linking one pan-5208-before-*.png and the matching pan-5208-after-*.png",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "after-evidence.ac2",
+            "title": "PAN-5208.md contains links to native machine-list screenshots in light and dark, or contains the recorded deviation with its reason and the MachinesScreen.test.tsx test names used instead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "after-evidence.ac3",
+            "title": "git diff origin/main -- apps/mobile/ACCEPTANCE.md produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the phone look, sting and /m appearance, and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T21:47:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5208",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/phone.mdx",
+            "apps/mobile/README.md",
+            "changelog.d/pan-5208.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5",
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16. configuration/phone.mdx: rewrite ## Appearance to cover both the app (Settings -> Appearance) and the browser phone view (gear in the header; stored in this browser only; never changes the desktop dashboard theme), and add ## Look and feel (logo animation once when the app opens / once per browser session in /m, tap to skip, Reduce Motion shows it without movement; install and notification hints in one dismissible banner that stay in Settings). apps/mobile/README.md: note in the src/shell/ module row that the appearance store lives in src/dashboard/frontend/src/lib/appearance.ts and src/shell/appearance.ts keeps the native side effects. .overdeck/context/codebase/architecture.md line 18: note the shared store (leave the last-verified line unchanged). changelog.d/pan-5208.md with the #### Improved bullet from the PRD."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "configuration/phone.mdx no longer contains 'not the browser phone view' and its Appearance section names the gear in the header of the browser phone view",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "configuration/phone.mdx has a '## Look and feel' heading that states a tap skips the logo animation and Reduce Motion shows it without movement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "changelog.d/pan-5208.md has exactly one '#### Improved' heading with one bullet linking https://github.com/eltmon/overdeck/issues/5208, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "apps/mobile/README.md contains the path src/dashboard/frontend/src/lib/appearance.ts in its src/shell/ module row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "baseline-screens",
+        "to": "m-appearance-controller",
+        "type": "blocks"
+      },
+      {
+        "from": "baseline-screens",
+        "to": "m-header-tabbar",
+        "type": "blocks"
+      },
+      {
+        "from": "baseline-screens",
+        "to": "needs-you-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "baseline-screens",
+        "to": "conversation-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "baseline-screens",
+        "to": "pipeline-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "baseline-screens",
+        "to": "native-screens",
+        "type": "blocks"
+      },
+      {
+        "from": "baseline-screens",
+        "to": "native-sting",
+        "type": "blocks"
+      },
+      {
+        "from": "baseline-screens",
+        "to": "m-settings-sheet",
+        "type": "blocks"
+      },
+      {
+        "from": "appearance-core",
+        "to": "appearance-choice",
+        "type": "blocks"
+      },
+      {
+        "from": "appearance-core",
+        "to": "m-appearance-controller",
+        "type": "blocks"
+      },
+      {
+        "from": "appearance-choice",
+        "to": "m-settings-sheet",
+        "type": "blocks"
+      },
+      {
+        "from": "appearance-choice",
+        "to": "native-screens",
+        "type": "blocks"
+      },
+      {
+        "from": "brand-components",
+        "to": "logo-sting",
+        "type": "blocks"
+      },
+      {
+        "from": "brand-components",
+        "to": "m-header-tabbar",
+        "type": "blocks"
+      },
+      {
+        "from": "brand-components",
+        "to": "needs-you-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "brand-components",
+        "to": "conversation-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "brand-components",
+        "to": "pipeline-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "brand-components",
+        "to": "native-screens",
+        "type": "blocks"
+      },
+      {
+        "from": "brand-components",
+        "to": "m-watermark-sting",
+        "type": "blocks"
+      },
+      {
+        "from": "m-settings-sheet",
+        "to": "m-header-tabbar",
+        "type": "blocks"
+      },
+      {
+        "from": "m-appearance-controller",
+        "to": "m-header-tabbar",
+        "type": "blocks"
+      },
+      {
+        "from": "m-header-tabbar",
+        "to": "m-hints-banner",
+        "type": "blocks"
+      },
+      {
+        "from": "m-settings-sheet",
+        "to": "m-hints-banner",
+        "type": "blocks"
+      },
+      {
+        "from": "m-hints-banner",
+        "to": "m-watermark-sting",
+        "type": "blocks"
+      },
+      {
+        "from": "logo-sting",
+        "to": "m-watermark-sting",
+        "type": "blocks"
+      },
+      {
+        "from": "logo-sting",
+        "to": "native-sting",
+        "type": "blocks"
+      },
+      {
+        "from": "baseline-screens",
+        "to": "browser-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "m-watermark-sting",
+        "to": "browser-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "m-appearance-controller",
+        "to": "browser-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "m-header-tabbar",
+        "to": "browser-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "logo-sting",
+        "to": "browser-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "brand-components",
+        "to": "browser-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "appearance-core",
+        "to": "browser-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "m-settings-sheet",
+        "to": "browser-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "browser-checks",
+        "to": "after-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "needs-you-rows",
+        "to": "after-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-rows",
+        "to": "after-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "pipeline-rows",
+        "to": "after-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "native-screens",
+        "to": "after-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "native-sting",
+        "to": "after-evidence",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

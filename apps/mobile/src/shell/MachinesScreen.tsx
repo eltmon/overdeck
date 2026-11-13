@@ -2,6 +2,17 @@
 import type { DirectoryWebClient } from '@overdeck/anywhere-channel/web';
 import type { DirectoryMachine } from '@overdeck/contracts';
 
+import {
+  LogoWatermark,
+  MOBILE_ROW_META_CLASS,
+  MOBILE_ROW_TITLE_CLASS,
+  MobileEmptyState,
+  MobileScreenHeader,
+  OverdeckLockup,
+  PlusIcon,
+  SettingsIcon,
+} from '../../../../src/dashboard/frontend/src/components/mobile/brand';
+
 import { MIN_PAN_VERSION } from './config';
 import { connectionText } from './connection';
 import { useDirectoryMachines, useDirectoryState } from './directory';
@@ -22,6 +33,8 @@ interface MachinesScreenProps {
   /** Default `location.assign`: switching machines reloads the page (C-7). */
   navigate?: (path: string) => void;
 }
+
+const HEADER_ICON_BUTTON = 'flex min-h-11 min-w-11 items-center justify-center text-muted-foreground active:text-foreground';
 
 export function isOutdated(machine: DirectoryMachine): boolean {
   return compareVersions(machine.serverVersion, MIN_PAN_VERSION) < 0;
@@ -47,17 +60,21 @@ export function MachinesScreen({ client, paired, onPair, onSettings, onSignedOut
 
   return (
     <section data-component="machines-screen" className="flex min-h-0 flex-1 flex-col">
-      <header className="flex min-h-11 items-center justify-between gap-3 border-b border-border px-4 pt-[env(safe-area-inset-top)]">
-        <h1 className="text-base font-medium">Machines</h1>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => onPair(null)} className="min-h-11 px-2 text-sm text-foreground">
-            Pair a machine
-          </button>
-          <button type="button" onClick={onSettings} className="min-h-11 px-2 text-sm text-foreground">
-            Settings
-          </button>
-        </div>
-      </header>
+      <MobileScreenHeader
+        leading={<OverdeckLockup className="h-6" />}
+        trailing={
+          <>
+            <button type="button" onClick={() => onPair(null)} className={HEADER_ICON_BUTTON}>
+              <PlusIcon className="h-5 w-5" aria-hidden />
+              <span className="sr-only">Pair a machine</span>
+            </button>
+            <button type="button" onClick={onSettings} className={`${HEADER_ICON_BUTTON} -mr-2`}>
+              <SettingsIcon className="h-5 w-5" aria-hidden />
+              <span className="sr-only">Settings</span>
+            </button>
+          </>
+        }
+      />
       {state === 'connecting' ? <p className="px-4 pt-3 text-sm text-muted-foreground">Connecting to overdeck.ai…</p> : null}
       {state === 'refused' ? (
         <div className="flex flex-col gap-2 px-4 pt-3">
@@ -74,41 +91,51 @@ export function MachinesScreen({ client, paired, onPair, onSettings, onSignedOut
         </div>
       ) : null}
       {state === 'off' ? <p className="px-4 pt-3 text-sm text-muted-foreground">{connectionText.directoryOffline()}</p> : null}
-      <ul className="min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
-        {rows.map((machine) => {
-          const isPaired = pairedIds.has(machine.environmentId);
-          // Advisory only: a development build ahead of the last release reports the old version.
-          // Pairing checks the machine's capabilities, and a paired machine has already passed.
-          const outdated = !isPaired && isOutdated(machine);
-          const disabled = isPaired && !machine.online;
-          return (
-            <li key={machine.environmentId} className="border-b border-border">
-              <button
-                type="button"
-                data-environment-id={machine.environmentId}
-                disabled={disabled}
-                onClick={() => open(machine)}
-                className="flex min-h-11 w-full flex-col items-start gap-1 px-4 py-3 text-left disabled:opacity-60"
-              >
-                <span className="flex w-full items-center gap-2">
-                  <span
-                    aria-label={machine.online ? 'online' : 'offline'}
-                    className={`h-2 w-2 shrink-0 rounded-full ${machine.online ? 'bg-success' : 'bg-muted-foreground'}`}
-                  />
-                  <span className="truncate text-sm font-medium text-foreground">{machine.label}</span>
-                  {isPaired ? (
-                    <span className="ml-auto shrink-0 rounded-sm border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-                      Paired
+      {/* PAN-5208 D-14: the faint watermark sits behind the scroller and never takes taps. */}
+      <div className="relative min-h-0 flex-1">
+        <LogoWatermark />
+        <div className="relative h-full overflow-y-auto pb-[env(safe-area-inset-bottom)]">
+          <h2 className="px-4 pb-1 pt-4 text-sm font-medium text-foreground">Machines</h2>
+          {state === 'online' && rows.length === 0 ? (
+            <MobileEmptyState title="No machines yet." detail="Pair a machine to see it here." />
+          ) : null}
+          <ul>
+            {rows.map((machine) => {
+              const isPaired = pairedIds.has(machine.environmentId);
+              // Advisory only: a development build ahead of the last release reports the old version.
+              // Pairing checks the machine's capabilities, and a paired machine has already passed.
+              const outdated = !isPaired && isOutdated(machine);
+              const disabled = isPaired && !machine.online;
+              return (
+                <li key={machine.environmentId} className="border-b border-border">
+                  <button
+                    type="button"
+                    data-environment-id={machine.environmentId}
+                    disabled={disabled}
+                    onClick={() => open(machine)}
+                    className="flex min-h-14 w-full flex-col items-start gap-1 px-4 py-3 text-left active:bg-muted disabled:opacity-60"
+                  >
+                    <span className="flex w-full items-center gap-2">
+                      <span
+                        aria-label={machine.online ? 'online' : 'offline'}
+                        className={`h-2 w-2 shrink-0 rounded-full ${machine.online ? 'bg-success' : 'bg-muted-foreground'}`}
+                      />
+                      <span className={MOBILE_ROW_TITLE_CLASS}>{machine.label}</span>
+                      {isPaired ? (
+                        <span className="ml-auto shrink-0 rounded-sm border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                          Paired
+                        </span>
+                      ) : null}
                     </span>
-                  ) : null}
-                </span>
-                <span className="font-mono text-xs text-muted-foreground">{machine.fingerprint}</span>
-                {outdated ? <span className="text-xs text-muted-foreground">{connectionText.outdated(machine.label)}</span> : null}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+                    <span className={`${MOBILE_ROW_META_CLASS} font-mono`}>{machine.fingerprint}</span>
+                    {outdated ? <span className={MOBILE_ROW_META_CLASS}>{connectionText.outdated(machine.label)}</span> : null}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </div>
     </section>
   );
 }

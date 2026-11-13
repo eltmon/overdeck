@@ -13,7 +13,7 @@ Design: [PAN-4837 PRD](../../.pan/drafts/PAN-4837.md) (this app) and the epic
 | Path | What lives there |
 | --- | --- |
 | `src/main.tsx` | Entry. Sets `__OVERDECK_NATIVE__`, installs the channel shims, then loads the shell (D-3). |
-| `src/shell/` | The app's own screens and logic: sign-in (`signIn.ts`), the directory and dial policy (`directory.ts`, `connection.ts`, `relayMeter.ts`), pairing (`pairing.ts`), the machine list, pair, settings, removed-machine and machine views, sign-out, account deletion (`accountDeletion.ts`, PAN-5107), the foreground resume path (`lifecycle.ts`), and the System/Light/Dark appearance setting and controller (`appearance.ts`, PAN-5041). |
+| `src/shell/` | The app's own screens and logic: sign-in (`signIn.ts`), the directory and dial policy (`directory.ts`, `connection.ts`, `relayMeter.ts`), pairing (`pairing.ts`), the machine list, pair, settings, removed-machine and machine views, sign-out, account deletion (`accountDeletion.ts`, PAN-5107), the foreground resume path (`lifecycle.ts`), and the System/Light/Dark appearance controller (`appearance.ts`, PAN-5041). The appearance store itself lives in `src/dashboard/frontend/src/lib/appearance.ts`, shared with the `/m` web shell (PAN-5208); `src/shell/appearance.ts` re-exports it and keeps the native side effects. |
 | `src/native/` | The `OverdeckKeys` plugin bridge (`keys.ts`), its `localStorage` stand-in for a desktop browser (`keys-web.ts`), push registration (`push.ts`), the `OverdeckLiveActivity` bridge (`liveActivity.ts`, PAN-4839), and the `OverdeckAppearance` bridge (`appearance.ts`, PAN-5041). |
 | `android/` | The Capacitor Android project. App code is in `app/src/main/java/ai/overdeck/app/` (`OverdeckKeysPlugin`, `SecureStore`, `OverdeckAppearancePlugin`, and the push path: `OverdeckMessagingService`, `PushHandler`, `PushNotice`, `PushNotifier`, `SealedBox`, `OverdeckPushPlugin`). |
 | `ios/` | The Capacitor iOS project (Swift Package Manager). App code is in `ios/App/App/` (`OverdeckKeysPlugin.swift`, `OverdeckLiveActivityPlugin.swift`, `OverdeckAppearancePlugin.swift`, `MainViewController.swift`, `App.entitlements`). |
@@ -221,8 +221,10 @@ you"; a push after sign-out posts nothing. A tap opens `ai.overdeck.app:/open#v=
 ## Appearance
 
 The System/Light/Dark setting (PAN-5041, Settings → Appearance) is held in `localStorage` as
-`overdeck.appearance` and owned by `src/shell/appearance.ts`, which resolves it against the OS
-preference and applies it to the dashboard theme, the status bar (`SystemBars`) and native chrome.
+`overdeck.appearance`. The store (read, write, subscribe, resolve) lives in
+`src/dashboard/frontend/src/lib/appearance.ts`, shared with the `/m` web shell (PAN-5208), and
+`src/shell/appearance.ts` resolves it against the OS preference and applies it to the dashboard
+theme, the status bar (`SystemBars`) and native chrome.
 An inline script in `index.html` applies the `.dark` class before first paint, ahead of any JS
 module load. The native plugin (`OverdeckAppearance`, `src/native/appearance.ts`) keeps its own
 copy — UserDefaults on iOS, SharedPreferences on Android — used only at launch (`storedStyle()`

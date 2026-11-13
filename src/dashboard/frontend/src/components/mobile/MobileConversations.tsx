@@ -16,8 +16,10 @@
  */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChevronRight, Plus } from 'lucide-react';
 import { parseLinkedConversationName } from '@overdeck/contracts';
 import { ConversationPanel } from '../chat/ConversationPanel';
+import { MOBILE_ROW_AGE_CLASS, MOBILE_ROW_CLASS, MOBILE_ROW_META_CLASS, MOBILE_ROW_TITLE_CLASS, MobileEmptyState } from './brand';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import type { RegisteredProjectLite } from '../CommandDeck/projectsData';
 import { fetchWithTimeout } from '../../lib/apiFetch';
@@ -76,7 +78,9 @@ function ConversationListView({ onOpen }: { onOpen: (id: string) => void }) {
   if (isError) return <p className="px-4 py-6 text-sm text-muted-foreground">Couldn’t load conversations.</p>;
 
   const groups = groupMobileConversations(data ?? [], projectsQuery.isError ? null : projectsQuery.data ?? []);
-  if (groups.length === 0) return <p className="px-4 py-6 text-sm text-muted-foreground">No conversations.</p>;
+  if (groups.length === 0) {
+    return <MobileEmptyState title="No conversations." detail="Conversations you start on any machine show up here." />;
+  }
 
   function toggle(key: string) {
     setExpanded((prev) => {
@@ -120,9 +124,12 @@ function ConversationListView({ onOpen }: { onOpen: (id: string) => void }) {
                 onClick={() => toggle(group.key)}
                 className="flex min-h-11 flex-1 items-center gap-2 text-left"
               >
-                <span aria-hidden="true">{isOpen ? '▾' : '▸'}</span>
+                <ChevronRight
+                  aria-hidden
+                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                />
                 <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{group.label}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">{group.rows.length}</span>
+                <span className={MOBILE_ROW_AGE_CLASS}>{group.rows.length}</span>
               </button>
               {group.canCreate ? (
                 <button
@@ -130,9 +137,9 @@ function ConversationListView({ onOpen }: { onOpen: (id: string) => void }) {
                   aria-label={`New conversation in ${group.label}`}
                   disabled={pendingKey === group.key}
                   onClick={() => handleCreate(group.key)}
-                  className="min-h-11 min-w-11 px-3 text-lg text-foreground"
+                  className="-mr-2 flex min-h-11 min-w-11 items-center justify-center text-foreground disabled:opacity-50"
                 >
-                  +
+                  <Plus className="h-5 w-5" aria-hidden />
                 </button>
               ) : null}
             </div>
@@ -149,13 +156,13 @@ function ConversationListView({ onOpen }: { onOpen: (id: string) => void }) {
                       <button
                         type="button"
                         onClick={() => onOpen(conversationRouteKey(c))}
-                        className="flex min-h-11 w-full items-start justify-between gap-3 px-4 py-3 text-left"
+                        className={MOBILE_ROW_CLASS}
                       >
                         <span className="min-w-0">
-                          <span className="block truncate text-sm font-medium text-foreground">{c.title?.trim() || c.name}</span>
-                          {c.issueId ? <span className="block text-xs text-muted-foreground">{c.issueId}</span> : null}
+                          <span className={MOBILE_ROW_TITLE_CLASS}>{c.title?.trim() || c.name}</span>
+                          {c.issueId ? <span className={MOBILE_ROW_META_CLASS}>{c.issueId}</span> : null}
                         </span>
-                        <span className="shrink-0 text-xs text-muted-foreground">{formatRelativeTime(recencyAt(c), now)}</span>
+                        <span className={MOBILE_ROW_AGE_CLASS}>{formatRelativeTime(recencyAt(c), now)}</span>
                       </button>
                     </li>
                   ))}

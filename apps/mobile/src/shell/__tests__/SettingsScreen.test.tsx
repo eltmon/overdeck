@@ -318,3 +318,13 @@ describe('SettingsScreen delete account (PAN-5107)', () => {
     expect(screen.queryByRole('button', { name: 'Delete account' })).toBeNull();
   });
 });
+
+describe('SettingsScreen header (PAN-5208)', () => {
+  it('puts the ‹ Machines back button and the Settings title in a header', () => {
+    const { container } = renderSettings();
+    const header = container.querySelector('header');
+    expect(header).not.toBeNull();
+    expect(header?.contains(screen.getByRole('button', { name: '‹ Machines' }))).toBe(true);
+    expect(header?.contains(screen.getByRole('heading', { name: 'Settings' }))).toBe(true);
+  });
+});

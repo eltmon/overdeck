@@ -40,6 +40,12 @@ function renderMenu(over: Partial<ExplorerContextMenuProps> = {}) {
     onOpen: vi.fn(),
     onFindInFolder: vi.fn(),
     onGitChanged: vi.fn(),
+    writable: false,
+    onNewFile: vi.fn(),
+    onNewFolder: vi.fn(),
+    onRename: vi.fn(),
+    onDuplicate: vi.fn(),
+    onDelete: vi.fn(),
     children: <div>tree</div>,
     ...over,
   }
@@ -129,5 +135,44 @@ describe('ExplorerContextMenu', () => {
   it('shows no Open for a folder target', () => {
     renderMenu({ targets: [{ path: 'src', kind: 'dir', absPath: '/ws/src' }] })
     expect(screen.queryByRole('menuitem', { name: 'Open' })).toBeNull()
+  })
+
+  describe('write actions (PAN-5190)', () => {
+    const WRITE_ITEMS = ['New file', 'New folder', 'Rename', 'Duplicate', 'Delete']
+
+    it('renders every write action for one target in a writable issue tree', () => {
+      renderMenu({ writable: true })
+      for (const name of WRITE_ITEMS) expect(item(name)).toBeInTheDocument()
+    })
+
+    it('renders no write action on a project root', () => {
+      renderMenu({ rootId: 'project:overdeck', rootKind: 'project', writable: false })
+      for (const name of WRITE_ITEMS) expect(screen.queryByRole('menuitem', { name })).toBeNull()
+    })
+
+    it('offers only Delete for two targets, and only New for none', () => {
+      renderMenu({ writable: true, targets: [FILE_A, FILE_B] })
+      expect(item('Delete')).toBeInTheDocument()
+      for (const name of ['New file', 'New folder', 'Rename', 'Duplicate']) expect(screen.queryByRole('menuitem', { name })).toBeNull()
+    })
+
+    it('offers New file and New folder with no target', () => {
+      renderMenu({ writable: true, targets: [] })
+      expect(item('New file')).toBeInTheDocument()
+      expect(item('New folder')).toBeInTheDocument()
+      expect(screen.queryByRole('menuitem', { name: 'Delete' })).toBeNull()
+    })
+
+    it('routes each write item to its callback', () => {
+      const rename = renderMenu({ writable: true })
+      fireEvent.click(item('Rename'))
+      expect(rename.onRename).toHaveBeenCalledWith('src/a.ts')
+    })
+
+    it('routes Delete with every target path', () => {
+      const props = renderMenu({ writable: true, targets: [FILE_A, FILE_B] })
+      fireEvent.click(item('Delete'))
+      expect(props.onDelete).toHaveBeenCalledWith(['src/a.ts', 'src/b.ts'])
+    })
   })
 })

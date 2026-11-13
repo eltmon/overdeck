@@ -1,0 +1,1188 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-13T19:35:44Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5190: File explorer E: file actions, undo/redo, OS drop, drag to composer",
+    "updated": "2026-11-13T20:35:36.090Z"
+  },
+  "plan": {
+    "id": "pan-5190",
+    "title": "File explorer E: file actions, undo/redo, OS drop, drag to composer",
+    "status": "running",
+    "uid": "f4a7f955-e0da-44dd-9b5e-15f902c9dd23",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-11-13T19:35:44Z",
+    "updated": "2026-11-13T20:35:36.090Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5190",
+        "label": "PAN-5190",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5190/.pan/drafts/pan-5190.md",
+        "label": "PRD draft (.pan/drafts/pan-5190.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5183",
+        "label": "Parent PAN-5183 (.pan/drafts/pan-5183.md, WI-13)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "file-explorer",
+      "undo",
+      "drag-and-drop",
+      "composer"
+    ],
+    "narratives": {
+      "Problem": "The explorer pane (PAN-5186) and code pane (PAN-5187) can read and edit files, but the tree has no way to create, rename, duplicate, move or delete entries, no undo, no upload from the OS, and no way to hand file paths to an agent's composer. The write RPCs already exist on the server (PAN-5187) and the upload route in PAN-5188.",
+      "Proposal": "A frontend-only slice under components/explorer/actions/: write wrappers in the one RPC seam, a step-wise per-root undo stack ported from Orca, pure name/move rules, an actions core whose single runWrite seam every write goes through (PAN-5191 later wraps it for edit workspaces), an inline name row, menu/header/keyboard wiring, HTML5 drag move with hover expand and edge scroll, OS-drop upload through PAN-5188's client, and a composer drop that inserts root-relative paths at the caret. Project roots and the Changed view get no write actions. See .pan/drafts/pan-5190.md for decisions D-E1..D-E20.",
+      "NonGoals": "- Write actions on project: roots, and edit workspaces (PAN-5191).\n- Write actions while the Changed filter is on.\n- Moving entries between two different explorer roots.\n- Uploading OS folders (walking their contents) or overwriting an existing file on upload.\n- Byte-level upload progress.\n- Path drops on any target other than ComposerFooter (SubagentComposer, AgentTellForm, terminals, external apps), and absolute paths in the drop.\n- File copy/paste shortcuts (Ctrl/Cmd+C/V) and a Ctrl/Cmd+D duplicate key.\n- Persisting undo history across reloads.\n- The user page features/file-explorer.mdx (PAN-5191).\n- Any server, contract, RPC method, HTTP route or no-loss-matrix change.\n- Recreating any PAN-5187 or PAN-5188 file (code-drafts, save queue, write handlers, explorer-http.ts) if those issues have not merged."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Project roots get no write actions in this issue; every write goes through one runWrite seam that PAN-5191 wraps (D-E1, D-E3).",
+        "rationale": "Parent WI-13 step 9 needs withEditWorkspace, which PAN-5191 builds and PAN-5191 depends on this issue; PAN-5186 D-B7 and PAN-5187 D-C12 set the same read-only precedent."
+      },
+      {
+        "summary": "No write actions while the Changed filter is on (D-E2).",
+        "rationale": "Changed-view rows are synthesized from git status and can be deleted files or unlisted folders, so writes there are ambiguous."
+      },
+      {
+        "summary": "Undo ops are step-wise; refusals (ALREADY_EXISTS, NOT_FOUND, INVALID_TARGET) keep the op for retry, other errors drop it (D-E4).",
+        "rationale": "Orca keeps refused ops; making ops step-wise keeps multi-item actions retryable without replaying steps that already ran."
+      },
+      {
+        "summary": "Delete sends one explorerDelete call per top-level path (D-E6).",
+        "rationale": "trashPaths throws without returning the ids it already moved on a mid-batch failure; per-path calls keep every moved entry undoable."
+      },
+      {
+        "summary": "Undo of create, duplicate and upload moves the file to the trash, and redo restores it (D-E7).",
+        "rationale": "Content written into a new file after creation survives an undo and redo round trip."
+      },
+      {
+        "summary": "OS-drop folders are detected via webkitGetAsEntry().isDirectory only, without walking them (D-E16).",
+        "rationale": "The parent PRD rules out folder traversal; the flag is the only reliable signal that a dropped item is a folder."
+      },
+      {
+        "summary": "The drag payload sets two custom MIME types and no text/plain (D-E15).",
+        "rationale": "Keeps other dashboard text fields from accepting tree drags; the composer reads its own type."
+      },
+      {
+        "summary": "PAN-5188 is treated as a dependency of the OS-drop item only; that item blocks until it merges.",
+        "rationale": "Only uploads need uploadExplorerFile; the rest of the issue can ship on PAN-5186 + PAN-5187."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "This is one child (WI-13) of an epic the parent PRD already split into seven issues. All code is one frontend surface: components/explorer/ plus one small composer hook, and about half of the ~40 files are co-located test files. The serialized chain exists because ExplorerPane.tsx is the single integration point; splitting into more sibling issues would serialize the same file across PRs and leave half-wired menus on main between them. Subsystem count is 5 (src/dashboard plus four root-level files).",
+      "canonicalFilename": "2026-11-13-PAN-5190-file-explorer-e-file-actions-undo-redo-os-drop-drag-to-composer.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "rpc-write-wrappers",
+        "title": "Add create/rename/copy/trash/restore wrappers to explorer-rpc.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:35:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5190",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/explorer-rpc.ts",
+            "src/dashboard/frontend/src/components/explorer/__tests__/explorer-rpc.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/__tests__/explorer-rpc.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "1 test file(s) pass: explorer-rpc.test.ts",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E1",
+            "NFR-E1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-5190.md WI-E1. First run `pan sync-main PAN-5190` and confirm explorer/code/code-drafts.ts, explorer/code/useCodePaneSave.ts and a `[WS_METHODS.explorerRestore]` handler in src/dashboard/server/ws-rpc-explorer.ts exist; if not, PAN-5187 has not merged: stop, `pan tell flywheel-orchestrator`, and never recreate them. Then add createEntry, renameEntry, copyEntry, trashPath (one path per explorerDelete call, returns trashIds[0], rejects on an empty list) and restoreEntry to explorer-rpc.ts, following the writeFile wrapper's shape."
+        },
+        "items": [
+          {
+            "id": "rpc-write-wrappers.ac1",
+            "title": "Given the fake transport, when each of createEntry, renameEntry, copyEntry and restoreEntry is called, then it sends the matching pan.explorer* method with exactly the PRD payload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rpc-write-wrappers.ac2",
+            "title": "Given explorerDelete returns trashIds ['t1'], when trashPath(root, 'a') is called, then it sends paths ['a'] and returns 't1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rpc-write-wrappers.ac3",
+            "title": "Given explorerDelete returns an empty trashIds list, when trashPath is called, then the promise rejects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "undo-stack",
+        "title": "Port Orca's undo stack as a step-wise per-root stack",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:35:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5190",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/actions/undo-stack.ts",
+            "scripts/upstream-ports.json",
+            "src/dashboard/frontend/src/components/explorer/actions/__tests__/undo-stack.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/actions/__tests__/undo-stack.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "1 test file(s) pass: undo-stack.test.ts",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E7",
+            "NFR-E5",
+            "NFR-E6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-5190.md WI-E2 and D-E4/D-E9. New explorer/actions/undo-stack.ts with the exact API in the PRD (commitOp, undo, redo, undoEntry, hasUndo, hasRedo, clearUndoHistory, MAX_UNDO_OPS = 50, REFUSAL_CODES = ALREADY_EXISTS/NOT_FOUND/INVALID_TARGET). Port header naming Orca fileExplorerUndoRedo.ts @ c6b9ac9549b, and append one row to scripts/upstream-ports.json (keep every existing row)."
+        },
+        "items": [
+          {
+            "id": "undo-stack.ac1",
+            "title": "Given an op with three steps, when undo runs, then the steps' undo functions run last to first and undo returns the op's label; redo then runs them first to last",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "undo-stack.ac2",
+            "title": "Given a refusal (code ALREADY_EXISTS) on step 2 of 3 during undo, when undo is called again, then only the remaining steps run and the op is not lost",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "undo-stack.ac3",
+            "title": "Given a non-refusal error during undo, when hasUndo is read, then the op has been dropped from history and the error was rethrown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "undo-stack.ac4",
+            "title": "Given 51 committed ops, when undo is called 51 times, then only 50 ops are undone; and undoEntry on a non-top op runs its undo without adding it to redo",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "name-rules",
+        "title": "Add pure name, duplicate and move rules",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:35:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5190",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/actions/name-rules.ts",
+            "scripts/upstream-ports.json",
+            "src/dashboard/frontend/src/components/explorer/actions/__tests__/name-rules.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/actions/__tests__/name-rules.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "1 test file(s) pass: name-rules.test.ts",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E2",
+            "FR-E4",
+            "FR-E6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-5190.md WI-E3, D-E11, D-E12, D-E13. New explorer/actions/name-rules.ts exporting joinPath, validateEntryName, duplicateName, topLevelPaths, planMoves, rewritePath and isAtOrUnder exactly as the PRD signatures say, reusing parentPath and baseName from tree/explorer-tree-model.ts. Port header for the copy-name loop of Orca useFileDuplicate.ts @ c6b9ac9549b; append one row to scripts/upstream-ports.json."
+        },
+        "items": [
+          {
+            "id": "name-rules.ac1",
+            "title": "Given siblings ['a.ts', 'a copy.ts'], when duplicateName('a.ts', siblings) runs, then it returns 'a copy 2.ts'; '.env' returns '.env copy' and 'archive.tar.gz' returns 'archive.tar copy.gz'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "name-rules.ac2",
+            "title": "Given each invalid name from D-E11 (empty, '.', '..', 'a/b', '.GIT', an existing sibling), when validateEntryName runs, then it returns the exact D-E11 error message; renaming to the current name returns { name }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "name-rules.ac3",
+            "title": "Given ['a/b', 'a', 'c'], when topLevelPaths runs, then it returns ['a', 'c']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "name-rules.ac4",
+            "title": "Given a source already in destDir and a folder moved into its own child, when planMoves runs, then the first is omitted from moves and the second is listed in intoItself; rewritePath leaves 'ab' unchanged for from 'a'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "actions-core",
+        "title": "Add the explorer actions core with the runWrite seam",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:35:44Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5190",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/actions/useExplorerActions.ts",
+            "src/dashboard/frontend/src/components/explorer/explorerStore.ts",
+            "src/dashboard/frontend/src/components/explorer/actions/__tests__/useExplorerActions.test.ts",
+            "src/dashboard/frontend/src/components/explorer/__tests__/explorerStore.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/actions/__tests__/useExplorerActions.test.ts src/components/explorer/__tests__/explorerStore.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "2 test file(s) pass: useExplorerActions.test.ts, explorerStore.test.ts",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E1",
+            "FR-E2",
+            "FR-E3",
+            "FR-E4",
+            "FR-E5",
+            "FR-E6",
+            "FR-E7",
+            "NFR-E1"
+          ],
+          "foundationFor": [
+            "create-rename-ui",
+            "duplicate-delete-ui",
+            "tree-action-keys",
+            "drag-move",
+            "os-drop-upload"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-5190.md WI-E4 and D-E1–D-E7, D-E19, D-E20. New explorer/actions/useExplorerActions.ts with createExplorerActions/useExplorerActions and the ExplorerActions interface exactly as in the PRD; add renamePaths and clearSelection to explorerStore.ts. Rename/move must follow D-E5's six-step order (await codeSaveQueue.whenIdle for affected draft keys, renameEntry, rekey drafts, updatePane in every deck, renamePaths, reload parents + refreshGit). Delete is one trashPath call per top-level path (D-E6). Create/duplicate/upload steps trash on undo and restore on redo (D-E7). Every write goes through runWrite, which rejects project roots."
+        },
+        "items": [
+          {
+            "id": "actions-core.ac1",
+            "title": "Given a folder with open code panes in two decks, when rename runs, then both panes get the new explorerPath and label, both drafts are rekeyed, whenIdle resolved before renameEntry was called, and rekey ran before updatePane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "actions-core.ac2",
+            "title": "Given remove(['a', 'a/b', 'c']), when it runs, then trashPath is called for 'a' and 'c' only; undo calls restoreEntry with both trash ids in reverse order, and after redo the next undo uses the new ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "actions-core.ac3",
+            "title": "Given a failure on the second path of remove, when the call settles, then an op with one step is committed and a toast names the failed path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "actions-core.ac4",
+            "title": "Given a project: root, when create is called, then no RPC is sent and runWrite rejects with 'The main checkout is read-only.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "actions-core.ac5",
+            "title": "Given renamePaths(root, 'src', 'lib'), when the store is read, then expanded 'src/x' became 'lib/x', the selection and focused path were rewritten, and listings at or under 'src' were dropped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "inline-name-row",
+        "title": "Add the inline name row and its tree projection",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:35:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5190",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/actions/InlineNameRow.tsx",
+            "src/dashboard/frontend/src/components/explorer/actions/inline-edit.ts",
+            "src/dashboard/frontend/src/components/explorer/tree/ExplorerTree.tsx",
+            "src/dashboard/frontend/src/components/explorer/actions/__tests__/InlineNameRow.test.tsx",
+            "src/dashboard/frontend/src/components/explorer/actions/__tests__/inline-edit.test.ts",
+            "src/dashboard/frontend/src/components/explorer/tree/__tests__/ExplorerTree.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/actions/__tests__/InlineNameRow.test.tsx src/components/explorer/actions/__tests__/inline-edit.test.ts src/components/explorer/tree/__tests__/ExplorerTree.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "3 test file(s) pass: InlineNameRow.test.tsx, inline-edit.test.ts, ExplorerTree.test.tsx",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E2",
+            "FR-E3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-5190.md WI-E5 and D-E11, D-E18. New explorer/actions/inline-edit.ts (InlineEdit, InlineRow, isInlineRow, withInlineRow) and explorer/actions/InlineNameRow.tsx (props, stem selection, validation via validateEntryName, Enter/Escape/blur rules with the settled guard so blur after Enter or Escape does nothing, stopPropagation on every keydown, IME guard). ExplorerTree renders inline rows and the rename row through a renderInline prop and its isTreeRow skips inline rows. Load the pan-style-guide skill first."
+        },
+        "items": [
+          {
+            "id": "inline-name-row.ac1",
+            "title": "Given a create edit under folder 'src', when withInlineRow runs, then the inline row is inserted directly after the 'src' row with depth src.depth + 1; for parentDir '' it is inserted at index 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inline-name-row.ac2",
+            "title": "Given the inline row, when the user types a valid name and presses Enter, then onCommit receives the trimmed name; Escape calls onCancel; blur with the unchanged initial value calls onCancel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inline-name-row.ac3",
+            "title": "Given Escape then blur, when both events fire, then onCancel is called once and onCommit never; given Enter then blur, onCommit is called exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inline-name-row.ac4",
+            "title": "Given an invalid name, when Enter is pressed, then the D-E11 message renders under the input and onCommit is not called; an onCommit that resolves to a message keeps the row open showing it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inline-name-row.ac5",
+            "title": "Given ArrowDown or Enter with isComposing inside the input, when the key is pressed, then a parent onKeyDown does not receive it and no commit happens; in the tree, ArrowDown focus skips the inline row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "create-rename-ui",
+        "title": "Wire New file, New folder and Rename into the menu and pane header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:35:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5190",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "src/dashboard/frontend/src/components/explorer/menu/ExplorerContextMenu.tsx",
+            "src/dashboard/frontend/src/components/explorer/tree/ExplorerTree.tsx",
+            "src/dashboard/frontend/src/components/explorer/menu/__tests__/ExplorerContextMenu.test.tsx",
+            "src/dashboard/frontend/src/components/explorer/__tests__/ExplorerPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/menu/__tests__/ExplorerContextMenu.test.tsx src/components/explorer/__tests__/ExplorerPane.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "2 test file(s) pass: ExplorerContextMenu.test.tsx, ExplorerPane.test.tsx",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E1",
+            "FR-E2",
+            "FR-E3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-5190.md WI-E6 and D-E1, D-E2, D-E10. ExplorerPane computes writable (not a project root, Changed filter off), creates actions with useExplorerActions, holds inlineEdit state, adds New file/New folder header buttons, and passes write props to ExplorerContextMenu (New file, New folder, Rename; Duplicate/Delete wired as no-ops until duplicate-delete-ui). New file, New folder and Rename set a startsInlineEditRef so ContextMenuContent's onCloseAutoFocus calls preventDefault (Radix would otherwise refocus the tree and blur the new input; browser-uat scenarios 1-2 prove it). Blank-space right-click clears the selection; the empty-folder message is a menu trigger. Update the ExplorerContextMenu header comment. Clear inlineEdit when writable turns false or when a rename target's row is no longer in the projected rows (deleted on disk while the row was open)."
+        },
+        "items": [
+          {
+            "id": "create-rename-ui.ac1",
+            "title": "Given rootKind 'issue' and writable, when the menu opens on one file, then New file, New folder, Rename, Duplicate and Delete render; given rootKind 'project', none of them render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-rename-ui.ac2",
+            "title": "Given an issue root, when the header New file button is clicked and 'x.ts' + Enter is typed, then createEntry is called with (rootId, 'x.ts', 'file') and a code pane opens for x.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-rename-ui.ac3",
+            "title": "Given a project: root or the Changed filter on, when the pane renders, then the header shows no New file or New folder button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-rename-ui.ac4",
+            "title": "Given an empty issue root, when the empty-folder message is right-clicked, then the menu offers New file and New folder",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "duplicate-delete-ui",
+        "title": "Wire Duplicate and Delete with confirmation and the 8 s undo toast",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:35:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5190",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/actions/useDeleteFlow.ts",
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "src/dashboard/frontend/src/components/explorer/actions/__tests__/useDeleteFlow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/actions/__tests__/useDeleteFlow.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "1 test file(s) pass: useDeleteFlow.test.tsx",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E4",
+            "FR-E5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-5190.md WI-E7 and D-E8, D-E9. New explorer/actions/useDeleteFlow.ts returning requestDelete(paths): top-level paths, confirm (useConfirm, destructive) when more than one item or any dirty draft at or under a target, then actions.remove and a toast with an Undo action calling actions.undoEntry(opId) for 8000 ms. ExplorerPane replaces create-rename-ui's no-op onDuplicate/onDelete."
+        },
+        "items": [
+          {
+            "id": "duplicate-delete-ui.ac1",
+            "title": "Given one clean path, when requestDelete runs, then no confirm opens, actions.remove is called, and a toast with duration 8000 shows an Undo action that calls undoEntry with the returned op id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "duplicate-delete-ui.ac2",
+            "title": "Given two paths, when requestDelete runs and the confirm is cancelled, then actions.remove is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "duplicate-delete-ui.ac3",
+            "title": "Given a path with a dirty draft under it, when requestDelete runs, then the confirm opens and its message contains 'Unsaved edits in:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tree-action-keys",
+        "title": "Add F2, Delete and undo/redo keys while the tree has focus",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:35:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5190",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/actions/useTreeActionKeys.ts",
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "src/dashboard/frontend/src/components/explorer/actions/__tests__/useTreeActionKeys.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/actions/__tests__/useTreeActionKeys.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "1 test file(s) pass: useTreeActionKeys.test.ts",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E3",
+            "FR-E5",
+            "FR-E7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-5190.md WI-E8 and D-E18. New explorer/actions/useTreeActionKeys.ts returning an onKeyDown passed to ExplorerTree by ExplorerPane: F2 renames one selected path, Delete or Meta+Backspace calls requestDelete, Ctrl/Cmd+Z undoes, Ctrl/Cmd+Shift+Z redoes; ignores defaultPrevented events and events whose target is not the tree element; preventDefault on handled keys."
+        },
+        "items": [
+          {
+            "id": "tree-action-keys.ac1",
+            "title": "Given a writable tree with one selected file, when F2 is pressed, then startRename is called with that path and preventDefault is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-action-keys.ac2",
+            "title": "Given a selection, when Delete or Meta+Backspace is pressed, then requestDelete receives the selection; when the tree is not writable, nothing is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-action-keys.ac3",
+            "title": "Given an issue root, when Ctrl+Z and Ctrl+Shift+Z are pressed, then undo and redo are called; on a project root neither is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-action-keys.ac4",
+            "title": "Given a keydown whose target is a child input, when it reaches the handler, then no callback runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drag-payload",
+        "title": "Add the shared drag payload module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:35:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5190",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/explorer-drag-paths.ts",
+            "src/dashboard/frontend/src/lib/__tests__/explorer-drag-paths.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/__tests__/explorer-drag-paths.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "1 test file(s) pass: explorer-drag-paths.test.ts",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E6",
+            "FR-E9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-5190.md WI-E9 and D-E15. New src/dashboard/frontend/src/lib/explorer-drag-paths.ts with EXPLORER_PATHS_MIME = 'application/x-overdeck-paths', EXPLORER_MOVE_MIME = 'application/x-overdeck-explorer', setExplorerDragData, hasDragPaths, hasExplorerMove, readDragPaths, readExplorerMove exactly as the PRD says. It imports nothing from components/."
+        },
+        "items": [
+          {
+            "id": "drag-payload.ac1",
+            "title": "Given a fake DataTransfer, when setExplorerDragData(dt, 'issue:X', ['a', 'b/c']) runs, then readDragPaths returns ['a', 'b/c'], readExplorerMove returns { rootId: 'issue:X', paths: ['a', 'b/c'] }, and effectAllowed is 'copyMove'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drag-payload.ac2",
+            "title": "Given malformed JSON or a non-string paths array under the move type, when readExplorerMove runs, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drag-payload.ac3",
+            "title": "Given the module source, when npm run lint:circular runs, then it reports no cycle and the module has no import from components/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drag-move",
+        "title": "Add drag move with 600 ms hover expand and 24 px edge scroll",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:35:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5190",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/actions/useTreeDragMove.ts",
+            "src/dashboard/frontend/src/components/explorer/tree/ExplorerRow.tsx",
+            "src/dashboard/frontend/src/components/explorer/tree/ExplorerTree.tsx",
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "scripts/upstream-ports.json",
+            "src/dashboard/frontend/src/components/explorer/actions/__tests__/useTreeDragMove.test.tsx",
+            "src/dashboard/frontend/src/components/explorer/tree/__tests__/ExplorerTree.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/actions/__tests__/useTreeDragMove.test.tsx src/components/explorer/tree/__tests__/ExplorerTree.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "2 test file(s) pass: useTreeDragMove.test.tsx, ExplorerTree.test.tsx",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-5190.md WI-E10 and D-E10, D-E13, D-E14, D-E15. New explorer/actions/useTreeDragMove.ts with pure dragPathsFor and startRowDrag (D-E15), the ported getDragEdgeScrollTarget (port header, Orca file-explorer-drag-edge-scroll.ts @ c6b9ac9549b; append one row to scripts/upstream-ports.json), resolveDropDir and useTreeDropZone. ExplorerRow gets draggable (on every root kind, unless renaming)/onDragStart/dropTarget; ExplorerTree passes them through; ExplorerPane wraps the body in the drop zone, sets the payload on drag start, and calls actions.move on drop. Foreign-root drops toast and do nothing."
+        },
+        "items": [
+          {
+            "id": "drag-move.ac1",
+            "title": "Given a dragover on a collapsed folder row, when 599 ms pass the folder is still collapsed, and when 600 ms pass expand is called with its path; hovering another row restarts the timer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drag-move.ac2",
+            "title": "Given scrollTop 100 and localY 5 in a 300 px tree, when getDragEdgeScrollTarget runs with edgeZonePx 24, then it returns a value below 100; localY 150 returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drag-move.ac3",
+            "title": "Given a drop whose payload rootId differs from the zone's root, when it lands, then onMove is not called and the toast 'Files can only be moved within the same tree.' shows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drag-move.ac4",
+            "title": "Given a non-writable zone, when an internal move drags over it, then preventDefault is not called; resolveDropDir returns the folder for a folder row, the parent for a file row and '' for blank space",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drag-move.ac5",
+            "title": "Given selection ['a', 'a/b', 'c'], when dragPathsFor('a', selection) runs, then it returns ['a', 'c'] and dragPathsFor('x', selection) returns ['x']; startRowDrag sets both drag types, and rows render draggable on a project: root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "os-drop-upload",
+        "title": "Upload files dropped from the OS",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:35:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5190",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/actions/useOsFileDrop.ts",
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "src/dashboard/frontend/src/components/explorer/actions/__tests__/useOsFileDrop.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/actions/__tests__/useOsFileDrop.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "1 test file(s) pass: useOsFileDrop.test.ts",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-5190.md WI-E11 and D-E16. Before starting, confirm explorer/explorer-http.ts exports uploadExplorerFile (PAN-5188); if not, `pan task block` this item, tell the orchestrator, and never write a second upload client; browser-uat and docs-ci wait for this item. New explorer/actions/useOsFileDrop.ts with MAX_UPLOAD_BYTES, snapshotDroppedItems (sync, webkitGetAsEntry().isDirectory) and uploadDroppedItems (sequential through actions.runWrite, toasts per D-E16, one op via recordCreated). ExplorerPane passes onFiles to useTreeDropZone, with the read-only and Changed-view toasts."
+        },
+        "items": [
+          {
+            "id": "os-drop-upload.ac1",
+            "title": "Given two dropped files, when uploadDroppedItems runs, then the fake upload is called twice in order with destDir and recordCreated commits one op with both paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "os-drop-upload.ac2",
+            "title": "Given a folder item, when uploadDroppedItems runs, then it is skipped and a toast containing 'Drop files, not folders' shows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "os-drop-upload.ac3",
+            "title": "Given a file of 100 MiB + 1 byte, when uploadDroppedItems runs, then upload is not called for it and the '<name> is larger than 100 MiB.' toast shows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "os-drop-upload.ac4",
+            "title": "Given an ExplorerHttpError with code ALREADY_EXISTS for the first file, when uploadDroppedItems runs, then its toast shows and the second file still uploads",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "os-drop-upload.ac5",
+            "title": "Given an item whose webkitGetAsEntry reports isDirectory, when snapshotDroppedItems runs, then it returns isDirectory true; an item without webkitGetAsEntry is treated as a file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-path-drop",
+        "title": "Insert dragged tree paths into the conversation composer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:35:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5190",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/composerPathDrop.ts",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/composerPathDrop.test.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.path-drop.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/chat/__tests__/composerPathDrop.test.ts src/components/chat/__tests__/ComposerFooter.path-drop.test.tsx",
+            "npm run typecheck:frontend",
+            "wc -l src/dashboard/frontend/src/components/chat/ComposerFooter.tsx"
+          ],
+          "expected_outputs": [
+            "2 test file(s) pass: composerPathDrop.test.ts, ComposerFooter.path-drop.test.tsx",
+            "typecheck:frontend completes without errors",
+            "ComposerFooter.tsx line count is 1000 or less"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E9",
+            "NFR-E3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-5190.md WI-E12 and D-E17. New src/dashboard/frontend/src/components/chat/composerPathDrop.ts (insertPathsIntoComposer with insertRawText, append when there is no range selection). In ComposerFooter.tsx, handleDragOver accepts application/x-overdeck-paths (preventDefault, dropEffect 'copy') and handleDrop inserts readDragPaths(...) via editorRef.current before the file branch, under the existing sending/sessionAlive guard, using the exact before/after snippets in the PRD. ComposerFooter.tsx must stay at or under 1000 lines. The composerPathDrop unit test uses only the core lexical package; the ComposerFooter test mocks composerPathDrop because its harness mocks lexical."
+        },
+        "items": [
+          {
+            "id": "composer-path-drop.ac1",
+            "title": "Given an editor holding 'hello' with the caret after 'he', when insertPathsIntoComposer(editor, ['a.ts', 'b/c.ts']) runs, then the text becomes 'he' + 'a.ts' + line break + 'b/c.ts' + 'llo'; with no selection the paths are appended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-path-drop.ac2",
+            "title": "Given the ComposerFooter test harness (lexical and ComposerPromptEditor mocked) and a mocked composerPathDrop, when a drop carrying application/x-overdeck-paths lands, then insertPathsIntoComposer is called once with editorRef.current and the paths, and no attachment upload is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-path-drop.ac3",
+            "title": "Given sessionAlive false, when the same drop lands, then insertPathsIntoComposer is not called; a dragover with the type calls preventDefault",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-path-drop.ac4",
+            "title": "Given the finished change, when `wc -l src/dashboard/frontend/src/components/chat/ComposerFooter.tsx` runs, then it prints 1000 or less",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "browser-uat",
+        "title": "Verify file actions end to end in an isolated browser",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:35:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5190",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-5190-file-actions.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-5190-file-actions.spec.ts"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "pan-5190-file-actions.spec.ts passes against the isolated dashboard"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E2",
+            "FR-E3",
+            "FR-E5",
+            "FR-E6",
+            "FR-E7",
+            "FR-E8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-5190.md WI-E13 (parent AC-13). New src/dashboard/frontend/tests/pan-5190-file-actions.spec.ts copying the setup of tests/pan-5187-code-pane.spec.ts: isolated dashboard (tests/fixtures/isolated-dashboard.ts, its own temp OVERDECK_HOME, its own browser context), throwaway project 'uat', root issue:UAT-1. Never use the operator's :3011 dashboard or a shared profile. Run `npm run build` first. Do not add the spec to the test:playwright script. Scenarios 1–7 in the PRD, each asserting on disk with node:fs; inspect the saved drop-target screenshot yourself. Implementation checkpoint: if locator.dragTo does not fire HTML5 dragstart/drop in Chromium, dispatch dragstart, dragover and drop with a page-built DataTransfer, as scenario 5 does; that is the fallback."
+        },
+        "items": [
+          {
+            "id": "browser-uat.ac1",
+            "title": "Given the isolated dashboard, when New file 'new.ts' is created in 'src' and renamed with F2 to 'renamed.ts', then src/new.ts does not exist, src/renamed.ts exists, and the code pane tab reads 'renamed.ts'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-uat.ac2",
+            "title": "Given src/renamed.ts, when Delete is pressed and then Control+Z with the tree focused, then the file is gone with one entry under <temp home>/trash/issue-UAT-1/ and then returns with the same bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-uat.ac3",
+            "title": "Given row a.txt dragged onto folder docs, when the drop lands, then docs/a.txt exists and a.txt does not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-uat.ac4",
+            "title": "Given a DataTransfer with a known File dispatched as dragenter/dragover/drop on folder docs, when the upload finishes, then docs/dropped.bin exists with the same SHA-256",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-uat.ac5",
+            "title": "Given Duplicate on docs/a.txt, when it completes, then docs/a copy.txt exists, and test-results/pan-5190-drop-target.png shows the highlighted drop target",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-ci",
+        "title": "Document file actions, add the changelog entry and list the new tests for CI",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T19:35:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5190",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5190.md",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c -E 'explorer/actions/__tests__/|explorer-drag-paths.test|composerPathDrop.test|ComposerFooter.path-drop.test' scripts/frontend-test-subset.txt"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints 12 or more (the 9 actions tests plus the 3 drag/composer tests)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-E6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-5190.md WI-E14. Add `### File actions, undo and drag (PAN-5190)` to docs/DASHBOARD-ARCHITECTURE.md directly after `### Write services and the trash (PAN-5187)` (or after PAN-5188's explorer section if one follows it), covering every bullet in WI-E14 step 1; remove any sentence there that says write actions are PAN-5190's. Add changelog.d/pan-5190.md with the exact #### New bullet in the PRD. Add every test file listed in WI-E14 step 3 to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "docs-ci.ac1",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when it is read, then a section titled 'File actions, undo and drag (PAN-5190)' names runWrite, application/x-overdeck-paths, application/x-overdeck-explorer, the 50-op undo limit and the 100 MiB upload cap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-ci.ac2",
+            "title": "Given changelog.d/pan-5190.md, when `npm run lint:docs` runs, then it exits 0 and the file has exactly one '#### New' heading with one bullet linking #5190",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-ci.ac3",
+            "title": "Given scripts/frontend-test-subset.txt, when it is read, then each of the 17 test paths in WI-E14 step 3 appears on its own line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "rpc-write-wrappers",
+        "to": "actions-core",
+        "type": "blocks"
+      },
+      {
+        "from": "undo-stack",
+        "to": "actions-core",
+        "type": "blocks"
+      },
+      {
+        "from": "name-rules",
+        "to": "actions-core",
+        "type": "blocks"
+      },
+      {
+        "from": "undo-stack",
+        "to": "name-rules",
+        "type": "blocks"
+      },
+      {
+        "from": "name-rules",
+        "to": "inline-name-row",
+        "type": "blocks"
+      },
+      {
+        "from": "actions-core",
+        "to": "create-rename-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "inline-name-row",
+        "to": "create-rename-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "create-rename-ui",
+        "to": "duplicate-delete-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "duplicate-delete-ui",
+        "to": "tree-action-keys",
+        "type": "blocks"
+      },
+      {
+        "from": "tree-action-keys",
+        "to": "drag-move",
+        "type": "blocks"
+      },
+      {
+        "from": "drag-payload",
+        "to": "drag-move",
+        "type": "blocks"
+      },
+      {
+        "from": "drag-move",
+        "to": "os-drop-upload",
+        "type": "blocks"
+      },
+      {
+        "from": "drag-payload",
+        "to": "composer-path-drop",
+        "type": "blocks"
+      },
+      {
+        "from": "os-drop-upload",
+        "to": "browser-uat",
+        "type": "blocks"
+      },
+      {
+        "from": "os-drop-upload",
+        "to": "docs-ci",
+        "type": "blocks"
+      },
+      {
+        "from": "composer-path-drop",
+        "to": "docs-ci",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
