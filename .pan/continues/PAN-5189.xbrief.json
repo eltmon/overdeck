@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5189",
   "created": "2026-11-13T19:51:19.231Z",
-  "updated": "2026-11-13T21:25:19.662Z",
+  "updated": "2026-11-13T21:44:26.133Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -272,9 +272,26 @@
       "doneAt": "2026-11-13T21:25:11.033Z"
     },
     "router-and-host": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5189",
-      "claimedAt": "2026-11-13T21:25:19.662Z"
+      "claimedAt": "2026-11-13T21:25:19.662Z",
+      "doneAt": "2026-11-13T21:44:26.132Z"
+    },
+    "router-and-host.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:44:26.132Z"
+    },
+    "router-and-host.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:44:26.132Z"
+    },
+    "router-and-host.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:44:26.132Z"
+    },
+    "router-and-host.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T21:44:26.132Z"
     }
   }
 }
