@@ -4,17 +4,17 @@
     "created": "2026-11-13T13:45:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5184: Composer keeps sent text and blocks a second send until the server acknowledges",
-    "updated": "2026-11-13T13:48:55.733Z"
+    "updated": "2026-11-13T13:49:57.343Z"
   },
   "plan": {
     "id": "pan-5184",
     "title": "Composer keeps sent text and blocks a second send until the server acknowledges",
-    "status": "proposed",
+    "status": "running",
     "uid": "f60091cf-ef41-4c57-a990-b5c56b9c4f46",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-13T13:45:00Z",
-    "updated": "2026-11-13T13:48:55.733Z",
+    "updated": "2026-11-13T13:49:57.343Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5184",
@@ -717,5 +717,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
