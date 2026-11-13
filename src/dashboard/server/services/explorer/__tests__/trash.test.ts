@@ -55,7 +55,7 @@ beforeEach(async () => {
   previousHome = process.env.OVERDECK_HOME;
   home = await mkdtemp(join(tmpdir(), 'explorer-trash-home-'));
   process.env.OVERDECK_HOME = home;
-  repo = await makeFixtureRepo({ 'a.txt': 'alpha\n', 'src/x.ts': 'export {};\n', 'src/deep/y.ts': 'y\n' });
+  repo = await makeFixtureRepo({ 'a.txt': 'alpha\n', 'src/x.js': 'export {};\n', 'src/deep/y.js': 'y\n' });
   root = rootAt(await realpath(repo.dir));
 });
 
@@ -99,17 +99,17 @@ describe('trashPaths and restore', () => {
     expect(await restore(root, ids[0]!)).toEqual({ path: 'a.txt' });
     expect(await restore(root, ids[1]!)).toEqual({ path: 'src' });
     expect(await readFile(join(root.absPath, 'a.txt'), 'utf8')).toBe('alpha\n');
-    expect(await readFile(join(root.absPath, 'src/x.ts'), 'utf8')).toBe('export {};\n');
-    expect(await readFile(join(root.absPath, 'src/deep/y.ts'), 'utf8')).toBe('y\n');
+    expect(await readFile(join(root.absPath, 'src/x.js'), 'utf8')).toBe('export {};\n');
+    expect(await readFile(join(root.absPath, 'src/deep/y.js'), 'utf8')).toBe('y\n');
     expect(await exists(trashEntry(ids[0]!))).toBe(false);
     expect(await exists(trashEntry(ids[1]!))).toBe(false);
   });
 
   it('restores a nested path, recreating its parent folder', async () => {
-    const [id] = await trashPaths(root, ['src/deep/y.ts'], clock);
+    const [id] = await trashPaths(root, ['src/deep/y.js'], clock);
     await rm(join(root.absPath, 'src'), { recursive: true });
     await restore(root, id!);
-    expect(await readFile(join(root.absPath, 'src/deep/y.ts'), 'utf8')).toBe('y\n');
+    expect(await readFile(join(root.absPath, 'src/deep/y.js'), 'utf8')).toBe('y\n');
   });
 
   it('trashes a symlink as a link and leaves its target', async () => {
@@ -127,15 +127,15 @@ describe('trashPaths and restore', () => {
   });
 
   it('gives a and a/b in one call exactly one trash id', async () => {
-    const ids = await trashPaths(root, ['src', 'src/x.ts', 'src/deep/y.ts'], clock);
+    const ids = await trashPaths(root, ['src', 'src/x.js', 'src/deep/y.js'], clock);
     expect(ids).toHaveLength(1);
-    expect(await exists(join(trashEntry(ids[0]!), 'files/src/x.ts'))).toBe(true);
+    expect(await exists(join(trashEntry(ids[0]!), 'files/src/x.js'))).toBe(true);
   });
 
   it('moves nothing when one path is missing', async () => {
     expect(await codeOf(trashPaths(root, ['a.txt', 'missing.txt', 'src'], clock))).toBe('NOT_FOUND');
     expect(await exists(join(root.absPath, 'a.txt'))).toBe(true);
-    expect(await exists(join(root.absPath, 'src/x.ts'))).toBe(true);
+    expect(await exists(join(root.absPath, 'src/x.js'))).toBe(true);
     expect(await exists(join(home, 'trash', 'issue-PAN-1'))).toBe(false);
   });
 
@@ -180,7 +180,7 @@ describe('trashPaths and restore', () => {
     const project = rootAt(root.absPath, 'project', 'issue:PAN-1');
     expect(await codeOf(trashPaths(project, ['src'], clock))).toBe('EDIT_WORKSPACE_REQUIRED');
     expect(await codeOf(restore(project, id!))).toBe('EDIT_WORKSPACE_REQUIRED');
-    expect(await exists(join(root.absPath, 'src/x.ts'))).toBe(true);
+    expect(await exists(join(root.absPath, 'src/x.js'))).toBe(true);
   });
 
   it('stores trash only under the OVERDECK_HOME of the test', async () => {

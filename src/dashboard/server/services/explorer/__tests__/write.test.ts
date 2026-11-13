@@ -69,7 +69,7 @@ async function tempFilesIn(dir: string): Promise<string[]> {
 }
 
 beforeEach(async () => {
-  repo = await makeFixtureRepo({ 'a.txt': 'alpha\n', 'src/x.ts': 'export {};\n', 'bin/run.sh': '#!/bin/sh\n' });
+  repo = await makeFixtureRepo({ 'a.txt': 'alpha\n', 'src/x.js': 'export {};\n', 'bin/run.sh': '#!/bin/sh\n' });
   root = rootAt(await realpath(repo.dir));
 });
 
@@ -141,8 +141,8 @@ describe('writeFile on disk', () => {
   });
 
   it('leaves no temp file behind', async () => {
-    await writeFile(root, 'src/x.ts', 'export const x = 1;\n', diskSignature('export {};\n'), false);
-    await writeFile(root, 'src/y.ts', 'export const y = 1;\n', null, false);
+    await writeFile(root, 'src/x.js', 'export const x = 1;\n', diskSignature('export {};\n'), false);
+    await writeFile(root, 'src/y.js', 'export const y = 1;\n', null, false);
     expect(await tempFilesIn(join(root.absPath, 'src'))).toEqual([]);
   });
 });
@@ -180,9 +180,9 @@ describe('writeFile refusals', () => {
 
 describe('create', () => {
   it('creates an empty file and returns its entry', async () => {
-    const { entry } = await create(root, 'src/new.ts', 'file');
-    expect(entry).toMatchObject({ name: 'new.ts', path: 'src/new.ts', kind: 'file', size: 0, ignored: false });
-    expect(await readFile(join(root.absPath, 'src/new.ts'), 'utf8')).toBe('');
+    const { entry } = await create(root, 'src/new.js', 'file');
+    expect(entry).toMatchObject({ name: 'new.js', path: 'src/new.js', kind: 'file', size: 0, ignored: false });
+    expect(await readFile(join(root.absPath, 'src/new.js'), 'utf8')).toBe('');
   });
 
   it('creates a folder and returns its entry', async () => {
@@ -204,7 +204,7 @@ describe('create', () => {
     expect(await readFile(join(root.absPath, 'a.txt'), 'utf8')).toBe('alpha\n');
     expect(await codeOf(create(root, 'src', 'dir'))).toBe('ALREADY_EXISTS');
     expect(await codeOf(create(root, 'src', 'file'))).toBe('ALREADY_EXISTS');
-    expect(await readFile(join(root.absPath, 'src/x.ts'), 'utf8')).toBe('export {};\n');
+    expect(await readFile(join(root.absPath, 'src/x.js'), 'utf8')).toBe('export {};\n');
   });
 
   it('throws ALREADY_EXISTS over a dangling symlink without creating its target', async () => {
@@ -239,7 +239,7 @@ describe('rename', () => {
     const { entry } = await rename(root, 'src', 'lib/src');
     expect(entry).toMatchObject({ name: 'src', path: 'lib/src', kind: 'dir' });
     expect(await exists(join(root.absPath, 'src'))).toBe(false);
-    expect(await readFile(join(root.absPath, 'lib/src/x.ts'), 'utf8')).toBe('export {};\n');
+    expect(await readFile(join(root.absPath, 'lib/src/x.js'), 'utf8')).toBe('export {};\n');
   });
 
   it('renames a symlink, not its target', async () => {
@@ -250,15 +250,15 @@ describe('rename', () => {
   });
 
   it('throws ALREADY_EXISTS for an occupied target and moves nothing', async () => {
-    expect(await codeOf(rename(root, 'a.txt', 'src/x.ts'))).toBe('ALREADY_EXISTS');
+    expect(await codeOf(rename(root, 'a.txt', 'src/x.js'))).toBe('ALREADY_EXISTS');
     expect(await readFile(join(root.absPath, 'a.txt'), 'utf8')).toBe('alpha\n');
-    expect(await readFile(join(root.absPath, 'src/x.ts'), 'utf8')).toBe('export {};\n');
+    expect(await readFile(join(root.absPath, 'src/x.js'), 'utf8')).toBe('export {};\n');
   });
 
   it('throws INVALID_TARGET for a folder moved into its own subfolder or onto itself', async () => {
     expect(await codeOf(rename(root, 'src', 'src/inner/src'))).toBe('INVALID_TARGET');
     expect(await codeOf(rename(root, 'src', 'src'))).toBe('INVALID_TARGET');
-    expect(await exists(join(root.absPath, 'src/x.ts'))).toBe(true);
+    expect(await exists(join(root.absPath, 'src/x.js'))).toBe(true);
   });
 
   it('throws NOT_FOUND for a missing source or a missing target folder', async () => {
@@ -298,7 +298,7 @@ describe('moveEntry', () => {
     await moveEntry(join(root.absPath, 'src'), join(root.absPath, 'moved'), ops);
     expect(calls).toEqual(['rename', 'cp', 'rm']);
     expect(await exists(join(root.absPath, 'src'))).toBe(false);
-    expect(await readFile(join(root.absPath, 'moved/x.ts'), 'utf8')).toBe('export {};\n');
+    expect(await readFile(join(root.absPath, 'moved/x.js'), 'utf8')).toBe('export {};\n');
   });
 
   it('rethrows a rename error other than EXDEV without copying', async () => {
@@ -331,10 +331,10 @@ describe('copy', () => {
   it('copies a folder recursively', async () => {
     await fsWriteFile(join(root.absPath, 'src/nested.txt'), 'n\n');
     await mkdir(join(root.absPath, 'src/deep'));
-    await fsWriteFile(join(root.absPath, 'src/deep/z.ts'), 'z\n');
+    await fsWriteFile(join(root.absPath, 'src/deep/z.js'), 'z\n');
     const { entry } = await copy(root, 'src', 'src2');
     expect(entry).toMatchObject({ path: 'src2', kind: 'dir' });
-    for (const rel of ['x.ts', 'nested.txt', 'deep/z.ts']) {
+    for (const rel of ['x.js', 'nested.txt', 'deep/z.js']) {
       expect(await readFile(join(root.absPath, 'src2', rel), 'utf8')).toBe(await readFile(join(root.absPath, 'src', rel), 'utf8'));
     }
   });
@@ -346,8 +346,8 @@ describe('copy', () => {
   });
 
   it('throws ALREADY_EXISTS for an occupied target and leaves it unchanged', async () => {
-    expect(await codeOf(copy(root, 'a.txt', 'src/x.ts'))).toBe('ALREADY_EXISTS');
-    expect(await readFile(join(root.absPath, 'src/x.ts'), 'utf8')).toBe('export {};\n');
+    expect(await codeOf(copy(root, 'a.txt', 'src/x.js'))).toBe('ALREADY_EXISTS');
+    expect(await readFile(join(root.absPath, 'src/x.js'), 'utf8')).toBe('export {};\n');
   });
 
   it('throws INVALID_TARGET for a copy into its own subfolder', async () => {
