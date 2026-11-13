@@ -1,0 +1,1406 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-13T14:46:22Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5185: File explorer A: server core (contracts, roots, read, git, search, watcher child)",
+    "updated": "2026-11-13T14:56:32.185Z"
+  },
+  "plan": {
+    "id": "pan-5185",
+    "title": "File explorer A: server core (contracts, roots, read, git, search, watcher child)",
+    "status": "proposed",
+    "uid": "c680c1ca-aab1-413d-a4d9-042c97433a89",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-13T14:46:22Z",
+    "updated": "2026-11-13T14:56:32.185Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5185",
+        "label": "PAN-5185",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5185/.pan/drafts/pan-5185.md",
+        "label": "PRD draft (.pan/drafts/pan-5185.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5185/.pan/drafts/pan-5183.md",
+        "label": "Parent PRD (.pan/drafts/pan-5183.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "file-explorer",
+      "dashboard-server",
+      "rpc",
+      "watcher",
+      "git",
+      "security"
+    ],
+    "metadata": {
+      "sizeJustification": "This is child A of the PAN-5183 file explorer, which the parent PRD already decomposed into seven sibling issues (PAN-5185 to PAN-5191). It is the server foundation every sibling depends on: the full RPC contract (which must land as one unit because PanRpcGroup.of and the no-loss matrix require every method at once), root and path safety, the read/git/search services and the watcher process boundary. The file count comes from one test file per module and from WI-17 assets (license copies, a script, a JSON file) that the subsystem counter scores as separate subsystems. Splitting further would leave siblings depending on several fragments with no change in reviewability, since the items are already small and separately verifiable.",
+      "canonicalFilename": "2026-11-13-PAN-5185-file-explorer-a-server-core-contracts-roots-read-git-search-watcher-child.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Overdeck has no server API to list a project's directories, read arbitrary files under a root safely, report git status per path, search a tree, or watch it for changes. The file explorer (PAN-5183) needs all of this before any UI can be built, and @parcel/watcher must never run inside the dashboard process (PAN-4193 froze it).",
+      "Proposal": "Add packages/contracts/src/explorer.ts and the 14 pan.explorer* RPCs (7 read handlers implemented here, 7 stubs answering NOT_IMPLEMENTED for PAN-5187/PAN-5191). Add services under src/dashboard/server/services/explorer/: root resolution and path safety (project roots read-only, strict workspace isolation rule, .git write guard ported from t3code), a single git runner with literal pathspecs and no optional locks, listDir/readFile, git status/stage/unstage/discard (discard never deletes new files), fuzzy file search and git-grep content search, and a forked @parcel/watcher child with Orca-ported batching and ignore regex, supervised with heartbeat, restart, per-root and global poll fallback. Enforce the process boundary at build time. Add the upstream port-record script, licenses and records for this issue's ports, and document it in DASHBOARD-ARCHITECTURE.md. The full executable spec is .pan/drafts/pan-5185.md.",
+      "NonGoals": "- Any frontend code: no pane, tree, editor or viewer (PAN-5186 onward).\n- Write services, the Overdeck trash, and discard of files not in HEAD (PAN-5187); this issue never deletes a file and never runs rm or git clean.\n- HTTP routes, downloads and uploads (PAN-5188); no ROUTE_SCOPES rows.\n- Edit workspaces, a real explorerBeginEdit handler, and PRs (PAN-5191).\n- RPC_METHOD_SCOPES entries; new methods stay admin-only.\n- Setting isDirectory or emitting rename events from the watcher.\n- Raising any scripts/file-size-allowlist.txt cap.\n- Importing @parcel/watcher anywhere except watch-child.ts, or spawning any process from the watcher child.\n- Sorting directory listings on the server."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Register all 14 explorer RPCs now; the 7 owned by PAN-5187/PAN-5191 get stub handlers that fail with NOT_IMPLEMENTED (D-A1).",
+        "rationale": "PanRpcGroup.of requires a handler per Rpc and parent AC-1 requires all 14 in the group; stubs give sibling issues a fixed contract and fail loudly instead of silently."
+      },
+      {
+        "summary": "Add all 14 no-loss-matrix rows here, READ for read methods and WRITE for the rest (D-A2).",
+        "rationale": "no-loss-matrix.test.ts scans rpc.ts, so any WS_METHODS value without a row turns CI red; the file has no NEW disposition."
+      },
+      {
+        "summary": "Resolve issue roots through resolveProjectFromIssue then getWorkspacePathForIssue(projectPath, id) (D-A3).",
+        "rationale": "getWorkspacePathForIssue takes two arguments; readWorkspaceFile already uses this exact sequence."
+      },
+      {
+        "summary": "Accept workspace:<id> roots only under the derived isolation rule in D-A4.",
+        "rationale": "WorkspaceRow has no isolated flag and a non-isolated scratch row points at the primary checkout; accepting it would make the primary writable, breaking parent D-6."
+      },
+      {
+        "summary": "Port the Orca signature over the UTF-8-decoded string, not bytes; vectors computed from Orca's own file (D-A5).",
+        "rationale": "Orca hashes UTF-16 code units; porting unchanged keeps parity, and the signature is opaque to clients."
+      },
+      {
+        "summary": "Treat stage/unstage/discard as writes (forWrite) and refuse discard of paths not in HEAD with NOT_IMPLEMENTED until PAN-5187 ships the trash (D-A7).",
+        "rationale": "They mutate the index or worktree; deleting untracked files without the trash would be unrecoverable, and the trash belongs to WI-11."
+      },
+      {
+        "summary": "Run every explorer git call through one runner with --literal-pathspecs and GIT_OPTIONAL_LOCKS=0 (D-A8).",
+        "rationale": "Pathspec magic would make discard/stage act on unintended files, and optional locks contend with agents running git in the same worktree."
+      },
+      {
+        "summary": "Use async project lookups (listProjectsAsync, defaultBranchForRepo, resolveBaseRef) instead of the parent's sync helpers (D-A9).",
+        "rationale": "NFR-1 forbids sync calls reachable from the dashboard server."
+      },
+      {
+        "summary": "Compute committed against resolveBaseRef(default branch) with a three-dot name-status diff (D-A10).",
+        "rationale": "Matches the existing vs-main diff panel, so the Changed filter keeps FilesPane's meaning; the parent's WI-14 lookup belongs to a later issue."
+      },
+      {
+        "summary": "Use Orca's anchored regex via ignoreGlobs for watcher ignores, not **/name/** globs (D-A11).",
+        "rationale": "Orca documents pathological regex costs for leading-** globs; a probe showed the regex prunes ignored trees to the same 5 watches as globs."
+      },
+      {
+        "summary": "Do not set isDirectory or emit rename from the watcher (D-A12).",
+        "rationale": "Parcel reports only create/update/delete; clients re-list parents on any event, and rename inference belongs to PAN-5187."
+      },
+      {
+        "summary": "Port records only for signature.ts, watch-batch.ts, watch-ignore.ts and git-dir-guard.ts (D-A13).",
+        "rationale": "Only those files copy upstream logic; idioms do not warrant a record."
+      },
+      {
+        "summary": "Validate port records with upstream-port-diff.sh --check in npm run lint, tested from tests/unit/scripts/ (D-A14).",
+        "rationale": "scripts/__tests__ is outside the vitest include; a script check needs no upstream checkout and runs in CI lint."
+      },
+      {
+        "summary": "Enforce NFR-2 with a tsdown writeBundle assertion plus a local slow test; move the live tree checks of parent AC-3/AC-4 to PAN-5186 (D-A15, D-A16).",
+        "rationale": "This issue has no UI; a build assertion is mechanical and the slow test proves the process boundary with real parcel."
+      },
+      {
+        "summary": "Ship no changelog entry (D-A17).",
+        "rationale": "changelog.d/README.md requires an entry only for user-noticeable changes; nothing here is visible."
+      },
+      {
+        "summary": "Add NOT_IMPLEMENTED, INVALID_QUERY and EXPLORER_FAILED to the explorer error codes (D-A18).",
+        "rationale": "Stubs, invalid regex queries and unexpected failures each need a code clients can branch on."
+      }
+    ],
+    "items": [
+      {
+        "id": "contracts-surface",
+        "title": "Add the 14 explorer RPC contracts with stub handlers and no-loss rows (WI-A1)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:46:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5185",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "roots-paths",
+            "read-service",
+            "git-service",
+            "search-service",
+            "watch-child",
+            "watch-supervisor",
+            "rpc-handlers"
+          ],
+          "files_scope": [
+            "packages/contracts/src/explorer.ts",
+            "packages/contracts/src/rpc.ts",
+            "packages/contracts/src/index.ts",
+            "packages/contracts/src/__tests__/explorer.test.ts",
+            "src/dashboard/server/services/explorer/errors.ts",
+            "src/dashboard/server/ws-rpc-explorer.ts",
+            "src/dashboard/server/ws-rpc.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/ws-rpc-explorer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/__tests__/explorer.test.ts src/dashboard/server/__tests__/ws-rpc-explorer.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run build:contracts && npm run typecheck"
+          ],
+          "expected_outputs": [
+            "explorer.test.ts, ws-rpc-explorer.test.ts and no-loss-matrix.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-A1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-10",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/pan-5185.md WI-A1 exactly. Create packages/contracts/src/explorer.ts with every schema listed in WI-A1 step 1 and EXPLORER_ERROR_CODES (13 codes, D-A18). In packages/contracts/src/rpc.ts add the 14 explorer* keys to WS_METHODS after resolveFilePathExists, one Rpc.make per method after WriteFileAtPathRpc (ExplorerWatchRpc with stream: true), and add all 14 to PanRpcGroup after ResolveFilePathExistsRpc. Export ./explorer from index.ts. Create services/explorer/errors.ts (explorerError, toExplorerRpcError). Create src/dashboard/server/ws-rpc-explorer.ts exporting explorerRpcHandlers where ALL 14 handlers are stubs failing with PanRpcError code NOT_IMPLEMENTED and a message naming the owner issue (write methods PAN-5187, explorerBeginEdit PAN-5191, read methods PAN-5185). Spread it into PanRpcGroup.of in ws-rpc.ts before the readFileAtPath handler (fallback: list the 14 keys explicitly, note it in the PR). Add 14 no-loss-matrix rows after pan.writeFileAtPath: READ for ListDir/ReadFile/GitStatus/SearchFiles/SearchContent/Watch, WRITE for the other eight, door \"Explorer door (src/dashboard/server/services/explorer/, PAN-5183)\"."
+        },
+        "items": [
+          {
+            "id": "contracts-surface.ac1",
+            "title": "Given packages/contracts/src/__tests__/explorer.test.ts, when it runs, then every explorer input schema accepts one valid payload, rejects one invalid payload via Schema.decodeUnknownSync, and EXPLORER_ERROR_CODES has 13 entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-surface.ac2",
+            "title": "Given WS_METHODS, when filtered to values starting with \"pan.explorer\", then it returns exactly 14 values and PanRpcGroup includes the 14 Explorer*Rpc definitions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-surface.ac3",
+            "title": "Given explorerRpcHandlers, when pan.explorerWriteFile or pan.explorerBeginEdit is invoked, then it fails with PanRpcError code NOT_IMPLEMENTED and a message naming PAN-5187 or PAN-5191 respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-surface.ac4",
+            "title": "Given tests/unit/lib/overdeck/no-loss-matrix.test.ts, when it runs after the contract change, then it passes with 14 new pan.explorer* rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "git-runner",
+        "title": "Add the explorer git runner with literal pathspecs and no optional locks (WI-A2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:46:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5185",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/git-exec.ts",
+            "src/dashboard/server/services/explorer/__tests__/git-exec.test.ts",
+            "src/dashboard/server/services/explorer/__tests__/fixture-repo.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/git-exec.test.ts"
+          ],
+          "expected_outputs": [
+            "git-exec.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-A1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-A2. runGit(cwd, args, opts) spawns git with \"-c core.fsmonitor=false --literal-pathspecs\" prepended, env GIT_OPTIONAL_LOCKS=0 and GIT_TERMINAL_PROMPT=0, optional stdin input, default 10 s timeout and 64 MiB stdout cap (SIGKILL on either, flags timedOut/truncated), stderr capped at 64 KiB, resolves {code, stdout: Buffer, stderr, timedOut, truncated} on close and rejects only when git cannot be spawned (EXPLORER_FAILED). Also add __tests__/fixture-repo.ts (makeFixtureRepo: temp git repo on main with an initial commit) used by later service tests. Async only, no execSync."
+        },
+        "items": [
+          {
+            "id": "git-runner.ac1",
+            "title": "Given a fixture repo subdirectory, when runGit runs rev-parse --show-prefix there, then it returns code 0 and stdout \"sub/\\n\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-runner.ac2",
+            "title": "Given a repo with .gitignore \"*.log\", when runGit runs check-ignore -z --stdin with input \"a.log\\0b.txt\\0\", then stdout returns exactly \"a.log\\0\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-runner.ac3",
+            "title": "Given maxBytes 4, when runGit runs ls-files -z on a repo with files, then it returns truncated: true and exactly 4 stdout bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-runner.ac4",
+            "title": "Given a temp dir that is not a git repo, when runGit runs rev-parse, then it returns code 128 without rejecting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "roots-paths",
+        "title": "Resolve explorer roots and enforce path safety (WI-A3)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:46:22Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5185",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "read-service",
+            "git-service",
+            "search-service",
+            "rpc-handlers"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/explorer/roots.ts",
+            "src/dashboard/server/services/explorer/paths.ts",
+            "src/dashboard/server/services/explorer/git-dir-guard.ts",
+            "src/dashboard/server/services/file-at-path.ts",
+            "src/dashboard/server/services/explorer/__tests__/roots.test.ts",
+            "src/dashboard/server/services/explorer/__tests__/paths.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/roots.test.ts src/dashboard/server/services/explorer/__tests__/paths.test.ts",
+            "npm run build:contracts && npm run typecheck"
+          ],
+          "expected_outputs": [
+            "roots.test.ts and paths.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-A2",
+            "NFR-3",
+            "D-6"
+          ],
+          "parallelSafeReason": "Touches only new files under services/explorer/ plus a one-word export in file-at-path.ts that no other item edits."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-A3 and decisions D-A3, D-A4, D-A9. Export isInsidePath from file-at-path.ts (one-word change). roots.ts: resolveExplorerRoot(rootId) for project:<key> (listProjectsAsync, realpath, writable false, defaultBranchForRepo), issue:<ID> (parseIssueId, Effect.runPromise(resolveProjectFromIssue), getWorkspacePathForIssue(projectPath, ID), realpath dir, canonical id issue:<UPPER>), workspace:<id> (getWorkspaceById plus the full D-A4 rule: scratch, not archived, branch scratch/*, project known, realpath dir, not the primary checkout, inside the workspaces dir); every failure is ROOT_NOT_FOUND. git-dir-guard.ts ports t3code isGitMetadataName and isInGitFolder (read via git -C ~/Projects/t3code show 2d8a843e6b:apps/server/src/workspace/WorkspaceFileSystem.ts) with the port header. paths.ts resolveInsideRoot(root, rel, {forWrite, allowRoot}) applies the seven ordered checks in WI-A3 step 4 (project+forWrite first → EDIT_WORKSPACE_REQUIRED). No sync calls."
+        },
+        "items": [
+          {
+            "id": "roots-paths.ac1",
+            "title": "Given a project-kind root, when resolveInsideRoot is called with forWrite for \"a/b.txt\" or \"../x\", then it rejects with EDIT_WORKSPACE_REQUIRED",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "roots-paths.ac2",
+            "title": "Given an issue-kind root, when resolveInsideRoot is called with \"../x\", \"/etc/passwd\", \"a//b\", \"./a\", \"a\\\\b\", \"C:/x\", a NUL path, or a symlink that points outside the root, then it rejects with PATH_OUTSIDE_ROOT",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "roots-paths.ac3",
+            "title": "Given forWrite, when the path is \".git/config\", \"GIT~1/config\", \".git./x\", \"g/config\" through a symlink to .git, or a path inside a bare-repo directory, then it rejects with PATH_IN_GIT_DIR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "roots-paths.ac4",
+            "title": "Given a scratch workspace row whose path is the project primary checkout, or a row with kind issue, isArchived true, or branchName null, when resolveExplorerRoot(\"workspace:<id>\") runs, then it rejects with ROOT_NOT_FOUND",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "roots-paths.ac5",
+            "title": "Given issue:pan-1 with an existing workspaces/feature-pan-1 directory, when resolveExplorerRoot runs, then it returns id issue:PAN-1, writable true and the realpath of that directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "signature",
+        "title": "Port the Orca disk signature (WI-A4)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:46:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5185",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/signature.ts",
+            "src/dashboard/server/services/explorer/__tests__/signature.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/signature.test.ts"
+          ],
+          "expected_outputs": [
+            "signature.test.ts passes with the Orca vectors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-A4 and D-A5. Port src/shared/file-write/disk-baseline-signature.ts read via git -C ~/Projects/orca show c6b9ac9549b:<path> (never the working tree) unchanged in logic (it hashes a JS string, not bytes) with the port header from WI-A13 step 1; exports diskSignature, DiskSignatureBuilder, diskSignatureLength, writtenContentDiskSignature, utf8ByteSizeCanDecodeToLength. Test with the exact vectors in the PRD table."
+        },
+        "items": [
+          {
+            "id": "signature.ac1",
+            "title": "Given the inputs \"\", \"a\", \"hello\\n\", \"héllo wörld\\n\" and \"😀\", when diskSignature runs, then it returns 811c9dc5-50c5d1f-0, e40c292c-292375ea-1, f8934173-6cae28a5-6, d01bb24-ad2f8f9a-c and cb31c4b8-60d25212-2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signature.ac2",
+            "title": "Given DiskSignatureBuilder fed \"hel\" then \"lo\\n\", when digest runs, then it returns f8934173-6cae28a5-6",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signature.ac3",
+            "title": "Given \"a\\uD800b\", when writtenContentDiskSignature runs, then it returns b94649b3-8a58c155-3, equal to diskSignature(\"a\\uFFFDb\")",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signature.ac4",
+            "title": "Given signature.ts, when its first two lines are read, then they are the Orca port header naming src/shared/file-write/disk-baseline-signature.ts @ c6b9ac9549b",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "read-service",
+        "title": "List directories with ignore flags and read files (WI-A5)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:46:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5185",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/read.ts",
+            "src/dashboard/server/services/explorer/__tests__/read.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/read.test.ts",
+            "npm run build:contracts && npm run typecheck"
+          ],
+          "expected_outputs": [
+            "read.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-4",
+            "D-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-A5. listDir(root, rel, {maxEntries=10000}): resolveInsideRoot(allowRoot), opendir capped with truncated, lstat in batches of 64 (symlink/dir/file kinds, size for files, drop ENOENT races), unsorted, ignored flags via runGit check-ignore (directory-itself-ignored shortcut first; exit 128 → all false). readFile(root, rel, {ref?, largeTextBytes=5 MiB}): O_RDONLY|O_NONBLOCK open, regular files only, NUL in first 8 KiB → binary, over threshold → large-text, else UTF-8 decode + diskSignature; lang via languageForPath; writable = root.writable; ref HEAD via git cat-file -s and git show HEAD:./<rel>, missing in HEAD → empty text."
+        },
+        "items": [
+          {
+            "id": "read-service.ac1",
+            "title": "Given a fixture repo with .gitignore \"node_modules/\" and \"*.log\", when listDir(root, \"\") runs, then it returns node_modules and b.log with ignored true, a.txt with ignored false and the link entry with kind symlink",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-service.ac2",
+            "title": "Given listDir on \"node_modules\", when it runs, then every entry returns ignored true; given a non-git temp dir, every entry returns ignored false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-service.ac3",
+            "title": "Given a file with a NUL byte in its first 8 KiB, when readFile runs, then it returns kind binary with no text; given a file larger than largeTextBytes, then it returns kind large-text with no text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-service.ac4",
+            "title": "Given a.txt modified on disk after commit, when readFile runs with ref HEAD, then it returns the committed text and writable false; an untracked file with ref HEAD returns empty text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-service.ac5",
+            "title": "Given a text file, when readFile runs, then it returns kind text and signature equal to diskSignature of the returned text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "git-service",
+        "title": "Parse git status and stage, unstage and discard safely (WI-A6)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:46:22Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5185",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/git.ts",
+            "src/dashboard/server/services/explorer/__tests__/git.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/git.test.ts",
+            "npm run build:contracts && npm run typecheck"
+          ],
+          "expected_outputs": [
+            "git.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-A3",
+            "NFR-1"
+          ],
+          "parallelSafeReason": "Creates only git.ts and its test; read-service and search-service touch disjoint new files."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-A6 and D-A6, D-A7, D-A10. gitStatus: rev-parse --show-prefix (fail → NOT_A_GIT_REPO), status --porcelain=v2 -z --branch --untracked-files=normal, parse records 1/2/u/?/! and # branch.head exactly as specified, the X/Y mapping, prefix stripping, 20000-entry cap; committed via resolveBaseRef(root.absPath, root.defaultBranch) and diff --name-status -z -M base...HEAD (empty for project roots). gitStage: first require rev-parse --show-prefix to be empty (non-zero exit or non-empty prefix → NOT_A_GIT_REPO, so an enclosing repo is never touched), then resolve every path forWrite; stage = add, unstage = restore --staged, discard = ls-tree HEAD check then restore --source=HEAD --staged --worktree; any path not in HEAD makes the whole discard fail with NOT_IMPLEMENTED before any git command. Never rm, never git clean."
+        },
+        "items": [
+          {
+            "id": "git-service.ac1",
+            "title": "Given a fixture repo with a staged rename, MM, .M, a staged add, an unstaged delete, an untracked directory and an untracked file, when gitStatus runs, then it returns renamed/modified/modified/added/deleted/untracked/untracked with the staged flags listed in the PRD and branch main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-service.ac2",
+            "title": "Given a failed merge, when gitStatus runs, then the conflicting path returns status conflicted; given an issue-kind root on a branch with one new commit, committed returns that file as added",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-service.ac3",
+            "title": "Given a file literally named \"*.txt\" and an unstaged a.txt, when gitStage stage([\"*.txt\"]) runs, then only \"*.txt\" becomes staged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-service.ac4",
+            "title": "Given discard of [\"d.txt\", \"u.txt\"] where u.txt is untracked, when gitStage runs, then it rejects with NOT_IMPLEMENTED, u.txt still exists and d.txt keeps its modification",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-service.ac5",
+            "title": "Given a project-kind root, when gitStage stage([\"a.txt\"]) runs, then it rejects with EDIT_WORKSPACE_REQUIRED; given an issue-kind root that is a subdirectory of a repo, then it rejects with NOT_A_GIT_REPO and the enclosing repo index stays unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "search-service",
+        "title": "Search file names fuzzily and file contents with git grep (WI-A7)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:46:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5185",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/search.ts",
+            "src/dashboard/server/services/explorer/__tests__/search.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/search.test.ts",
+            "npm run build:contracts && npm run typecheck"
+          ],
+          "expected_outputs": [
+            "search.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-A7. 30 s per-root file-list cache from git ls-files --cached --others --exclude-standard -z with injectable clock and exported invalidateFileListCache(rootId); fuzzyScore exactly as specified (+1 per char, +3 at segment start after / _ - . or space, +5 when consecutive; greedy; null on miss or empty query); searchFiles sorts by score desc, length asc, localeCompare, limit clamped 1..500. searchContent: git grep -n --column -I --untracked --no-color --max-count=20 -z with -F or -E, -i unless caseSensitive, -e query, optional literal scope, 5 s timeout, 16 MiB cap; parse path\\0line\\0col\\0text lines, convert byte column to UTF-16 column, preview 240 chars, INVALID_QUERY on exit 128 with regex, truncated on limit/timeout/cap."
+        },
+        "items": [
+          {
+            "id": "search-service.ac1",
+            "title": "Given paths src/foo/bar.ts, src/fixtures/barrel.ts, lib/f/b/a/r.txt and src/zzz.ts, when searchFiles runs with query \"fbar\", then it returns exactly the first three in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "search-service.ac2",
+            "title": "Given an injected clock, when a file is created after the first searchFiles call, then a call 10 s later omits it, a call after invalidateFileListCache includes it, and a call 31 s later includes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "search-service.ac3",
+            "title": "Given content search for \"a.b\", when regex is false then it does not match \"axb\", and when regex is true it does; scopePath \"src\" excludes matches outside src",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "search-service.ac4",
+            "title": "Given a line \"é = needle\", when searchContent finds \"needle\", then it returns column 5; given regex \"(\", then it rejects with INVALID_QUERY",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "watch-batch",
+        "title": "Port Orca watch batching and coalescing (WI-A8)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:46:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5185",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/watch-batch.ts",
+            "src/dashboard/server/services/explorer/__tests__/watch-batch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/watch-batch.test.ts"
+          ],
+          "expected_outputs": [
+            "watch-batch.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-A8 (read upstream with git show c6b9ac9549b:<path>). Pure module with the Orca port header carrying two upstream lines (filesystem-watch-batch-window.ts and filesystem-watcher-local-events.ts @ c6b9ac9549b). Port WATCH_BATCH_LEADING_MS, WATCH_BATCH_INTERVAL_MS, watchBatchFlushDelayMs and coalesceEvents unchanged; add MAX_BUFFERED_WATCH_EVENTS = 5000 and createWatchBatcher({flush, now, setTimeout, clearTimeout}) whose armed timer is never reset and whose overflow flushes one {kind: \"overflow\", path: \"\"}. Tests use fake timers with vi.setSystemTime(new Date(\"2026-01-01T00:00:00Z\"))."
+        },
+        "items": [
+          {
+            "id": "watch-batch.ac1",
+            "title": "Given fake timers at a realistic system time, when one event is pushed, then flush is called at 75 ms and not at 74 ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-batch.ac2",
+            "title": "Given an event pushed every 10 ms for 1 s, when timers advance, then flushes after the first occur 100 ms apart and a push at 50 ms does not move the 75 ms flush",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-batch.ac3",
+            "title": "Given create then delete of one path in one window, when the batch flushes, then no event is emitted for it; given delete then create, both are emitted with delete first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-batch.ac4",
+            "title": "Given 5001 events pushed in one window, when the batch flushes, then flush receives exactly [{ kind: \"overflow\", path: \"\" }]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "watch-ignore",
+        "title": "Port Orca watcher ignore regex and add top-level ignores (WI-A9)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:46:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5185",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/watch-ignore.ts",
+            "src/dashboard/server/services/explorer/__tests__/watch-ignore.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/watch-ignore.test.ts"
+          ],
+          "expected_outputs": [
+            "watch-ignore.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5",
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-A9 and D-A11 (read upstream with git show c6b9ac9549b:<path>). Port WATCHER_IGNORE_DIRS, MACOS_FSEVENTS_EXCLUSION_PATH_LIMIT, ParcelWatcherIgnoreOptions and buildParcelWatcherIgnoreOptions from Orca filesystem-watcher-ignore.ts with an added platform parameter; add topLevelIgnoreRegex(names, platform) and buildWatchOptions(topLevelDirs, platform). Port header required."
+        },
+        "items": [
+          {
+            "id": "watch-ignore.ac1",
+            "title": "Given platform linux, when buildParcelWatcherIgnoreOptions(WATCHER_IGNORE_DIRS) runs, then its regex matches node_modules, a/node_modules/b and x/.git/HEAD, does not match node_modules_x/a or src/a.ts, and ignore is undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-ignore.ac2",
+            "title": "Given platform darwin, when buildParcelWatcherIgnoreOptions runs, then ignore has exactly 8 entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-ignore.ac3",
+            "title": "Given topLevelIgnoreRegex([\"workspaces\", \"dist.rollback.1\"]), when tested, then it matches workspaces/feature-1/x and dist.rollback.1 and rejects src/workspaces/x and dist-rollback-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-ignore.ac4",
+            "title": "Given buildWatchOptions on linux, when called with [] it returns one ignoreGlobs entry, and with [\"workspaces\"] it returns two",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "watch-child",
+        "title": "Add the watcher child runtime, entry and build isolation check (WI-A10)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:46:22Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5185",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/watch-protocol.ts",
+            "src/dashboard/server/services/explorer/watch-child-runtime.ts",
+            "src/dashboard/server/services/explorer/watch-child.ts",
+            "src/dashboard/server/tsdown.config.ts",
+            "apps/desktop/scripts/prepare-server-resources.mjs",
+            "src/dashboard/server/services/explorer/__tests__/watch-child-runtime.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/watch-child-runtime.test.ts",
+            "npm run build:dashboard:server",
+            "node -e \"const fs=require('fs');const d='dist/dashboard';console.log(fs.existsSync(d+'/explorer-watch-child.js'))\""
+          ],
+          "expected_outputs": [
+            "watch-child-runtime.test.ts passes",
+            "build:dashboard:server succeeds with the parcel isolation assertion",
+            "node prints true"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2",
+            "NFR-A2",
+            "D-5"
+          ],
+          "parallelSafeReason": "Owns the only tsdown.config.ts and prepare-server-resources.mjs edits and three new watch files; no parallel item touches them."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-A10 and D-A12, D-A15. watch-protocol.ts: SupervisorToChild/ChildToSupervisor types and WATCH_CHILD_BACKEND_DEATH_EXIT = 3. watch-child-runtime.ts: runWatchChild(deps) with injected subscribe/send/onMessage/onDisconnect/exit/timers/platform; heartbeat every 5 s; disconnect → exit(0); watch → subscribe with buildWatchOptions + backend (inotify/fs-events/windows); rejected subscribe → watch-failed (stay up); callback error → error message then exit(3); events → root-relative POSIX paths into createWatchBatcher → events messages; it never spawns processes and only type-imports @parcel/watcher. watch-child.ts is the thin entry that imports @parcel/watcher. Add \"explorer-watch-child.js\" to ENTRY_POINTS in apps/desktop/scripts/prepare-server-resources.mjs so the desktop app stages @parcel/watcher. tsdown.config.ts: add entry explorer-watch-child and parcelWatcherIsolationAssertion (only explorer-watch-child.js may import @parcel/watcher; fallback to scanning chunk.code, note in PR)."
+        },
+        "items": [
+          {
+            "id": "watch-child.ac1",
+            "title": "Given a watch message on linux, when runWatchChild handles it, then subscribe receives the absPath, backend inotify and an ignoreGlobs array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-child.ac2",
+            "title": "Given parcel calls back with absolute paths, when 75 ms pass, then the child sends one events message whose paths are root-relative",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-child.ac3",
+            "title": "Given parcel calls back with an error, when handled, then the child sends an error message and calls exit(3); given subscribe rejects, then it sends watch-failed and does not exit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-child.ac4",
+            "title": "Given a heartbeat interval, when 5 s pass, then a heartbeat message is sent; given IPC disconnect, then exit(0) is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-child.ac5",
+            "title": "Given npm run build:dashboard:server, when it completes, then dist/dashboard/explorer-watch-child.js exists, the build fails if any other chunk imports @parcel/watcher, and prepare-server-resources.mjs ENTRY_POINTS includes explorer-watch-child.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "watch-supervisor",
+        "title": "Supervise the watcher child with heartbeat, restart and poll mode (WI-A11)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:46:22Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-5185",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "rpc-handlers"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/explorer/watch-supervisor.ts",
+            "src/dashboard/server/services/explorer/__tests__/watch-supervisor.test.ts",
+            "src/dashboard/server/services/explorer/__tests__/watch-child.slow.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/watch-supervisor.test.ts",
+            "VITEST_INCLUDE_SLOW=1 npx vitest run src/dashboard/server/services/explorer/__tests__/watch-child.slow.test.ts",
+            "npm run build:contracts && npm run typecheck"
+          ],
+          "expected_outputs": [
+            "watch-supervisor.test.ts passes",
+            "watch-child.slow.test.ts passes locally (create event within 500 ms; watcher.node only in the child)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-A4",
+            "NFR-2",
+            "NFR-5",
+            "D-5"
+          ],
+          "acJustification": "Six ACs: the supervisor has six independent failure behaviors (ref counting, heartbeat restart, poll mode, per-root polling, idle stop, real-process isolation) and each needs its own observable check.",
+          "parallelSafeReason": "Creates only watch-supervisor.ts and its two tests; it can run beside the read, git and search services."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-A11. createExplorerWatchSupervisor(deps) with injectable fork/scriptPath/execArgv/timers/listTopLevelIgnored/log, lazy singleton getExplorerWatchSupervisor, resolveWatchChildScript (workerScriptUrl pattern). Lazy fork with stdio [ignore, ignore, pipe, ipc] and execArgv [] by default; per-root listener ref counts with one watch/unwatch; topLevelDirs = git-check-ignored top-level directories plus \"workspaces\" for project roots; heartbeat check 5 s / 15 s → SIGKILL; crash → restart, re-watch, overflow to all listeners, unless 3 restarts already in 5 minutes → poll mode (overflow every 5 s, log \"[explorer-watch] polling fallback\"); watch-failed → that root polls; last unsubscribe → reset poll mode and arm a 60 s idle kill that is not a crash. Never import @parcel/watcher. Add the slow test with execArgv [\"--import\", \"tsx\"]."
+        },
+        "items": [
+          {
+            "id": "watch-supervisor.ac1",
+            "title": "Given no subscription, when the supervisor is created, then fork is not called; given a project spec, the first subscribe sends watch with topLevelDirs including workspaces, and an issue spec omits it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-supervisor.ac2",
+            "title": "Given two listeners on one root, when both subscribe then both unsubscribe, then exactly one watch and one unwatch message are sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-supervisor.ac3",
+            "title": "Given no heartbeat for 15 s, when timers advance, then the child is killed with SIGKILL, fork runs again, watch is re-sent and every listener receives one overflow event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-supervisor.ac4",
+            "title": "Given four crashes within 5 minutes, when timers advance, then fork was called 4 times in total and listeners receive overflow every 5 s with the log line \"[explorer-watch] polling fallback\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-supervisor.ac5",
+            "title": "Given the last listener unsubscribes, when 60 s pass, then the child is killed and no new fork follows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-supervisor.ac6",
+            "title": "Given VITEST_INCLUDE_SLOW=1 on Linux, when the slow test writes new.txt under a watched temp dir, then a create event for new.txt arrives within 500 ms and watcher.node appears in the child maps but not the test process maps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rpc-handlers",
+        "title": "Replace the seven read stubs with real handlers and the watch stream (WI-A12)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:46:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5185",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/ws-rpc-explorer.ts",
+            "src/dashboard/server/__tests__/ws-rpc-explorer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/ws-rpc-explorer.test.ts",
+            "npm run build:contracts && npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ws-rpc-explorer.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-A12. In ws-rpc-explorer.ts replace the stubs for explorerListDir, explorerReadFile, explorerGitStatus, explorerGitStage (returns {}), explorerSearchFiles, explorerSearchContent with Effect.tryPromise({ try, catch: toExplorerRpcError }) around resolveExplorerRoot + the service call; implement explorerWatch with Stream.callback + Effect.acquireRelease around getExplorerWatchSupervisor().subscribe, calling invalidateFileListCache(root.id) on every batch and offering { events } to the queue (fallback via Stream.unwrap if typing requires). Keep the six write stubs and the explorerBeginEdit stub."
+        },
+        "items": [
+          {
+            "id": "rpc-handlers.ac1",
+            "title": "Given a fixture repo with node_modules gitignored, when pan.explorerListDir is invoked through explorerRpcHandlers, then it returns the top-level entries with node_modules ignored true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rpc-handlers.ac2",
+            "title": "Given resolveExplorerRoot rejects with ROOT_NOT_FOUND, when a handler runs, then it fails with PanRpcError code ROOT_NOT_FOUND; given a plain Error, then it fails with EXPLORER_FAILED",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rpc-handlers.ac3",
+            "title": "Given a fake supervisor that emits one batch, when the pan.explorerWatch stream is consumed, then it emits { events } and interrupting the stream calls the unsubscribe function",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rpc-handlers.ac4",
+            "title": "Given the write stubs, when pan.explorerWriteFile is invoked after this change, then it still fails with NOT_IMPLEMENTED",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "port-diff-script",
+        "title": "Add the upstream port-diff script, licenses and acknowledgements (WI-A13)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:46:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-5185",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/upstream-port-diff.sh",
+            "scripts/upstream-ports.json",
+            "licenses/*-LICENSE",
+            "docs/ACKNOWLEDGEMENTS.md",
+            "package.json",
+            "tests/unit/scripts/upstream-ports.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/upstream-ports.test.ts",
+            "bash scripts/upstream-port-diff.sh --check",
+            "cmp licenses/orca-LICENSE ~/Projects/orca/LICENSE && cmp licenses/t3code-LICENSE ~/Projects/t3code/LICENSE"
+          ],
+          "expected_outputs": [
+            "upstream-ports.test.ts passes",
+            "script prints \"upstream-ports: 0 records OK\" and exits 0",
+            "cmp prints nothing and exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-17",
+            "FR-18",
+            "D-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-A13 and D-A14. scripts/upstream-port-diff.sh with --check mode (record schema, local file exists, header line and \"// upstream: <path> @ <commit>\" in the first 10 lines, hex commit; exit 1 listing failures) and diff mode ([orca|t3code] [--patch], best-effort fetch, git log <commit>..$UPSTREAM_REF -- <path>, \"up to date\" lines, skip missing repos, exit 0); env UPSTREAM_PORTS_FILE, UPSTREAM_PORTS_ROOT, ORCA_REPO, T3CODE_REPO, UPSTREAM_REF; JSON via node -e, no jq. scripts/upstream-ports.json starts as []. Add lint:upstream-ports to package.json and append it to the lint chain. Copy both LICENSE files byte for byte into licenses/. Add ## Orca and ## t3code sections to docs/ACKNOWLEDGEMENTS.md with URLs https://github.com/stablyai/orca and https://github.com/pingdotgg/t3code."
+        },
+        "items": [
+          {
+            "id": "port-diff-script.ac1",
+            "title": "Given a fixture record whose file has the matching header, when upstream-port-diff.sh --check runs, then it exits 0 and prints \"upstream-ports: 1 records OK\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "port-diff-script.ac2",
+            "title": "Given a fixture record with a wrong commit in the header, a missing header, or a missing file, when --check runs, then it exits 1 and names the local file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "port-diff-script.ac3",
+            "title": "Given a temp upstream repo with two commits touching x.ts and a record at the first, when diff mode runs with UPSTREAM_REF=main, then it prints the second commit subject; a record at the second prints \"up to date\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "port-diff-script.ac4",
+            "title": "Given docs/ACKNOWLEDGEMENTS.md, when read, then it contains \"## Orca\" with https://github.com/stablyai/orca and \"## t3code\" with https://github.com/pingdotgg/t3code, and licenses/orca-LICENSE and licenses/t3code-LICENSE equal the upstream LICENSE files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "port-records",
+        "title": "Record the five upstream ports of this issue (WI-A14)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:46:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5185",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/upstream-ports.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/upstream-port-diff.sh --check",
+            "bash scripts/upstream-port-diff.sh orca"
+          ],
+          "expected_outputs": [
+            "prints \"upstream-ports: 5 records OK\"",
+            "exits 0 and prints one line per Orca record"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-17"
+          ],
+          "acJustification": "Two ACs: the item is one data file; one AC checks validation and one checks the diff report."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-A14. Write the five records from the PRD table to scripts/upstream-ports.json, each with the commit its header names (c6b9ac9549b for Orca, 2d8a843e6b for t3code). Do not re-port. Run bash scripts/upstream-port-diff.sh and paste its output into the PR description so newer upstream commits are visible."
+        },
+        "items": [
+          {
+            "id": "port-records.ac1",
+            "title": "Given the five records, when bash scripts/upstream-port-diff.sh --check runs, then it prints \"upstream-ports: 5 records OK\" and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "port-records.ac2",
+            "title": "Given ~/Projects/orca exists, when bash scripts/upstream-port-diff.sh orca runs, then it exits 0 and prints one line per Orca record (up to date or the new commits)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the explorer server in DASHBOARD-ARCHITECTURE.md (WI-A15)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:46:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5185",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c \"pan.explorer\" docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "grep prints 14 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-A1",
+            "FR-A2",
+            "FR-A3",
+            "FR-A4",
+            "NFR-A1",
+            "NFR-A2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-A15. Append \"## File explorer server (PAN-5183)\" to docs/DASHBOARD-ARCHITECTURE.md: root kinds and id grammar with the workspace isolation rule and read-only project roots; path safety; a table of the 14 pan.explorer* methods with owning issues and the error codes; the git runner (--literal-pathspecs, GIT_OPTIONAL_LOCKS=0) and why; the watcher child/supervisor (batching, overflow, ignore regex, heartbeat, restart, poll mode, per-root polling, idle stop, the build-time isolation assertion and the PAN-4193 reason); upstream port records and the diff script."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when read, then it contains the heading \"## File explorer server (PAN-5183)\" and a table naming all 14 pan.explorer* methods with their owning issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given that section, when read, then it names explorer-watch-child.js, poll mode after 3 restarts in 5 minutes, GIT_OPTIONAL_LOCKS=0 and --literal-pathspecs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given npm run lint:docs, when it runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-surface",
+        "to": "roots-paths",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-surface",
+        "to": "read-service",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-surface",
+        "to": "git-service",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-surface",
+        "to": "search-service",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-surface",
+        "to": "watch-batch",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-surface",
+        "to": "watch-child",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-surface",
+        "to": "watch-supervisor",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-surface",
+        "to": "rpc-handlers",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-surface",
+        "to": "git-runner",
+        "type": "blocks"
+      },
+      {
+        "from": "git-runner",
+        "to": "read-service",
+        "type": "blocks"
+      },
+      {
+        "from": "git-runner",
+        "to": "git-service",
+        "type": "blocks"
+      },
+      {
+        "from": "git-runner",
+        "to": "search-service",
+        "type": "blocks"
+      },
+      {
+        "from": "git-runner",
+        "to": "watch-supervisor",
+        "type": "blocks"
+      },
+      {
+        "from": "roots-paths",
+        "to": "read-service",
+        "type": "blocks"
+      },
+      {
+        "from": "roots-paths",
+        "to": "git-service",
+        "type": "blocks"
+      },
+      {
+        "from": "roots-paths",
+        "to": "search-service",
+        "type": "blocks"
+      },
+      {
+        "from": "roots-paths",
+        "to": "rpc-handlers",
+        "type": "blocks"
+      },
+      {
+        "from": "signature",
+        "to": "read-service",
+        "type": "blocks"
+      },
+      {
+        "from": "watch-batch",
+        "to": "watch-child",
+        "type": "blocks"
+      },
+      {
+        "from": "watch-ignore",
+        "to": "watch-child",
+        "type": "blocks"
+      },
+      {
+        "from": "watch-child",
+        "to": "watch-supervisor",
+        "type": "blocks"
+      },
+      {
+        "from": "read-service",
+        "to": "rpc-handlers",
+        "type": "blocks"
+      },
+      {
+        "from": "git-service",
+        "to": "rpc-handlers",
+        "type": "blocks"
+      },
+      {
+        "from": "search-service",
+        "to": "rpc-handlers",
+        "type": "blocks"
+      },
+      {
+        "from": "watch-supervisor",
+        "to": "rpc-handlers",
+        "type": "blocks"
+      },
+      {
+        "from": "port-diff-script",
+        "to": "port-records",
+        "type": "blocks"
+      },
+      {
+        "from": "signature",
+        "to": "port-records",
+        "type": "blocks"
+      },
+      {
+        "from": "roots-paths",
+        "to": "port-records",
+        "type": "blocks"
+      },
+      {
+        "from": "watch-batch",
+        "to": "port-records",
+        "type": "blocks"
+      },
+      {
+        "from": "watch-ignore",
+        "to": "port-records",
+        "type": "blocks"
+      },
+      {
+        "from": "rpc-handlers",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
