@@ -4,17 +4,17 @@
     "created": "2026-11-13T21:47:06Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5208: Phone app: visual pass, faint logo watermark, logo sting on first load, appearance setting in /m",
-    "updated": "2026-11-13T21:56:01.132Z"
+    "updated": "2026-11-13T21:57:08.091Z"
   },
   "plan": {
     "id": "pan-5208",
     "title": "Phone app: visual pass, faint logo watermark, logo sting on first load, appearance setting in /m",
-    "status": "proposed",
+    "status": "running",
     "uid": "5189b593-e928-4da6-981b-72ebd96fba67",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-13T21:47:06Z",
-    "updated": "2026-11-13T21:56:01.132Z",
+    "updated": "2026-11-13T21:57:08.091Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5208",
@@ -1519,5 +1519,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
