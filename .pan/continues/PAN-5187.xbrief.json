@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5187",
   "created": "2026-11-13T16:27:22.124Z",
-  "updated": "2026-11-13T17:18:15.248Z",
+  "updated": "2026-11-13T17:18:16.544Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -206,6 +206,11 @@
     "f-save-queue.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T17:18:15.248Z"
+    },
+    "f-self-write": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5187",
+      "claimedAt": "2026-11-13T17:18:16.543Z"
     }
   }
 }
