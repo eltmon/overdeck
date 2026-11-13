@@ -4,17 +4,17 @@
     "created": "2026-11-13T05:25:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5178: Dashboard stalls ~1.5 s whenever a tab connects to /ws/rpc (first snapshot blocks the event loop?)",
-    "updated": "2026-11-13T05:42:34.793Z"
+    "updated": "2026-11-13T05:43:43.839Z"
   },
   "plan": {
     "id": "pan-5178",
     "title": "Dashboard stalls ~1.5 s whenever a tab connects to /ws/rpc (first snapshot blocks the event loop?)",
-    "status": "proposed",
+    "status": "running",
     "uid": "1f273a42-ba1d-4f05-b720-3cac6a8c3b34",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-13T05:25:00Z",
-    "updated": "2026-11-13T05:42:34.793Z",
+    "updated": "2026-11-13T05:43:43.839Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5178",
@@ -592,5 +592,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
