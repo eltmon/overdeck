@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5211",
   "created": "2026-11-13T22:53:14.172Z",
-  "updated": "2026-11-13T22:56:42.725Z",
+  "updated": "2026-11-13T22:58:37.945Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,11 @@
     "wi2-byte-scrub.ac5": {
       "status": "completed",
       "doneAt": "2026-11-13T22:56:42.724Z"
+    },
+    "wi3-reader-byte-split": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5211",
+      "claimedAt": "2026-11-13T22:58:37.945Z"
     }
   }
 }
