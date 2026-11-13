@@ -1,0 +1,17 @@
+plan-digest: bcf9b426ed6c77d5354fd709e63f3404bc0c065579cc92f5d5a72ffe5da68dd2
+
+## blocks-the-design: Shared-route fixture is invalid
+
+The PRD WI-1/WI-2 and xBRIEF require `#/shared/abc` to send no request. `sharedRouteCode` requires exactly eight characters from a restricted alphabet (`src/dashboard/frontend/src/components/chat/sharing/joinApi.ts`, lines 14–26), and its existing test explicitly rejects a short code (`src/dashboard/frontend/src/components/chat/sharing/__tests__/SharedConversationView.test.tsx`, lines 296–300). The proposed guard therefore falls through and starts the mint; the required boot test fails. Use a valid code such as `#/shared/bcdf-ghjk` in the PRD, xBRIEF, and acceptance criteria.
+
+## blocks-the-design: Issue prefetch outruns authentication
+
+WI-2 starts `queryClient.prefetchQuery` immediately after `ensureDashboardSession()`, but the mint's fetch runs in a later `.then()` callback (`src/dashboard/frontend/src/lib/wsTransport.ts`, lines 133–151), while TanStack Query calls the query function synchronously. I reproduced that order with `QueryClient.prefetchQuery`: output was `issue fetch` before `mint fetch`. For a first visit using `#pair=...`, session setup must exchange the pairing credential before minting (`wsTransport.ts`, lines 86–101 and 117–145); the issue GET is gated and answers 401 until a credential exists (`src/dashboard/server/remote-request-gate.ts`, lines 150–166). `useIssueRecord` has `retry: false` and no refetch tied to mint success (`src/dashboard/frontend/src/components/issue-view/useIssueRecord.ts`, lines 39–53). WI-2's failure test waits for the prefetch to settle before mounting the hook, so it misses the normal in-flight mount and can pass while the drawer remains unavailable. Add a boot test with a pending pairing exchange, a mounted hook, an initial 401, and later successful exchange; make the issue query recover after authentication while preserving the parallel fast path for an already authenticated tab.
+
+## blocks-the-design: Delay monitor can miss the blocking span
+
+WI-4 enables `monitorEventLoopDelay`, awaits the RPC reply, and disables the histogram immediately. The monitor records a delay only when its timer runs; a long synchronous span can finish and the client can receive the reply before that timer callback. I reproduced the gap with Node: a 120 ms busy loop in a `setImmediate` callback followed by `h.disable()` reported `max before disable 0` and `max after disable 0`. The test can therefore pass below 100 ms without observing the serialization stall. Keep the histogram enabled through the next timer turn after the reply and prove the harness detects an injected synchronous block over 100 ms. Amend WI-4's ban on any timer wait to permit that measurement turn.
+
+## blocks-the-design: Warm fixture omits the first production connect
+
+The PRD's own Evidence 6 and D-1 say the first production connect is about 100–110 ms with 1,450 issues and 1,662 agents. NFR-1 requires a connect under 100 ms, but WI-4 discards the first connect and measures only warm connects with 100 agents (`.pan/drafts/PAN-5178.md`, lines 34, 52, 71, 76, 86, and 246–256). This can pass while the first real connect breaches the stated limit. Add a cold-connect measurement with production-like agent count and a separate warm measurement, or explicitly narrow NFR-1 and its acceptance criterion to warm connects and state the first-connect limit separately.

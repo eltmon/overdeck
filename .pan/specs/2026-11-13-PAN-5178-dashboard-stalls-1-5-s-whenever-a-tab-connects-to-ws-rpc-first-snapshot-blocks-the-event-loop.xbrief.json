@@ -1,0 +1,596 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-13T05:25:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5178: Dashboard stalls ~1.5 s whenever a tab connects to /ws/rpc (first snapshot blocks the event loop?)",
+    "updated": "2026-11-13T05:42:34.793Z"
+  },
+  "plan": {
+    "id": "pan-5178",
+    "title": "Dashboard stalls ~1.5 s whenever a tab connects to /ws/rpc (first snapshot blocks the event loop?)",
+    "status": "proposed",
+    "uid": "1f273a42-ba1d-4f05-b720-3cac6a8c3b34",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-13T05:25:00Z",
+    "updated": "2026-11-13T05:42:34.793Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5178",
+        "label": "PAN-5178",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5178.md",
+        "label": "PRD draft",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "performance",
+      "frontend",
+      "read-model",
+      "ws-rpc"
+    ],
+    "narratives": {
+      "Problem": "A deep-linked issue drawer shows its loading title for about 2.2 s. Planning measured the cause: it is not the /ws/rpc snapshot. The drawer's GET /api/issues/:id (1-10 ms of server time) and the session mint POST /api/dashboard/session are issued last in a burst of about 45 REST requests sent in one React commit. On HTTP/1.1 (localhost:3011, desktop shell) Chromium sends 6 at a time, so they wait 1.1-2.3 s in the browser behind slow status reads. On HTTP/2 (Traefik) they reach a busy server last (TTFB 1.0-1.4 s). /ws/rpc sends no RPC until the session mint returns, so the snapshot waits too. The snapshot path itself is about 60-70 ms (handler 3-11 ms, encode plus stringify plus TextEncoder 49-59 ms for 5.5 MB).",
+      "Proposal": "Send the session mint and, on a deep link, the issue record read from a new src/dashboard/frontend/src/lib/bootRequests.ts called in main.tsx before React renders, so both leave the browser first (measured: 41-52 ms and 108-121 ms on both origins). Memoize the server's cleanIssues deep copy by input-array identity so repeated getSnapshot calls stop re-cleaning 5 MB. Add an event-loop delay test for getSnapshot with 1,500 issues (max under 100 ms), a committed Playwright latency script with --assert, and docs plus a changelog entry. A final item serves the branch frontend with Vite and runs the latency script with --assert. Server-side burst congestion is PAN-5180.",
+      "NonGoals": "- Making the slow status endpoints fast (/api/prerequisites, /api/claude-code/status, /api/flywheel/status, /api/workspace-registry, /api/conversations/pending-input) and the server-side congestion of the whole tab-open burst (PAN-5180)\n- Removing description from the snapshot or changing the snapshot wire format, schema or RPC\n- Pre-serializing, chunking or streaming the snapshot\n- Marking other boot fetches priority low, or deduplicating repeated boot reads such as /api/settings\n- The dashboard's background CPU use and its chronic event-loop p99 warnings\n- Pruning stopped agents from agentsById\n- Prefetching for the cockpit route /command-deck/<project>/<issue>\n- Serving the dashboard over HTTP/2 on port 3011\n- Raising any test threshold to make a test pass\n- Making the first connect after a server start (JIT warm-up) fit under 100 ms; it has its own 300 ms limit (NFR-1b)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix request ordering instead of the snapshot path; keep both of the issue's acceptance criteria.",
+        "rationale": "The issue marks its hypothesis unconfirmed and makes Confirm step 1. Measurement showed the issue read queued 1,094-2,348 ms with 3-72 ms TTFB on HTTP/1.1, and 1,008 ms TTFB behind the burst on HTTP/2. The snapshot path was 60-70 ms. Firing the two requests at domcontentloaded brought them to 41-52 ms and 108-121 ms. The acceptance criteria are outcomes, so they still bind."
+      },
+      {
+        "summary": "Do not mark other boot fetches priority low.",
+        "rationale": "Tested in Chromium: priority high on the critical fetch did nothing, and priority low works only when every other boot fetch (30+ call sites) carries it. A future fetch without it silently regresses. Issuing first is one module."
+      },
+      {
+        "summary": "The issue's Playwright check is a committed script (scripts/verify-deep-link-latency.mjs --assert), run by the test role against a branch build in an isolated browser.",
+        "rationale": "The existing e2e harness replaces window.fetch, so a CI spec cannot observe the browser connection queue. This follows scripts/verify-dashboard-performance.mjs and the PAN-5171 D-14 split."
+      },
+      {
+        "summary": "The event-loop test uses RpcGroup.make(GetSnapshotRpc) over the real RpcServer and JSON serialization, with a real ReadModelServiceLive, and a fixture of 1,500 issues (2,400-character descriptions) plus 100 agents.",
+        "rationale": "Mounting websocketRpcRouteLayer needs EventStoreService, TerminalService and PanOpen stubs; the production handler only adds logging around the same readModel.getSnapshot call. The acceptance criterion names 1,500 issues; agent volume is a separate concern."
+      },
+      {
+        "summary": "Memoize cleanIssues by input-array identity with a WeakMap.",
+        "rationale": "IssueDataService.getIssues() returns one cached array until the next poll, getSnapshot runs on every connect and every 500 ms while an issue stream is open, and reducers never mutate issuesRaw rows in place."
+      },
+      {
+        "summary": "This issue fixes the deep-linked drawer and the session mint only; the server-side congestion of the tab-open burst (late requests wait 1.0-1.4 s TTFB on HTTP/2, other clients' pings stall 280-433 ms) and the slow status endpoints are filed as PAN-5180.",
+        "rationale": "The issue's headline says other clients stall when a tab opens. Planning confirmed that, but the cause is the whole burst on a busy server, not the snapshot, and fixing it means profiling and caching several unrelated endpoints."
+      },
+      {
+        "summary": "The work agent verifies the fix itself by serving the branch frontend with Vite (proxied to the running dashboard) and running the latency script with --assert; the test role repeats it in its own isolated browser.",
+        "rationale": "WI-1 and WI-2 change only the frontend, Vite's dev proxy targets 127.0.0.1:3011 by default, and Vite serves HTTP/1.1, so the browser's 6-request limit applies. No branch-built dashboard server is needed."
+      },
+      {
+        "summary": "Critique round 1 accepted: valid shared-route fixture (#/shared/bcdf-ghjk), issue-read recovery after the session settles (FR-7), histogram kept on through one timer turn plus a detection self-check, and NFR-1 split into warm (100 ms) and first-connect (300 ms) limits.",
+        "rationale": "Each finding was verified against the code: sharedRouteCode needs 8 characters, TanStack Query fires the query function before the mint's microtask, monitorEventLoopDelay records only when its timer fires, and the cold encode at production volume is 91-96 ms."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Seven small items across the dashboard frontend, the read model, one test, one script, one browser verification and docs; 12 files.",
+      "canonicalFilename": "2026-11-13-PAN-5178-dashboard-stalls-1-5-s-whenever-a-tab-connects-to-ws-rpc-first-snapshot-blocks-the-event-loop.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "boot-session-first",
+        "title": "Send the session mint from a boot module before React renders",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T05:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5178",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/bootRequests.ts",
+            "src/dashboard/frontend/src/main.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/bootRequests.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/bootRequests.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "bootRequests.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1. Create src/dashboard/frontend/src/lib/bootRequests.ts exporting startBootRequests(queryClient, location = window.location), which returns early when sharedRouteCode(location.hash) is truthy and otherwise calls void ensureDashboardSession().catch(() => {}). In main.tsx call startBootRequests(queryClient) after installQueryRecovery(queryClient) and before ReactDOM.createRoot. Add bootRequests.test.ts with the four WI-1 tests and list it in scripts/frontend-test-subset.txt before src/lib/__tests__/citationFormat.test.ts."
+        },
+        "items": [
+          {
+            "id": "boot-session-first.ac1",
+            "title": "Given a normal location, when startBootRequests runs, then it sends exactly one POST to /api/dashboard/session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-session-first.ac2",
+            "title": "Given startBootRequests already ran, when ensureDashboardSession() is called again, then no second /api/dashboard/session request is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-session-first.ac3",
+            "title": "Given the hash #/shared/bcdf-ghjk, when startBootRequests runs, then it sends no request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-session-first.ac4",
+            "title": "Given the mint answers 401, when startBootRequests runs, then the test run records no unhandled rejection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-session-first.ac5",
+            "title": "main.tsx contains the startBootRequests(queryClient) call on a line above ReactDOM.createRoot(",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "boot-deeplink-prefetch",
+        "title": "Prefetch the deep-linked issue record before React renders",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T05:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5178",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/bootRequests.ts",
+            "src/dashboard/frontend/src/lib/__tests__/bootRequests.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/bootRequests.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "bootRequests.test.ts passes, including the deep-link and dedupe tests",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2, D-4 and D-4a. Add deepLinkedIssueId(location) to bootRequests.ts (the ?issue= query value, else getIssueIdFromPath(location.pathname), trimmed, null when empty). Rewrite startBootRequests as the PRD snippet: keep the session promise, prefetch issueRecordQueryKey(id) with fetchIssueRecord and staleTime 30_000 in parallel (not chained on the mint), and after Promise.allSettled of both, invalidate the issue query when the session succeeded and the query is in error. Add the WI-2 tests, including the pairing first-visit test with a hook mounted while the exchange is pending."
+        },
+        "items": [
+          {
+            "id": "boot-deeplink-prefetch.ac1",
+            "title": "deepLinkedIssueId returns PAN-5170 for ?issue=PAN-5170 and for /issues/PAN-5170, and returns null for /pipeline and for ?issue=",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-deeplink-prefetch.ac2",
+            "title": "Given an authenticated tab with ?issue=PAN-5170, when startBootRequests runs and useIssueRecord('PAN-5170') renders, then it renders 'Real title' and the test records exactly one issue fetch, started before the session promise resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-deeplink-prefetch.ac3",
+            "title": "Given #pair=<credential> with a pending exchange and a first issue read answering 401, when the hook mounts before the exchange resolves, then after the exchange resolves it renders 'Real title' with exactly two issue fetches, the second after /api/dashboard/session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-deeplink-prefetch.ac4",
+            "title": "Given the first issue read answers 401 and the hook mounts after recovery settles, then it renders 'Real title' with exactly two issue fetches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-deeplink-prefetch.ac5",
+            "title": "Given no deep link, or the hash #/shared/bcdf-ghjk, when startBootRequests runs, then it sends no request to /api/issues/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "clean-issues-memo",
+        "title": "Memoize cleanIssues by input array in the read model",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T05:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5178",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/read-model.ts",
+            "src/dashboard/server/__tests__/read-model-clean-issues-memo.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/read-model-clean-issues-memo.test.ts src/dashboard/server/__tests__/read-model-served-agent-status.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In src/dashboard/server/read-model.ts replace cleanIssues (line 169) with an exported version backed by a module-level WeakMap keyed by the input array, so the same IssueDataService.getIssues() array is cleaned once. Leave the three call sites (lines 425, 639, 663) and toJsonish unchanged. Add read-model-clean-issues-memo.test.ts with the four WI-3 tests."
+        },
+        "items": [
+          {
+            "id": "clean-issues-memo.ac1",
+            "title": "Given the same input array twice, cleanIssues returns the identical output array (toBe)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clean-issues-memo.ac2",
+            "title": "Given a new input array with equal content, cleanIssues returns a different output array whose rows equal the cleaned rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clean-issues-memo.ac3",
+            "title": "cleanIssues converts a Date to its ISO string, converts NaN to null, preserves nested objects, and accepts a frozen input array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "snapshot-event-loop-test",
+        "title": "Event-loop delay test for a getSnapshot connect with 1,500 issues",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T05:25:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5178",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/__tests__/ws-rpc-snapshot-event-loop.test.ts",
+            "src/dashboard/server/read-model.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/ws-rpc-snapshot-event-loop.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ws-rpc-snapshot-event-loop.test.ts passes all three tests",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1",
+            "NFR-1b",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 and D-9, D-9a, D-9c. Write bootSnapshotServer(agentCount) from the read-model-served-agent-status.test.ts and ws-rpc-revoke.test.ts patterns, serving RpcGroup.make(GetSnapshotRpc) whose 'pan.getSnapshot' handler returns readModel.getSnapshot over RpcServer.toHttpEffectWebsocket with RpcSerialization.layerJson, with 1,500 fixture issues (2,400-character descriptions). Write connectAndSnapshot (never JSON.parse inside), measured (monitorEventLoopDelay resolution 1, enable, await, one 20 ms setTimeout measurement turn, disable) and busyWait. Declare three tests in order: first connect with 1,700 agents under 300 ms with all 1,500 issues in the reply; warm connects with 100 agents (one warm-up, three measured, smallest max under 100 ms); and a self-check that an injected 120 ms block reports max at least 100. No fake timers and no other waits. Run the implementation checkpoint and record values in the PR body."
+        },
+        "items": [
+          {
+            "id": "snapshot-event-loop-test.ac1",
+            "title": "Given a fresh test process with 1,500 issues and 1,700 agents, when the first ws client completes pan.getSnapshot, then the measured event-loop max is under 300 ms and the reply parses to an Exit Success with 1,500 issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snapshot-event-loop-test.ac2",
+            "title": "Given 1,500 issues, 100 agents and one warm-up connect, when three measured connects complete pan.getSnapshot, then the smallest event-loop max is under 100 ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snapshot-event-loop-test.ac3",
+            "title": "Given an injected 120 ms synchronous block inside a measured window, then the harness reports a max of at least 100 ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snapshot-event-loop-test.ac4",
+            "title": "The test file contains no vi.useFakeTimers call, its only timer wait is the 20 ms measurement turn in measured(), and the PR body records the values from 5 local runs and whether the setImmediate fallback was applied",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deep-link-latency-script",
+        "title": "Committed Playwright deep-link latency check script",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T05:25:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5178",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/verify-deep-link-latency.mjs"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/verify-deep-link-latency.mjs --help",
+            "node scripts/verify-deep-link-latency.mjs --base-url http://127.0.0.1:3011 --issue PAN-5170 --runs 1",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "--help exits 0 and lists --base-url, --issue, --runs, --assert and --help",
+            "one 'run 1:' line with total=, queued=, ttfb= and title at dcl+",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. Write scripts/verify-deep-link-latency.mjs in the argument style of scripts/verify-dashboard-performance.mjs. It reads the internal token from OVERDECK_HOME or ~/.overdeck, reads the real title through GET /api/issues/<ID>, then per run launches Chromium with a fresh context carrying the x-overdeck-internal-token header, opens <base>/?issue=<ID>, and records domcontentloaded, the first /api/issues/<ID> request's total, queued and ttfb timing, the time the issue-drawer test id contains the real title, and the first five /api/ request paths. It prints one line per run and, with --assert, exits 1 when the issue read is 300 ms or more or the title appears 1,000 ms or more after domcontentloaded."
+        },
+        "items": [
+          {
+            "id": "deep-link-latency-script.ac1",
+            "title": "node scripts/verify-deep-link-latency.mjs --help exits 0 and prints the five flags",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deep-link-latency-script.ac2",
+            "title": "Running the script without --issue exits 2 with a message naming --issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deep-link-latency-script.ac3",
+            "title": "Against a reachable dashboard, one run prints a 'run 1:' line containing total=, queued=, ttfb= and title at dcl+",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deep-link-latency-script.ac4",
+            "title": "With --assert, the script exits 1 when a run's issue read total is 300 ms or more or its title appears 1,000 ms or more after domcontentloaded, and exits 0 otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verify-deep-link-fix",
+        "title": "Verify the deep-link fix in a browser against the branch frontend",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T05:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5178",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/verify-deep-link-latency.mjs"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "node scripts/verify-deep-link-latency.mjs --base-url http://127.0.0.1:3019 --issue PAN-5170 --runs 3 --assert (with the branch frontend served in the background by: cd src/dashboard/frontend && npx vite --port 3019 --strictPort)"
+          ],
+          "expected_outputs": [
+            "the script exits 0 and every run lists /api/dashboard/session and /api/issues/PAN-5170 among its first five /api/ requests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6"
+          ],
+          "acJustification": "Browser verification of the two issue acceptance criteria; changes no file unless the run exposes a bug."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7. Optionally record a baseline: serve origin/main's frontend from a throwaway worktree under $HOME with npx vite --port 3018 --strictPort and run the latency script without --assert. Then serve this branch's frontend with cd src/dashboard/frontend && npx vite --port 3019 --strictPort (VITE_PROXY_TARGET unset, proxying to 127.0.0.1:3011) and run node scripts/verify-deep-link-latency.mjs --base-url http://127.0.0.1:3019 --issue PAN-5170 --runs 3 --assert. Stop both Vite servers and paste both outputs into the PR body. Apply the PRD's re-run rule only for a single failed run with ttfb over 250 ms."
+        },
+        "items": [
+          {
+            "id": "verify-deep-link-fix.ac1",
+            "title": "Given the branch frontend on port 3019, when the latency script runs with --runs 3 --assert, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-deep-link-fix.ac2",
+            "title": "Every run prints a first-five /api/ request list that contains /api/dashboard/session and /api/issues/PAN-5170",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-deep-link-fix.ac3",
+            "title": "The PR body contains the --assert output and either the origin/main baseline output or a sentence saying why the baseline was skipped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-boot-order",
+        "title": "Document the boot order and snapshot cost, and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T05:25:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5178",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5178.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6. Under 'Frontend data flow' in docs/DASHBOARD-ARCHITECTURE.md add the boot-order bullet after the EventRouter.tsx bullet and the snapshot-delivery-cost bullet after the runtime-map bullet, using the PRD text. Create changelog.d/pan-5178.md with the PRD's #### Fixed entry. No em dashes. Run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "docs-boot-order.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md under 'Frontend data flow' contains a bullet naming startBootRequests, the 6-request HTTP/1.1 limit and that WsTransport sends no RPC until the session mint returns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-boot-order.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a snapshot delivery cost bullet naming cleanIssues and ws-rpc-snapshot-event-loop.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-boot-order.ac3",
+            "title": "changelog.d/pan-5178.md exists with one #### Fixed heading, a bullet linking issue #5178, and no em dash; npm run lint:docs passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "boot-session-first",
+        "to": "boot-deeplink-prefetch",
+        "type": "blocks"
+      },
+      {
+        "from": "clean-issues-memo",
+        "to": "snapshot-event-loop-test",
+        "type": "blocks"
+      },
+      {
+        "from": "boot-deeplink-prefetch",
+        "to": "verify-deep-link-fix",
+        "type": "blocks"
+      },
+      {
+        "from": "deep-link-latency-script",
+        "to": "verify-deep-link-fix",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
