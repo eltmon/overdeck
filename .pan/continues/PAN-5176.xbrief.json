@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5176",
   "created": "2026-11-13T05:00:59.712Z",
-  "updated": "2026-11-13T05:14:47.694Z",
+  "updated": "2026-11-13T05:22:33.089Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,9 +98,30 @@
       "doneAt": "2026-11-13T05:14:41.415Z"
     },
     "bare-host-smoke-script": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5176",
-      "claimedAt": "2026-11-13T05:14:47.694Z"
+      "claimedAt": "2026-11-13T05:14:47.694Z",
+      "doneAt": "2026-11-13T05:22:33.089Z"
+    },
+    "bare-host-smoke-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:22:33.089Z"
+    },
+    "bare-host-smoke-script.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:22:33.089Z"
+    },
+    "bare-host-smoke-script.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:22:33.089Z"
+    },
+    "bare-host-smoke-script.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:22:33.089Z"
+    },
+    "bare-host-smoke-script.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:22:33.089Z"
     }
   }
 }
