@@ -70,7 +70,9 @@ describe('incremental Codex history', () => {
     const next = await read(file);
     expect(next.messages.map(m => m.text)).toEqual([JSON.parse(updated).payload.message]);
     expect(next.transcriptGeneration).not.toBe(first.transcriptGeneration);
-    expect(next.lastSequence).toBe(1);
+    // PAN-5211: the only row comes from the record at byte 0.
+    expect(next.lastSequence).toBe(0);
+    expect(next.messages[0]!.sequence).toBe(0);
   });
 
   it('retains every history row beyond the read chunk and safely evicts cold files', async () => {
@@ -247,5 +249,70 @@ describe('incremental Codex history', () => {
     const next = await read(file);
     expect(offsets).toEqual([size, size + Buffer.byteLength(message('appended one'))]);
     expect(next.messages.slice(-2).map(m => m.text)).toEqual(['appended one', 'appended two']);
+  });
+
+  it('numbers reader-fed rows by record offset, from byte 0 and after a tail read', async () => {
+    let body = '';
+    for (let i = 0; i < 400; i++) {
+      body += message(`user ${i} ${'u'.repeat(100)}`);
+      body += line('event_msg', { type: 'agent_message', message: `agent ${i}` });
+    }
+    await writeFile(file, body);
+    const bytes = await readFile(file);
+    const lineAt = (offset: number) => bytes.subarray(offset, bytes.indexOf(10, offset)).toString('utf8');
+
+    for (const options of [{}, { tailReadBytes: 8 * 1024 }]) {
+      const result = await createIncrementalTranscriptReader(createCodexConversationAccumulator, options)(file);
+      expect(result.messages.length).toBeGreaterThan(0);
+      for (const m of result.messages) {
+        const record = JSON.parse(lineAt(m.sequence!)) as { payload: { type: string; message: string } };
+        expect(record.payload.message).toBe(m.text);
+        expect(m.id).toBe(`codex-${record.payload.type === 'user_message' ? 'user' : 'agent'}-@${m.sequence}`);
+      }
+      expect(result.lastSequence).toBe(result.messages[result.messages.length - 1]!.sequence);
+    }
+  });
+
+  it('reports each message row through onRowCreated as legacy id and offset id', () => {
+    const created: Array<[string, string]> = [];
+    const parser = createCodexConversationAccumulator(file, { onRowCreated: (legacyId, id) => created.push([legacyId, id]) });
+    const call = line('response_item', { type: 'function_call', name: 'exec_command', arguments: '{"cmd":"ls"}', call_id: 'c1' }).trimEnd();
+    parser.push(call, { offset: 0, length: Buffer.byteLength(call) });
+    const user = message('hello').trimEnd();
+    const userOffset = Buffer.byteLength(call) + 1;
+    parser.push(user, { offset: userOffset, length: Buffer.byteLength(user) });
+
+    expect(created).toEqual([['codex-user-2', `codex-user-@${userOffset}`]]);
+  });
+
+  it('records each output\'s byte location so it slices exactly that line', async () => {
+    await writeFile(file, message('go') +
+      line('response_item', { type: 'function_call', name: 'exec_command', arguments: '{"cmd":"pwd"}', call_id: 'c1' }) +
+      line('response_item', { type: 'function_call_output', call_id: 'c1', output: '/repo' }) +
+      line('response_item', { type: 'custom_tool_call_output', call_id: 'orphan', output: 'stray' }));
+    const result = await createIncrementalTranscriptReader(createCodexConversationAccumulator)(file);
+    const bytes = await readFile(file);
+
+    for (const callId of ['c1', 'orphan']) {
+      const location = result.toolResultLocations?.get(callId);
+      expect(location).toBeDefined();
+      const record = JSON.parse(bytes.subarray(location!.offset, location!.offset + location!.length).toString('utf8')) as {
+        payload: { call_id: string; type: string };
+      };
+      expect(record.payload.call_id).toBe(callId);
+      expect(record.payload.type).toMatch(/_output$/);
+    }
+  });
+
+  it('keeps counter ids for direct pushes without a location', () => {
+    const parser = createCodexConversationAccumulator(file);
+    parser.push(message('one').trimEnd());
+    parser.push(line('response_item', { type: 'function_call', name: 'x', arguments: '', call_id: '' }).trimEnd());
+    parser.push(message('two').trimEnd());
+
+    const result = parser.result(0, 0);
+    expect(result.messages.map(m => [m.id, m.sequence])).toEqual([['codex-user-1', 1], ['codex-user-3', 3]]);
+    expect(result.workLog.map(w => [w.id, w.sequence])).toEqual([['codex-tool-2', 2]]);
+    expect(result.lastSequence).toBe(3);
   });
 });

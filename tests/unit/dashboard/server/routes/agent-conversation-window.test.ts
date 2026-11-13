@@ -148,3 +148,34 @@ describe('buildAgentToolBodyResult (PAN-4558)', () => {
     expect((result.body as { entry: WorkLogEntry }).entry.id).toBe('sub-t1');
   });
 });
+
+describe('Codex agent bodies keep server-internal fields off the wire (PAN-5211)', () => {
+  const codexTranscript = join(TEST_DIR, 'rollout-codex.jsonl');
+  const codexLine = (type: string, payload: object) => JSON.stringify({ type, timestamp: '2026-11-13T00:00:00.000Z', payload });
+  writeFileSync(codexTranscript, [
+    codexLine('event_msg', { type: 'user_message', message: 'run it' }),
+    codexLine('response_item', { type: 'function_call', name: 'exec_command', arguments: '{"cmd":"ls"}', call_id: 'call_1' }),
+    codexLine('response_item', { type: 'function_call_output', call_id: 'call_1', output: 'a.ts' }),
+  ].join('\n') + '\n');
+
+  beforeEach(() => {
+    vi.mocked(listAgentTranscriptCandidates).mockResolvedValue([{ kind: 'codex', path: codexTranscript }] as never);
+    vi.mocked(resolveAgentSubagentTranscript).mockResolvedValue({ kind: 'codex', path: codexTranscript } as never);
+  });
+
+  it.each([
+    ['the plain body', new URLSearchParams()],
+    ['the subagent body', new URLSearchParams('subagentId=sub')],
+  ])('omits toolResultLocations and historyStartOffset from %s', async (_label, query) => {
+    const result = await buildAgentConversationWindowResult('agent-pan-5211', query);
+
+    expect(result.status).toBe(200);
+    const body = result.body as Body & Record<string, unknown>;
+    expect(body.workLog.map((w) => w.result)).toEqual(['a.ts']);
+    expect(body).not.toHaveProperty('toolResultLocations');
+    expect(body).not.toHaveProperty('historyStartOffset');
+    const wire = JSON.stringify(body);
+    expect(wire).not.toContain('toolResultLocations');
+    expect(wire).not.toContain('historyStartOffset');
+  });
+});

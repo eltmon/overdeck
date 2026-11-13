@@ -35,6 +35,7 @@
 
 import type { ChatMessage, CompactBoundary, WorkLogEntry } from '@overdeck/contracts';
 import type { ParseResult } from './conversation-service.js';
+import type { RecordLocation } from './conversation/types.js';
 import { createCodexSessionParser } from '../../../lib/cost-parsers/codex-parser.js';
 import { readCodexRolloutMessage } from '../../../lib/codex-rollout-message.js';
 import { createIncrementalTranscriptReader } from './incremental-transcript-reader.js';
@@ -115,6 +116,8 @@ function extractCommand(name: string, args: string): string | undefined {
 export interface CodexAccumulatorOptions {
   /** PAN-5211: byte offset of the first record this accumulator receives (a tail read starts above 0). */
   readonly historyStartOffset?: number;
+  /** PAN-5211: reports each new message row's counter-form id next to its offset-form id (bookmark migration). */
+  readonly onRowCreated?: (legacyId: string, id: string) => void;
 }
 
 /** Incremental rollout accumulator; each JSONL record is consumed once per cached file. */
@@ -137,6 +140,19 @@ export function createCodexConversationAccumulator(sessionFile: string, options:
   // PAN-5211: retained characters of every kept row (see tool-result-bounds.ts).
   let retained = 0;
   const historyStart = options.historyStartOffset ?? 0;
+  // PAN-5211: byte location of each kept tool result's record, keyed by call_id (expand reads it).
+  const resultLocations = new Map<string, RecordLocation>();
+  // Sequence of the newest row; equals the legacy counter when no locations are given.
+  let lastRowSequence = 0;
+
+  // PAN-5211 D7: a located row's sequence is its record's byte offset, and its id suffix is `@<offset>`,
+  // so the same record has the same id in every parse. Unlocated pushes keep the counter form.
+  // Call after incrementing the legacy counter.
+  const nextRowSequence = (location: RecordLocation | undefined): number => {
+    lastRowSequence = location ? location.offset : sequence;
+    return lastRowSequence;
+  };
+  const rowSuffix = (location: RecordLocation | undefined): string => (location ? `@${location.offset}` : `${sequence}`);
 
   const addMessage = (message: ChatMessage): void => {
     messages.push(message);
@@ -151,7 +167,7 @@ export function createCodexConversationAccumulator(sessionFile: string, options:
     workLog[position] = next;
   };
 
-  const push = (line: string): void => {
+  const push = (line: string, location?: RecordLocation): void => {
     costs.push(line);
     let entry: CodexEntry;
     try {
@@ -170,19 +186,23 @@ export function createCodexConversationAccumulator(sessionFile: string, options:
       if (rolloutMessage) {
         const isUser = rolloutMessage.role === 'user';
         sequence += 1;
+        const rowSequence = nextRowSequence(location);
+        const legacyId = `codex-${isUser ? 'user' : 'agent'}-${sequence}`;
+        const id = `codex-${isUser ? 'user' : 'agent'}-${rowSuffix(location)}`;
         // PAN-3770: a completed-looking assistant message does NOT mean the
         // turn ended — Codex narrates mid-turn, so only a message with no tool
         // activity after it does. The tool branches below clear this.
         trailingAgentMessageAt = isUser ? undefined : createdAt;
         addMessage({
-          id: `codex-${isUser ? 'user' : 'agent'}-${sequence}`,
+          id,
           role: rolloutMessage.role,
           text: rolloutMessage.text,
           createdAt,
           completedAt: createdAt,
           streaming: false,
-          sequence,
+          sequence: rowSequence,
         });
+        options.onRowCreated?.(legacyId, id);
       } else if (ptype === 'token_count') {
         // Cumulative usage — the latest token_count carries the running total.
         const usage = payload.info?.total_token_usage;
@@ -207,12 +227,12 @@ export function createCodexConversationAccumulator(sessionFile: string, options:
         const command = extractCommand(name, args);
         sequence += 1;
         const wl: WorkLogEntry = {
-          id: callId || `codex-tool-${sequence}`,
+          id: callId || `codex-tool-${rowSuffix(location)}`,
           createdAt,
           label: command ? 'Shell' : name,
           tone: 'tool',
           ...(name === 'spawn_agent' ? { toolInput: parseToolInput(args) } : {}),
-          sequence,
+          sequence: nextRowSequence(location),
           ...(command ? { command } : args ? { detail: args } : {}),
         };
         addWork(wl);
@@ -226,19 +246,23 @@ export function createCodexConversationAccumulator(sessionFile: string, options:
         const wl = position >= 0 ? workLog[position] : undefined;
         if (wl) {
           // A replaced entry is a new object, so earlier result() snapshots keep their own entry.
-          if (output) replaceWork(position, { ...wl, result: output });
+          if (output) {
+            replaceWork(position, { ...wl, result: output });
+            if (location) resultLocations.set(callId, location);
+          }
           toolCallsByCallId.delete(callId);
         } else if (output) {
           // Output with no matching call (truncated/rotated) — stand-alone entry.
           sequence += 1;
           addWork({
-            id: callId || `codex-tool-out-${sequence}`,
+            id: callId || `codex-tool-out-${rowSuffix(location)}`,
             createdAt,
             label: 'Tool result',
             result: output,
             tone: 'tool',
-            sequence,
+            sequence: nextRowSequence(location),
           });
+          if (callId && location) resultLocations.set(callId, location);
         }
       }
       // response_item 'message' (injected context) and 'reasoning' (encrypted)
@@ -273,12 +297,13 @@ export function createCodexConversationAccumulator(sessionFile: string, options:
       contextActiveBytes: size,
       pendingToolUse: new Map(),
       unresolvedResults: new Map(),
-      lastSequence: sequence,
+      lastSequence: lastRowSequence,
       mtimeMs,
       planToolUseIds: new Set(),
       compactBoundaries,
       fileEditsByAssistantId: new Map(),
       historyStartOffset: historyStart,
+      toolResultLocations: new Map(resultLocations),
     };
   };
   return { push, result, retainedChars: (): number => retained };

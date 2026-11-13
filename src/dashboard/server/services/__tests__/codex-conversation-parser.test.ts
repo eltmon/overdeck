@@ -107,9 +107,13 @@ describe('codex conversation parser', () => {
     const sorted = [...seqs].sort((a, b) => a - b);
     expect(seqs.length).toBeGreaterThan(0);
     expect(new Set(seqs).size).toBe(seqs.length); // all unique
-    // A single shared counter across messages + workLog yields contiguous 1..N,
+    // PAN-5211: each row's sequence is the byte offset of the record that created it,
     // so re-sorting by sequence reconstructs original file order in the UI.
-    expect(sorted).toEqual(Array.from({ length: seqs.length }, (_, i) => i + 1));
+    const lineOffsets: number[] = [];
+    let offset = 0;
+    for (const l of ROLLOUT_LINES) { lineOffsets.push(offset); offset += Buffer.byteLength(JSON.stringify(l)) + 1; }
+    for (const seq of seqs) expect(lineOffsets).toContain(seq);
+    expect(result.lastSequence).toBe(sorted[sorted.length - 1]);
   });
 
   it('summarizes a completed Codex turn as not working even when the tmux session is alive', async () => {

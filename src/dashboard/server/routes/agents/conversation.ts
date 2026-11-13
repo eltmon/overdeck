@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import type { ConversationResponse, WorkLogEntry } from '@overdeck/contracts';
+import type { RecordLocation } from '../../services/conversation/types.js';
 import { Effect, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
@@ -144,8 +145,14 @@ async function agentWorkspaceFor(id: string): Promise<string | null> {
 const EMPTY_CONVERSATION: ConversationResponse = { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 };
 
 type AgentConversationResult =
-  /** `transcriptPath` is server-side only; routes send `body`. */
-  | { status: 200; body: ConversationResponse; transcriptPath?: string }
+  /** `transcriptPath`, `toolResultLocations` and `historyStartOffset` are server-side only; routes send `body`. */
+  | {
+    status: 200;
+    body: ConversationResponse;
+    transcriptPath?: string;
+    toolResultLocations?: ReadonlyMap<string, RecordLocation> | undefined;
+    historyStartOffset?: number | undefined;
+  }
   | { status: 400; body: { error: string } }
   | { status: 404; body: { error: string; checked: string[] } }
   | { status: 500; body: { error: string } };
@@ -201,8 +208,10 @@ export async function buildAgentConversationResult(
       : selected.kind === 'acp' ? await parseAcpConversationMessages(selected.path)
       : await sharedTranscriptParser(selected.kind)(selected.path);
     // latestCompactSummary (PAN-4245) is server-internal title/About input, never an HTTP response field.
-    const { latestCompactSummary: _latestCompactSummary, ...parsed } =
+    // PAN-5211: toolResultLocations and historyStartOffset are server-internal too.
+    const { latestCompactSummary: _latestCompactSummary, toolResultLocations, historyStartOffset, ...parsed } =
       rawResult as typeof rawResult & { latestCompactSummary?: unknown };
+    const serverOnly = { transcriptPath: selected.path, toolResultLocations, historyStartOffset };
     // PAN-4255: the composer effort chip compares what the transcript shows with what was launched.
     const state = isExternalAgentId(id) ? null : getAgentState(id);
     const resolution = state ? resolveRelaunchEffort(state) : null;
@@ -213,7 +222,7 @@ export async function buildAgentConversationResult(
     };
 
     if (selected.kind === 'acp') {
-      return { status: 200, transcriptPath: selected.path, body: {
+      return { status: 200, ...serverOnly, body: {
         ...result,
         messages: result.messages.map((message) => message.role === 'assistant'
           ? {
@@ -225,7 +234,7 @@ export async function buildAgentConversationResult(
         streaming: false,
       } };
     }
-    return { status: 200, transcriptPath: selected.path, body: { ...result, streaming: false } };
+    return { status: 200, ...serverOnly, body: { ...result, streaming: false } };
   } catch (err) {
     console.error('[conversation] failed for', id, err);
     return { status: 500, body: { error: `Failed to load transcript for ${id}.` } };
@@ -246,9 +255,13 @@ async function buildAgentSubagentResult(
     ? await parseEntireConversation(resolved.path)
     : await parseCodexConversationMessages(resolved.path);
   // latestCompactSummary (PAN-4245) is server-internal title/About input, never an HTTP response field.
-  const { latestCompactSummary: _latestCompactSummary, ...result } =
+  // PAN-5211: toolResultLocations and historyStartOffset are server-internal too.
+  const { latestCompactSummary: _latestCompactSummary, toolResultLocations, historyStartOffset, ...result } =
     rawResult as typeof rawResult & { latestCompactSummary?: unknown };
-  return { status: 200, transcriptPath: resolved.path, body: { ...result, streaming: false } };
+  return {
+    status: 200, transcriptPath: resolved.path, toolResultLocations, historyStartOffset,
+    body: { ...result, streaming: false },
+  };
 }
 
 async function transcriptIdAt(path: string | undefined): Promise<string | undefined> {

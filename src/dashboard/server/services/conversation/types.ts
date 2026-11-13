@@ -70,6 +70,8 @@ export interface ParseResult {
   latestCompactSummary?: CompactSummaryRecord;
   /** PAN-5211: byte offset of the oldest record this result holds; > 0 means older history is only on disk. */
   historyStartOffset?: number;
+  /** PAN-5211: byte location of each kept Codex tool result's record; server-internal. */
+  toolResultLocations?: ReadonlyMap<string, RecordLocation>;
 }
 
 /** State carried across incremental parseConversationMessages calls. */
