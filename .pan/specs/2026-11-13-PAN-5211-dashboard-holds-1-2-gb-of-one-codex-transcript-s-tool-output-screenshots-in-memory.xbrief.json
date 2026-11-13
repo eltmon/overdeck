@@ -1,0 +1,1640 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-13T22:31:39Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5211: Dashboard holds ~1.2 GB of one Codex transcript's tool output (screenshots) in memory",
+    "updated": "2026-11-13T22:51:47.961Z"
+  },
+  "plan": {
+    "id": "pan-5211",
+    "title": "Dashboard holds ~1.2 GB of one Codex transcript's tool output (screenshots) in memory",
+    "status": "proposed",
+    "uid": "1dc71bd0-eb57-4e8c-9999-47642a909e90",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-13T22:31:39Z",
+    "updated": "2026-11-13T22:51:47.961Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5211",
+        "label": "PAN-5211",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5211.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "memory",
+      "codex",
+      "transcripts",
+      "performance"
+    ],
+    "metadata": {
+      "sizeJustification": "The operator explicitly directed (2026-11-13, issue comment plus session instruction) that all five follow-up requirements ship in this issue. They share one foundation: the byte-level line splitter, record-offset sequences and historyStartOffset that the tail read, expand-by-offset, disk paging and the UI notice all consume, so a sibling split would land a bounded window with no way to page back past it. Most of the 35 files are paired test files; production logic lands in two new modules to respect the file-size ratchet.",
+      "canonicalFilename": "2026-11-13-PAN-5211-dashboard-holds-1-2-gb-of-one-codex-transcript-s-tool-output-screenshots-in-memory.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The dashboard server held ~1.2 GB of one 1.6 GB Codex rollout's tool output (0.98 GB base64 PNG screenshots, 0.55 GB tool text) live in its heap, with RSS at 6.4 GB. The Codex accumulator stores every result whole, every multi-MB line is decoded and JSON.parsed whole so a cold open parses the entire file, the incremental reader and the snapshot cache budget file bytes and always keep one entry however large, and the output branch uses an O(n^2) workLog.indexOf lookup. The tool-body expand route reads the parse cache, not the transcript.",
+      "Proposal": "Split transcript lines as bytes and scrub image data URLs to '[image: <format>, <N> KB]' before decoding or JSON.parse; skip lines over 8 MiB after scrubbing; open transcripts over 64 MiB by tail read. Cap every stored tool result at 65,536 characters (head and tail) through one helper used by Codex, pi, prime-agent, ohmypi and kimi. Budget the reader and the snapshot cache in retained characters (32 Mi total, 16 Mi hard per-entry cap) and give the Codex accumulator a 16 Mi/12 Mi window of newest rows. Number Codex rows by record byte offset, store each kept result's location so expand seeks straight to it, page older history back from disk, mark bounded windows so the conversation view shows a notice, and guard heap, peak RSS and cold-open time with a 200 MB synthetic transcript test. Keep Node's default heap limit (no --max-old-space-size) and document why.",
+      "NonGoals": "- Rendering images in the dashboard; image data is shown only as a placeholder.\n- Capping tool-call arguments (detail, toolInput).\n- Changing the Claude parser or its unresolvedResults.rawContent.\n- Adding a byte budget to messagesCache in src/lib/overdeck/conversation-reads.ts.\n- Full-text expand or disk paging for pi, prime-agent, ohmypi or kimi.\n- Changing ACP's 500-character cap or the muse parser.\n- Changing how Codex result JSON is displayed beyond the placeholder substitution.\n- Setting --max-old-space-size on the dashboard.\n- Changing transcripts-to-drive, appserver-events.jsonl, codex-home-v2 or embeddings.db.\n- Raising any scripts/file-size-allowlist.txt cap."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Image data URLs become placeholders everywhere, including expand and disk pages.",
+        "rationale": "The frontend has no input_image renderer (git grep finds none); base64 as text is useless and is the bulk of the memory."
+      },
+      {
+        "summary": "Tool-body expand for Codex seeks to the record's stored byte location instead of reading the parse cache.",
+        "rationale": "Verified that both tool-body routes read the parse cache (conversation-reads.ts:702, agents/conversation.ts:291), so capping without a disk read would silently truncate expands; the operator's comment requires offset-based expand."
+      },
+      {
+        "summary": "Codex row sequences and id suffixes become the record's byte offset when the reader supplies locations.",
+        "rationale": "Unique and ordered across the whole file regardless of tail-read start, which disk paging needs to continue the cursor; resume still works because offsets grow; costs one reset snapshot per open client after deploy."
+      },
+      {
+        "summary": "Caps: 65,536 chars stored, 4 Mi chars on expand, 16 Mi retained per entry with a 12 Mi eviction target, 32 Mi total, 64 MiB tail read, 8 MiB parse limit.",
+        "rationale": "16 Mi retained holds hundreds of capped results, far beyond the 75-row UI window; 4 Mi hysteresis limits window-slide resets; a 64 MiB tail of the sampled rollout yields roughly one window of rows."
+      },
+      {
+        "summary": "pi, prime-agent, ohmypi and kimi get the text cap but not record locations or disk paging.",
+        "rationale": "They are whole-file re-parsers outside the incremental reader; results over 64 KiB are rare there and expand shows head, tail and an explicit omitted marker."
+      },
+      {
+        "summary": "ACP and muse parsers are not changed.",
+        "rationale": "ACP already caps results at 500 chars (stricter than the helper); muse stores no work log."
+      },
+      {
+        "summary": "The snapshot cache in shared-transcript-parser.ts is fixed here; messagesCache in conversation-reads.ts is a follow-up.",
+        "rationale": "The snapshot cache has the identical file-bytes and single-entry bug; conversation-reads.ts is at 989 of 1,000 lines and its entries are already bounded once Codex results are bounded."
+      },
+      {
+        "summary": "Do not set --max-old-space-size on the dashboard.",
+        "rationale": "Default limit is 4,144 MiB per isolate on this host; this change bounds retained parse state by design, and a low cap turns transient spikes into a dashboard crash that drops every view at once."
+      },
+      {
+        "summary": "The memory test measures heap after runtime-exposed gc, peak RSS and cold-open time, in a normal .test.ts file.",
+        "rationale": "Sliced strings can retain multi-MB parents invisibly to a byte-size assertion (probe: 127.6 MB vs 5.3 MB); runtime gc via vm.runInNewContext works in Vitest forks (probed); *.slow.test.ts is excluded from CI default runs."
+      },
+      {
+        "summary": "The operator's follow-up comment is folded into this one plan rather than split into sibling issues.",
+        "rationale": "The operator explicitly asked to include all five follow-up requirements; recorded in plan.metadata.sizeJustification."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-text-bounds",
+        "title": "Add the shared tool-result text bounds and retained-size estimate helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5211",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation/tool-result-bounds.ts",
+            "src/dashboard/server/services/conversation/__tests__/tool-result-bounds.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/conversation/__tests__/tool-result-bounds.test.ts"
+          ],
+          "expected_outputs": [
+            "tool-result-bounds.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ],
+          "foundationFor": [
+            "wi2-byte-scrub",
+            "wi4-reader-retained-budget",
+            "wi6-codex-bounded-results",
+            "wi11-pi-bounds",
+            "wi12-ohmypi-kimi-bounds",
+            "wi19-snapshot-cache-budget"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create src/dashboard/server/services/conversation/tool-result-bounds.ts with the nine exported constants (TOOL_RESULT_STORED_MAX_CHARS=65_536, TOOL_BODY_FULL_READ_MAX_CHARS=4Mi, TRANSCRIPT_ENTRY_MAX_RETAINED_CHARS=16Mi, TRANSCRIPT_WINDOW_TARGET_CHARS=12Mi, TRANSCRIPT_CACHE_MAX_RETAINED_CHARS=32Mi, TRANSCRIPT_TAIL_READ_BYTES=64Mi, RECORD_PARSE_MAX_BYTES=8Mi, OLDER_PAGE_READ_STEP_BYTES=8Mi, OLDER_PAGE_READ_MAX_BYTES=64Mi, RECORD_FULL_READ_MAX_BYTES=64Mi), imagePlaceholder, boundToolResultText (regex image replace, then head 32,768 + marker '\\n\\n… [<N> characters omitted] …\\n\\n' + tail 32,768, no surrogate split, changed output returned as Buffer.from(out,'utf8').toString('utf8'); unchanged input returned by reference with bounded:false; text already holding '[image: ' reports bounded:true), and the three estimate functions (64 overhead per row, recursive toolInput walk without JSON.stringify)."
+        },
+        "items": [
+          {
+            "id": "wi1-text-bounds.ac1",
+            "title": "Given a stringified Codex output array holding a 1 MB PNG data URL, when boundToolResultText runs, then it returns text containing '[image: png, ' and no 'data:image' with bounded true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-text-bounds.ac2",
+            "title": "Given a 200,000-character string, when boundToolResultText runs, then the result starts with the input's first 32,768 characters, ends with its last 32,768 and contains 'characters omitted'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-text-bounds.ac3",
+            "title": "Given a string under the cap with no image, when boundToolResultText runs, then it returns the same string reference with bounded false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-text-bounds.ac4",
+            "title": "Given a surrogate pair straddling the cut point, when boundToolResultText cuts, then the result contains no lone surrogate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-text-bounds.ac5",
+            "title": "Given a fixture work-log entry, when estimateWorkLogEntryChars runs, then it returns the hand-computed sum of field lengths plus 64",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-byte-scrub",
+        "title": "Add the byte-level image data URL scrub",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation/tool-result-bounds.ts",
+            "src/dashboard/server/services/conversation/__tests__/tool-result-bounds.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/conversation/__tests__/tool-result-bounds.test.ts"
+          ],
+          "expected_outputs": [
+            "tool-result-bounds.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 and D2. In tool-result-bounds.ts add scrubImageDataUrls(line: Buffer): Buffer: find 'data:image/' with Buffer.indexOf, require 1-32 bytes of [A-Za-z0-9.+-] immediately followed by ';base64,' (otherwise leave the match unchanged and keep scanning), take the payload as the run of [A-Za-z0-9+/=] bytes, replace the whole data URL with the ASCII imagePlaceholder via one Buffer.concat; return the same Buffer when nothing matches."
+        },
+        "items": [
+          {
+            "id": "wi2-byte-scrub.ac1",
+            "title": "Given a real-shape custom_tool_call_output line holding two 1 MB data URLs, when scrubbed, then JSON.parse accepts the result and each input_image image_url equals '[image: png, <N> KB]'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-byte-scrub.ac2",
+            "title": "Given that scrubbed line, when measured, then its byte length is under 2,048 bytes plus the input_text bytes and every input_text item is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-byte-scrub.ac3",
+            "title": "Given a line with no image, when scrubbed, then the same Buffer reference is returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-byte-scrub.ac4",
+            "title": "Given a multi-byte '🌍' adjacent to a data URL, when scrubbed and decoded, then the emoji survives intact",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-byte-scrub.ac5",
+            "title": "Given a line holding 'data:image/svg+xml;utf8,<svg></svg>', when scrubbed, then the same Buffer reference is returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-reader-byte-split",
+        "title": "Split transcript lines as bytes, scrub before decoding, and pass record locations",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5211",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/services/incremental-transcript-reader.ts",
+            "src/dashboard/server/services/conversation/types.ts",
+            "src/dashboard/server/services/__tests__/codex-incremental-parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/codex-incremental-parser.test.ts"
+          ],
+          "expected_outputs": [
+            "codex-incremental-parser.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-9"
+          ],
+          "foundationFor": [
+            "wi4-reader-retained-budget",
+            "wi5-tail-read",
+            "wi8-offset-sequences",
+            "wi10-oversized-records",
+            "wi14-disk-paging"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and D2/D3. In incremental-transcript-reader.ts replace the StringDecoder text split (lines 54-75) with an exported createTranscriptLineSplitter(startOffset, onLine) that splits on byte 0x0A, keeps copied pieces of the partial last line, and emits { offset, length } of the original bytes; onLine scrubs (WI-2) then calls push(scrubbed.toString('utf8'), location) or pushOversized(head 4096 bytes, location) when the scrubbed line exceeds recordParseMaxBytes. Export RecordLocation from conversation/types.ts. Accumulator interface gains location? and pushOversized?; the create callback becomes (file, { historyStartOffset }) => Accumulator. Reader takes an options object { maxEntryRetainedChars?, maxCacheRetainedChars?, tailReadBytes?, recordParseMaxBytes? } (this item reads only recordParseMaxBytes)."
+        },
+        "items": [
+          {
+            "id": "wi3-reader-byte-split.ac1",
+            "title": "Given the existing split-UTF-8, incomplete-final-record, missing-final-newline and rewrite cases, when the reader runs, then every existing assertion in codex-incremental-parser.test.ts still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-reader-byte-split.ac2",
+            "title": "Given a transcript read across a 1 MiB chunk boundary and then appended to, when each line is pushed, then file.subarray(offset, offset + length) equals that line's original bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-reader-byte-split.ac3",
+            "title": "Given a line holding a data URL, when the reader pushes it, then the pushed string contains '[image: png, ' and no 'data:image'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-reader-byte-split.ac4",
+            "title": "Given recordParseMaxBytes 1024 and a 4 KB text line, when the reader reads it, then pushOversized receives it and push does not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-reader-retained-budget",
+        "title": "Budget the incremental reader in retained characters with a hard per-entry cap",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/incremental-transcript-reader.ts",
+            "src/dashboard/server/services/codex-conversation-parser.ts",
+            "src/dashboard/server/services/__tests__/codex-incremental-parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/codex-incremental-parser.test.ts"
+          ],
+          "expected_outputs": [
+            "codex-incremental-parser.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 and D9. Add retainedChars() to the Accumulator interface; the Codex accumulator keeps a running retained total (add per new row, subtract old/add new on replace) using the WI-1 estimates. In the reader delete maxBytes and replace lines 81-87: an entry whose retainedChars() exceeds maxEntryRetainedChars is returned but not cached; otherwise cache it and evict oldest entries while cache.size > 8 or summed retainedChars() > maxCacheRetainedChars, never evicting the entry just set. Delete the cache.size === 1 exception."
+        },
+        "items": [
+          {
+            "id": "wi4-reader-retained-budget.ac1",
+            "title": "Given maxCacheRetainedChars set small and three files read in turn, when the third is read, then the oldest is evicted and a push spy shows it re-parsed from byte 0 on its next read",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-reader-retained-budget.ac2",
+            "title": "Given a stub accumulator whose retainedChars() exceeds maxEntryRetainedChars, when an unchanged file is read twice, then the second read creates a new accumulator",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-reader-retained-budget.ac3",
+            "title": "Given a Codex transcript of known rows, when parsed, then retainedChars() equals estimateParseResultChars of the result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-tail-read",
+        "title": "Open transcripts over 64 MiB by tail read",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/incremental-transcript-reader.ts",
+            "src/dashboard/server/services/__tests__/codex-incremental-parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/codex-incremental-parser.test.ts"
+          ],
+          "expected_outputs": [
+            "codex-incremental-parser.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 and D6. When the reader creates a fresh entry and stats.size > tailReadBytes, read 64 KiB blocks from size - tailReadBytes to the first 0x0A, set start = its offset + 1 (or size if none), set entry.size and entry.lineStart to start and call create(file, { historyStartOffset: start }); smaller files pass historyStartOffset 0. Keep head/tail prefix verification (head still from byte 0)."
+        },
+        "items": [
+          {
+            "id": "wi5-tail-read.ac1",
+            "title": "Given tailReadBytes 65,536 and a 1 MB transcript, when it is read cold, then only lines whose offset is at or after size - 65,536 are pushed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-tail-read.ac2",
+            "title": "Given that tail read, when the result returns, then historyStartOffset is greater than 0 and totalTokens equals the file's final cumulative token_count total",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-tail-read.ac3",
+            "title": "Given a later append to that file, when it is read again, then the push spy sees only the appended lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-codex-bounded-results",
+        "title": "Store bounded Codex tool results",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/codex-conversation-parser.ts",
+            "src/dashboard/server/services/__tests__/codex-conversation-parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/codex-conversation-parser.test.ts"
+          ],
+          "expected_outputs": [
+            "codex-conversation-parser.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In the output branch use const { text: output, bounded } = boundToolResultText(extractCodexToolOutput(payload.output)); rename and export extractToolOutput as extractCodexToolOutput."
+        },
+        "items": [
+          {
+            "id": "wi6-codex-bounded-results.ac1",
+            "title": "Given an output array of input_text plus an input_image with a 1 MB data URL pushed directly into the accumulator, when result() runs, then the stored result contains the text and '[image: png, ' and no 'data:image'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-codex-bounded-results.ac2",
+            "title": "Given a 100,000-character string output, when result() runs, then the stored result is at most 65,536 characters plus the omitted-characters marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-call-index",
+        "title": "Replace the workLog.indexOf lookup with a stored call index",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-5211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/codex-conversation-parser.ts",
+            "src/dashboard/server/services/__tests__/codex-conversation-parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/codex-conversation-parser.test.ts"
+          ],
+          "expected_outputs": [
+            "codex-conversation-parser.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 and D10. toolCallsByCallId becomes Map<string, number> of absolute indexes with let droppedWorkLogRows = 0; position = absolute - droppedWorkLogRows; replace with a new object; delete workLog.indexOf."
+        },
+        "items": [
+          {
+            "id": "wi7-call-index.ac1",
+            "title": "Given 5,000 interleaved call/output pairs, when parsed, then workLog[i].result equals 'out-<i>' for every i",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-call-index.ac2",
+            "title": "Given codex-conversation-parser.ts after the change, when 'git grep -n \"workLog.indexOf\" src/dashboard/server/services/codex-conversation-parser.ts' runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-call-index.ac3",
+            "title": "Given an earlier result() snapshot taken before an output arrives, when the output is pushed, then the earlier snapshot's entry still has no result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-offset-sequences",
+        "title": "Number Codex rows by record offset and expose result locations and historyStartOffset",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5211",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation/types.ts",
+            "src/dashboard/server/services/codex-conversation-parser.ts",
+            "src/dashboard/server/routes/agents/conversation.ts",
+            "src/dashboard/server/services/__tests__/codex-incremental-parser.test.ts",
+            "src/dashboard/server/services/__tests__/codex-conversation-parser.test.ts",
+            "tests/unit/dashboard/server/routes/agent-conversation-window.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/codex-incremental-parser.test.ts",
+            "npx vitest run src/dashboard/server/services/__tests__/codex-conversation-parser.test.ts",
+            "npx vitest run tests/unit/dashboard/server/routes/agent-conversation-window.test.ts"
+          ],
+          "expected_outputs": [
+            "named test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ],
+          "foundationFor": [
+            "wi9-codex-window",
+            "wi13-expand-by-offset",
+            "wi14-disk-paging",
+            "wi15-window-bounded-flag"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8, D7, D11. Add toolResultLocations and historyStartOffset to ParseResult (types.ts). createCodexConversationAccumulator(sessionFile, { historyStartOffset?, maxRetainedChars?, windowTargetChars? }): with a location, new rows use sequence = location.offset and '@<offset>' id suffixes (codex-user-@<offset>, codex-agent-@<offset>, codex-tool-@<offset>, codex-tool-out-@<offset>) in every reader-fed parse, so a record has one id in every parser; without a location keep the counter. Always keep the legacy counter and call options.onRowCreated?.(legacyId, id) for each new message row (used by the bookmark migration). Record resultLocations for every output row with a non-empty callId; result() returns toolResultLocations (new Map copy), historyStartOffset, lastSequence = newest row's sequence. In routes/agents/conversation.ts strip both fields from the HTTP body beside latestCompactSummary in buildAgentConversationResult (line 204) and buildAgentSubagentResult (line 249) and return them as server-only sibling fields on the status-200 AgentConversationResult."
+        },
+        "items": [
+          {
+            "id": "wi8-offset-sequences.ac1",
+            "title": "Given a transcript read through the reader, from byte 0 or by tail read, when parsed, then each message's sequence equals the byte offset of its line and its id is codex-user-@<offset> or codex-agent-@<offset>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-offset-sequences.ac2",
+            "title": "Given an accumulator built with onRowCreated, when the first user message is pushed, then the callback receives ('codex-user-1', 'codex-user-@<offset>')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-offset-sequences.ac3",
+            "title": "Given an output with a non-empty call_id, when parsed through the reader, then toolResultLocations.get(callId) slices exactly that output's line from the file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-offset-sequences.ac4",
+            "title": "Given GET /api/agents/:id/conversation and its ?subagentId= variant for a Codex agent, when the body is serialized, then it contains no toolResultLocations or historyStartOffset key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9-codex-window",
+        "title": "Keep a bounded in-memory window of the newest Codex rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/codex-conversation-parser.ts",
+            "src/dashboard/server/services/__tests__/codex-conversation-parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/codex-conversation-parser.test.ts"
+          ],
+          "expected_outputs": [
+            "codex-conversation-parser.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 and D8. After a push leaves retained > maxRetainedChars (default 16 Mi), dropOldest(): walk messages and workLog fronts by lowest sequence until retained <= windowTargetChars (default 12 Mi) or one row remains; subtract estimates; delete dropped rows' call-index and location entries; add to droppedWorkLogRows; one splice(0,k) per array; in located mode set historyStart to the lowest kept sequence. totalCost, totalTokens and lastSequence keep counting every record."
+        },
+        "items": [
+          {
+            "id": "wi9-codex-window.ac1",
+            "title": "Given maxRetainedChars 20,000, windowTargetChars 15,000 and 200 located rows of ~1,000 characters, when pushed, then retainedChars() is at most 20,000 and the newest row is kept",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-codex-window.ac2",
+            "title": "Given that window, when result() runs, then historyStartOffset equals the oldest kept row's sequence while totalTokens and lastSequence reflect all 200 rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-codex-window.ac3",
+            "title": "Given consecutive appends between two slides, when result() is compared, then the kept-row id prefix is identical",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi10-oversized-records",
+        "title": "Handle transcript records over the parse limit in the Codex accumulator",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/codex-conversation-parser.ts",
+            "src/dashboard/server/services/__tests__/codex-incremental-parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/codex-incremental-parser.test.ts"
+          ],
+          "expected_outputs": [
+            "codex-incremental-parser.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10 and D3. Implement pushOversized(head, location): regex payload type and call_id from head; an output for a call in the window is replaced by { ...wl, bodyOmitted: true, resultBytes: location.length } with no result and its location recorded (so useToolBody fetches it on expand); otherwise push an info row id codex-skipped-<offset>, label 'Skipped a <X.Y> MB transcript record', sequence location.offset, createdAt from the head's timestamp or the previous row."
+        },
+        "items": [
+          {
+            "id": "wi10-oversized-records.ac1",
+            "title": "Given recordParseMaxBytes 2048 and a 10 KB text output for a known call, when read, then that entry has bodyOmitted true, resultBytes equal to the line's byte length, no result, and a toolResultLocations entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-oversized-records.ac2",
+            "title": "Given recordParseMaxBytes 2048 and a 10 KB record of unknown type, when read, then the work log gains an info row labelled 'Skipped a 0.0 MB transcript record' with id codex-skipped-<offset>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi11-pi-bounds",
+        "title": "Bound pi and prime-agent tool results with the shared helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-5211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/pi-conversation-parser.ts",
+            "src/dashboard/server/services/__tests__/pi-conversation-parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/pi-conversation-parser.test.ts"
+          ],
+          "expected_outputs": [
+            "pi-conversation-parser.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. pi-conversation-parser.ts:276 result: text -> result: boundToolResultText(text).text; prime error rows unchanged."
+        },
+        "items": [
+          {
+            "id": "wi11-pi-bounds.ac1",
+            "title": "Given a pi toolResult with a 100,000-character text block, when parsed, then the work-log result is at most 65,536 characters plus the marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-pi-bounds.ac2",
+            "title": "Given the same record under the prime-agent dialect, when parsed with parsePrimeAgentConversationMessages, then its result is cut the same way",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi12-ohmypi-kimi-bounds",
+        "title": "Bound ohmypi and kimi tool results with the shared helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/ohmypi-conversation-parser.ts",
+            "src/dashboard/server/services/kimi-conversation-parser.ts",
+            "src/dashboard/server/services/__tests__/ohmypi-conversation-parser.test.ts",
+            "src/dashboard/server/services/__tests__/kimi-conversation-parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/ohmypi-conversation-parser.test.ts",
+            "npx vitest run src/dashboard/server/services/__tests__/kimi-conversation-parser.test.ts"
+          ],
+          "expected_outputs": [
+            "ohmypi and kimi parser tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. ohmypi-conversation-parser.ts:227 result: text -> boundToolResultText(text).text; kimi tool.result branch wraps extractToolOutput(event.result) in boundToolResultText(...).text."
+        },
+        "items": [
+          {
+            "id": "wi12-ohmypi-kimi-bounds.ac1",
+            "title": "Given an ohmypi tool result of 100,000 characters, when parsed, then the stored result is at most 65,536 characters plus the marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-ohmypi-kimi-bounds.ac2",
+            "title": "Given a kimi tool.result object holding a PNG data URL, when parsed, then the stored result contains '[image: png, ' and no 'data:image'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi13-expand-by-offset",
+        "title": "Serve full Codex tool bodies by seeking to the record location",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation/codex-transcript-ranges.ts",
+            "src/dashboard/server/services/conversation/__tests__/codex-transcript-ranges.test.ts",
+            "src/lib/overdeck/conversation-reads.ts",
+            "src/lib/overdeck/__tests__/conversation-tool-body.test.ts",
+            "src/dashboard/server/routes/agents/conversation.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/conversation/__tests__/codex-transcript-ranges.test.ts",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-tool-body.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "named tests pass",
+            "file-size lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13 and D11. Create conversation/codex-transcript-ranges.ts with withFullToolResult(sessionFile, locations, entry): return entry when location.length > RECORD_FULL_READ_MAX_BYTES; otherwise open, read location.length bytes at location.offset, close in finally, scrub, JSON.parse, require response_item / *_output / payload.call_id === entry.id, return { ...entry, result: boundToolResultText(extractCodexToolOutput(payload.output), TOOL_BODY_FULL_READ_MAX_CHARS).text }; any failure returns entry. Also export resolveToolBodyEntry(sessionFile, parsed, toolUseId, seq?) that finds the entry in parsed.workLog or parsed.pendingToolUse and returns withFullToolResult(...) or undefined. Wire it into conversation-reads.ts getConversationToolBodyRead (replace lines 702-704, +1 import, net growth at most 1 line, file must stay at or under 1,000 lines) and routes/agents/conversation.ts buildAgentToolBodyResult (with result.transcriptPath, toolResultLocations and historyStartOffset)."
+        },
+        "items": [
+          {
+            "id": "wi13-expand-by-offset.ac1",
+            "title": "Given a stored bounded entry whose transcript output is 100,000 characters plus a PNG data URL, when withFullToolResult runs, then it returns all 100,000 characters with '[image: png, ' and no 'data:image'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-expand-by-offset.ac2",
+            "title": "Given a location that points at a record with a different call_id, a missing file, or a length over RECORD_FULL_READ_MAX_BYTES, when withFullToolResult runs, then it returns the stored entry unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-expand-by-offset.ac3",
+            "title": "Given a registered Codex conversation whose output is 100,000 characters, when GET /api/conversations/:name/tool-body/:toolUseId is read, then entry.result has length at least 100,000 and contains no 'characters omitted'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-expand-by-offset.ac4",
+            "title": "Given conversation-reads.ts after the change, when 'bash scripts/lint-file-size.sh' runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi15-window-bounded-flag",
+        "title": "Mark windows of bounded conversations with bounded: true over HTTP and WS",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/rpc.ts",
+            "src/dashboard/server/services/conversation/window.ts",
+            "src/dashboard/server/services/transcript-delta.ts",
+            "src/dashboard/server/routes/agents/conversation.ts",
+            "src/dashboard/server/services/conversation/__tests__/window.test.ts",
+            "tests/unit/dashboard/server/routes/agent-conversation-window.test.ts",
+            "src/dashboard/server/services/__tests__/transcript-delta.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/conversation/__tests__/window.test.ts",
+            "npx vitest run tests/unit/dashboard/server/routes/agent-conversation-window.test.ts",
+            "npx vitest run src/dashboard/server/services/__tests__/transcript-delta.test.ts"
+          ],
+          "expected_outputs": [
+            "named tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15 and D13. Add optional bounded boolean to ConversationWindow in packages/contracts/src/rpc.ts; WindowInput gains historyStartOffset?; selectInitialWindow returns hasOlder: true, bounded: true when it is > 0; transcript-delta.ts passes result.historyStartOffset into the selectInitialWindow input for every windowed snapshot; routes/agents/conversation.ts:278 passes { ...result.body, historyStartOffset: result.historyStartOffset }."
+        },
+        "items": [
+          {
+            "id": "wi15-window-bounded-flag.ac1",
+            "title": "Given a window input with historyStartOffset 1000 and three rows, when selectInitialWindow runs, then window.hasOlder is true and window.bounded is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-window-bounded-flag.ac2",
+            "title": "Given a window input without historyStartOffset, when selectInitialWindow runs, then the window has no bounded key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-window-bounded-flag.ac3",
+            "title": "Given a bounded Codex agent, when GET /api/agents/:id/conversation?window=initial is read, then body.window.bounded is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-window-bounded-flag.ac4",
+            "title": "Given a transcript delta fed a result with historyStartOffset > 0, when it emits its first snapshot, then that event's window.bounded is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi14-disk-paging",
+        "title": "Page back past a bounded conversation's in-memory start by reading older records from disk",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation/codex-transcript-ranges.ts",
+            "src/dashboard/server/services/conversation/__tests__/codex-transcript-ranges.test.ts",
+            "src/lib/overdeck/conversation-reads.ts",
+            "src/dashboard/server/routes/agents/conversation.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/conversation/__tests__/codex-transcript-ranges.test.ts",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-tool-body.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "codex-transcript-ranges.test.ts passes",
+            "file-size lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14 and D12. In codex-transcript-ranges.ts add readCodexRowsBefore(sessionFile, beforeOffset, minRows, options?) (newline-aligned range [rangeStart, beforeOffset), parsed through createTranscriptLineSplitter + scrub into a fresh accumulator with historyStartOffset rangeStart, span doubling from 8 MiB to 64 MiB until minRows or byte 0) and selectHistoryPageBefore(parsed, sessionFile, before, limit, transcript) per D12 (in-memory page with hasOlder true and bounded true when it has rows; otherwise a disk page ending at min(before[1], historyStartOffset), hasOlder = page hasOlder || rangeStart > 0, bounded true; an empty disk page with rangeStart > 0 gets the synthetic cursor encodeTimelineCursor([before[0], rangeStart, 0, '']) with hasOlder true). Wire into conversation-reads.ts:640 and routes/agents/conversation.ts:275; conversation-reads.ts net growth with wi13 at most 4 lines."
+        },
+        "items": [
+          {
+            "id": "wi14-disk-paging.ac1",
+            "title": "Given a 300-message Codex transcript read with a small tailReadBytes so memory holds about 50, when pages are requested from the initial window's cursor until hasOlder is false, then every message is returned exactly once in timeline order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-disk-paging.ac2",
+            "title": "Given that walk, when the last page returns, then its window.hasOlder is false and every page carried window.bounded true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-disk-paging.ac3",
+            "title": "Given a non-bounded parse result, when selectHistoryPageBefore runs, then it returns the same rows and window as selectPageBefore",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-disk-paging.ac4",
+            "title": "Given conversation-reads.ts after the change, when 'bash scripts/lint-file-size.sh' runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi16-ui-notice",
+        "title": "Show a large-conversation notice in the conversation view for bounded history",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/chat-types.ts",
+            "src/dashboard/frontend/src/components/chat/conversationHistory.ts",
+            "src/dashboard/frontend/src/components/chat/useOlderHistory.ts",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/conversationHistory.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/chat/__tests__/MessagesTimeline.test.tsx",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/chat/__tests__/conversationHistory.test.ts"
+          ],
+          "expected_outputs": [
+            "frontend tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16 and D13. chat-types.ts ConversationWindow gains bounded?; conversationHistory.ts mergeWindowIntoCache copies window.bounded into kept history and prependOlderPage sets bounded: page.window.bounded ?? previous.history?.bounded; useOlderHistory returns bounded: history?.bounded === true (OlderHistory gains bounded); messagesTimeline/types.ts history prop gains bounded?; MessagesTimeline.tsx renders the notice 'Large conversation: the dashboard keeps recent history in memory and loads older history from the transcript as you scroll up.' in a timelineHistoryEdge div before line 560."
+        },
+        "items": [
+          {
+            "id": "wi16-ui-notice.ac1",
+            "title": "Given MessagesTimeline rendered with history.bounded true, when it mounts, then the text 'Large conversation: the dashboard keeps recent history in memory' is in the document",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-ui-notice.ac2",
+            "title": "Given history.bounded absent, when MessagesTimeline mounts, then that notice is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-ui-notice.ac3",
+            "title": "Given a cache whose incoming window has bounded true, when mergeWindowIntoCache and then prependOlderPage run, then the resulting history.bounded is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi17-memory-guard-test",
+        "title": "Guard heap, peak RSS and cold-open time on a 200 MB synthetic Codex transcript",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/__tests__/codex-transcript-memory.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/codex-transcript-memory.test.ts"
+          ],
+          "expected_outputs": [
+            "codex-transcript-memory.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-17 and D17. New codex-transcript-memory.test.ts: gc via v8.setFlagsFromString('--expose-gc') + vm.runInNewContext('gc'); beforeAll streams a >=200,000,000-byte rollout (turn_context, 170 call/output pairs each with a 20,000-char input_text and a distinct ~1.2 MB PNG data URL, cumulative token_count every 10 pairs) to mkdtemp(tmpdir()); the file is written from one reused payload Buffer with awaited drain; cold-open case records rssBefore = process.memoryUsage().rss (current) and asserts elapsed < 5,000 ms, process.resourceUsage().maxRSS*1024 - rssBefore < 256 MiB, retained heap growth < 64 MiB after gc, no data:image, results <= 65,636 chars, historyStartOffset > 0, totalTokens equals the final token_count; window case with maxRetainedChars 1,000,000 asserts retainedChars() <= 1,000,000 and heap growth < 16 MiB. 60 s per-test timeout; afterAll removes the directory."
+        },
+        "items": [
+          {
+            "id": "wi17-memory-guard-test.ac1",
+            "title": "Given the 200 MB synthetic transcript, when it is opened cold through a fresh reader, then parsing completes in under 5,000 ms and process.resourceUsage().maxRSS in bytes exceeds the pre-parse process.memoryUsage().rss by under 256 MiB",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-memory-guard-test.ac2",
+            "title": "Given that parse result still referenced, when gc runs twice, then used_heap_size grows by under 64 MiB versus the pre-parse baseline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-memory-guard-test.ac3",
+            "title": "Given that result, when its work log is inspected, then no result contains 'data:image', every result is at most 65,636 characters, historyStartOffset is above 0 and totalTokens equals the final token_count total",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-memory-guard-test.ac4",
+            "title": "Given an accumulator capped at 1,000,000 retained characters, when it parses the same file, then retainedChars() is at most 1,000,000 and heap growth is under 16 MiB",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi19-snapshot-cache-budget",
+        "title": "Budget the shared snapshot cache in retained characters with a hard per-entry cap",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/shared-transcript-parser.ts",
+            "src/dashboard/server/services/__tests__/shared-transcript-parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/shared-transcript-parser.test.ts"
+          ],
+          "expected_outputs": [
+            "shared-transcript-parser.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-19. In shared-transcript-parser.ts rename CachedParse.bytes to retainedChars (0 while pending); after await set it to estimateParseResultChars(parsed); over TRANSCRIPT_ENTRY_MAX_RETAINED_CHARS delete the entry when still current; evict oldest while size > 8 or summed retainedChars > TRANSCRIPT_CACHE_MAX_RETAINED_CHARS, never evicting key; delete the 'Keep one oversized active transcript' comment and the snapshots.size === 1 exception."
+        },
+        "items": [
+          {
+            "id": "wi19-snapshot-cache-budget.ac1",
+            "title": "Given a parse result whose estimate exceeds the hard cap, when the parser is called twice with an unchanged stat signature, then the parse job is dispatched twice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi19-snapshot-cache-budget.ac2",
+            "title": "Given a result under the cap, when called twice with an unchanged signature, then the job is dispatched once and the same result is returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi20-paged-row-expand",
+        "title": "Expand tool rows that came from a disk page by reading forward from their call record",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation/codex-transcript-ranges.ts",
+            "src/dashboard/server/services/conversation/__tests__/codex-transcript-ranges.test.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "src/lib/overdeck/conversation-reads.ts",
+            "src/dashboard/server/routes/agents/conversation.ts",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/toolBodyLoader.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/__tests__/toolBodyLoader.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/conversation/__tests__/codex-transcript-ranges.test.ts",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/chat/messagesTimeline/__tests__/toolBodyLoader.test.tsx",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "named tests pass",
+            "file-size lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-20 and D19. In codex-transcript-ranges.ts add findCodexToolEntryFrom(sessionFile, seq, toolUseId) (seq must be a line start: 0 or preceded by 0x0A; parse forward from seq through createTranscriptLineSplitter + scrub into a fresh located accumulator until the id's row has its output or OLDER_PAGE_READ_MAX_BYTES is consumed; serve via withFullToolResult) and toolBodyQuery(url) returning { agentId?, subagentId?, seq? } with seq a non-negative integer. resolveToolBodyEntry falls back to it when the entry is missing, historyStartOffset > 0 and seq < historyStartOffset. conversations.ts (1,034 lines, must not grow): replace the agentId line near 499 with const { agentId, seq } = toolBodyQuery(request.url); and append , seq to the getConversationToolBodyRead call on its line. conversation-reads.ts getConversationToolBodyRead gains trailing seq?: number with zero net growth. routes/agents/conversation.ts buildAgentToolBodyResult takes opts.seq read via toolBodyQuery. Frontend toolBodyLoader.tsx: load(entryId, sequence?) appends seq=<n> with ? or & after the existing query; loadCached passes entry.sequence."
+        },
+        "items": [
+          {
+            "id": "wi20-paged-row-expand.ac1",
+            "title": "Given a bounded parse whose in-memory window no longer holds a tool row, when resolveToolBodyEntry runs with that row's call offset as seq, then it returns the row with its full output text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi20-paged-row-expand.ac2",
+            "title": "Given seq omitted or a seq that is not a line start, when resolveToolBodyEntry runs for an evicted row, then it returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi20-paged-row-expand.ac3",
+            "title": "Given toolBodyLoaderFor('/api/x/tool-body', '?agentId=a'), when load('id', 42) runs, then it fetches '/api/x/tool-body/id?agentId=a&seq=42', and without a query it fetches '/api/x/tool-body/id?seq=42'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi20-paged-row-expand.ac4",
+            "title": "Given conversations.ts and conversation-reads.ts after the change, when 'bash scripts/lint-file-size.sh' runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi21-bookmark-migration",
+        "title": "Migrate counter-form Codex bookmarks to offset ids on first list",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-bookmarks.ts",
+            "src/lib/overdeck/codex-bookmark-migration.ts",
+            "src/lib/overdeck/__tests__/codex-bookmark-migration.test.ts",
+            "src/dashboard/server/routes/conversation-bookmarks.ts",
+            "src/dashboard/server/routes/__tests__/conversation-bookmarks-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/codex-bookmark-migration.test.ts",
+            "npx vitest run src/dashboard/server/routes/__tests__/conversation-bookmarks-route.test.ts"
+          ],
+          "expected_outputs": [
+            "named tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-21 and D20. Add renameConversationBookmarkId(name, fromId, toId) to conversation-bookmarks.ts (UPDATE message_id, updated_at; no change when toId already exists). Create src/lib/overdeck/codex-bookmark-migration.ts with migrateCodexCounterBookmarks(name, deps): for a harness 'codex' conversation with bookmarks matching ^codex-(user|agent)-\\d+$, resolve the transcript, stream from byte 0 in 1 MiB chunks through createTranscriptLineSplitter + scrub into createCodexConversationAccumulator(file, { historyStartOffset: 0, onRowCreated }), stop once every wanted id is mapped, rename each mapped bookmark, record the name in a module Set so it runs once per process, and on any error log once and change nothing. Call it in the GET handler of routes/conversation-bookmarks.ts before listConversationBookmarks."
+        },
+        "items": [
+          {
+            "id": "wi21-bookmark-migration.ac1",
+            "title": "Given a registered Codex conversation bookmarked at counter id codex-user-3, when migrateCodexCounterBookmarks runs, then the bookmark's messageId equals the codex-user-@<offset> id a reader parse gives that message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi21-bookmark-migration.ac2",
+            "title": "Given the migrated conversation, when migrateCodexCounterBookmarks runs again, then no bookmark row changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi21-bookmark-migration.ac3",
+            "title": "Given a counter-form bookmark on a Codex conversation, when GET /api/conversations/:name/bookmarks is read, then the returned bookmark carries the offset id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi21-bookmark-migration.ac4",
+            "title": "Given a counter id with no matching row in the transcript, when the migration runs, then that bookmark keeps its original messageId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi18-docs",
+        "title": "Document bounded transcript memory, disk paging and the heap-limit decision, and add the changelog entry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T22:31:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5211.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'tool-result-bounds.ts' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'max-old-space-size' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "both greps print a match"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-18. docs/DASHBOARD-ARCHITECTURE.md: add the 'Bounded transcript memory (PAN-5211)' sub-bullet under subscribeConversationMessages (scrub before JSON.parse, 8 MiB oversize rule, 64 MiB tail read, 65,536-char caps via tool-result-bounds.ts for Codex/pi/prime-agent/ohmypi/kimi with ACP at 500, 32 Mi/16 Mi/8-file budgets, record-offset sequences, 16 Mi/12 Mi window, historyStartOffset, bounded windows, the notice, disk pages via codex-transcript-ranges.ts with the open-call boundary limitation, ?window=all exports only the in-memory rows); extend the tool-body paragraph (expand by record location, 4 Mi cap, other harnesses return the stored entry); add a 'Heap limit' paragraph recording D16 with the 4,144 MiB default measured 2026-11-13. Create changelog.d/pan-5211.md with the PRD's Fixed entry. Also document D18 (what title generation, diffs, exports, flywheel status and codex subagents see for a bounded conversation), D19 (expand on a disk-paged row sends seq), D20 (one-time bookmark id migration) and D21 (each budget is per cache, four caches, messagesCache has no character budget). Hand-off step outside the checklist: after pan done opens the PR, add a 'Heap limit decision' section with D16's text via gh pr edit --body-file."
+        },
+        "items": [
+          {
+            "id": "wi18-docs.ac1",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when grepped, then it names tool-result-bounds.ts, codex-transcript-ranges.ts, historyStartOffset and the string 'max-old-space-size' with the 4,144 MiB default and the crash reasoning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-docs.ac2",
+            "title": "Given changelog.d/pan-5211.md, when npm run lint:docs runs, then it exits 0 and the file has one '#### Fixed' heading whose bullet links issue 5211",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-docs.ac3",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when read, then the bounded-memory sub-bullet states that title generation, conversation diffs, ?window=all exports and codex subagent matching see only the in-memory rows of a bounded conversation, and that each retained-character budget applies per cache",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-text-bounds",
+        "to": "wi2-byte-scrub",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-byte-scrub",
+        "to": "wi3-reader-byte-split",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-reader-byte-split",
+        "to": "wi4-reader-retained-budget",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-reader-retained-budget",
+        "to": "wi5-tail-read",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-text-bounds",
+        "to": "wi6-codex-bounded-results",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-codex-bounded-results",
+        "to": "wi7-call-index",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-call-index",
+        "to": "wi4-reader-retained-budget",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-reader-retained-budget",
+        "to": "wi8-offset-sequences",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-reader-byte-split",
+        "to": "wi8-offset-sequences",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-tail-read",
+        "to": "wi8-offset-sequences",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-offset-sequences",
+        "to": "wi9-codex-window",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-codex-window",
+        "to": "wi10-oversized-records",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-tail-read",
+        "to": "wi10-oversized-records",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-text-bounds",
+        "to": "wi11-pi-bounds",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-text-bounds",
+        "to": "wi12-ohmypi-kimi-bounds",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-offset-sequences",
+        "to": "wi13-expand-by-offset",
+        "type": "blocks"
+      },
+      {
+        "from": "wi13-expand-by-offset",
+        "to": "wi15-window-bounded-flag",
+        "type": "blocks"
+      },
+      {
+        "from": "wi15-window-bounded-flag",
+        "to": "wi14-disk-paging",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-tail-read",
+        "to": "wi14-disk-paging",
+        "type": "blocks"
+      },
+      {
+        "from": "wi10-oversized-records",
+        "to": "wi14-disk-paging",
+        "type": "blocks"
+      },
+      {
+        "from": "wi10-oversized-records",
+        "to": "wi17-memory-guard-test",
+        "type": "blocks"
+      },
+      {
+        "from": "wi14-disk-paging",
+        "to": "wi20-paged-row-expand",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-offset-sequences",
+        "to": "wi21-bookmark-migration",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-reader-byte-split",
+        "to": "wi21-bookmark-migration",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-text-bounds",
+        "to": "wi19-snapshot-cache-budget",
+        "type": "blocks"
+      },
+      {
+        "from": "wi20-paged-row-expand",
+        "to": "wi18-docs",
+        "type": "informs"
+      },
+      {
+        "from": "wi21-bookmark-migration",
+        "to": "wi18-docs",
+        "type": "informs"
+      },
+      {
+        "from": "wi14-disk-paging",
+        "to": "wi18-docs",
+        "type": "informs"
+      },
+      {
+        "from": "wi16-ui-notice",
+        "to": "wi18-docs",
+        "type": "informs"
+      },
+      {
+        "from": "wi17-memory-guard-test",
+        "to": "wi18-docs",
+        "type": "informs"
+      },
+      {
+        "from": "wi19-snapshot-cache-budget",
+        "to": "wi18-docs",
+        "type": "informs"
+      },
+      {
+        "from": "wi12-ohmypi-kimi-bounds",
+        "to": "wi18-docs",
+        "type": "informs"
+      },
+      {
+        "from": "wi11-pi-bounds",
+        "to": "wi18-docs",
+        "type": "informs"
+      },
+      {
+        "from": "wi15-window-bounded-flag",
+        "to": "wi16-ui-notice",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}
