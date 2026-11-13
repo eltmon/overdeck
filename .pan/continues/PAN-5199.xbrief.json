@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5199",
   "created": "2026-11-13T20:11:44.953Z",
-  "updated": "2026-11-13T20:27:28.894Z",
+  "updated": "2026-11-13T20:27:35.874Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
     "extract-polyrepo-gitignore.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T20:27:28.893Z"
+    },
+    "wrapper-sync-entries": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5199",
+      "claimedAt": "2026-11-13T20:27:35.874Z"
     }
   }
 }
