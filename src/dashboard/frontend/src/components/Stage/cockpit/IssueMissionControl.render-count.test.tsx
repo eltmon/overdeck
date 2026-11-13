@@ -37,6 +37,9 @@ vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
   useWorkspaceQuery: () => queryMocks.workspaceQuery,
 }))
 vi.mock('../../../lib/useSharedTick', () => ({ useSharedTick: () => new Date('2026-10-19T00:05:00Z') }))
+vi.mock('../../issue-view/useIssueRecord', () => ({
+  useIssueRecord: () => ({ issue: { identifier: 'PAN-1', title: 'Cockpit' }, status: 'ready' }),
+}))
 vi.mock('../../../lib/simple/useSimpleActions', () => ({ useSimpleActions: () => ({}) }))
 vi.mock('../../IssueActionMenu/useIssueActions', () => ({ useIssueActions: () => queryMocks.actions }))
 vi.mock('../../MergeButton', () => ({ MergeButton: () => <div /> }))
