@@ -7,7 +7,7 @@
  * (mounted from the first render) and every view that offers installation receives its result.
  * A component mounted later, such as the sheet, would never see the event itself.
  */
-import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 
@@ -91,13 +91,44 @@ function InstallSection({ prompt }: { prompt: InstallPrompt }) {
 }
 
 /** The `/m` settings sheet: appearance, install and notifications (PAN-5208 FR-2, FR-5). */
+const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export function MobileSettingsSheet({ open, onClose, prompt }: { open: boolean; onClose(): void; prompt: InstallPrompt }) {
   const appearance = useAppearance();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  // Focus moves into the sheet on open and back to the opener (the gear) on close.
+  useEffect(() => {
+    if (!open) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeRef.current?.focus();
+    return () => {
+      if (opener?.isConnected) opener.focus();
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') {
+        onClose();
+        return;
+      }
+      // Keep Tab inside the modal sheet.
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+      const focusable = [...dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !dialogRef.current.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !dialogRef.current.contains(active))) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -109,6 +140,7 @@ export function MobileSettingsSheet({ open, onClose, prompt }: { open: boolean; 
     <>
       <div data-component="mobile-settings-scrim" className="fixed inset-0 z-50 bg-black/50" onClick={onClose} />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Settings"
@@ -118,6 +150,7 @@ export function MobileSettingsSheet({ open, onClose, prompt }: { open: boolean; 
         <div className="flex min-h-11 items-center justify-between">
           <h2 className="text-base font-medium text-foreground">Settings</h2>
           <button
+            ref={closeRef}
             type="button"
             aria-label="Close"
             onClick={onClose}

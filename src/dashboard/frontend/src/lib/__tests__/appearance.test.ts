@@ -47,6 +47,23 @@ describe('phone appearance store (PAN-5208)', () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps a choice whose storage write failed, until a later write succeeds', () => {
+    const listener = vi.fn();
+    const off = onAppearanceChange(listener);
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+    writeAppearance('dark');
+    expect(readAppearance()).toBe('dark');
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    setItem.mockRestore();
+    writeAppearance('light');
+    expect(localStorage.getItem(APPEARANCE_KEY)).toBe('light');
+    expect(readAppearance()).toBe('light');
+    off();
+  });
+
   it('resolves system through the OS setting', () => {
     expect(resolveAppearance('system', true)).toBe('dark');
     expect(resolveAppearance('system', false)).toBe('light');

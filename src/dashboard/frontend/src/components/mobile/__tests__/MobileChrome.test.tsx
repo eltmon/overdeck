@@ -101,6 +101,28 @@ describe('MobileSettingsSheet (PAN-5208)', () => {
     expect(event.prompt).toHaveBeenCalledTimes(1);
   });
 
+  it('moves focus into the sheet, keeps Tab inside it and restores it on close', () => {
+    renderWithQuery(<SheetHarness />);
+    const opener = screen.getByRole('button', { name: 'Open settings' });
+    opener.focus();
+    fireEvent.click(opener);
+
+    const dialog = screen.getByRole('dialog', { name: 'Settings' });
+    const close = screen.getByRole('button', { name: 'Close', exact: true });
+    expect(document.activeElement).toBe(close);
+
+    const focusable = [...dialog.querySelectorAll<HTMLElement>('button:not([disabled])')];
+    const last = focusable[focusable.length - 1];
+    fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(window, { key: 'Tab' });
+    expect(document.activeElement).toBe(focusable[0]);
+
+    fireEvent.click(close);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(opener);
+  });
+
   it('says Installed when running as a Home Screen app', () => {
     renderWithQuery(<MobileSettingsSheet open onClose={() => {}} prompt={{ ...STATIC_PROMPT, standalone: true }} />);
     expect(screen.getByText('Installed')).toBeInTheDocument();

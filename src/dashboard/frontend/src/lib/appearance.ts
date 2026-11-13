@@ -6,8 +6,8 @@
  *
  * Leaf module: never import `hooks/useTheme` here (`useTheme` imports this module).
  *
- * Storage errors read as `system` and writes fail silently, matching `notificationPrefs.ts`'s
- * `readStorage`/`writeStorage`.
+ * Storage read errors read as `system`. A failed write keeps the choice in memory, so it still
+ * applies until the page reloads.
  */
 import { useSyncExternalStore } from 'react';
 
@@ -25,19 +25,25 @@ function readStorage(key: string): string | null {
   }
 }
 
-function writeStorage(key: string, value: string): void {
+/** Returns false when storage is unavailable or full. */
+function writeStorage(key: string, value: string): boolean {
   try {
     localStorage.setItem(key, value);
+    return true;
   } catch {
-    // Storage unavailable: the in-memory state still applies for this launch.
+    return false;
   }
 }
+
+/** The last choice whose storage write failed: it still applies for this page's lifetime. */
+let unsavedAppearance: Appearance | null = null;
 
 function isAppearance(value: string | null): value is Appearance {
   return value === 'system' || value === 'light' || value === 'dark';
 }
 
 export function readAppearance(): Appearance {
+  if (unsavedAppearance !== null) return unsavedAppearance;
   const stored = readStorage(APPEARANCE_KEY);
   return isAppearance(stored) ? stored : 'system';
 }
@@ -57,7 +63,7 @@ function notify(): void {
 }
 
 export function writeAppearance(appearance: Appearance): void {
-  writeStorage(APPEARANCE_KEY, appearance);
+  unsavedAppearance = writeStorage(APPEARANCE_KEY, appearance) ? null : appearance;
   notify();
 }
 
