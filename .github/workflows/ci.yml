@@ -132,6 +132,75 @@ jobs:
             ${{ runner.temp }}/bare-host/*.log
           if-no-files-found: warn
 
+  # PAN-5176: which changed paths warrant a macOS smoke. A job-level `if:`
+  # over these outputs (never a workflow-level `paths:` filter) means a PR
+  # that skips the macOS jobs still reports them as SKIPPED, which GitHub and
+  # Overdeck's merge gate both treat as passing, so no PR is stranded (D10).
+  bare-host-changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      macos: ${{ steps.f.outputs.macos }}
+      smoke: ${{ steps.f.outputs.smoke }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: f
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            macos:
+              - 'src/dashboard/server/**'
+              - 'src/lib/**'
+              - 'src/cli/**'
+              - 'package.json'
+              - 'bun.lock'
+              - 'scripts/bare-host-smoke.sh'
+              - '.github/workflows/ci.yml'
+            smoke:
+              - 'scripts/bare-host-smoke.sh'
+
+  # PAN-5176: the same bare-host smoke on macOS, the host where PAN-5168/5169/
+  # 5170 hurt users, run with macOS /bin/bash 3.2. Blocking when it runs: no
+  # continue-on-error. It runs on every CI-triggering push to main and on PRs
+  # that touch the server, lib, CLI, dependencies, the smoke or this workflow
+  # (D11); other PRs report it SKIPPED. GitHub's Free plan allows 5 concurrent
+  # macOS jobs, so the filter and the workflow's cancel-in-progress keep the
+  # queue short.
+  bare-host-macos:
+    runs-on: macos-latest
+    needs: [build, bare-host-changes]
+    if: github.event_name == 'push' || needs.bare-host-changes.outputs.macos == 'true'
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Download the bare-host subject
+        uses: actions/download-artifact@v4
+        with:
+          name: bare-host-subject
+          path: ${{ runner.temp }}/subject
+
+      - name: Bare-host smoke (macOS /bin/bash 3.2)
+        run: /bin/bash scripts/bare-host-smoke.sh --tarball "$(ls "$RUNNER_TEMP"/subject/*.tgz)" --work-dir "$RUNNER_TEMP/bare-host"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bare-host-macos-logs
+          path: |
+            ${{ runner.temp }}/bare-host/result.json
+            ${{ runner.temp }}/bare-host/*.log
+          if-no-files-found: warn
+
   # `npm run lint` took ~9 min as one job, almost all of it in three steps.
   # scripts/run-lint-group.mjs splits the lint script's steps into groups that
   # run as parallel jobs; any step it doesn't name as heavy runs in `core`.
