@@ -66,6 +66,12 @@
     "commit": "2d8a843e6b"
   },
   {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/shared/imageDimensions.ts",
+    "upstream": "t3code",
+    "path": "packages/shared/src/imageDimensions.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
     "local": "src/dashboard/frontend/src/components/explorer/viewers/font/FontViewer.tsx",
     "upstream": "t3code",
     "path": "apps/web/src/components/files/FontViewer.tsx",
