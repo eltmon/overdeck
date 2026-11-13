@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5198",
   "created": "2026-11-13T19:57:57.248Z",
-  "updated": "2026-11-13T20:37:29.619Z",
+  "updated": "2026-11-13T20:38:47.754Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,9 +134,22 @@
       "doneAt": "2026-11-13T20:37:22.630Z"
     },
     "docs-flywheel-needs-you": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5198",
-      "claimedAt": "2026-11-13T20:37:29.619Z"
+      "claimedAt": "2026-11-13T20:37:29.619Z",
+      "doneAt": "2026-11-13T20:38:47.753Z"
+    },
+    "docs-flywheel-needs-you.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:38:47.753Z"
+    },
+    "docs-flywheel-needs-you.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:38:47.753Z"
+    },
+    "docs-flywheel-needs-you.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:38:47.753Z"
     }
   }
 }
