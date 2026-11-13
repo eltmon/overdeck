@@ -32,12 +32,14 @@ import { canUseHarness } from '../../../../lib/harness-policy.js';
 import { emitActivityEntry } from '../../../../lib/activity-logger.js';
 import { extractPrefix, parseIssueId } from '../../../../lib/issue-id.js';
 import { workspaceNeedsSetup } from '../../../../lib/workspace-manager/setup-marker.js';
+import { healPolyrepoWorkspaceGitignoreAsync } from '../../../../lib/workspace-manager/polyrepo-gitignore.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { ProviderHealthError, validateProviderHealth } from '../../../../lib/provider-health.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/projects.js';
-import { isGeneratedGitHookPath, isOverdeckWorkspaceRuntimePath, parsePorcelainStatusPaths } from '../../../../lib/state-plane.js';
+import { isGeneratedGitHookPath, isOverdeckWorkspaceRuntimePath, parsePorcelainStatusEntries } from '../../../../lib/state-plane.js';
+import { isOverdeckWorkspaceSyncPath } from '../../../../lib/workspace-sync-paths.js';
 import { assertWorkspaceStackHealthyForSpawn } from '../../../../lib/agents/spawn-prep.js';
 import { resolveIssueStackDiskHold } from '../../../../lib/workspace/disk-cost.js';
 import { getWorkspaceStackHealth } from '../../../../lib/workspace/stack-health.js';
@@ -99,11 +101,19 @@ export function emitDirtyWorkspaceRefusalActivity(issueId: string, porcelain: st
  * True when git porcelain contains only Overdeck-owned workspace runtime files
  * (PAN-3042; shared predicate since PAN-3245) or generated git-hook output — the
  * `.husky/_/pre-rebase` guard that worktree creation writes made every fresh
- * workspace read as dirty and 409 the planning auto-handoff (PAN-3266).
+ * workspace read as dirty and 409 the planning auto-handoff (PAN-3266). In a
+ * polyrepo wrapper, also tolerates untracked Overdeck sync output written
+ * before its .gitignore carried it (PAN-5199); monorepos and tracked edits
+ * to sync paths stay refused.
  */
-export function isOnlyOverdeckRuntimeWorkspaceChanges(porcelain: string): boolean {
-  return parsePorcelainStatusPaths(porcelain)
-    .every((path) => isOverdeckWorkspaceRuntimePath(path) || isGeneratedGitHookPath(path));
+export function isOnlyOverdeckRuntimeWorkspaceChanges(
+  porcelain: string,
+  options: { polyrepoWrapper?: boolean } = {},
+): boolean {
+  return parsePorcelainStatusEntries(porcelain).every(({ status, path }) =>
+    isOverdeckWorkspaceRuntimePath(path)
+    || isGeneratedGitHookPath(path)
+    || (options.polyrepoWrapper === true && status === '??' && isOverdeckWorkspaceSyncPath(path)));
 }
 
 export function spawnGuardrailResourcesHint(hint?: string): string {
@@ -669,6 +679,16 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
       console.log(`[start-agent] Killed stale tmux session ${agentSessionName}`);
     }).pipe(Effect.catch(() => Effect.void));
 
+    // PAN-5199: heal a polyrepo wrapper created before its .gitignore carried
+    // Overdeck's sync output, so the gate below reads the healed tree.
+    const polyrepoWorkspace = projectConfig?.workspace?.type === 'polyrepo' ? projectConfig.workspace.repos : undefined;
+    if (polyrepoWorkspace && existsSync(workspacePath)) {
+      const heal = yield* Effect.promise(() => healPolyrepoWorkspaceGitignoreAsync(workspacePath, polyrepoWorkspace));
+      if (heal.added.length > 0 || heal.warning) {
+        yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.polyrepo_gitignore_heal', { issueId, workspacePath, ...heal }));
+      }
+    }
+
     // PAN-1531: dirty-worktree refusal replaces silent pre-spawn stashing.
     // If the workspace has uncommitted changes the route returns 409 with the
     // diff so the dashboard can present the user three explicit choices:
@@ -684,7 +704,7 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
           cwd: workspacePath,
           encoding: 'utf-8',
         }));
-        if (statusOut.trim() && !isOnlyOverdeckRuntimeWorkspaceChanges(statusOut)) {
+        if (statusOut.trim() && !isOnlyOverdeckRuntimeWorkspaceChanges(statusOut, { polyrepoWrapper: Boolean(polyrepoWorkspace) })) {
           const { stdout: diffOut } = yield* Effect.promise(() => execAsync('git diff HEAD --stat', {
             cwd: workspacePath,
             encoding: 'utf-8',

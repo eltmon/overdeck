@@ -72,9 +72,10 @@ describe("explorer input schemas", () => {
 })
 
 describe("explorer contract surface", () => {
-  it("defines 13 error codes", () => {
-    expect(EXPLORER_ERROR_CODES).toHaveLength(13)
-    expect(new Set(EXPLORER_ERROR_CODES).size).toBe(13)
+  it("defines 14 error codes", () => {
+    expect(EXPLORER_ERROR_CODES).toHaveLength(14)
+    expect(new Set(EXPLORER_ERROR_CODES).size).toBe(14)
+    expect(EXPLORER_ERROR_CODES).toContain("INVALID_TARGET")
   })
 
   it("adds 14 pan.explorer* methods to WS_METHODS and PanRpcGroup", () => {

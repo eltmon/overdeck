@@ -38,6 +38,8 @@ export interface ExplorerTreeProps extends Omit<HTMLAttributes<HTMLDivElement>, 
   onToggle(path: string): void
   onSelect(path: string, mode: SelectMode): void
   onOpen(path: string): void
+  /** A plain click on a file row: open it in the root's preview pane (PAN-5187). */
+  onPreview?(path: string): void
   onFocus(path: string): void
   onContextMenuRow(path: string): void
 }
@@ -47,7 +49,7 @@ function isTreeRow(row: ExplorerTreeItem | undefined): row is TreeRow {
 }
 
 export const ExplorerTree = forwardRef<HTMLDivElement, ExplorerTreeProps>(function ExplorerTree(
-  { rows, decorations, selection, focused, onToggle, onSelect, onOpen, onFocus, onContextMenuRow, className, onKeyDown, ...rest },
+  { rows, decorations, selection, focused, onToggle, onSelect, onOpen, onPreview, onFocus, onContextMenuRow, className, onKeyDown, ...rest },
   forwardedRef,
 ) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -92,9 +94,10 @@ export const ExplorerTree = forwardRef<HTMLDivElement, ExplorerTreeProps>(functi
       else {
         onSelect(row.path, 'replace')
         if (row.kind === 'dir') onToggle(row.path)
+        else onPreview?.(row.path)
       }
     },
-    [onSelect, onToggle],
+    [onSelect, onToggle, onPreview],
   )
 
   const handleRowDoubleClick = useCallback(

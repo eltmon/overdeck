@@ -10,9 +10,12 @@ import {
   type ExplorerGitStageInput,
   type ExplorerGitStatusResult,
   type ExplorerListDirResult,
+  type ExplorerReadFileResult,
   type ExplorerSearchContentResult,
   type ExplorerSearchFilesResult,
   type ExplorerWatchBatch,
+  type ExplorerWriteFileInput,
+  type ExplorerWriteFileResult,
 } from '@overdeck/contracts'
 
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport'
@@ -21,6 +24,18 @@ export type GitStageAction = ExplorerGitStageInput['action']
 
 export function listDir(rootId: string, path: string): Promise<ExplorerListDirResult> {
   return getTransport().request((client) => (client as PanRpcProtocolClient)[WS_METHODS.explorerListDir]({ rootId, path }))
+}
+
+/** Read a file of a root; `ref: 'HEAD'` reads its committed version (PAN-5187). */
+export function readFile(rootId: string, path: string, ref?: 'HEAD'): Promise<ExplorerReadFileResult> {
+  return getTransport().request((client) =>
+    (client as PanRpcProtocolClient)[WS_METHODS.explorerReadFile]({ rootId, path, ...(ref ? { ref } : {}) }),
+  )
+}
+
+/** Save a code pane's text with the disk-signature precondition (PAN-5187). */
+export function writeFile(input: ExplorerWriteFileInput): Promise<ExplorerWriteFileResult> {
+  return getTransport().request((client) => (client as PanRpcProtocolClient)[WS_METHODS.explorerWriteFile](input))
 }
 
 export function gitStatus(rootId: string): Promise<ExplorerGitStatusResult> {

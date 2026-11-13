@@ -47,7 +47,12 @@ export function isStatePlanePath(relativePath: string): boolean {
   });
 }
 
-export function parsePorcelainStatusPaths(porcelain: string): string[] {
+export interface PorcelainStatusEntry {
+  status: string;
+  path: string;
+}
+
+export function parsePorcelainStatusEntries(porcelain: string): PorcelainStatusEntry[] {
   return porcelain
     .split('\n')
     .map((line) => line.trimEnd())
@@ -58,9 +63,13 @@ export function parsePorcelainStatusPaths(porcelain: string): string[] {
       const paths = status.includes('R') || status.includes('C')
         ? pathPart.split(' -> ')
         : [pathPart];
-      return paths.map(unquoteGitPath);
+      return paths.map(unquoteGitPath).map((path) => ({ status, path }));
     })
-    .filter(Boolean);
+    .filter((entry) => entry.path.length > 0);
+}
+
+export function parsePorcelainStatusPaths(porcelain: string): string[] {
+  return parsePorcelainStatusEntries(porcelain).map((entry) => entry.path);
 }
 
 export function isStatePlaneOnlyStatus(porcelain: string): boolean {

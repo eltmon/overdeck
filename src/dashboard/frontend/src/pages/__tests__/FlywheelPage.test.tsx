@@ -198,7 +198,7 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     });
     setup(status, { pendingInput: [{ name: 'conv-flywheel', pendingAskUserQuestion: { toolUseId: 'tu-1', askedAt: '2026-09-23T09:59:00.000Z', questions: [] } }] });
     const { client } = renderWithQuery(<FlywheelPage />);
-    const banner = await screen.findByTestId('flywheel-needs-you');
+    const banner = (await screen.findAllByTestId('flywheel-needs-you-item'))[0]!;
     await waitFor(() => expect(client.getQueryData(['conv-ask-user-question'])).toBeDefined());
 
     fireEvent.click(banner);
@@ -213,7 +213,7 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     });
     setup(status, { pendingInput: [] });
     const { client } = renderWithQuery(<FlywheelPage />);
-    const banner = await screen.findByTestId('flywheel-needs-you');
+    const banner = (await screen.findAllByTestId('flywheel-needs-you-item'))[0]!;
     await waitFor(() => expect(client.getQueryData(['conv-ask-user-question'])).toBeDefined());
 
     fireEvent.click(banner);
@@ -233,5 +233,38 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     fireEvent.click(banner);
     expect(pane).toHaveAttribute('data-target-id', 'msg-9');
     expect(pane).toHaveAttribute('data-target-nonce', '3');
+  });
+
+  it('a needs-you row jumps to its first-raised message (PAN-5198)', async () => {
+    const status = flywheelStatus({
+      lastTick: {
+        tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the scope', at: '2026-09-23T09:59:50.000Z', messageId: 'msg-9',
+        needsYouItems: [{ text: 'decide the scope', firstRaisedTick: 2, firstRaisedAt: '2026-09-23T09:40:00.000Z', firstRaisedMessageId: 'msg-2' }],
+      },
+    });
+    setup(status, { pendingInput: [] });
+    const { client } = renderWithQuery(<FlywheelPage />);
+    const row = (await screen.findAllByTestId('flywheel-needs-you-item'))[0]!;
+    await waitFor(() => expect(client.getQueryData(['conv-ask-user-question'])).toBeDefined());
+
+    fireEvent.click(row);
+    expect(screen.getByTestId('flywheel-conversation-pane')).toHaveAttribute('data-target-id', 'msg-2');
+  });
+
+  it('a needs-you row reopens the pending question instead of jumping to its first-raised message (PAN-5198)', async () => {
+    const status = flywheelStatus({
+      lastTick: {
+        tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the scope', at: '2026-09-23T09:59:50.000Z', messageId: 'msg-9',
+        needsYouItems: [{ text: 'decide the scope', firstRaisedTick: 2, firstRaisedAt: '2026-09-23T09:40:00.000Z', firstRaisedMessageId: 'msg-2' }],
+      },
+    });
+    setup(status, { pendingInput: [{ name: 'conv-flywheel', pendingAskUserQuestion: { toolUseId: 'tu-1', askedAt: '2026-09-23T09:59:00.000Z', questions: [] } }] });
+    const { client } = renderWithQuery(<FlywheelPage />);
+    const row = (await screen.findAllByTestId('flywheel-needs-you-item'))[0]!;
+    await waitFor(() => expect(client.getQueryData(['conv-ask-user-question'])).toBeDefined());
+
+    fireEvent.click(row);
+    expect(useAskUserQuestionUiStore.getState().reopenNonce).toBe(1);
+    expect(screen.getByTestId('flywheel-conversation-pane')).toHaveAttribute('data-target-id', '');
   });
 });

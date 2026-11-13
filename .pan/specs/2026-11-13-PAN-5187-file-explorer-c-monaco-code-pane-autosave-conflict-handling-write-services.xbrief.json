@@ -1,0 +1,1627 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-13T14:51:15Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5187: File explorer C: Monaco code pane, autosave, conflict handling, write services",
+    "updated": "2026-11-13T16:26:39.564Z"
+  },
+  "plan": {
+    "id": "pan-5187",
+    "title": "File explorer C: Monaco code pane, autosave, conflict handling, write services",
+    "status": "running",
+    "uid": "96d6a981-7d2a-4dbb-8a04-f3657647db5d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-11-13T14:51:15Z",
+    "updated": "2026-11-13T16:26:39.564Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5187",
+        "label": "PAN-5187",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5187/.pan/drafts/pan-5187.md",
+        "label": "PRD draft (.pan/drafts/pan-5187.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5183",
+        "label": "PAN-5183 parent PRD (.pan/drafts/pan-5183.md)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "file-explorer",
+      "monaco",
+      "autosave",
+      "conflicts",
+      "server",
+      "frontend"
+    ],
+    "narratives": {
+      "Problem": "Overdeck has no way to edit an arbitrary file of a project checkout or workspace from the dashboard. The file explorer epic (PAN-5183) needs a code pane with Monaco, safe autosave that never silently overwrites changes another process made on disk, and server services that write, create, rename, copy, delete and restore files inside an explorer root.",
+      "Proposal": "Server: write.ts (writeFile with the disk-signature precondition table and atomic temp-file rename, create, rename/move with an EXDEV-safe moveEntry, copy) and trash.ts (delete to <OVERDECK_HOME>/trash with a manifest, validated restore, 7-day prune), replacing PAN-5185's handler stubs. Client: a lazily loaded CodePane rendering Monaco (all languages in the lazy chunk only), an in-memory drafts store, a per-file save queue, a 1,000 ms autosave controller, a self-write registry, an external-change controller fed by PAN-5186's watch hub, an external-change banner with Compare/Reload/Keep/Overwrite, a Changes view against HEAD, preview tabs through PAN-5186's openCodePane, markdown preview and word wrap. Stage and tree items wait for PAN-5186 to merge; server and pure modules do not.",
+      "NonGoals": "- No explorer tree, git colors, quick open or content search (PAN-5186 owns them); this issue only changes the tree's file-row click to open preview panes.\n- No re-creation of PAN-5186 modules (the 'code' pane type and fields, openCodePane, the watch hub) on this branch.\n- No viewers for images, PDF, audio, fonts, large text, archives, SQLite or Office (PAN-5188, PAN-5189); non-text files show NonTextFallback.\n- No file-action UI: inline create/rename rows, drag move, duplicate naming, delete confirmation, undo/redo, OS drop, drag to composer (PAN-5190).\n- No edit workspaces and no editing of project roots; project-root files open read-only (PAN-5191 changes that).\n- No download or upload HTTP routes (PAN-5188).\n- No new StageApi or StageDeckContext members.\n- No window-level keyboard listeners and no Monaco addCommand bindings.\n- No atomic compare-and-swap against other processes beyond the documented precondition race.\n- No minimap, rich markdown editor or language servers.\n- No persistence of drafts, the save queue or external-change state; the trash is the only new on-disk data."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Code panes build on PAN-5186's 'code' pane type, openCodePane and watch hub instead of re-creating them; the four Stage/tree items task_block until PAN-5186 merges.",
+        "rationale": "PAN-5186's plan (D-B2 to D-B5) built these seams for this issue; duplicating them on two parallel branches would conflict in panesStore.ts, PaneBar.tsx and Stage/index.tsx. Server and pure items still run first, so little time is lost. A comment on the issue asks for PAN-5186 to be added as an order-book prereq (the Flywheel tell failed: not running)."
+      },
+      {
+        "summary": "Project-root files open read-only with a one-line note until PAN-5191 adds edit workspaces.",
+        "rationale": "Every project-root write is refused with EDIT_WORKSPACE_REQUIRED by PAN-5185; an editable pane whose saves always fail would lose work or confuse the operator."
+      },
+      {
+        "summary": "The trash payload lives under <entry>/files/ next to .overdeck-trash.json, with compact ISO stamps.",
+        "rationale": "The parent's layout collides when the deleted path is itself named .overdeck-trash.json; a subfolder removes the collision and keeps names readable and parseable for prune."
+      },
+      {
+        "summary": "Writes follow a symlink that resolves inside the root and replace its target atomically.",
+        "rationale": "This matches every editor and keeps the link; escapes are already refused by PAN-5185's resolveInsideRoot."
+      },
+      {
+        "summary": "Monaco language comes from the client path via monaco.languages.getLanguages(), not the server's lang field.",
+        "rationale": "The server's languageForPath returns Shiki ids (bash, tsx, mdx, toml) that Monaco does not recognize."
+      },
+      {
+        "summary": "The all-languages editor.main.js import lives only in the lazy MonacoCodeEditor chunk; the shared monaco-setup.ts imports editor.api.js and the workers.",
+        "rationale": "ContextEditor shares the setup and must not pull every language into its chunk."
+      },
+      {
+        "summary": "A new INVALID_TARGET error code is added for moving or copying a folder into itself.",
+        "rationale": "None of the parent's codes describe this case, and reusing PATH_OUTSIDE_ROOT or ALREADY_EXISTS would mislead the UI."
+      },
+      {
+        "summary": "Parent AC-11's tree Ctrl+Z check is verified at the RPC level here and through the tree in PAN-5190.",
+        "rationale": "Undo is PAN-5190's UI; this issue ships only the services."
+      },
+      {
+        "summary": "Closing a code pane with an armed autosave timer saves at once.",
+        "rationale": "Typing and closing within one second should not leave the change only in memory; the draft also survives either way."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "The parent PRD already split the explorer epic into seven children, and this child's three work items (client save path, conflict handling, server write services) form one protocol: the signature precondition, the save queue and the external-change logic only make sense together, and PAN-5190 and PAN-5191 already depend on this grouping in the order book. The surface is 51 concrete files, about 20 of them new test files, under three directories (services/explorer/, components/explorer/code/, docs) plus single-line touches to existing files. The plan is decomposed into 20 small items with serial edges only where files are shared.",
+      "canonicalFilename": "2026-11-13-PAN-5187-file-explorer-c-monaco-code-pane-autosave-conflict-handling-write-services.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "s-write-file",
+        "title": "Server writeFile with the disk-signature precondition and atomic write (PRD WI-11.1)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5187",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/write.ts",
+            "src/dashboard/server/services/explorer/__tests__/write.test.ts",
+            "src/dashboard/server/ws-rpc-explorer.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/write.test.ts",
+            "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "write.test.ts passes",
+            "no-loss-matrix.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "s-create",
+            "s-rename",
+            "s-copy",
+            "s-trash"
+          ],
+          "parallelSafeReason": "Server-only; shares no file with any frontend item."
+        },
+        "narrative": {
+          "Action": "Merge origin/main and confirm the PAN-5185 names in PRD §2 exist (D-C1). Create src/dashboard/server/services/explorer/write.ts exporting writeFile(root, rel, text, expectedSignature, allowMissing) exactly per PRD WI-11.1: FILE_TOO_LARGE over 5 MiB (D-C5), resolveInsideRoot forWrite, the D-C4 precondition table, symlink-follow with dangling links refused as NOT_FOUND (D-C3), atomic temp-file write with fsync and mode preservation, return { signature, mtimeMs }. Replace the PAN-5185 handler stub for WS_METHODS.explorerWriteFile in ws-rpc-explorer.ts with an Effect.tryPromise handler, and set the pan.explorerWriteFile no-loss row door (D-C2). Write write.test.ts with every case PRD WI-11.1 lists, using a temp git repo."
+        },
+        "items": [
+          {
+            "id": "s-write-file.ac1",
+            "title": "Given a file whose signature matches expectedSignature, when writeFile runs, then it saves the new text and returns the signature of the new bytes; with a mismatching signature it throws DISK_CONFLICT and the file bytes stay unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s-write-file.ac2",
+            "title": "Given a missing file, writeFile with a signature and allowMissing false throws DISK_CONFLICT, with allowMissing true it creates the file and any missing parent folder, and with expectedSignature null it creates the file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s-write-file.ac3",
+            "title": "A file with mode 0o755 preserves mode 0o755 after writeFile, a symlink to a file inside the root remains a symlink whose target contains the new text, a dangling symlink throws NOT_FOUND and creates nothing, and no .overdeck-tmp- file remains in the folder",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s-write-file.ac4",
+            "title": "writeFile rejects a project root with EDIT_WORKSPACE_REQUIRED, a .git/config path with PATH_IN_GIT_DIR, and text one byte over 5 MiB with FILE_TOO_LARGE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s-write-file.ac5",
+            "title": "The pan.explorerWriteFile row in no-loss-matrix.ts contains the door string naming services/explorer/write.ts and PAN-5187, and no-loss-matrix.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s-create",
+        "title": "Server create for files and folders (PRD WI-11.2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/write.ts",
+            "src/dashboard/server/services/explorer/__tests__/write.test.ts",
+            "src/dashboard/server/ws-rpc-explorer.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/write.test.ts",
+            "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "write.test.ts passes including the create cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "In write.ts add statEntry(root, rel) returning an ExplorerEntry with ignored false (D-C11) and create(root, rel, kind) per PRD WI-11.2: resolve for write, mkdir the parent recursively, create the file with flag wx or mkdir the folder, map EEXIST to ALREADY_EXISTS. Replace the explorerCreate handler stub in ws-rpc-explorer.ts and set its no-loss row door. Add the create cases to write.test.ts."
+        },
+        "items": [
+          {
+            "id": "s-create.ac1",
+            "title": "When create runs with kind file or dir on a free path, then it creates the entry on disk and returns an entry whose kind and path match the request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s-create.ac2",
+            "title": "Given an existing file or folder at the path, create throws ALREADY_EXISTS and the existing entry is preserved unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s-create.ac3",
+            "title": "Given a path whose parent folder is missing, create creates the parent folders and the entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s-rename",
+        "title": "Server rename/move with the EXDEV-safe moveEntry helper (PRD WI-11.3)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/write.ts",
+            "src/dashboard/server/services/explorer/__tests__/write.test.ts",
+            "src/dashboard/server/ws-rpc-explorer.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "packages/contracts/src/explorer.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/write.test.ts",
+            "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck",
+            "npm run typecheck:contracts"
+          ],
+          "expected_outputs": [
+            "write.test.ts passes including the rename and moveEntry cases",
+            "typecheck and typecheck:contracts complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "In write.ts add moveEntry(from, to, ops) with the rename-then-EXDEV-copy-and-remove fallback (D-C9) and rename(root, from, to) per PRD WI-11.3: NOT_FOUND for a missing source, INVALID_TARGET for a move into itself (D-C10), ALREADY_EXISTS for an occupied target unless lstat dev and ino match (case-only rename), NOT_FOUND for a missing target parent. Add INVALID_TARGET to EXPLORER_ERROR_CODES in packages/contracts/src/explorer.ts. Replace the explorerRename stub and set its no-loss row door. Add the rename cases to write.test.ts."
+        },
+        "items": [
+          {
+            "id": "s-rename.ac1",
+            "title": "When rename moves a file, or a folder with contents into another folder, then the source path no longer exists and the target contains the same bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s-rename.ac2",
+            "title": "rename throws ALREADY_EXISTS for an occupied target and INVALID_TARGET for a folder moved into its own subfolder, and EXPLORER_ERROR_CODES contains INVALID_TARGET",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s-rename.ac3",
+            "title": "Given injected ops.rename that throws an EXDEV error, when moveEntry runs, then it copies the entry to the target and deletes the source",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s-rename.ac4",
+            "title": "A case-only rename of a.txt to A.txt resolves without throwing and A.txt exists afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s-copy",
+        "title": "Server copy for files and folders (PRD WI-11.4)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/write.ts",
+            "src/dashboard/server/services/explorer/__tests__/write.test.ts",
+            "src/dashboard/server/ws-rpc-explorer.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/write.test.ts",
+            "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "write.test.ts passes including the copy cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "In write.ts add copy(root, from, to) per PRD WI-11.4: resolve both for write, NOT_FOUND for a missing source, INVALID_TARGET for a copy into itself, ALREADY_EXISTS when lstat of the target succeeds, then fs.cp with recursive, errorOnExist, force false and verbatimSymlinks, returning statEntry. Replace the explorerCopy stub and set its no-loss row door. Add the copy cases to write.test.ts."
+        },
+        "items": [
+          {
+            "id": "s-copy.ac1",
+            "title": "When copy runs on a file, then the target contains bytes identical to the source and the source is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s-copy.ac2",
+            "title": "When copy runs on a folder, then every nested file exists under the target with identical bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s-copy.ac3",
+            "title": "copy throws ALREADY_EXISTS for an occupied target and INVALID_TARGET for a copy into its own subfolder",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s-trash",
+        "title": "Server delete to the Overdeck trash, restore and prune (PRD WI-11.5)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5187",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/trash.ts",
+            "src/dashboard/server/services/explorer/__tests__/trash.test.ts",
+            "src/dashboard/server/ws-rpc-explorer.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/trash.test.ts",
+            "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "trash.test.ts passes",
+            "no-loss-matrix.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-3",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "docs-records"
+          ],
+          "parallelSafeReason": "Server-only; ordered after s-copy only because both edit ws-rpc-explorer.ts and the no-loss matrix."
+        },
+        "narrative": {
+          "Action": "Checkpoint first: if PAN-5185 already created a trash module for discarding untracked files, extend it instead of adding a second one. Otherwise create src/dashboard/server/services/explorer/trash.ts with rootSlug, formatStamp, parseStamp, trashPaths, restore and pruneTrash exactly per PRD WI-11.5 and decisions D-C6 (layout with files/ subfolder and .overdeck-trash.json manifest under getOverdeckHome()/trash), D-C7 (restore validates the trash id shape, root slug, manifest rootId and re-resolves the manifest path for write) and D-C8 (validate all paths before moving any, drop nested paths, prune errors logged and swallowed). Use moveEntry from write.ts. Replace the explorerDelete and explorerRestore stubs and set their no-loss row doors. Write trash.test.ts with OVERDECK_HOME pointed at a temp dir and an injected clock."
+        },
+        "items": [
+          {
+            "id": "s-trash.ac1",
+            "title": "Given a file and a folder with contents, when trashPaths then restore run with the returned ids, then both return to the same paths with identical bytes and the trash entry directory is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s-trash.ac2",
+            "title": "restore throws ALREADY_EXISTS for an occupied path, NOT_FOUND for a trash id of another root slug, a malformed id or an id containing .., and PATH_OUTSIDE_ROOT for a manifest edited to point at ../outside",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s-trash.ac3",
+            "title": "Given one missing path among several, trashPaths throws NOT_FOUND and moves nothing; given a and a/b in one call, it returns exactly one trash id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s-trash.ac4",
+            "title": "Given an injected clock, pruneTrash deletes entries older than 7 days, preserves newer entries and preserves directories whose names parseStamp rejects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s-trash.ac5",
+            "title": "trashPaths rejects a project root with EDIT_WORKSPACE_REQUIRED, restore rejects it too, and every test stores trash entries only under the temp OVERDECK_HOME",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s-read-head",
+        "title": "explorerReadFile with ref HEAD returns the committed text (PRD WI-11.6)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/read.ts",
+            "src/dashboard/server/services/explorer/__tests__/read.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/read.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "read.test.ts passes including both ref HEAD cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Checkpoint: read PAN-5185's read.ts for a ref branch. If it exists and read.test.ts covers both cases below, add no code and close the item with an empty commit (git commit --allow-empty) carrying the Item: s-read-head trailer, push, then pan task done; if only one case is covered, add the missing test case. Otherwise implement PRD WI-11.6 in read.ts: resolve the path for read, run git show HEAD:<rel> with async execFile, a 10 s timeout, a 6 MiB buffer and -c core.fsmonitor=false, return the decoded text with writable false, and return empty text for a file not in HEAD or a non-git root."
+        },
+        "items": [
+          {
+            "id": "s-read-head.ac1",
+            "title": "Given a committed file modified in the working tree, explorerReadFile with ref HEAD returns the committed text and writable false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s-read-head.ac2",
+            "title": "Given a new untracked file, explorerReadFile with ref HEAD returns empty text without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f-monaco-setup",
+        "title": "Shared Monaco setup with local language workers (PRD WI-8.1)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/monaco-setup.ts",
+            "src/dashboard/frontend/src/lib/__tests__/monaco-setup.test.ts",
+            "src/dashboard/frontend/src/components/context/ContextEditor.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/__tests__/monaco-setup.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "monaco-setup.test.ts passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/lib/monaco-setup.ts exporting workerKindForLabel and an idempotent ensureMonaco() that sets self.MonacoEnvironment.getWorker to the editor, json, css, html and ts workers (Vite ?worker imports, no CDN) and calls loader.config with the editor.api.js module, per PRD WI-8.1 and D-C16. Change ContextEditor.tsx to call ensureMonaco() instead of its inline worker and loader lines, leaving its markdown contribution import and component unchanged. Add lib/__tests__/monaco-setup.test.ts for workerKindForLabel."
+        },
+        "items": [
+          {
+            "id": "f-monaco-setup.ac1",
+            "title": "workerKindForLabel returns json for json, css for scss, html for handlebars, typescript for javascript and editor for markdown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-monaco-setup.ac2",
+            "title": "ContextEditor.tsx contains a call to ensureMonaco() and contains no self.MonacoEnvironment assignment and no loader.config call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-monaco-setup.ac3",
+            "title": "monaco-setup.ts imports editor.api.js and contains no import of editor.main.js, so the all-language bundle stays out of the Context page chunk",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f-preview-open",
+        "title": "Preview panes: openCodePane preview option, italic tab label and single click in the tree (PRD WI-8.2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/panesStore.ts",
+            "src/dashboard/frontend/src/components/explorer/openCodePane.ts",
+            "src/dashboard/frontend/src/components/Stage/PaneBar.tsx",
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "src/dashboard/frontend/src/components/explorer/tree/ExplorerTree.tsx",
+            "src/dashboard/frontend/src/components/explorer/tree/__tests__/ExplorerTree.test.tsx",
+            "src/dashboard/frontend/src/components/explorer/__tests__/openCodePane.preview.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/__tests__/openCodePane.preview.test.ts src/components/explorer/__tests__/openCodePane.test.ts src/components/explorer/tree/__tests__/ExplorerTree.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "openCodePane.preview.test.ts and openCodePane.test.ts pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "FR-19"
+          ],
+          "acJustification": "Five criteria: four unit-level checks plus the browser check of three single clicks, which only this item can carry.",
+          "readinessReason": "Sequential because it waits on PAN-5186 merging into main; it edits PAN-5186 files."
+        },
+        "narrative": {
+          "Action": "Needs PAN-5186 on main (D-C13): merge origin/main; if PAN-5186 has not merged, task_block this item with reason \"waits for PAN-5186 to merge\", pan tell flywheel-orchestrator, and continue with other items. Then per PRD WI-8.2: add explorerPreview?: boolean to WorkspacePane under PAN-5186's explorerPath field; add preview?: boolean to CodePaneTarget and the three-step preview logic to PAN-5186's openCodePane (focus-and-pin, retarget the root's one preview pane, else add); make the PaneBar label span italic for code panes with explorerPreview; add an optional onPreview(path) prop to PAN-5186's ExplorerTree, called on a plain click of a file row after onSelect, and wire it in ExplorerPane.tsx to openCodePane with preview true, while onOpen (double click, Enter) keeps opening a permanent pane (D-C22); extend ExplorerTree.test.tsx. Add components/explorer/__tests__/openCodePane.preview.test.ts."
+        },
+        "items": [
+          {
+            "id": "f-preview-open.ac1",
+            "title": "Given two preview opens of different files in one root, then the deck contains one code pane showing the second path with explorerPreview true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-preview-open.ac2",
+            "title": "Given a preview pane, when openCodePane opens the same file without preview, then the same pane id remains and explorerPreview becomes false; the next preview open then creates a second pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-preview-open.ac3",
+            "title": "Preview panes in two different roots are independent: a preview open in root B preserves the preview pane of root A",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-preview-open.ac4",
+            "title": "When a file row in the explorer tree receives a plain click, then ExplorerTree calls onPreview with its path, and a Ctrl click or a folder click does not call it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-preview-open.ac5",
+            "title": "Browser UAT (isolated Playwright profile, dashboard built from the branch, PRD §10 fixture uat-fixture/ in the PAN-5187 workspace): when a.ts, b.ts and c.ts are single-clicked in the tree, then the deck shows one code tab with an italic label, and it shows c.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f-drafts",
+        "title": "In-memory drafts store keyed by root and path (PRD WI-8.3)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/code-drafts.ts",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/code-drafts.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/code/__tests__/code-drafts.test.ts"
+          ],
+          "expected_outputs": [
+            "code-drafts.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/explorer/code/code-drafts.ts: a non-persisted zustand 4 store of CodeDraft { text, baseText, baseSignature } keyed by draftKey(rootId, path), with the actions loaded, edited, saved, reset, keepMine, rekey and drop and the selector selectIsDirty, with exactly the semantics in PRD WI-8.3 (loaded keeps a dirty draft's text; saved leaves the draft dirty when the text changed since the save started). It must not import from components/Stage. Add code/__tests__/code-drafts.test.ts."
+        },
+        "items": [
+          {
+            "id": "f-drafts.ac1",
+            "title": "Given a dirty draft, when loaded runs with a different signature, then the draft text and base are preserved unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-drafts.ac2",
+            "title": "When saved runs with text that differs from the current draft text, then the base updates to the saved text and selectIsDirty returns true; with equal text selectIsDirty returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-drafts.ac3",
+            "title": "keepMine preserves the draft text and sets the base to the disk text and signature, and rekey moves a draft to a new key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-drafts.ac4",
+            "title": "A draft survives when no component subscribes to the store: after the subscribing test component unmounts, the store still returns the dirty draft",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f-save-queue",
+        "title": "Per-file save queue ported from Orca (PRD WI-8.4)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/save-queue.ts",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/save-queue.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/code/__tests__/save-queue.test.ts"
+          ],
+          "expected_outputs": [
+            "save-queue.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Run git -C ~/Projects/orca log --oneline c6b9ac9549b..origin/main -- src/renderer/src/components/editor/save/queue/editor-save-queue.ts and port from the newest commit. Create code/save-queue.ts with the Orca port header and createSaveQueue(deps) per PRD WI-8.4: one write in flight per key, the newest queued request replaces older ones, expectedSignature read from getBaseSignature at dispatch time, overwrite sends null, an error drops the queued request and calls onError, plus isInFlight and whenIdle. Add code/__tests__/save-queue.test.ts with fake timers and a deferred fake write."
+        },
+        "items": [
+          {
+            "id": "f-save-queue.ac1",
+            "title": "Given a write in flight, when three more requests are enqueued for the same key, then exactly one more write is sent after the first resolves and it carries the last text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-save-queue.ac2",
+            "title": "The second write sends the signature the first write returned as expectedSignature, and a request with overwrite true sends expectedSignature null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-save-queue.ac3",
+            "title": "When a write throws, then the queued request for that key is dropped and onError receives the error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-save-queue.ac4",
+            "title": "Writes for two different keys run in parallel, and whenIdle resolves only after the key has nothing in flight or queued",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f-self-write",
+        "title": "Self-write registry ported from Orca (PRD WI-8.5 step 1)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/self-write-registry.ts",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/self-write-registry.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/code/__tests__/self-write-registry.test.ts"
+          ],
+          "expected_outputs": [
+            "self-write-registry.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Create code/self-write-registry.ts with the Orca port header (upstream src/renderer/src/components/editor/external-changes/editor-self-write-registry.ts, port from the newest commit after checking git log) exporting recordSelfWrite(key, signature, now) and isRecentSelfWrite(key, signature, now) with a 750 ms TTL and a 256-stamp cap, dropping Orca's runtime-environment and path-normalization parts. Add code/__tests__/self-write-registry.test.ts."
+        },
+        "items": [
+          {
+            "id": "f-self-write.ac1",
+            "title": "isRecentSelfWrite returns true for the recorded signature within 750 ms and returns false for another signature",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-self-write.ac2",
+            "title": "isRecentSelfWrite returns false once more than 750 ms have passed since recordSelfWrite",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-self-write.ac3",
+            "title": "After 257 records for distinct keys the registry contains 256 stamps and the oldest key returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f-autosave",
+        "title": "Autosave controller: 1,000 ms debounce, blur, explicit save, flush on close (PRD WI-8.5 step 2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/autosave.ts",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/autosave.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/code/__tests__/autosave.test.ts"
+          ],
+          "expected_outputs": [
+            "autosave.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Create code/autosave.ts exporting AUTOSAVE_DELAY_MS = 1000 and createAutosave({ delayMs, save, isDirty }) with changed, blurred, saveNow and dispose per PRD WI-8.5 and D-C19: changed re-arms the timer, blurred saves with reason blur when dirty, saveNow cancels the timer and saves with reason explicit when dirty, dispose saves with reason close only when the timer is armed, and no method saves a clean draft. Add code/__tests__/autosave.test.ts with vi.useFakeTimers and advanceTimersByTimeAsync."
+        },
+        "items": [
+          {
+            "id": "f-autosave.ac1",
+            "title": "Given several changed calls 300 ms apart, then save runs exactly once with reason timer, 1,000 ms after the last call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-autosave.ac2",
+            "title": "blurred saves at once with reason blur, and saveNow saves at once with reason explicit and cancels the armed timer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-autosave.ac3",
+            "title": "dispose with an armed timer saves with reason close, and dispose with no armed timer sends nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-autosave.ac4",
+            "title": "When isDirty returns false, then none of the four methods calls save",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f-code-pane-shell",
+        "title": "Code pane shell: read, Monaco editor, language mapping, reveal, lazy Stage case (PRD WI-8.6)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5187",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/CodePane.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/MonacoCodeEditor.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/monaco-language.ts",
+            "src/dashboard/frontend/src/components/explorer/code/NonTextFallback.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/monaco-language.test.ts",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/CodePane.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/index.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/code/__tests__/monaco-language.test.ts src/components/explorer/code/__tests__/CodePane.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "monaco-language.test.ts and CodePane.test.tsx pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-19",
+            "NFR-7",
+            "NFR-8"
+          ],
+          "foundationFor": [
+            "f-code-pane-save",
+            "f-header-markdown-wrap",
+            "f-changes-view",
+            "f-external-change-wiring",
+            "f-external-change-banner"
+          ],
+          "parallelSafeReason": "Only Stage/index.tsx is shared with other work, and it waits for PAN-5186."
+        },
+        "narrative": {
+          "Action": "Needs PAN-5186 on main (D-C13; block and tell the flywheel if not). Per PRD WI-8.6: create monaco-language.ts (monacoLanguageForPath, D-C15), MonacoCodeEditor.tsx (calls ensureMonaco, imports editor.main.js, Editor with the overdeck-explorer:// model path, theme from useTheme resolvedTheme, per-editor addAction keybindings for Ctrl/Cmd+S and Alt+Z, blur callback, D-C16 and D-C17), NonTextFallback.tsx (file name, size, the viewer note), and CodePane.tsx (reads explorerReadFile, feeds drafts.loaded, renders the editor read-only with the D-C12 note when writable is false, NonTextFallback for binary and large-text, error and loading states, reveal of explorerRevealLine on mount and on nonce change, D-C23). In Stage/index.tsx add the React.lazy CodePane import and case code in renderPane inside Suspense, with key set to rootId + NUL + path so a preview retarget remounts CodePane for the new file. Load the pan-style-guide skill before writing UI. Add monaco-language.test.ts and CodePane.test.tsx (MonacoCodeEditor mocked with a textarea stand-in, fake transport)."
+        },
+        "items": [
+          {
+            "id": "f-code-pane-shell.ac1",
+            "title": "monacoLanguageForPath returns dockerfile for Dockerfile by filename, typescript for a .TS extension, markdown for .mdx and defaults to plaintext for an unknown extension",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-code-pane-shell.ac2",
+            "title": "Given a text read result, CodePane renders the editor with the file text; given writable false, it renders the read-only editor and the note \"Read-only: the main checkout is never edited directly.\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-code-pane-shell.ac3",
+            "title": "Given a binary read result, CodePane renders NonTextFallback with the file name and size instead of the editor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-code-pane-shell.ac4",
+            "title": "Given explorerRevealLine 40, the editor reveals line 40 on mount, and a new explorerRevealNonce reveals it again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-code-pane-shell.ac5",
+            "title": "When explorerPath changes on the same pane id (a preview retarget), then the Stage renders a fresh CodePane that shows the new file text and reads the new path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f-code-pane-save",
+        "title": "Saving from the code pane: autosave, Ctrl/Cmd+S, dirty dot, preview pinning, conflict state (PRD WI-8.7)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/useCodePaneSave.ts",
+            "src/dashboard/frontend/src/components/explorer/code/CodePane.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/CodePane.save.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/PaneBar.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/code/__tests__/CodePane.save.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "CodePane.save.test.tsx passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ],
+          "parallelSafeReason": "Its only shared files (CodePane.tsx, PaneBar.tsx) are ordered by blocks edges.",
+          "acJustification": "Six criteria: five unit-level save behaviors plus the browser autosave check, which belongs with the save wiring."
+        },
+        "narrative": {
+          "Action": "Needs PAN-5186 on main (D-C13). Create code/useCodePaneSave.ts per PRD WI-8.7: an app-wide codeSaveQueue whose write calls explorerWriteFile through getTransport, getBaseSignature reads the drafts store, onSaved calls drafts.saved and recordSelfWrite; an autosave controller per mount; onChange calls drafts.edited, clears explorerPreview on the first edit through updatePane and re-arms autosave; explicit saves send allowMissing true and the other reasons false; a DISK_CONFLICT error sets the conflict state and other errors toast \"Failed to save: <message>\". In CodePane add a Keep open button for preview panes and a pane-root onKeyDown for Ctrl/Cmd+S. In PaneBar render CodeTabDirtyDot for code panes. Writable false disables all of it. On unmount, after the D-C19 flush, call drafts.drop(key) when the draft is clean so the in-memory store does not grow without bound; a dirty draft stays. Add code/__tests__/CodePane.save.test.tsx with fake timers."
+        },
+        "items": [
+          {
+            "id": "f-code-pane-save.ac1",
+            "title": "Given a writable code pane, when the user types and 1,000 ms pass, then CodePane sends one explorerWriteFile with the loaded signature as expectedSignature and allowMissing false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-code-pane-save.ac2",
+            "title": "When Ctrl+S is pressed on the pane root, then CodePane sends explorerWriteFile at once with allowMissing true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-code-pane-save.ac3",
+            "title": "The first edit of a preview pane updates the pane to explorerPreview false, and PaneBar renders the unsaved-changes dot while the draft is dirty and removes it after the save resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-code-pane-save.ac4",
+            "title": "Given a DISK_CONFLICT answer, the pane records the conflict state and the draft stays dirty; unmounting with an armed autosave timer sends the save",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-code-pane-save.ac5",
+            "title": "When a clean code pane unmounts, then its draft is deleted from the drafts store, and when a dirty pane unmounts its draft survives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-code-pane-save.ac6",
+            "title": "Browser UAT (isolated Playwright profile, dashboard built from the branch, PRD §10 fixture uat-fixture/ in the PAN-5187 workspace): when a marker string is typed into c.ts and 1 s passes, then cat uat-fixture/c.ts shows the marker on disk and the tab label is no longer italic",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f-header-markdown-wrap",
+        "title": "Code pane header with markdown Edit/Preview and word wrap toggle (PRD WI-8.8)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/CodePaneHeader.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/CodePane.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/CodePaneHeader.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/code/__tests__/CodePaneHeader.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "CodePaneHeader.test.tsx passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Create code/CodePaneHeader.tsx per PRD WI-8.8: the root-relative path, Edit and Preview tabs only for .md, .mdx and .markdown files using the EditorPane sub-tab classes, a Wrap toggle with aria-pressed, a Changes toggle slot for f-changes-view and the Keep open button moved here from CodePane. Preview renders MarkdownTab with the draft text. Word wrap is pane-local state defaulting to on, toggled by the Wrap button and the Alt+Z editor action. Add code/__tests__/CodePaneHeader.test.tsx."
+        },
+        "items": [
+          {
+            "id": "f-header-markdown-wrap.ac1",
+            "title": "CodePaneHeader renders Edit and Preview tabs for README.md and renders no such tabs for a.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-header-markdown-wrap.ac2",
+            "title": "When Preview is clicked on a markdown file, then the pane renders MarkdownTab with the current draft text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-header-markdown-wrap.ac3",
+            "title": "Word wrap defaults to on, and clicking Wrap flips aria-pressed and applies wordWrap off to the editor props",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f-changes-view",
+        "title": "Changes view: Monaco diff of HEAD against the live draft (PRD WI-8.9)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/ChangesView.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/CodePaneHeader.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/CodePane.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/changes-view.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/code/__tests__/changes-view.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "changes-view.test.tsx passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Create code/ChangesView.tsx per PRD WI-8.9: when the header Changes toggle is on, fetch explorerReadFile with ref HEAD once per toggle and render @monaco-editor/react DiffEditor with original = HEAD text and modified = draft text, distinct original and modified model paths, the same language and theme, the original side read-only, and modified-side edits routed through the same onChange as the main editor. Keep the cursor position across the switch with getPosition, setPosition and revealPositionInCenter. Wire the toggle in CodePaneHeader and CodePane. Add code/__tests__/changes-view.test.tsx with @monaco-editor/react mocked."
+        },
+        "items": [
+          {
+            "id": "f-changes-view.ac1",
+            "title": "When Changes is toggled on, then the pane sends explorerReadFile with ref HEAD and renders the diff editor with the HEAD text as original and the draft text as modified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-changes-view.ac2",
+            "title": "When Changes is toggled off, then the pane renders the plain editor again and the draft text is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-changes-view.ac3",
+            "title": "An edit on the modified side of the diff updates the draft store text for the file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f-external-change-controller",
+        "title": "External-change controller ported from Orca reconciliation logic (PRD WI-9.1)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/external-change.ts",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/external-change.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/code/__tests__/external-change.test.ts"
+          ],
+          "expected_outputs": [
+            "external-change.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Create code/external-change.ts with the Orca port header (upstream src/renderer/src/hooks/editor-external-watch-event-reconciliation.ts, decision logic only) exporting ExternalChangeState, DiskRead and createExternalChangeController(deps) with handle(events) and dispose(), following every rule in PRD WI-9.1 and decisions D-C18 (wait for an in-flight save), D-C20 (500 ms delete window, same-basename create marks renamed, same-path create is an update, rename event marks renamed) and D-C21 (overflow re-reads). Re-reads happen 250 ms after the last relevant event. Add code/__tests__/external-change.test.ts with fake timers and fake deps."
+        },
+        "items": [
+          {
+            "id": "f-external-change-controller.ac1",
+            "title": "Given a clean pane, when an update event for its path arrives, then reload runs once 250 ms later; given a dirty pane, setState receives changed with the disk text and signature",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-external-change-controller.ac2",
+            "title": "A re-read whose signature equals the base signature or a recent self-write signature produces no reload and no state change, and an event during an in-flight save waits for whenSaveIdle before re-reading",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-external-change-controller.ac3",
+            "title": "A delete followed within 500 ms by a create of the same basename at another path marks the pane renamed with that path; a delete followed by a create of the same path re-reads instead of marking deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-external-change-controller.ac4",
+            "title": "A delete alone marks the pane deleted after 500 ms, and a later create of the path re-reads and clears the deleted mark",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-external-change-controller.ac5",
+            "title": "When an overflow event arrives, then the controller re-reads after 250 ms; after dispose, no pending timer fires",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f-external-change-wiring",
+        "title": "Wire external changes into the code pane through the PAN-5186 watch hub (PRD WI-9.2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/useExternalChange.ts",
+            "src/dashboard/frontend/src/components/explorer/code/CodePane.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/useExternalChange.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/code/__tests__/useExternalChange.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "useExternalChange.test.tsx passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Needs PAN-5186 on main (D-C13) for subscribeExplorerWatch. Create code/useExternalChange.ts per PRD WI-9.2: build the controller with deps wired to explorerReadFile, the drafts store, the save queue isInFlight and whenIdle, and the self-write registry; subscribe through subscribeExplorerWatch, passing events signals to handle and turning resync signals into an overflow event; reload calls drafts.reset; unmount unsubscribes and disposes. Use it in CodePane for writable and read-only panes. Add code/__tests__/useExternalChange.test.tsx with fake timers and the watch hub mocked."
+        },
+        "items": [
+          {
+            "id": "f-external-change-wiring.ac1",
+            "title": "Given a clean pane, when the watch hub delivers an update event for its path, then the pane re-reads after 250 ms and resets the draft to the disk text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-external-change-wiring.ac2",
+            "title": "When the watch hub delivers a resync signal, then the pane re-reads the file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-external-change-wiring.ac3",
+            "title": "When the pane unmounts, then its watch hub listener is removed and no re-read runs afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f-external-change-banner",
+        "title": "External-change banner with Compare, Reload, Keep my edits and Overwrite (PRD WI-9.3)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/ExternalChangeBanner.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/CodePane.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/ExternalChangeBanner.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/code/__tests__/ExternalChangeBanner.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "ExternalChangeBanner.test.tsx passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ],
+          "acJustification": "Five criteria including the browser conflict check; it is the last item that completes the conflict flow."
+        },
+        "narrative": {
+          "Action": "Create code/ExternalChangeBanner.tsx per PRD WI-9.3 with the changed, deleted and renamed variants and their exact texts, styled with the warning, destructive and muted-foreground tokens (load the pan-style-guide skill first). Compare toggles a DiffEditor with the disk text on the left read-only and the draft on the right editable; Reload from disk calls drafts.reset; Keep my edits calls drafts.keepMine; Overwrite enqueues a save with overwrite true; Open in the renamed variant calls openCodePane with the new path. In CodePane, a DISK_CONFLICT answer re-reads the file and sets changed (or deleted if missing). Add code/__tests__/ExternalChangeBanner.test.tsx."
+        },
+        "items": [
+          {
+            "id": "f-external-change-banner.ac1",
+            "title": "Given the changed state, the banner renders Compare, Reload from disk, Keep my edits and Overwrite, and Compare renders the diff editor with the disk text and the draft text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-external-change-banner.ac2",
+            "title": "When Reload from disk is clicked, then drafts.reset receives the disk text and signature; when Keep my edits is clicked, drafts.keepMine receives them; when Overwrite is clicked, a save is enqueued with overwrite true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-external-change-banner.ac3",
+            "title": "The deleted variant renders \"This file was deleted on disk. Save (Ctrl+S) recreates it.\" and the renamed variant renders the new path and an Open button that calls openCodePane with it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-external-change-banner.ac4",
+            "title": "Given a save answered with DISK_CONFLICT, CodePane re-reads the file and renders the changed banner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f-external-change-banner.ac5",
+            "title": "Browser UAT (isolated Playwright profile, dashboard built from the branch, PRD §10 fixture uat-fixture/ in the PAN-5187 workspace): given a dirty c.ts pane, when echo x >> uat-fixture/c.ts runs in a shell, then the banner shows the four buttons within 1 s and Compare renders a diff editor; given a clean pane, the same command reloads the text within 1 s and shows no banner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-records",
+        "title": "Docs, changelog, port records and CI frontend test list for the code pane and write services (PRD WI-18 part)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:51:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/MARKDOWN-EDITOR-PANE.md",
+            "changelog.d/pan-5187.md",
+            "scripts/upstream-ports.json",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -v '^#' scripts/frontend-test-subset.txt | while read f; do [ -z \"$f\" ] || [ -e \"src/dashboard/frontend/$f\" ] || echo \"missing $f\"; done"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "the subset check prints no missing lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-10",
+            "FR-19"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-18 (part): add to docs/DASHBOARD-ARCHITECTURE.md, under the File explorer section from PAN-5185 (or a new one after the Optional host tools section), the subsections \"### Code pane, saves and conflicts (PAN-5187)\" and \"### Write services and the trash (PAN-5187)\" with every topic PRD WI-18 lists; add the code-pane paragraph to docs/MARKDOWN-EDITOR-PANE.md under the editor pane type section; add changelog.d/pan-5187.md with a #### New bullet; add Orca port records for save-queue.ts, self-write-registry.ts and external-change.ts to scripts/upstream-ports.json with the commits actually ported from; add every new frontend test file of this issue to scripts/frontend-test-subset.txt in sorted position. Run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "docs-records.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains \"### Code pane, saves and conflicts (PAN-5187)\" stating the 1,000 ms autosave, the D-C4 precondition table and the 250 ms and 500 ms external-change timings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-records.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains \"### Write services and the trash (PAN-5187)\" stating the trash path layout with files/ and .overdeck-trash.json, the restore checks and the 7-day prune",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-records.ac3",
+            "title": "docs/MARKDOWN-EDITOR-PANE.md contains a paragraph stating that the code pane (paneType code) is separate from the editor pane and uses the pan.explorer* door",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-records.ac4",
+            "title": "changelog.d/pan-5187.md contains a #### New heading with one bullet linking #5187, and npm run lint:docs passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-records.ac5",
+            "title": "scripts/upstream-ports.json contains Orca records for the three ported files, and scripts/frontend-test-subset.txt contains every new frontend test path of this issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "s-write-file",
+        "to": "s-create",
+        "type": "blocks"
+      },
+      {
+        "from": "s-create",
+        "to": "s-rename",
+        "type": "blocks"
+      },
+      {
+        "from": "s-rename",
+        "to": "s-copy",
+        "type": "blocks"
+      },
+      {
+        "from": "s-copy",
+        "to": "s-trash",
+        "type": "blocks"
+      },
+      {
+        "from": "f-monaco-setup",
+        "to": "f-code-pane-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "f-drafts",
+        "to": "f-code-pane-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "f-code-pane-shell",
+        "to": "f-code-pane-save",
+        "type": "blocks"
+      },
+      {
+        "from": "f-save-queue",
+        "to": "f-code-pane-save",
+        "type": "blocks"
+      },
+      {
+        "from": "f-self-write",
+        "to": "f-code-pane-save",
+        "type": "blocks"
+      },
+      {
+        "from": "f-autosave",
+        "to": "f-code-pane-save",
+        "type": "blocks"
+      },
+      {
+        "from": "f-drafts",
+        "to": "f-code-pane-save",
+        "type": "blocks"
+      },
+      {
+        "from": "f-preview-open",
+        "to": "f-code-pane-save",
+        "type": "blocks"
+      },
+      {
+        "from": "f-code-pane-save",
+        "to": "f-header-markdown-wrap",
+        "type": "blocks"
+      },
+      {
+        "from": "f-header-markdown-wrap",
+        "to": "f-changes-view",
+        "type": "blocks"
+      },
+      {
+        "from": "f-changes-view",
+        "to": "f-external-change-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "f-external-change-controller",
+        "to": "f-external-change-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "f-external-change-wiring",
+        "to": "f-external-change-banner",
+        "type": "blocks"
+      },
+      {
+        "from": "f-external-change-banner",
+        "to": "docs-records",
+        "type": "blocks"
+      },
+      {
+        "from": "s-trash",
+        "to": "docs-records",
+        "type": "blocks"
+      },
+      {
+        "from": "s-read-head",
+        "to": "docs-records",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -37,6 +37,9 @@ import { useExplorerWatch } from './watch/useExplorerWatch'
 const EXPAND_ALL_CAP = 2000
 const NO_ROOT_MESSAGE = 'This Files pane has no root. Close it and open Files again.'
 
+/** How long a single click waits before opening the preview tab, so a double click can win. */
+export const PREVIEW_OPEN_DELAY_MS = 250
+
 /** True when every ancestor folder of `path` is in `expanded`. */
 function ancestorsExpanded(path: string, expanded: ReadonlySet<string>): boolean {
   for (let p = parentPath(path); p !== ''; p = parentPath(p)) {
@@ -207,8 +210,34 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
     },
     [deck, deckKey, paneId],
   )
-  // D-B2 seam: PAN-5187 changes this to open preview tabs.
-  const openFileFromTree = useCallback((path: string) => openFile({ rootId, path }), [openFile, rootId])
+  // D-B2 seam: a double click, Enter or quick open opens a permanent pane; a
+  // single click opens the root's preview pane (PAN-5187, D-C22). The preview
+  // waits out the double-click interval: in an unsplit deck opening it
+  // activates the code tab, which would hide the tree before the second click
+  // of a double click could land and pin the file.
+  const pendingPreview = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cancelPreview = useCallback(() => {
+    if (pendingPreview.current !== null) clearTimeout(pendingPreview.current)
+    pendingPreview.current = null
+  }, [])
+  useEffect(() => cancelPreview, [cancelPreview])
+  const openFileFromTree = useCallback(
+    (path: string) => {
+      cancelPreview()
+      openFile({ rootId, path })
+    },
+    [cancelPreview, openFile, rootId],
+  )
+  const previewFileFromTree = useCallback(
+    (path: string) => {
+      cancelPreview()
+      pendingPreview.current = setTimeout(() => {
+        pendingPreview.current = null
+        openFile({ rootId, path, preview: true })
+      }, PREVIEW_OPEN_DELAY_MS)
+    },
+    [cancelPreview, openFile, rootId],
+  )
 
   const onQuickOpen = useCallback(() => setQuickOpen(true), [])
   const onContentSearch = useCallback(() => setContentSearchScope(''), [])
@@ -326,6 +355,7 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
           onToggle={onToggle}
           onSelect={onSelect}
           onOpen={openFileFromTree}
+          onPreview={previewFileFromTree}
           onFocus={onFocus}
           onContextMenuRow={onContextMenuRow}
         />

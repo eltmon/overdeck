@@ -261,6 +261,7 @@ export const EXPLORER_ERROR_CODES = [
   "NOTHING_TO_COMMIT",
   "NOT_IMPLEMENTED",
   "INVALID_QUERY",
+  "INVALID_TARGET",
   "EXPLORER_FAILED",
 ] as const
 export type ExplorerErrorCode = (typeof EXPLORER_ERROR_CODES)[number]

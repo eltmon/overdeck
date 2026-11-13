@@ -8,6 +8,13 @@ persists. This doc covers the four pieces that implement it.
 
 ## The `editor` pane type
 
+The file explorer's code pane (`paneType: 'code'`, PAN-5187) is a separate
+pane with its own door: it addresses files by explorer root and root-relative
+path and reads and writes them through the `pan.explorer*` RPC methods, with
+Monaco, autosave and conflict handling (see "Code pane, saves and conflicts"
+in `docs/DASHBOARD-ARCHITECTURE.md`). The `editor` pane and its file-at-path
+door below are unchanged.
+
 `src/dashboard/frontend/src/lib/panesStore.ts` adds `'editor'` to `PaneType`
 and an `editorFilePath?: string` field to `WorkspacePane` — the absolute
 path of the file being edited. `src/dashboard/frontend/src/components/Stage/index.tsx`
