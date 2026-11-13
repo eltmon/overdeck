@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5187",
   "created": "2026-11-13T16:27:22.124Z",
-  "updated": "2026-11-13T18:20:12.719Z",
+  "updated": "2026-11-13T18:25:32.284Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -139,9 +139,10 @@
       "claimedAt": "2026-11-13T18:14:53.781Z"
     },
     "f-code-pane-shell": {
-      "status": "pending",
+      "status": "completed",
       "claimedBy": "agent-pan-5187",
-      "claimedAt": "2026-11-13T18:20:12.718Z"
+      "claimedAt": "2026-11-13T18:20:12.718Z",
+      "doneAt": "2026-11-13T18:25:32.283Z"
     },
     "f-code-pane-save": {
       "status": "pending"
@@ -292,6 +293,26 @@
     "f-preview-open.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T18:20:09.847Z"
+    },
+    "f-code-pane-shell.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:25:32.283Z"
+    },
+    "f-code-pane-shell.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:25:32.283Z"
+    },
+    "f-code-pane-shell.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:25:32.283Z"
+    },
+    "f-code-pane-shell.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:25:32.283Z"
+    },
+    "f-code-pane-shell.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:25:32.283Z"
     }
   }
 }
