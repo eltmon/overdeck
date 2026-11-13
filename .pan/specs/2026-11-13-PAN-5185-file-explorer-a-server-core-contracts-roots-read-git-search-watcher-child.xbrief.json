@@ -4,17 +4,17 @@
     "created": "2026-11-13T14:46:22Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5185: File explorer A: server core (contracts, roots, read, git, search, watcher child)",
-    "updated": "2026-11-13T14:56:32.185Z"
+    "updated": "2026-11-13T14:57:42.544Z"
   },
   "plan": {
     "id": "pan-5185",
     "title": "File explorer A: server core (contracts, roots, read, git, search, watcher child)",
-    "status": "proposed",
+    "status": "running",
     "uid": "c680c1ca-aab1-413d-a4d9-042c97433a89",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-13T14:46:22Z",
-    "updated": "2026-11-13T14:56:32.185Z",
+    "updated": "2026-11-13T14:57:42.544Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5185",
@@ -1402,5 +1402,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
