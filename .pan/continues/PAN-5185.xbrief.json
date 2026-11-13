@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5185",
   "created": "2026-11-13T14:58:00.032Z",
-  "updated": "2026-11-13T15:27:32.380Z",
+  "updated": "2026-11-13T15:27:39.103Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,6 +202,11 @@
     "watch-ignore.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T15:27:32.379Z"
+    },
+    "watch-child": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5185",
+      "claimedAt": "2026-11-13T15:27:39.102Z"
     }
   }
 }
