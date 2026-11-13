@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5184",
   "created": "2026-11-13T13:50:17.317Z",
-  "updated": "2026-11-13T13:52:05.303Z",
+  "updated": "2026-11-13T13:52:31.963Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "send-queue.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T13:52:05.303Z"
+    },
+    "draft-module": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5184",
+      "claimedAt": "2026-11-13T13:52:31.962Z"
     }
   }
 }
