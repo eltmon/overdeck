@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5187",
   "created": "2026-11-13T16:27:22.124Z",
-  "updated": "2026-11-13T18:14:53.782Z",
+  "updated": "2026-11-13T18:20:09.847Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -274,6 +274,22 @@
     "f-external-change-controller.ac5": {
       "status": "completed",
       "doneAt": "2026-11-13T17:22:57.878Z"
+    },
+    "f-preview-open.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:20:09.847Z"
+    },
+    "f-preview-open.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:20:09.847Z"
+    },
+    "f-preview-open.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:20:09.847Z"
+    },
+    "f-preview-open.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:20:09.847Z"
     }
   }
 }
