@@ -28,7 +28,8 @@ vi.mock('../MonacoCodeEditor', () => ({
   ),
 }))
 
-const { CodePane, CONFLICT_NOTE } = await import('../CodePane')
+const { CodePane } = await import('../CodePane')
+const { CHANGED_TEXT } = await import('../ExternalChangeBanner')
 const { PaneBar } = await import('../../../Stage/PaneBar')
 const { draftKey, useCodeDrafts } = await import('../code-drafts')
 const { clearSelfWrites, isRecentSelfWrite } = await import('../self-write-registry')
@@ -163,7 +164,10 @@ describe('CodePane saving', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000)
     })
-    expect(screen.getByTestId('code-pane-conflict').textContent).toBe(CONFLICT_NOTE)
+    await flush()
+    // The refused save re-reads disk and raises the changed banner.
+    expect(screen.getByTestId('external-change-banner').textContent).toContain(CHANGED_TEXT)
+    expect(screen.getByRole('button', { name: 'Overwrite' })).toBeTruthy()
     expect(useCodeDrafts.getState().drafts[key()]).toMatchObject({ text: 'two\n', baseText: 'one\n' })
   })
 

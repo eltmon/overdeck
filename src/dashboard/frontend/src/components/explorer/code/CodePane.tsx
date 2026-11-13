@@ -16,14 +16,15 @@ import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
 import styles from '../../Stage/stage.module.css'
 import type { PaneWrapperProps } from '../../Stage/types'
 import { explorerErrorCode, explorerErrorMessage, readFile } from '../explorer-rpc'
-import { codePaneLabel } from '../openCodePane'
+import { codePaneLabel, openCodePane } from '../openCodePane'
 import { draftKey, useCodeDrafts } from './code-drafts'
 import { MonacoCodeEditor, type CodeEditorInstance, type CodePosition } from './MonacoCodeEditor'
 import { ChangesView } from './ChangesView'
 import { CodePaneHeader, isMarkdownPath, type CodePaneView } from './CodePaneHeader'
+import { ExternalChangeBanner } from './ExternalChangeBanner'
 import { NonTextFallback } from './NonTextFallback'
 import { useCodePaneSave } from './useCodePaneSave'
-import { useExternalChange } from './useExternalChange'
+import { readDisk, useExternalChange } from './useExternalChange'
 
 type LoadState =
   | { status: 'loading' }
@@ -40,8 +41,6 @@ function Placeholder({ title, hint, testId }: { title: string; hint?: string; te
     </div>
   )
 }
-
-export const CONFLICT_NOTE = 'The file changed on disk. Your edits are not saved.'
 
 export function CodePane({ pane, ctx }: PaneWrapperProps) {
   const rootId = pane.explorerRootId
@@ -66,7 +65,8 @@ function CodePaneForFile({
   const [wordWrap, setWordWrap] = useState<'on' | 'off'>('on')
   const [view, setView] = useState<CodePaneView>('edit')
   const showPreview = view === 'preview' && isMarkdownPath(path)
-  const [changes, setChanges] = useState(false)
+  // The diff in the body: the Changes view (HEAD) or the banner's Compare (disk).
+  const [diff, setDiff] = useState<'head' | 'disk' | null>(null)
   // The cursor carried between the plain editor and the diff's modified side.
   const diffEditor = useRef<CodeEditorInstance | null>(null)
   const carriedPosition = useRef<CodePosition | null>(null)
@@ -117,24 +117,28 @@ function CodePaneForFile({
   // Back from the diff: put the cursor where it was on the modified side.
   useEffect(() => {
     const position = carriedPosition.current
-    if (!editor || changes || !position) return
+    if (!editor || diff || !position) return
     carriedPosition.current = null
     editor.setPosition(position)
     editor.revealPositionInCenter(position)
     editor.focus()
-  }, [editor, changes])
+  }, [editor, diff])
 
   const writable = load.status === 'ready' && load.result.kind === 'text' && load.result.writable
   const preview = pane.explorerPreview === true
   const save = useCodePaneSave({ rootId, path, workspaceId, paneId: pane.paneId, writable, preview })
   const toggleWrap = useCallback(() => setWordWrap((w) => (w === 'on' ? 'off' : 'on')), [])
-  const toggleChanges = useCallback(() => {
-    carriedPosition.current = (changes ? diffEditor.current : editor)?.getPosition() ?? null
-    if (changes) diffEditor.current = null
-    else setEditor(null)
-    setView('edit')
-    setChanges(!changes)
-  }, [changes, editor])
+  const switchDiff = useCallback(
+    (next: 'head' | 'disk' | null) => {
+      carriedPosition.current = (diff ? diffEditor.current : editor)?.getPosition() ?? null
+      if (diff) diffEditor.current = null
+      if (!diff && next) setEditor(null)
+      setView('edit')
+      setDiff(next)
+    },
+    [diff, editor],
+  )
+  const toggleChanges = useCallback(() => switchDiff(diff === 'head' ? null : 'head'), [diff, switchDiff])
   const onDiffMount = useCallback((instance: CodeEditorInstance) => {
     diffEditor.current = instance
   }, [])
@@ -144,7 +148,56 @@ function CodePaneForFile({
   )
   // Ctrl/Cmd+S while focus is anywhere in this pane, e.g. its header (D-C17).
   // The editor's own action handles it while the editor has focus.
-  const { saveNow } = save
+  const { saveNow, conflict, clearConflict, overwrite } = save
+
+  // A save refused with DISK_CONFLICT: show what disk holds now.
+  useEffect(() => {
+    if (!conflict) return
+    let cancelled = false
+    readDisk(rootId, path)
+      .then((read) => {
+        if (cancelled) return
+        setExternal(read.missing ? { kind: 'deleted' } : { kind: 'changed', diskText: read.text, diskSignature: read.signature })
+      })
+      .catch((error: unknown) => {
+        console.warn('[explorer-code] re-read after a refused save failed', error)
+      })
+      .finally(() => {
+        if (!cancelled) clearConflict()
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [conflict, rootId, path, setExternal, clearConflict])
+
+  const externalState = external.state
+  const resolveChange = useCallback(
+    (apply: (diskText: string, diskSignature: string) => void) => {
+      if (externalState.kind !== 'changed') return
+      apply(externalState.diskText, externalState.diskSignature)
+      if (diff === 'disk') switchDiff(null)
+      setExternal({ kind: 'clean' })
+    },
+    [externalState, diff, switchDiff, setExternal],
+  )
+  const onReload = useCallback(
+    () => resolveChange((diskText, signature) => useCodeDrafts.getState().reset(key, diskText, signature)),
+    [resolveChange, key],
+  )
+  const onKeepMine = useCallback(
+    () => resolveChange((diskText, signature) => useCodeDrafts.getState().keepMine(key, diskText, signature)),
+    [resolveChange, key],
+  )
+  const onOverwrite = useCallback(() => resolveChange(() => overwrite()), [resolveChange, overwrite])
+  // Compare closes when the banner clears by itself (e.g. disk went back to the base).
+  useEffect(() => {
+    if (diff === 'disk' && externalState.kind !== 'changed') switchDiff(null)
+  }, [diff, externalState.kind, switchDiff])
+  const onCompare = useCallback(() => switchDiff(diff === 'disk' ? null : 'disk'), [diff, switchDiff])
+  const onOpenRenamed = useCallback(
+    (newPath: string) => openCodePane(workspaceId, { rootId, path: newPath }),
+    [workspaceId, rootId],
+  )
   const onPaneKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
@@ -159,6 +212,8 @@ function CodePaneForFile({
   if (load.status === 'error') return <Placeholder title="Couldn’t open file" hint={load.message} testId="code-pane-error" />
   const { result } = load
   if (result.kind !== 'text') return <NonTextFallback name={codePaneLabel(path)} size={result.size} />
+  // Compare shows the disk text only while the banner reports it.
+  const diskDiff = diff === 'disk' && externalState.kind === 'changed' ? externalState.diskText : undefined
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="code-pane" onKeyDown={onPaneKeyDown}>
@@ -168,27 +223,33 @@ function CodePaneForFile({
         onView={setView}
         wordWrap={wordWrap}
         onToggleWrap={toggleWrap}
-        changes={changes}
+        changes={diff === 'head'}
         onToggleChanges={toggleChanges}
         preview={preview}
         onKeepOpen={keepOpen}
       />
-      {save.conflict ? (
-        <div className="border-b border-border px-3 py-1.5 text-xs text-warning-foreground" role="status" data-testid="code-pane-conflict">
-          {CONFLICT_NOTE}
-        </div>
-      ) : null}
+      <ExternalChangeBanner
+        state={externalState}
+        comparing={diskDiff !== undefined}
+        onCompare={onCompare}
+        onReload={onReload}
+        onKeepMine={onKeepMine}
+        onOverwrite={onOverwrite}
+        onOpen={onOpenRenamed}
+      />
       {!result.writable ? (
         <div className="border-b border-border px-3 py-1.5 text-xs text-muted-foreground" data-testid="code-pane-read-only">
           {READ_ONLY_NOTE}
         </div>
       ) : null}
-      {changes ? (
+      {diff === 'head' || diskDiff !== undefined ? (
         <div className="min-h-0 flex-1" data-testid="code-pane-changes">
           <ChangesView
+            key={diff ?? 'none'}
             rootId={rootId}
             path={path}
             modified={text ?? result.text ?? ''}
+            original={diff === 'disk' ? diskDiff : undefined}
             wordWrap={wordWrap}
             readOnly={!result.writable}
             initialPosition={carriedPosition.current}

@@ -6,6 +6,9 @@
  * the draft: edits there go through the same onChange as the plain editor,
  * and Ctrl/Cmd+S and blur save as they do there. A file that is not in HEAD
  * diffs against empty text.
+ *
+ * With `original` set (the banner's Compare), the left side is that text,
+ * the file's current disk content, and nothing is read.
  */
 import { DiffEditor, type DiffOnMount } from '@monaco-editor/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -19,6 +22,8 @@ export interface ChangesViewProps {
   rootId: string
   path: string
   modified: string
+  /** Diff against this text instead of HEAD. */
+  original?: string
   wordWrap: 'on' | 'off'
   readOnly: boolean
   /** Where the cursor was in the plain editor; restored on the modified side. */
@@ -30,27 +35,30 @@ export interface ChangesViewProps {
 }
 
 export function ChangesView(props: ChangesViewProps) {
-  const { rootId, path, modified, wordWrap, readOnly } = props
+  const { rootId, path, modified, original, wordWrap, readOnly } = props
   const theme = useTheme((s) => s.resolvedTheme)
-  const [head, setHead] = useState<HeadState>({ status: 'loading' })
+  const [fetched, setFetched] = useState<HeadState>({ status: 'loading' })
+  const head: HeadState = original !== undefined ? { status: 'ready', text: original } : fetched
+  const against = original !== undefined ? 'disk' : 'HEAD'
   const latest = useRef(props)
   latest.current = props
 
   useEffect(() => {
+    if (against === 'disk') return
     let cancelled = false
     readFile(rootId, path, 'HEAD')
       .then((result) => {
         if (cancelled) return
-        if (result.kind === 'text') setHead({ status: 'ready', text: result.text ?? '' })
-        else setHead({ status: 'unavailable', message: 'The committed version is too large or binary to compare.' })
+        if (result.kind === 'text') setFetched({ status: 'ready', text: result.text ?? '' })
+        else setFetched({ status: 'unavailable', message: 'The committed version is too large or binary to compare.' })
       })
       .catch((error: unknown) => {
-        if (!cancelled) setHead({ status: 'unavailable', message: explorerErrorMessage(error) })
+        if (!cancelled) setFetched({ status: 'unavailable', message: explorerErrorMessage(error) })
       })
     return () => {
       cancelled = true
     }
-  }, [rootId, path])
+  }, [rootId, path, against])
 
   const handleMount = useCallback<DiffOnMount>((diffEditor, monaco) => {
     const editor = diffEditor.getModifiedEditor()
@@ -90,7 +98,7 @@ export function ChangesView(props: ChangesViewProps) {
       modified={modified}
       language={codeLanguageForPath(path)}
       theme={theme === 'dark' ? 'vs-dark' : 'vs'}
-      originalModelPath={`${modelUri}?ref=HEAD`}
+      originalModelPath={`${modelUri}?ref=${against}`}
       modifiedModelPath={`${modelUri}?diff`}
       loading={<div className="p-4 text-sm text-muted-foreground">Loading changes…</div>}
       options={{
