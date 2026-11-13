@@ -375,6 +375,16 @@ services:
     user: "${UID}:${GID}"
 ```
 
+## Docker or tmux installed, but the dashboard still shows nothing
+
+The dashboard caches whether an optional host tool (Docker, tmux, and a few
+others) is on `PATH`, so installing it after the dashboard started will not
+show up instantly everywhere. It looks again within 60 seconds on its own,
+and immediately after any `PUT /api/settings` save (saving settings from the
+UI, even unrelated settings, is a quick way to force a re-check). To see
+exactly what this machine resolves right now, run `pan doctor` and read its
+"Host tools" row — it names each tool's resolved path or `missing`.
+
 ## Network Issues
 
 ### HTTPS not working
