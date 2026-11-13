@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5187",
   "created": "2026-11-13T16:27:22.124Z",
-  "updated": "2026-11-13T17:20:45.625Z",
+  "updated": "2026-11-13T17:20:46.778Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -246,6 +246,11 @@
     "f-autosave.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T17:20:45.625Z"
+    },
+    "f-external-change-controller": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5187",
+      "claimedAt": "2026-11-13T17:20:46.778Z"
     }
   }
 }
