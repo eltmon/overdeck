@@ -256,11 +256,11 @@ export function hasDashboardAuth(request: HttpServerRequest.HttpServerRequest): 
   return resolveRequestCredential(request) !== null;
 }
 
-function isJsonContentType(headers: HeaderMap): boolean {
+function hasContentType(headers: HeaderMap, expected: string): boolean {
   const contentType = getHeaderFromMap(headers, 'content-type');
   if (!contentType) return false;
   const [mime] = contentType.toLowerCase().split(';');
-  return mime.trim() === 'application/json';
+  return mime.trim() === expected;
 }
 
 function hasTrustedExactOrigin(headers: HeaderMap): boolean {
@@ -274,15 +274,22 @@ function hasValidCsrfToken(headers: HeaderMap): boolean {
   return constantTimeTokenEqual(getHeaderFromMap(headers, DASHBOARD_CSRF_HEADER), dashboardCsrfToken());
 }
 
+/**
+ * `contentType` (default `application/json`) is the one body type the route accepts.
+ * Neither JSON nor `application/octet-stream` is CORS-safelisted, so a cross-site
+ * page cannot send either without a preflight (PAN-5188 D-5).
+ */
 export function rejectUnsafeDashboardMutationRequest(
   request: HttpServerRequest.HttpServerRequest,
+  options: { contentType?: string } = {},
 ): HttpServerResponse.HttpServerResponse | null {
   const authError = rejectUnauthorizedDashboardRequest(request);
   if (authError) return authError;
 
   const headers = request.headers as HeaderMap;
-  if (!isJsonContentType(headers)) {
-    return jsonResponse({ error: 'Content-Type must be application/json' }, { status: 400 });
+  const contentType = options.contentType ?? 'application/json';
+  if (!hasContentType(headers, contentType)) {
+    return jsonResponse({ error: `Content-Type must be ${contentType}` }, { status: 400 });
   }
 
   // Header-borne credentials cannot be sent by a cross-site form, so they skip

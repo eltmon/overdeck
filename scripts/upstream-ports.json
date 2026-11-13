@@ -42,6 +42,162 @@
     "commit": "c6b9ac9549b"
   },
   {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/shared/readBounded.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/readBoundedDocument.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/shared/readBounded.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/readBinaryPreview.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/shared/observeResize.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/lib/observeResize.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/shared/formatSize.ts",
+    "upstream": "t3code",
+    "path": "packages/client-runtime/src/state/attachments.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/font/FontViewer.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/FontViewer.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/large-text/LargeTextViewer.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/LargeTextViewer.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/large-text/VirtualTablePreview.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/VirtualTablePreview.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/large-text/DelimitedTablePreview.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/DelimitedTablePreview.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/large-text/largeText.worker.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/largeText.worker.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/large-text/largeTextProtocol.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/largeTextProtocol.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/large-text/delimitedPreview.ts",
+    "upstream": "t3code",
+    "path": "packages/shared/src/delimitedPreview.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/large-text/__tests__/delimitedPreview.test.ts",
+    "upstream": "t3code",
+    "path": "packages/shared/src/delimitedPreview.test.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/pdf/PdfViewer.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/PdfViewer.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/pdf/pdfDocument.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/pdfDocument.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/pdf/pdfLayout.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/pdfLayout.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/pdf/pdfViewer.css",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/pdfViewer.css",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/pdf/__tests__/pdfLayout.test.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/pdfLayout.test.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/image/imageDecode.worker.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/imageDecode.worker.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/image/decodeImagePreview.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/decodeImagePreview.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/binary/BinaryViewer.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/BinaryViewer.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/binary/binaryPreview.worker.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/binaryPreview.worker.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/binary/binaryPreviewProtocol.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/binaryPreviewProtocol.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/binary/boundedZip.ts",
+    "upstream": "t3code",
+    "path": "packages/client-runtime/src/zip/boundedZip.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/binary/zipDirectory.ts",
+    "upstream": "t3code",
+    "path": "packages/client-runtime/src/zip/zipDirectory.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/binary/entryPreview.ts",
+    "upstream": "t3code",
+    "path": "packages/shared/src/filePreview.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/viewer-router.ts",
+    "upstream": "t3code",
+    "path": "packages/shared/src/filePreview.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
     "local": "src/dashboard/frontend/src/components/explorer/code/save-queue.ts",
     "upstream": "orca",
     "path": "src/renderer/src/components/editor/save/queue/editor-save-queue.ts",
