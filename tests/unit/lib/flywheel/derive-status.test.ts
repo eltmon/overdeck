@@ -116,8 +116,24 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
     expect(status.conversation).toMatchObject({ name: 'conv-flywheel', id: 42, model: 'claude-opus-5-5', sessionAlive: true });
     expect(status.lastTick).toEqual({
       tick: 2, pick: 'PAN-2', phase: 'launch', inFlight: ['PAN-1', 'PAN-2'], needsYou: 'decide the scope', at: '2026-09-23T09:59:30.000Z',
+      needsYouItems: [{ text: 'decide the scope', firstRaisedTick: 2, firstRaisedAt: '2026-09-23T09:59:30.000Z' }],
     });
     expect(status.freshness).toBe('live');
+  });
+
+  it('lastTick carries needs-you items with their first-raised tick (PAN-5198)', async () => {
+    const status = await deriveFlywheelStatus({
+      deps: baseDeps({
+        readTranscript: async () => [
+          marker(1, '2026-09-23T09:00:00.000Z', 'pick=PAN-1 phase=watch in-flight=PAN-1 needs-you=merge PR #7'),
+          marker(2, '2026-09-23T09:30:00.000Z', 'pick=PAN-1 phase=watch in-flight=PAN-1 needs-you=merge PR #7'),
+          marker(3, '2026-09-23T09:59:30.000Z', 'pick=PAN-1 phase=watch in-flight=PAN-1 needs-you=merge PR #7'),
+        ],
+      }),
+    });
+    expect(status.lastTick?.needsYouItems).toEqual([
+      { text: 'merge PR #7', firstRaisedTick: 1, firstRaisedAt: '2026-09-23T09:00:00.000Z' },
+    ]);
   });
 
   it('has lastTick null when the transcript has no marker', async () => {

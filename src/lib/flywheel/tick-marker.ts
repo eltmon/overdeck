@@ -12,7 +12,7 @@
  * so free text may contain spaces and `=`.
  */
 
-import type { TickMarker, TickMarkerPhase } from '@overdeck/contracts';
+import { needsYouItemKey, splitNeedsYouItems, type FlywheelNeedsYouItem, type TickMarker, type TickMarkerPhase } from '@overdeck/contracts';
 
 export type { TickMarker, TickMarkerPhase };
 
@@ -102,4 +102,41 @@ export function findLastTick(
     if (parsed) return { ...parsed, at: message.createdAt, ...(message.id ? { messageId: message.id } : {}) };
   }
   return null;
+}
+
+/**
+ * The newest tick's needs-you items, each with the oldest tick message of its
+ * current unbroken run (PAN-5198). Walks tick messages newest first, using the
+ * same assistant-only rule as `findLastTick`, and stops once every item's run
+ * has ended. A run that reaches the oldest tick in `messages` ends there.
+ */
+export function resolveNeedsYouItems(messages: readonly TickMarkerMessage[]): FlywheelNeedsYouItem[] {
+  type Seen = { tick: number; at: string; messageId?: string };
+  let items: Array<{ text: string; key: string; first: Seen }> | null = null;
+  const open = new Set<string>();
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (!message || message.role !== 'assistant' || !message.text.includes(TICK_MARKER_PREFIX)) continue;
+    const parsed = parseTickMarker(message.text);
+    if (!parsed) continue;
+    const here: Seen = { tick: parsed.tick, at: message.createdAt, ...(message.id ? { messageId: message.id } : {}) };
+    if (items === null) {
+      items = splitNeedsYouItems(parsed.needsYou).map((text) => ({ text, key: needsYouItemKey(text), first: here }));
+      for (const item of items) open.add(item.key);
+    } else {
+      const keys = new Set(splitNeedsYouItems(parsed.needsYou).map(needsYouItemKey));
+      for (const item of items) {
+        if (!open.has(item.key)) continue;
+        if (keys.has(item.key)) item.first = here;
+        else open.delete(item.key);
+      }
+    }
+    if (open.size === 0) break;
+  }
+  return (items ?? []).map(({ text, first }) => ({
+    text,
+    firstRaisedTick: first.tick,
+    firstRaisedAt: first.at,
+    ...(first.messageId ? { firstRaisedMessageId: first.messageId } : {}),
+  }));
 }

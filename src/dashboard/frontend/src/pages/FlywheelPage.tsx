@@ -71,14 +71,14 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
     refetchInterval: 5_000,
   });
 
-  const handleNeedsYouClick = useCallback(() => {
+  const handleNeedsYouClick = useCallback((messageId?: string) => {
     const ui = useAskUserQuestionUiStore.getState();
     const action = resolveNeedsYouAction(pendingInputQuery.data, ui.answeredToolUseIds);
     if (action.kind === 'reopen-question') {
       ui.requestReopen(FLYWHEEL_CONVERSATION_NAME);
       return;
     }
-    setTickJump((prev) => ({ messageId: status?.lastTick?.messageId, nonce: (prev?.nonce ?? 0) + 1 }));
+    setTickJump((prev) => ({ messageId: messageId ?? status?.lastTick?.messageId, nonce: (prev?.nonce ?? 0) + 1 }));
   }, [pendingInputQuery.data, status?.lastTick?.messageId]);
 
   const handleTickTargetHandled = useCallback(() => {

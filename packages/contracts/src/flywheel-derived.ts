@@ -57,6 +57,41 @@ export const FlywheelConversationSummary = Schema.Struct({
 })
 export type FlywheelConversationSummary = typeof FlywheelConversationSummary.Type
 
+/**
+ * One `;`-separated item of the newest tick's needs-you line (PAN-5198), with
+ * the oldest tick of the item's current unbroken run: the message that raised
+ * it, which is where the loop explained it.
+ */
+export const FlywheelNeedsYouItem = Schema.Struct({
+  text: Schema.String,
+  firstRaisedTick: Schema.Number,
+  /** The first-raised tick message's `createdAt`. */
+  firstRaisedAt: Schema.String,
+  /** The first-raised tick message's id, when the harness records one. */
+  firstRaisedMessageId: Schema.optional(Schema.String),
+})
+export type FlywheelNeedsYouItem = typeof FlywheelNeedsYouItem.Type
+
+/** Two items are the same item when their keys match. */
+export function needsYouItemKey(text: string): string {
+  return text.trim().toLowerCase()
+}
+
+/** Split a needs-you line on `;`: trimmed, empty pieces dropped, one per key. */
+export function splitNeedsYouItems(needsYou: string | null | undefined): string[] {
+  if (!needsYou) return []
+  const seen = new Set<string>()
+  const items: string[] = []
+  for (const piece of needsYou.split(";")) {
+    const text = piece.trim()
+    const key = needsYouItemKey(text)
+    if (!text || seen.has(key)) continue
+    seen.add(key)
+    items.push(text)
+  }
+  return items
+}
+
 export const FlywheelLastTick = Schema.Struct({
   tick: Schema.Number,
   pick: Schema.NullOr(Schema.String),
@@ -67,6 +102,8 @@ export const FlywheelLastTick = Schema.Struct({
   at: Schema.String,
   /** The assistant message's id, when the harness records one. */
   messageId: Schema.optional(Schema.String),
+  /** The needs-you line split into items, each with its first-raised tick (PAN-5198). */
+  needsYouItems: Schema.optional(Schema.Array(FlywheelNeedsYouItem)),
 })
 export type FlywheelLastTick = typeof FlywheelLastTick.Type
 

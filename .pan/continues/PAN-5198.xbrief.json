@@ -1,0 +1,155 @@
+{
+  "version": "1",
+  "issueId": "PAN-5198",
+  "created": "2026-11-13T19:57:57.248Z",
+  "updated": "2026-11-13T20:38:47.754Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "contracts-needs-you-item": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5198",
+      "claimedAt": "2026-11-13T19:57:57.248Z",
+      "doneAt": "2026-11-13T20:06:35.640Z"
+    },
+    "contracts-needs-you-item.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:06:35.640Z"
+    },
+    "contracts-needs-you-item.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:06:35.640Z"
+    },
+    "contracts-needs-you-item.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:06:35.640Z"
+    },
+    "server-first-raised": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5198",
+      "claimedAt": "2026-11-13T20:06:43.760Z",
+      "doneAt": "2026-11-13T20:13:07.432Z"
+    },
+    "server-first-raised.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:13:07.432Z"
+    },
+    "server-first-raised.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:13:07.432Z"
+    },
+    "server-first-raised.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:13:07.432Z"
+    },
+    "server-first-raised.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:13:07.432Z"
+    },
+    "server-first-raised.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:13:07.432Z"
+    },
+    "needs-you-link-tokenizer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5198",
+      "claimedAt": "2026-11-13T20:13:27.462Z",
+      "doneAt": "2026-11-13T20:25:59.428Z"
+    },
+    "needs-you-link-tokenizer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:25:59.428Z"
+    },
+    "needs-you-link-tokenizer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:25:59.428Z"
+    },
+    "needs-you-link-tokenizer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:25:59.428Z"
+    },
+    "needs-you-link-tokenizer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:25:59.428Z"
+    },
+    "status-pane-rows": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5198",
+      "claimedAt": "2026-11-13T20:26:08.303Z",
+      "doneAt": "2026-11-13T20:32:05.604Z"
+    },
+    "status-pane-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:32:05.604Z"
+    },
+    "status-pane-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:32:05.604Z"
+    },
+    "status-pane-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:32:05.604Z"
+    },
+    "status-pane-rows.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:32:05.604Z"
+    },
+    "page-row-jump": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5198",
+      "claimedAt": "2026-11-13T20:32:20.481Z",
+      "doneAt": "2026-11-13T20:36:03.671Z"
+    },
+    "page-row-jump.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:36:03.671Z"
+    },
+    "page-row-jump.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:36:03.671Z"
+    },
+    "page-row-jump.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:36:03.671Z"
+    },
+    "skill-needs-you-contract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5198",
+      "claimedAt": "2026-11-13T20:36:12.120Z",
+      "doneAt": "2026-11-13T20:37:22.630Z"
+    },
+    "skill-needs-you-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:37:22.630Z"
+    },
+    "skill-needs-you-contract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:37:22.630Z"
+    },
+    "skill-needs-you-contract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:37:22.630Z"
+    },
+    "docs-flywheel-needs-you": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5198",
+      "claimedAt": "2026-11-13T20:37:29.619Z",
+      "doneAt": "2026-11-13T20:38:47.753Z"
+    },
+    "docs-flywheel-needs-you.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:38:47.753Z"
+    },
+    "docs-flywheel-needs-you.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:38:47.753Z"
+    },
+    "docs-flywheel-needs-you.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:38:47.753Z"
+    }
+  }
+}

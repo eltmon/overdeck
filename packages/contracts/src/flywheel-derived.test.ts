@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
-import { FlywheelDerivedStatus, TickMarker, decodeFlywheelDerivedStatus } from "./flywheel-derived"
+import {
+  FlywheelDerivedStatus,
+  TickMarker,
+  decodeFlywheelDerivedStatus,
+  needsYouItemKey,
+  splitNeedsYouItems,
+} from "./flywheel-derived"
 
 const running = {
   run: "running",
@@ -77,5 +83,37 @@ describe("FlywheelDerivedStatus (PAN-3964 FR-1)", () => {
 
   it("exports the schema", () => {
     expect(FlywheelDerivedStatus).toBeDefined()
+  })
+})
+
+describe("splitNeedsYouItems (PAN-5198)", () => {
+  it("splits on ';', trims, and drops empty pieces", () => {
+    expect(splitNeedsYouItems("a; b ;; c")).toEqual(["a", "b", "c"])
+  })
+
+  it("returns [] for null, undefined and ''", () => {
+    expect(splitNeedsYouItems(null)).toEqual([])
+    expect(splitNeedsYouItems(undefined)).toEqual([])
+    expect(splitNeedsYouItems("")).toEqual([])
+  })
+
+  it("collapses duplicates by key to the first spelling", () => {
+    expect(splitNeedsYouItems("Merge PR #7; merge pr #7 ")).toEqual(["Merge PR #7"])
+  })
+
+  it("needsYouItemKey trims and lower-cases", () => {
+    expect(needsYouItemKey("  PR #7 Merge ")).toBe("pr #7 merge")
+  })
+
+  it("decodeFlywheelDerivedStatus accepts a status with and without needsYouItems", () => {
+    const withItems = {
+      ...running,
+      lastTick: {
+        ...running.lastTick,
+        needsYouItems: [{ text: "merge PR #7", firstRaisedTick: 2, firstRaisedAt: "2026-09-23T09:00:00.000Z" }],
+      },
+    }
+    expect(() => decodeFlywheelDerivedStatus(withItems)).not.toThrow()
+    expect(() => decodeFlywheelDerivedStatus(running)).not.toThrow()
   })
 })
