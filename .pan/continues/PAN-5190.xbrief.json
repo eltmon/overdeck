@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5190",
   "created": "2026-11-13T20:35:48.124Z",
-  "updated": "2026-11-13T20:59:30.379Z",
+  "updated": "2026-11-13T20:59:41.002Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -180,6 +180,11 @@
     "duplicate-delete-ui.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T20:59:30.379Z"
+    },
+    "tree-action-keys": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5190",
+      "claimedAt": "2026-11-13T20:59:41.002Z"
     }
   }
 }
