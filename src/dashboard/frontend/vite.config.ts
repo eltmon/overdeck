@@ -1,7 +1,10 @@
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import path from 'node:path';
 
 import { defineConfig, type Plugin, type ViteDevServer } from 'vite';
 import react from '@vitejs/plugin-react';
+import pdfjsPkg from 'pdfjs-dist/package.json' with { type: 'json' };
 
 // "In container" and "behind Traefik" are two different things and must NOT be
 // conflated (PAN-1153). Traefik routinely fronts the dev server while Vite runs
@@ -55,13 +58,21 @@ function panDevFullReloadOnSignal(): Plugin {
   };
 }
 
+// PAN-5188: the PDF viewer globs pdf.js fonts, cmaps and wasm through this
+// alias. bun links packages from a store under the repo root, so a path
+// relative to node_modules would match nothing; the alias is the real folder.
+const pdfjsAssetsAlias = {
+  find: 'pdfjs-dist-assets',
+  replacement: path.dirname(realpathSync(createRequire(import.meta.url).resolve('pdfjs-dist/package.json'))),
+};
+
 // PAN-4560: `vite build --mode profile` aliases react-dom to its profiling
 // build, so React records per-fiber render timings in production mode. The
 // output goes to the gitignored .tmp/dashboard-profile; it must never
 // overwrite the normal dist/dashboard/public.
 const profileOverrides = {
   resolve: {
-    alias: [{ find: /^react-dom$/, replacement: 'react-dom/profiling' }],
+    alias: [{ find: /^react-dom$/, replacement: 'react-dom/profiling' }, pdfjsAssetsAlias],
   },
   build: {
     outDir: '../../../.tmp/dashboard-profile',
@@ -73,6 +84,9 @@ const profileOverrides = {
 
 export default defineConfig(({ mode }) => ({
   plugins: [react(), panDevFullReloadOnSignal()],
+  resolve: {
+    alias: [pdfjsAssetsAlias],
+  },
   server: {
     port: 3010,
     host: '0.0.0.0',
@@ -96,6 +110,18 @@ export default defineConfig(({ mode }) => ({
     outDir: '../../../dist/dashboard/public',
     emptyOutDir: true,
     sourcemap: 'hidden',
+    rolldownOptions: {
+      output: {
+        // PDF.js resolves its decoder modules relative to wasmUrl, so its wasm
+        // assets keep stable names in one folder (t3code vite.config.ts, PAN-5188).
+        assetFileNames: (asset) =>
+          asset.originalFileNames.some((p) => /[/\\]pdfjs-dist[/\\]wasm[/\\]/.test(p))
+            ? `assets/pdfjs-${pdfjsPkg.version}/[name][extname]`
+            : 'assets/[name]-[hash][extname]',
+      },
+    },
   },
+  // Workers build as ES modules so they can code-split dynamic imports (sql.js, tiff; PAN-5188 D-8).
+  worker: { format: 'es' },
   ...(mode === 'profile' ? profileOverrides : {}),
 }));
