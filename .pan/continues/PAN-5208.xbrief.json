@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5208",
   "created": "2026-11-13T21:57:26.421Z",
-  "updated": "2026-11-13T22:35:02.311Z",
+  "updated": "2026-11-13T22:54:32.861Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-13T22:54Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-13T22:54:32.861Z"
+    }
+  ],
   "items": {
     "baseline-screens": {
       "status": "completed",
@@ -381,5 +387,14 @@
       "status": "completed",
       "doneAt": "2026-11-13T22:35:02.310Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-13T22:54:32Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5208 (PR #5213)\n\nCodeRabbit posted 2 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4569594115 · src/dashboard/frontend/src/components/mobile/MobileChrome.tsx:113 [Minor]: Move focus into Settings on open. Keep focus inside it. Restore focus on close.\n  https://github.com/eltmon/overdeck/pull/5213#discussion_r4569594115\n- Thread 4569594121 · src/dashboard/frontend/src/lib/appearance.ts:60 [Minor]: Keep the selected appearance when storage writes fail.\n  https://github.com/eltmon/overdeck/pull/5213#discussion_r4569594121\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5213/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5208`.\n   If you only replied, you are done.\n5. If PR #5213 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
 }
