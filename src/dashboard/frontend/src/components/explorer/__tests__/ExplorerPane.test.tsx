@@ -163,6 +163,27 @@ describe('ExplorerPane', () => {
     expect(screen.getByRole('button', { name: 'Changed' })).toHaveAttribute('title', 'Not a git repository')
   })
 
+  it('opens quick open on Ctrl+P and content search on Ctrl+Shift+F', async () => {
+    renderPane()
+    await screen.findByText('README.md')
+    const tree = screen.getByRole('tree')
+    fireEvent.keyDown(tree, { key: 'p', ctrlKey: true })
+    expect(screen.getByRole('dialog', { name: 'Quick open' })).toBeInTheDocument()
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Quick open' })).toBeNull()
+    fireEvent.keyDown(tree, { key: 'F', ctrlKey: true, shiftKey: true })
+    expect(screen.getByRole('textbox', { name: 'Search in files' })).toBeInTheDocument()
+    expect(screen.getByRole('tree')).toBeInTheDocument()
+  })
+
+  it('opens content search scoped to a folder from Find in folder', async () => {
+    renderPane()
+    fireEvent.contextMenu(await screen.findByText('src'))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Find in folder' }))
+    expect(screen.getByRole('textbox', { name: 'Search in files' })).toBeInTheDocument()
+    expect(screen.getByText('src/')).toBeInTheDocument()
+  })
+
   it('removes a persisted expanded folder that is gone', async () => {
     localStorage.setItem('overdeck.explorer.issue:PAN-1', JSON.stringify({ expanded: ['old'], showDotfiles: true }))
     rpc.listDir.mockImplementation(async (_root: string, path: string) => {

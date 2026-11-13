@@ -17,6 +17,9 @@ import { useExplorerStore, type RootState, type SelectMode } from './explorerSto
 import { useExplorerGitStatus } from './git/useExplorerGitStatus'
 import { ExplorerContextMenu, type ExplorerMenuTarget } from './menu/ExplorerContextMenu'
 import { openCodePane } from './openCodePane'
+import { ContentSearch, type ContentSearchTarget } from './search/ContentSearch'
+import { QuickOpen } from './search/QuickOpen'
+import { useExplorerShortcuts } from './search/useExplorerShortcuts'
 import { createDirectoryLoader, expandAll, type DirectoryLoader } from './tree/directory-loader'
 import { ExplorerTree } from './tree/ExplorerTree'
 import {
@@ -89,6 +92,9 @@ function ExplorerPaneBody({ rootId, deckKey }: { rootId: string; deckKey: string
   const loaderRef = useRef<DirectoryLoader | null>(null)
   const git = useExplorerGitStatus(rootId)
   const [expanding, setExpanding] = useState(false)
+  const [quickOpen, setQuickOpen] = useState(false)
+  // null = closed; otherwise the folder scope ('' = the whole root).
+  const [contentSearchScope, setContentSearchScope] = useState<string | null>(null)
 
   // Create the loader, list the root, and re-list every persisted expanded
   // folder whose ancestors are open (a remount refreshes stale listings).
@@ -180,6 +186,14 @@ function ExplorerPaneBody({ rootId, deckKey }: { rootId: string; deckKey: string
 
   // D-B2 seam: PAN-5187 changes this to open preview tabs.
   const openFileFromTree = useCallback((path: string) => openCodePane(deckKey, { rootId, path }), [deckKey, rootId])
+
+  const onQuickOpen = useCallback(() => setQuickOpen(true), [])
+  const onContentSearch = useCallback(() => setContentSearchScope(''), [])
+  const onKeyDown = useExplorerShortcuts({ onQuickOpen, onContentSearch })
+  const onPickMatch = useCallback(
+    (target: ContentSearchTarget) => openCodePane(deckKey, { rootId, ...target }),
+    [deckKey, rootId],
+  )
 
   const onToggle = useCallback(
     (path: string) => {
@@ -282,7 +296,7 @@ function ExplorerPaneBody({ rootId, deckKey }: { rootId: string; deckKey: string
         targets={targets}
         decorations={git.decorations}
         onOpen={openFileFromTree}
-        onFindInFolder={() => {}}
+        onFindInFolder={(dirPath) => setContentSearchScope(dirPath)}
         onGitChanged={git.refresh}
       >
         <ExplorerTree
@@ -304,7 +318,7 @@ function ExplorerPaneBody({ rootId, deckKey }: { rootId: string; deckKey: string
   const branch = git.result?.branch
 
   return (
-    <div className="flex h-full min-h-0 flex-col" data-testid="explorer-pane">
+    <div className="flex h-full min-h-0 flex-col" data-testid="explorer-pane" onKeyDown={onKeyDown}>
       <div className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-xs">
         <span className="truncate font-mono text-foreground">{rootLabel(rootId)}</span>
         {branch && <span className="min-w-0 truncate font-mono text-muted-foreground">{branch}</span>}
@@ -343,7 +357,22 @@ function ExplorerPaneBody({ rootId, deckKey }: { rootId: string; deckKey: string
         <div className="border-b border-border px-3 py-1 text-[11px] text-muted-foreground">Git status shows the first 20,000 changes.</div>
       )}
       {/* PAN-5191 edit-workspace banner slot */}
-      {body}
+      {contentSearchScope === null ? (
+        body
+      ) : (
+        <>
+          {/* The tree keeps the upper half; search takes the lower half. */}
+          <div className="flex min-h-0 flex-1 flex-col">{body}</div>
+          <ContentSearch
+            rootId={rootId}
+            scopePath={contentSearchScope || undefined}
+            onScopeClear={() => setContentSearchScope('')}
+            onClose={() => setContentSearchScope(null)}
+            onPick={onPickMatch}
+          />
+        </>
+      )}
+      <QuickOpen rootId={rootId} open={quickOpen} onClose={() => setQuickOpen(false)} onPick={openFileFromTree} />
     </div>
   )
 }
