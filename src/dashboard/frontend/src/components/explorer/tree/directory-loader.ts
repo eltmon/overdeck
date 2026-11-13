@@ -27,6 +27,12 @@ export interface DirectoryLoader {
   reload(paths: Iterable<string>): void
   /** Forget that `path` was loaded, so the next ensure() lists it again. */
   forget(path: string): void
+  /**
+   * List `path` through the same bounded queue (Expand all uses this, so it
+   * shares the cap and never lists a folder twice at once). Resolves with the
+   * next listing of `path`; rejects on error or after dispose().
+   */
+  load(path: string): Promise<ExplorerListDirResult>
   /** Drop every later result. */
   dispose(): void
 }
@@ -39,6 +45,17 @@ export function createDirectoryLoader(deps: DirectoryLoaderDeps): DirectoryLoade
   const queue: string[] = []
   let running = 0
   let disposed = false
+  const waiters = new Map<string, Array<{ resolve(r: ExplorerListDirResult): void; reject(e: unknown): void }>>()
+
+  const settleWaiters = (path: string, outcome: { result: ExplorerListDirResult } | { error: unknown }): void => {
+    const list = waiters.get(path)
+    if (!list) return
+    waiters.delete(path)
+    for (const w of list) {
+      if ('result' in outcome) w.resolve(outcome.result)
+      else w.reject(outcome.error)
+    }
+  }
 
   const pump = (): void => {
     while (!disposed && running < maxConcurrent && queue.length > 0) {
@@ -57,11 +74,13 @@ export function createDirectoryLoader(deps: DirectoryLoaderDeps): DirectoryLoade
           if (disposed) return
           loaded.add(path)
           deps.onResult(path, result)
+          settleWaiters(path, { result })
         },
         (error: unknown) => {
           if (disposed) return
           loaded.delete(path)
           deps.onError(path, explorerErrorCode(error), explorerErrorMessage(error))
+          settleWaiters(path, { error })
         },
       )
       .finally(() => {
@@ -100,10 +119,21 @@ export function createDirectoryLoader(deps: DirectoryLoaderDeps): DirectoryLoade
     forget(path) {
       loaded.delete(path)
     },
+    load(path) {
+      if (disposed) return Promise.reject(new Error('Directory loader disposed'))
+      return new Promise<ExplorerListDirResult>((resolve, reject) => {
+        const list = waiters.get(path) ?? []
+        list.push({ resolve, reject })
+        waiters.set(path, list)
+        enqueue(path)
+        pump()
+      })
+    },
     dispose() {
       disposed = true
       queue.length = 0
       rerun.clear()
+      for (const path of [...waiters.keys()]) settleWaiters(path, { error: new Error('Directory loader disposed') })
     },
   }
 }

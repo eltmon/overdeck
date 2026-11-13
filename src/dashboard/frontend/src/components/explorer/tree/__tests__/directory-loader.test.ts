@@ -99,6 +99,37 @@ function dirEntry(path: string, ignored = false): ExplorerEntry {
   return { name: path.split('/').pop() ?? path, path, kind: 'dir', mtimeMs: 0, ignored }
 }
 
+describe('createDirectoryLoader.load', () => {
+  it('shares the four-call cap with ensure', async () => {
+    const h = harness()
+    for (const p of ['a', 'b', 'c', 'd']) h.loader.ensure(p)
+    const pending = h.loader.load('e')
+    expect(h.listDir).toHaveBeenCalledTimes(4)
+    h.calls[0].resolve(result())
+    await flush()
+    expect(h.calls[4].path).toBe('e')
+    h.calls[4].resolve(result('/e'))
+    await expect(pending).resolves.toEqual(result('/e'))
+    expect(h.onResult).toHaveBeenCalledWith('e', result('/e'))
+  })
+
+  it('joins a listing already in flight instead of starting another', async () => {
+    const h = harness()
+    h.loader.ensure('src')
+    const pending = h.loader.load('src')
+    expect(h.listDir).toHaveBeenCalledTimes(1)
+    h.calls[0].resolve(result('/src'))
+    await expect(pending).resolves.toEqual(result('/src'))
+  })
+
+  it('rejects pending loads on dispose', async () => {
+    const h = harness()
+    const pending = h.loader.load('src')
+    h.loader.dispose()
+    await expect(pending).rejects.toThrow('disposed')
+  })
+})
+
 describe('expandAll', () => {
   it('walks breadth-first and skips ignored folders', async () => {
     const tree: Record<string, ExplorerEntry[]> = {

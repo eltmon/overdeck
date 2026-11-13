@@ -11,12 +11,13 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { ChevronsDownUp, ChevronsUpDown, Eye, EyeOff, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 
+import { useStageDeck } from '../Stage/StageDeckContext'
 import type { PaneWrapperProps } from '../Stage/types'
 import { explorerErrorMessage, listDir, parseRootId, rootLabel } from './explorer-rpc'
 import { useExplorerStore, type RootState, type SelectMode } from './explorerStore'
 import { useExplorerGitStatus } from './git/useExplorerGitStatus'
 import { ExplorerContextMenu, type ExplorerMenuTarget } from './menu/ExplorerContextMenu'
-import { openCodePane } from './openCodePane'
+import { openCodePane, type CodePaneTarget } from './openCodePane'
 import { ContentSearch, type ContentSearchTarget } from './search/ContentSearch'
 import { QuickOpen } from './search/QuickOpen'
 import { useExplorerShortcuts } from './search/useExplorerShortcuts'
@@ -82,15 +83,16 @@ export function ExplorerPane({ pane, ctx }: PaneWrapperProps) {
       </div>
     )
   }
-  return <ExplorerPaneBody key={rootId} rootId={rootId} deckKey={ctx.workspaceId} />
+  return <ExplorerPaneBody key={rootId} rootId={rootId} deckKey={ctx.workspaceId} paneId={pane.paneId} />
 }
 
-function ExplorerPaneBody({ rootId, deckKey }: { rootId: string; deckKey: string }) {
+function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey: string; paneId: string }) {
   const parsed = parseRootId(rootId)
   const rootKind = parsed?.kind ?? 'workspace'
   const root: RootState | undefined = useExplorerStore((s) => s.roots[rootId])
   const loaderRef = useRef<DirectoryLoader | null>(null)
   const git = useExplorerGitStatus(rootId)
+  const deck = useStageDeck()
   const [expanding, setExpanding] = useState(false)
   const [quickOpen, setQuickOpen] = useState(false)
   // null = closed; otherwise the folder scope ('' = the whole root).
@@ -196,16 +198,22 @@ function ExplorerPaneBody({ rootId, deckKey }: { rootId: string; deckKey: string
   const visibleOrder = useMemo(() => treeRows.map((r) => r.path), [treeRows])
   const rowByPath = useMemo(() => new Map(treeRows.map((r) => [r.path, r])), [treeRows])
 
+  // Open a file and, while the deck is split, put it in a region beside this
+  // explorer rather than only activating its tab.
+  const openFile = useCallback(
+    (target: CodePaneTarget) => {
+      const id = openCodePane(deckKey, target)
+      deck?.revealPane?.(id, paneId)
+    },
+    [deck, deckKey, paneId],
+  )
   // D-B2 seam: PAN-5187 changes this to open preview tabs.
-  const openFileFromTree = useCallback((path: string) => openCodePane(deckKey, { rootId, path }), [deckKey, rootId])
+  const openFileFromTree = useCallback((path: string) => openFile({ rootId, path }), [openFile, rootId])
 
   const onQuickOpen = useCallback(() => setQuickOpen(true), [])
   const onContentSearch = useCallback(() => setContentSearchScope(''), [])
   const onKeyDown = useExplorerShortcuts({ onQuickOpen, onContentSearch })
-  const onPickMatch = useCallback(
-    (target: ContentSearchTarget) => openCodePane(deckKey, { rootId, ...target }),
-    [deckKey, rootId],
-  )
+  const onPickMatch = useCallback((target: ContentSearchTarget) => openFile({ rootId, ...target }), [openFile, rootId])
 
   const onToggle = useCallback(
     (path: string) => {
@@ -245,6 +253,10 @@ function ExplorerPaneBody({ rootId, deckKey }: { rootId: string; deckKey: string
   }
 
   const onExpandAll = async () => {
+    // The run belongs to this mount's loader: listings share its 4-call queue
+    // and its writes, and after an unmount (dispose) nothing more is written.
+    const loader = loaderRef.current
+    if (!loader) return
     setExpanding(true)
     try {
       const result = await expandAll({
@@ -254,22 +266,16 @@ function ExplorerPaneBody({ rootId, deckKey }: { rootId: string; deckKey: string
         load: async (path) => {
           const existing = useExplorerStore.getState().roots[rootId]?.dirs[path]
           if (existing?.status === 'ready') return existing.entries
-          const listing = await listDir(rootId, path)
-          useExplorerStore.getState().setDir(rootId, path, {
-            status: 'ready',
-            entries: listing.entries,
-            truncated: listing.truncated,
-            absPath: listing.absPath,
-          })
-          return listing.entries
+          return (await loader.load(path)).entries
         },
       })
+      if (loaderRef.current !== loader) return
       useExplorerStore.getState().setExpandedMany(rootId, result.expanded)
       if (result.capped) toast('Expanded the first 2,000 folders.')
     } catch (e) {
-      toast.error(`Couldn't expand all: ${explorerErrorMessage(e)}`)
+      if (loaderRef.current === loader) toast.error(`Couldn't expand all: ${explorerErrorMessage(e)}`)
     } finally {
-      setExpanding(false)
+      if (loaderRef.current === loader) setExpanding(false)
     }
   }
 
