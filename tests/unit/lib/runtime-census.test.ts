@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // PAN-4739: the default census reads tmux and ps through child_process. tmux
 // without a UTF-8 locale (Fly's pan serve) prints -F tabs as '_'; this fake
@@ -21,14 +21,18 @@ vi.mock('../../../src/lib/config-yaml.js', async (importOriginal) => {
   return { ...actual, loadConfigSync: () => ({ config: { tmux: { configMode: 'inherit-user' } } }) };
 });
 
+import { execFile as mockedExecFile } from 'child_process';
+
 import {
   createRuntimeCensusService,
   descendantPidsForSession,
+  listHostTmuxPanes,
   panePidsForSession,
   parseRuntimeProcessTable,
   refreshRuntimeCensus,
   runtimeCensusHasHarnessProcess,
 } from '../../../src/lib/runtime-census.js';
+import { resetHostToolsForTests, setHostToolFinderForTests } from '../../../src/lib/host-tools.js';
 import { parseTmuxPaneRecords } from '../../../src/lib/tmux.js';
 
 const pane = (sessionName: string, panePid: number) => ({
@@ -45,6 +49,11 @@ const process = (pid: number, ppid: number, comm: string) => ({
   rssBytes: 1024,
   comm,
   command: comm,
+});
+
+afterEach(() => {
+  resetHostToolsForTests();
+  (mockedExecFile as unknown as ReturnType<typeof vi.fn>).mockClear();
 });
 
 describe('runtime census', () => {
@@ -132,5 +141,27 @@ describe('runtime census', () => {
     expect(census.available).toBe(true);
     expect(census.sessionNames.has('conv-20261102-2889')).toBe(true);
     expect(runtimeCensusHasHarnessProcess(census, 'conv-20261102-2889')).toBe(true);
+  });
+
+  it('listHostTmuxPanes rejects with ENOENT and calls execFile 0 times when tmux is missing (PAN-5168)', async () => {
+    setHostToolFinderForTests(() => null);
+
+    await expect(listHostTmuxPanes()).rejects.toMatchObject({ code: 'ENOENT' });
+
+    const tmuxCalls = (mockedExecFile as unknown as ReturnType<typeof vi.fn>).mock.calls
+      .filter(([cmd]) => cmd === 'tmux');
+    expect(tmuxCalls).toHaveLength(0);
+  });
+
+  it('reports tmuxAvailable false when tmux is missing (PAN-5168)', async () => {
+    setHostToolFinderForTests(() => null);
+
+    const service = createRuntimeCensusService({
+      listPanes: listHostTmuxPanes,
+      readProcesses: async () => [],
+    });
+    const census = await service.get();
+
+    expect(census.tmuxAvailable).toBe(false);
   });
 });
