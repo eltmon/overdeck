@@ -1,14 +1,28 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 import { APPEARANCE_KEY } from '../../../lib/appearance';
-import { MobileSettingsSheet, useInstallPrompt } from '../MobileChrome';
+import { PUSH_STATUS_QUERY_KEY, type PushStatus } from '../../push/pushApi';
+import { HINTS_DISMISSED_KEY, MobileHintsBanner, MobileSettingsSheet, useInstallPrompt } from '../MobileChrome';
 
-function renderWithQuery(ui: ReactNode) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderWithQuery(ui: ReactNode, client = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
+
+function subscribedStatus(thisDevice: boolean): PushStatus {
+  return {
+    enabled: true,
+    events: [],
+    includePreview: false,
+    webpush: {
+      subscriptions: [{ id: 's1', label: 'iPhone', host: 'desk', createdAt: '2026-11-01T00:00:00.000Z', lastSuccessAt: null, failureCount: 0, thisDevice }],
+    },
+    ntfy: { state: 'off' },
+    native: { phones: 0, directoryOnline: false },
+    stats: { sent: 0, dropped: 0, rateLimited: 0, lastError: null },
+  };
 }
 
 /** Mirrors MobileApp: the prompt hook lives from the first render, the sheet opens later. */
@@ -90,5 +104,55 @@ describe('MobileSettingsSheet (PAN-5208)', () => {
   it('says Installed when running as a Home Screen app', () => {
     renderWithQuery(<MobileSettingsSheet open onClose={() => {}} prompt={{ ...STATIC_PROMPT, standalone: true }} />);
     expect(screen.getByText('Installed')).toBeInTheDocument();
+  });
+});
+
+describe('MobileHintsBanner (PAN-5208)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('shows by default with the install control', () => {
+    const prompt = { ...STATIC_PROMPT, installEvent: Object.assign(new Event('beforeinstallprompt'), { prompt: vi.fn(async () => {}) }) };
+    renderWithQuery(<MobileHintsBanner prompt={prompt} />);
+    const region = screen.getByRole('region', { name: 'Setup hints' });
+    expect(within(region).getByRole('button', { name: 'Install app' })).toBeInTheDocument();
+  });
+
+  it('ac2: Dismiss removes it and remembers; a stored dismissal renders nothing', () => {
+    const first = renderWithQuery(<MobileHintsBanner prompt={STATIC_PROMPT} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss', exact: true }));
+    expect(screen.queryByRole('region', { name: 'Setup hints' })).not.toBeInTheDocument();
+    expect(localStorage.getItem(HINTS_DISMISSED_KEY)).toBe('1');
+    first.unmount();
+
+    renderWithQuery(<MobileHintsBanner prompt={STATIC_PROMPT} />);
+    expect(screen.queryByRole('region', { name: 'Setup hints' })).not.toBeInTheDocument();
+  });
+
+  it('ac3: hides on a Home Screen app that already has push on this device', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(PUSH_STATUS_QUERY_KEY, subscribedStatus(true));
+    renderWithQuery(<MobileHintsBanner prompt={{ ...STATIC_PROMPT, standalone: true }} />, client);
+    expect(screen.queryByRole('region', { name: 'Setup hints' })).not.toBeInTheDocument();
+  });
+
+  it('still shows on a Home Screen app whose push is on another device only', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(PUSH_STATUS_QUERY_KEY, subscribedStatus(false));
+    renderWithQuery(<MobileHintsBanner prompt={{ ...STATIC_PROMPT, standalone: true }} />, client);
+    expect(screen.getByRole('region', { name: 'Setup hints' })).toBeInTheDocument();
+  });
+
+  it('ac4: shows when localStorage.getItem throws', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('storage blocked');
+    });
+    renderWithQuery(<MobileHintsBanner prompt={STATIC_PROMPT} />);
+    expect(screen.getByRole('region', { name: 'Setup hints' })).toBeInTheDocument();
   });
 });

@@ -28,7 +28,7 @@ import { isNativeShell } from '../../lib/nativeShell';
 import { MobileNeedsYou } from './MobileNeedsYou';
 import { MobileConversations } from './MobileConversations';
 import { MobileScreenHeader, OverdeckLockup } from './brand';
-import { MobileSettingsSheet, useInstallPrompt } from './MobileChrome';
+import { MobileHintsBanner, MobileSettingsSheet, useInstallPrompt } from './MobileChrome';
 import { useMobileAppearance } from './useMobileAppearance';
 import { MobileIssueSheet } from './MobileIssueSheet';
 import { MobilePairScreen } from './MobilePairScreen';
@@ -162,6 +162,7 @@ export default function MobileApp({ headerSlot }: { headerSlot?: ReactNode } = {
               }
             />
           )}
+          {!native && !fullScreen && <MobileHintsBanner prompt={installPrompt} />}
           <main className="min-h-0 flex-1 overflow-y-auto">
             {route.tab === 'needs-you' ? (
               <MobileNeedsYou subjectId={route.subjectId} />

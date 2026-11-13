@@ -121,6 +121,19 @@ describe('MobileApp', () => {
     localStorage.removeItem('overdeck.appearance');
   });
 
+  it('shows the Setup hints banner with Install app after beforeinstallprompt (PAN-5208)', () => {
+    setSecureContext(false);
+    localStorage.removeItem('overdeck.m.hintsDismissed');
+    render(<MobileApp />);
+    const event = Object.assign(new Event('beforeinstallprompt', { cancelable: true }), { prompt: vi.fn(async () => {}) });
+    act(() => {
+      window.dispatchEvent(event);
+    });
+    const region = screen.getByRole('region', { name: 'Setup hints' });
+    expect(within(region).getByRole('button', { name: 'Install app' })).toBeInTheDocument();
+    expect(within(screen.getByRole('banner')).queryByRole('button', { name: 'Install app' })).not.toBeInTheDocument();
+  });
+
   it('puts an aria-hidden icon in every tab and keeps aria-current on the active one (PAN-5208)', () => {
     setSecureContext(false);
     render(<MobileApp />);
@@ -209,6 +222,7 @@ describe('MobileApp in the phone app (PAN-4837)', () => {
     expect(screen.getByRole('button', { name: 'desk ▾' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Install app' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Settings', exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Setup hints' })).not.toBeInTheDocument();
     expect(register).not.toHaveBeenCalled();
   });
 });

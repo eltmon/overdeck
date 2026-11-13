@@ -1,17 +1,19 @@
 /**
  * The `/m` web shell's setup chrome (PAN-5208 WI-7, WI-8): the install prompt, the settings sheet
- * behind the header's gear, and (later) the dismissible hints banner. None of it renders in the
+ * behind the header's gear, and the dismissible hints banner below the header. None of it renders in the
  * phone app, where the native Settings screen owns these controls.
  *
  * `beforeinstallprompt` fires once, near page load, so `useInstallPrompt` lives in `MobileApp`
  * (mounted from the first render) and every view that offers installation receives its result.
  * A component mounted later, such as the sheet, would never see the event itself.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 
 import { useAppearance, writeAppearance } from '../../lib/appearance';
-import { TurnOnNotificationsButton } from '../push/TurnOnNotificationsButton';
+import { loadPushStatus, PUSH_STATUS_QUERY_KEY } from '../push/pushApi';
+import { pushSupport, TurnOnNotificationsButton } from '../push/TurnOnNotificationsButton';
 import { AppearanceChoice } from './AppearanceChoice';
 
 /** The Chromium install event; not in the DOM lib types. */
@@ -140,4 +142,65 @@ export function MobileSettingsSheet({ open, onClose, prompt }: { open: boolean; 
       </div>
     </>
   );
+}
+
+export const HINTS_DISMISSED_KEY = 'overdeck.m.hintsDismissed';
+
+function readHintsDismissed(): boolean {
+  try {
+    return localStorage.getItem(HINTS_DISMISSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeHintsDismissed(): void {
+  try {
+    localStorage.setItem(HINTS_DISMISSED_KEY, '1');
+  } catch {
+    // Storage unavailable: the banner hides for this page only.
+  }
+}
+
+/** A Home Screen app hides the banner once this device already receives push (D-8). */
+function HideWhenSubscribed({ children }: { children: ReactNode }) {
+  const { data: status } = useQuery({ queryKey: PUSH_STATUS_QUERY_KEY, queryFn: loadPushStatus, enabled: pushSupport().ok });
+  if (status?.webpush.subscriptions.some((subscription) => subscription.thisDevice)) return null;
+  return <>{children}</>;
+}
+
+/**
+ * The install hint and the notifications control, below the `/m` header (PAN-5208 FR-5, D-8).
+ * Dismiss hides it for good in this browser; both controls stay in the settings sheet.
+ */
+export function MobileHintsBanner({ prompt }: { prompt: InstallPrompt }) {
+  const [dismissed, setDismissed] = useState(readHintsDismissed);
+  if (dismissed) return null;
+
+  const banner = (
+    <div
+      data-component="mobile-hints-banner"
+      role="region"
+      aria-label="Setup hints"
+      className="mx-3 mt-3 flex shrink-0 items-start gap-3 rounded-md border border-border bg-card px-3 py-2"
+    >
+      <div className="flex min-w-0 flex-1 flex-col items-start gap-2 py-1">
+        <InstallAffordance prompt={prompt} />
+        <TurnOnNotificationsButton />
+      </div>
+      <button
+        type="button"
+        aria-label="Dismiss"
+        onClick={() => {
+          writeHintsDismissed();
+          setDismissed(true);
+        }}
+        className="-mr-2 flex min-h-11 min-w-11 shrink-0 items-center justify-center text-muted-foreground"
+      >
+        <X className="h-4 w-4" aria-hidden />
+      </button>
+    </div>
+  );
+
+  return prompt.standalone ? <HideWhenSubscribed>{banner}</HideWhenSubscribed> : banner;
 }
