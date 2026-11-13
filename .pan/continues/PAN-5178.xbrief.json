@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5178",
   "created": "2026-11-13T05:44:52.973Z",
-  "updated": "2026-11-13T06:42:49.465Z",
+  "updated": "2026-11-13T06:53:53.935Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,9 +102,26 @@
       "doneAt": "2026-11-13T06:42:44.072Z"
     },
     "deep-link-latency-script": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5178",
-      "claimedAt": "2026-11-13T06:42:49.465Z"
+      "claimedAt": "2026-11-13T06:42:49.465Z",
+      "doneAt": "2026-11-13T06:53:53.935Z"
+    },
+    "deep-link-latency-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:53:53.935Z"
+    },
+    "deep-link-latency-script.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:53:53.935Z"
+    },
+    "deep-link-latency-script.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:53:53.935Z"
+    },
+    "deep-link-latency-script.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T06:53:53.935Z"
     }
   }
 }
