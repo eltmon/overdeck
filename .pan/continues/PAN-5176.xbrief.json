@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5176",
   "created": "2026-11-13T05:00:59.712Z",
-  "updated": "2026-11-13T05:29:49.710Z",
+  "updated": "2026-11-13T05:31:09.504Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -129,9 +129,26 @@
       "claimedAt": "2026-11-13T05:22:39.920Z"
     },
     "release-macos-gate": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5176",
-      "claimedAt": "2026-11-13T05:29:49.710Z"
+      "claimedAt": "2026-11-13T05:29:49.710Z",
+      "doneAt": "2026-11-13T05:31:09.504Z"
+    },
+    "release-macos-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:31:09.504Z"
+    },
+    "release-macos-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:31:09.504Z"
+    },
+    "release-macos-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:31:09.504Z"
+    },
+    "release-macos-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T05:31:09.504Z"
     }
   }
 }
