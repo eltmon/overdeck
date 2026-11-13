@@ -1,6 +1,6 @@
 /**
- * File explorer code pane (PAN-5187, PRD section 10): preview tabs, Monaco and
- * autosave, in a real browser against a real server.
+ * File explorer code pane (PAN-5187, PRD section 10): preview tabs, Monaco,
+ * autosave and external changes, in a real browser against a real server.
  *
  * Runs against an **isolated** dashboard (its own temp `OVERDECK_HOME`, never
  * the operator's live dashboard on :3011) and in its own browser context. The
@@ -16,7 +16,7 @@
  * the real tree from there.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
@@ -141,6 +141,43 @@ test('single clicks reuse one italic preview tab, and typing autosaves to disk a
   await expect(tab.locator('span.italic')).toHaveCount(0);
   await expect(tab.getByLabel('Unsaved changes')).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('autosaved.png') });
+});
+
+test('an external change raises the banner on a dirty pane and reloads a clean one', async ({ page }) => {
+  const file = path.join(workspace, 'uat-fixture', 'b.ts');
+  await openDeck(page);
+  await treeItem(page, 'uat-fixture').click();
+  await treeItem(page, 'b.ts').dblclick();
+  const editor = page.locator('.monaco-editor').first();
+  await expect(editor.locator('.view-lines')).toContainText('export function b');
+
+  // Dirty pane: an edit not yet saved, then another process appends a line.
+  await editor.locator('.view-lines').click();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.press('Enter');
+  await page.keyboard.insertText('// unsaved edit');
+  appendFileSync(file, '// x from another process\n');
+
+  const banner = page.getByTestId('external-change-banner');
+  await expect(banner).toContainText('This file changed on disk, and you have unsaved edits.', { timeout: 1000 });
+  for (const name of ['Compare', 'Reload from disk', 'Keep my edits', 'Overwrite']) {
+    await expect(banner.getByRole('button', { name })).toBeVisible();
+  }
+  await banner.getByRole('button', { name: 'Compare' }).click();
+  await expect(page.locator('.monaco-diff-editor')).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('external-change-compare.png') });
+
+  await banner.getByRole('button', { name: 'Reload from disk' }).click();
+  await expect(banner).toHaveCount(0);
+  const plain = page.locator('.monaco-editor').first();
+  await expect(plain.locator('.view-lines')).toContainText('x from another process');
+  await expect(plain.locator('.view-lines')).not.toContainText('unsaved edit');
+
+  // Clean pane: the next external change reloads the text with no banner.
+  appendFileSync(file, '// y from another process\n');
+  await expect(plain.locator('.view-lines')).toContainText('y from another process', { timeout: 1000 });
+  await expect(banner).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('external-change-reloaded.png') });
 });
 
 test('the Context page editor still mounts Monaco with the shared setup', async ({ page }) => {
