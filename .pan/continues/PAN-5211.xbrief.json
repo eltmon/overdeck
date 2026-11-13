@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5211",
   "created": "2026-11-13T22:53:14.172Z",
-  "updated": "2026-11-13T23:06:19.655Z",
+  "updated": "2026-11-13T23:07:13.222Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,9 +126,22 @@
       "doneAt": "2026-11-13T23:06:11.461Z"
     },
     "wi7-call-index": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5211",
-      "claimedAt": "2026-11-13T23:06:19.655Z"
+      "claimedAt": "2026-11-13T23:06:19.655Z",
+      "doneAt": "2026-11-13T23:07:13.222Z"
+    },
+    "wi7-call-index.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:07:13.222Z"
+    },
+    "wi7-call-index.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:07:13.222Z"
+    },
+    "wi7-call-index.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:07:13.222Z"
     }
   }
 }
