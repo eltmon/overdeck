@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5199",
   "created": "2026-11-13T20:11:44.953Z",
-  "updated": "2026-11-13T20:23:01.827Z",
+  "updated": "2026-11-13T20:27:28.894Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,22 @@
       "doneAt": "2026-11-13T20:22:53.666Z"
     },
     "extract-polyrepo-gitignore": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5199",
-      "claimedAt": "2026-11-13T20:23:01.827Z"
+      "claimedAt": "2026-11-13T20:23:01.827Z",
+      "doneAt": "2026-11-13T20:27:28.893Z"
+    },
+    "extract-polyrepo-gitignore.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:27:28.893Z"
+    },
+    "extract-polyrepo-gitignore.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:27:28.893Z"
+    },
+    "extract-polyrepo-gitignore.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T20:27:28.893Z"
     }
   }
 }
