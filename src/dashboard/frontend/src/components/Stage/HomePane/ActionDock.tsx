@@ -8,8 +8,8 @@ export interface ActionDockProps {
   onOpen: (paneType: PaneType) => void
   /**
    * Which actions to surface. Defaults to the full set. The project Home passes
-   * a project-appropriate subset (terminal + web), since Files/Commits/Plan/Docs
-   * are issue-scoped (PAN-1561).
+   * terminal, files (the explorer on the project checkout, PAN-5186) and web,
+   * since Commits/Plan/Docs are issue-scoped (PAN-1561).
    */
   actions?: PaneType[]
   /**

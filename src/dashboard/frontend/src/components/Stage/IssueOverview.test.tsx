@@ -5,7 +5,12 @@ import { IssueOverview } from './IssueOverview'
 import type { StageApi } from './types'
 
 vi.mock('./cockpit/IssueMissionControl', () => ({
-  IssueMissionControl: ({ launcher }: { launcher: ReactNode }) => <>{launcher}</>,
+  IssueMissionControl: ({ launcher, actionDock }: { launcher: ReactNode; actionDock: ReactNode }) => (
+    <>
+      {launcher}
+      {actionDock}
+    </>
+  ),
 }))
 
 function api(overrides: Partial<StageApi> = {}): StageApi {
@@ -30,6 +35,19 @@ function deferred<T>() {
 }
 
 describe('IssueOverview', () => {
+  it('opens Files on the issue explorer root (PAN-5186)', () => {
+    const openPane = vi.fn()
+    render(<IssueOverview issueId="PAN-2773" title="Explorer" agentId="agent-pan-2773" api={api({ openPane })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Files' }))
+    expect(openPane).toHaveBeenCalledWith({
+      paneType: 'files',
+      label: 'Files',
+      issueId: 'PAN-2773',
+      agentId: 'agent-pan-2773',
+      explorerRootId: 'issue:PAN-2773',
+    })
+  })
+
   it('renders conversation creation errors inline without opening a pane', async () => {
     const openOrFocusAgentPane = vi.fn()
     const onCreateConversation = vi.fn().mockResolvedValue({ error: 'Unknown project: overdeck' })

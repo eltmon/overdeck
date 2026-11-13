@@ -1,0 +1,392 @@
+{
+  "version": "1",
+  "issueId": "PAN-5186",
+  "created": "2026-11-13T16:27:17.519Z",
+  "updated": "2026-11-13T17:48:57.466Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-13T17:48Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-13T17:48:57.466Z"
+    }
+  ],
+  "items": {
+    "pane-model": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5186",
+      "claimedAt": "2026-11-13T16:27:17.519Z",
+      "doneAt": "2026-11-13T16:32:12.837Z"
+    },
+    "pane-model.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:32:12.837Z"
+    },
+    "pane-model.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:32:12.837Z"
+    },
+    "pane-model.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:32:12.837Z"
+    },
+    "pane-model.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:32:12.837Z"
+    },
+    "rpc-client": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5186",
+      "claimedAt": "2026-11-13T16:44:02.443Z",
+      "doneAt": "2026-11-13T16:44:44.433Z"
+    },
+    "explorer-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5186",
+      "claimedAt": "2026-11-13T16:44:04.360Z",
+      "doneAt": "2026-11-13T16:45:13.624Z"
+    },
+    "tree-model": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5186",
+      "claimedAt": "2026-11-13T16:44:06.440Z",
+      "doneAt": "2026-11-13T16:45:32.516Z"
+    },
+    "git-decoration": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5186",
+      "claimedAt": "2026-11-13T16:44:08.489Z",
+      "doneAt": "2026-11-13T16:45:50.897Z"
+    },
+    "dir-loader": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5186",
+      "claimedAt": "2026-11-13T16:44:10.636Z",
+      "doneAt": "2026-11-13T16:46:08.193Z"
+    },
+    "rpc-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:44:44.433Z"
+    },
+    "rpc-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:44:44.433Z"
+    },
+    "rpc-client.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:44:44.433Z"
+    },
+    "rpc-client.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:44:44.433Z"
+    },
+    "explorer-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:45:13.624Z"
+    },
+    "explorer-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:45:13.624Z"
+    },
+    "explorer-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:45:13.624Z"
+    },
+    "explorer-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:45:13.624Z"
+    },
+    "tree-model.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:45:32.516Z"
+    },
+    "tree-model.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:45:32.516Z"
+    },
+    "tree-model.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:45:32.516Z"
+    },
+    "tree-model.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:45:32.516Z"
+    },
+    "git-decoration.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:45:50.897Z"
+    },
+    "git-decoration.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:45:50.897Z"
+    },
+    "git-decoration.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:45:50.897Z"
+    },
+    "dir-loader.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:46:08.193Z"
+    },
+    "dir-loader.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:46:08.193Z"
+    },
+    "dir-loader.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:46:08.193Z"
+    },
+    "dir-loader.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:46:08.193Z"
+    },
+    "tree-view": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5186",
+      "claimedAt": "2026-11-13T16:48:48.574Z",
+      "doneAt": "2026-11-13T16:49:05.884Z"
+    },
+    "tree-view.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:49:05.884Z"
+    },
+    "tree-view.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:49:05.884Z"
+    },
+    "tree-view.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:49:05.884Z"
+    },
+    "tree-view.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:49:05.884Z"
+    },
+    "watch-hub": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5186",
+      "claimedAt": "2026-11-13T16:49:23.521Z",
+      "doneAt": "2026-11-13T16:49:41.201Z"
+    },
+    "watch-hub.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:49:41.201Z"
+    },
+    "watch-hub.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:49:41.201Z"
+    },
+    "watch-hub.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:49:41.201Z"
+    },
+    "git-status": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5186",
+      "claimedAt": "2026-11-13T16:49:58.335Z",
+      "doneAt": "2026-11-13T16:50:16.525Z"
+    },
+    "git-status.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:50:16.525Z"
+    },
+    "git-status.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:50:16.525Z"
+    },
+    "git-status.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:50:16.525Z"
+    },
+    "git-status.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:50:16.525Z"
+    },
+    "context-menu": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5186",
+      "claimedAt": "2026-11-13T16:50:35.072Z",
+      "doneAt": "2026-11-13T16:50:52.650Z"
+    },
+    "context-menu.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:50:52.650Z"
+    },
+    "context-menu.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:50:52.650Z"
+    },
+    "context-menu.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:50:52.650Z"
+    },
+    "context-menu.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:50:52.650Z"
+    },
+    "quick-open": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5186",
+      "claimedAt": "2026-11-13T16:51:10.452Z",
+      "doneAt": "2026-11-13T16:51:27.298Z"
+    },
+    "quick-open.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:51:27.298Z"
+    },
+    "quick-open.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:51:27.298Z"
+    },
+    "quick-open.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:51:27.298Z"
+    },
+    "explorer-pane": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5186",
+      "claimedAt": "2026-11-13T16:51:44.866Z",
+      "doneAt": "2026-11-13T16:52:03.137Z"
+    },
+    "explorer-pane.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:52:03.137Z"
+    },
+    "explorer-pane.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:52:03.137Z"
+    },
+    "explorer-pane.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:52:03.137Z"
+    },
+    "explorer-pane.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:52:03.137Z"
+    },
+    "explorer-pane.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T16:52:03.137Z"
+    },
+    "search-shortcuts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5186",
+      "claimedAt": "2026-11-13T17:05:23.989Z",
+      "doneAt": "2026-11-13T17:05:42.749Z"
+    },
+    "search-shortcuts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:05:42.749Z"
+    },
+    "search-shortcuts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:05:42.749Z"
+    },
+    "search-shortcuts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:05:42.749Z"
+    },
+    "stage-swap": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5186",
+      "claimedAt": "2026-11-13T17:06:01.392Z",
+      "doneAt": "2026-11-13T17:06:18.367Z"
+    },
+    "stage-swap.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:06:18.367Z"
+    },
+    "stage-swap.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:06:18.367Z"
+    },
+    "stage-swap.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:06:18.367Z"
+    },
+    "stage-swap.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:06:18.367Z"
+    },
+    "project-home": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5186",
+      "claimedAt": "2026-11-13T17:06:36.334Z",
+      "doneAt": "2026-11-13T17:06:59.037Z"
+    },
+    "project-home.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:06:59.037Z"
+    },
+    "project-home.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:06:59.037Z"
+    },
+    "port-records": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5186",
+      "claimedAt": "2026-11-13T17:07:23.872Z",
+      "doneAt": "2026-11-13T17:07:49.086Z"
+    },
+    "port-records.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:07:49.086Z"
+    },
+    "port-records.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:07:49.086Z"
+    },
+    "ci-subset": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5186",
+      "claimedAt": "2026-11-13T17:08:11.642Z",
+      "doneAt": "2026-11-13T17:08:29.256Z"
+    },
+    "ci-subset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:08:29.256Z"
+    },
+    "ci-subset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:08:29.256Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5186",
+      "claimedAt": "2026-11-13T17:08:51.942Z",
+      "doneAt": "2026-11-13T17:09:09.302Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:09:09.302Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:09:09.302Z"
+    },
+    "search-shortcuts.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:36:46.394Z"
+    },
+    "stage-swap.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:36:46.394Z"
+    },
+    "project-home.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-13T17:36:46.394Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-13T17:48:57Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5186 (PR #5196)\n\nCodeRabbit posted 8 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4566713145 · src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx:257 [Minor]: Share the directory request limit with the normal loader.\n  https://github.com/eltmon/overdeck/pull/5196#discussion_r4566713145\n- Thread 4566713153 · src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx:258 [Minor]: Cancel Expand all writes when the pane unmounts.\n  https://github.com/eltmon/overdeck/pull/5196#discussion_r4566713153\n- Thread 4566713164 · src/dashboard/frontend/src/components/explorer/git/git-decoration.ts:104 [Major]: Partially staged files cannot be staged from the explorer menu.\n  https://github.com/eltmon/overdeck/pull/5196#discussion_r4566713164\n- Thread 4566713174 · src/dashboard/frontend/src/components/explorer/menu/ExplorerContextMenu.tsx:133 [Minor]: Hide or disable Download until the endpoint exists.\n  https://github.com/eltmon/overdeck/pull/5196#discussion_r4566713174\n- Thread 4566713186 · src/dashboard/frontend/src/components/explorer/search/QuickOpen.tsx:51 [Minor]: Clear or disable results when the query changes.\n  https://github.com/eltmon/overdeck/pull/5196#discussion_r4566713186\n- Thread 4566713192 · src/dashboard/frontend/src/components/explorer/tree/ExplorerTree.tsx:175 [Minor]: Keep the active descendant mounted.\n  https://github.com/eltmon/overdeck/pull/5196#discussion_r4566713192\n- Thread 4566713200 · src/dashboard/frontend/src/components/explorer/watch/explorer-watch-hub.ts:41 [Minor]: Remove the provisional channel when stream creation throws.\n  https://github.com/eltmon/overdeck/pull/5196#discussion_r4566713200\n- Thread 4566713208 · src/dashboard/frontend/src/components/Stage/index.tsx:118 [Major]: Explorer-opened files do not appear when the layout is split.\n  https://github.com/eltmon/overdeck/pull/5196#discussion_r4566713208\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5196/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5186`.\n   If you only replied, you are done.\n5. If PR #5196 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
+}

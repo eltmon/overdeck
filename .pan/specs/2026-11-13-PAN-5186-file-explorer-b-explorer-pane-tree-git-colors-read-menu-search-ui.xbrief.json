@@ -1,0 +1,1550 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-13T14:39:30Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5186: File explorer B: explorer pane, tree, git colors, read menu, search UI",
+    "updated": "2026-11-13T16:26:57.726Z"
+  },
+  "plan": {
+    "id": "pan-5186",
+    "title": "File explorer B: explorer pane, tree, git colors, read menu, search UI",
+    "status": "running",
+    "uid": "6d715d21-7c86-42ef-b11d-1a122983743a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-11-13T14:39:30Z",
+    "updated": "2026-11-13T16:26:57.726Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5186",
+        "label": "PAN-5186",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5186/.pan/drafts/pan-5186.md",
+        "label": "PRD draft (.pan/drafts/pan-5186.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5186/.pan/drafts/pan-5183.md",
+        "label": "Parent PRD (.pan/drafts/pan-5183.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "file-explorer",
+      "stage"
+    ],
+    "metadata": {
+      "sizeJustification": "This issue is already the B slice of the seven-way PAN-5183 split (PAN-5185 to PAN-5191). Its surface is one subsystem (the dashboard frontend): about 19 new small files under one new directory, components/explorer/, plus their co-located tests, which push the per-file count past 25. The items are fine-grained and each is independently reviewable; splitting into more sibling issues would separate the tree from the pane that composes it, and neither half would be user-visible alone.",
+      "canonicalFilename": "2026-11-13-PAN-5186-file-explorer-b-explorer-pane-tree-git-colors-read-menu-search-ui.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The Stage files pane only lists an agent's changed files (FilesPane.tsx). No surface shows a project's or workspace's directory tree, its git state, or lets the operator find a file by name or content.",
+      "Proposal": "Repurpose the files pane as the explorer keyed by explorerRootId (project:<key> from the project home, issue:<ID> from the issue tab): a lazy virtualized tree with natural sort, dotfile/ignored handling, git colors and letter badges, live updates through a shared watch hub, debounced git status, a read and git context menu, quick open and content search. Opening a file creates a code pane spec that PAN-5187 renders. All RPC goes through one client seam over PAN-5185's contracts.",
+      "NonGoals": "- No code pane renderer, Monaco, autosave, preview tabs, Changes view or conflict banner (PAN-5187).\n- No write actions in the menu: New file, New folder, Rename, Duplicate, Delete, undo/redo, drag to move, OS drop, drag to composer (PAN-5190).\n- No server code of any kind: no RPC handlers, routes, watcher or contracts (PAN-5185, PAN-5188).\n- No download or upload route; the Download item only links to the PAN-5188 route.\n- No edit workspaces, edit-workspace banner, Create PR or merge (PAN-5191).\n- No git action (Stage, Unstage, Discard) and no write on a project root.\n- No keyboard shortcuts or watch handling inside code panes.\n- No features/file-explorer.mdx user page (PAN-5191).\n- No global keybinding registry and no change to App.tsx or useStageShortcuts.ts shortcuts.\n- No folder letter badges and no staged/unstaged split view in the Changed filter.\n- No raise of any file-size allowlist cap."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Plan against parent WI-1 contract names while PAN-5185 is unmerged; the code on main wins after pan sync-main, and every call goes through explorer-rpc.ts.",
+        "rationale": "PAN-5185 is the declared prerequisite and the order book runs it first; a single seam makes a rename a one-file change (D-B1)."
+      },
+      {
+        "summary": "This issue adds the 'code' pane type, fields, dedupe, label and icon but no renderer; opened files show the existing PanePlaceholder until PAN-5187 merges.",
+        "rationale": "CodePane is parent WI-8, owned by PAN-5187, which plans in parallel; building an interim viewer would be thrown away (D-B3)."
+      },
+      {
+        "summary": "Single click selects; double click, Enter and Open open a code pane. Preview tabs stay with PAN-5187 through the openFileFromTree seam.",
+        "rationale": "Preview tabs are FR-7/WI-8 (PAN-5187); one seam keeps the change local (D-B2)."
+      },
+      {
+        "summary": "Reveal line/column travel as explorerRevealLine/Column/Nonce pane fields.",
+        "rationale": "Mirrors the existing targetMessageId/targetMessageNonce precedent (D-B4)."
+      },
+      {
+        "summary": "Watch events go through a ref-counted hub with one server subscription per root.",
+        "rationale": "PAN-5187 code panes need the same events without a second stream (D-B5)."
+      },
+      {
+        "summary": "Include the Download menu item, linking to the PAN-5188 route; it 404s until PAN-5188 merges.",
+        "rationale": "The parent PRD puts Download in this issue and no later child adds it (D-B6)."
+      },
+      {
+        "summary": "No Stage/Unstage/Discard on project roots.",
+        "rationale": "Parent D-6: the primary checkout is never written (D-B7)."
+      },
+      {
+        "summary": "Changed filter renders a tree synthesized from git status, not from loaded directories.",
+        "rationale": "Deleted files and unloaded folders must still show, as FilesPane showed (D-B8)."
+      },
+      {
+        "summary": "Folder priority uses FR-4, not Orca STATUS_PRIORITY.",
+        "rationale": "FR-4 is the authoritative requirement; Orca lacks conflicted (D-B9)."
+      },
+      {
+        "summary": "Pane-scoped React onKeyDown with preventDefault for Ctrl/Cmd+P and Ctrl/Cmd+Shift+F.",
+        "rationale": "No keybinding registry exists and no global handler uses these keys (D-B11)."
+      },
+      {
+        "summary": "Expand all is capped at 2,000 folders; dotfiles show by default; content search debounces 300 ms at 2+ chars.",
+        "rationale": "Defensible defaults that keep a large checkout responsive (D-B12, D-B13, D-B14)."
+      },
+      {
+        "summary": "Project home shows Files only when projectKey is defined.",
+        "rationale": "Without a project key there is no project root id to show."
+      },
+      {
+        "summary": "Stage swap is one item: render switch, files dedupe, IssueOverview root, migration, FilesPane deletion.",
+        "rationale": "Splitting it breaks the issue tab Files button mid-branch (D-B15)."
+      }
+    ],
+    "items": [
+      {
+        "id": "pane-model",
+        "title": "Add the 'code' pane type and openCodePane (PRD WI-B1)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:39:30Z",
+        "metadata": {
+          "issueLabel": "pan-5186",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "explorer-pane",
+            "stage-swap",
+            "search-shortcuts"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/panesStore.ts",
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/PaneBar.tsx",
+            "src/dashboard/frontend/src/components/explorer/openCodePane.ts",
+            "src/dashboard/frontend/src/lib/__tests__/panesStore.code.test.ts",
+            "src/dashboard/frontend/src/components/explorer/__tests__/openCodePane.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/__tests__/panesStore.code.test.ts src/components/explorer/__tests__/openCodePane.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "panesStore.code.test.ts and openCodePane.test.ts pass"
+          ],
+          "traces": [
+            "FR-22"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/pan-5186.md WI-B1 exactly. In FE/lib/panesStore.ts add | 'code' to PaneType and the fields explorerRootId, explorerPath, explorerRevealLine, explorerRevealColumn, explorerRevealNonce to WorkspacePane; add ONLY the code dedupe rule to addPane (leave 'files' in SINGLETON_TYPES — stage-swap changes it). Add code: 'File' to PANE_LABELS in Stage/index.tsx and code: FileCode to PANE_ICONS in PaneBar.tsx (both are Record<PaneType>, so typecheck fails without them). Create components/explorer/openCodePane.ts with codePaneLabel and openCodePane(deckKey, {rootId, path, line?, column?}) using a module counter for explorerRevealNonce. Do NOT add case 'code' to renderPane: the default PanePlaceholder renders it until PAN-5187 ships CodePane."
+        },
+        "items": [
+          {
+            "id": "pane-model.ac1",
+            "title": "Given a code pane for (issue:PAN-1, src/a.ts) exists, when addPane is called again with the same root and path, then the store keeps one pane and focuses it; a different path or root creates a second pane (panesStore.code.test.ts).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-model.ac2",
+            "title": "When openCodePane is called with line 40 on an existing code pane, then it applies explorerRevealLine 40, explorerRevealColumn 1 and a larger explorerRevealNonce through updatePane and focuses that pane (openCodePane.test.ts).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-model.ac3",
+            "title": "When openCodePane opens a new pane for src/dashboard/server/ws-rpc.ts, then the pane renders the label ws-rpc.ts and has paneType 'code', with no reveal fields when no line is given.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-model.ac4",
+            "title": "npm run typecheck:frontend passes with 'code' present in PaneType, PANE_LABELS and PANE_ICONS.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rpc-client",
+        "title": "Create the explorer RPC client seam (PRD WI-B2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:39:30Z",
+        "metadata": {
+          "issueLabel": "pan-5186",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "watch-hub",
+            "git-status",
+            "context-menu",
+            "quick-open",
+            "explorer-pane",
+            "search-shortcuts"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/explorer-rpc.ts",
+            "src/dashboard/frontend/src/components/explorer/__tests__/explorer-rpc.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/__tests__/explorer-rpc.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "explorer-rpc.test.ts passes"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-B2. FIRST run pan sync-main and read packages/contracts/src/explorer.ts and rpc.ts from PAN-5185; if any method, field or error-code name differs from PRD §3, the code on main wins (D-B1). If PAN-5185 is not on main, stop and pan tell flywheel-orchestrator. Create components/explorer/explorer-rpc.ts with listDir, gitStatus, gitStage, searchFiles, searchContent, subscribeWatchStream(rootId, onBatch, onReconnect), explorerErrorCode, parseRootId, rootLabel and explorerDownloadUrl. This is the ONLY explorer module that imports lib/wsTransport."
+        },
+        "items": [
+          {
+            "id": "rpc-client.ac1",
+            "title": "When listDir('issue:PAN-1', 'src') is called, then it sends { rootId: 'issue:PAN-1', path: 'src' } to WS_METHODS.explorerListDir through getTransport().request and returns the result (explorer-rpc.test.ts).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rpc-client.ac2",
+            "title": "When subscribeWatchStream is called, then it passes the onReconnect callback in the subscribe options and returns the transport's unsubscribe function.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rpc-client.ac3",
+            "title": "parseRootId('issue:PAN-1') returns { kind: 'issue', key: 'PAN-1' }, parseRootId('bogus') returns null, and explorerDownloadUrl encodes both query parameters with inline=0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rpc-client.ac4",
+            "title": "When git grep -l wsTransport -- src/dashboard/frontend/src/components/explorer runs, then it prints only explorer-rpc.ts and test files.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "explorer-store",
+        "title": "Create the per-root explorer store (PRD WI-B3)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:39:30Z",
+        "metadata": {
+          "issueLabel": "pan-5186",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "tree-model",
+            "explorer-pane"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/explorerStore.ts",
+            "src/dashboard/frontend/src/components/explorer/__tests__/explorerStore.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/__tests__/explorerStore.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "explorerStore.test.ts passes"
+          ],
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-B3. Create components/explorer/explorerStore.ts (zustand 4, create from 'zustand' like panesStore.ts) holding per-root DirState map, expanded set, showDotfiles (default true), changedOnly, selection/anchor/focused, with the listed actions. Persist only { expanded, showDotfiles } as JSON under localStorage key overdeck.explorer.<rootId>, every read and write in try/catch; corrupt JSON hydrates defaults. Export the DirState type (tree-model imports it)."
+        },
+        "items": [
+          {
+            "id": "explorer-store.ac1",
+            "title": "Given a folder is expanded for root issue:PAN-1, when the store is reset and ensureRoot('issue:PAN-1') runs, then the expanded set is restored from localStorage key overdeck.explorer.issue:PAN-1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "explorer-store.ac2",
+            "title": "Given localStorage holds corrupt JSON for a root, when ensureRoot runs, then the store falls back to defaults (showDotfiles true, empty expanded set) without throwing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "explorer-store.ac3",
+            "title": "When select is called with mode 'range', then the selection contains the slice of visibleOrder between the anchor and the target; mode 'toggle' adds and removes one path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "explorer-store.ac4",
+            "title": "collapseAll empties the expanded set and persists the empty set.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tree-model",
+        "title": "Port the tree row projection and natural sort (PRD WI-B4)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:39:30Z",
+        "metadata": {
+          "issueLabel": "pan-5186",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/tree/natural-sort.ts",
+            "src/dashboard/frontend/src/components/explorer/tree/explorer-tree-model.ts",
+            "src/dashboard/frontend/src/components/explorer/tree/__tests__/explorer-tree-model.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/tree/__tests__/explorer-tree-model.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "explorer-tree-model.test.ts passes"
+          ],
+          "traces": [
+            "FR-2",
+            "NFR-4",
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-B4. Create tree/natural-sort.ts (Intl.Collator numeric, base sensitivity, dirs first) and tree/explorer-tree-model.ts with projectRows, projectChangedRows and parentPath. Port the flatten/path-index logic of Orca src/renderer/src/components/right-sidebar/file-explorer/tree/file-explorer-row-projection.ts without store reads; the file starts with the parent WI-17 two-line port header (Orca, MIT, Copyright (c) 2026 Lovecast Inc.; upstream path @ commit). Check git -C ~/Projects/orca log --oneline c6b9ac9549b..origin/main -- <path> first and use the commit you actually port from."
+        },
+        "items": [
+          {
+            "id": "tree-model.ac1",
+            "title": "Given a directory with file100, a folder z, file9 and file99, when projectRows runs, then the rows return in the order z, file9, file99, file100.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-model.ac2",
+            "title": "Given src is expanded, then its children follow src at depth + 1; given it is collapsed, its children are absent; with showDotfiles false, names starting with '.' are absent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-model.ac3",
+            "title": "Given a truncated directory listing, then projectRows emits one TruncatedRow after that directory's children.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-model.ac4",
+            "title": "projectChangedRows([{ path: 'src/a/b.ts' }]) returns rows src, src/a, src/a/b.ts in that order, with both folders marked synthetic and expanded.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "git-decoration",
+        "title": "Port git decoration with the FR-4 priority (PRD WI-B5)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:39:30Z",
+        "metadata": {
+          "issueLabel": "pan-5186",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/git/git-decoration.ts",
+            "src/dashboard/frontend/src/components/explorer/git/__tests__/git-decoration.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/git/__tests__/git-decoration.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "git-decoration.test.ts passes"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-B5. Create git/git-decoration.ts with STATUS_LETTER, STATUS_PRIORITY (conflicted 6 > deleted 5 > modified 4 > renamed 3 > added 2 > untracked 1 — NOT Orca's order, D-B9), STATUS_TEXT_CLASS (success/warning/destructive tokens), IGNORED_TEXT_CLASS, COMMITTED_ONLY_BADGE_CLASS, dominantStatus and buildDecorations. Port header from Orca src/renderer/src/lib/source-control/paths/git-path-decoration.ts and note the changed priority in a comment."
+        },
+        "items": [
+          {
+            "id": "git-decoration.ac1",
+            "title": "dominantStatus(['untracked', 'renamed', 'added']) returns 'renamed', and conflicted wins over deleted (git-decoration.test.ts).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-decoration.ac2",
+            "title": "Given one modified and one untracked file under src/, when buildDecorations runs, then the folder map marks src as modified.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-decoration.ac3",
+            "title": "Given a path only in committed, then its FileDecoration has committedOnly true; given the same path also in entries as modified, then committedOnly is false and the status is modified.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dir-loader",
+        "title": "Create the lazy directory loader with a 4-call limit (PRD WI-B6)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:39:30Z",
+        "metadata": {
+          "issueLabel": "pan-5186",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/tree/directory-loader.ts",
+            "src/dashboard/frontend/src/components/explorer/tree/__tests__/directory-loader.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/tree/__tests__/directory-loader.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "directory-loader.test.ts passes"
+          ],
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-B6. Create tree/directory-loader.ts exporting createDirectoryLoader (ensure, reload, dispose; at most 4 concurrent listDir calls; listDir injected, typed from @overdeck/contracts) and expandAll (breadth-first, skips ignored folders and, when dotfiles are hidden, dot folders; cap 2000). Original code; the t3code concurrency pattern is behavior only, no port header."
+        },
+        "items": [
+          {
+            "id": "dir-loader.ac1",
+            "title": "Given four listDir calls are in flight, when a fifth ensure is called, then the fifth call starts only after one of the four settles.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dir-loader.ac2",
+            "title": "When ensure is called on a loaded path, then no listDir call is sent; when reload is called on an in-flight path, then listDir runs once more after it settles.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dir-loader.ac3",
+            "title": "Given dispose was called, when a pending listDir result settles, then onResult is not called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dir-loader.ac4",
+            "title": "When expandAll runs, then it skips a folder whose entry is ignored and, at the cap, returns capped: true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tree-view",
+        "title": "Build the virtualized ExplorerTree and ExplorerRow (PRD WI-B7)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:39:30Z",
+        "metadata": {
+          "issueLabel": "pan-5186",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "complex",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "parallelSafeReason": "Creates two new files under components/explorer/tree/ that no other item touches; it depends only on the pure tree-model and git-decoration types.",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/tree/ExplorerTree.tsx",
+            "src/dashboard/frontend/src/components/explorer/tree/ExplorerRow.tsx",
+            "src/dashboard/frontend/src/components/explorer/tree/__tests__/ExplorerTree.test.tsx"
+          ],
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/tree/__tests__/ExplorerTree.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "ExplorerTree.test.tsx passes"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-B7. Create tree/ExplorerTree.tsx (useVirtualizer, estimateSize 22, overscan 10, role=tree container with tabIndex 0 and aria-activedescendant, keyboard map) and tree/ExplorerRow.tsx (treeitem, aria-level, aria-expanded, aria-selected, lucide icons, colored name, plain monospace letter badge — no pill). Load the pan-style-guide skill first. Mock @tanstack/react-virtual in tests like components/conversations/__tests__/SessionTable.test.tsx."
+        },
+        "items": [
+          {
+            "id": "tree-view.ac1",
+            "title": "Given rows and decorations, the tree renders each row as role treeitem with aria-level equal to depth + 1, and a modified file shows the letter M with class text-warning while its folder name has text-warning.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-view.ac2",
+            "title": "An ignored row renders with the italic and text-faint-foreground classes; a committed-only file's letter renders with text-muted-foreground.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-view.ac3",
+            "title": "When a row is Shift-clicked, then onSelect(path, 'range') is called; when Ctrl-clicked, onSelect(path, 'toggle'); when a file is double-clicked, onOpen(path).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-view.ac4",
+            "title": "Given the tree is focused, when ArrowRight is pressed on a collapsed folder, then onToggle is called; when ArrowLeft is pressed on a file, then onFocus receives its parent; when Enter is pressed on a file, then onOpen is called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "watch-hub",
+        "title": "Create the shared watch hub and useExplorerWatch (PRD WI-B8)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:39:30Z",
+        "metadata": {
+          "issueLabel": "pan-5186",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/watch/explorer-watch-hub.ts",
+            "src/dashboard/frontend/src/components/explorer/watch/useExplorerWatch.ts",
+            "src/dashboard/frontend/src/components/explorer/watch/__tests__/explorer-watch-hub.test.ts",
+            "src/dashboard/frontend/src/components/explorer/watch/__tests__/useExplorerWatch.test.tsx"
+          ],
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/watch/__tests__/explorer-watch-hub.test.ts src/components/explorer/watch/__tests__/useExplorerWatch.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "explorer-watch-hub.test.ts and useExplorerWatch.test.tsx pass"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-20",
+            "FR-21"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-B8. Create watch/explorer-watch-hub.ts (ref-counted: one subscribeWatchStream per root shared by all listeners; overflow batches and onReconnect both deliver { kind: 'resync' }; a throwing listener does not stop others) and watch/useExplorerWatch.ts (maps events to parent dirs via parentPath, including oldPath parents for renames and the path itself for directory deletes). PAN-5187's code panes will subscribe to the same hub; this item does not touch code panes."
+        },
+        "items": [
+          {
+            "id": "watch-hub.ac1",
+            "title": "Given two listeners subscribe to root issue:PAN-1, then subscribeWatchStream is called once; after both unsubscribe, the stream's unsubscribe function is called once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-hub.ac2",
+            "title": "When the stream delivers a batch containing an overflow event, or onReconnect fires, then every listener receives { kind: 'resync' }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-hub.ac3",
+            "title": "When a create event for src/a.ts arrives, the hook reports dirs ['src']; a rename from a/x.ts to b/x.ts reports both a and b.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "git-status",
+        "title": "Create git status scheduling and useExplorerGitStatus (PRD WI-B9)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:39:30Z",
+        "metadata": {
+          "issueLabel": "pan-5186",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/git/git-status-scheduler.ts",
+            "src/dashboard/frontend/src/components/explorer/git/useExplorerGitStatus.ts",
+            "src/dashboard/frontend/src/components/explorer/git/__tests__/git-status-scheduler.test.ts",
+            "src/dashboard/frontend/src/components/explorer/git/__tests__/useExplorerGitStatus.test.tsx"
+          ],
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/git/__tests__/git-status-scheduler.test.ts src/components/explorer/git/__tests__/useExplorerGitStatus.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "git-status-scheduler.test.ts and useExplorerGitStatus.test.tsx pass"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-B9. Create git/git-status-scheduler.ts (createGitStatusScheduler: 125 ms debounce, 3000 ms minimum gap between run starts, 60 s safety run while active; dispose cancels) and git/useExplorerGitStatus.ts (runs once on mount, signal() on each watch-hub signal, active while document.visibilityState is visible via visibilitychange, returns { result, decorations, errorCode, refresh }; NOT_A_GIT_REPO sets errorCode with empty decorations and stops the scheduler: watch signals and the safety run make no call until refresh() runs once and, on success, resumes normal scheduling). All timing tests use vi.useFakeTimers + advanceTimersByTimeAsync."
+        },
+        "items": [
+          {
+            "id": "git-status.ac1",
+            "title": "Given fake timers, when three signals arrive 50 ms apart, then run is called once, 125 ms after the last signal.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-status.ac2",
+            "title": "Given a run started at t=0, when a signal arrives at t=1000 ms, then the next run starts at t=3000 ms and not before.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-status.ac3",
+            "title": "Given setActive(true), when 60 s pass after a run, then run is called again; given setActive(false), then no safety run happens; when dispose is called, then a pending run is cancelled.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-status.ac4",
+            "title": "Given explorerGitStatus rejects with NOT_A_GIT_REPO, then the hook returns errorCode 'NOT_A_GIT_REPO' and empty decorations; a later watch signal or 60 s safety tick sends no call; refresh() sends exactly one call.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "context-menu",
+        "title": "Build the read and git context menu (PRD WI-B10)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:39:30Z",
+        "metadata": {
+          "issueLabel": "pan-5186",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/menu/ExplorerContextMenu.tsx",
+            "src/dashboard/frontend/src/components/explorer/menu/__tests__/ExplorerContextMenu.test.tsx"
+          ],
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/menu/__tests__/ExplorerContextMenu.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "ExplorerContextMenu.test.tsx passes"
+          ],
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-B10. Create menu/ExplorerContextMenu.tsx on components/shared/ContextMenu.tsx primitives with Open, Copy path, Copy relative path, Find in folder, Download (temporary <a download> to explorerDownloadUrl; the route ships in PAN-5188), and — only when rootKind !== 'project' (D-B7) — Stage, Unstage and Discard changes. Discard asks useConfirm (components/DialogProvider.tsx) with variant destructive before calling gitStage discard. Tests render inside DialogProvider."
+        },
+        "items": [
+          {
+            "id": "context-menu.ac1",
+            "title": "When Discard changes is chosen, then a confirm dialog listing the paths opens and gitStage(rootId, paths, 'discard') is called only after Discard is confirmed; Cancel makes no call.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-menu.ac2",
+            "title": "Given rootKind 'project', when the menu opens, then it renders no Stage, Unstage or Discard changes item.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-menu.ac3",
+            "title": "When Copy relative path is chosen, then navigator.clipboard.writeText receives the selected root-relative paths joined by newlines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-menu.ac4",
+            "title": "Find in folder on a file calls onFindInFolder with the file's parent path; on a folder it passes the folder's own path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "quick-open",
+        "title": "Build the QuickOpen dialog (PRD WI-B11)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:39:30Z",
+        "metadata": {
+          "issueLabel": "pan-5186",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/search/QuickOpen.tsx",
+            "src/dashboard/frontend/src/components/explorer/search/__tests__/QuickOpen.test.tsx"
+          ],
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/search/__tests__/QuickOpen.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "QuickOpen.test.tsx passes"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-B11. Create search/QuickOpen.tsx (props rootId, open, onClose, onPick) on cmdk Command with shouldFilter={false} like components/CommandPalette.tsx; debounce 120 ms; nothing sent for an empty query ('Type to search files'); stale answers dropped by a request sequence number; Enter/click calls onPick then onClose; Escape calls onClose. Props-only so PAN-5187 can mount it in a code pane."
+        },
+        "items": [
+          {
+            "id": "quick-open.ac1",
+            "title": "Given fake timers, when ws-rpc is typed, then exactly one searchFiles call is sent 120 ms after the last key and none before.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quick-open.ac2",
+            "title": "Given an empty query, then no searchFiles call is sent and the dialog renders 'Type to search files'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quick-open.ac3",
+            "title": "When Enter is pressed on the first result src/dashboard/server/ws-rpc.ts, then onPick receives that path and onClose is called; an answer for an older query does not replace a newer one.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "explorer-pane",
+        "title": "Build the ExplorerPane shell with states and the Changed filter (PRD WI-B12)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:39:30Z",
+        "metadata": {
+          "issueLabel": "pan-5186",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "complex",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "parallelSafeReason": "Creates ExplorerPane.tsx and its test, which no parallel item touches; it runs after all component items it composes are done.",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "src/dashboard/frontend/src/components/explorer/__tests__/ExplorerPane.test.tsx"
+          ],
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/__tests__/ExplorerPane.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "ExplorerPane.test.tsx passes"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-19",
+            "FR-20"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-B12. Create components/explorer/ExplorerPane.tsx (PaneWrapperProps): header (root label, branch, dotfiles toggle, Changed toggle with aria-pressed, Refresh, Expand all with the 2000-folder cap toast, Collapse all), the tree wrapped in ExplorerContextMenu, the PAN-5191 banner-slot comment, loader + watch + git status wiring, Changed filter via projectChangedRows, openFileFromTree seam calling openCodePane, and every FR-19 state sentence exactly as written in the PRD. Load pan-style-guide first."
+        },
+        "items": [
+          {
+            "id": "explorer-pane.ac1",
+            "title": "When the pane mounts on issue:PAN-1, then it calls listDir for '' and renders the returned entries as tree rows.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "explorer-pane.ac2",
+            "title": "Given listDir rejects with ROOT_NOT_FOUND for issue:PAN-1, then the pane renders 'No workspace on disk for PAN-1. Start the issue to create one.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "explorer-pane.ac3",
+            "title": "When Changed is turned on, then the pane renders a file that git status reports deleted even though no listing contains it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "explorer-pane.ac4",
+            "title": "When the watch hub delivers resync, then listDir is called again for every loaded directory.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "explorer-pane.ac5",
+            "title": "When a file row is double-clicked, then usePanesStore contains a code pane with explorerRootId issue:PAN-1 and that explorerPath.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "search-shortcuts",
+        "title": "Add ContentSearch and the pane-scoped shortcuts (PRD WI-B13)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:39:30Z",
+        "metadata": {
+          "issueLabel": "pan-5186",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/search/ContentSearch.tsx",
+            "src/dashboard/frontend/src/components/explorer/search/useExplorerShortcuts.ts",
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "src/dashboard/frontend/src/components/explorer/search/__tests__/ContentSearch.test.tsx",
+            "src/dashboard/frontend/src/components/explorer/search/__tests__/useExplorerShortcuts.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/search/__tests__/ContentSearch.test.tsx src/components/explorer/search/__tests__/useExplorerShortcuts.test.ts src/components/explorer/__tests__/ExplorerPane.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "ContentSearch.test.tsx, useExplorerShortcuts.test.ts and ExplorerPane.test.tsx pass"
+          ],
+          "traces": [
+            "FR-6",
+            "FR-22"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-B13. Create search/useExplorerShortcuts.ts (isQuickOpenKey, isContentSearchKey, useExplorerShortcuts returning an onKeyDown that preventDefaults and stopPropagations a match) and search/ContentSearch.tsx (query, Aa and .* toggles with aria-pressed, scope chip, 300 ms debounce for queries of 2+ chars, Enter searches at once, stale answers dropped, results grouped by path, truncated note, server error shown). Edit ExplorerPane.tsx: root element onKeyDown from the hook; Ctrl/Cmd+P mounts QuickOpen whose onPick calls openCodePane; Ctrl/Cmd+Shift+F and the menu's Find in folder open ContentSearch in the lower half; onPick passes line and column to openCodePane."
+        },
+        "items": [
+          {
+            "id": "search-shortcuts.ac1",
+            "title": "isQuickOpenKey returns true for Ctrl+P and Meta+P and false for Ctrl+Shift+P; isContentSearchKey returns true for Ctrl+Shift+F; the handler calls preventDefault on a match.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "search-shortcuts.ac2",
+            "title": "Given fake timers, a 1-character query sends no searchContent call; typing foo sends one call 300 ms later with the scopePath passed through; Enter sends at once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "search-shortcuts.ac3",
+            "title": "Given matches in two files, then results render under one header per file in first-seen order, and clicking a match calls onPick with its path, line and column.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "search-shortcuts.ac4",
+            "title": "Browser UAT (test role, isolated Playwright profile; ac1-ac3 are the work agent's evidence, this live run is the test role's): Ctrl+P in the explorer, typing ws-rpc, then Enter adds a Stage tab labelled ws-rpc.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stage-swap",
+        "title": "Swap the Stage files pane to the explorer and delete FilesPane (PRD WI-B14)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:39:30Z",
+        "metadata": {
+          "issueLabel": "pan-5186",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/panesStore.ts",
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/IssueOverview.tsx",
+            "src/dashboard/frontend/src/components/Stage/types.ts",
+            "src/dashboard/frontend/src/components/Stage/stage.module.css",
+            "src/dashboard/frontend/src/components/Stage/panes/FilesPane.tsx",
+            "src/dashboard/frontend/src/components/Stage/panes/FilesPane.test.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/panesStore.explorer.test.ts",
+            "src/dashboard/frontend/src/components/Stage/__tests__/explorer-migration.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/IssueOverview.test.tsx"
+          ],
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/__tests__/panesStore.explorer.test.ts src/components/Stage/__tests__/explorer-migration.test.tsx src/components/Stage/IssueOverview.test.tsx src/components/Stage/Stage.test.tsx src/lib/panesStore.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "panesStore.explorer.test.ts, explorer-migration.test.tsx, IssueOverview.test.tsx, Stage.test.tsx and panesStore.test.ts pass"
+          ],
+          "traces": [
+            "FR-1",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-B14 as ONE change (D-B15). panesStore.ts: remove 'files' from SINGLETON_TYPES and add the files rule keyed by explorerRootId (PRD §7 After); fix the FilesPane comment. Stage/index.tsx: render <ExplorerPane> for case 'files'; in the deck-load effect migrate a files pane with issueId and no explorerRootId to explorerRootId issue:<id> via updatePane, close one with neither, and drop 'files' from ISSUE_SCOPED (add updatePane to the deps). IssueOverview.tsx: the files spec carries explorerRootId issue:<id>. types.ts comment. Delete FilesPane.tsx, FilesPane.test.tsx and the .filesPane/.fileRow/.fileRow:hover/.filePath/.fileStat CSS rules (keep .chipAdd/.chipDel)."
+        },
+        "items": [
+          {
+            "id": "stage-swap.ac1",
+            "title": "Given a files pane for issue:PAN-1 exists, when addPane opens files for issue:PAN-1 again, then the store focuses the existing pane; issue:PAN-1 and project:overdeck create two panes (panesStore.explorer.test.ts).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-swap.ac2",
+            "title": "Given a persisted files pane with issueId PAN-1 and no explorerRootId, when the Stage mounts, then the pane persists with explorerRootId issue:PAN-1; a files pane with neither field is closed; one with explorerRootId project:overdeck and no issueId is kept (explorer-migration.test.tsx).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-swap.ac3",
+            "title": "When the issue tab's Files button is clicked, then api.openPane receives explorerRootId 'issue:<id>' (IssueOverview.test.tsx).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-swap.ac4",
+            "title": "FilesPane.tsx and FilesPane.test.tsx do not exist, and git grep -n 'filesPane\\|fileRow' -- src/dashboard/frontend/src prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-swap.ac5",
+            "title": "Browser UAT (test role, isolated Playwright profile; ac1-ac4 are the work agent's evidence, this live run is the test role's): on an issue workspace with one modified and one untracked file, the issue tab's Files button opens the explorer; the screenshot shows M in the warning color, U in the success color, and the parent folder name in the warning color; touch <root>/uat-new.txt makes the row appear within 2 s.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "project-home",
+        "title": "Add the Files button to the project home (PRD WI-B15)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:39:30Z",
+        "metadata": {
+          "issueLabel": "pan-5186",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/ActionDock.tsx",
+            "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx"
+          ],
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/Stage/ProjectHome.test.tsx src/components/Stage/HomePane/ActionDock.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "ProjectHome.test.tsx and ActionDock.test.tsx pass"
+          ],
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-B15. In ProjectHome.tsx define dockActions (['terminal','files','browser'] when projectKey is set, else ['terminal','browser']) and onDockOpen (files opens { paneType: 'files', label: 'Files', explorerRootId: `project:${projectKey}` }), and use them at BOTH ActionDock call sites (cockpit branch and sparse fallback). Replace both 'Files/Commits/Plan/Docs are issue-scoped' comments with the PRD wording and update the ActionDock actions-prop comment."
+        },
+        "items": [
+          {
+            "id": "project-home.ac1",
+            "title": "Given projectKey 'overdeck', when Files is clicked on the project home, then api.openPane receives { paneType: 'files', label: 'Files', explorerRootId: 'project:overdeck' } (ProjectHome.test.tsx).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-home.ac2",
+            "title": "Given no projectKey, then the project home renders no Files button.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-home.ac3",
+            "title": "Browser UAT (test role, isolated Playwright profile; ac1-ac2 are the work agent's evidence, this live run is the test role's): the project home's Files button opens an explorer whose header shows the project key and lists the checkout's top-level entries.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "port-records",
+        "title": "Add port records for the two Orca ports (PRD WI-B16)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:39:30Z",
+        "metadata": {
+          "issueLabel": "pan-5186",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "trivial",
+          "kind": "infra",
+          "requiresInspection": false,
+          "files_scope": [
+            "scripts/upstream-ports.json"
+          ],
+          "verify_commands": [
+            "node -e \"const r=require('./scripts/upstream-ports.json');const l=r.filter(x=>x.local.includes('components/explorer/'));if(l.length<2)process.exit(1);console.log(l.length)\""
+          ],
+          "expected_outputs": [
+            "the node check prints 2 or more and exits 0"
+          ],
+          "traces": [
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-B16. Add two records to scripts/upstream-ports.json (format { local, upstream: 'orca', path, commit }) for components/explorer/tree/explorer-tree-model.ts and components/explorer/git/git-decoration.ts, with commit equal to the commit in each file's port header. If PAN-5185 left no scripts/upstream-ports.json on main, create it as a JSON array with these two records."
+        },
+        "items": [
+          {
+            "id": "port-records.ac1",
+            "title": "scripts/upstream-ports.json contains a record whose local is src/dashboard/frontend/src/components/explorer/tree/explorer-tree-model.ts and one for components/explorer/git/git-decoration.ts, both with upstream orca.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "port-records.ac2",
+            "title": "Each record's commit matches the commit named on line 2 of the ported file's header, so the header and the record name the same upstream commit (contains the same sha).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-subset",
+        "title": "List the new frontend tests in the CI subset (PRD WI-B17)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:39:30Z",
+        "metadata": {
+          "issueLabel": "pan-5186",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "trivial",
+          "kind": "test",
+          "requiresInspection": false,
+          "files_scope": [
+            "scripts/frontend-test-subset.txt"
+          ],
+          "verify_commands": [
+            "node -e \"const fs=require('fs');const l=fs.readFileSync('scripts/frontend-test-subset.txt','utf8').split('\\n').filter(x=>x.includes('components/explorer/')||x.includes('panesStore.code')||x.includes('panesStore.explorer')||x.includes('explorer-migration')||x.includes('Stage/IssueOverview.test')||x.includes('Stage/ProjectHome.test'));for(const f of l){if(!fs.existsSync('src/dashboard/frontend/'+f)){console.error('missing',f);process.exit(1)}}console.log(l.length)\"",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer src/lib/__tests__/panesStore.code.test.ts src/lib/__tests__/panesStore.explorer.test.ts src/components/Stage/__tests__/explorer-migration.test.tsx src/components/Stage/IssueOverview.test.tsx src/components/Stage/ProjectHome.test.tsx"
+          ],
+          "expected_outputs": [
+            "the node check prints at least 22 and exits 0",
+            "the vitest run of the listed files passes"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-B17. Add every new test file from the other items, plus the existing src/components/Stage/IssueOverview.test.tsx and src/components/Stage/ProjectHome.test.tsx, to scripts/frontend-test-subset.txt (paths relative to src/dashboard/frontend, e.g. src/components/explorer/tree/__tests__/explorer-tree-model.test.ts), each on its own line in sorted position. Do NOT run the full npm run test:frontend-subset locally; CI runs it. Remove only a line naming FilesPane.test.tsx if one exists."
+        },
+        "items": [
+          {
+            "id": "ci-subset.ac1",
+            "title": "scripts/frontend-test-subset.txt contains each new test file path from WI-B1 to WI-B14, plus IssueOverview.test.tsx and ProjectHome.test.tsx, exactly once, in sorted position.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-subset.ac2",
+            "title": "When the node check runs, then every listed explorer, pane-store, migration, IssueOverview and ProjectHome test path exists, and a vitest run of exactly those files passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the explorer pane and add the changelog entry (PRD WI-B18)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T14:39:30Z",
+        "metadata": {
+          "issueLabel": "pan-5186",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5186.md"
+          ],
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "FR-21"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-B18. In docs/DASHBOARD-ARCHITECTURE.md add '### Explorer pane, tree and search (PAN-5186)' under PAN-5185's '## File explorer' section if present, otherwise '## File explorer: explorer pane, tree and search (PAN-5186)' at the end, covering every point the PRD lists. Create changelog.d/pan-5186.md with the PRD's #### New bullet. Do not create features/file-explorer.mdx (PAN-5191)."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a heading with 'Explorer pane, tree and search (PAN-5186)' whose text names explorerRootId, the Changed filter replacing FilesPane, the watch hub resync on overflow and reconnect, and the 125 ms / 3 s / 60 s git status cadence.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "changelog.d/pan-5186.md exists with a single #### New heading and a bullet linking https://github.com/eltmon/overdeck/issues/5186, and npm run lint:docs passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pane-model",
+        "to": "explorer-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-model",
+        "to": "stage-swap",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-model",
+        "to": "search-shortcuts",
+        "type": "blocks"
+      },
+      {
+        "from": "rpc-client",
+        "to": "watch-hub",
+        "type": "blocks"
+      },
+      {
+        "from": "rpc-client",
+        "to": "git-status",
+        "type": "blocks"
+      },
+      {
+        "from": "rpc-client",
+        "to": "context-menu",
+        "type": "blocks"
+      },
+      {
+        "from": "rpc-client",
+        "to": "quick-open",
+        "type": "blocks"
+      },
+      {
+        "from": "rpc-client",
+        "to": "explorer-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "rpc-client",
+        "to": "search-shortcuts",
+        "type": "blocks"
+      },
+      {
+        "from": "explorer-store",
+        "to": "tree-model",
+        "type": "blocks"
+      },
+      {
+        "from": "explorer-store",
+        "to": "explorer-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "tree-model",
+        "to": "tree-view",
+        "type": "blocks"
+      },
+      {
+        "from": "tree-model",
+        "to": "watch-hub",
+        "type": "blocks"
+      },
+      {
+        "from": "tree-model",
+        "to": "explorer-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "git-decoration",
+        "to": "tree-view",
+        "type": "blocks"
+      },
+      {
+        "from": "git-decoration",
+        "to": "git-status",
+        "type": "blocks"
+      },
+      {
+        "from": "git-decoration",
+        "to": "context-menu",
+        "type": "blocks"
+      },
+      {
+        "from": "dir-loader",
+        "to": "explorer-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "tree-view",
+        "to": "explorer-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "watch-hub",
+        "to": "git-status",
+        "type": "blocks"
+      },
+      {
+        "from": "watch-hub",
+        "to": "explorer-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "git-status",
+        "to": "explorer-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "context-menu",
+        "to": "explorer-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "quick-open",
+        "to": "search-shortcuts",
+        "type": "blocks"
+      },
+      {
+        "from": "explorer-pane",
+        "to": "search-shortcuts",
+        "type": "blocks"
+      },
+      {
+        "from": "explorer-pane",
+        "to": "stage-swap",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-swap",
+        "to": "project-home",
+        "type": "blocks"
+      },
+      {
+        "from": "tree-model",
+        "to": "port-records",
+        "type": "blocks"
+      },
+      {
+        "from": "git-decoration",
+        "to": "port-records",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-model",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "rpc-client",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "explorer-store",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "tree-model",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "git-decoration",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "dir-loader",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "tree-view",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "watch-hub",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "git-status",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "context-menu",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "quick-open",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "explorer-pane",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "search-shortcuts",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-swap",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "project-home",
+        "to": "ci-subset",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

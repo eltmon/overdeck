@@ -22,6 +22,7 @@ const PANE_ICONS: Record<PaneType, typeof Home> = {
   docs: FileText,
   browser: Globe,
   editor: Pencil,
+  code: FileCode,
 }
 
 export interface PaneBarProps {

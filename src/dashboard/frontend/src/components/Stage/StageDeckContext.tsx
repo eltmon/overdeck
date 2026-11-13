@@ -18,6 +18,12 @@ export interface StageDeckContextValue {
   openOrFocusEditorPane: (filePath: string, label: string, citeConversationName?: string | null) => void
   /** Open (or focus) the agent tab for a conversation (PAN-4658 D10). */
   openOrFocusAgentPane: (conversationId: string, label: string) => void
+  /**
+   * Focus a pane that is already in the deck and, while the deck is split, put
+   * it on screen: a pane outside the grid replaces a region other than
+   * `besidePaneId`'s, so the caller (e.g. the explorer, PAN-5186) stays visible.
+   */
+  revealPane?: (paneId: string, besidePaneId?: string) => void
 }
 
 const StageDeckContext = createContext<StageDeckContextValue | null>(null)

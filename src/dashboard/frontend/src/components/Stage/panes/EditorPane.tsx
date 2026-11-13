@@ -35,7 +35,7 @@ const TEXTAREA_STYLE: React.CSSProperties = {
 /**
  * EditorPane — paneType='editor' (PAN-3260). Reads/writes a single
  * allowlisted markdown file by absolute path via readFileAtPath/writeFileAtPath
- * (no issueId required, unlike DocsPane/FilesPane — this pane serves surfaces
+ * (no issueId required, unlike DocsPane — this pane serves surfaces
  * with no workspace context, e.g. a repo-root file chip inside a conversation).
  * Edit|Preview mirrors DocsPane's sub-tab styling; Preview reuses MarkdownTab
  * so there is exactly one markdown renderer in the app (PAN-3260 decision).
