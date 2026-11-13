@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5208",
   "created": "2026-11-13T21:57:26.421Z",
-  "updated": "2026-11-13T22:19:47.645Z",
+  "updated": "2026-11-13T22:19:48.903Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -242,6 +242,11 @@
     "needs-you-rows.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T22:19:47.645Z"
+    },
+    "conversation-rows": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5208",
+      "claimedAt": "2026-11-13T22:19:48.903Z"
     }
   }
 }
