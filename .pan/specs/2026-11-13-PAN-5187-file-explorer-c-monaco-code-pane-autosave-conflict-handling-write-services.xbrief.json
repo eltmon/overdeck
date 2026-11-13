@@ -4,17 +4,17 @@
     "created": "2026-11-13T14:51:15Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5187: File explorer C: Monaco code pane, autosave, conflict handling, write services",
-    "updated": "2026-11-13T14:52:16.101Z"
+    "updated": "2026-11-13T16:26:39.564Z"
   },
   "plan": {
     "id": "pan-5187",
     "title": "File explorer C: Monaco code pane, autosave, conflict handling, write services",
-    "status": "proposed",
+    "status": "running",
     "uid": "96d6a981-7d2a-4dbb-8a04-f3657647db5d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-13T14:51:15Z",
-    "updated": "2026-11-13T14:52:16.101Z",
+    "updated": "2026-11-13T16:26:39.564Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5187",
@@ -1623,5 +1623,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
