@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PanRpcError } from '@overdeck/contracts';
 import type { ExplorerRoot } from '../roots.js';
 import { diskSignature } from '../signature.js';
-import { MAX_EDITABLE_TEXT_BYTES, WRITE_TEMP_MARKER, writeFile } from '../write.js';
+import { create, MAX_EDITABLE_TEXT_BYTES, statEntry, WRITE_TEMP_MARKER, writeFile } from '../write.js';
 import { makeFixtureRepo, type FixtureRepo } from './fixture-repo.js';
 
 let repo: FixtureRepo;
@@ -151,5 +151,53 @@ describe('writeFile refusals', () => {
   it('keeps a dangling symlink that resolves outside the root a PATH_OUTSIDE_ROOT refusal for its children', async () => {
     await symlink('/nonexistent-dir-for-explorer-test', join(root.absPath, 'out'));
     expect(await codeOf(writeFile(root, 'out/file.txt', 'x', null, true))).toBe('PATH_OUTSIDE_ROOT');
+  });
+});
+
+describe('create', () => {
+  it('creates an empty file and returns its entry', async () => {
+    const { entry } = await create(root, 'src/new.ts', 'file');
+    expect(entry).toMatchObject({ name: 'new.ts', path: 'src/new.ts', kind: 'file', size: 0, ignored: false });
+    expect(await readFile(join(root.absPath, 'src/new.ts'), 'utf8')).toBe('');
+  });
+
+  it('creates a folder and returns its entry', async () => {
+    const { entry } = await create(root, 'docs', 'dir');
+    expect(entry).toMatchObject({ name: 'docs', path: 'docs', kind: 'dir', ignored: false });
+    expect((await stat(join(root.absPath, 'docs'))).isDirectory()).toBe(true);
+  });
+
+  it('creates missing parent folders', async () => {
+    await create(root, 'one/two/three.txt', 'file');
+    await create(root, 'four/five', 'dir');
+    expect(await exists(join(root.absPath, 'one/two/three.txt'))).toBe(true);
+    expect((await stat(join(root.absPath, 'four/five'))).isDirectory()).toBe(true);
+  });
+
+  it('throws ALREADY_EXISTS over an existing file or folder and leaves it unchanged', async () => {
+    expect(await codeOf(create(root, 'a.txt', 'file'))).toBe('ALREADY_EXISTS');
+    expect(await codeOf(create(root, 'a.txt', 'dir'))).toBe('ALREADY_EXISTS');
+    expect(await readFile(join(root.absPath, 'a.txt'), 'utf8')).toBe('alpha\n');
+    expect(await codeOf(create(root, 'src', 'dir'))).toBe('ALREADY_EXISTS');
+    expect(await codeOf(create(root, 'src', 'file'))).toBe('ALREADY_EXISTS');
+    expect(await readFile(join(root.absPath, 'src/x.ts'), 'utf8')).toBe('export {};\n');
+  });
+
+  it('throws ALREADY_EXISTS over a dangling symlink without creating its target', async () => {
+    await symlink('missing-target.txt', join(root.absPath, 'dangling.txt'));
+    expect(await codeOf(create(root, 'dangling.txt', 'file'))).toBe('ALREADY_EXISTS');
+    expect(await exists(join(root.absPath, 'missing-target.txt'))).toBe(false);
+  });
+
+  it('refuses a project root and a git folder', async () => {
+    expect(await codeOf(create(rootAt(root.absPath, 'project'), 'n.txt', 'file'))).toBe('EDIT_WORKSPACE_REQUIRED');
+    expect(await codeOf(create(root, '.git/hooks/x', 'file'))).toBe('PATH_IN_GIT_DIR');
+  });
+});
+
+describe('statEntry', () => {
+  it('reports a symlink as a symlink, not as its target', async () => {
+    await symlink('src', join(root.absPath, 'src-link'));
+    expect(await statEntry(root, 'src-link')).toMatchObject({ name: 'src-link', path: 'src-link', kind: 'symlink' });
   });
 });

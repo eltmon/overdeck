@@ -25,12 +25,17 @@
  * Accepted race: the signature check and the rename are two steps, so a
  * process that writes the file between them is overwritten. Orca has the
  * same window; closing it would need a lock no other editor honours.
+ *
+ * The tree's file actions use the entry operations below them: `create`
+ * (empty file or folder) and `statEntry`. They resolve paths with
+ * `resolveEntryInsideRoot`, which never follows a symlink in the last
+ * segment, so they act on a link and not on its target.
  */
 import { randomBytes } from 'node:crypto';
 import type { Stats } from 'node:fs';
-import { lstat, mkdir, open, readFile, realpath, rename, rm, stat } from 'node:fs/promises';
+import { lstat, mkdir, open, readFile, realpath, rename, rm, stat, writeFile as fsWriteFile } from 'node:fs/promises';
 import { basename, dirname, join, posix } from 'node:path';
-import { PanRpcError, type ExplorerWriteFileResult } from '@overdeck/contracts';
+import { PanRpcError, type ExplorerEntry, type ExplorerEntryResult, type ExplorerWriteFileResult } from '@overdeck/contracts';
 import { explorerError } from './errors.js';
 import { resolveInsideRoot } from './paths.js';
 import type { ExplorerRoot } from './roots.js';
@@ -57,35 +62,92 @@ async function lstatOrNull(abs: string): Promise<Stats | null> {
 }
 
 /**
- * Resolve a write target. `resolveInsideRoot` refuses a path whose last
- * segment is a dangling symlink as PATH_OUTSIDE_ROOT (its target cannot be
- * checked). For a write that case is "the file the link names does not
- * exist", so it becomes NOT_FOUND. The link is only inspected after its
- * parent folder resolved inside the root.
+ * Resolve the parent folder of `rel` inside the root and lstat the last
+ * segment there, without following it. Null when the parent does not
+ * resolve (the caller then reports its own error).
+ */
+async function lstatLastSegment(
+  root: ExplorerRoot,
+  rel: string,
+  forWrite: boolean,
+): Promise<{ abs: string; stats: Stats | null } | null> {
+  const parentRel = posix.dirname(rel);
+  let parentAbs: string;
+  try {
+    parentAbs = await resolveInsideRoot(root, parentRel === '.' ? '' : parentRel, { forWrite, allowRoot: true });
+  } catch {
+    return null;
+  }
+  const abs = join(parentAbs, posix.basename(rel));
+  return { abs, stats: await lstatOrNull(abs) };
+}
+
+/**
+ * Absolute path of the entry `rel` names, with a symlink in its last
+ * segment left unresolved, so rename, copy and delete act on the link and
+ * not on what it points at. A link whose target is missing or outside the
+ * root is still an entry of the root. Every other path is checked by
+ * `resolveInsideRoot` first.
+ */
+export async function resolveEntryInsideRoot(root: ExplorerRoot, rel: string, forWrite = true): Promise<string> {
+  try {
+    await resolveInsideRoot(root, rel, { forWrite });
+  } catch (error) {
+    if (!(error instanceof PanRpcError) || error.code !== 'PATH_OUTSIDE_ROOT') throw error;
+    const last = await lstatLastSegment(root, rel, forWrite);
+    if (last?.stats?.isSymbolicLink()) return last.abs;
+    throw error;
+  }
+  const last = await lstatLastSegment(root, rel, forWrite);
+  if (!last) throw explorerError('PATH_OUTSIDE_ROOT', `${JSON.stringify(rel)} has no parent folder inside the root`);
+  return last.abs;
+}
+
+/**
+ * Resolve a write target, following a symlink in the last segment.
+ * `resolveInsideRoot` refuses a dangling link as PATH_OUTSIDE_ROOT (its
+ * target cannot be checked). For a write that case is "the file the link
+ * names does not exist", so it becomes NOT_FOUND. The link is only
+ * inspected after its parent folder resolved inside the root.
  */
 async function resolveWriteTarget(root: ExplorerRoot, rel: string): Promise<string> {
   try {
     return await resolveInsideRoot(root, rel, { forWrite: true });
   } catch (error) {
     if (!(error instanceof PanRpcError) || error.code !== 'PATH_OUTSIDE_ROOT') throw error;
-    const parentRel = posix.dirname(rel);
-    let parentAbs: string;
-    try {
-      parentAbs = await resolveInsideRoot(root, parentRel === '.' ? '' : parentRel, { forWrite: true, allowRoot: true });
-    } catch {
-      throw error;
-    }
-    const link = join(parentAbs, posix.basename(rel));
-    const linkStats = await lstatOrNull(link);
-    if (linkStats?.isSymbolicLink()) {
+    const last = await lstatLastSegment(root, rel, true);
+    if (last?.stats?.isSymbolicLink()) {
       try {
-        await realpath(link);
+        await realpath(last.abs);
       } catch (linkError) {
         if (isMissing(linkError)) throw explorerError('NOT_FOUND', 'Symlink target does not exist');
       }
     }
     throw error;
   }
+}
+
+function entryKind(stats: Stats): ExplorerEntry['kind'] {
+  if (stats.isSymbolicLink()) return 'symlink';
+  if (stats.isDirectory()) return 'dir';
+  return 'file';
+}
+
+/**
+ * The tree entry for `rel` (D-C11). `ignored` is always false: the watcher
+ * event that follows a change makes the tree re-list, which corrects it.
+ */
+export async function statEntry(root: ExplorerRoot, rel: string): Promise<ExplorerEntry> {
+  const stats = await lstat(await resolveEntryInsideRoot(root, rel, false));
+  const kind = entryKind(stats);
+  return {
+    name: posix.basename(rel),
+    path: rel,
+    kind,
+    ...(kind === 'file' ? { size: stats.size } : {}),
+    mtimeMs: stats.mtimeMs,
+    ignored: false,
+  };
 }
 
 async function writeAtomically(target: string, text: string, mode: number | null): Promise<void> {
@@ -143,4 +205,20 @@ export async function writeFile(
   await writeAtomically(target, text, existing ? existing.mode & 0o7777 : null);
 
   return { signature: writtenContentDiskSignature(text), mtimeMs: (await stat(target)).mtimeMs };
+}
+
+/** Create an empty file or a folder at `rel`, with any missing parent folders. */
+export async function create(root: ExplorerRoot, rel: string, kind: 'file' | 'dir'): Promise<ExplorerEntryResult> {
+  const abs = await resolveEntryInsideRoot(root, rel);
+  await mkdir(dirname(abs), { recursive: true });
+  try {
+    if (kind === 'file') await fsWriteFile(abs, '', { flag: 'wx' });
+    else await mkdir(abs);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+      throw explorerError('ALREADY_EXISTS', `${JSON.stringify(rel)} already exists`);
+    }
+    throw error;
+  }
+  return { entry: await statEntry(root, rel) };
 }
