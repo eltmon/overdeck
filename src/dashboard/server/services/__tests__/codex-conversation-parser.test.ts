@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseCodexConversationMessages } from '../codex-conversation-parser.js';
+import { createCodexConversationAccumulator, parseCodexConversationMessages } from '../codex-conversation-parser.js';
 import { summarizeConversationActivity } from '../conversation-service.js';
 
 /**
@@ -214,5 +214,38 @@ describe('codex conversation parser — cli >= 0.153.4 item_completed shape', ()
 
     expect(result.totalTokens).toBe(60700);
     expect(result.totalCost).toBeGreaterThan(0);
+  });
+});
+
+/** PAN-5211: stored tool results are bounded even when no reader scrub ran first. */
+describe('codex conversation parser — bounded tool results', () => {
+  const record = (payload: object) => JSON.stringify({ type: 'response_item', timestamp: '2026-11-13T00:00:00.000Z', payload });
+
+  function parseDirect(output: unknown) {
+    const accumulator = createCodexConversationAccumulator('/nonexistent/rollout.jsonl');
+    accumulator.push(record({ type: 'custom_tool_call', name: 'screenshot', input: 'take', call_id: 'call_img' }));
+    accumulator.push(record({ type: 'custom_tool_call_output', call_id: 'call_img', output }));
+    return accumulator.result(0, 0);
+  }
+
+  it('stores an input_image data URL as a placeholder next to its text', () => {
+    const image = `data:image/png;base64,${Buffer.alloc(1024 * 1024, 3).toString('base64')}`;
+    const result = parseDirect([
+      { type: 'input_text', text: 'Screenshot of the login page' },
+      { type: 'input_image', image_url: image, detail: 'high' },
+    ]);
+
+    const stored = result.workLog[0]?.result ?? '';
+    expect(stored).toContain('Screenshot of the login page');
+    expect(stored).toContain('[image: png, ');
+    expect(stored).not.toContain('data:image');
+  });
+
+  it('cuts a 100,000-character string output to the stored cap plus the marker', () => {
+    const result = parseDirect('q'.repeat(100_000));
+
+    const stored = result.workLog[0]?.result ?? '';
+    expect(stored).toContain('characters omitted');
+    expect(stored.replace(/\n\n… \[[\d,]+ characters omitted\] …\n\n/, '').length).toBeLessThanOrEqual(65_536);
   });
 });

@@ -38,6 +38,7 @@ import type { ParseResult } from './conversation-service.js';
 import { createCodexSessionParser } from '../../../lib/cost-parsers/codex-parser.js';
 import { readCodexRolloutMessage } from '../../../lib/codex-rollout-message.js';
 import { createIncrementalTranscriptReader } from './incremental-transcript-reader.js';
+import { boundToolResultText } from './conversation/tool-result-bounds.js';
 
 interface CodexTokenUsage {
   input_tokens?: number;
@@ -75,7 +76,7 @@ function parseToolInput(args: string): Record<string, unknown> | undefined {
 }
 
 /** Flatten a Codex tool output (usually a string) into display text. */
-function extractToolOutput(output: unknown): string {
+export function extractCodexToolOutput(output: unknown): string {
   if (typeof output === 'string') return output.trim();
   if (output && typeof output === 'object') {
     const obj = output as Record<string, unknown>;
@@ -191,7 +192,8 @@ export function createCodexConversationAccumulator(sessionFile: string) {
         if (callId) toolCallsByCallId.set(callId, wl);
       } else if (ptype === 'function_call_output' || ptype === 'custom_tool_call_output') {
         const callId = typeof payload.call_id === 'string' ? payload.call_id : '';
-        const output = extractToolOutput(payload.output);
+        // PAN-5211: images become placeholders and long text keeps its head and tail.
+        const output = boundToolResultText(extractCodexToolOutput(payload.output)).text;
         const wl = callId ? toolCallsByCallId.get(callId) : undefined;
         if (wl) {
           if (output) {
