@@ -1,0 +1,32 @@
+[
+  {
+    "local": "src/dashboard/server/services/explorer/signature.ts",
+    "upstream": "orca",
+    "path": "src/shared/file-write/disk-baseline-signature.ts",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "src/dashboard/server/services/explorer/watch-batch.ts",
+    "upstream": "orca",
+    "path": "src/shared/file-watch/filesystem-watch-batch-window.ts",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "src/dashboard/server/services/explorer/watch-batch.ts",
+    "upstream": "orca",
+    "path": "src/main/ipc/filesystem/watchers/filesystem-watcher-local-events.ts",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "src/dashboard/server/services/explorer/watch-ignore.ts",
+    "upstream": "orca",
+    "path": "src/main/ipc/filesystem/watchers/filesystem-watcher-ignore.ts",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "src/dashboard/server/services/explorer/git-dir-guard.ts",
+    "upstream": "t3code",
+    "path": "apps/server/src/workspace/WorkspaceFileSystem.ts",
+    "commit": "2d8a843e6b"
+  }
+]

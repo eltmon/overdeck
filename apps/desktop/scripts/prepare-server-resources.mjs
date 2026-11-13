@@ -274,6 +274,7 @@ const ENTRY_POINTS = [
   "dashboard-db-worker.js",
   "checkpoint-worker.js",
   "memory-fts-worker.js",
+  "explorer-watch-child.js",
 ];
 const SKIP_PACKAGES = new Set([
   "@effect/platform-bun", // bun-only dynamic import, never reached under Node

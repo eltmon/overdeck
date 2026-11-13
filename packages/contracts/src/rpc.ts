@@ -17,6 +17,34 @@ import {
 } from "./types"
 import { BrowserIdSchema, EditorIdSchema, OpenInBrowserInput, OpenInEditorInput } from "./editor"
 import { EffortLevelSchema } from "./effort"
+import {
+  ExplorerBeginEditInput,
+  ExplorerBeginEditResult,
+  ExplorerCopyInput,
+  ExplorerCreateInput,
+  ExplorerDeleteInput,
+  ExplorerDeleteResult,
+  ExplorerEntryResult,
+  ExplorerGitStageInput,
+  ExplorerGitStageResult,
+  ExplorerGitStatusInput,
+  ExplorerGitStatusResult,
+  ExplorerListDirInput,
+  ExplorerListDirResult,
+  ExplorerReadFileInput,
+  ExplorerReadFileResult,
+  ExplorerRenameInput,
+  ExplorerRestoreInput,
+  ExplorerRestoreResult,
+  ExplorerSearchContentInput,
+  ExplorerSearchContentResult,
+  ExplorerSearchFilesInput,
+  ExplorerSearchFilesResult,
+  ExplorerWatchBatch,
+  ExplorerWatchInput,
+  ExplorerWriteFileInput,
+  ExplorerWriteFileResult,
+} from "./explorer"
 
 // ─── RPC method names ─────────────────────────────────────────────────────────
 
@@ -57,6 +85,22 @@ export const WS_METHODS = {
   // File-path existence (PAN-1457) — used by MarkdownFileLink to decide
   // whether a path candidate in chat markdown should render as a chip.
   resolveFilePathExists: "pan.resolveFilePathExists",
+
+  // File explorer (PAN-5183)
+  explorerListDir: "pan.explorerListDir",
+  explorerReadFile: "pan.explorerReadFile",
+  explorerWriteFile: "pan.explorerWriteFile",
+  explorerCreate: "pan.explorerCreate",
+  explorerRename: "pan.explorerRename",
+  explorerCopy: "pan.explorerCopy",
+  explorerDelete: "pan.explorerDelete",
+  explorerRestore: "pan.explorerRestore",
+  explorerGitStatus: "pan.explorerGitStatus",
+  explorerGitStage: "pan.explorerGitStage",
+  explorerSearchFiles: "pan.explorerSearchFiles",
+  explorerSearchContent: "pan.explorerSearchContent",
+  explorerWatch: "pan.explorerWatch",
+  explorerBeginEdit: "pan.explorerBeginEdit",
 
   // Terminal control
   terminalOpen: "pan.terminalOpen",
@@ -456,6 +500,97 @@ export const WriteFileAtPathRpc = Rpc.make(WS_METHODS.writeFileAtPath, {
   error: PanRpcError,
 })
 
+// ─── File explorer (PAN-5183) ────────────────────────────────────────────────
+//
+// Root-scoped file tree, file reads, git status and actions, search and a
+// change stream. Schemas live in ./explorer. Errors carry a PanRpcError code
+// from EXPLORER_ERROR_CODES.
+
+export const ExplorerListDirRpc = Rpc.make(WS_METHODS.explorerListDir, {
+  payload: ExplorerListDirInput,
+  success: ExplorerListDirResult,
+  error: PanRpcError,
+})
+
+export const ExplorerReadFileRpc = Rpc.make(WS_METHODS.explorerReadFile, {
+  payload: ExplorerReadFileInput,
+  success: ExplorerReadFileResult,
+  error: PanRpcError,
+})
+
+export const ExplorerWriteFileRpc = Rpc.make(WS_METHODS.explorerWriteFile, {
+  payload: ExplorerWriteFileInput,
+  success: ExplorerWriteFileResult,
+  error: PanRpcError,
+})
+
+export const ExplorerCreateRpc = Rpc.make(WS_METHODS.explorerCreate, {
+  payload: ExplorerCreateInput,
+  success: ExplorerEntryResult,
+  error: PanRpcError,
+})
+
+export const ExplorerRenameRpc = Rpc.make(WS_METHODS.explorerRename, {
+  payload: ExplorerRenameInput,
+  success: ExplorerEntryResult,
+  error: PanRpcError,
+})
+
+export const ExplorerCopyRpc = Rpc.make(WS_METHODS.explorerCopy, {
+  payload: ExplorerCopyInput,
+  success: ExplorerEntryResult,
+  error: PanRpcError,
+})
+
+export const ExplorerDeleteRpc = Rpc.make(WS_METHODS.explorerDelete, {
+  payload: ExplorerDeleteInput,
+  success: ExplorerDeleteResult,
+  error: PanRpcError,
+})
+
+export const ExplorerRestoreRpc = Rpc.make(WS_METHODS.explorerRestore, {
+  payload: ExplorerRestoreInput,
+  success: ExplorerRestoreResult,
+  error: PanRpcError,
+})
+
+export const ExplorerGitStatusRpc = Rpc.make(WS_METHODS.explorerGitStatus, {
+  payload: ExplorerGitStatusInput,
+  success: ExplorerGitStatusResult,
+  error: PanRpcError,
+})
+
+export const ExplorerGitStageRpc = Rpc.make(WS_METHODS.explorerGitStage, {
+  payload: ExplorerGitStageInput,
+  success: ExplorerGitStageResult,
+  error: PanRpcError,
+})
+
+export const ExplorerSearchFilesRpc = Rpc.make(WS_METHODS.explorerSearchFiles, {
+  payload: ExplorerSearchFilesInput,
+  success: ExplorerSearchFilesResult,
+  error: PanRpcError,
+})
+
+export const ExplorerSearchContentRpc = Rpc.make(WS_METHODS.explorerSearchContent, {
+  payload: ExplorerSearchContentInput,
+  success: ExplorerSearchContentResult,
+  error: PanRpcError,
+})
+
+export const ExplorerWatchRpc = Rpc.make(WS_METHODS.explorerWatch, {
+  payload: ExplorerWatchInput,
+  success: ExplorerWatchBatch,
+  error: PanRpcError,
+  stream: true,
+})
+
+export const ExplorerBeginEditRpc = Rpc.make(WS_METHODS.explorerBeginEdit, {
+  payload: ExplorerBeginEditInput,
+  success: ExplorerBeginEditResult,
+  error: PanRpcError,
+})
+
 /**
  * 10c. Resolve whether a file path candidate exists on disk (PAN-1457).
  *
@@ -759,6 +894,20 @@ export const PanRpcGroup = RpcGroup.make(
   ReadFileAtPathRpc,
   WriteFileAtPathRpc,
   ResolveFilePathExistsRpc,
+  ExplorerListDirRpc,
+  ExplorerReadFileRpc,
+  ExplorerWriteFileRpc,
+  ExplorerCreateRpc,
+  ExplorerRenameRpc,
+  ExplorerCopyRpc,
+  ExplorerDeleteRpc,
+  ExplorerRestoreRpc,
+  ExplorerGitStatusRpc,
+  ExplorerGitStageRpc,
+  ExplorerSearchFilesRpc,
+  ExplorerSearchContentRpc,
+  ExplorerWatchRpc,
+  ExplorerBeginEditRpc,
   TerminalOpenRpc,
   TerminalWriteRpc,
   TerminalResizeRpc,
