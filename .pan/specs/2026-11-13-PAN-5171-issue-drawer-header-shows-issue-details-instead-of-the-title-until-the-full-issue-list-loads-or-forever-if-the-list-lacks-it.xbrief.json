@@ -4,17 +4,17 @@
     "created": "2026-11-13T02:49:44Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5171: Issue drawer header shows 'Issue details' instead of the title until the full issue list loads (or forever if the list lacks it)",
-    "updated": "2026-11-13T03:00:47.680Z"
+    "updated": "2026-11-13T03:02:44.325Z"
   },
   "plan": {
     "id": "pan-5171",
     "title": "Issue drawer header shows 'Issue details' instead of the title until the full issue list loads (or forever if the list lacks it)",
-    "status": "proposed",
+    "status": "running",
     "uid": "3c9dfd0d-e94e-48f8-8451-3bf184d7b929",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-13T02:49:44Z",
-    "updated": "2026-11-13T03:00:47.680Z",
+    "updated": "2026-11-13T03:02:44.325Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5171",
@@ -793,5 +793,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
