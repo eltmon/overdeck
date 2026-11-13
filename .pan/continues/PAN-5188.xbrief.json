@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5188",
   "created": "2026-11-13T17:44:21.691Z",
-  "updated": "2026-11-13T18:31:45.364Z",
+  "updated": "2026-11-13T18:32:47.903Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -274,9 +274,18 @@
       "doneAt": "2026-11-13T18:31:34.240Z"
     },
     "audio-viewer": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5188",
-      "claimedAt": "2026-11-13T18:31:45.364Z"
+      "claimedAt": "2026-11-13T18:31:45.364Z",
+      "doneAt": "2026-11-13T18:32:47.902Z"
+    },
+    "audio-viewer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:32:47.902Z"
+    },
+    "audio-viewer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T18:32:47.902Z"
     }
   }
 }
