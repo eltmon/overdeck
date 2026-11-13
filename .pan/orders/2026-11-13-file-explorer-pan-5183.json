@@ -83,8 +83,17 @@
       "reVerify": false,
       "addedAt": "2026-11-13T14:22:44.950Z",
       "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5195",
+      "lane": "A",
+      "order": 8,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-13T17:52:15.744Z",
+      "addedBy": "conv-flywheel"
     }
   ],
   "createdAt": "2026-11-13T14:22:29.232Z",
-  "updatedAt": "2026-11-13T14:24:17.194Z"
+  "updatedAt": "2026-11-13T17:52:15.746Z"
 }

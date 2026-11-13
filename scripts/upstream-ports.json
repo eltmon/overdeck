@@ -28,5 +28,17 @@
     "upstream": "t3code",
     "path": "apps/server/src/workspace/WorkspaceFileSystem.ts",
     "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/tree/explorer-tree-model.ts",
+    "upstream": "orca",
+    "path": "src/renderer/src/components/right-sidebar/file-explorer/tree/file-explorer-row-projection.ts",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/git/git-decoration.ts",
+    "upstream": "orca",
+    "path": "src/renderer/src/lib/source-control/paths/git-path-decoration.ts",
+    "commit": "c6b9ac9549b"
   }
 ]
