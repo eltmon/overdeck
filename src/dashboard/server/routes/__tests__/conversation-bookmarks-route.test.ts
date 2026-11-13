@@ -2,9 +2,16 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+
+// PAN-5211: the Codex bookmark migration resolves the transcript through conversation-reads.
+const codexTranscript = vi.hoisted(() => ({ path: '' }));
+vi.mock('../../../../lib/overdeck/conversation-reads.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/overdeck/conversation-reads.js')>()),
+  resolveSessionFile: vi.fn(async () => codexTranscript.path || null),
+}));
 
 let testHome: string;
 let originalHome: string | undefined;
@@ -137,3 +144,22 @@ describe('bookmark routes (PAN-4498 WI-2)', () => {
     expect(decode(del)).toEqual({ removed: true });
   });
 });
+
+describe('bookmark routes for Codex conversations (PAN-5211)', () => {
+  it('GET returns a counter-form bookmark under its offset id', async () => {
+    const { writeFileSync } = await import('node:fs');
+    const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+    const { upsertConversationBookmark } = await import('../../../../lib/overdeck/conversation-bookmarks.js');
+    createConversation({ name: 'codex-route', tmuxSession: 'conv-codex-route', cwd: testHome, harness: 'codex' });
+    const first = JSON.stringify({ type: 'event_msg', timestamp: '2026-11-13T00:00:00.000Z', payload: { type: 'user_message', message: 'hello' } });
+    codexTranscript.path = join(testHome, 'rollout-2026-11-13T00-00-00-route.jsonl');
+    writeFileSync(codexTranscript.path, `${first}\n${first.replace('hello', 'again')}\n`);
+    upsertConversationBookmark('codex-route', { messageId: 'codex-user-2', label: 'Again', messageCreatedAt: null });
+
+    const response = await request('GET', '/api/conversations/codex-route/bookmarks');
+
+    expect(response.status).toBe(200);
+    expect(decode(response)).toMatchObject({ bookmarks: [{ messageId: `codex-user-@${Buffer.byteLength(first) + 1}`, label: 'Again' }] });
+  });
+});
+

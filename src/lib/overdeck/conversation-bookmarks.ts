@@ -144,3 +144,23 @@ export function removeConversationBookmark(name: string, messageId: string): boo
     .run(name, messageId);
   return Number(result.changes) > 0;
 }
+
+/**
+ * PAN-5211 D20: move a bookmark to a new message id. Returns true when a row moved. When `toId`
+ * already holds a bookmark, nothing changes and the existing row is kept.
+ */
+export function renameConversationBookmarkId(name: string, fromId: string, toId: string, now: number = Date.now()): boolean {
+  const db = getOverdeckDatabase();
+  return db.transaction((): boolean => {
+    const taken = db.prepare(`
+      SELECT 1 FROM conversation_bookmarks
+      WHERE conversation_id = (SELECT id FROM conversations WHERE name = ?) AND message_id = ?
+    `).get(name, toId);
+    if (taken) return false;
+    const result = db.prepare(`
+      UPDATE conversation_bookmarks SET message_id = ?, updated_at = ?
+      WHERE conversation_id = (SELECT id FROM conversations WHERE name = ?) AND message_id = ?
+    `).run(toId, now, name, fromId);
+    return Number(result.changes) > 0;
+  })();
+}
