@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5168",
+  "created": "2026-11-13T02:56:42.362Z",
+  "updated": "2026-11-13T02:56:42.362Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "host-tools-module": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5168",
+      "claimedAt": "2026-11-13T02:56:42.362Z"
+    }
+  }
+}
