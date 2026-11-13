@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5171",
   "created": "2026-11-13T03:13:45.277Z",
-  "updated": "2026-11-13T03:55:09.221Z",
+  "updated": "2026-11-13T03:55:13.802Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -166,6 +166,11 @@
     "mobile-sheet.ac4": {
       "status": "completed",
       "doneAt": "2026-11-13T03:55:09.220Z"
+    },
+    "e2e-drawer-title": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5171",
+      "claimedAt": "2026-11-13T03:55:13.801Z"
     }
   }
 }
