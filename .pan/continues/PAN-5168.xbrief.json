@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5168",
   "created": "2026-11-13T02:56:42.362Z",
-  "updated": "2026-11-13T03:33:41.980Z",
+  "updated": "2026-11-13T03:38:15.876Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -107,6 +107,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5168",
       "claimedAt": "2026-11-13T03:33:41.980Z"
+    },
+    "doctor-host-tools-row": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5168",
+      "claimedAt": "2026-11-13T03:38:15.876Z"
     }
   }
 }
