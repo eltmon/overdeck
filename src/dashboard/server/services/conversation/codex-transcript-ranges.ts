@@ -5,16 +5,23 @@
  * output record straight from the transcript at the byte location the accumulator recorded, scrubs its
  * image data URLs, and serves the text under the larger expand cap.
  */
-import { open } from 'node:fs/promises';
-import type { WorkLogEntry } from '@overdeck/contracts';
-import { extractCodexToolOutput } from '../codex-conversation-parser.js';
+import { open, type FileHandle } from 'node:fs/promises';
+import { encodeTimelineCursor, type ChatMessage, type TimelineKey, type WorkLogEntry } from '@overdeck/contracts';
+import { createCodexConversationAccumulator, extractCodexToolOutput } from '../codex-conversation-parser.js';
+import { createTranscriptLineSplitter, pushTranscriptLine } from '../incremental-transcript-reader.js';
 import type { ParseResult, RecordLocation } from './types.js';
 import {
   boundToolResultText,
+  OLDER_PAGE_READ_MAX_BYTES,
+  OLDER_PAGE_READ_STEP_BYTES,
   RECORD_FULL_READ_MAX_BYTES,
   scrubImageDataUrls,
   TOOL_BODY_FULL_READ_MAX_CHARS,
 } from './tool-result-bounds.js';
+import { selectPageBefore, type WindowedRows, type WindowInput } from './window.js';
+
+const RANGE_READ_CHUNK_BYTES = 1024 * 1024;
+const LINE_SCAN_BLOCK_BYTES = 64 * 1024;
 
 async function readRange(file: string, location: RecordLocation): Promise<Buffer> {
   const handle = await open(file, 'r');
@@ -80,3 +87,105 @@ export async function resolveToolBodyEntry(
   const entry = parsed.workLog.find((candidate) => candidate.id === toolUseId) ?? parsed.pendingToolUse?.get(toolUseId);
   return entry ? withFullToolResult(sessionFile, parsed.toolResultLocations, entry) : undefined;
 }
+
+export interface DiskPageOptions {
+  readonly stepBytes?: number;
+  readonly maxBytes?: number;
+}
+
+export interface CodexRowsBefore {
+  readonly messages: ChatMessage[];
+  readonly workLog: WorkLogEntry[];
+  /** Byte offset of the first record the range read. */
+  readonly rangeStart: number;
+}
+
+/** The start of the first line that begins at or after `from` (the byte after a `\n`), or `end`. */
+async function lineStartAtOrAfter(handle: FileHandle, from: number, end: number): Promise<number> {
+  if (from <= 0) return 0;
+  const block = Buffer.alloc(LINE_SCAN_BLOCK_BYTES);
+  // A line starts at `from` when the byte before it is a newline.
+  for (let offset = from - 1; offset < end; offset += LINE_SCAN_BLOCK_BYTES) {
+    const { bytesRead } = await handle.read(block, 0, Math.min(LINE_SCAN_BLOCK_BYTES, end - offset), offset);
+    if (bytesRead === 0) break;
+    const newline = block.subarray(0, bytesRead).indexOf(10);
+    if (newline !== -1) return Math.min(end, offset + newline + 1);
+  }
+  return end;
+}
+
+/** Parse the records in `[start, end)` with a fresh located accumulator. */
+async function parseRange(handle: FileHandle, sessionFile: string, start: number, end: number) {
+  const parser = createCodexConversationAccumulator(sessionFile, { historyStartOffset: start });
+  const splitter = createTranscriptLineSplitter(start, (line, location) => pushTranscriptLine(parser, line, location));
+  const chunk = Buffer.alloc(Math.max(1, Math.min(RANGE_READ_CHUNK_BYTES, end - start)));
+  for (let offset = start; offset < end;) {
+    const { bytesRead } = await handle.read(chunk, 0, Math.min(chunk.length, end - offset), offset);
+    if (bytesRead === 0) break;
+    splitter.write(chunk.subarray(0, bytesRead));
+    offset += bytesRead;
+  }
+  splitter.flushComplete();
+  return parser.result(end, 0);
+}
+
+/**
+ * PAN-5211 D12: rows from the records just before `beforeOffset`, read from disk. The range starts
+ * `stepBytes` back and doubles, up to `maxBytes`, until it holds `minRows` rows or reaches byte 0.
+ */
+export async function readCodexRowsBefore(
+  sessionFile: string,
+  beforeOffset: number,
+  minRows: number,
+  options: DiskPageOptions = {},
+): Promise<CodexRowsBefore> {
+  const step = options.stepBytes ?? OLDER_PAGE_READ_STEP_BYTES;
+  const max = options.maxBytes ?? OLDER_PAGE_READ_MAX_BYTES;
+  const handle = await open(sessionFile, 'r');
+  try {
+    for (let span = Math.min(step, max); ; span = Math.min(span * 2, max)) {
+      const rangeStart = await lineStartAtOrAfter(handle, beforeOffset - span, beforeOffset);
+      const parsed = await parseRange(handle, sessionFile, rangeStart, beforeOffset);
+      const rows = parsed.messages.length + parsed.workLog.length;
+      if (rows >= minRows || rangeStart === 0 || span >= max) {
+        return { messages: parsed.messages, workLog: parsed.workLog, rangeStart };
+      }
+    }
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
+ * PAN-5211 D12: one older page. In-memory rows come first; once they run out, a bounded conversation
+ * reads older rows from disk. Pages of a bounded conversation carry `bounded: true`.
+ */
+export async function selectHistoryPageBefore(
+  parsed: WindowInput,
+  sessionFile: string | undefined,
+  before: TimelineKey,
+  limit: number,
+  transcript?: string,
+  options?: DiskPageOptions,
+): Promise<WindowedRows> {
+  const page = selectPageBefore(parsed, before, limit, transcript);
+  const historyStart = parsed.historyStartOffset ?? 0;
+  if (historyStart <= 0) return page;
+  if (page.messages.length + page.workLog.length > 0 || !sessionFile) {
+    return { ...page, window: { ...page.window, hasOlder: true, bounded: true } };
+  }
+  const older = await readCodexRowsBefore(sessionFile, Math.min(before[1], historyStart), limit, options);
+  const diskPage = selectPageBefore(older, before, limit, transcript);
+  const empty = diskPage.messages.length + diskPage.workLog.length === 0;
+  return {
+    ...diskPage,
+    window: {
+      ...diskPage.window,
+      // An empty page still moves the cursor back past the range it read, so paging never stalls.
+      ...(empty && older.rangeStart > 0 ? { cursor: encodeTimelineCursor([before[0], older.rangeStart, 0, '']) } : {}),
+      hasOlder: diskPage.window.hasOlder || older.rangeStart > 0,
+      bounded: true,
+    },
+  };
+}
+

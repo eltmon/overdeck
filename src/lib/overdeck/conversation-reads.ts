@@ -66,7 +66,7 @@ import { parseAcpConversationMessages } from '../../dashboard/server/services/ac
 import { isCompacting } from '../../dashboard/server/services/conversation-compaction.js';
 import { listCodexSubagents, resolveCodexSubagentTranscript } from '../../dashboard/server/services/conversation/codex-subagents.js';
 import { listSubagentMetas, subagentTranscriptPath } from '../../dashboard/server/services/conversation/subagents.js';
-import { selectInitialWindow, selectPageBefore, transcriptIdOf } from '../../dashboard/server/services/conversation/window.js';
+import { selectInitialWindow, transcriptIdOf } from '../../dashboard/server/services/conversation/window.js';
 import {
   resolveAcpTranscriptPath,
   resolveCodexRolloutPath,
@@ -86,7 +86,7 @@ import { ACP_TRANSCRIPT_FILE } from '../runtimes/storage/acp.js';
 import { isKimiWirePath } from '../runtimes/storage/kimi-code.js';
 import { isBrowsableVaultId, vaultBrowseFilePath } from '../vault/browse.js';
 import { vaultIdFromBrowseName } from './conversation-vault-rows.js';
-import { resolveToolBodyEntry } from '../../dashboard/server/services/conversation/codex-transcript-ranges.js';
+import { resolveToolBodyEntry, selectHistoryPageBefore } from '../../dashboard/server/services/conversation/codex-transcript-ranges.js';
 
 export interface ConversationReadResult {
   body: unknown;
@@ -638,7 +638,7 @@ export async function getConversationMessagesRead(
       const parsed = await getCachedMessages(sessionFile, false);
       if (options.mode === 'page') {
         const transcript = transcriptIdOf(await stat(sessionFile));
-        return result(selectPageBefore(parsed, options.before, options.limit, transcript));
+        return result(await selectHistoryPageBefore(parsed, sessionFile, options.before, options.limit, transcript));
       }
       if (agentId === undefined && conv && !browseCopy && (parsed.totalCost > 0 || parsed.totalTokens > 0)) {
         updateConversationCost(name, parsed.totalCost, parsed.totalTokens);

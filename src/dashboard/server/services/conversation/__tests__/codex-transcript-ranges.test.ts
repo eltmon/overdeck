@@ -5,7 +5,12 @@ import { join } from 'node:path';
 import type { WorkLogEntry } from '@overdeck/contracts';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { withFullToolResult } from '../codex-transcript-ranges.js';
+import { decodeTimelineCursor } from '@overdeck/contracts';
+
+import { createCodexConversationAccumulator } from '../../codex-conversation-parser.js';
+import { createIncrementalTranscriptReader } from '../../incremental-transcript-reader.js';
+import { selectHistoryPageBefore, withFullToolResult } from '../codex-transcript-ranges.js';
+import { selectInitialWindow, selectPageBefore } from '../window.js';
 import { RECORD_FULL_READ_MAX_BYTES } from '../tool-result-bounds.js';
 import type { RecordLocation } from '../types.js';
 
@@ -68,3 +73,51 @@ describe('withFullToolResult (PAN-5211)', () => {
     expect(await withFullToolResult(file, new Map([['call_1', tooLong]]), stored)).toBe(stored);
   });
 });
+
+describe('selectHistoryPageBefore (PAN-5211)', () => {
+  const userLine = (i: number) => JSON.stringify({
+    type: 'event_msg',
+    timestamp: new Date(Date.UTC(2026, 10, 13) + i * 1000).toISOString(),
+    payload: { type: 'user_message', message: `message ${String(i).padStart(3, '0')} ${'m'.repeat(200)}` },
+  });
+
+  it('walks back through every older message from disk, once each and in order', async () => {
+    const lines = Array.from({ length: 300 }, (_, i) => userLine(i));
+    await writeLines(lines);
+    const lineBytes = Buffer.byteLength(lines[0]!) + 1;
+    // Memory holds about 50 messages; each disk step covers about 10.
+    const parsed = await createIncrementalTranscriptReader(createCodexConversationAccumulator, { tailReadBytes: 50 * lineBytes })(file);
+    expect(parsed.historyStartOffset).toBeGreaterThan(0);
+    expect(parsed.messages.length).toBeLessThan(60);
+    const options = { stepBytes: 10 * lineBytes, maxBytes: 64 * lineBytes };
+
+    const initial = selectInitialWindow(parsed);
+    expect(initial.window).toMatchObject({ hasOlder: true, bounded: true });
+    const seen = [...initial.messages];
+    let cursor = initial.window.cursor;
+    let lastPage = initial;
+    for (let guard = 0; guard < 200 && lastPage.window.hasOlder; guard++) {
+      lastPage = await selectHistoryPageBefore(parsed, file, decodeTimelineCursor(cursor!)!, 20, undefined, options);
+      expect(lastPage.window.bounded).toBe(true);
+      seen.unshift(...lastPage.messages);
+      cursor = lastPage.window.cursor;
+    }
+
+    expect(lastPage.window.hasOlder).toBe(false);
+    expect(seen.map((m) => m.text.slice(0, 11))).toEqual(lines.map((_, i) => `message ${String(i).padStart(3, '0')}`));
+    expect(new Set(seen.map((m) => m.id)).size).toBe(300);
+  });
+
+  it('returns the in-memory page unchanged for a conversation that is not bounded', async () => {
+    const lines = Array.from({ length: 30 }, (_, i) => userLine(i));
+    await writeLines(lines);
+    const parsed = await createIncrementalTranscriptReader(createCodexConversationAccumulator)(file);
+    const before = decodeTimelineCursor(selectInitialWindow(parsed, undefined, { maxRows: 10, maxBytes: 1024 * 1024 }).window.cursor!)!;
+
+    const page = await selectHistoryPageBefore(parsed, file, before, 5);
+
+    expect(page).toEqual(selectPageBefore(parsed, before, 5));
+    expect(page.window).not.toHaveProperty('bounded');
+  });
+});
+

@@ -99,6 +99,26 @@ export function createTranscriptLineSplitter(
   };
 }
 
+/**
+ * PAN-5211: scrub one raw transcript line and hand it to an accumulator. A line still over
+ * `recordParseMaxBytes` after the scrub goes to `pushOversized` with only its first bytes decoded.
+ * The location always describes the original (pre-scrub) bytes.
+ */
+export function pushTranscriptLine(
+  parser: Pick<Accumulator, 'push' | 'pushOversized'>,
+  line: Buffer,
+  location: RecordLocation,
+  recordParseMaxBytes: number = RECORD_PARSE_MAX_BYTES,
+): void {
+  if (line.length === 0) return;
+  const scrubbed = scrubImageDataUrls(line);
+  if (scrubbed.length > recordParseMaxBytes) {
+    parser.pushOversized?.(scrubbed.toString('utf8', 0, OVERSIZED_HEAD_BYTES), location);
+  } else {
+    parser.push(scrubbed.toString('utf8'), location);
+  }
+}
+
 interface Entry {
   generation: number;
   head: Buffer;
@@ -128,13 +148,7 @@ export function createIncrementalTranscriptReader(
   const newEntry = (file: string, stats: { dev: number; ino: number; mtimeMs: number }, start: number): Entry => {
     const parser = create(file, { historyStartOffset: start });
     const splitter = createTranscriptLineSplitter(start, (line, location) => {
-      if (line.length === 0) return;
-      const scrubbed = scrubImageDataUrls(line);
-      if (scrubbed.length > recordParseMaxBytes) {
-        parser.pushOversized?.(scrubbed.toString('utf8', 0, OVERSIZED_HEAD_BYTES), location);
-      } else {
-        parser.push(scrubbed.toString('utf8'), location);
-      }
+      pushTranscriptLine(parser, line, location, recordParseMaxBytes);
     });
     return {
       generation: ++generation, head: Buffer.alloc(0), tail: Buffer.alloc(0), dev: stats.dev, ino: stats.ino,

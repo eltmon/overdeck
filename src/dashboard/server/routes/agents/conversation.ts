@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import type { ConversationResponse, WorkLogEntry } from '@overdeck/contracts';
 import type { RecordLocation } from '../../services/conversation/types.js';
-import { resolveToolBodyEntry } from '../../services/conversation/codex-transcript-ranges.js';
+import { resolveToolBodyEntry, selectHistoryPageBefore } from '../../services/conversation/codex-transcript-ranges.js';
 import { Effect, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
@@ -21,7 +21,7 @@ import { parseOhmypiConversationMessages } from '../../services/ohmypi-conversat
 import { parseCodexConversationMessages } from '../../services/codex-conversation-parser.js';
 import { parseAcpConversationMessages } from '../../services/acp-conversation-parser.js';
 import { sharedTranscriptParser } from '../../services/shared-transcript-parser.js';
-import { readPageParams, selectInitialWindow, selectPageBefore, transcriptIdOf } from '../../services/conversation/window.js';
+import { readPageParams, selectInitialWindow, transcriptIdOf } from '../../services/conversation/window.js';
 import {
   listAgentTranscriptCandidates,
 } from '../../../../lib/agents/transcript-resolver.js';
@@ -286,7 +286,9 @@ export async function buildAgentConversationWindowResult(
   const result = await buildAgentConversationResult(id, subagentId === null ? {} : { subagentId });
   if (result.status !== 200) return result;
   if (page) {
-    return { status: 200, body: selectPageBefore(result.body, page.before, page.limit, await transcriptIdAt(result.transcriptPath)) };
+    const input = { ...result.body, historyStartOffset: result.historyStartOffset };
+    const transcript = await transcriptIdAt(result.transcriptPath);
+    return { status: 200, body: await selectHistoryPageBefore(input, result.transcriptPath, page.before, page.limit, transcript) };
   }
   if (query.get('window') === 'initial') {
     const input = { ...result.body, historyStartOffset: result.historyStartOffset };
