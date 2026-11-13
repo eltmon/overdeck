@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5211",
   "created": "2026-11-13T22:53:14.172Z",
-  "updated": "2026-11-13T23:04:54.985Z",
+  "updated": "2026-11-13T23:06:11.461Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,9 +112,18 @@
       "doneAt": "2026-11-13T23:04:53.013Z"
     },
     "wi12-ohmypi-kimi-bounds": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5211",
-      "claimedAt": "2026-11-13T23:04:54.984Z"
+      "claimedAt": "2026-11-13T23:04:54.984Z",
+      "doneAt": "2026-11-13T23:06:11.461Z"
+    },
+    "wi12-ohmypi-kimi-bounds.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:06:11.461Z"
+    },
+    "wi12-ohmypi-kimi-bounds.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-13T23:06:11.461Z"
     }
   }
 }
