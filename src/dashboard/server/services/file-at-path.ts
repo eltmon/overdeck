@@ -29,7 +29,7 @@ const MAX_FILE_AT_PATH_BYTES = 1024 * 1024;
 const MAX_PATH_LENGTH = 4096;
 const MARKDOWN_EXTENSIONS = new Set(['.md', '.mdx', '.markdown']);
 
-function isInsidePath(parent: string, child: string): boolean {
+export function isInsidePath(parent: string, child: string): boolean {
   return child === parent || child.startsWith(`${parent}${sep}`);
 }
 
