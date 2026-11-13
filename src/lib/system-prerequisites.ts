@@ -27,6 +27,7 @@ import { hostTerminalBackendName } from './terminal-backends/select.js';
 import type { TerminalBackendName } from './terminal-backends/types.js';
 
 const execFileAsync = promisify(execFile);
+const PI_INSTALL_COMMAND = 'npm install -g @earendil-works/pi-coding-agent';
 
 export interface PrerequisiteInstallHints {
   linux: string;
@@ -190,6 +191,19 @@ export const PREREQUISITES: readonly PrerequisiteDefinition[] = [
       linux: CODEX_CLI_INSTALL_COMMAND,
       mac: CODEX_CLI_INSTALL_COMMAND,
       win: CODEX_CLI_INSTALL_COMMAND,
+    },
+  },
+  {
+    // PAN-5212: the default harness for non-Anthropic, non-OpenAI providers.
+    id: 'pi',
+    name: 'Pi Coding Agent',
+    required: false,
+    purpose: 'Pi harness — default for Google, xAI, MiniMax, Z.AI, MiMo, OpenRouter, Nous, DashScope, Groq, Cerebras and Mistral models',
+    versionArgs: ['--version'],
+    install: {
+      linux: PI_INSTALL_COMMAND,
+      mac: PI_INSTALL_COMMAND,
+      win: PI_INSTALL_COMMAND,
     },
   },
   {

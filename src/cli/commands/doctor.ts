@@ -20,6 +20,7 @@ import { getProjectPanPaths } from '../../lib/pan-dir/paths.js';
 import { getMainDivergence, type MainDivergence } from '../../lib/state-plane.js';
 import { checkKimi } from './doctor-kimi.js';
 import { checkGrok } from './doctor-grok.js';
+import { checkPi } from './doctor-pi.js';
 import { checkHostTools } from './doctor-host-tools.js';
 import { checkSageox } from './doctor-sageox.js';
 import { checkAtlassianMcp } from './doctor-atlassian.js';
@@ -727,9 +728,10 @@ export async function collectDoctorChecks(options: DoctorOptions = {}): Promise<
   // PAN-5153: who acts on each GitHub owner; never crashes doctor.
   checks.push(...await checkGitHubIdentityRows());
 
-  // oh-my-pi / omp (ohmypi harness — PAN-1989, replaces pi PAN-636).
-  // omp is optional: missing → warn (or error under --strict). When installed, version
-  // is compared against SUPPORTED_OMP_VERSION_MIN and the bundled extension is checked.
+  // pi (PAN-5212, the default for non-Anthropic, non-OpenAI providers) and
+  // oh-my-pi / omp (PAN-1989). Both are optional: missing → warn (or error under
+  // --strict). When installed, the version floor and the bundled extension are checked.
+  for (const c of await checkPi(options.strict ?? false)) checks.push(c);
   for (const c of checkOhmypi(options.strict ?? false)) checks.push(c);
 
   // Codex CLI (alternative harness — PAN-1574). Optional: missing → warn.
