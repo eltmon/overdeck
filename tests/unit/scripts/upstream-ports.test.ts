@@ -62,6 +62,21 @@ describe('upstream-port-diff.sh --check', () => {
     expect(run.stdout.trim()).toBe('upstream-ports: 1 records OK');
   });
 
+  it('checks a .css port against the header written as /* ... */ comments (PAN-5188)', async () => {
+    const root = await tempDir('upstream-ports-css-');
+    await writeFile(join(root, 'x.css'), `/* ${ORCA_HEADER.slice(3)} */\n/* upstream: lib/x.css @ abc1234 */\na {}\n`);
+    await writeFile(join(root, 'bad.css'), `${ORCA_HEADER}\n// upstream: lib/x.css @ abc1234\n`);
+    const portsFile = join(root, 'ports.json');
+    const record = (local: string) => ({ local, upstream: 'orca', path: 'lib/x.css', commit: 'abc1234' });
+    await writeFile(portsFile, JSON.stringify([record('x.css')]));
+    const ok = await runScript(['--check'], { UPSTREAM_PORTS_FILE: portsFile, UPSTREAM_PORTS_ROOT: root });
+    expect(ok.code).toBe(0);
+    await writeFile(portsFile, JSON.stringify([record('bad.css')]));
+    const bad = await runScript(['--check'], { UPSTREAM_PORTS_FILE: portsFile, UPSTREAM_PORTS_ROOT: root });
+    expect(bad.code).toBe(1);
+    expect(bad.stdout).toContain('bad.css: first 10 lines lack the header');
+  });
+
   it.each([
     ['a wrong commit in the header', `${ORCA_HEADER}\n// upstream: lib/x.ts @ fff9999\n`],
     ['a missing header', 'export {};\n'],

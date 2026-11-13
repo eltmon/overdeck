@@ -69,7 +69,7 @@ repo_for() {
 check() {
   local data
   data="$(records)" || exit 1
-  local failed=0 count=0 local_path upstream path commit file header head10
+  local failed=0 count=0 local_path upstream path commit file header head10 origin_line
   while IFS=$'\t' read -r local_path upstream path commit; do
     [[ -z "$local_path$upstream$path$commit" ]] && continue
     count=$((count + 1))
@@ -93,13 +93,19 @@ check() {
       echo "upstream-ports: $local_path: commit '$commit' is not 7-40 lowercase hex"
       failed=1
     fi
+    origin_line="// upstream: $path @ $commit"
+    # CSS has no line comments: a .css port carries the same two lines as /* ... */ (PAN-5188).
+    if [[ "$local_path" == *.css ]]; then
+      header="/* ${header#// } */"
+      origin_line="/* upstream: $path @ $commit */"
+    fi
     head10="$(head -n 10 "$file")"
     if ! grep -qxF -- "$header" <<<"$head10"; then
       echo "upstream-ports: $local_path: first 10 lines lack the header '$header'"
       failed=1
     fi
-    if ! grep -qxF -- "// upstream: $path @ $commit" <<<"$head10"; then
-      echo "upstream-ports: $local_path: first 10 lines lack '// upstream: $path @ $commit'"
+    if ! grep -qxF -- "$origin_line" <<<"$head10"; then
+      echo "upstream-ports: $local_path: first 10 lines lack '$origin_line'"
       failed=1
     fi
   done <<<"$data"

@@ -1,3 +1,5 @@
+// Ported from t3code (MIT, Copyright (c) 2026 T3 Tools Inc.)
+// upstream: packages/shared/src/filePreview.ts @ 2d8a843e6b
 /**
  * Viewer router (PAN-5188 §6.6). Maps a root-relative path and its
  * explorerReadFile result to the viewer that shows it. The extension rows are

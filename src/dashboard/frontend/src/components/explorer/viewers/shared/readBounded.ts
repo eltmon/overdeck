@@ -1,5 +1,6 @@
 // Ported from t3code (MIT, Copyright (c) 2026 T3 Tools Inc.)
-// upstream: apps/web/src/components/files/readBoundedDocument.ts, apps/web/src/components/files/readBinaryPreview.ts @ 2d8a843e6b
+// upstream: apps/web/src/components/files/readBoundedDocument.ts @ 2d8a843e6b
+// upstream: apps/web/src/components/files/readBinaryPreview.ts @ 2d8a843e6b
 /**
  * Fetch a file into memory with a byte cap, failing as soon as the body passes
  * it. readBinaryPreview's limit was the archive cap; here it is a parameter.
