@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5176",
   "created": "2026-11-13T05:00:59.712Z",
-  "updated": "2026-11-13T07:52:59.137Z",
+  "updated": "2026-11-13T07:53:03.056Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -201,6 +201,11 @@
     "ci-bare-host-macos.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T07:52:59.136Z"
+    },
+    "ci-known-bad-canary": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5176",
+      "claimedAt": "2026-11-13T07:53:03.056Z"
     }
   },
   "feedback": [
