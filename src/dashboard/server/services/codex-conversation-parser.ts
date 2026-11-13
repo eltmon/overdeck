@@ -115,7 +115,9 @@ export function createCodexConversationAccumulator(sessionFile: string) {
   const workLog: WorkLogEntry[] = [];
   const compactBoundaries: CompactBoundary[] = [];
   // Matches function_call → function_call_output by call_id within this parse.
-  const toolCallsByCallId = new Map<string, WorkLogEntry>();
+  // PAN-5211: holds the call row's absolute work-log index (rows dropped so far + array position).
+  const toolCallsByCallId = new Map<string, number>();
+  let droppedWorkLogRows = 0;
   let totalTokens = 0;
   let sequence = 0;
   // The trailing agent_message, if the file ends on one. Codex narrates
@@ -189,18 +191,18 @@ export function createCodexConversationAccumulator(sessionFile: string) {
           ...(command ? { command } : args ? { detail: args } : {}),
         };
         workLog.push(wl);
-        if (callId) toolCallsByCallId.set(callId, wl);
+        if (callId) toolCallsByCallId.set(callId, droppedWorkLogRows + workLog.length - 1);
       } else if (ptype === 'function_call_output' || ptype === 'custom_tool_call_output') {
         const callId = typeof payload.call_id === 'string' ? payload.call_id : '';
         // PAN-5211: images become placeholders and long text keeps its head and tail.
         const output = boundToolResultText(extractCodexToolOutput(payload.output)).text;
-        const wl = callId ? toolCallsByCallId.get(callId) : undefined;
+        const absolute = callId ? toolCallsByCallId.get(callId) : undefined;
+        const position = absolute === undefined ? -1 : absolute - droppedWorkLogRows;
+        const wl = position >= 0 ? workLog[position] : undefined;
         if (wl) {
-          if (output) {
-            const index = workLog.indexOf(wl);
-            workLog[index] = { ...wl, result: output };
-          }
-          if (callId) toolCallsByCallId.delete(callId);
+          // A replaced entry is a new object, so earlier result() snapshots keep their own entry.
+          if (output) workLog[position] = { ...wl, result: output };
+          toolCallsByCallId.delete(callId);
         } else if (output) {
           // Output with no matching call (truncated/rotated) — stand-alone entry.
           sequence += 1;

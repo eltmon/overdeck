@@ -249,3 +249,32 @@ describe('codex conversation parser — bounded tool results', () => {
     expect(stored.replace(/\n\n… \[[\d,]+ characters omitted\] …\n\n/, '').length).toBeLessThanOrEqual(65_536);
   });
 });
+
+/** PAN-5211: outputs attach through the stored call index, not a linear search. */
+describe('codex conversation parser — stored call index', () => {
+  const record = (payload: object) => JSON.stringify({ type: 'response_item', timestamp: '2026-11-13T00:00:00.000Z', payload });
+
+  it('attaches 5,000 interleaved outputs to their calls', () => {
+    const accumulator = createCodexConversationAccumulator('/nonexistent/rollout.jsonl');
+    for (let i = 0; i < 5_000; i++) {
+      accumulator.push(record({ type: 'function_call', name: 'exec_command', arguments: '{"cmd":"true"}', call_id: `call-${i}` }));
+      if (i > 0) accumulator.push(record({ type: 'function_call_output', call_id: `call-${i - 1}`, output: `out-${i - 1}` }));
+    }
+    accumulator.push(record({ type: 'function_call_output', call_id: 'call-4999', output: 'out-4999' }));
+
+    const { workLog } = accumulator.result(0, 0);
+    expect(workLog).toHaveLength(5_000);
+    for (let i = 0; i < 5_000; i++) expect(workLog[i]?.result).toBe(`out-${i}`);
+  });
+
+  it('leaves an earlier snapshot entry without the result that arrived later', () => {
+    const accumulator = createCodexConversationAccumulator('/nonexistent/rollout.jsonl');
+    accumulator.push(record({ type: 'function_call', name: 'exec_command', arguments: '{"cmd":"ls"}', call_id: 'call-a' }));
+    const before = accumulator.result(0, 0);
+    accumulator.push(record({ type: 'function_call_output', call_id: 'call-a', output: 'listing' }));
+    const after = accumulator.result(0, 0);
+
+    expect(before.workLog[0]?.result).toBeUndefined();
+    expect(after.workLog[0]?.result).toBe('listing');
+  });
+});
