@@ -282,3 +282,61 @@ describe('codex conversation parser — stored call index', () => {
     expect(after.workLog[0]?.result).toBe('listing');
   });
 });
+
+/** PAN-5211 D8: an over-cap accumulator keeps a window of its newest rows. */
+describe('codex conversation parser — in-memory window', () => {
+  const event = (payload: object) => JSON.stringify({ type: 'event_msg', timestamp: '2026-11-13T00:00:00.000Z', payload });
+
+  function pushRows(count: number, onPush?: (result: ReturnType<ReturnType<typeof createCodexConversationAccumulator>['result']>) => void) {
+    const accumulator = createCodexConversationAccumulator('/nonexistent/rollout.jsonl', {
+      maxRetainedChars: 20_000, windowTargetChars: 15_000,
+    });
+    let offset = 0;
+    let lastRowOffset = 0;
+    for (let i = 0; i < count; i++) {
+      const text = event({ type: 'user_message', message: `row ${i} ${'x'.repeat(950)}` });
+      lastRowOffset = offset;
+      accumulator.push(text, { offset, length: Buffer.byteLength(text) });
+      offset += Buffer.byteLength(text) + 1;
+      const tokens = event({ type: 'token_count', info: { total_token_usage: { input_tokens: 0, output_tokens: 0, total_tokens: (i + 1) * 100 } } });
+      accumulator.push(tokens, { offset, length: Buffer.byteLength(tokens) });
+      offset += Buffer.byteLength(tokens) + 1;
+      onPush?.(accumulator.result(offset, 0));
+    }
+    return { accumulator, lastRowOffset };
+  }
+
+  it('keeps at most maxRetainedChars and the newest row', () => {
+    const { accumulator } = pushRows(200);
+    const result = accumulator.result(0, 0);
+
+    expect(accumulator.retainedChars()).toBeLessThanOrEqual(20_000);
+    expect(result.messages.length).toBeLessThan(200);
+    expect(result.messages[result.messages.length - 1]?.text.startsWith('row 199 ')).toBe(true);
+  });
+
+  it('reports the oldest kept row as historyStartOffset and keeps totals for all rows', () => {
+    const { accumulator, lastRowOffset } = pushRows(200);
+    const result = accumulator.result(0, 0);
+
+    expect(result.historyStartOffset).toBe(result.messages[0]?.sequence);
+    expect(result.historyStartOffset).toBeGreaterThan(0);
+    expect(result.totalTokens).toBe(200 * 100);
+    expect(result.lastSequence).toBe(lastRowOffset);
+  });
+
+  it('keeps the kept-row prefix identical across appends between two slides', () => {
+    const snapshots: string[][] = [];
+    pushRows(200, (result) => snapshots.push(result.messages.map((m) => m.id)));
+
+    let slides = 0;
+    for (let i = 1; i < snapshots.length; i++) {
+      const previous = snapshots[i - 1]!;
+      const next = snapshots[i]!;
+      if (next[0] === previous[0]) expect(next.slice(0, previous.length)).toEqual(previous);
+      else slides += 1;
+    }
+    expect(slides).toBeGreaterThan(1);
+    expect(slides).toBeLessThan(snapshots.length / 3);
+  });
+});

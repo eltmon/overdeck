@@ -43,6 +43,8 @@ import {
   boundToolResultText,
   estimateMessageChars,
   estimateWorkLogEntryChars,
+  TRANSCRIPT_ENTRY_MAX_RETAINED_CHARS,
+  TRANSCRIPT_WINDOW_TARGET_CHARS,
 } from './conversation/tool-result-bounds.js';
 
 interface CodexTokenUsage {
@@ -118,6 +120,10 @@ export interface CodexAccumulatorOptions {
   readonly historyStartOffset?: number;
   /** PAN-5211: reports each new message row's counter-form id next to its offset-form id (bookmark migration). */
   readonly onRowCreated?: (legacyId: string, id: string) => void;
+  /** PAN-5211: a push that leaves more retained characters than this drops the oldest rows. */
+  readonly maxRetainedChars?: number;
+  /** PAN-5211: the retained characters a window slide shrinks to. */
+  readonly windowTargetChars?: number;
 }
 
 /** Incremental rollout accumulator; each JSONL record is consumed once per cached file. */
@@ -139,7 +145,11 @@ export function createCodexConversationAccumulator(sessionFile: string, options:
   let trailingAgentMessageAt: string | undefined;
   // PAN-5211: retained characters of every kept row (see tool-result-bounds.ts).
   let retained = 0;
-  const historyStart = options.historyStartOffset ?? 0;
+  let historyStart = options.historyStartOffset ?? 0;
+  const maxRetainedChars = options.maxRetainedChars ?? TRANSCRIPT_ENTRY_MAX_RETAINED_CHARS;
+  const windowTargetChars = options.windowTargetChars ?? TRANSCRIPT_WINDOW_TARGET_CHARS;
+  // True once any record arrived with a location, so row sequences are record offsets.
+  let located = false;
   // PAN-5211: byte location of each kept tool result's record, keyed by call_id (expand reads it).
   const resultLocations = new Map<string, RecordLocation>();
   // Sequence of the newest row; equals the legacy counter when no locations are given.
@@ -167,7 +177,41 @@ export function createCodexConversationAccumulator(sessionFile: string, options:
     workLog[position] = next;
   };
 
+  // PAN-5211 D8: drop the oldest rows (lowest sequence first, across both arrays) until the window holds
+  // at most windowTargetChars, keeping at least one row. The hysteresis between the two limits means the
+  // kept-row prefix changes once per slide, not once per append.
+  const dropOldest = (): void => {
+    let m = 0;
+    let w = 0;
+    while (retained > windowTargetChars && messages.length - m + workLog.length - w > 1) {
+      const message = messages[m];
+      const work = workLog[w];
+      if (message && (!work || (message.sequence ?? 0) <= (work.sequence ?? 0))) {
+        retained -= estimateMessageChars(message);
+        m += 1;
+      } else if (work) {
+        retained -= estimateWorkLogEntryChars(work);
+        toolCallsByCallId.delete(work.id);
+        resultLocations.delete(work.id);
+        w += 1;
+      }
+    }
+    messages.splice(0, m);
+    workLog.splice(0, w);
+    droppedWorkLogRows += w;
+    if (located) {
+      const oldest = Math.min(messages[0]?.sequence ?? Infinity, workLog[0]?.sequence ?? Infinity);
+      if (Number.isFinite(oldest)) historyStart = oldest;
+    }
+  };
+
   const push = (line: string, location?: RecordLocation): void => {
+    if (location) located = true;
+    consume(line, location);
+    if (retained > maxRetainedChars) dropOldest();
+  };
+
+  const consume = (line: string, location?: RecordLocation): void => {
     costs.push(line);
     let entry: CodexEntry;
     try {
