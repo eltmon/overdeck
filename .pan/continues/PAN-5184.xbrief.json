@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5184",
   "created": "2026-11-13T13:50:17.317Z",
-  "updated": "2026-11-13T13:55:07.040Z",
+  "updated": "2026-11-13T13:55:14.771Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
     "draft-module.ac3": {
       "status": "completed",
       "doneAt": "2026-11-13T13:55:07.040Z"
+    },
+    "store-held-order": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5184",
+      "claimedAt": "2026-11-13T13:55:14.771Z"
     }
   }
 }
