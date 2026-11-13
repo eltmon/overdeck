@@ -1635,9 +1635,10 @@ before. A test that needs a missing tool calls
 The file explorer's server half lives in `src/dashboard/server/services/explorer/`
 and is reached only through the 14 `pan.explorer*` RPC methods on `/ws/rpc`. Their
 handlers are in `src/dashboard/server/ws-rpc-explorer.ts`, which ws-rpc.ts spreads
-into `PanRpcGroup.of`. Schemas are in `packages/contracts/src/explorer.ts`. No
-HTTP route exists, and the methods have no `RPC_METHOD_SCOPES` entry, so they
-default to the `admin` scope.
+into `PanRpcGroup.of`. Schemas are in `packages/contracts/src/explorer.ts`. The
+methods have no `RPC_METHOD_SCOPES` entry, so they default to the `admin` scope.
+File bytes move over the download and upload HTTP routes instead (see
+"Viewers, download and upload" below).
 
 ### Roots and path safety
 
@@ -1768,6 +1769,7 @@ upstream, its license and the source path and commit:
 // upstream: src/shared/file-write/disk-baseline-signature.ts @ c6b9ac9549b
 ```
 
+A `.css` port carries the same two lines as `/* ... */` comments.
 `scripts/upstream-ports.json` holds one record per ported file and upstream
 path. `npm run lint` runs `scripts/upstream-port-diff.sh --check`, which
 fails when a record and its file's header disagree. Run
@@ -1839,3 +1841,84 @@ pane's root element handles them while focus is inside the pane, and calls
 global binding. Quick open queries 120 ms after the last keystroke; content
 search runs 300 ms after the last change, or at once on Enter. **Find in
 folder** opens content search scoped to that folder.
+
+### Viewers, download and upload (PAN-5188)
+
+Non-text files and file bytes move over two HTTP routes in
+`src/dashboard/server/routes/explorer.ts`, never over RPC frames. Both have an
+explicit `admin` row in `ROUTE_SCOPES` and check the dashboard credential
+themselves, because the remote request gate lets trusted local callers through.
+
+- `GET /api/explorer/download?root=<rootId>&path=<rel>&inline=0|1` streams a
+  regular file's bytes, or a folder (or the root, when `path` is empty) as
+  `<name>.tar.gz`. Other query parameters, such as the client's `rev`
+  cache-buster, are ignored.
+- `POST /api/explorer/upload?root=<rootId>&dir=<rel>&name=<filename>` takes a
+  raw `application/octet-stream` body and writes one new file, answering
+  `201 { path, size, mtimeMs }`.
+
+**Downloads are never active content.** Repo files are served from the
+dashboard origin, so a file that ran script would run with the operator's
+session. `services/explorer/download-headers.ts` picks the content type by
+extension: HTML, XHTML and XML files go out as `text/plain; charset=utf-8`, and
+SVG goes out as `image/svg+xml` but always as an attachment. `inline=1` gives
+`Content-Disposition: inline` only for the passive allow-list (raster images,
+PDF, audio, fonts, `text/plain`, `text/csv`). Every response carries
+`X-Content-Type-Options: nosniff`, the `Content-Security-Policy: sandbox;
+default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'` header and
+`Cache-Control: no-store`.
+
+**Range requests.** The file route answers a single range (`bytes=a-b`,
+`bytes=a-`, `bytes=-n`) with `206` and `Content-Range`, an unsatisfiable range
+with `416` and `Content-Range: bytes */<size>`, and a malformed or multi-range
+header with the full body. The large-text viewer reads its first screen and its
+index through ranges, and `<audio>` needs them to seek. The file is opened with
+`O_RDONLY | O_NONBLOCK` and `fstat`-checked, so a FIFO or a device answers 404
+instead of hanging the route; a client that disconnects closes the handle.
+
+**Folder downloads** spawn the system `tar` (`services/explorer/folder-archive.ts`)
+with member names fed NUL-separated on stdin, so no name is read as an option,
+and without `-h`, so symlinks are archived as links. The watcher's heavy-folder
+list (`node_modules`, `.git`, `dist`, `build` and the rest of
+`WATCHER_IGNORE_DIRS`) is left out at every depth, except the requested folder's
+own name; `workspaces/` is left out at the top of a project root. Closing the
+download kills `tar`.
+
+**Uploads** run the dashboard mutation guard with
+`rejectUnsafeDashboardMutationRequest(request, { contentType:
+'application/octet-stream' })`: the same credential, Origin and CSRF-token
+checks as every write, and a body type that a cross-site page cannot send
+without a CORS preflight. The body is capped at 100 MiB (`413 FILE_TOO_LARGE`,
+from `Content-Length` before any byte is read, or as soon as the count passes
+the cap). It streams to a `.overdeck-upload-<hex>` temp file in the target
+directory and commits with link-then-unlink, so a name that exists, or appears
+while the body streams, answers `409 ALREADY_EXISTS` and is never replaced. A
+project root answers `409 EDIT_WORKSPACE_REQUIRED`.
+
+**Viewers** live in `src/dashboard/frontend/src/components/explorer/viewers/`
+and read bytes only through the download route (`explorer-http.ts` builds the
+URLs and posts uploads). `viewer-router.ts` `pickViewer(path, read)` chooses
+one per file, extension rows first:
+
+- SQLite (`.sqlite`, `.sqlite3`, `.db` binary reads): the archive and SQLite
+  viewer lists tables read-only, with `PRAGMA query_only=ON`.
+- PDF: the ported pdf.js viewer, with page virtualization, zoom and find, up to
+  50 MB and 2,000 pages. The browser's built-in PDF viewer is never used, since
+  the sandbox CSP stops Chromium from running it.
+- Raster images: an `<img>` with a Fit / Actual size toggle. A TIFF the browser
+  cannot show is decoded to PNG in a worker. HEIC/HEIF has no decoder, because
+  `heic-to` is LGPL, so it falls back to the binary card.
+- SVG: read as text and shown through a `data:` URL, never as a document.
+- Audio: the browser's `<audio controls>`.
+- Fonts: a specimen in a `sandbox=""` iframe, after `FontFace` validates the file.
+- Archives (`zip`, `jar`, `tar`, `gz`, `tgz`): entry lists with folder
+  navigation and image or text entry previews, within t3code's bounds.
+- CSV/TSV text reads: a virtualized table. Large text: the large-text viewer,
+  which indexes up to 256 MB in a worker.
+- Anything else: the binary card, with the size and a Download link.
+
+`FileViewer.tsx` is the seam a code pane mounts for any read that is not
+`'text'`; it lazy-loads the chosen viewer, so pdf.js, sql.js, jszip and tiff
+stay out of the entry bundle. Workers build as ES modules (`worker: { format:
+'es' }` in `vite.config.ts`), and the `pdfjs-dist-assets` alias points the
+pdf.js font, cmap and wasm globs at the real package folder.
