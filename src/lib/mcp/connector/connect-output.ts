@@ -28,6 +28,7 @@ export const CONNECT_CODES = [
   'machine-not-in-account',
   'machine-offline',
   'relay-plan-needed',
+  'no-webrtc-egress',
   'machine-unreachable',
   'pairing-code-refused',
   'key-mismatch',
@@ -54,6 +55,8 @@ export const CONNECT_NEXT: Readonly<Record<ConnectCode, string>> = {
   'machine-not-in-account': `You signed in with an account that does not own this machine. To fix it, ${LOGOUT_THEN_RERUN}, and ask the user to authorize with the account their Overdeck uses.`,
   'machine-offline': 'The machine is offline. Ask the user to start Overdeck there, then run the same command again.',
   'relay-plan-needed': 'This network blocks direct connections and the account has no relay plan. Tell the user.',
+  'no-webrtc-egress':
+    'This computer got no TURN relay connection. The usual cause is an environment that blocks TLS to turn.cloudflare.com:443 and UDP; then running this again will not help. Tell the user and ask them to run pan doctor on their machine: if its TURN relay row is ok, use Public MCP or run the connector on a host with WebRTC egress; if it warns too, the relay is down and this command can be run again once it passes. See https://overdeck.ai/configuration/bots#no-webrtc-egress',
   'machine-unreachable': 'The machine could not be reached. Run the same command again in a minute.',
   'pairing-code-refused': `The pairing code expired, was cancelled or was already used. ${COPY_AGAIN}`,
   'key-mismatch': `The machine's key does not match the message. ${COPY_AGAIN}`,

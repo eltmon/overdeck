@@ -69,6 +69,17 @@ describe('failureStatus (FR-7)', () => {
     }
     expect(failureStatus('pairing-failed', 'HTTP 500')).toMatchObject({ code: 'pairing-failed', detail: 'HTTP 500' });
   });
+
+  it('makes no-webrtc-egress a non-retryable error that points to Public MCP and pan doctor (PAN-5242)', () => {
+    expect(failureStatus('no-webrtc-egress').status).toBe('error');
+    expect(exitCodeFor(failureStatus('no-webrtc-egress'))).toBe(1);
+    const next = CONNECT_NEXT['no-webrtc-egress'];
+    expect(next).toContain('turn.cloudflare.com:443');
+    expect(next).toContain('Public MCP');
+    expect(next).toContain('pan doctor');
+    expect(next).toContain('will not help');
+    expect(next).toContain('https://overdeck.ai/configuration/bots#no-webrtc-egress');
+  });
 });
 
 describe('registrationFor (FR-6)', () => {
