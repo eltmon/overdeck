@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5224",
   "created": "2026-11-14T03:12:38.408Z",
-  "updated": "2026-11-14T04:38:02.698Z",
+  "updated": "2026-11-14T04:38:10.794Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -238,6 +238,11 @@
     "derived-refresh-last-start-wins.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T04:38:02.698Z"
+    },
+    "docs-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5224",
+      "claimedAt": "2026-11-14T04:38:10.794Z"
     }
   }
 }
