@@ -37,6 +37,15 @@
         "value": "cubic-bezier(.34, 1.56, .64, 1)",
         "createdAt": "2026-08-27T02:02:43.886Z",
         "reason": "User confirmed the Broadsheet --ease-spring token is intentional (PAN-3706 design system)"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          ".tmp/conversation-changes-files-mockup.html"
+        ],
+        "createdAt": "2026-11-14T17:58:54.623Z",
+        "reason": "Claude: flagged elements are compact inline badges, keycaps and counters in a data-dense developer UI, matching the Overdeck style guide's badge pattern; throwaway mockup in gitignored .tmp"
       }
     ]
   }
