@@ -98,8 +98,8 @@ describe('resolveHarness', () => {
     await expect(resolveHarness({ model: 'claude-sonnet-4-6' })).resolves.toBe('claude-code');
     await expect(resolveHarness({ model: 'gpt-5.5' })).resolves.toBe('codex');
     await expect(resolveHarness({ model: 'kimi-k2.6' })).resolves.toBe('kimi-code');
-    await expect(resolveHarness({ model: 'gemini-3.1-pro-preview' })).resolves.toBe('ohmypi');
-    await expect(resolveHarness({ model: 'glm-5.1' })).resolves.toBe('ohmypi');
+    await expect(resolveHarness({ model: 'gemini-3.1-pro-preview' })).resolves.toBe('pi');
+    await expect(resolveHarness({ model: 'glm-5.1' })).resolves.toBe('pi');
   });
 
   it('rejects unknown model ids before choosing a harness', async () => {
