@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5236",
   "created": "2026-11-14T04:12:49.397Z",
-  "updated": "2026-11-14T04:41:22.715Z",
+  "updated": "2026-11-14T04:41:31.166Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,11 @@
     "mount-app-shell.ac2": {
       "status": "completed",
       "doneAt": "2026-11-14T04:41:22.715Z"
+    },
+    "mount-mobile-shell": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5236",
+      "claimedAt": "2026-11-14T04:41:31.166Z"
     }
   }
 }
