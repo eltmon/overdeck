@@ -200,20 +200,22 @@ describe('IssueDrawer', () => {
     expect(screen.getByTestId('drawer-tab-tasks-count')).not.toHaveClass('rounded-full');
     expect(screen.getByTestId('drawer-tab-session')).toHaveTextContent('Conversation');
     expect(screen.getByTestId('drawer-tab-overview')).toHaveTextContent('Details');
+    expect(screen.getByTestId('drawer-tab-plan')).toHaveTextContent('Plan');
+    expect(screen.getByTestId('drawer-tab-changes')).toHaveTextContent('Changes');
     expect(
       within(screen.getByTestId('drawer-tabs')).getAllByRole('tab').map((button) => button.getAttribute('data-testid')),
     ).toEqual([
       'drawer-tab-session',
       'drawer-tab-tasks',
       'drawer-tab-plan',
-      'drawer-tab-files',
+      'drawer-tab-changes',
       'drawer-tab-activity',
-      'drawer-tab-artifacts',
+      'drawer-tab-discussion',
       'drawer-tab-skills',
       'drawer-tab-overview',
     ]);
 
-    fireEvent.click(screen.getByTestId('drawer-tab-files'));
+    fireEvent.click(screen.getByTestId('drawer-tab-changes'));
 
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'files' });
     expect(window.location.search).toBe('?issue=PAN-1&tab=files');
@@ -292,7 +294,7 @@ describe('IssueDrawer', () => {
 
     renderDrawer();
 
-    expect(screen.getByTestId('drawer-tab-artifacts')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('drawer-tab-changes')).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByTestId('drawer-tab-panel-artifacts')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/PAN-1/artifacts');
 

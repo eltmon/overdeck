@@ -49,6 +49,14 @@ describe('PipelineStripView', () => {
     expect(within(work).getByTestId('pipeline-step-pulse')).toBeInTheDocument();
   });
 
+  it('a phase with a live pane and no agent is live and disabled', () => {
+    render(<PipelineStripView rail={RAIL} livePhases={new Set<Phase>(['review'])} />);
+    const review = phaseButton('review');
+    expect(review).toHaveAttribute('data-kind', 'live');
+    expect(review).toBeDisabled();
+    expect(review.title).toBe('Review is running');
+  });
+
   it('a paused phase wins over live', () => {
     render(
       <PipelineStripView

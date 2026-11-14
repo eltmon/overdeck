@@ -12,6 +12,7 @@
  */
 import { Fragment, useMemo, type ReactNode } from 'react';
 import { Check, CircleAlert, Pause } from 'lucide-react';
+import { presenceForPaneState } from '@overdeck/contracts';
 
 import type { Agent } from '../../types';
 import { cn } from '../../lib/utils';
@@ -53,7 +54,7 @@ export function usePipelineRail(issueId: string) {
     }
     return out;
   }, [phaseTimeline]);
-  return { rail, meta, derived };
+  return { rail, meta, derived, panes };
 }
 
 const KIND_TEXT: Record<PipelineStepKind, string> = {
@@ -114,6 +115,8 @@ export interface PipelineStripViewProps {
   rail: PhaseRailState;
   agents?: Partial<Record<Phase, PhaseAgentInfo>>;
   pausedPhases?: ReadonlySet<Phase>;
+  /** Phases with a live backend pane of that role, agent or not (D-13, FR-7). */
+  livePhases?: ReadonlySet<Phase>;
   meta?: Partial<Record<Phase, string>>;
   /** The phase whose agent's conversation is showing. */
   activePhase?: Phase | null;
@@ -124,7 +127,7 @@ export interface PipelineStripViewProps {
   className?: string;
 }
 
-export function PipelineStripView({ rail, agents, pausedPhases, meta, activePhase, reviewCount, onSelectPhase, children, className }: PipelineStripViewProps) {
+export function PipelineStripView({ rail, agents, pausedPhases, livePhases, meta, activePhase, reviewCount, onSelectPhase, children, className }: PipelineStripViewProps) {
   return (
     <div
       data-component="pipeline-strip"
@@ -135,7 +138,7 @@ export function PipelineStripView({ rail, agents, pausedPhases, meta, activePhas
         {PHASES.map((phase, index) => {
           const state = rail[phase];
           const info = agents?.[phase];
-          const kind = pipelineStepKind(phase, state, info?.live === true, pausedPhases?.has(phase) === true);
+          const kind = pipelineStepKind(phase, state, info?.live === true || livePhases?.has(phase) === true, pausedPhases?.has(phase) === true);
           const clickable = !!onSelectPhase && info?.hasConversation === true;
           const selected = activePhase === phase;
           return (
@@ -191,7 +194,7 @@ export interface IssuePipelineStripProps {
 }
 
 export function IssuePipelineStrip({ issueId, agents, activeAgentId, onOpenAgentConversation, children, className }: IssuePipelineStripProps) {
-  const { rail, meta, derived } = usePipelineRail(issueId);
+  const { rail, meta, derived, panes } = usePipelineRail(issueId);
 
   const phaseAgents = useMemo(() => agentPhaseInfo(agents), [agents]);
   const pausedPhases = useMemo(() => {
@@ -202,6 +205,14 @@ export function IssuePipelineStrip({ issueId, agents, activeAgentId, onOpenAgent
     }
     return out;
   }, [agents]);
+  const livePhases = useMemo(() => {
+    const out = new Set<Phase>();
+    for (const pane of panes) {
+      const phase = ROLE_TO_PHASE[pane.role];
+      if (phase && presenceForPaneState(pane.state) === 'active') out.add(phase);
+    }
+    return out;
+  }, [panes]);
   const activePhase = useMemo(
     () => ROLE_TO_PHASE[agents.find((agent) => agent.id === activeAgentId)?.role ?? ''] ?? null,
     [agents, activeAgentId],
@@ -223,6 +234,7 @@ export function IssuePipelineStrip({ issueId, agents, activeAgentId, onOpenAgent
       rail={rail}
       agents={phaseAgents}
       pausedPhases={pausedPhases}
+      livePhases={livePhases}
       meta={meta}
       activePhase={activePhase}
       reviewCount={reviewCount}
