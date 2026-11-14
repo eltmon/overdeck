@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5288",
+  "created": "2026-11-14T23:58:11.612Z",
+  "updated": "2026-11-14T23:58:11.612Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "diffs-parse-worklog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5288",
+      "claimedAt": "2026-11-14T23:58:11.612Z"
+    }
+  }
+}
