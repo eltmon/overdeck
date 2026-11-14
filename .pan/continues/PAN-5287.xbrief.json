@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5287",
   "created": "2026-11-14T19:49:14.970Z",
-  "updated": "2026-11-14T20:18:34.365Z",
+  "updated": "2026-11-14T20:27:33.584Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -188,6 +188,11 @@
     "registry-core.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T20:18:34.365Z"
+    },
+    "app-migration": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:27:33.584Z"
     }
   }
 }
