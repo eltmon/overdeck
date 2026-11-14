@@ -1,0 +1,1459 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T18:59:15Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5283: Flywheel page redesign: live lane board with plain-language blockers, action Needs-you cards, non-duplicative health strip, shipped-today timeline",
+    "updated": "2026-11-14T18:59:56.476Z"
+  },
+  "plan": {
+    "id": "pan-5283",
+    "title": "Flywheel page redesign: live lane board with plain-language blockers, action Needs-you cards, non-duplicative health strip, shipped-today timeline",
+    "status": "proposed",
+    "uid": "72521a66-e00f-4844-9ced-1a198994ee8a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-14T18:59:15Z",
+    "updated": "2026-11-14T18:59:56.476Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5283",
+        "label": "PAN-5283",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4666",
+        "label": "PAN-4666",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "dashboard",
+      "frontend",
+      "derived-status",
+      "ux"
+    ],
+    "metadata": {
+      "sizeJustification": "The operator directed this redesign to ship in this one issue (YOLO mode, 2026-11-14). The surface spans contracts, lib derivations, the status route, the CLI line, frontend components, one Playwright spec, screenshots and docs, but every slice serves one page and one payload; the DAG still fans out (wi2/wi3/wi4/wi6/wi7/wi11 parallel, then wi12-wi15 parallel).",
+      "canonicalFilename": "2026-11-14-PAN-5283-flywheel-page-redesign-live-lane-board-with-plain-language-blockers-action-needs-you-cards-non-duplicative-health-strip-shipped-today-timeline.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The Flywheel Status tab is a thin table over the tick line: the header counts only tick ids (5) while showing every census row (7); live agents read 'no agent' because derive-status.ts drops Herdr 'done' panes (PAN-4666) and gate-queue waits are invisible; handoff conversations show '—'; text is cryptic ('#5127 · none · green', raw 'verification.failed'), titles truncate, the table scrolls sideways; Needs-you items are plain text.",
+      "Proposal": "Extend the derived status (no stored state) with per-row stage, stageSince, owner, agent (including handoff conversations), plain-language blocker and cost, plus route-only health-strip and shipped-today fields; fix pane liveness through liveness.ts; replace the Status tab body with a vertical lane board (Plan, Build, Checks, Review, Merge, Deploy, Done today), Needs-you action cards, a health strip with only facts the global header lacks, and a shipped-today timeline; stack the page at phone width; guide the build with a committed-screenshot mockup and prove it with a Playwright spec. Full detail: .pan/drafts/PAN-5283.md.",
+      "NonGoals": "- No new endpoint, stored state, table, file or column, and no new frontend poll\n- No change to the State, Report or Stats tabs, the rail cards above the tab, the header toggles, or the conversation column\n- No restart-approval button in Needs-you\n- No attribution of pan start calls to the launching conversation\n- No merge-train ETA in minutes\n- No per-check CI shard names\n- No change to the tick-marker format or the /pan-flywheel skill\n- No CLI rendering of the health strip or shipped-today\n- No repetition of any global header item (agent count, GitHub quota, memory health, Needs-you count) in the health strip"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Absorb the PAN-4666 liveness fix (Herdr 'done' panes count as live when liveness.ts confirms the agent) into this issue.",
+        "rationale": "Verified live: agent-pan-5275 and conv-20261114-cc68 had agent_status 'done' and alive=true but liveAgents 0. The issue's acceptance 'never no agent' cannot pass without it."
+      },
+      {
+        "summary": "Health strip and shipped-today are computed only by the route (src/lib/flywheel/health.ts) and memoized 30 s; pan flywheel status does not compute them.",
+        "rationale": "They need server facts (running build commit) and forge reads; the status endpoint is also polled every 30 s on every page by NeedsYouIndicator, so they must be cheap and cached."
+      },
+      {
+        "summary": "Main CI verdict comes from a 60 s-memoized GitHub Actions read of the newest completed ci.yml push run, not from the read model.",
+        "rationale": "The read-model ciByProjectKey replaces the snapshot when a new head starts, so it cannot answer 'newest run that concluded'."
+      },
+      {
+        "summary": "Keep deployed-vs-main in the health strip although StaleBuildChip sits in the global header.",
+        "rationale": "The issue lists it explicitly, and StaleBuildChip's backend (/api/deploy/staleness → getDeployStaleness) returns null since PAN-3917, so the header never shows it."
+      },
+      {
+        "summary": "Header count reads '<N> in flight · <M> shipped today' with N = inFlight.length; the '(loop)' wording is retired and the owner chip shows loop-driven cards.",
+        "rationale": "The acceptance demands the count equal the cards; counting only inTick rows is the reported bug."
+      },
+      {
+        "summary": "Needs-you action buttons come only from structured row blockers (test-removal waiver, start issue, answer agent); free-text tick items get jump + link; no restart-approval button.",
+        "rationale": "Tick needs-you text is free text, so pattern-matching it into POSTs is unsafe; RestartApprovalBanner already owns restart approval globally."
+      },
+      {
+        "summary": "No merge-train ETA in minutes; cards and strip say 'waiting for batch CI' or 'batching paused until HH:MM'.",
+        "rationale": "An ETA needs ready-since times from forge rollups the lib cannot read cheaply; inventing a time violates 'derive, don't guess'."
+      },
+      {
+        "summary": "Owner rule: flywheel (inTick or flywheel: startedBy) > conversation (issue conversation row) > operator; planning-auto-handoff reads operator.",
+        "rationale": "startedBy carries no conversation name for a pan start from another conversation (verified agent-pan-5281: planning-auto-handoff), and docs/FLYWHEEL.md classifies that token as an operator origin."
+      },
+      {
+        "summary": "Gate wait reason is recomputed at read time and waiters map to issues by issueId, then workspace/conversation-cwd prefix, then a feature-/hoff- regex.",
+        "rationale": "Verified live: 9 waiter tickets, none with issueId, several in ~/Projects/hoff-pan-* handoff worktrees; tickets store no wait reason."
+      },
+      {
+        "summary": "Lanes stack vertically in the rail and the page stacks rail above conversation below 768 px.",
+        "rationale": "The rail is 360-560 px and FlywheelPage's fixed split overflows a 390 px phone; the issue requires no horizontal scroll at both widths."
+      },
+      {
+        "summary": "Screenshots (mockup and final) are committed under docs/screenshots/pan-5283/ and linked from the PR body; the mockup HTML stays in gitignored .tmp/.",
+        "rationale": "Precedent docs/screenshots/pan-4523 and pan-5239; .tmp/ is gitignored so PNGs need a tracked home for the PR."
+      },
+      {
+        "summary": "No new frontend poll: all new data rides GET /api/flywheel/status, which the page already polls at 5 s.",
+        "rationale": "The issue forbids new frontend polling and the page's only status channel today is that query."
+      },
+      {
+        "summary": "Ship as one issue with plan.metadata.sizeJustification instead of sibling issues.",
+        "rationale": "The operator directed 'ship the real implementation in this issue' in YOLO mode."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-contract",
+        "title": "Add the additive board contract to flywheel-derived.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:59:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5283",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/flywheel-derived.ts",
+            "tests/unit/contracts/flywheel-derived-board.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/contracts/flywheel-derived-board.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "flywheel-derived-board.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "wi4-board-derivations",
+            "wi5-wire-board",
+            "wi8-health-deriver",
+            "wi12-lane-board",
+            "wi13-needs-you-cards",
+            "wi14-health-strip",
+            "wi15-shipped-today",
+            "wi16-compose-status-tab"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 and the 'Contract (WI-1) — exact shapes' section: add FlywheelStage, FlywheelOwner, FlywheelCardAgent, FlywheelBlockerKind, FlywheelBlocker, FlywheelActivity, FlywheelShippedMerge, FlywheelShippedEvent, FlywheelHealth; extend FlywheelInFlightRow (stage, stageSince, owner, agent, blocker, cost, lastActivity), FlywheelNeedsYouItem (context) and FlywheelDerivedStatus (health, shipped) with Schema.optional fields only; export shippedCardCount(). Change no existing field."
+        },
+        "items": [
+          {
+            "id": "wi1-contract.ac1",
+            "title": "Given a payload with none of the new fields, when decodeFlywheelDerivedStatus runs, then it returns the status without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-contract.ac2",
+            "title": "Given a payload carrying every new row field plus health and shipped, when decoded, then it returns those fields unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-contract.ac3",
+            "title": "shippedCardCount returns shipped.merges.length, and returns 0 when shipped is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-gate-queue-snapshot",
+        "title": "Add a read-only gate-queue snapshot reader",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:59:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/quality-gate-admission.ts",
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "quality-gate-admission.test.ts passes including the three readQualityGateQueue tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2: export readQualityGateQueue(deps) returning { slots, owners, waiters } from owner.json/slot-<n>.json and waiter-*.json, live pids only, waiters sorted by createdAt, never unlinking or writing any file; export readQualityGateMemory() wrapping the existing private readMemory(sampleProcMemory)."
+        },
+        "items": [
+          {
+            "id": "wi2-gate-queue-snapshot.ac1",
+            "title": "Given three waiter files with live pids, when readQualityGateQueue runs, then it returns them oldest createdAt first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-gate-queue-snapshot.ac2",
+            "title": "Given a waiter file whose pid is dead, when readQualityGateQueue runs, then it omits the entry and the file still exists on disk afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-gate-queue-snapshot.ac3",
+            "title": "Given a missing admission root, when readQualityGateQueue runs, then it returns { owners: [], waiters: [] } with the resolved slot count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-liveness-fix",
+        "title": "Count Herdr done panes as live when liveness.ts says the agent is alive (PAN-4666)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:59:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/flywheel/derive-status.ts",
+            "tests/unit/lib/flywheel/derive-status.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/flywheel/derive-status.test.ts"
+          ],
+          "expected_outputs": [
+            "derive-status.test.ts passes including the three liveness tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and D5: replace paneIsLive (derive-status.ts line 171, `pane.state !== 'exited' && pane.state !== 'done'`) with an async livePanes() that drops exited panes, keeps working/blocked/idle, and probes done/unknown panes through a new injectable dep isAgentAlive (default: lazy isAlive from ../agents/liveness.js; alive or runtime-indeterminate counts live; a throw counts live), concurrency 4. Use it for both liveAgents and agents."
+        },
+        "items": [
+          {
+            "id": "wi3-liveness-fix.ac1",
+            "title": "Given a pane with state 'done' whose isAgentAlive returns true, when deriveFlywheelStatus runs, then the row returns liveAgents: 1 and agents[] contains that pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-liveness-fix.ac2",
+            "title": "Given a pane with state 'done' whose isAgentAlive returns false, when deriveFlywheelStatus runs, then the pane is excluded from agents[]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-liveness-fix.ac3",
+            "title": "Given a pane with state 'exited', when deriveFlywheelStatus runs, then isAgentAlive is not called and the pane is excluded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-board-derivations",
+        "title": "Create pure board derivations in src/lib/flywheel/board.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:59:15Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5283",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/flywheel/board.ts",
+            "tests/unit/lib/flywheel/board.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/flywheel/board.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "board.test.ts passes with one test per D1, D3, D9, D10 and D11 rule",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5"
+          ],
+          "foundationFor": [
+            "wi5-wire-board"
+          ],
+          "parallelSafeReason": "New file board.ts plus its own new test file; no other item touches them."
+        },
+        "narrative": {
+          "Action": "PRD WI-4 with decisions D1 (stage), D2 (stageSince), D3 (owner), D4 (agent), D9 (gate wait text), D10 (waiter→issue mapping), D11 (16-rule blocker precedence). Export JOURNAL_ACTIVITY_LABELS: Record<PipelineJournalEntryType,string> (plain lower-case phrases, no dots), activityFrom, gateLabel, describeGateWait, mapWaiterToIssue, deriveStage, deriveStageSince, deriveOwner, deriveCardAgent, deriveBlocker, formatClock over one BoardFacts input type. No I/O in this file. Types come from @overdeck/contracts (WI-1 shapes)."
+        },
+        "items": [
+          {
+            "id": "wi4-board-derivations.ac1",
+            "title": "deriveStage returns the stage named by each of the six D1 rules, one passing test per rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-board-derivations.ac2",
+            "title": "describeGateWait returns the exact D9 text for the memory, slots, queue and cpu reasons, e.g. 'typecheck queued: 11.5 GB free, needs 2.2 GB, gates keep 12.0 GB (20 min)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-board-derivations.ac3",
+            "title": "mapWaiterToIssue resolves a waiter in /home/u/Projects/hoff-pan-5276 to PAN-5276 through a conversation cwd candidate, and falls back to the feature-/hoff- regex",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-board-derivations.ac4",
+            "title": "deriveBlocker returns the D11 kind, severity and text for each of rules 1-16, one passing test per rule, and returns null for a moving row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-board-derivations.ac5",
+            "title": "Given every PipelineJournalEntryType, JOURNAL_ACTIVITY_LABELS returns a non-empty label containing no '.' character",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-wire-board",
+        "title": "Wire board fields into deriveFlywheelStatus",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:59:15Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/flywheel/derive-status.ts",
+            "tests/unit/lib/flywheel/derive-status.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/flywheel/derive-status.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "derive-status.test.ts passes including the five named WI-5 tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "Runs after wi3 (the only other item editing derive-status.ts and its test, serialized by the wi3 -> wi5 edge); no other item touches these files."
+        },
+        "narrative": {
+          "Action": "PRD WI-5, D21, D22: add lazy-default deps listIssueConversations, readStartedBy (getAgentState from ../agents/agent-state-read.js), issueCost, readGateQueue, readMemory, softReserveBytes, listAutoMerges, listWindowGenerations, batchingPausedUntil, journalTail; build BoardFacts per candidate and set stage, stageSince, owner, agent, blocker, cost, lastActivity on every row. A failing dep yields null for its field and never throws the status."
+        },
+        "items": [
+          {
+            "id": "wi5-wire-board.ac1",
+            "title": "Given a waiter ticket in the row's workspace, when deriveFlywheelStatus runs, then the row returns blocker.kind 'gate-queue' and agent.state 'waiting', and no 'no-agent' blocker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-wire-board.ac2",
+            "title": "Given no live pane and an active listIssueConversations row, when deriveFlywheelStatus runs, then the row returns agent.role 'handoff' with conversationName set and owner per D3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-wire-board.ac3",
+            "title": "Given a waiter whose workspacePath is the handoff conversation cwd, when deriveFlywheelStatus runs, then that issue's row returns the gate-queue blocker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-wire-board.ac4",
+            "title": "Given a cost aggregate of 0 and conversations totalling 0.46, when deriveFlywheelStatus runs, then the row returns cost 0.46",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-wire-board.ac5",
+            "title": "Given a dep that throws (e.g. readGateQueue), when deriveFlywheelStatus runs, then it returns the status with the affected field null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-batch-pause-until",
+        "title": "Add projectBatchCiPausedUntil to merge-route.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:59:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/merge-route.ts",
+            "tests/unit/lib/cloister/merge-route-batch-pause.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/merge-route-batch-pause.test.ts"
+          ],
+          "expected_outputs": [
+            "merge-route-batch-pause.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6: add projectBatchCiPausedUntil(projectRoot, deps) returning the ISO end of the BATCH_CI_RETRY_MS window for the newest invalidated generation held out with NO_BATCH_CI_PREFIX, else null; re-express projectLacksBatchCi as projectBatchCiPausedUntil(...) !== null."
+        },
+        "items": [
+          {
+            "id": "wi6-batch-pause-until.ac1",
+            "title": "Given an invalidated generation updated 2 h ago with a held-out reason starting 'no combined CI run', when projectBatchCiPausedUntil runs, then it returns updatedAt + 24 h as ISO",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-batch-pause-until.ac2",
+            "title": "Given only generations older than 24 h, when projectBatchCiPausedUntil runs, then it returns null and projectLacksBatchCi returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-needs-you-context",
+        "title": "Attach the first-raised message prose to needs-you items",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:59:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/flywheel/tick-marker.ts",
+            "tests/unit/lib/flywheel/tick-marker.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/flywheel/tick-marker.test.ts"
+          ],
+          "expected_outputs": [
+            "tick-marker.test.ts passes including the three context tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 and D18: in resolveNeedsYouItems keep the first-raised message's text and emit context = text with every line containing 'flywheel-tick:' removed, whitespace collapsed, last 280 characters with a leading '…' when cut; omit when empty."
+        },
+        "items": [
+          {
+            "id": "wi7-needs-you-context.ac1",
+            "title": "Given a first-raised message 'CI is red on main.\\nflywheel-tick: tick=4 … needs-you=fix main', when resolveNeedsYouItems runs, then the item returns context 'CI is red on main.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-needs-you-context.ac2",
+            "title": "Given a first-raised message that is only the tick line, when resolveNeedsYouItems runs, then the item has no context field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-needs-you-context.ac3",
+            "title": "Given 400 characters of prose, when resolveNeedsYouItems runs, then context is 281 characters starting with '…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-health-deriver",
+        "title": "Create the server-only health and shipped-today deriver",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:59:15Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/flywheel/health.ts",
+            "tests/unit/lib/flywheel/health.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/flywheel/health.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "health.test.ts passes including the six named WI-8 tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "NFR-1",
+            "NFR-3",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "New file health.ts plus its own new test file; no other item touches them."
+        },
+        "narrative": {
+          "Action": "PRD WI-8 with D6, D7, D8, D12, D13: deriveFlywheelHealth({ projectRoot, deps }) computes mainCi (newest completed ci.yml push run via projectCiGhApi, 60 s memo), deployed (buildCommit vs CI verdict, D13 applicability), gateQueue, nextBatch, batchingPausedUntil, lastRelease (git for-each-ref refs/tags/v*), merges (git log origin/<branch> --first-parent since local midnight, subjects ending '(#<n>)') and events (merges, successful 'pan reload' restart events, today's tags) newest first; whole result memoized 30 s per project root. Git via promisified execFile only. Use fake timers for memo tests."
+        },
+        "items": [
+          {
+            "id": "wi8-health-deriver.ac1",
+            "title": "Given a gh response whose first completed run has head_sha abc, when deriveFlywheelHealth runs, then health.mainCi returns sha abc with its conclusion and url",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-health-deriver.ac2",
+            "title": "Given buildCommit present in the repo and 3 commits between it and the verdict sha, when deriveFlywheelHealth runs, then health.deployed.behindVerdict returns 3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-health-deriver.ac3",
+            "title": "Given git cat-file fails for buildCommit, when deriveFlywheelHealth runs, then health.deployed is null and every merge has deployed null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-health-deriver.ac4",
+            "title": "Given log lines 'PAN-5246 (#5273)' and 'chore: flywheel state', when deriveFlywheelHealth runs, then shipped.merges returns only the PR merge with issueId PAN-5246 and prNumber 5273",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-health-deriver.ac5",
+            "title": "Given two calls 10 s apart and a third after advancing fake timers 31 s, then git and gh deps are invoked once for the first two calls and again for the third",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9-route-wiring",
+        "title": "Merge health and shipped into GET /api/flywheel/status",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:59:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/flywheel.ts",
+            "tests/unit/dashboard/server/routes/flywheel-status.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/flywheel-status.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "flywheel-status.test.ts passes including the two WI-9 tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9: getFlywheelStatusPayload derives the status, then calls deriveFlywheelHealth({ projectRoot: status.projectRoot }) and returns { ...status, health, shipped }; a health failure logs once and returns the status without those fields. serverFlywheelStatusDeps adds trackerTitle from getSharedIssueService().getTrackerIssue(id)?.title. No new route."
+        },
+        "items": [
+          {
+            "id": "wi9-route-wiring.ac1",
+            "title": "Given a health deriver that resolves, when GET /api/flywheel/status is served, then the body returns health and shipped alongside inFlight",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-route-wiring.ac2",
+            "title": "Given a health deriver that throws, when GET /api/flywheel/status is served, then it returns status 200 with inFlight and without health",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi10-cli-blocker",
+        "title": "Print the blocker text in pan flywheel status",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:59:15Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-5283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/flywheel.ts",
+            "tests/unit/cli/commands/flywheel.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/commands/flywheel.test.ts"
+          ],
+          "expected_outputs": [
+            "flywheel.test.ts passes including the blocker print test"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10: at src/cli/commands/flywheel.ts line 182 (grep 'no agent') print `${row.stage ?? row.state} · ${row.blocker.text}` when row.blocker is set; keep the old 'no agent' fallback for rows without board fields."
+        },
+        "items": [
+          {
+            "id": "wi10-cli-blocker.ac1",
+            "title": "Given a row with blocker.text 'typecheck queued: 11.5 GB free, needs 2.2 GB, gates keep 12.0 GB (20 min)', when pan flywheel status prints, then the line contains that text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-cli-blocker.ac2",
+            "title": "Given a row without board fields, working and liveAgents 0, when printed, then the line still contains 'working · no agent'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi11-mockup",
+        "title": "Build the interactive mockup and commit its screenshots",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:59:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "design",
+          "issueLabel": "pan-5283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".tmp/pan-5283-flywheel-mockup/index.html",
+            "docs/screenshots/pan-5283/mockup-rail-light.png",
+            "docs/screenshots/pan-5283/mockup-rail-dark.png",
+            "docs/screenshots/pan-5283/mockup-phone-light.png",
+            "docs/screenshots/pan-5283/mockup-phone-dark.png"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "ls docs/screenshots/pan-5283/mockup-rail-light.png docs/screenshots/pan-5283/mockup-rail-dark.png docs/screenshots/pan-5283/mockup-phone-light.png docs/screenshots/pan-5283/mockup-phone-dark.png"
+          ],
+          "expected_outputs": [
+            "all four mockup PNGs are listed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11 and D19: static HTML mockup in gitignored .tmp/pan-5283-flywheel-mockup/ with the live 2026-11-14 shapes (7 in-flight cards incl. PAN-5275 gate-queued, handoff agents for PAN-5276/5277/5279, PAN-5095 CI failed; 2 Needs-you cards; health strip; shipped timeline with v0.85.0). Screenshot with Playwright at a 560 px rail inside a 1440 px viewport and at 390 px phone, light and dark, into docs/screenshots/pan-5283/. Inspect the PNGs yourself. Never wait for operator review."
+        },
+        "items": [
+          {
+            "id": "wi11-mockup.ac1",
+            "title": "Given the mockup at 390 px width, when screenshotted, then the PNG shows no horizontal scrollbar and every card title wraps to at most two lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-mockup.ac2",
+            "title": "docs/screenshots/pan-5283/ contains mockup-rail-light.png, mockup-rail-dark.png, mockup-phone-light.png and mockup-phone-dark.png",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi12-lane-board",
+        "title": "Build FlywheelLaneBoard with issue and shipped cards",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:59:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelLaneBoard.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelLaneBoard.test.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/fixtures.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/flywheel/__tests__/FlywheelLaneBoard.test.tsx"
+          ],
+          "expected_outputs": [
+            "FlywheelLaneBoard.test.tsx passes with the eight named WI-12 tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12 and D15: seven vertically stacked lanes (data-testid flywheel-lane-<plan|build|checks|review|merge|deploy|done>, heading '<Lane> · <n>'); issue cards data-testid flywheel-card-<ID> with data-attention and data-stage, line-clamp-2 title, time in stage, cost, owner chip, agent line, blocker line (flywheel-blocker-<ID>, tone by severity), 'last: <label> · <age>'; whole card is one button calling onNavigateIssue with no nested interactive elements; Deploy/Done cards from status.shipped.merges linked to the PR. Never render row.lastJournal.type. Only this item edits fixtures.tsx (add boardStatus())."
+        },
+        "items": [
+          {
+            "id": "wi12-lane-board.ac1",
+            "title": "Given boardStatus(), when FlywheelLaneBoard renders, then it renders seven lanes in the order Plan, Build, Checks, Review, Merge, Deploy, Done today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-lane-board.ac2",
+            "title": "Given a row with lastJournal.type 'verification.failed' and a blocker, when rendered, then the card shows the blocker text and no element's text equals 'verification.failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-lane-board.ac3",
+            "title": "Given a gate-queued row, when rendered, then its card shows the gate-queue blocker and contains no 'no agent' text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-lane-board.ac4",
+            "title": "Given a row whose agent.role is 'handoff', when rendered, then the card shows 'handoff' and the conversation name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-lane-board.ac5",
+            "title": "When a card is clicked, then onNavigateIssue is called once with its issue id, and no button-role element contains another button or link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi13-needs-you-cards",
+        "title": "Build Needs-you action cards",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:59:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelNeedsYouCards.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelNeedsYouCards.test.tsx",
+            "src/dashboard/frontend/src/lib/flywheelNeedsYou.ts",
+            "src/dashboard/frontend/src/lib/__tests__/flywheelNeedsYou.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/flywheel/__tests__/FlywheelNeedsYouCards.test.tsx src/lib/__tests__/flywheelNeedsYou.test.ts"
+          ],
+          "expected_outputs": [
+            "both test files pass including the six named WI-13 tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13 and D14: buildNeedsYouCards(tick, inFlight) in lib/flywheelNeedsYou.ts merges tick items with row blockers that carry an action (waive-test-removal, start-issue, answer-agent) and adds structured-only cards for such rows; the component keeps role=group aria-label 'Needs you' data-testid flywheel-needs-you, each card flywheel-needs-you-item with question (needsYouSegments), why (context), since ('tick <n> · HH:MM · <age>'), jump button flywheel-needs-you-jump, whole-card click jumps except on inner controls (PAN-5275 semantics), and the action: TestRemovalWaiverControl, a two-step Start/Confirm start button (flywheel-needs-you-start) POSTing /api/agents { issueId } with dashboardMutationJsonHeaders(), or 'Open <ID>'. Build fixtures inline in the test files. No restart-approval button."
+        },
+        "items": [
+          {
+            "id": "wi13-needs-you-cards.ac1",
+            "title": "Given a tick item naming PAN-5095 and a PAN-5095 row with action 'waive-test-removal', when buildNeedsYouCards runs, then it returns one card for PAN-5095 carrying the tick text and the waiver action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-needs-you-cards.ac2",
+            "title": "Given a free-text tick item that names no in-flight issue, when the cards render, then the card renders the jump button and no action button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-needs-you-cards.ac3",
+            "title": "Given an item with context and firstRaisedTick 12, when rendered, then the card shows the context text and 'tick 12'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-needs-you-cards.ac4",
+            "title": "When the Start button is clicked once, then no request is sent; when 'Confirm start' is clicked, then fetch is called once with POST /api/agents and body { issueId }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-needs-you-cards.ac5",
+            "title": "When an inner issue or PR link inside a card is clicked, then onNeedsYouClick is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi14-health-strip",
+        "title": "Build the Flywheel health strip",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:59:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelHealthStrip.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelHealthStrip.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/flywheel/__tests__/FlywheelHealthStrip.test.tsx"
+          ],
+          "expected_outputs": [
+            "FlywheelHealthStrip.test.tsx passes with the four named WI-14 tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14: data-testid flywheel-health-strip, one flex-wrap row of facts flywheel-health-<ci|deployed|gates|batch|release>: 'main CI <conclusion> · <sha7>' linked to the run, 'deployed = main CI verdict' or 'deployed <n> commits behind', 'gates <r> running · <q> queued · oldest <age>', 'next batch <n> PRs · <status>' / 'batching paused until HH:MM' / 'no batch forming', 'release <tag> · <age>'. Omit null facts. Build fixtures inline."
+        },
+        "items": [
+          {
+            "id": "wi14-health-strip.ac1",
+            "title": "Given a full health object, when FlywheelHealthStrip renders, then it renders the five facts with their test ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-health-strip.ac2",
+            "title": "Given health.mainCi null, when rendered, then flywheel-health-ci is absent and the other facts remain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-health-strip.ac3",
+            "title": "Given batchingPausedUntil set, when rendered, then the batch fact reads 'batching paused until HH:MM'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-health-strip.ac4",
+            "title": "When rendered, then the strip text contains none of 'agents', 'quota', 'memory', 'needs you' and none of the global header components render inside it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi15-shipped-today",
+        "title": "Build the Shipped-today timeline",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:59:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelShippedToday.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelShippedToday.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/flywheel/__tests__/FlywheelShippedToday.test.tsx"
+          ],
+          "expected_outputs": [
+            "FlywheelShippedToday.test.tsx passes with the three named WI-15 tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15: data-testid flywheel-shipped-today, ordered list of status.shipped.events newest first: merge 'HH:MM merged <ID or PR#> <title or subject>' linked to the PR, deploy 'HH:MM deployed (pan reload)', release 'HH:MM released <tag>' linked; empty → 'Nothing shipped yet today.' Build fixtures inline."
+        },
+        "items": [
+          {
+            "id": "wi15-shipped-today.ac1",
+            "title": "Given a merge, a deploy and a release event, when rendered, then the list renders them newest first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-shipped-today.ac2",
+            "title": "Given a merge with issueId PAN-5246 and prUrl, when rendered, then the row names PAN-5246 and links to the PR url",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-shipped-today.ac3",
+            "title": "Given no events, when rendered, then it shows 'Nothing shipped yet today.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi16-compose-status-tab",
+        "title": "Compose the new Status tab, fix the header count and stack the page at phone width",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:59:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelStatusPane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx",
+            "src/dashboard/frontend/src/pages/FlywheelPage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx src/pages/__tests__/FlywheelPage.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-12",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16, D16, D17: FlywheelStatusPane keeps its props, empty states and run summary; renders health strip, last tick + freshness, FlywheelNeedsYouCards, FlywheelLaneBoard, FlywheelShippedToday; removes the old table and Agents list. inFlightCountLabel returns `${inFlight.length} in flight · ${shippedCardCount(status)} shipped today`. FlywheelPage stacks rail above conversation below md (flex-col md:flex-row, separator hidden, width via --fw-left CSS variable at md+), keeps every control and the reveal selectors. Migrate every existing FlywheelStatusPane test case to the new structure rather than deleting it; add no refetchInterval."
+        },
+        "items": [
+          {
+            "id": "wi16-compose-status-tab.ac1",
+            "title": "Given a status with 7 in-flight rows and 2 shipped merges, when FlywheelPage renders, then flywheel-inflight-count shows '7 in flight · 2 shipped today' and 7 flywheel-card-* elements render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-compose-status-tab.ac2",
+            "title": "Given a needs-you tick, when the header indicator reveal fires, then the [data-testid=\"flywheel-needs-you\"] element exists and receives scrollIntoView",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-compose-status-tab.ac3",
+            "title": "Given the pre-change FlywheelStatusPane.test.tsx cases, when the migrated file runs, then every covered behavior passes under a renamed test and the count of it( calls does not decrease",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-compose-status-tab.ac4",
+            "title": "grep -rn refetchInterval src/dashboard/frontend/src/components/flywheel/ returns only the pre-existing matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi17-playwright-screens",
+        "title": "Add the Playwright board spec and commit the final screenshots",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:59:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-5283-flywheel-board.spec.ts",
+            "src/dashboard/frontend/tests/fixtures/flywheel-board-status.json",
+            "src/dashboard/frontend/package.json",
+            "docs/screenshots/pan-5283/board-rail-light.png",
+            "docs/screenshots/pan-5283/board-rail-dark.png",
+            "docs/screenshots/pan-5283/board-phone-light.png",
+            "docs/screenshots/pan-5283/board-phone-dark.png"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-5283-flywheel-board.spec.ts"
+          ],
+          "expected_outputs": [
+            "the build completes",
+            "the spec passes and writes four board PNGs under docs/screenshots/pan-5283/"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-17 and D20: an isolated-dashboard spec (pattern: pan-4523-river-bands.spec.ts) that serves tests/fixtures/flywheel-board-status.json through page.route('**/api/flywheel/status'), seeds localStorage['overdeck.ui.theme'], and per viewport/theme (rail: 1440x900 with the default 560 px rail; phone: 390x844; light and dark, one it each, at most 3 page loads per it) asserts no horizontal scroll, header count equals the number of flywheel-card-* elements, and the gate-queued card has no 'no agent' text, then writes the screenshot. Add the spec to test:playwright in src/dashboard/frontend/package.json. Use an isolated browser profile; never reuse another agent's Playwright session."
+        },
+        "items": [
+          {
+            "id": "wi17-playwright-screens.ac1",
+            "title": "Given the fixture at 390 px and at the 560 px rail, when the page loads, then document.documentElement.scrollWidth is at most window.innerWidth in light and dark",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-playwright-screens.ac2",
+            "title": "When the page loads, then the number in flywheel-inflight-count equals the count of [data-testid^=\"flywheel-card-\"] elements",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-playwright-screens.ac3",
+            "title": "docs/screenshots/pan-5283/ contains board-rail-light.png, board-rail-dark.png, board-phone-light.png and board-phone-dark.png produced by the spec",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi18-docs",
+        "title": "Document the board in FLYWHEEL.md, the changelog, the codebase map and the frontend test subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:59:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/FLYWHEEL.md",
+            "changelog.d/pan-5283.md",
+            ".overdeck/context/codebase/architecture.md",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n '^| Blocker' docs/FLYWHEEL.md"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "grep prints the Blocker row"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-18: docs/FLYWHEEL.md Sources table — update 'In-flight issues', 'No agent', 'Loop in-flight', 'Live agents' (remove 'not done', describe D5), 'Needs-you block'; add rows 'Stage', 'Owner', 'Card agent', 'Blocker' (D11 precedence), 'Cost', 'Health strip', 'Shipped today'; add a 'Board layout' subsection. changelog.d/pan-5283.md with '#### Improved' (the board) and '#### Fixed' (live Herdr done agents no longer show as no agent). architecture.md Flywheel section names board.ts and health.ts and that health is route-only (leave its last-verified line unchanged). Add the four new frontend test files to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "wi18-docs.ac1",
+            "title": "docs/FLYWHEEL.md contains a Sources row whose first cell is 'Blocker' and lists the D11 precedence in plain words",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-docs.ac2",
+            "title": "docs/FLYWHEEL.md's 'Live agents' row no longer contains the phrase 'not `done`' and states that a done pane counts when liveness.ts reports the agent alive",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-docs.ac3",
+            "title": "changelog.d/pan-5283.md exists with '#### Improved' and '#### Fixed' headings and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-docs.ac4",
+            "title": "scripts/frontend-test-subset.txt contains the FlywheelLaneBoard, FlywheelNeedsYouCards, FlywheelHealthStrip and FlywheelShippedToday test paths in sorted order, and npm run test:frontend-subset passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-contract",
+        "to": "wi5-wire-board",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-contract",
+        "to": "wi7-needs-you-context",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-contract",
+        "to": "wi8-health-deriver",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-contract",
+        "to": "wi10-cli-blocker",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-contract",
+        "to": "wi12-lane-board",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-contract",
+        "to": "wi13-needs-you-cards",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-contract",
+        "to": "wi14-health-strip",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-contract",
+        "to": "wi15-shipped-today",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-gate-queue-snapshot",
+        "to": "wi5-wire-board",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-gate-queue-snapshot",
+        "to": "wi8-health-deriver",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-liveness-fix",
+        "to": "wi5-wire-board",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-board-derivations",
+        "to": "wi5-wire-board",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-batch-pause-until",
+        "to": "wi5-wire-board",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-batch-pause-until",
+        "to": "wi8-health-deriver",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-health-deriver",
+        "to": "wi9-route-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-contract",
+        "to": "wi4-board-derivations",
+        "type": "blocks"
+      },
+      {
+        "from": "wi11-mockup",
+        "to": "wi12-lane-board",
+        "type": "blocks"
+      },
+      {
+        "from": "wi12-lane-board",
+        "to": "wi16-compose-status-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "wi12-lane-board",
+        "to": "wi18-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi11-mockup",
+        "to": "wi13-needs-you-cards",
+        "type": "blocks"
+      },
+      {
+        "from": "wi13-needs-you-cards",
+        "to": "wi16-compose-status-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "wi13-needs-you-cards",
+        "to": "wi18-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi11-mockup",
+        "to": "wi14-health-strip",
+        "type": "blocks"
+      },
+      {
+        "from": "wi14-health-strip",
+        "to": "wi16-compose-status-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "wi14-health-strip",
+        "to": "wi18-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi11-mockup",
+        "to": "wi15-shipped-today",
+        "type": "blocks"
+      },
+      {
+        "from": "wi15-shipped-today",
+        "to": "wi16-compose-status-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "wi15-shipped-today",
+        "to": "wi18-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-needs-you-context",
+        "to": "wi13-needs-you-cards",
+        "type": "blocks"
+      },
+      {
+        "from": "wi16-compose-status-tab",
+        "to": "wi17-playwright-screens",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-wire-board",
+        "to": "wi18-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-health-deriver",
+        "to": "wi18-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
