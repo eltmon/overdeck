@@ -14,7 +14,7 @@ import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { dashboardMutationJsonHeaders } from '../../../lib/wsTransport';
 import { MergeTrainRequestError, fetchJson } from '../mergeTrainApi';
-import type { MergeStepKey, MergeTrainBoard, UatGenerationPayload } from './boardTypes';
+import type { BoardProject, MergeStepKey, MergeTrainBoard, UatGenerationPayload } from './boardTypes';
 
 /** Prefix every board query shares; invalidate it after a mutation. */
 export const MERGE_TRAIN_BOARD_KEY = ['merge-train', 'board'] as const;
@@ -29,10 +29,37 @@ export function boardUrl(projectKey?: string): string {
     : '/api/merge-train/board';
 }
 
+function list<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value as T[] : [];
+}
+
+/**
+ * The board with every list present, so a malformed or partial answer (an
+ * older server, a proxy error page parsed as `{}`) renders as empty instead
+ * of throwing inside every placement that reads it.
+ */
+export function normalizeBoard(raw: unknown): MergeTrainBoard {
+  const body = (raw && typeof raw === 'object' ? raw : {}) as Partial<MergeTrainBoard>;
+  return {
+    masterEnabled: body.masterEnabled !== false,
+    projects: list<BoardProject>(body.projects)
+      .filter((p) => p && typeof p.projectKey === 'string')
+      .map((p) => ({
+        ...p,
+        window: p.window ?? null,
+        notices: list<string>(p.notices),
+        cars: list(p.cars),
+        strikes: list(p.strikes),
+        batches: list(p.batches),
+        recent: list(p.recent),
+      })),
+  };
+}
+
 export function useMergeTrainBoard({ projectKey, active }: { projectKey?: string; active: boolean }) {
   return useQuery({
     queryKey: boardQueryKey(projectKey),
-    queryFn: () => fetchJson<MergeTrainBoard>(boardUrl(projectKey)),
+    queryFn: async () => normalizeBoard(await fetchJson<unknown>(boardUrl(projectKey))),
     refetchInterval: active ? 15_000 : false,
   });
 }

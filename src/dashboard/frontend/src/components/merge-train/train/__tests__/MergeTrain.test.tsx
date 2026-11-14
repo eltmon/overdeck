@@ -7,7 +7,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MERGE_TRAIN_PROJECT_FILTER_KEY, MergeTrain, isIdleProject } from '../MergeTrain';
-import { trainTotals } from '../useMergeTrainBoard';
+import { normalizeBoard, trainTotals } from '../useMergeTrainBoard';
 import { board, car, gen, mockFetch, project, renderWithClient, strike } from './fixtures';
 
 vi.mock('../../../DialogProvider', () => ({ useConfirm: () => vi.fn(async () => true) }));
@@ -129,5 +129,21 @@ describe('MergeTrain notices (PAN-5277 no-loss audit)', () => {
     mockFetch({ '/api/merge-train/board': board([OVERDECK, skipped]) });
     renderWithClient(<MergeTrain placement="all-projects" />);
     expect((await screen.findByTestId('train-notice-auricle')).textContent).toBe('Not scheduled: the PR listing could not be read');
+  });
+});
+
+describe('MergeTrain with a malformed board answer', () => {
+  it('renders an empty train instead of throwing when the board read answers {}', async () => {
+    mockFetch({});
+    renderWithClient(<MergeTrain placement="project" projectKey="overdeck" />);
+    expect(await screen.findByTestId('merge-train')).toBeInTheDocument();
+  });
+
+  it('normalizeBoard fills every list', () => {
+    expect(normalizeBoard({ projects: [{ projectKey: 'p' }] })).toEqual({
+      masterEnabled: true,
+      projects: [{ projectKey: 'p', window: null, notices: [], cars: [], strikes: [], batches: [], recent: [] }],
+    });
+    expect(normalizeBoard(null)).toEqual({ masterEnabled: true, projects: [] });
   });
 });
