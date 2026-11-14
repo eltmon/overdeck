@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { LoadingBoundary } from '../primitives/LoadingBoundary';
+import { PickupGateStrip } from './PickupGateStrip';
 
 // PAN-2059: the operator pickup controls — Plan → Release, AI objection, Ready /
 // Park / Blocks-main, planning mode, and the pickup gate — for ONE issue. This is
@@ -90,10 +91,29 @@ function ToggleRow({ label, hint, on, color, onChange }: {
   );
 }
 
-export function PickupGateControls({ issueId, onOpenIssueBrowser }: {
+export type PickupStage = 'open' | 'picked-up' | 'finished';
+
+/** D-10: what the strip variant shows for a derived issue state. */
+export function pickupStageFor(state: string | null | undefined): PickupStage {
+  if (state === 'merged' || state === 'closed') return 'finished';
+  if (state === 'working' || state === 'in-review' || state === 'changes-requested' || state === 'ready') return 'picked-up';
+  return 'open';
+}
+
+const PICKUP_HINT = {
+  ready: "Definition of Ready — when off, the Flywheel won't auto-pick it (the entry gate).",
+  blocksMain: 'Flywheel prioritizes / strikes it even with auto-pickup off (never if vetoed).',
+  parked: 'Defer — needs human design/discussion; excluded from auto-pickup, reversible.',
+} as const;
+
+export function PickupGateControls({ issueId, onOpenIssueBrowser, variant = 'full', stage = 'open' }: {
   issueId: string;
   /** Optional: open the issue (e.g. on GitHub) to read the full objection write-up. */
   onOpenIssueBrowser?: (issueId: string) => void;
+  /** 'strip' (PAN-5244): three switch chips, a popover with the full controls, and Release/Recall. */
+  variant?: 'full' | 'strip';
+  /** Strip variant only: see pickupStageFor. */
+  stage?: PickupStage;
 }) {
   const qc = useQueryClient();
   const { data, isLoading, error } = useQuery<IssueStateResponse>({
@@ -106,6 +126,7 @@ export function PickupGateControls({ issueId, onOpenIssueBrowser }: {
       return body;
     },
     staleTime: 10_000,
+    enabled: !(variant === 'strip' && stage === 'finished'),
   });
 
   const [busy, setBusy] = useState(false);
@@ -199,10 +220,14 @@ export function PickupGateControls({ issueId, onOpenIssueBrowser }: {
       : { color: 'var(--info-foreground)', borderColor: 'color-mix(in srgb, var(--info) 34%, transparent)', background: 'color-mix(in srgb, var(--info) 9%, transparent)' }),
   });
 
-  if (isLoading) return <LoadingBoundary label="Pickup state" timeoutMs={8000}><div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Loading pickup state…</div></LoadingBoundary>;
-  if (error || !data) return <div style={{ fontSize: 11, color: 'var(--destructive-foreground)' }}>{error ? String(error) : 'No pickup state'}</div>;
+  if (variant === 'strip' && stage === 'finished') return null;
+  if (isLoading) return variant === 'strip' ? null : <LoadingBoundary label="Pickup state" timeoutMs={8000}><div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Loading pickup state…</div></LoadingBoundary>;
+  if (error || !data) {
+    const failure = <div style={{ fontSize: 11, color: 'var(--destructive-foreground)' }}>{error ? String(error) : 'No pickup state'}</div>;
+    return variant === 'strip' ? <PickupGateStrip unavailable>{failure}</PickupGateStrip> : failure;
+  }
 
-  return (
+  const full = (
     <div style={{ color: 'var(--foreground)' }}>
       {/* Plan → Release pickup flow + AI objection */}
       <div style={{ marginBottom: 13 }}>
@@ -253,7 +278,7 @@ export function PickupGateControls({ issueId, onOpenIssueBrowser }: {
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 13, marginBottom: 13 }}>
         <div style={SECTION_LABEL}>Pipeline state · operator controls {busy && '…'}</div>
         <ToggleRow label="Ready" color="var(--success)" on={ready}
-          hint="Definition of Ready — when off, the Flywheel won't auto-pick it (the entry gate)."
+          hint={PICKUP_HINT.ready}
           onChange={(v) => toggleLabel('ready', v)} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '9px 0' }}>
           <span style={{ fontSize: 12, fontWeight: 500 }}>Planned</span>
@@ -266,10 +291,10 @@ export function PickupGateControls({ issueId, onOpenIssueBrowser }: {
           <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>derived</span>
         </div>
         <ToggleRow label="Blocks main 🔴" color="var(--destructive)" on={blocksMain}
-          hint="Flywheel prioritizes / strikes it even with auto-pickup off (never if vetoed)."
+          hint={PICKUP_HINT.blocksMain}
           onChange={(v) => toggleLabel('blocksMain', v)} />
         <ToggleRow label="Park" color="var(--warning)" on={parked}
-          hint="Defer — needs human design/discussion; excluded from auto-pickup, reversible."
+          hint={PICKUP_HINT.parked}
           onChange={(v) => toggleLabel('parked', v)} />
       </div>
 
@@ -301,5 +326,20 @@ export function PickupGateControls({ issueId, onOpenIssueBrowser }: {
         </div>
       )}
     </div>
+  );
+
+  if (variant === 'full') return full;
+  return (
+    <PickupGateStrip
+      ready={ready} blocksMain={blocksMain} parked={parked}
+      planned={planned} released={released} objection={objection}
+      busy={busy} stage={stage === 'picked-up' ? 'picked-up' : 'open'}
+      onToggle={(field, value) => void toggleLabel(field, value)}
+      onRelease={() => void toggleLabel('released', true)}
+      onRecall={() => void toggleLabel('released', false)}
+      hints={PICKUP_HINT}
+    >
+      {full}
+    </PickupGateStrip>
   );
 }
