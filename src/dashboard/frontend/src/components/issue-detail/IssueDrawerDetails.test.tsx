@@ -17,6 +17,31 @@ vi.mock('../issue-view/ActiveAgentPanel', () => ({ ActiveAgentPanel: () => <div 
 vi.mock('../backlog/PickupGateControls', () => ({ PickupGateControls: () => <div data-testid="mock-pickup" /> }));
 vi.mock('../CommandDeck/UatEnvironmentPanel', () => ({ UatEnvironmentPanel: () => <div data-testid="mock-uat" /> }));
 vi.mock('../PanOpenInPicker', () => ({ PanOpenInPicker: () => <div /> }));
+vi.mock('../IssueActionMenu/useIssueActions', () => ({
+  useIssueActions: () => ({ all: [], state: { hasPlan: true } }),
+}));
+const useSharedTickMock = vi.fn(() => new Date('2026-05-22T00:00:00.000Z'));
+vi.mock('../../lib/useSharedTick', () => ({
+  useSharedTick: (...args: unknown[]) => useSharedTickMock(...args),
+}));
+const useIssueCostsQueryMock = vi.fn(() => ({ data: undefined }));
+const usePrQueryMock = vi.fn(() => ({ data: undefined }));
+vi.mock('../CommandDeck/ZoneCOverviewTabs/queries', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../CommandDeck/ZoneCOverviewTabs/queries')>()),
+  useIssueCostsQuery: (...args: unknown[]) => useIssueCostsQueryMock(...args),
+  usePrQuery: (...args: unknown[]) => usePrQueryMock(...args),
+}));
+vi.mock('../CommandDeck/ZoneCOverviewTabs/CostsTab', () => ({ CostsTab: () => <div data-testid="mock-costs-tab" /> }));
+vi.mock('../deft/DeftSubagentRows', () => ({ DeftSubagentRows: () => null }));
+vi.mock('../deft/DeftGatesPanel', () => ({ DeftGatesPanel: () => null }));
+vi.mock('../deft/DeftReviewCyclePanel', () => ({ DeftReviewCyclePanel: () => null }));
+vi.mock('../deft/DeftBadges', () => ({ DeftDeliveryChip: () => null }));
+vi.mock('../Stage/cockpit/LinkedConversations', () => ({
+  LinkedConversations: ({ prUrl }: { prUrl: string }) => <div data-testid="mock-linked-conversations">{prUrl}</div>,
+}));
+vi.mock('../issue-view/StackDrawer', () => ({
+  StackDrawer: ({ branch }: { branch: string }) => <div data-testid="mock-stack-drawer">{branch}</div>,
+}));
 
 import type { Agent } from '../../types';
 import { useDashboardStore } from '../../lib/store';
@@ -63,6 +88,9 @@ function renderDetails(props: Partial<IssueDrawerDetailsProps> = {}) {
 
 beforeEach(() => {
   stubWorkspace({ exists: true, path: '/tmp/pan-1', containers: {} });
+  useSharedTickMock.mockReturnValue(new Date('2026-05-22T00:00:00.000Z'));
+  useIssueCostsQueryMock.mockReturnValue({ data: undefined });
+  usePrQueryMock.mockReturnValue({ data: undefined });
 });
 
 afterEach(() => {
@@ -73,10 +101,28 @@ afterEach(() => {
     detailedActivity: [],
     agentsById: {},
     derivedIssueStateByIssueId: {},
+    backendPanesById: {},
   } as Parameters<typeof useDashboardStore.setState>[0]);
 });
 
 describe('IssueDrawerDetails', () => {
+  it('the Status section shows the narrative', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: { 'PAN-1': { issueId: 'PAN-1', state: 'changes-requested' } },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderDetails();
+    expect(screen.getByTestId('drawer-details-status')).toHaveTextContent('The reviewer asked for changes');
+  });
+
+  it('the Status section reads as running for a pane-only work phase (no work agent)', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: { 'PAN-1': { issueId: 'PAN-1', state: 'working' } },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderDetails();
+    expect(screen.getByTestId('drawer-details-status')).not.toHaveTextContent('Waiting to start');
+    expect(screen.getByTestId('drawer-details-status')).not.toHaveTextContent('Planning what to build');
+  });
+
   it('renders the six pipeline rows in order', () => {
     renderDetails();
     const rows = screen.getByTestId('drawer-details-pipeline').querySelectorAll('tr[data-phase]');
@@ -90,6 +136,144 @@ describe('IssueDrawerDetails', () => {
     expect(row).toHaveTextContent('Running now');
     fireEvent.click(screen.getByTestId('drawer-details-open-work'));
     expect(onOpenAgentConversation).toHaveBeenCalledWith('agent-pan-1');
+  });
+
+  it("a phase row shows the agent's model and harness", () => {
+    renderDetails({ agents: [agent({ id: 'agent-pan-1', role: 'work', model: 'claude-opus-5', harness: 'claude-code' })] });
+    const row = screen.getByTestId('drawer-details-pipeline').querySelector('tr[data-phase="work"]') as HTMLElement;
+    expect(row).toHaveTextContent('opus-5 · claude-code');
+  });
+
+  it("a phase with a live pane and no agent shows the pane's model and Running now, and no pane id", () => {
+    useDashboardStore.setState({
+      backendPanesById: {
+        'pane-review-1': { id: 'pane-review-1', issue: 'PAN-1', role: 'review', model: 'claude-opus-5', harness: 'claude-code', state: 'working' },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderDetails();
+    const row = screen.getByTestId('drawer-details-pipeline').querySelector('tr[data-phase="review"]') as HTMLElement;
+    expect(row).toHaveTextContent('opus-5');
+    expect(row).toHaveTextContent('Running now');
+    expect(document.body).not.toHaveTextContent('pane-review-1');
+    expect(screen.queryByTestId('drawer-details-open-review')).toBeNull();
+  });
+
+  it('a stopped agent does not hide a different, currently working pane for the same phase', () => {
+    useDashboardStore.setState({
+      backendPanesById: {
+        'pane-work-2': { id: 'pane-work-2', issue: 'PAN-1', role: 'work', model: 'claude-opus-5', harness: 'claude-code', state: 'working' },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderDetails({ agents: [agent({ id: 'agent-pan-1-work-1', role: 'work', status: 'stopped' })] });
+    const row = screen.getByTestId('drawer-details-pipeline').querySelector('tr[data-phase="work"]') as HTMLElement;
+    expect(row).toHaveTextContent('Running now');
+    expect(row).not.toHaveTextContent('started');
+  });
+
+  it('an exited pane adds no row content', () => {
+    useDashboardStore.setState({
+      backendPanesById: {
+        'pane-review-1': { id: 'pane-review-1', issue: 'PAN-1', role: 'review', model: 'claude-opus-5', harness: 'claude-code', state: 'exited' },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderDetails();
+    const row = screen.getByTestId('drawer-details-pipeline').querySelector('tr[data-phase="review"]') as HTMLElement;
+    expect(row).toHaveTextContent('none');
+    expect(row).toHaveTextContent('Not started');
+  });
+
+  it('a live agent row shows its running duration', () => {
+    useSharedTickMock.mockReturnValue(new Date('2026-05-22T00:02:05.000Z'));
+    renderDetails({ agents: [agent({ id: 'agent-pan-1', role: 'work', startedAt: '2026-05-22T00:00:00.000Z' })] });
+    const row = screen.getByTestId('drawer-details-pipeline').querySelector('tr[data-phase="work"]') as HTMLElement;
+    expect(row).toHaveTextContent('Running now · 2m');
+  });
+
+  it("the cost column sums an agent's cost rows and shows the issue total", () => {
+    useIssueCostsQueryMock.mockReturnValue({
+      data: {
+        issueId: 'PAN-1',
+        totalCost: 1.5,
+        resolvedTotalCost: 2,
+        totalTokens: 0,
+        sessions: [
+          { sessionId: 's1', agentId: 'agent-pan-1', startedAt: '', endedAt: null, type: 'work', model: 'claude-sonnet-4-6', cost: 1 },
+          { sessionId: 's2', agentId: 'agent-pan-1', startedAt: '', endedAt: null, type: 'work', model: 'claude-sonnet-4-6', cost: 0.5 },
+          { sessionId: 's3', agentId: 'agent-pan-1-review-security', startedAt: '', endedAt: null, type: 'review', model: 'claude-sonnet-4-6', cost: 0.5 },
+        ],
+      },
+    });
+    renderDetails({ agents: [agent({ id: 'agent-pan-1', role: 'work' })] });
+
+    expect(screen.getByTestId('drawer-details-cost-work')).toHaveTextContent('$1.50');
+    expect(screen.getByTestId('drawer-details-cost-total')).toHaveTextContent('$2.00');
+  });
+
+  it('shows no total row when the resolved total is zero', () => {
+    useIssueCostsQueryMock.mockReturnValue({
+      data: { issueId: 'PAN-1', totalCost: 0, resolvedTotalCost: 0, totalTokens: 0, sessions: [] },
+    });
+    renderDetails();
+    expect(screen.queryByTestId('drawer-details-cost-total')).toBeNull();
+  });
+
+  it('the cost breakdown disclosure mounts CostsTab only while open', () => {
+    renderDetails();
+    expect(screen.queryByTestId('mock-costs-tab')).not.toBeInTheDocument();
+
+    const toggle = screen.getByTestId('drawer-details-costs-toggle');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('drawer-details-costs')).toBeInTheDocument();
+    expect(screen.getByTestId('mock-costs-tab')).toBeInTheDocument();
+  });
+
+  it('the Ship section renders the merge gate for a ready issue', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: { 'PAN-1': { issueId: 'PAN-1', state: 'ready' } },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderDetails();
+    const ship = screen.getByTestId('drawer-details-ship');
+    expect(ship.querySelector('[data-section="ship-progress-full"] [data-ship-status="ready"]')).toBeInTheDocument();
+  });
+
+  it('the Ship section shows the diff size and the merge commit', () => {
+    usePrQueryMock.mockReturnValue({
+      data: { issueId: 'PAN-1', pr: { additions: 12, deletions: 3, changedFiles: 1, mergeCommit: { oid: 'abc1234' } } },
+    });
+    renderDetails();
+    expect(screen.getByTestId('drawer-details-diff')).toHaveTextContent('+12 −3 · 1 file · merged as abc1234');
+  });
+
+  it('renders no linked conversations without a pull request', () => {
+    renderDetails();
+    expect(screen.queryByTestId('drawer-details-linked')).not.toBeInTheDocument();
+  });
+
+  it('renders linked conversations with the pull request url', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: {
+        'PAN-1': { issueId: 'PAN-1', state: 'in-review', pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'review-requested', checks: 'green', mergeable: true } },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderDetails();
+    expect(screen.getByTestId('drawer-details-linked')).toHaveTextContent('https://example.test/pr/1');
+  });
+
+  it('the stack disclosure sits in the workspace section, receiving the derived branch name', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: { 'PAN-1': { issueId: 'PAN-1', branch: { name: 'feature/pan-1' } } },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderDetails();
+    const workspaceSection = document.querySelector('[data-section="DrawerWorkspaceSection"]') as HTMLElement;
+    expect(within(workspaceSection).getByTestId('mock-stack-drawer')).toHaveTextContent('feature/pan-1');
+  });
+
+  it("falls back to the issue's own branch name when there is no derived branch", () => {
+    renderDetails({ issueId: 'PAN-7' });
+    expect(screen.getByTestId('mock-stack-drawer')).toHaveTextContent('feature/pan-7');
   });
 
   it('a phase without an agent shows no Open conversation button', () => {

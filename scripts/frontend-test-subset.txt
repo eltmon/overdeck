@@ -285,12 +285,17 @@ src/components/home/__tests__/pendingTerminal.test.ts
 src/components/home/__tests__/useTypeToFocus.test.tsx
 src/components/issue-detail/IssueDetail.test.tsx
 src/components/issue-detail/IssueDetailSections.test.tsx
+src/components/issue-detail/IssueDetailTabBodies.test.tsx
 src/components/issue-detail/IssueDrawerDetails.test.tsx
 src/components/issue-detail/issue-session-tabs.no-loss.test.tsx
+src/components/issue-detail/issueTabs.test.ts
+src/components/issue-view/IssueBannerSlot.test.tsx
 src/components/issue-view/IssueChecksChip.test.tsx
+src/components/issue-view/IssueChecksPanel.test.tsx
 src/components/issue-view/IssueHeaderFacts.test.tsx
 src/components/issue-view/IssueHeaderTitle.test.tsx
 src/components/issue-view/IssuePipelineStrip.test.tsx
+src/components/issue-view/StackDrawer.test.tsx
 src/components/issue-view/useIssueRecord.test.tsx
 src/components/merge-train/__tests__/MergeTrainView.test.tsx
 src/components/mobile/__tests__/AppearanceChoice.test.tsx

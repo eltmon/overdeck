@@ -7,8 +7,9 @@ import { useDashboardStore } from '../../lib/store';
 import { DrawerAgentSession, pickDefaultDrawerAgent, sortIssueAgents } from './DrawerAgentSession';
 import { agentDisplayName } from '../../lib/agentConversation';
 
+const useQueryMock = vi.fn(() => ({ data: null }));
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => ({ data: null }),
+  useQuery: (...args: unknown[]) => useQueryMock(...args),
 }));
 
 vi.mock('../chat/ConversationPanel', () => ({
@@ -270,6 +271,7 @@ describe('DrawerAgentSession view selector', () => {
 describe('DrawerAgentSession conversation-header layout', () => {
   afterEach(() => {
     useDashboardStore.setState({ agentsById: {} } as Parameters<typeof useDashboardStore.setState>[0]);
+    useQueryMock.mockReturnValue({ data: null });
   });
 
   it('agentDisplayName names slots, workers, reviewers and roles', () => {
@@ -427,5 +429,57 @@ describe('DrawerAgentSession conversation-header layout', () => {
     );
 
     expect(screen.getByTestId('drawer-agent-cost')).toHaveTextContent('$1.50');
+  });
+
+  it('the branch chip copies the branch name', () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    useQueryMock.mockReturnValue({ data: { actualBranch: 'feature/pan-1', workspaceMissing: false } });
+
+    render(
+      <DrawerAgentSession
+        view="conversation"
+        layout="conversation-header"
+        agents={[agent({ id: 'agent-pan-1', role: 'work' })]}
+        agentId="agent-pan-1"
+        onSelectAgent={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('drawer-agent-branch-copy'));
+    expect(writeText).toHaveBeenCalledWith('feature/pan-1');
+  });
+
+  it('no copy button renders for a missing workspace', () => {
+    useQueryMock.mockReturnValue({ data: { actualBranch: null, workspaceMissing: true } });
+
+    render(
+      <DrawerAgentSession
+        view="conversation"
+        layout="conversation-header"
+        agents={[agent({ id: 'agent-pan-1', role: 'work' })]}
+        agentId="agent-pan-1"
+        onSelectAgent={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('drawer-agent-branch-chip')).toBeInTheDocument();
+    expect(screen.queryByTestId('drawer-agent-branch-copy')).toBeNull();
+  });
+
+  it('the toolbar layout has no copy button', () => {
+    useQueryMock.mockReturnValue({ data: { actualBranch: 'feature/pan-1', workspaceMissing: false } });
+
+    render(
+      <DrawerAgentSession
+        view="conversation"
+        agents={[agent({ id: 'agent-pan-1', role: 'work' })]}
+        agentId="agent-pan-1"
+        onSelectAgent={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('drawer-agent-branch-chip')).toBeInTheDocument();
+    expect(screen.queryByTestId('drawer-agent-branch-copy')).toBeNull();
   });
 });

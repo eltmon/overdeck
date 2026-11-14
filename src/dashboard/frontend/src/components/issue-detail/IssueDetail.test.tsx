@@ -75,8 +75,16 @@ vi.mock('../skills/SkillOverridesSections', () => ({
   ),
 }));
 vi.mock('../TasksPanel', () => ({ TasksPanel: () => <div data-testid="tasks-panel" /> }));
+const useDeftIssueSummaryMock = vi.hoisted(() => vi.fn(() => ({ isDeft: false, summary: null, isLoading: false })));
+vi.mock('../deft/queries', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../deft/queries')>()),
+  useDeftIssueSummary: (...args: unknown[]) => useDeftIssueSummaryMock(...args),
+}));
+vi.mock('../deft/DeftDecisionsTab', () => ({ DeftDecisionsTab: () => <div data-testid="deft-decisions" /> }));
+vi.mock('../issue-view/IssueBannerSlot', () => ({ IssueBannerSlot: () => <div data-testid="mock-banner-slot" /> }));
 
 beforeEach(() => {
+  useDeftIssueSummaryMock.mockReturnValue({ isDeft: false, summary: null, isLoading: false });
   // Overview-tab panels query their domains; answer everything benignly.
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({})));
 });
@@ -249,6 +257,16 @@ describe('IssueDetail (C-DETAIL one component)', () => {
     expect(screen.queryByTestId('mock-pipeline-strip')).not.toBeInTheDocument();
     expect(screen.getByTestId('mock-agent-session-conversation')).toHaveAttribute('data-layout', 'toolbar');
     expect(screen.queryByTestId('drawer-tab-skills')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('drawer-tab-discussion')).not.toBeInTheDocument();
+  });
+
+  it('page density keeps its own DrawerPausedBanner wrapper and never the banner slot', () => {
+    renderDetail(
+      <IssueDetail issueId="PAN-1" density="page" agents={AGENTS} tab="conversation" onSelectTab={() => {}} />,
+    );
+    expect(document.querySelector('[data-section="DrawerPausedBanner"]')).toBeInTheDocument();
+    expect(screen.queryByTestId('mock-banner-slot')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('issue-banner-slot')).not.toBeInTheDocument();
   });
 
   it('page density keeps the Overview body with the skills disclosure and the tasks panel', () => {
@@ -332,5 +350,49 @@ describe('IssueDetail (C-DETAIL one component)', () => {
 
     expect(screen.getByTestId('mock-agent-session-conversation')).toHaveAttribute('data-agent-id', 'agent-review-1');
     expect(document.querySelectorAll('[data-section="SpecialistStrip"]')).toHaveLength(1);
+  });
+
+  it('adds a Decisions tab before Discussion for a Deft issue', () => {
+    useDeftIssueSummaryMock.mockReturnValue({ isDeft: true, summary: null, isLoading: false });
+    renderDetail(
+      <IssueDetail issueId="PAN-1" density="drawer" agents={AGENTS} tab="conversation" onSelectTab={() => {}} />,
+    );
+    const ids = screen.getAllByRole('tab').map((button) => button.getAttribute('data-testid'));
+    expect(ids.indexOf('drawer-tab-decisions')).toBe(ids.indexOf('drawer-tab-discussion') - 1);
+  });
+
+  it('hides the Decisions tab for a non-Deft issue', () => {
+    useDeftIssueSummaryMock.mockReturnValue({ isDeft: false, summary: null, isLoading: false });
+    renderDetail(
+      <IssueDetail issueId="PAN-1" density="drawer" agents={AGENTS} tab="conversation" onSelectTab={() => {}} />,
+    );
+    expect(screen.queryByTestId('drawer-tab-decisions')).not.toBeInTheDocument();
+  });
+
+  it('opens Decisions from tab="decisions"', () => {
+    useDeftIssueSummaryMock.mockReturnValue({ isDeft: true, summary: null, isLoading: false });
+    renderDetail(
+      <IssueDetail issueId="PAN-1" density="drawer" agents={AGENTS} tab="decisions" onSelectTab={() => {}} />,
+    );
+    expect(screen.getByTestId('deft-decisions')).toBeInTheDocument();
+  });
+
+  it('renders the banner slot between the strip and the tabs', () => {
+    renderDetail(
+      <IssueDetail issueId="PAN-1" density="drawer" agents={AGENTS} tab="conversation" onSelectTab={() => {}} />,
+    );
+    const strip = screen.getByTestId('mock-pipeline-strip');
+    const banner = screen.getByTestId('mock-banner-slot');
+    const tabs = screen.getByTestId('drawer-tabs');
+    expect(strip.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(banner.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('an unknown tab value renders the placeholder', () => {
+    renderDetail(
+      <IssueDetail issueId="PAN-1" density="drawer" agents={AGENTS} tab="no-such-tab" onSelectTab={() => {}} />,
+    );
+    expect(screen.getByTestId('drawer-tab-panel-no-such-tab')).toHaveTextContent('This drawer section will appear here as data streams in.');
+    expect(screen.getAllByRole('tab').every((button) => button.getAttribute('aria-selected') === 'false')).toBe(true);
   });
 });

@@ -4,12 +4,13 @@ import { XBriefViewer } from '../xbrief/XBriefViewer';
 import type { XBriefDocument } from '../xbrief/types';
 import { IssueViewFullscreenButton } from '../issue-view/IssueView';
 import { useDashboardStore } from '../../lib/store';
-import { useDrawerData, type DrawerActivityPhase } from './useDrawerData';
+import { useIssueData, type DrawerActivityPhase } from './useDrawerData';
 
 const DOT_CLASSES = { work: 'bg-primary', review: 'bg-signal-review', ship: 'bg-warning', done: 'bg-success', info: 'bg-info' } satisfies Record<DrawerActivityPhase, string>;
 
-export function DrawerActivityPanel() {
-  const { activityFull } = useDrawerData();
+export function DrawerActivityPanel({ issueId }: { issueId?: string | null }) {
+  const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
+  const { activityFull } = useIssueData(issueId ?? drawerIssueId);
   return <div data-testid="drawer-tab-panel-activity">{activityFull.length === 0 ? <div className="rounded-[12px] border border-dashed border-border px-[12px] py-[18px] text-center text-[12px] text-muted-foreground">No activity yet.</div> : <div className="space-y-[12px]">{activityFull.map((item) => {
     const date = new Date(item.when);
     const when = !item.when ? 'just now' : Number.isNaN(date.getTime()) ? item.when : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

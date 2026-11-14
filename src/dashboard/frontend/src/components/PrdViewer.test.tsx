@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { PrdViewer } from './PrdViewer';
+import { PrdBody, PrdViewer } from './PrdViewer';
 
 vi.mock('./chat/ChatMarkdown', () => ({
   ChatMarkdown: ({ text, issueId }: { text: string; issueId: string }) => (
@@ -64,5 +64,22 @@ describe('PrdViewer', () => {
     fireEvent.click(container.querySelector('.absolute.inset-0')!);
 
     expect(onClose).toHaveBeenCalledTimes(3);
+  });
+
+  it('PrdBody renders the PRD without a dialog', async () => {
+    const fetchMock = vi.fn(async () => Response.json({
+      hasPrd: true,
+      content: '# Artifact viewers\n\n- PRD chip',
+      path: '/state/overdeck/drafts/pan-3231.md',
+      status: 'draft',
+      format: 'pan-draft',
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<PrdBody issueId="PAN-3231" />, { wrapper });
+
+    const markdown = await screen.findByTestId('chat-markdown');
+    expect(markdown).toHaveTextContent('# Artifact viewers');
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
