@@ -286,6 +286,16 @@ export function invalidateRepoPullRequests(projectPath: string): void {
 }
 
 /**
+ * PAN-5261: drop only the open listing (settled or in flight). A review,
+ * check or status webhook can change only an open PR's fields; a PR that
+ * closed shows up as a shrink on the next open read, which already forces
+ * the closed re-read.
+ */
+export function invalidateOpenRepoPullRequests(projectPath: string): void {
+  cachedOpenPullRequests.invalidate(projectPath, { includeInFlight: true });
+}
+
+/**
  * The repo's full PR listing (open and closed combined), or null when either
  * read failed (rate limit, auth, network), so a caller that backs off can
  * tell "failed" from "no PRs". The closed read runs only after the open read
