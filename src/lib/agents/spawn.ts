@@ -654,7 +654,7 @@ async function spawnAgentWithoutConsentClaim(
   const role: 'work' | 'strike' | 'knowledge' = options.role ?? 'work';
   const sessionPrefix = role === 'strike' ? 'strike' : 'agent';
   const agentId = options.agentId ?? `${sessionPrefix}-${options.issueId.toLowerCase()}`;
-  // PAN-5243: claim first, before any write to the agent dir; every process's start shares it.
+  // PAN-5243: claim first, before any write to the agent dir; held through kickoff. Every process's start shares it.
   const startClaim = await claimAgentStart(agentId);
   try { return await spawnClaimedAgent(options, role, agentId, startClaim, acceptConsent); } finally { await startClaim.release(); }
 }
@@ -897,7 +897,6 @@ async function spawnClaimedAgent(options: SpawnOptions, role: 'work' | 'strike' 
     await markSpawnFailed(agentId, `launch failed: ${err instanceof Error ? err.message : String(err)}`);
     throw err;
   }
-  await startClaim.release(); // the pane is named now; the pane-exists guard sees it
   await acceptConsent?.();
   await saveAgentRuntimeState(agentId, {
     claudeSessionId: state.sessionId,

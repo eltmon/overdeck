@@ -284,15 +284,18 @@ export async function fetchIssueForAutoStart(issueId: string): Promise<AutoSynth
 
 /** PAN-4211: `--force` clears the troubled gate the way dashboard `clearGates` does. */
 /**
- * PAN-5243: another start owns this agent (its live pane, or a start claim
- * mid-launch). Report the winner, touch nothing, exit 0 — callers such as the
- * dashboard's planning auto-handoff and the Flywheel read that as "agent is
- * live", never as spawn-failed. False for any other error.
+ * PAN-5243: another start owns this agent (a start claim mid-launch, or a live
+ * pane whose record is starting or running). Report the winner, touch nothing,
+ * exit 0 — callers such as the dashboard's planning auto-handoff and the
+ * Flywheel read that as "agent is live", never as spawn-failed. False for any
+ * other error, and for a leftover pane on a stopped record, which stays exit 1.
  */
 export async function reportLostStartRace(error: unknown, id: string, agentId: string, spinner: Pick<Ora, 'info'>): Promise<boolean> {
   if (!(error instanceof AgentAlreadyRunningError)) return false;
+  const state = getAgentState(agentId);
+  if (error.phase === 'running' && state?.status !== 'running' && state?.status !== 'starting') return false;
   spinner.info(error.message);
-  await printAlreadyRunningHints(id, getAgentState(agentId) ?? { id: agentId });
+  await printAlreadyRunningHints(id, state ?? { id: agentId });
   return true;
 }
 

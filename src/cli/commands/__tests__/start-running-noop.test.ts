@@ -352,6 +352,17 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     expect(agentMocks.stopAgent).not.toHaveBeenCalled();
   });
 
+  it('keeps exit 1 for a leftover pane on a stopped record', async () => {
+    agentMocks.getAgentState.mockReturnValue({ id: 'agent-pan-x', issueId: 'PAN-X', status: 'stopped', paneId: 'w1Y5:p2' });
+    const { AgentAlreadyRunningError } = await import('../../../lib/agents/start-claim.js');
+    const { reportLostStartRace } = await import('../start.js');
+    const spinner = { info: vi.fn() };
+
+    await expect(reportLostStartRace(new AgentAlreadyRunningError('agent-pan-x', 'running'), 'PAN-X', 'agent-pan-x', spinner)).resolves.toBe(false);
+    expect(spinner.info).not.toHaveBeenCalled();
+    expect(process.exitCode).toBeUndefined();
+  });
+
   it('leaves every other spawn failure to the normal exit-1 path', async () => {
     const { reportLostStartRace } = await import('../start.js');
     const spinner = { info: vi.fn() };
