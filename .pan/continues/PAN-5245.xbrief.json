@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5245",
   "created": "2026-11-14T05:12:59.498Z",
-  "updated": "2026-11-14T05:26:04.667Z",
+  "updated": "2026-11-14T05:26:13.182Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
     "level-switch-control.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T05:26:04.667Z"
+    },
+    "skill-rows-level-switch": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5245",
+      "claimedAt": "2026-11-14T05:26:13.182Z"
     }
   }
 }
