@@ -1,0 +1,128 @@
+{
+  "id": "2026-11-14-workflow-redesign-pan-5284",
+  "name": "Workflow redesign (PAN-5284)",
+  "status": "ready",
+  "settings": {
+    "laneAConcurrency": 2,
+    "posture": "open",
+    "postureSetAt": "2026-11-14T19:18:58.032Z",
+    "postureSetBy": "dashboard"
+  },
+  "items": [
+    {
+      "issue": "PAN-5281",
+      "lane": "A",
+      "order": 1,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-14T19:18:17.714Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5287",
+      "lane": "A",
+      "order": 2,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-14T19:18:17.714Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5288",
+      "lane": "A",
+      "order": 3,
+      "prereqs": [
+        "PAN-5287",
+        "PAN-5281"
+      ],
+      "reVerify": false,
+      "addedAt": "2026-11-14T19:18:17.714Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5292",
+      "lane": "A",
+      "order": 4,
+      "prereqs": [
+        "PAN-5287"
+      ],
+      "reVerify": false,
+      "addedAt": "2026-11-14T19:18:17.714Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5289",
+      "lane": "A",
+      "order": 5,
+      "prereqs": [
+        "PAN-5287",
+        "PAN-5288"
+      ],
+      "reVerify": false,
+      "addedAt": "2026-11-14T19:18:17.714Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5293",
+      "lane": "A",
+      "order": 6,
+      "prereqs": [
+        "PAN-5292",
+        "PAN-5288"
+      ],
+      "reVerify": false,
+      "addedAt": "2026-11-14T19:18:17.714Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5291",
+      "lane": "A",
+      "order": 7,
+      "prereqs": [
+        "PAN-5288",
+        "PAN-5289"
+      ],
+      "reVerify": false,
+      "addedAt": "2026-11-14T19:18:17.714Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5290",
+      "lane": "A",
+      "order": 8,
+      "prereqs": [
+        "PAN-5289"
+      ],
+      "reVerify": false,
+      "addedAt": "2026-11-14T19:18:17.714Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5295",
+      "lane": "A",
+      "order": 9,
+      "prereqs": [
+        "PAN-5290",
+        "PAN-5291"
+      ],
+      "reVerify": false,
+      "addedAt": "2026-11-14T19:18:17.714Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5294",
+      "lane": "A",
+      "order": 10,
+      "prereqs": [
+        "PAN-5288",
+        "PAN-5289",
+        "PAN-5293"
+      ],
+      "reVerify": false,
+      "addedAt": "2026-11-14T19:18:17.714Z",
+      "addedBy": "conv-20261113-6031"
+    }
+  ],
+  "createdAt": "2026-11-14T19:17:57.102Z",
+  "updatedAt": "2026-11-14T19:19:06.172Z"
+}

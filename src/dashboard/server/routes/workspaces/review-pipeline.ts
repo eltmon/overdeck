@@ -765,6 +765,10 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
     const derived = yield* Effect.promise(() => getDerivedIssueState(canonicalIssueId));
 
+    // PAN-4753 WI-5: a strike-only issue gets its expedited review, not the feature pipeline.
+    const { strikeReviewRequestAnswer } = yield* Effect.promise(() => import('../../services/strike-review.js'));
+    const strikeAnswer = yield* Effect.promise(() => strikeReviewRequestAnswer(canonicalIssueId, { force: forceReview }));
+    if (strikeAnswer) return jsonResponse(strikeAnswer.body, { status: strikeAnswer.status });
     const { answerAdoptionInFlight, answerMissingWorkspace } = yield* Effect.promise(() => import('../../../../lib/cloister/pr-adoption-review.js'));
     // PAN-4995: never verify a worktree an in-flight adoption still owns; adoption starts the review.
     const adopting = answerAdoptionInFlight(canonicalIssueId);

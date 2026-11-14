@@ -39,7 +39,11 @@ const routeMocks = vi.hoisted(() => ({
   isDeftPipelineIssue: vi.fn(),
   clearVerificationDispatchOwed: vi.fn(),
   confirmResumedDispatch: vi.fn(),
+  strikeReviewRequestAnswer: vi.fn(),
 }));
+
+// PAN-4753 WI-5: answers null (not a strike) unless a test says otherwise.
+vi.mock('../../../services/strike-review.js', () => ({ strikeReviewRequestAnswer: routeMocks.strikeReviewRequestAnswer }));
 
 vi.mock('../../../../../lib/cloister/verification-worker-supervisor.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../lib/cloister/verification-worker-supervisor.js')>()),
@@ -183,6 +187,7 @@ beforeEach(() => {
   routeMocks.pushLocalReviewBranches.mockImplementation(() => new Promise<void>(() => {}));
   routeMocks.resolveEffort.mockReturnValue({ effort: 'high', source: 'default', requested: 'high', clamped: false });
   routeMocks.answerMissingWorkspace.mockResolvedValue(null);
+  routeMocks.strikeReviewRequestAnswer.mockResolvedValue(null);
   routeMocks.answerAdoptionInFlight.mockReturnValue(null);
   routeMocks.isDeftPipelineIssue.mockResolvedValue(false);
 });
@@ -478,6 +483,22 @@ describe('POST /api/review/:issueId/request — PR state refresh (PAN-4457)', ()
 
     expect(result.body).toMatchObject({ success: false, error: 'Workspace does not exist' });
     expect(routeMocks.refreshIssuePullRequestStateNow).not.toHaveBeenCalled();
+  });
+
+  it('dispatches the expedited review for a strike-only issue instead of 400 "Workspace does not exist" (PAN-4753)', async () => {
+    routeMocks.getWorkspaceInfoForIssue.mockReturnValue({ exists: false, isRemote: false, localPath: '' });
+    routeMocks.strikeReviewRequestAnswer.mockResolvedValue({ status: 202, body: { success: true, message: 'Strike review dispatched at abcd1234' } });
+
+    const result = await post('/api/review/PAN-3340/request?force=true', {
+      method: 'POST',
+      headers: authHeaders,
+      body: '{}',
+    });
+
+    expect(result.status).toBe(202);
+    expect(result.body).toEqual({ success: true, message: 'Strike review dispatched at abcd1234' });
+    expect(routeMocks.strikeReviewRequestAnswer).toHaveBeenCalledWith('PAN-3340', { force: true });
+    expect(routeMocks.answerMissingWorkspace).not.toHaveBeenCalled();
   });
 
   it('adopts an open PR before the approved-head shortcut when the issue has no workspace (PAN-4605)', async () => {

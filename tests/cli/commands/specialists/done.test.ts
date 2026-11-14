@@ -85,6 +85,9 @@ vi.mock('../../../../src/lib/overdeck/issue-projects.js', () => ({
   getIssueWorkspacePath: mockGetIssueWorkspacePath,
 }));
 
+// PAN-4753 WI-5: no strike workspace unless a test says so (done-strike-target.test.ts covers it).
+vi.mock('../../../../src/lib/cloister/review-target.js', () => ({ resolveReviewTarget: () => null }));
+
 vi.mock('../../../../src/lib/cloister/review-verdict-feedback.js', () => ({
   deliverReviewVerdictFeedback: mockDeliverReviewVerdictFeedback,
 }));

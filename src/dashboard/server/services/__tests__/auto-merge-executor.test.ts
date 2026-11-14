@@ -31,6 +31,13 @@ vi.mock('../issue-service-singleton.js', () => ({
 vi.mock('../../../../lib/cloister/merge-gate.js', () => ({
   evaluateIssueMergeGate: vi.fn(async () => ({ ready: true, facts: { headSha: null } })),
 }));
+// PAN-4753 WI-6: the default merge for a strike row builds a strike request.
+const mergeDoors = vi.hoisted(() => ({
+  triggerMerge: vi.fn(async () => ({ success: true, outcome: 'merged', statusCode: 200 })),
+  buildStrikeMergeRequest: vi.fn(),
+}));
+vi.mock('../../routes/workspaces/merge-ops.js', () => ({ triggerMerge: mergeDoors.triggerMerge }));
+vi.mock('../strike-merge.js', () => ({ buildStrikeMergeRequest: mergeDoors.buildStrikeMergeRequest }));
 
 import {
   AUTO_MERGE_EXECUTOR_INTERVAL_MS,
@@ -81,6 +88,7 @@ function pendingEntry(overrides: Partial<PendingAutoMerge> = {}): PendingAutoMer
     scheduledMergeAt: '2026-05-25T09:59:59.000Z',
     scheduledAt: '2026-05-25T09:54:59.000Z',
     headSha: 'aaaaaaaaaaaaaaaa',
+    kind: 'feature',
     ...overrides,
   };
 }
@@ -256,7 +264,7 @@ describe('auto-merge executor', () => {
       markFailed,
     });
 
-    expect(mergeIssue).toHaveBeenCalledWith('PAN-1486', 'aaaaaaaaaaaaaaaa');
+    expect(mergeIssue).toHaveBeenCalledWith('PAN-1486', 'aaaaaaaaaaaaaaaa', 'feature');
     expect(markMerged).toHaveBeenCalledWith(1);
     expect(markFailed).not.toHaveBeenCalled();
   });
@@ -605,7 +613,7 @@ describe('auto-merge executor', () => {
       markMerged,
     });
 
-    expect(mergeIssue).toHaveBeenCalledWith('PAN-1486', 'aaaaaaaaaaaaaaaa');
+    expect(mergeIssue).toHaveBeenCalledWith('PAN-1486', 'aaaaaaaaaaaaaaaa', 'feature');
     expect(markMerged).toHaveBeenCalledWith(1);
   });
 
@@ -661,5 +669,98 @@ describe('auto-merge executor', () => {
     _resetMergeRetryCountsForTests();
     await tickAutoMergeExecutor(base);
     expect(markMergeRetriesExhausted).not.toHaveBeenCalled();
+  });
+});
+
+describe('auto-merge executor strike rows (PAN-4753 WI-6)', () => {
+  const STRIKE_REQUEST = {
+    kind: 'strike' as const, markerHead: 'bbbbbbbbbbbbbbbb', workspacePath: '/repos/overdeck/workspaces/feature-pan-2-strike',
+    branchName: 'strike/pan-2', recoveryTarget: 'strike-pan-2', expectedHeadSha: 'bbbbbbbbbbbbbbbb',
+  };
+  const featureRow = () => pendingEntry({ id: 1, issueId: 'PAN-1', scheduledMergeAt: '2026-05-25T09:50:00.000Z' });
+  const strikeRow = () => pendingEntry({ id: 2, issueId: 'PAN-2', kind: 'strike', headSha: 'bbbbbbbbbbbbbbbb', scheduledMergeAt: '2026-05-25T09:59:00.000Z' });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    tracker.open = true;
+    mergeDoors.triggerMerge.mockClear();
+    mergeDoors.buildStrikeMergeRequest.mockReset();
+    mergeDoors.buildStrikeMergeRequest.mockResolvedValue({ ok: true, request: STRIKE_REQUEST });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function deps(overrides: Parameters<typeof tickAutoMergeExecutor>[0] = {}) {
+    return {
+      now: () => NOW,
+      listEntries: () => [featureRow(), strikeRow()],
+      isEligible: vi.fn(async () => ({ eligible: true as const })),
+      deftHold: async () => null,
+      mergeGate: vi.fn(async (issueId: string) => gate(true, { headSha: issueId === 'PAN-2' ? 'bbbbbbbbbbbbbbbb' : 'aaaaaaaaaaaaaaaa' })),
+      transition: () => true,
+      markMerged: vi.fn(() => true),
+      markBlocked: vi.fn(() => true),
+      log: () => {},
+      ...overrides,
+    };
+  }
+
+  it('merges a due strike row before an earlier-due feature row', async () => {
+    const mergeIssue = vi.fn(async () => ({ success: true, outcome: 'merged' }));
+    await tickAutoMergeExecutor(deps({ mergeIssue }));
+    expect(mergeIssue.mock.calls).toEqual([
+      ['PAN-2', 'bbbbbbbbbbbbbbbb', 'strike'],
+      ['PAN-1', 'aaaaaaaaaaaaaaaa', 'feature'],
+    ]);
+  });
+
+  it('reads, gates and judges a strike row on its strike branch', async () => {
+    const d = deps({ listEntries: () => [strikeRow()], mergeIssue: vi.fn(async () => ({ success: true, outcome: 'merged' })) });
+    await tickAutoMergeExecutor(d);
+    expect(d.isEligible).toHaveBeenCalledWith('PAN-2', { preferBranch: 'strike/pan-2' });
+    expect(d.mergeGate).toHaveBeenCalledWith('PAN-2', { preferBranch: 'strike/pan-2' });
+  });
+
+  it('merges a strike row through triggerMerge with a strike request pinned to the scheduled head', async () => {
+    await tickAutoMergeExecutor(deps({ listEntries: () => [strikeRow()] }));
+    expect(mergeDoors.buildStrikeMergeRequest).toHaveBeenCalledWith('PAN-2', { expectedHeadSha: 'bbbbbbbbbbbbbbbb' });
+    expect(mergeDoors.triggerMerge).toHaveBeenCalledWith('PAN-2', STRIKE_REQUEST);
+  });
+
+  it('refuses, never merges, a strike row whose strike workspace is gone', async () => {
+    mergeDoors.buildStrikeMergeRequest.mockResolvedValue({ ok: false, status: 404, error: 'No strike workspace for PAN-2' });
+    const markRefused = vi.fn(() => true);
+    await tickAutoMergeExecutor(deps({ listEntries: () => [strikeRow()], markRefused }));
+    expect(mergeDoors.triggerMerge).not.toHaveBeenCalled();
+    expect(markRefused).toHaveBeenCalledWith(2, 'PAN-2 is not ready to merge: No strike workspace for PAN-2');
+  });
+
+  it('retries, never fails, a strike row whose branch fetch failed (409)', async () => {
+    mergeDoors.buildStrikeMergeRequest.mockResolvedValue({ ok: false, status: 409, error: 'Could not read origin/strike/pan-2: network down' });
+    const markFailed = vi.fn(() => true);
+    const requeueToPending = vi.fn(() => true);
+    const setMergeRetryCount = vi.fn();
+    await tickAutoMergeExecutor(deps({
+      listEntries: () => [strikeRow()], markFailed, requeueToPending, getMergeRetryCount: () => 0, setMergeRetryCount,
+    }));
+    expect(mergeDoors.triggerMerge).not.toHaveBeenCalled();
+    expect(markFailed).not.toHaveBeenCalled();
+    expect(setMergeRetryCount).toHaveBeenCalledWith('PAN-2', 1);
+    expect(requeueToPending).toHaveBeenCalledWith(2, '2026-05-25T10:01:00.000Z');
+  });
+
+  it('blocks, never merges, a strike row whose gate reports no head approval (FR-2)', async () => {
+    const mergeIssue = vi.fn();
+    const markBlocked = vi.fn(() => true);
+    await tickAutoMergeExecutor(deps({
+      listEntries: () => [strikeRow()],
+      mergeGate: vi.fn(async () => gate(false, { headSha: 'bbbbbbbbbbbbbbbb' }, 'PR is not approved at PR HEAD bbbbbbbbbbbbbbbb')),
+      mergeIssue,
+      markBlocked,
+    }));
+    expect(mergeIssue).not.toHaveBeenCalled();
+    expect(markBlocked).toHaveBeenCalledWith(2, 'PAN-2 is not ready to merge: PR is not approved at PR HEAD bbbbbbbbbbbbbbbb');
   });
 });

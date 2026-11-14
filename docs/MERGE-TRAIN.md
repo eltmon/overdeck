@@ -75,15 +75,20 @@ UI never hides a voided or superseded batch.
 ## Strikes
 
 A strike PR (`strike/<id>`, from `pan strike`) is high priority, so it never
-batches. Batches stay feature-only. Today the operator merges a strike with
-the strike lane's Merge button, `POST /api/merge-train/strikes/:issueId/merge`
-(PAN-4750). That operator-started door is the only merge that does not require
-a head approval; every automatic merge and every feature merge still needs
-one. The board shows each open strike's state: checks running, bot review
-running, flagged by review (with the reviewer's summary), waiting for UAT in a
-hold project, merging, failed, blocked, or approved. Automatic expedited review
-and no-cooldown strike auto-merge are PAN-4753 WI-5 and WI-6; until they land,
-the operator door is how strikes merge.
+batches; batches stay feature-only. Each open strike with green checks gets
+one expedited (quick-mode, single-reviewer) review per head
+(`strike-review.ts`). An approval is a head approval, so the scheduler
+schedules the strike per-PR (`pending_auto_merges.kind = 'strike'`) and the
+executor merges due strike rows before due feature rows. A
+CHANGES_REQUESTED verdict stops the strike, and the reviewer's `summary` is
+journaled for the strike lane. A strike held for UAT is never scheduled: it
+waits for the operator's strike Merge button,
+`POST /api/merge-train/strikes/:issueId/merge` (PAN-4750), the only merge
+that does not require a head approval. The full flow is in
+[MERGE-WORKFLOW.md](MERGE-WORKFLOW.md) ("Strike PRs: expedited review and
+auto-merge"). The board shows each open strike's state: checks running, bot
+review running, flagged by review (with the reviewer's summary), waits for
+UAT, merging next (scheduled), merging, failed, blocked, or approved.
 
 ## The board read model
 
