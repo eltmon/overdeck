@@ -10,6 +10,7 @@ src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dash
 src/dashboard/server/routes/conversations.ts
 src/dashboard/server/routes/workspaces.ts > src/dashboard/server/routes/workspaces/container-ops.ts
 src/dashboard/server/routes/workspaces.ts > src/dashboard/server/routes/workspaces/merge-ops.ts
+src/dashboard/server/routes/workspaces.ts > src/dashboard/server/routes/workspaces/merge-ops.ts > src/dashboard/server/routes/workspaces/internal-pipeline-notify.ts
 src/dashboard/server/routes/workspaces.ts > src/dashboard/server/routes/workspaces/review-control.ts
 src/dashboard/server/routes/workspaces.ts > src/dashboard/server/routes/workspaces/review-pipeline.ts
 src/dashboard/server/routes/workspaces.ts > src/dashboard/server/routes/workspaces/stash-clean.ts

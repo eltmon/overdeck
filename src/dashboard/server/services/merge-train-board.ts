@@ -26,7 +26,7 @@ import type { ProjectConfig } from '../../../lib/projects.js';
 import type { PrFacts } from '../../../lib/cloister/pr-facts.js';
 import type { PipelineJournalEntry } from '../../../lib/cloister/pipeline-journal.js';
 import type { PendingAutoMerge, UatGeneration } from '../../../lib/overdeck/merge-types.js';
-import type { TrackerType } from '../../../lib/project-tracker-type.js';
+import type { TrackerType } from '../../../lib/tracker/interface.js';
 import type { MergeRun } from './merge-queue-service.js';
 import type { UatGenerationPayload } from './uat-train.js';
 import type { MergedPr } from './recent-merges.js';
