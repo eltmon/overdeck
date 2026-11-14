@@ -4,6 +4,7 @@ import { Home, CircleDot, Bot, Terminal, FileCode, GitCommit, ListTodo, FileText
 import type { PaneType, WorkspacePane, PaneId } from '../../lib/panesStore'
 import { CodeTabDirtyDot } from '../explorer/code/CodeTabDirtyDot'
 import styles from './stage.module.css'
+import { currentPlatform } from '../../lib/shortcuts/keys'
 
 export interface NewPaneAction {
   key: string
@@ -49,11 +50,13 @@ export interface PaneBarProps {
 /**
  * PaneBar — the Stage's persistent tab strip (PAN-1549). Pure presentation:
  * renders one tab per pane from the store, highlights the active tab, shows a
- * ⌘N hint for the first nine panes, and exposes close (×, non-HOME only) and
+ * ⌘N hint for the first nine panes on macOS (Linux and Windows switch tabs
+ * with Ctrl+Alt+N, too wide for a chip; PAN-5287 S-D9), and exposes close (×, non-HOME only) and
  * add (+) affordances via callbacks.
  */
 export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, onClose, onAdd, newActions, onPaneContextMenu, onTabDragStart, onTabDragEnd, onTabDetach }: PaneBarProps) {
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
+  const isMac = currentPlatform() === 'mac'
   const addBtnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const barRef = useRef<HTMLDivElement>(null)
@@ -203,7 +206,7 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
             </span>
             <span className={pane.paneType === 'code' && pane.explorerPreview ? 'italic' : undefined}>{pane.label}</span>
             {pane.paneType === 'code' ? <CodeTabDirtyDot rootId={pane.explorerRootId} path={pane.explorerPath} /> : null}
-            {index < 9 && <span className={styles.kbd}>⌘{index + 1}</span>}
+            {index < 9 && isMac && <span className={styles.kbd}>⌘{index + 1}</span>}
             {closable && (
               <button
                 type="button"
