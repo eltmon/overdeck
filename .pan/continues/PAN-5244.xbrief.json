@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5244",
   "created": "2026-11-14T05:28:55.884Z",
-  "updated": "2026-11-14T06:42:00.139Z",
+  "updated": "2026-11-14T06:42:08.127Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -332,6 +332,11 @@
     "drawer-test-migration.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T06:42:00.139Z"
+    },
+    "header-facts": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T06:42:08.127Z"
     }
   }
 }
