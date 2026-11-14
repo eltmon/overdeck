@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5239",
   "created": "2026-11-14T04:43:48.158Z",
-  "updated": "2026-11-14T05:02:29.491Z",
+  "updated": "2026-11-14T05:02:41.139Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,11 @@
     "needs-you-target-link.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T05:02:29.490Z"
+    },
+    "hide-jump-without-origin": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5239",
+      "claimedAt": "2026-11-14T05:02:41.139Z"
     }
   }
 }
