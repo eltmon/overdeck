@@ -4,17 +4,17 @@
     "created": "2026-11-14T04:42:04Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5238: Skills for this issue takes 37-77 s to load (GET /api/skills/overrides?issue=)",
-    "updated": "2026-11-14T04:49:01.822Z"
+    "updated": "2026-11-14T04:51:58.028Z"
   },
   "plan": {
     "id": "pan-5238",
     "title": "Skills for this issue takes 37-77 s to load (GET /api/skills/overrides?issue=)",
-    "status": "proposed",
+    "status": "running",
     "uid": "9f92be43-f817-4c8b-a28b-a57fca9e0017",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T04:42:04Z",
-    "updated": "2026-11-14T04:49:01.822Z",
+    "updated": "2026-11-14T04:51:58.028Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5238",
@@ -426,5 +426,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
