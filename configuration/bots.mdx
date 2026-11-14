@@ -265,7 +265,7 @@ relay, tool calls fail with `No direct path to <machine>. Use the relay plan, or
 the Tailscale route in the README.` After a lost connection it tries again after
 1 s, doubling up to 60 s, and at once when overdeck.ai shows the machine online
 again. A tool call made while the connection is down returns an error; the bot
-can retry it.
+can retry it. Connector errors name each leg (`relay: …; direct: …`).
 
 ### What a connector can reach
 
@@ -305,6 +305,24 @@ dashboard host on port 443. Each integration README has a "Tailscale route"
 section with the exact config. Grok Build's Tailscale route is not working yet
 ([#5029](https://github.com/eltmon/overdeck/issues/5029)); use the connector
 or "This computer" for Grok Build.
+
+## Troubleshooting
+
+### no-webrtc-egress
+
+The connector reached overdeck.ai and got relay credentials, but the computer
+it runs on got no TURN relay connection, so no WebRTC path can open. The usual
+cause is an environment that blocks TLS to `turn.cloudflare.com:443` and UDP;
+running the command again then does not help. A relay outage gives the same
+result, so check that first (next point).
+
+What to do: use [Public MCP](/configuration/mcp#public-mcp-for-hosted-bots)
+(see Grok Bot above), or run the connector on a host with WebRTC egress, or
+use Tailscale instead (`#tailscale-instead-of-the-connector`).
+
+How to tell a relay outage from a blocked bot: run `pan doctor` on the
+machine. If its `TURN relay` row is `ok`, the block is on the bot's side; if
+it warns, the relay or the machine's own network is the problem.
 
 ## Remove a bot
 
