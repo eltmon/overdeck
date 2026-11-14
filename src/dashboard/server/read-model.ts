@@ -673,6 +673,9 @@ export const ReadModelServiceLive = Layer.effect(
         const { seedTrackerIssues, noteTrackerIssues } = yield* Effect.promise(
           () => import('./services/membership-tracker-trigger.js'),
         );
+        // PAN-5261 FR-8: this process also diffs the raw tracker rows above,
+        // so it alone may reuse GraphQL issue-state answers across gathers.
+        (yield* Effect.promise(() => import('../../lib/pipeline-membership-gather.js'))).enableIssueStateCache();
         seedTrackerIssues(issueService.getCachedTrackerIssues());
 
         // Wire live issue updates — when IssueDataService polls new data,

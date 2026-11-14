@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   resolveProjectFromIssueSync: vi.fn(),
   listProjectsSync: vi.fn(),
   enqueueProjectsResourceRefresh: vi.fn(),
+  invalidateCachedIssueState: vi.fn(),
 }));
 
 vi.mock('../../../../../src/lib/projects.js', () => ({
@@ -20,13 +21,17 @@ vi.mock('../../../../../src/dashboard/server/services/project-resource-refresh-q
   enqueueProjectsResourceRefresh: mocks.enqueueProjectsResourceRefresh,
 }));
 
+vi.mock('../../../../../src/lib/pipeline-membership-gather.js', () => ({
+  invalidateCachedIssueState: mocks.invalidateCachedIssueState,
+}));
+
 import {
   noteTrackerIssues,
   resetMembershipTrackerTriggerForTests,
   seedTrackerIssues,
 } from '../../../../../src/dashboard/server/services/membership-tracker-trigger.js';
 
-const PAN_PROJECT = { name: 'overdeck', path: '/repos/overdeck' };
+const PAN_PROJECT = { name: 'overdeck', path: '/repos/overdeck', github_repo: 'eltmon/overdeck' };
 const MIN_PROJECT = { name: 'myn', path: '/repos/myn' };
 
 beforeEach(() => {
@@ -120,5 +125,39 @@ describe('membership tracker trigger (PAN-5224)', () => {
   it('never throws on malformed issue rows', () => {
     expect(() => seedTrackerIssues([null, 42, { identifier: 7 }, { identifier: 'PAN-9' }])).not.toThrow();
     expect(() => noteTrackerIssues([undefined, 'not-an-issue'])).not.toThrow();
+  });
+});
+
+describe('membership tracker trigger drops the issue-state cache answer for a changed identifier (PAN-5261)', () => {
+  it("a label change on PAN-7 invalidates eltmon/overdeck#7 before enqueueing the project (ac1)", () => {
+    seedTrackerIssues([{ identifier: 'PAN-7', state: 'open', labels: ['a'] }]);
+
+    noteTrackerIssues([{ identifier: 'PAN-7', state: 'open', labels: ['a', 'b'] }]);
+
+    expect(mocks.invalidateCachedIssueState).toHaveBeenCalledWith('eltmon', 'overdeck', 7);
+    const invalidateOrder = mocks.invalidateCachedIssueState.mock.invocationCallOrder[0]!;
+    const enqueueOrder = mocks.enqueueProjectsResourceRefresh.mock.invocationCallOrder[0]!;
+    expect(invalidateOrder).toBeLessThan(enqueueOrder);
+  });
+
+  it('PAN-7 dropped from the rows invalidates its number; an unchanged issue invalidates nothing (ac2)', () => {
+    seedTrackerIssues([
+      { identifier: 'PAN-7', state: 'open', labels: [] },
+      { identifier: 'PAN-8', state: 'open', labels: [] },
+    ]);
+
+    noteTrackerIssues([{ identifier: 'PAN-8', state: 'open', labels: [] }]);
+
+    expect(mocks.invalidateCachedIssueState).toHaveBeenCalledWith('eltmon', 'overdeck', 7);
+    expect(mocks.invalidateCachedIssueState).not.toHaveBeenCalledWith('eltmon', 'overdeck', 8);
+  });
+
+  it('a changed issue whose project has no github_repo invalidates nothing but the project is still enqueued (ac3)', () => {
+    seedTrackerIssues([{ identifier: 'MIN-1', state: 'open', labels: [] }]);
+
+    noteTrackerIssues([{ identifier: 'MIN-1', state: 'closed', labels: [] }]);
+
+    expect(mocks.invalidateCachedIssueState).not.toHaveBeenCalled();
+    expect(mocks.enqueueProjectsResourceRefresh).toHaveBeenCalledWith([MIN_PROJECT], 'tracker:issues-changed');
   });
 });
