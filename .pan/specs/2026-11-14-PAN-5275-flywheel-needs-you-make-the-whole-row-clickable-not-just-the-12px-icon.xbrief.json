@@ -4,17 +4,17 @@
     "created": "2026-11-14T17:53:52Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5275: Flywheel Needs-you: make the whole row clickable, not just the 12px icon",
-    "updated": "2026-11-14T17:55:17.867Z"
+    "updated": "2026-11-14T17:56:45.110Z"
   },
   "plan": {
     "id": "pan-5275",
     "title": "Flywheel Needs-you: make the whole row clickable, not just the 12px icon",
-    "status": "proposed",
+    "status": "running",
     "uid": "0fb3c09f-c371-42e1-82e1-1cd18f3cab10",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T17:53:52Z",
-    "updated": "2026-11-14T17:55:17.867Z",
+    "updated": "2026-11-14T17:56:45.110Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5275",
@@ -266,5 +266,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
