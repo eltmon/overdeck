@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5287",
   "created": "2026-11-14T19:49:14.970Z",
-  "updated": "2026-11-14T20:46:52.593Z",
+  "updated": "2026-11-14T20:47:13.938Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -241,6 +241,26 @@
     "app-migration.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T20:46:52.593Z"
+    },
+    "shortcuts-sheet": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:47:13.938Z"
+    },
+    "shortcuts-sheet.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:47:13.938Z"
+    },
+    "shortcuts-sheet.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:47:13.938Z"
+    },
+    "shortcuts-sheet.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:47:13.938Z"
+    },
+    "shortcuts-sheet.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:47:13.938Z"
     }
   }
 }
