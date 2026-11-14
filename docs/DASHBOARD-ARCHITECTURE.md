@@ -1776,6 +1776,140 @@ before. A test that needs a missing tool calls
 `setHostToolFinderForTests(() => null)` and resets with
 `resetHostToolsForTests()` in its own `afterEach`.
 
+## Frame seams (PAN-5287)
+
+The workflow redesign (PAN-5284) builds its children on shared seams that
+PAN-5287 added. Use these instead of adding a second copy of any of them.
+
+### Stage seams
+
+`StageDeckContext` (`components/Stage/StageDeckContext.tsx`) carries two more
+functions, implemented in `components/Stage/index.tsx`:
+
+- `openBeside({ rootId, path, line?, preview?, besidePaneId? })` opens a code
+  pane beside `besidePaneId` (default: the active pane) and returns its pane id.
+  An unsplit deck splits into a row, the beside pane left and the file right.
+- In a split deck, a region that already shows a code pane is reused before any
+  other region, so the chat keeps its region. With no explicit `besidePaneId`,
+  an active code pane counts as that region.
+- The beside pane is never replaced. A second preview open of the same root
+  reuses the preview pane (from `openCodePane`) and stays in its region.
+
+`openDock({ tab, reveal?, diff?, changesScope? })` writes `workDockStore` only.
+Nothing renders the dock until child B builds it.
+
+### Dock store
+
+`components/dock/workDockStore.ts` holds per-deck dock state: `open`, `tab`
+(`files`, `changes` or `search`), `width`, and the transient `reveal`, `diff`,
+`changesScope` and `rootOverride`. Only `open`, `tab` and `width` persist, as
+JSON under `localStorage` key `overdeck.dock.<deckKey>`. Width is clamped to
+260–720 px (default 340). A corrupt stored field falls back to its default.
+
+### Explorer root of a conversation
+
+`rootIdForConversation(conv, ctx)` (`components/explorer/rootForConversation.ts`)
+maps a conversation to an explorer root id. The first matching rule wins:
+
+1. `origin === 'linked'` → `null` (the conversation runs on another machine).
+2. `issueId` → `issue:<ID>`, upper-cased.
+3. A `workspaceId` that names a workspace-registry row: scratch →
+   `workspace:<id>`, main → `project:<projectId>`, issue → `issue:<ID>`.
+4. A cwd at or under `<project path>/workspaces/feature-<slug>` → `issue:<SLUG>`.
+   Any other path under `<project path>/workspaces/` → `null`.
+5. A cwd at or under a project path → `project:<key>`; the longest path wins.
+6. Otherwise `null`.
+
+`useRootLabel(rootId)` returns the project name (never `panopticon-cli` when a
+name exists), `<ID> · <title cut to 40 chars>` for an issue, the workspace row
+name or `Edit workspace`, and `null` for a `null` root.
+
+### Needs-you and agents-working selectors
+
+Every count surface must use these two selectors, so the numbers agree.
+
+`useNeedsYouItems({ projectKey? })` (`lib/selectors/needsYou.ts`) merges, in
+order: (a) pending input on agents and conversations, with the Needs-you
+answered/dismissed rule; (b) issues whose derived state has
+`attention: 'needs-you'`; (c) Flywheel needs-you rows, where a row naming an
+issue id folds into `issue:<ID>`; (d) every other decision (fleet rows,
+unreachable machines, disk alert, harness updates, restart recovery, MCP
+sign-ins, connector notices, agent requests). Items dedupe by key
+(`issue:<ID>`, `conversation:<name>`, `agent:<id>`, `flywheel:<key>`,
+`decision:<id>`) and sort oldest first.
+
+`useAgentsWorking({ projectKey? })` (`lib/selectors/agentsWorking.ts`) counts
+agents with a running status and conversations with `isWorking`. An agent id
+`conv-<name>` is the same session as the conversation whose `tmuxSession` is
+that id, so it counts once, as a conversation. Roles map to planning, building,
+review, test, conversation and other; system agents count under other. Both
+selectors file items under a project with `lib/selectors/projectOf.ts`.
+
+### Keyboard registry
+
+App-level shortcuts are declared in one place, `lib/shortcuts/registry.ts`;
+key specs are parsed, matched and formatted in `lib/shortcuts/keys.ts`.
+`installShortcutListener()` (App calls it once) adds two `keydown` listeners
+to `window`:
+
+- A capture listener for `global` shortcuts. It runs before the focused
+  element's own handlers, so app keys win inside Monaco. It skips a focus
+  element inside `.xterm`.
+- A bubble listener for `not-editing` shortcuts (focus not in an input,
+  textarea, select, contenteditable, `.xterm` or `.monaco-editor`), plus
+  `global` shortcuts whose focus is inside `.xterm`. xterm cancels every key it
+  turns into terminal input, so a global key reaches this listener only when the
+  terminal let it pass. Bubbling also lets `useTypeToFocus` take printable keys
+  on the Home page first. It skips events already `defaultPrevented`.
+
+Within a phase the newest registration wins. The first registration whose spec
+for the current platform matches and whose `when(event)` is not false runs,
+after the registry calls `preventDefault()` and `stopPropagation()`. A chord
+such as `G P` arms on the first key and waits 1500 ms; the next key completes
+it or is consumed by the cancel.
+
+To add a shortcut, register a memoized definition while the owner is mounted:
+
+```tsx
+useShortcut(useMemo((): ShortcutDef => ({
+  id: 'area.action', keys: { mac: 'Meta+K', other: 'Ctrl+K' },
+  scope: 'global', label: 'Do the thing', group: 'General',
+  run: () => doTheThing(),
+}), [doTheThing]))
+```
+
+The `?` sheet (`lib/shortcuts/ShortcutsSheet.tsx`) lists every registration
+that is not `hidden` and is bound on the current platform.
+
+| id | macOS | Linux / Windows | scope | registered in |
+|---|---|---|---|---|
+| `app.palette` | `⌘K` | `Ctrl+K` | global | `App/hooks/useAppShortcuts.ts` |
+| `app.palette-conversations` | `⌘J` | `Ctrl+J` | global | `App/hooks/useAppShortcuts.ts` |
+| `app.search` | `/` | `/` | not-editing | `App/hooks/useAppShortcuts.ts` |
+| `app.lens-*` | `G P`, `G B`, `G A`, `G C` | same | not-editing | `App/hooks/useAppShortcuts.ts` |
+| `app.shortcuts-sheet` | `?` | `?` | not-editing (not on God View) | `App/hooks/useAppShortcuts.ts` |
+| `stage.focus-tab-1`…`-9` | `⌘1`…`⌘9` | `Ctrl+Alt+1`…`9` | not-editing | `Stage/useStageShortcuts.ts` |
+| `stage.close-tab` | `⌘W` | `Ctrl+Alt+W` | not-editing | `Stage/useStageShortcuts.ts` |
+| `stage.toggle-terminal` | `⌘T` | unbound | not-editing | `Stage/useStageShortcuts.ts` |
+| `sidebar.collapse` | `[` | `[` | not-editing | `components/Sidebar.tsx` |
+| `safety.emergency-stop` | `⌘⇧.` | `Ctrl+Shift+.` | global | `components/EmergencyStopOverlay.tsx` |
+| `deck.new-conversation` | `N` | `N` | not-editing, no open modal | `components/CommandDeck/index.tsx` |
+| `explorer.quick-open` | `⌘P` | `Ctrl+P` | global, focus in that explorer | `explorer/search/useExplorerShortcuts.ts` |
+| `explorer.content-search` | `⌘⇧F` | `Ctrl+Shift+F` | global, focus in that explorer | `explorer/search/useExplorerShortcuts.ts` |
+
+### Workflow fixture
+
+`node --import tsx scripts/dev/seed-workflow-fixture.ts --root <dir> [--home <dir>]`
+creates the shared UAT fixture that the UI children use for their screenshots:
+a bare origin and a `workflow-fixture` repo with two pushed commits, one local
+commit with an `Overdeck-Conversation: conv-fixture-1` trailer, uncommitted
+edits to `docs/shared.md` from two conversations, and a git-ignored
+`build/output.txt`. It registers project `workflow-fixture` (prefix `WFX`),
+records conversations `fixture-1` and `fixture-2`, and writes their Claude Code
+transcripts under `<home>/.claude/projects/`. It refuses to run when
+`OVERDECK_HOME` is unset or is the operator's `~/.overdeck`, so point it at an
+isolated test home.
+
 ## File explorer server (PAN-5183)
 
 The file explorer's server half lives in `src/dashboard/server/services/explorer/`

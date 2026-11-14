@@ -29,6 +29,7 @@ import {
   acquireQualityGateAdmission,
   QualityGateAdmissionTimeoutError,
   readQualityGateAdmissionOwnerPids,
+  readQualityGateQueue,
   sampleQualityGatePressure,
   type QualityGateAdmissionDeps,
   type QualityGatePressureSample,
@@ -737,6 +738,41 @@ describe('memory admission (PAN-5248)', () => {
     expect(unkeyed.footprintBytes).toBe(0)
     expect(existsSync(join(unkeyedRoot, 'footprints'))).toBe(false)
     await unkeyed.release()
+  })
+})
+
+describe('readQualityGateQueue (PAN-5283)', () => {
+  function waiterJson(ticketId: string, pid: number, createdAt: number, extra: Record<string, unknown> = {}): string {
+    return JSON.stringify({ ticketId, pid, createdAt, workspacePath: `/ws/${ticketId}`, gateName: 'vitest', attempt: 1, ...extra })
+  }
+
+  it('readQualityGateQueue lists live waiters oldest first', async () => {
+    const rootDir = home()
+    writeFileSync(join(rootDir, 'waiter-b.json'), waiterJson('b', process.pid, 200, { issueId: 'PAN-2', footprintBytes: 1024 }))
+    writeFileSync(join(rootDir, 'waiter-a.json'), waiterJson('a', process.pid, 100))
+    writeFileSync(join(rootDir, 'waiter-c.json'), waiterJson('c', process.pid, 150))
+    writeFileSync(join(rootDir, 'owner.json'), ownerJson(process.pid, 50))
+    const snapshot = await readQualityGateQueue({ rootDir, slots: 2, isProcessAlive: (pid) => pid === process.pid, now: () => 60, staleMs: 1_000 })
+    expect(snapshot.slots).toBe(2)
+    expect(snapshot.owners).toEqual([{ workspacePath: '/tmp/owner', gateName: 'test', createdAt: 50, acquiredAt: 50 }])
+    expect(snapshot.waiters.map((waiter) => waiter.workspacePath)).toEqual(['/ws/a', '/ws/c', '/ws/b'])
+    expect(snapshot.waiters[2]).toMatchObject({ issueId: 'PAN-2', footprintBytes: 1024, createdAt: 200 })
+  })
+
+  it('readQualityGateQueue skips dead pids without deleting their files', async () => {
+    const rootDir = home()
+    writeFileSync(join(rootDir, 'waiter-dead.json'), waiterJson('dead', 999_999, 100))
+    writeFileSync(join(rootDir, 'owner.json'), ownerJson(999_999, 50))
+    writeFileSync(join(rootDir, 'waiter-torn.json'), '{not json')
+    const snapshot = await readQualityGateQueue({ rootDir, slots: 1, isProcessAlive: (pid) => pid === process.pid, now: () => 60 })
+    expect(snapshot).toEqual({ slots: 1, owners: [], waiters: [] })
+    expect(readdirSync(rootDir).sort()).toEqual(['owner.json', 'waiter-dead.json', 'waiter-torn.json'])
+  })
+
+  it('readQualityGateQueue returns an empty snapshot when the root is missing', async () => {
+    const rootDir = join(home(), 'missing')
+    expect(await readQualityGateQueue({ rootDir, slots: 3 })).toEqual({ slots: 3, owners: [], waiters: [] })
+    expect(existsSync(rootDir)).toBe(false)
   })
 })
 

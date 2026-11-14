@@ -55,13 +55,27 @@ function offlineDeps(issueIds: readonly string[]): DeriveFlywheelStatusDeps {
       workspacePath: join(PROJECT_ROOT, 'workspaces', `feature-${issueId.toLowerCase()}`),
     })),
     lastJournal: () => null,
+    // PAN-5283 board reads, stubbed so the route test never reads the host.
+    isAgentAlive: async () => true,
+    listIssueConversations: () => [],
+    readStartedBy: () => null,
+    issueCost: () => null,
+    readGateQueue: async () => ({ slots: 2, owners: [], waiters: [] }),
+    readMemory: async () => null,
+    softReserveBytes: () => 0,
+    readAutoMerge: () => null,
+    listWindowGenerations: () => [],
+    batchingPausedUntil: () => null,
     policies: () => ({ auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: false }),
     runningBook: () => null,
   };
 }
 
+/** No health read unless a case asks for one. */
+const noHealth = async (): Promise<never> => { throw new Error('health not under test'); };
+
 async function statusFor(issueIds: readonly string[]): Promise<{ status: number; body: FlywheelDerivedStatus }> {
-  const result = await getFlywheelStatusPayload(offlineDeps(issueIds));
+  const result = await getFlywheelStatusPayload(offlineDeps(issueIds), noHealth);
   return { status: result.status, body: result.body as FlywheelDerivedStatus };
 }
 
@@ -91,5 +105,41 @@ describe('GET /api/flywheel/status reads the server caches (PAN-4199 FR-4)', () 
     expect(body.inFlight).toEqual([
       expect.objectContaining({ issueId: 'PAN-9', title: null, trackerUnknown: true }),
     ]);
+  });
+});
+
+describe('GET /api/flywheel/status merges the health strip (PAN-5283 WI-9)', () => {
+  const health: NonNullable<FlywheelDerivedStatus['health']> = {
+    mainCi: { conclusion: 'success', sha: 'abc', url: null, at: '2026-11-14T12:00:00.000Z' },
+    deployed: null,
+    gateQueue: { running: 0, queued: 1, slots: 2, oldestWaitSince: '2026-11-14T11:00:00.000Z' },
+    nextBatch: null,
+    batchingPausedUntil: null,
+    lastRelease: null,
+  };
+  const shipped: NonNullable<FlywheelDerivedStatus['shipped']> = { merges: [], events: [] };
+
+  it('status payload carries health and shipped when the health deriver answers', async () => {
+    trackerCache['PAN-8'] = { open: true, labels: [], title: 'Open thing' };
+    const readHealth = vi.fn(async () => ({ health, shipped }));
+    const result = await getFlywheelStatusPayload(offlineDeps(['PAN-8']), readHealth);
+    const body = result.body as FlywheelDerivedStatus;
+    expect(result.status).toBe(200);
+    expect(readHealth).toHaveBeenCalledWith(PROJECT_ROOT);
+    expect(body.health).toEqual(health);
+    expect(body.shipped).toEqual(shipped);
+    expect(body.inFlight.map((row) => row.issueId)).toEqual(['PAN-8']);
+  });
+
+  it('status payload omits health when the health deriver throws', async () => {
+    trackerCache['PAN-8'] = { open: true, labels: [], title: 'Open thing' };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const result = await getFlywheelStatusPayload(offlineDeps(['PAN-8']), async () => { throw new Error('git missing'); });
+    const body = result.body as FlywheelDerivedStatus;
+    expect(result.status).toBe(200);
+    expect(body).not.toHaveProperty('health');
+    expect(body).not.toHaveProperty('shipped');
+    expect(body.inFlight.map((row) => row.issueId)).toEqual(['PAN-8']);
+    warn.mockRestore();
   });
 });

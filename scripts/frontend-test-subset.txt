@@ -39,7 +39,10 @@ src/components/CommandDeck/__tests__/useConversationMutations.stop.test.tsx
 src/components/CommandDeck/__tests__/useConversationMutations.triage.test.tsx
 src/components/CommandDeck/__tests__/useDefaultDeckSelection.test.ts
 src/components/CommandPalette.test.tsx
+src/components/dock/__tests__/workDockStore.test.ts
+src/components/EmergencyStopOverlay.test.tsx
 src/components/EventRouter.test.tsx
+src/components/explorer/__tests__/rootForConversation.test.ts
 src/components/GodView/confluence/__tests__/GodViewConfluence.test.tsx
 src/components/GodView/confluence/__tests__/choreography.test.ts
 src/components/GodView/confluence/__tests__/confluence-help.test.tsx
@@ -107,8 +110,10 @@ src/components/Settings/sections/__tests__/PermissionsSection.test.tsx
 src/components/Settings/sections/__tests__/TelemetrySection.test.tsx
 src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx
 src/components/Settings/sections/__tests__/tiered-crews.test.ts
+src/components/Stage/__tests__/openBeside.test.tsx
 src/components/Stage/HomePane/Launcher.test.tsx
 src/components/Stage/IssueOverview.test.tsx
+src/components/Stage/PaneBar.test.tsx
 src/components/Stage/ProjectHome.test.tsx
 src/components/Stage/__tests__/explorer-migration.test.tsx
 src/components/Stage/__tests__/revealPane.test.tsx
@@ -118,6 +123,7 @@ src/components/Stage/cockpit/IssueMissionControl.sections.test.tsx
 src/components/Stage/cockpit/IssueMissionControl.test.tsx
 src/components/Stage/launcherFocusStore.test.ts
 src/components/Stage/panes/EditorPane.test.tsx
+src/components/Stage/useStageShortcuts.test.tsx
 src/components/XTerminal.test.tsx
 src/components/__tests__/AgentRequestCard.test.tsx
 src/components/__tests__/AskUserQuestionDialog.test.tsx
@@ -277,6 +283,10 @@ src/components/explorer/viewers/shared/__tests__/imageDimensions.test.ts
 src/components/explorer/viewers/shared/__tests__/shared.test.tsx
 src/components/explorer/watch/__tests__/explorer-watch-hub.test.ts
 src/components/explorer/watch/__tests__/useExplorerWatch.test.tsx
+src/components/flywheel/__tests__/FlywheelHealthStrip.test.tsx
+src/components/flywheel/__tests__/FlywheelLaneBoard.test.tsx
+src/components/flywheel/__tests__/FlywheelNeedsYouCards.test.tsx
+src/components/flywheel/__tests__/FlywheelShippedToday.test.tsx
 src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx
 src/components/home/__tests__/AnywhereSetUpRow.test.tsx
 src/components/home/__tests__/HomeComposer.test.tsx
@@ -408,7 +418,13 @@ src/lib/__tests__/wsTransport-pairing.test.ts
 src/lib/decisionContext.test.ts
 src/lib/pipeline-state.test.ts
 src/lib/panesStore.test.ts
+src/lib/selectors/__tests__/agentsWorking.test.ts
+src/lib/selectors/__tests__/needsYou.test.ts
+src/lib/selectors/__tests__/projectOf.test.ts
 src/lib/sessionOutcome.test.ts
+src/lib/shortcuts/__tests__/keys.test.ts
+src/lib/shortcuts/__tests__/registry.test.ts
+src/lib/shortcuts/__tests__/ShortcutsSheet.test.tsx
 src/lib/simple/uiMode.test.ts
 src/lib/simple/useSimpleActions.test.tsx
 src/pages/__tests__/FlywheelPage.test.tsx

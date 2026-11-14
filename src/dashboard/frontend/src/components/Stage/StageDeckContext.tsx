@@ -1,4 +1,16 @@
 import { createContext, useContext } from 'react'
+import type { OpenDockInput } from '../dock/workDockStore'
+
+export type { OpenDockInput } from '../dock/workDockStore'
+
+/** Input for `openBeside` (PAN-5287 §6.2). */
+export interface OpenBesideInput {
+  rootId: string
+  path: string
+  line?: number
+  preview?: boolean
+  besidePaneId?: string
+}
 
 /**
  * StageDeckContext — lets components nested arbitrarily deep inside a Stage
@@ -24,6 +36,10 @@ export interface StageDeckContextValue {
    * `besidePaneId`'s, so the caller (e.g. the explorer, PAN-5186) stays visible.
    */
   revealPane?: (paneId: string, besidePaneId?: string) => void
+  /** Open a code pane for rootId/path beside `besidePaneId` (default: the active pane). Splits the deck ('row') when it is not split. Returns the code pane id. */
+  openBeside?: (input: OpenBesideInput) => string
+  /** Open the dock on a tab, optionally revealing a path or a diff (PAN-5284 §6.2). Writes workDockStore only. */
+  openDock?: (input: OpenDockInput) => void
 }
 
 const StageDeckContext = createContext<StageDeckContextValue | null>(null)

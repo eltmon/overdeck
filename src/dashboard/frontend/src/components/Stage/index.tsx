@@ -45,7 +45,9 @@ import { BrowserPane } from './panes/BrowserPane'
 import { EditorPane } from './panes/EditorPane'
 import { CodePaneSlot } from '../explorer/code/CodePaneSlot'
 import type { StageContext, PaneWrapperProps, StageApi } from './types'
-import { StageDeckProvider, type StageDeckContextValue } from './StageDeckContext'
+import { StageDeckProvider, type StageDeckContextValue, type OpenBesideInput, type OpenDockInput } from './StageDeckContext'
+import { openCodePane } from '../explorer/openCodePane'
+import { useWorkDockStore } from '../dock/workDockStore'
 import styles from './stage.module.css'
 
 export type { StageContext, PaneWrapperProps, StageApi } from './types'
@@ -388,10 +390,6 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     },
     [layout, activeId, deckKey, setActivePane, setLayout],
   )
-  const deckContextValue: StageDeckContextValue = useMemo(
-    () => ({ deckKey, openOrFocusEditorPane, openOrFocusAgentPane, revealPane }),
-    [deckKey, openOrFocusEditorPane, openOrFocusAgentPane, revealPane],
-  )
   const handleClosePane = useCallback(
     (paneId: string) => closePane(deckKey, paneId),
     [closePane, deckKey],
@@ -527,6 +525,41 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
   const splitActive = isSplit(layout)
   const panesById = useMemo(() => new Map(displayPanes.map((p) => [p.paneId, p] as const)), [displayPanes])
   const layoutLeafIds = useMemo(() => (layout ? collectLeafIds(layout) : []), [layout])
+
+  // PAN-5287 §6.2: open a file beside a pane (the chat by default). The beside
+  // pane is read before openCodePane, which makes the new pane active.
+  const openBeside = useCallback(
+    (input: OpenBesideInput): string => {
+      const beside = input.besidePaneId ?? activeId
+      const id = openCodePane(deckKey, { rootId: input.rootId, path: input.path, line: input.line, preview: input.preview })
+      if (layout && leafCount(layout) > 1) {
+        if (!hasLeaf(layout, id)) {
+          const leaves = collectLeafIds(layout)
+          const isCode = (leafId: string): boolean => panesById.get(leafId)?.paneType === 'code'
+          // A region already showing a code pane is reused before any other, so the chat keeps its region.
+          // With no explicit beside pane, an active code pane is that region (the next file replaces it).
+          const codeRegion =
+            leaves.find((leafId) => leafId !== beside && isCode(leafId)) ??
+            (input.besidePaneId === undefined && isCode(beside) ? beside : undefined)
+          const target = codeRegion ?? leaves.find((leafId) => leafId !== beside) ?? leaves[0]
+          if (target) setLayout(replaceLeaf(layout, target, id))
+        }
+      } else if (beside && beside !== id) {
+        setLayout({ kind: 'split', dir: 'row', a: leaf(beside), b: leaf(id), ratio: 0.5 })
+      }
+      setActivePane(deckKey, id)
+      return id
+    },
+    [deckKey, activeId, layout, panesById, setActivePane, setLayout],
+  )
+  // Writes the dock store only until the dock UI lands (PAN-5287 S-D2).
+  const openDock = useCallback((input: OpenDockInput) => {
+    useWorkDockStore.getState().openDock(deckKey, input)
+  }, [deckKey])
+  const deckContextValue: StageDeckContextValue = useMemo(
+    () => ({ deckKey, openOrFocusEditorPane, openOrFocusAgentPane, revealPane, openBeside, openDock }),
+    [deckKey, openOrFocusEditorPane, openOrFocusAgentPane, revealPane, openBeside, openDock],
+  )
   // The focused leaf follows the active tab when it's in the layout.
   const focusedPaneId = splitActive
     ? layoutLeafIds.includes(activeId)
