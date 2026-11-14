@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5310",
+  "created": "2026-11-14T22:39:01.503Z",
+  "updated": "2026-11-14T22:39:01.503Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "server-backfill-derived-refresh": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5310",
+      "claimedAt": "2026-11-14T22:39:01.503Z"
+    }
+  }
+}
