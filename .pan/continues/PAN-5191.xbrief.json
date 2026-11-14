@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5191",
   "created": "2026-11-14T01:35:38.518Z",
-  "updated": "2026-11-14T01:49:04.465Z",
+  "updated": "2026-11-14T01:49:10.878Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,11 @@
     "status-route.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T01:49:04.465Z"
+    },
+    "direct-pr": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5191",
+      "claimedAt": "2026-11-14T01:49:10.878Z"
     }
   }
 }
