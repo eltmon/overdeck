@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5232",
   "created": "2026-11-14T03:50:14.887Z",
-  "updated": "2026-11-14T04:00:00.038Z",
+  "updated": "2026-11-14T04:05:38.268Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,9 +36,26 @@
       "doneAt": "2026-11-14T03:59:47.756Z"
     },
     "herdr-readers": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5232",
-      "claimedAt": "2026-11-14T04:00:00.038Z"
+      "claimedAt": "2026-11-14T04:00:00.038Z",
+      "doneAt": "2026-11-14T04:05:38.267Z"
+    },
+    "herdr-readers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:05:38.267Z"
+    },
+    "herdr-readers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:05:38.267Z"
+    },
+    "herdr-readers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:05:38.267Z"
+    },
+    "herdr-readers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:05:38.267Z"
     }
   }
 }
