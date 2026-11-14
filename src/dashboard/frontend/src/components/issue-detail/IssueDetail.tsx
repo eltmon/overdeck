@@ -7,14 +7,16 @@
  * scrim/header, the cockpit's route chrome) and render this as the body.
  *
  * Densities:
- * - **drawer** (PAN-5244) — conversation first: the compact pipeline strip
- *   (phase buttons, checks chip, pickup strip) + paused banner + tab strip +
- *   a full-width tab body. The Conversation tab uses DrawerAgentSession's
- *   conversation-header layout; Details (`overview`) is IssueDrawerDetails;
- *   Skills is IssueSkillsTabPanel. This is exactly what IssueDrawer renders.
+ * - **drawer** (PAN-5244, PAN-5253) — conversation first: the compact
+ *   pipeline strip (phase buttons, checks chip, pickup strip) + banner slot
+ *   (needs-you or paused, D-7) + tab strip with views + a full-width tab
+ *   body. The Conversation tab uses DrawerAgentSession's conversation-header
+ *   layout; Details (`overview`) is IssueDrawerDetails; Skills is
+ *   IssueSkillsTabPanel. This is exactly what IssueDrawer renders.
  * - **page** — tab strip + IssueDetailShell (phase rail + specialist strip)
  *   + tab bodies + a 360px status rail (the cockpit-route form). Adoption on
- *   `/command-deck/:project/:issue` is a product decision tracked in #2962.
+ *   `/command-deck/:project/:issue` is a product decision tracked in #2962;
+ *   PAN-5246 removes this legacy page return.
  * - **rail** — compact inline expansion: shell + active conversation +
  *   one action strip. (Adoption in the deck tree's FeatureItem is tracked
  *   in #2962; the density is complete and tested here.)
@@ -50,6 +52,7 @@ import { PickupGateControls, pickupStageFor } from '../backlog/PickupGateControl
 import { ChangedFilesView } from '../Stage/cockpit/ChangedFilesView';
 import { useDeftIssueSummary } from '../deft/queries';
 import { DeftDecisionsTab } from '../deft/DeftDecisionsTab';
+import { IssueBannerSlot } from '../issue-view/IssueBannerSlot';
 import { ISSUE_DETAIL_TABS, entryClickValue, resolveIssueTab, type IssueTabValue } from './issueTabs';
 import {
   IssueActivityBody,
@@ -296,7 +299,7 @@ export function IssueDetail({ issueId, density, agents, derived, tab, onSelectTa
             <PickupGateControls issueId={issueId} variant="strip" stage={pickupStageFor(derived?.state)} onOpenIssueBrowser={openIssueOnTracker} />
           </IssuePipelineStrip>
         </div>
-        <div data-section="DrawerPausedBanner"><PausedBanner agents={agents} /></div>
+        <IssueBannerSlot issueId={issueId} agents={agents} onOpenAgentConversation={openAgentConversation} />
         {showTabs && (
           <div data-section="DrawerTabs">
             <IssueDetailTabs

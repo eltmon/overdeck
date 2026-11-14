@@ -81,6 +81,7 @@ vi.mock('../deft/queries', async (importOriginal) => ({
   useDeftIssueSummary: (...args: unknown[]) => useDeftIssueSummaryMock(...args),
 }));
 vi.mock('../deft/DeftDecisionsTab', () => ({ DeftDecisionsTab: () => <div data-testid="deft-decisions" /> }));
+vi.mock('../issue-view/IssueBannerSlot', () => ({ IssueBannerSlot: () => <div data-testid="mock-banner-slot" /> }));
 
 beforeEach(() => {
   useDeftIssueSummaryMock.mockReturnValue({ isDeft: false, summary: null, isLoading: false });
@@ -259,6 +260,15 @@ describe('IssueDetail (C-DETAIL one component)', () => {
     expect(screen.queryByTestId('drawer-tab-discussion')).not.toBeInTheDocument();
   });
 
+  it('page density keeps its own DrawerPausedBanner wrapper and never the banner slot', () => {
+    renderDetail(
+      <IssueDetail issueId="PAN-1" density="page" agents={AGENTS} tab="conversation" onSelectTab={() => {}} />,
+    );
+    expect(document.querySelector('[data-section="DrawerPausedBanner"]')).toBeInTheDocument();
+    expect(screen.queryByTestId('mock-banner-slot')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('issue-banner-slot')).not.toBeInTheDocument();
+  });
+
   it('page density keeps the Overview body with the skills disclosure and the tasks panel', () => {
     renderDetail(
       <IssueDetail issueId="PAN-1" density="page" agents={AGENTS} tab="overview" onSelectTab={() => {}} />,
@@ -365,6 +375,17 @@ describe('IssueDetail (C-DETAIL one component)', () => {
       <IssueDetail issueId="PAN-1" density="drawer" agents={AGENTS} tab="decisions" onSelectTab={() => {}} />,
     );
     expect(screen.getByTestId('deft-decisions')).toBeInTheDocument();
+  });
+
+  it('renders the banner slot between the strip and the tabs', () => {
+    renderDetail(
+      <IssueDetail issueId="PAN-1" density="drawer" agents={AGENTS} tab="conversation" onSelectTab={() => {}} />,
+    );
+    const strip = screen.getByTestId('mock-pipeline-strip');
+    const banner = screen.getByTestId('mock-banner-slot');
+    const tabs = screen.getByTestId('drawer-tabs');
+    expect(strip.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(banner.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('an unknown tab value renders the placeholder', () => {

@@ -59,6 +59,7 @@ vi.mock('../deft/queries', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../deft/queries')>()),
   useDeftIssueSummary: () => ({ isDeft: true, summary: null, isLoading: false }),
 }));
+vi.mock('../issue-view/IssueBannerSlot', () => ({ IssueBannerSlot: () => null }));
 
 const OLD_ISSUE_DETAIL_TABS = [
   'overview',
