@@ -129,6 +129,7 @@ import { linkedOpenRouteLayer } from './routes/linked-open.js';
 import { conversationBookmarksRouteLayer } from './routes/conversation-bookmarks.js';
 import { conversationTriageRouteLayer } from './routes/conversation-triage.js';
 import { conversationScheduledMessagesRouteLayer } from './routes/conversation-scheduled-messages.js';
+import { conversationMessageCancelRouteLayer } from './routes/conversation-message-cancel.js';
 import { conversationSchedulesRouteLayer } from './routes/conversation-schedules.js';
 import { conversationsRetrospectiveRouteLayer } from './routes/conversations-retrospective.js';
 import { conversationCompanionTerminalRouteLayer } from './routes/conversation-companion-terminal.js';
@@ -432,6 +433,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   conversationBookmarksRouteLayer,
   conversationTriageRouteLayer,
   conversationScheduledMessagesRouteLayer,
+  conversationMessageCancelRouteLayer,
   conversationSchedulesRouteLayer,
   conversationsRetrospectiveRouteLayer,
   conversationCompanionTerminalRouteLayer,

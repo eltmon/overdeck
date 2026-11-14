@@ -216,6 +216,7 @@ const TELEMETRY_CLIENT_ROUTES = [
   "/api/conversations/:name/kickoff",
   "/api/conversations/:name/message",
   "/api/conversations/:name/message-locator",
+  "/api/conversations/:name/message/cancel",
   "/api/conversations/:name/messages",
   "/api/conversations/:name/plan-action",
   "/api/conversations/:name/preview-ports",

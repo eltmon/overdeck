@@ -617,8 +617,8 @@ const postConversationMessageRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
       try {
-        return await withConversationMessageReceipt(name, body, () =>
-          handleConversationMessage(name, body, conversationMessageDependencies));
+        return await withConversationMessageReceipt(name, body, (deliveryGate) =>
+          handleConversationMessage(name, body, { ...conversationMessageDependencies, deliveryGate }));
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         // Include the stack so failures are diagnosable after the fact (PAN-1552).
