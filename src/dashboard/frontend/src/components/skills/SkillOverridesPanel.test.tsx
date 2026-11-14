@@ -66,6 +66,19 @@ function row(name: string): HTMLElement {
   return element;
 }
 
+function group(key: string): HTMLElement {
+  const element = document.querySelector(`[data-skill-group="${key}"]`);
+  if (!(element instanceof HTMLElement)) throw new Error(`group ${key} not rendered`);
+  return element;
+}
+
+/** A changed skill renders in the "changed" group and in its home group; name the copy. */
+function rowIn(groupKey: string, name: string): HTMLElement {
+  const element = group(groupKey).querySelector(`[data-skill="${name}"]`);
+  if (!(element instanceof HTMLElement)) throw new Error(`row ${name} not rendered in ${groupKey}`);
+  return element;
+}
+
 beforeEach(() => {
   putBodies = [];
 });
@@ -143,27 +156,45 @@ describe('SkillOverridesPanel — issue', () => {
     ],
   };
 
-  it('opens filtered to overridden-here or off, collapses core skills, and shows the inherited value', async () => {
+  it('opens on All, with core collapsed and every skill listed', async () => {
     mockApi(issueSkills);
     renderPanel({ level: 'issue', issueId: 'TST-1' });
-    await waitFor(() => expect(row('grilling')).toBeTruthy());
+    await waitFor(() => expect(row('okf')).toBeTruthy());
 
-    expect(document.querySelector('[data-skill="okf"]')).toBeNull();
+    expect(screen.getByRole('button', { name: /^All/ }).getAttribute('aria-pressed')).toBe('true');
     expect(document.querySelector('[data-skill="pan-done"]')).toBeNull();
     expect(screen.getByText('1 core skills, always on')).toBeTruthy();
-    expect(within(row('local')).getByText('project skill')).toBeTruthy();
-    expect(within(row('codebase-design')).getByText('off · project')).toBeTruthy();
+    expect(within(rowIn('project', 'local')).getByText('project skill')).toBeTruthy();
+    expect(screen.getByTestId('skills-summary').textContent).toBe('3 on·2 off·1 core');
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: /^All/ }));
-    expect(row('okf')).toBeTruthy();
-    expect(within(row('okf')).getByText('on · global')).toBeTruthy();
+  it('offers All, Changed here and Off, with counts', async () => {
+    mockApi(issueSkills);
+    renderPanel({ level: 'issue', issueId: 'TST-1' });
+    await waitFor(() => expect(row('okf')).toBeTruthy());
+
+    expect(screen.getByRole('button', { name: /^All/ }).textContent).toBe('All5');
+    expect(screen.getByRole('button', { name: /^Changed here/ }).textContent).toBe('Changed here2');
+    expect(screen.getByRole('button', { name: /^Off/ }).textContent).toBe('Off2');
+    expect(screen.queryByRole('button', { name: /Overridden here/ })).toBeNull();
+  });
+
+  it('Changed here lists only skills with a stored value at this level', async () => {
+    mockApi(issueSkills);
+    renderPanel({ level: 'issue', issueId: 'TST-1' });
+    await waitFor(() => expect(row('okf')).toBeTruthy());
+
+    fireEvent.click(screen.getByRole('button', { name: /^Changed here/ }));
+    expect(row('grilling')).toBeTruthy();
+    expect(row('local')).toBeTruthy();
+    expect(document.querySelector('[data-skill="okf"]')).toBeNull();
+    expect(document.querySelector('[data-skill="codebase-design"]')).toBeNull();
   });
 
   it('shows one switch and a source per row, and no Inherit buttons', async () => {
     mockApi(issueSkills);
     renderPanel({ level: 'issue', issueId: 'TST-1' });
     await waitFor(() => expect(row('grilling')).toBeTruthy());
-    fireEvent.click(screen.getByRole('button', { name: /^All/ }));
 
     expect(within(row('okf')).getByText('on · global')).toBeTruthy();
     expect(within(row('codebase-design')).getByText('off · project')).toBeTruthy();
@@ -177,7 +208,6 @@ describe('SkillOverridesPanel — issue', () => {
     mockApi(issueSkills);
     renderPanel({ level: 'issue', issueId: 'TST-1' });
     await waitFor(() => expect(row('grilling')).toBeTruthy());
-    fireEvent.click(screen.getByRole('button', { name: /^All/ }));
 
     fireEvent.click(within(row('okf')).getByRole('switch'));
     await waitFor(() => expect(putBodies).toHaveLength(1));
@@ -197,7 +227,6 @@ describe('SkillOverridesPanel — issue', () => {
     mockApi(issueSkills);
     renderPanel({ level: 'issue', issueId: 'TST-1' });
     await waitFor(() => expect(row('grilling')).toBeTruthy());
-    fireEvent.click(screen.getByRole('button', { name: /^All/ }));
 
     fireEvent.click(within(row('okf')).getByRole('button', { name: 'Pin okf on for this issue' }));
     await waitFor(() => expect(putBodies).toHaveLength(1));
@@ -266,6 +295,16 @@ describe('SkillOverridesPanel — project', () => {
 
     fireEvent.click(within(row('grilling')).getByRole('switch', { name: 'grilling for this project' }));
     await waitFor(() => expect(putBodies).toEqual([{ level: 'project', skill: 'grilling', enabled: true, projectKey: 'tst' }]));
+  });
+
+  it('labels the filters All, Changed here and Off at launch', async () => {
+    mockApi({ project: 'tst', issue: null, skills: [GRILLING] });
+    renderPanel({ level: 'project', projectKey: 'tst' });
+    await waitFor(() => expect(row('grilling')).toBeTruthy());
+
+    expect(screen.getByRole('button', { name: /^All/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Changed here/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Off at launch/ })).toBeTruthy();
   });
 });
 

@@ -9,11 +9,11 @@
  *
  * The operator-approved UI decisions on the issue shape the details: core
  * skills collapse to one summary row below global, project-only skills are
- * tagged, the issue view opens filtered to what matters, the global page
- * names the projects and issues that override a skill, and a failed save
- * shows an inline error with Retry on its own row.
+ * tagged, every level opens on All, the global page names the projects and
+ * issues that override a skill, and a failed save shows an inline error
+ * with Retry on its own row.
  *
- * Skill packs (PAN-4334) render above the skill list in SkillPacksSection
+ * Skill packs (PAN-4334) render below the skill list in SkillPacksSection
  * when the response carries `packs`.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -74,12 +74,12 @@ interface SaveResult {
 export const SKILL_OVERRIDES_QUERY_KEY = ['skill-overrides'] as const;
 const ENDPOINT = '/api/skills/overrides';
 
-type Filter = 'all' | 'off' | 'core' | 'below' | 'here' | 'relevant';
+type Filter = 'all' | 'off' | 'core' | 'below' | 'here';
 
 const FILTERS: Record<SkillOverrideLevel, Array<[Filter, string]>> = {
   global: [['all', 'All'], ['off', 'Off'], ['core', 'Core'], ['below', 'Overridden below']],
-  project: [['all', 'All'], ['here', 'Overridden here'], ['off', 'Off at launch']],
-  issue: [['relevant', 'Overridden here or off'], ['all', 'All']],
+  project: [['all', 'All'], ['here', 'Changed here'], ['off', 'Off at launch']],
+  issue: [['all', 'All'], ['here', 'Changed here'], ['off', 'Off']],
 };
 
 export interface SkillOverridesPanelProps {
@@ -178,7 +178,6 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
     core: skills.filter(skill => skill.core).length,
     below: skills.filter(skill => !skill.core && belowNote(below[skill.name])).length,
     here: skills.filter(skill => !skill.core && levelValue(skill, level) !== null).length,
-    relevant: skills.filter(skill => !skill.core && (levelValue(skill, level) !== null || !skill.enabled)).length,
   }), [skills, below, level]);
 
   // Decision #6: an issue no registered project owns has no skills section.
@@ -198,7 +197,6 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
       case 'core': return skill.core;
       case 'below': return !skill.core && belowNote(below[skill.name]) !== null;
       case 'here': return !skill.core && levelValue(skill, level) !== null;
-      case 'relevant': return !skill.core && (levelValue(skill, level) !== null || !skill.enabled);
       default: return true;
     }
   });
