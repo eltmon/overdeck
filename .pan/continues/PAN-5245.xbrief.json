@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5245",
   "created": "2026-11-14T05:12:59.498Z",
-  "updated": "2026-11-14T05:26:13.182Z",
+  "updated": "2026-11-14T05:34:27.959Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,30 @@
       "doneAt": "2026-11-14T05:26:04.667Z"
     },
     "skill-rows-level-switch": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5245",
-      "claimedAt": "2026-11-14T05:26:13.182Z"
+      "claimedAt": "2026-11-14T05:26:13.182Z",
+      "doneAt": "2026-11-14T05:34:27.958Z"
+    },
+    "skill-rows-level-switch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:34:27.958Z"
+    },
+    "skill-rows-level-switch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:34:27.958Z"
+    },
+    "skill-rows-level-switch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:34:27.958Z"
+    },
+    "skill-rows-level-switch.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:34:27.958Z"
+    },
+    "skill-rows-level-switch.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:34:27.958Z"
     }
   }
 }
