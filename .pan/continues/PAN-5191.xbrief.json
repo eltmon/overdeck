@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5191",
   "created": "2026-11-14T01:35:38.518Z",
-  "updated": "2026-11-14T01:43:43.219Z",
+  "updated": "2026-11-14T01:43:49.725Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,6 +54,11 @@
     "begin-edit.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T01:43:43.219Z"
+    },
+    "edit-git": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5191",
+      "claimedAt": "2026-11-14T01:43:49.725Z"
     }
   }
 }
