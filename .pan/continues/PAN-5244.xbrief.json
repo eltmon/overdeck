@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5244",
   "created": "2026-11-14T05:28:55.884Z",
-  "updated": "2026-11-14T06:01:43.142Z",
+  "updated": "2026-11-14T06:02:02.220Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,11 @@
     "pipeline-strip.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T06:01:43.141Z"
+    },
+    "pickup-strip-variant": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T06:02:02.220Z"
     }
   }
 }
