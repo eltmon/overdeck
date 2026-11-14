@@ -317,17 +317,24 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
     });
   });
 
-  it('renders in-flight rows with state, attention, PR, and last journal; issue ids navigate', () => {
+  it('renders in-flight cards with title, PR and activity, never the raw journal type; cards navigate (PAN-5283)', () => {
     const onNavigateIssue = vi.fn();
-    render(<FlywheelStatusPane status={flywheelStatus()} unreachable={false} nowMs={NOW} onNavigateIssue={onNavigateIssue} />);
-    const row = screen.getByTestId('flywheel-inflight-PAN-3964');
-    expect(row).toHaveTextContent('in-review');
-    expect(row).toHaveTextContent('needs-you');
-    expect(row).toHaveTextContent('#4001 · review-requested · pending');
-    expect(row).toHaveTextContent('review.dispatched · 5m ago');
-    expect(screen.getByTestId('flywheel-inflight-PAN-3920')).toHaveTextContent('working');
-    // The Live agents list also links PAN-3964, so scope to this row's button.
-    fireEvent.click(row.querySelector('button')!);
+    const base = flywheelStatus();
+    const status = flywheelStatus({
+      inFlight: [
+        { ...base.inFlight[0]!, stage: 'review', lastActivity: { at: '2026-09-23T09:55:00.000Z', label: 'review started' } },
+        base.inFlight[1]!,
+      ],
+    });
+    render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} onNavigateIssue={onNavigateIssue} />);
+    const card = screen.getByTestId('flywheel-card-PAN-3964');
+    expect(card).toHaveTextContent('Restore the Flywheel page');
+    expect(card).toHaveTextContent('PR #4001');
+    expect(card).toHaveTextContent('last: review started · 5m ago');
+    expect(card).not.toHaveTextContent('review.dispatched');
+    expect(card).toHaveAttribute('data-stage', 'review');
+    expect(screen.getByTestId('flywheel-card-PAN-3920')).toHaveAttribute('data-stage', 'build');
+    fireEvent.click(card);
     expect(onNavigateIssue).toHaveBeenCalledWith('PAN-3964');
   });
 
@@ -367,7 +374,7 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
     });
   });
 
-  describe('no-agent and loop markers (PAN-4199 FR-5, FR-6)', () => {
+  describe('no-agent and loop markers (PAN-4199 FR-5, FR-6; PAN-5283 cards)', () => {
     function rowsStatus(rows: Array<Partial<FlywheelInFlightRow>>, overrides: Partial<Parameters<typeof flywheelStatus>[0]> = {}) {
       const base = flywheelStatus().inFlight[1]!;
       return flywheelStatus({
@@ -376,72 +383,86 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
       });
     }
 
-    it('marks a working row with no live pane, and only that row (ac1)', () => {
+    it('says no agent on a card nobody drives, and only that card (ac1)', () => {
       render(<FlywheelStatusPane status={rowsStatus([{ liveAgents: 0 }, { liveAgents: 1 }])} unreachable={false} nowMs={NOW} />);
-      expect(screen.getByTestId('flywheel-no-agent-PAN-1')).toHaveTextContent('no agent');
-      expect(screen.queryByTestId('flywheel-no-agent-PAN-2')).toBeNull();
+      expect(screen.getByTestId('flywheel-agentline-PAN-1')).toHaveTextContent('no agent');
+      expect(screen.getByTestId('flywheel-agentline-PAN-2')).toHaveTextContent('1 live agent');
     });
 
-    it('leaves a non-working row alone however few agents it has', () => {
-      render(<FlywheelStatusPane status={rowsStatus([{ state: 'in-review', liveAgents: 0 }])} unreachable={false} nowMs={NOW} />);
-      expect(screen.queryByTestId('flywheel-no-agent-PAN-1')).toBeNull();
+    it('shows no blocker line on a card the server found no blocker for', () => {
+      render(<FlywheelStatusPane status={rowsStatus([{ state: 'in-review', liveAgents: 0, blocker: null }])} unreachable={false} nowMs={NOW} />);
+      expect(screen.queryByTestId('flywheel-blocker-PAN-1')).toBeNull();
     });
 
-    it('marks the rows the loop named in its tick (ac2)', () => {
+    it('marks the cards the loop named in its tick with the Flywheel owner (ac2)', () => {
       render(<FlywheelStatusPane status={rowsStatus([{ inTick: true }, { inTick: false }])} unreachable={false} nowMs={NOW} />);
-      expect(screen.getByTestId('flywheel-in-tick-PAN-1')).toHaveTextContent('flywheel');
-      expect(screen.queryByTestId('flywheel-in-tick-PAN-2')).toBeNull();
+      expect(screen.getByTestId('flywheel-owner-PAN-1')).toHaveTextContent('Flywheel');
+      expect(screen.queryByTestId('flywheel-owner-PAN-2')).toBeNull();
     });
 
-    it('exposes each row\'s attention so the reveal can scroll to it', () => {
+    it('exposes each card\'s attention so the reveal can scroll to it', () => {
       render(<FlywheelStatusPane status={rowsStatus([{ attention: 'needs-you' }])} unreachable={false} nowMs={NOW} />);
-      expect(screen.getByTestId('flywheel-inflight-PAN-1')).toHaveAttribute('data-attention', 'needs-you');
+      expect(screen.getByTestId('flywheel-card-PAN-1')).toHaveAttribute('data-attention', 'needs-you');
     });
 
-    it('heads the section with the loop count or the census count', () => {
+    it('heads the board with every in-flight card and the shipped count, whatever the source (D17)', () => {
       const { unmount } = render(
         <FlywheelStatusPane status={rowsStatus([{ inTick: true }, { inTick: false }], { inFlightSource: 'tick' })} unreachable={false} nowMs={NOW} />,
       );
-      expect(screen.getByRole('region', { name: 'In-flight issues' })).toHaveTextContent('1 in flight (loop)');
+      expect(screen.getByRole('region', { name: 'In-flight issues' })).toHaveTextContent('2 in flight · 0 shipped today');
       unmount();
 
       render(<FlywheelStatusPane status={rowsStatus([{}, {}], { inFlightSource: 'census' })} unreachable={false} nowMs={NOW} />);
-      expect(screen.getByRole('region', { name: 'In-flight issues' })).toHaveTextContent('2 feature workspaces');
+      expect(screen.getByRole('region', { name: 'In-flight issues' })).toHaveTextContent('2 in flight · 0 shipped today');
     });
   });
 
-  describe('live agents (PAN-4199 WI-14)', () => {
-    const AGENTS = [
-      { issueId: 'PAN-3964', role: 'work', harness: 'claude-code', model: 'claude-opus-5-5', state: 'working' },
-      { issueId: 'PAN-3920', role: 'review', harness: 'codex', model: 'gpt-5.5', state: 'blocked' },
-    ];
+  describe('card agents (PAN-4199 WI-14, migrated to cards in PAN-5283)', () => {
+    function agentStatus() {
+      const base = flywheelStatus();
+      return flywheelStatus({
+        inFlight: [
+          { ...base.inFlight[0]!, agent: { role: 'work', model: 'claude-opus-5-5', harness: 'claude-code', state: 'working' } },
+          { ...base.inFlight[1]!, agent: { role: 'review', model: 'gpt-5.5', harness: 'codex', state: 'blocked' } },
+        ],
+      });
+    }
 
-    it('lists every agent with its issue, role, model, and pane state (ac1)', () => {
-      render(<FlywheelStatusPane status={flywheelStatus({ agents: AGENTS })} unreachable={false} nowMs={NOW} />);
-      const section = screen.getByRole('region', { name: 'Live agents' });
-      expect(section).toHaveTextContent('Agents · 2');
-      for (const agent of AGENTS) {
-        const row = screen.getByTestId(`flywheel-agent-${agent.issueId}-${agent.role}`);
-        expect(row).toHaveTextContent(agent.issueId);
-        expect(row).toHaveTextContent(agent.role);
-        expect(row).toHaveTextContent(agent.model);
-        expect(row).toHaveTextContent(agent.state);
-      }
+    it('shows each card\'s agent role, model, and state (ac1)', () => {
+      render(<FlywheelStatusPane status={agentStatus()} unreachable={false} nowMs={NOW} />);
+      expect(screen.getByTestId('flywheel-agentline-PAN-3964')).toHaveTextContent('work · claude-opus-5-5 · working');
+      expect(screen.getByTestId('flywheel-agentline-PAN-3920')).toHaveTextContent('review · gpt-5.5 · blocked');
+      expect(screen.queryByRole('region', { name: 'Live agents' })).toBeNull();
     });
 
-    it('navigates to the issue from an agent row (ac2)', () => {
+    it('navigates to the issue from the card that shows the agent (ac2)', () => {
       const onNavigateIssue = vi.fn();
-      render(
-        <FlywheelStatusPane status={flywheelStatus({ agents: [AGENTS[1]!] })} unreachable={false} nowMs={NOW} onNavigateIssue={onNavigateIssue} />,
-      );
-      const row = screen.getByTestId('flywheel-agent-PAN-3920-review');
-      fireEvent.click(row.querySelector('button')!);
+      render(<FlywheelStatusPane status={agentStatus()} unreachable={false} nowMs={NOW} onNavigateIssue={onNavigateIssue} />);
+      fireEvent.click(screen.getByTestId('flywheel-agentline-PAN-3920'));
       expect(onNavigateIssue).toHaveBeenCalledWith('PAN-3920');
     });
 
-    it('says so plainly when no pane is live (ac3)', () => {
-      render(<FlywheelStatusPane status={flywheelStatus({ agents: [] })} unreachable={false} nowMs={NOW} />);
-      expect(screen.getByText('No agent panes are live for these issues.')).toBeInTheDocument();
+    it('says so plainly when nothing drives a card (ac3)', () => {
+      const base = flywheelStatus();
+      render(<FlywheelStatusPane status={flywheelStatus({ inFlight: [{ ...base.inFlight[1]!, agent: null }] })} unreachable={false} nowMs={NOW} />);
+      expect(screen.getByTestId('flywheel-agentline-PAN-3920')).toHaveTextContent('no agent');
+    });
+  });
+
+  describe('board composition (PAN-5283 WI-16)', () => {
+    it('renders the health strip and the shipped-today timeline only when the route sent them', () => {
+      const health = {
+        mainCi: null, deployed: null, gateQueue: { running: 0, queued: 0, slots: 2, oldestWaitSince: null },
+        nextBatch: null, batchingPausedUntil: null, lastRelease: null,
+      };
+      const { unmount } = render(<FlywheelStatusPane status={flywheelStatus()} unreachable={false} nowMs={NOW} />);
+      expect(screen.queryByTestId('flywheel-health-strip')).toBeNull();
+      expect(screen.queryByTestId('flywheel-shipped-today')).toBeNull();
+      unmount();
+      render(<FlywheelStatusPane status={flywheelStatus({ health, shipped: { merges: [], events: [] } })} unreachable={false} nowMs={NOW} />);
+      expect(screen.getByTestId('flywheel-health-strip')).toBeInTheDocument();
+      expect(screen.getByTestId('flywheel-shipped-today')).toHaveTextContent('Nothing shipped yet today.');
+      expect(screen.getByTestId('flywheel-lane-board')).toBeInTheDocument();
     });
   });
 

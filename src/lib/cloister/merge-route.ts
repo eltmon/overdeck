@@ -106,28 +106,44 @@ export function droppedFromBatch(
   }
 }
 
+type BatchCiDeps = {
+  listInvalidated?: (projectRoot: string) => ReturnType<typeof listUatGenerations>;
+  now?: () => number;
+};
+
 /**
- * Whether the project has no batch CI: within the last
- * {@link BATCH_CI_RETRY_MS}, a window batch was dissolved because no `CI` run
- * appeared for its head. While true, the train does not batch this project's
- * PRs; they merge one at a time, as with the train off. Read from stored
- * generation rows only.
+ * When train batching resumes for the project (PAN-5283 WI-6): the end of the
+ * {@link BATCH_CI_RETRY_MS} window opened by the newest window batch that was
+ * dissolved because no `CI` run appeared for its head, as ISO. Null when no
+ * such batch is inside the window. Read from stored generation rows only.
  */
-export function projectLacksBatchCi(
-  projectRoot: string | undefined,
-  deps: { listInvalidated?: (projectRoot: string) => ReturnType<typeof listUatGenerations>; now?: () => number } = {},
-): boolean {
-  if (!projectRoot) return false;
+export function projectBatchCiPausedUntil(projectRoot: string | undefined, deps: BatchCiDeps = {}): string | null {
+  if (!projectRoot) return null;
   const now = (deps.now ?? Date.now)();
   const list = deps.listInvalidated
     ?? ((root: string) => listUatGenerations({ projectRoot: root, statuses: ['invalidated'], limit: DROP_LOOKBACK }));
   try {
-    return list(projectRoot).some((gen) =>
-      now - Date.parse(gen.updatedAt || gen.createdAt || '') < BATCH_CI_RETRY_MS
-      && gen.heldOut.some((held) => held.reason.startsWith(NO_BATCH_CI_PREFIX)));
+    let until: number | null = null;
+    for (const gen of list(projectRoot)) {
+      if (!gen.heldOut.some((held) => held.reason.startsWith(NO_BATCH_CI_PREFIX))) continue;
+      const end = Date.parse(gen.updatedAt || gen.createdAt || '') + BATCH_CI_RETRY_MS;
+      if (Number.isFinite(end) && end > now && (until === null || end > until)) until = end;
+    }
+    return until === null ? null : new Date(until).toISOString();
   } catch {
-    return false;
+    return null;
   }
+}
+
+/**
+ * Whether the project has no batch CI: within the last
+ * {@link BATCH_CI_RETRY_MS}, a window batch was dissolved because no `CI` run
+ * appeared for its head. While true, the train does not batch this project's
+ * PRs; they merge one at a time, as with the train off. Expressed through
+ * {@link projectBatchCiPausedUntil} so the two never disagree.
+ */
+export function projectLacksBatchCi(projectRoot: string | undefined, deps: BatchCiDeps = {}): boolean {
+  return projectBatchCiPausedUntil(projectRoot, deps) !== null;
 }
 
 /**
