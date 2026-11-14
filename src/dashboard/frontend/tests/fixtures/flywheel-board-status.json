@@ -1,0 +1,390 @@
+{
+ "run": "running",
+ "conversation": {
+  "name": "conv-flywheel",
+  "id": 42,
+  "title": "Flywheel",
+  "model": "claude-opus-5-5",
+  "harness": "claude-code",
+  "cwd": "/repos/overdeck",
+  "createdAt": "2026-11-14T12:00:00.000Z",
+  "sessionAlive": true
+ },
+ "lastTick": {
+  "tick": 41,
+  "pick": "PAN-5275",
+  "phase": "watch",
+  "inFlight": [
+   "PAN-5095",
+   "PAN-5275",
+   "PAN-5281"
+  ],
+  "needsYou": "Waive the test removal on PAN-5095; Approve the Fly VM image for the live check <https://fly.io/apps/overdeck-check>",
+  "at": "2026-11-14T18:59:40.000Z",
+  "messageId": "m41",
+  "needsYouItems": [
+   {
+    "text": "Waive the test removal on PAN-5095",
+    "firstRaisedTick": 38,
+    "firstRaisedAt": "2026-11-14T18:12:00.000Z",
+    "firstRaisedMessageId": "m38",
+    "context": "The test-skip gate failed because FlywheelStatusPane.test.tsx lost two cases that moved to the new board file."
+   },
+   {
+    "text": "Approve the Fly VM image for the live check <https://fly.io/apps/overdeck-check>",
+    "firstRaisedTick": 35,
+    "firstRaisedAt": "2026-11-14T17:50:00.000Z",
+    "firstRaisedMessageId": "m35",
+    "context": "The rig answers over SSH but has no Overdeck installed."
+   }
+  ]
+ },
+ "freshness": "live",
+ "policies": {
+  "auto_pickup_backlog": false,
+  "require_uat_before_merge": true,
+  "merge_train_enabled": true
+ },
+ "inFlight": [
+  {
+   "issueId": "PAN-5276",
+   "title": "Add the shipped-today timeline to the Flywheel page, with merges, deploys and releases linked to their PRs",
+   "state": "working",
+   "liveAgents": 0,
+   "inTick": false,
+   "lastJournal": {
+    "at": "2026-11-14T18:54:00.000Z",
+    "type": "feedback.delivered"
+   },
+   "stage": "build",
+   "stageSince": "2026-11-14T18:18:00.000Z",
+   "owner": {
+    "kind": "conversation",
+    "name": "20261114-d9c5",
+    "title": "Handoff for PAN-5276"
+   },
+   "agent": {
+    "role": "handoff",
+    "model": "claude-opus-5-5",
+    "harness": "claude-code",
+    "state": "working",
+    "conversationName": "20261114-d9c5"
+   },
+   "blocker": null,
+   "cost": 3.1,
+   "lastActivity": {
+    "at": "2026-11-14T18:54:00.000Z",
+    "label": "feedback delivered to agent"
+   }
+  },
+  {
+   "issueId": "PAN-5095",
+   "title": "Move the cost rollup off the request path",
+   "state": "working",
+   "liveAgents": 0,
+   "inTick": true,
+   "lastJournal": {
+    "at": "2026-11-14T18:42:00.000Z",
+    "type": "verification.failed"
+   },
+   "stage": "build",
+   "stageSince": "2026-11-14T17:50:00.000Z",
+   "owner": {
+    "kind": "flywheel"
+   },
+   "agent": null,
+   "blocker": {
+    "kind": "ci-failed",
+    "severity": "stuck",
+    "text": "CI tests failed on PR #5127, no agent running"
+   },
+   "cost": 7.84,
+   "lastActivity": {
+    "at": "2026-11-14T18:42:00.000Z",
+    "label": "checks failed"
+   },
+   "pr": {
+    "url": "https://github.com/eltmon/overdeck/pull/5127",
+    "number": 5127,
+    "reviewState": "none",
+    "checks": "red",
+    "mergeable": true
+   }
+  },
+  {
+   "issueId": "PAN-5279",
+   "title": "Dashboard phone layout for the God View",
+   "state": "working",
+   "liveAgents": 0,
+   "inTick": false,
+   "lastJournal": {
+    "at": "2026-11-14T18:52:00.000Z",
+    "type": "handoff.started"
+   },
+   "stage": "build",
+   "stageSince": "2026-11-14T18:52:00.000Z",
+   "owner": {
+    "kind": "conversation",
+    "name": "20261114-a1b2",
+    "title": null
+   },
+   "agent": {
+    "role": "handoff",
+    "model": "gpt-5.6",
+    "harness": "codex",
+    "state": "idle",
+    "conversationName": "20261114-a1b2"
+   },
+   "blocker": null,
+   "cost": null,
+   "lastActivity": {
+    "at": "2026-11-14T18:52:00.000Z",
+    "label": "handoff started"
+   }
+  },
+  {
+   "issueId": "PAN-5275",
+   "title": "Make the whole Needs-you row clickable, not just the 12px icon",
+   "state": "working",
+   "liveAgents": 1,
+   "inTick": true,
+   "lastJournal": {
+    "at": "2026-11-14T18:36:00.000Z",
+    "type": "verification.started"
+   },
+   "stage": "checks",
+   "stageSince": "2026-11-14T18:36:00.000Z",
+   "owner": {
+    "kind": "flywheel"
+   },
+   "agent": {
+    "role": "work",
+    "model": "claude-sonnet-5",
+    "harness": "claude-code",
+    "state": "waiting",
+    "agentId": "agent-pan-5275"
+   },
+   "blocker": {
+    "kind": "gate-queue",
+    "severity": "waiting",
+    "text": "typecheck (services/account/tsconfig.json) queued: 11.5 GB free, needs 2.2 GB, gates keep 12.0 GB (20 min)"
+   },
+   "cost": 1.92,
+   "lastActivity": {
+    "at": "2026-11-14T18:36:00.000Z",
+    "label": "checks started"
+   }
+  },
+  {
+   "issueId": "PAN-5277",
+   "title": "Gate queue reports why each waiter waits",
+   "state": "working",
+   "liveAgents": 0,
+   "inTick": false,
+   "lastJournal": null,
+   "stage": "checks",
+   "stageSince": "2026-11-14T18:49:00.000Z",
+   "owner": {
+    "kind": "conversation",
+    "name": "20261114-cc68",
+    "title": "Gate queue reasons"
+   },
+   "agent": {
+    "role": "handoff",
+    "model": "claude-opus-5-5",
+    "harness": "claude-code",
+    "state": "waiting",
+    "conversationName": "20261114-cc68"
+   },
+   "blocker": {
+    "kind": "gate-queue",
+    "severity": "waiting",
+    "text": "typecheck queued behind 3 other gates (11 min)"
+   },
+   "cost": 0.46,
+   "lastActivity": null
+  },
+  {
+   "issueId": "PAN-5278",
+   "title": "Stop review convoys wedging on a hung synthesis parent",
+   "state": "in-review",
+   "liveAgents": 1,
+   "inTick": false,
+   "lastJournal": {
+    "at": "2026-11-14T18:44:00.000Z",
+    "type": "review.dispatched"
+   },
+   "stage": "review",
+   "stageSince": "2026-11-14T18:44:00.000Z",
+   "owner": {
+    "kind": "operator"
+   },
+   "agent": {
+    "role": "review",
+    "model": "claude-opus-5-5",
+    "harness": "claude-code",
+    "state": "working"
+   },
+   "blocker": null,
+   "cost": 2.4,
+   "lastActivity": {
+    "at": "2026-11-14T18:44:00.000Z",
+    "label": "review started"
+   },
+   "pr": {
+    "url": "https://github.com/eltmon/overdeck/pull/5290",
+    "number": 5290,
+    "reviewState": "review-requested",
+    "checks": "pending",
+    "mergeable": null
+   }
+  },
+  {
+   "issueId": "PAN-5281",
+   "title": "Apps/mobile typecheck lane",
+   "state": "ready",
+   "liveAgents": 1,
+   "inTick": true,
+   "lastJournal": null,
+   "stage": "merge",
+   "stageSince": "2026-11-14T18:55:00.000Z",
+   "owner": {
+    "kind": "flywheel"
+   },
+   "agent": {
+    "role": "work",
+    "model": "claude-sonnet-5",
+    "harness": "claude-code",
+    "state": "idle"
+   },
+   "blocker": {
+    "kind": "auto-merge-scheduled",
+    "severity": "waiting",
+    "text": "auto-merge at 15:20"
+   },
+   "cost": 1.05,
+   "lastActivity": null
+  }
+ ],
+ "agents": [],
+ "inFlightSource": "tick",
+ "orderBook": null,
+ "projectRoot": "/repos/overdeck",
+ "generatedAt": "2026-11-14T19:00:00.000Z",
+ "health": {
+  "mainCi": {
+   "conclusion": "success",
+   "sha": "d0c9b93efe2a1b2c3d4e5f60718293a4b5c6d7e8",
+   "url": "https://github.com/eltmon/overdeck/actions/runs/1",
+   "at": "2026-11-14T18:30:00.000Z"
+  },
+  "deployed": {
+   "buildCommit": "d0c9b93efe2a1b2c3d4e5f60718293a4b5c6d7e8",
+   "behindVerdict": 0
+  },
+  "gateQueue": {
+   "running": 0,
+   "queued": 9,
+   "slots": 2,
+   "oldestWaitSince": "2026-11-14T18:36:00.000Z"
+  },
+  "nextBatch": null,
+  "batchingPausedUntil": "2026-11-14T23:40:00.000Z",
+  "lastRelease": {
+   "tag": "v0.85.0",
+   "at": "2026-11-14T16:00:00.000Z",
+   "url": "https://github.com/eltmon/overdeck/releases/tag/v0.85.0"
+  }
+ },
+ "shipped": {
+  "merges": [
+   {
+    "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "at": "2026-11-14T18:40:00.000Z",
+    "subject": "feat(dashboard): PAN-5246 stats panel (#5273)",
+    "prNumber": 5273,
+    "prUrl": "https://github.com/eltmon/overdeck/pull/5273",
+    "issueId": "PAN-5246",
+    "title": "Flywheel stats panel shows waste, not budget",
+    "deployed": false
+   },
+   {
+    "sha": "cccccccccccccccccccccccccccccccccccccccc",
+    "at": "2026-11-14T16:05:00.000Z",
+    "subject": "fix(cloister): PAN-5269 fast-forward heads (#5270)",
+    "prNumber": 5270,
+    "prUrl": "https://github.com/eltmon/overdeck/pull/5270",
+    "issueId": "PAN-5269",
+    "title": "Fast-forwarded batch heads do not mark the project as lacking batch CI",
+    "deployed": true
+   },
+   {
+    "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "at": "2026-11-14T14:30:00.000Z",
+    "subject": "fix(dashboard): PAN-5262 herdr done (#5266)",
+    "prNumber": 5266,
+    "prUrl": "https://github.com/eltmon/overdeck/pull/5266",
+    "issueId": "PAN-5262",
+    "title": "Herdr done is not an exit",
+    "deployed": true
+   }
+  ],
+  "events": [
+   {
+    "kind": "merge",
+    "at": "2026-11-14T18:40:00.000Z",
+    "merge": {
+     "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "at": "2026-11-14T18:40:00.000Z",
+     "subject": "feat(dashboard): PAN-5246 stats panel (#5273)",
+     "prNumber": 5273,
+     "prUrl": "https://github.com/eltmon/overdeck/pull/5273",
+     "issueId": "PAN-5246",
+     "title": "Flywheel stats panel shows waste, not budget",
+     "deployed": false
+    }
+   },
+   {
+    "kind": "deploy",
+    "at": "2026-11-14T16:20:00.000Z",
+    "trigger": "pan reload",
+    "issueId": null,
+    "initiator": "conv-flywheel"
+   },
+   {
+    "kind": "release",
+    "at": "2026-11-14T16:00:00.000Z",
+    "tag": "v0.85.0",
+    "url": "https://github.com/eltmon/overdeck/releases/tag/v0.85.0"
+   },
+   {
+    "kind": "merge",
+    "at": "2026-11-14T16:05:00.000Z",
+    "merge": {
+     "sha": "cccccccccccccccccccccccccccccccccccccccc",
+     "at": "2026-11-14T16:05:00.000Z",
+     "subject": "fix(cloister): PAN-5269 fast-forward heads (#5270)",
+     "prNumber": 5270,
+     "prUrl": "https://github.com/eltmon/overdeck/pull/5270",
+     "issueId": "PAN-5269",
+     "title": "Fast-forwarded batch heads do not mark the project as lacking batch CI",
+     "deployed": true
+    }
+   },
+   {
+    "kind": "merge",
+    "at": "2026-11-14T14:30:00.000Z",
+    "merge": {
+     "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "at": "2026-11-14T14:30:00.000Z",
+     "subject": "fix(dashboard): PAN-5262 herdr done (#5266)",
+     "prNumber": 5266,
+     "prUrl": "https://github.com/eltmon/overdeck/pull/5266",
+     "issueId": "PAN-5262",
+     "title": "Herdr done is not an exit",
+     "deployed": true
+    }
+   }
+  ]
+ }
+}
