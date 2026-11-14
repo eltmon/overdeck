@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5239",
   "created": "2026-11-14T04:43:48.158Z",
-  "updated": "2026-11-14T04:56:27.527Z",
+  "updated": "2026-11-14T04:56:38.984Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
     "pr-ref-prefix.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T04:56:27.526Z"
+    },
+    "needs-you-target-link": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5239",
+      "claimedAt": "2026-11-14T04:56:38.984Z"
     }
   }
 }
