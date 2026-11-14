@@ -4,6 +4,8 @@
  * one actionable row each, and one row per feature workspace in the
  * flywheel's project.
  */
+import { MessageSquare } from 'lucide-react';
+
 import type { FlywheelDerivedStatus, FlywheelFreshness, FlywheelLastTick } from '@overdeck/contracts';
 import { needsYouItemKey, splitNeedsYouItems } from '@overdeck/contracts';
 
@@ -144,54 +146,49 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
               <span className="mr-2 text-[11px] font-medium uppercase tracking-wider text-warning-foreground">Needs you</span>
               <ul>
                 {needsYouRows(tick).map((row) => (
-                  <li
-                    key={row.key}
-                    role="button"
-                    tabIndex={0}
-                    data-testid="flywheel-needs-you-item"
-                    title="Show the message that first raised this, or the question the flywheel is waiting on"
-                    className="cursor-pointer rounded-sm hover:bg-warning/[0.14]"
-                    onClick={() => onNeedsYouClick?.(row.messageId)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        onNeedsYouClick?.(row.messageId);
-                      }
-                    }}
-                  >
-                    {needsYouSegments(row.text, status.inFlight).map((segment, i) => {
-                      if (segment.kind === 'issue') {
-                        return (
-                          <button
-                            key={i}
-                            type="button"
-                            className="font-mono text-foreground hover:underline"
-                            data-testid="flywheel-needs-you-issue"
-                            onClick={(e) => { e.stopPropagation(); onNavigateIssue?.(segment.issueId); }}
-                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
-                          >
-                            {segment.text}
-                          </button>
-                        );
-                      }
-                      if (segment.kind === 'pr') {
-                        return (
-                          <a
-                            key={i}
-                            href={segment.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-mono hover:underline"
-                            data-testid="flywheel-needs-you-pr"
-                            onClick={(e) => e.stopPropagation()}
-                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
-                          >
-                            {segment.text}
-                          </a>
-                        );
-                      }
-                      return <span key={i}>{segment.text}</span>;
-                    })}
+                  <li key={row.key} data-testid="flywheel-needs-you-item" className="flex items-baseline gap-1.5">
+                    <button
+                      type="button"
+                      aria-label="Show where this was raised"
+                      title="Show the message that first raised this, or the question the flywheel is waiting on"
+                      data-testid="flywheel-needs-you-jump"
+                      className="shrink-0 self-center rounded-sm text-muted-foreground hover:text-foreground"
+                      onClick={() => onNeedsYouClick?.(row.messageId)}
+                    >
+                      <MessageSquare className="h-3 w-3" aria-hidden="true" />
+                    </button>
+                    <span className="min-w-0">
+                      {needsYouSegments(row.text, status.inFlight).map((segment, i) => {
+                        if (segment.kind === 'issue') {
+                          return (
+                            <button
+                              key={i}
+                              type="button"
+                              className="font-mono text-foreground hover:underline"
+                              data-testid="flywheel-needs-you-issue"
+                              onClick={() => onNavigateIssue?.(segment.issueId)}
+                            >
+                              {segment.text}
+                            </button>
+                          );
+                        }
+                        if (segment.kind === 'pr') {
+                          return (
+                            <a
+                              key={i}
+                              href={segment.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-mono hover:underline"
+                              data-testid="flywheel-needs-you-pr"
+                            >
+                              {segment.text}
+                            </a>
+                          );
+                        }
+                        return <span key={i}>{segment.text}</span>;
+                      })}
+                    </span>
                   </li>
                 ))}
               </ul>

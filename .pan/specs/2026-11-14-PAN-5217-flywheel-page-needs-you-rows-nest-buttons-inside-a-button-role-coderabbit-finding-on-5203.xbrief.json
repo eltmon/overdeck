@@ -4,17 +4,17 @@
     "created": "2026-11-14T01:05:31Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5217: Flywheel page: Needs-you rows nest buttons inside a button role (CodeRabbit finding on #5203)",
-    "updated": "2026-11-14T01:06:40.706Z"
+    "updated": "2026-11-14T01:19:37.727Z"
   },
   "plan": {
     "id": "pan-5217",
     "title": "Flywheel page: Needs-you rows nest buttons inside a button role (CodeRabbit finding on #5203)",
-    "status": "proposed",
+    "status": "running",
     "uid": "b3f974e6-ab72-43f4-a97c-3cc024f6eac0",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T01:05:31Z",
-    "updated": "2026-11-14T01:06:40.706Z",
+    "updated": "2026-11-14T01:19:37.727Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5217",
@@ -219,5 +219,5 @@
     ],
     "edges": []
   },
-  "status": "proposed"
+  "status": "active"
 }
