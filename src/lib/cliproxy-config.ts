@@ -15,7 +15,8 @@
  * `cliproxy-config-files.ts`; the lifecycle in `cliproxy.ts`.
  */
 
-import { stringify as stringifyYaml } from 'yaml';
+import { isDeepStrictEqual } from 'node:util';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
 export interface CliproxyConfigInput {
   host: string;
@@ -183,4 +184,35 @@ export function buildCliproxyConfigV8(input: CliproxyConfigInput): CliproxyConfi
     activeManagementKey,
     warnings,
   };
+}
+
+/**
+ * Whether `config.yaml` must be rewritten (PAN-5282 FR-9). CLIProxy replaces a
+ * plaintext `management.secret-key` with its bcrypt hash on startup, so a byte
+ * compare would rewrite (and hot-reload) the file on every start. Compare the
+ * parsed content instead, treating an on-disk hash as the generated key unless
+ * the active key changed in this build. A missing or unparseable file is
+ * always rewritten.
+ */
+export function configNeedsWrite(
+  existingText: string | null,
+  generated: Record<string, unknown>,
+  keyChanged: boolean,
+): boolean {
+  if (existingText === null) return true;
+  let existing: unknown;
+  try {
+    existing = parseYaml(existingText);
+  } catch {
+    return true;
+  }
+  if (!isPlainObject(existing)) return true;
+
+  const copy: Record<string, unknown> = { ...existing };
+  const management = copy.management;
+  if (!keyChanged && isPlainObject(management) && isBcryptHash(management['secret-key'])) {
+    const generatedManagement = isPlainObject(generated.management) ? generated.management : {};
+    copy.management = { ...management, 'secret-key': generatedManagement['secret-key'] };
+  }
+  return !isDeepStrictEqual(copy, generated);
 }

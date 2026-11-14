@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
-import { buildCliproxyConfigV8, type CliproxyConfigInput } from '../../src/lib/cliproxy-config.js';
+import { buildCliproxyConfigV8, configNeedsWrite, type CliproxyConfigInput } from '../../src/lib/cliproxy-config.js';
 
 const CLIENT_TOKEN = 'overdeck-local-cliproxy-key';
 
@@ -174,5 +174,43 @@ describe('buildCliproxyConfigV8 claude exclusion', () => {
     expect(config.oauth['excluded-models'].codex).toEqual(['gpt-5-codex-mini']);
     expect(config.oauth['excluded-models'].claude).toHaveLength(9);
     expect(config).not.toHaveProperty('oauth-excluded-models');
+  });
+});
+
+describe('configNeedsWrite', () => {
+  const HASH = '$2a$10$abcdefghijklmnopqrstuv';
+
+  function hashedText(yaml: string): string {
+    const replaced = yaml.replace(/secret-key: .*/, `secret-key: ${HASH}`);
+    expect(replaced).not.toBe(yaml);
+    return replaced;
+  }
+
+  it('needs a write when config.yaml is missing or unparseable', () => {
+    const { config } = buildCliproxyConfigV8(input());
+    expect(configNeedsWrite(null, config, false)).toBe(true);
+    expect(configNeedsWrite('not: [valid', config, false)).toBe(true);
+    expect(configNeedsWrite('- a list\n', config, false)).toBe(true);
+  });
+
+  it('does not rewrite an unchanged file', () => {
+    const { config, yaml } = buildCliproxyConfigV8(input({ extra: operatorExtra() }));
+    expect(configNeedsWrite(yaml, config, false)).toBe(false);
+  });
+
+  it('does not rewrite when only the secret-key was hashed by cliproxy', () => {
+    const { config, yaml } = buildCliproxyConfigV8(input({ extra: operatorExtra() }));
+    expect(configNeedsWrite(hashedText(yaml), config, false)).toBe(false);
+  });
+
+  it('rewrites a hashed file when the active key changed', () => {
+    const { config, yaml } = buildCliproxyConfigV8(input());
+    expect(configNeedsWrite(hashedText(yaml), config, true)).toBe(true);
+  });
+
+  it('rewrites when any other field differs', () => {
+    const { yaml } = buildCliproxyConfigV8(input());
+    const { config } = buildCliproxyConfigV8(input({ extra: { routing: { 'session-affinity-ttl': '2h' } } }));
+    expect(configNeedsWrite(hashedText(yaml), config, false)).toBe(true);
   });
 });
