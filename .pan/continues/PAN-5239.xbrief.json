@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5239",
   "created": "2026-11-14T04:43:48.158Z",
-  "updated": "2026-11-14T04:46:46.207Z",
+  "updated": "2026-11-14T04:46:52.715Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "contracts-target-key.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T04:46:46.207Z"
+    },
+    "pr-ref-prefix": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5239",
+      "claimedAt": "2026-11-14T04:46:52.715Z"
     }
   }
 }
