@@ -106,6 +106,7 @@ function PipelineRow({ phase, state, agent, pane, now, cost, onOpenAgentConversa
 }) {
   // A hook, so each row is its own component.
   const outcome = useAgentSessionOutcome(agent ?? null);
+  const paneIsLive = pane !== undefined && presenceForPaneState(pane.state) === 'active';
   let outcomeText: string;
   if (!agent && !pane) {
     outcomeText = noAgentOutcome(phase, state);
@@ -115,11 +116,18 @@ function PipelineRow({ phase, state, agent, pane, now, cost, onOpenAgentConversa
     const startedAt = Date.parse(agent.startedAt);
     const duration = Number.isFinite(startedAt) ? formatDuration(Math.max(0, Math.floor((now.getTime() - startedAt) / 1000))) : null;
     outcomeText = duration ? `Running now · ${duration}` : 'Running now';
+  } else if (paneIsLive) {
+    // The recorded agent has ended (or there is no agent record yet), but a
+    // backend pane is still live for this phase — a restart the agent
+    // record hasn't caught up with. The pane's liveness wins, matching the
+    // pipeline strip's own livePhases derivation (D-13): never show an
+    // ended outcome next to a phase the strip marks live.
+    outcomeText = 'Running now';
   } else if (agent) {
     const started = shortDate(agent.startedAt);
     outcomeText = `${(outcome ?? SESSION_ENDED_FALLBACK).label}${started ? ` · started ${started}` : ''}`;
   } else {
-    outcomeText = presenceForPaneState(pane!.state) === 'active' ? 'Running now' : 'Idle';
+    outcomeText = 'Idle';
   }
 
   const model = agent?.model ?? pane?.model;
@@ -178,7 +186,12 @@ export function IssueDrawerDetails({
   const chips = deriveSpecialistChips(agentsToReviewerSessions(agents), derived);
   const reviewStarted = chips.some((chip) => chip.status !== 'queued');
   const hasPlan = useIssueActions(issueId).state.hasPlan;
-  const workRunning = agents.some((agent) => agent.role === 'work' && (agent.status === 'running' || agent.status === 'starting'));
+  // `StatusNarrative` is Stage-owned and used unedited (D-14/D-15), so a
+  // pane-only work phase (D-13: a live backend pane with no agent record)
+  // is folded in here rather than inside its own workRunning check — the
+  // derived issue state already reflects that liveness.
+  const workRunning = agents.some((agent) => agent.role === 'work' && (agent.status === 'running' || agent.status === 'starting'))
+    || derived?.state === 'working';
   const [costsOpen, setCostsOpen] = useState(false);
   const costsData = useIssueCostsQuery(issueId).data;
   const sessions = costsData?.sessions ?? [];

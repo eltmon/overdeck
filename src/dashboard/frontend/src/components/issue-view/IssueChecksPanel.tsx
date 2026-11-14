@@ -14,8 +14,18 @@ function CheckRowIcon({ label }: { label: string }) {
   return <Loader2 className="h-[14px] w-[14px] shrink-0 animate-spin text-info-foreground motion-reduce:animate-none" />;
 }
 
+/** statusColor falls back to `status` when there is no conclusion; for a
+ * completed run that reads "COMPLETED" as a pass, so a run with no
+ * conclusion at all would show a success checkmark next to the "unknown"
+ * text checkRunStateText renders for the same run. Only a conclusion can
+ * establish success. */
+function checkRunLabel(run: Pick<IssueCheckRun, 'status' | 'conclusion'>): string {
+  if (run.status === 'completed' && !run.conclusion) return 'skip';
+  return statusColor({ status: run.status, conclusion: run.conclusion ?? undefined }).label;
+}
+
 function CheckRow({ run }: { run: IssueCheckRun }) {
-  const label = statusColor({ status: run.status, conclusion: run.conclusion ?? undefined }).label;
+  const label = checkRunLabel(run);
   const href = run.htmlUrl ?? run.detailsUrl;
   const content = (
     <>

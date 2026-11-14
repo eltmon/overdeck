@@ -63,6 +63,26 @@ describe('IssueChecksPanel', () => {
     expect(testRow).toHaveTextContent('failure');
   });
 
+  it('a completed run with no conclusion is not shown as passed', () => {
+    useIssueCheckRunsQueryMock.mockReturnValue({
+      isLoading: false,
+      data: {
+        issueId: 'PAN-1',
+        pr: { number: 1661, url: 'https://github.com/eltmon/overdeck/pull/1661' },
+        checkRuns: [
+          { id: 1, name: 'mystery', status: 'completed', conclusion: null },
+        ],
+        summary: { total: 1, passed: 0, failed: 0, running: 0, skipped: 0, pending: 0, cancelled: 1 },
+      },
+    });
+
+    render(<IssueChecksPanel issueId="PAN-1" />);
+
+    const row = screen.getByText('mystery').closest('[data-check-state]');
+    expect(row).not.toHaveAttribute('data-check-state', 'pass');
+    expect(row).toHaveTextContent('unknown');
+  });
+
   it('a run with a URL is a link', () => {
     useIssueCheckRunsQueryMock.mockReturnValue({
       isLoading: false,

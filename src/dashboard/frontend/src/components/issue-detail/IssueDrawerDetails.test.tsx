@@ -114,6 +114,15 @@ describe('IssueDrawerDetails', () => {
     expect(screen.getByTestId('drawer-details-status')).toHaveTextContent('The reviewer asked for changes');
   });
 
+  it('the Status section reads as running for a pane-only work phase (no work agent)', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: { 'PAN-1': { issueId: 'PAN-1', state: 'working' } },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderDetails();
+    expect(screen.getByTestId('drawer-details-status')).not.toHaveTextContent('Waiting to start');
+    expect(screen.getByTestId('drawer-details-status')).not.toHaveTextContent('Planning what to build');
+  });
+
   it('renders the six pipeline rows in order', () => {
     renderDetails();
     const rows = screen.getByTestId('drawer-details-pipeline').querySelectorAll('tr[data-phase]');
@@ -147,6 +156,18 @@ describe('IssueDrawerDetails', () => {
     expect(row).toHaveTextContent('Running now');
     expect(document.body).not.toHaveTextContent('pane-review-1');
     expect(screen.queryByTestId('drawer-details-open-review')).toBeNull();
+  });
+
+  it('a stopped agent does not hide a different, currently working pane for the same phase', () => {
+    useDashboardStore.setState({
+      backendPanesById: {
+        'pane-work-2': { id: 'pane-work-2', issue: 'PAN-1', role: 'work', model: 'claude-opus-5', harness: 'claude-code', state: 'working' },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderDetails({ agents: [agent({ id: 'agent-pan-1-work-1', role: 'work', status: 'stopped' })] });
+    const row = screen.getByTestId('drawer-details-pipeline').querySelector('tr[data-phase="work"]') as HTMLElement;
+    expect(row).toHaveTextContent('Running now');
+    expect(row).not.toHaveTextContent('started');
   });
 
   it('an exited pane adds no row content', () => {
