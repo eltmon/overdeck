@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5218",
   "created": "2026-11-14T02:30:48.079Z",
-  "updated": "2026-11-14T02:40:16.351Z",
+  "updated": "2026-11-14T02:42:36.831Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,30 @@
     "app-create-issue.ac2": {
       "status": "completed",
       "doneAt": "2026-11-14T02:40:16.351Z"
+    },
+    "followup-filer": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:42:36.830Z"
+    },
+    "followup-filer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:42:36.830Z"
+    },
+    "followup-filer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:42:36.830Z"
+    },
+    "followup-filer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:42:36.830Z"
+    },
+    "followup-filer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:42:36.830Z"
+    },
+    "followup-filer.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:42:36.830Z"
     }
   }
 }
