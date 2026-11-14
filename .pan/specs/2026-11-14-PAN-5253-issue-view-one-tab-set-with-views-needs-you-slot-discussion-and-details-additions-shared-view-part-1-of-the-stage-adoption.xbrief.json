@@ -1,0 +1,1591 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T08:09:44Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5253: Issue view: one tab set with views, needs-you slot, Discussion, and Details additions (shared view, part 1 of the Stage adoption)",
+    "updated": "2026-11-14T08:17:48.919Z"
+  },
+  "plan": {
+    "id": "pan-5253",
+    "title": "Issue view: one tab set with views, needs-you slot, Discussion, and Details additions (shared view, part 1 of the Stage adoption)",
+    "status": "proposed",
+    "uid": "0d5d7336-571f-42f3-9837-d54c768225fe",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-14T08:09:44Z",
+    "updated": "2026-11-14T08:17:48.919Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5253",
+        "label": "PAN-5253",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5253/.pan/drafts/pan-5253.md",
+        "label": "PRD draft (.pan/drafts/pan-5253.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/design/issue-view-two-shells.html",
+        "label": "Approved mockup (?shell=drawer)",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "issue-view",
+      "drawer",
+      "stage-adoption"
+    ],
+    "metadata": {
+      "sizeJustification": "30 files_scope entries, over the 25-file lint limit: 13 source files in one frontend area (components/issue-detail, issue-view, drawer, PrdViewer), 13 test files, 4 doc files and the CI test list. The issue is already part 1 of a three-issue split (PAN-5244 -> PAN-5253 -> PAN-5246) that the Flywheel runs strictly in sequence because all three edit IssueDetail.tsx and IssueDrawerDetails.tsx; a further split would add a fourth issue to that chain and let two issues edit the same two files at once. PAN-5246 depends on the complete set (tab table, banner slot, Details additions) landing together.",
+      "canonicalFilename": "2026-11-14-PAN-5253-issue-view-one-tab-set-with-views-needs-you-slot-discussion-and-details-additions-shared-view-part-1-of-the-stage-adoption.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The issue drawer and the Stage issue tab (the cockpit) are two different issue views. The cockpit has surfaces the shared view (IssueDetail, drawer density) lacks: Plan with a PRD view, Changes with Files/Checks/Artifacts, Activity with a status history, Discussion, a Decisions tab for Deft issues, a needs-you banner, and Details facts (model, per-agent cost, Ship, linked conversations, stack). Pane-only sessions are invisible in the drawer. PAN-5246 cannot switch the Stage tab to the shared view until the shared view carries all of this.",
+      "Proposal": "Follow .pan/drafts/pan-5253.md. One pure tab table (issueTabs.ts: resolveIssueTab, entryClickValue, ISSUE_TAB_VIEWS) maps every tab value either shell accepts to an entry and a view; the tab value is the only state. IssueDetail's drawer branch renders shell-independent tab bodies from a new IssueDetailTabBodies.tsx, a new IssueBannerSlot under the pipeline strip (D-7 first-match rule), and an extended IssueDrawerDetails (container-query columns, Status, model/harness, live duration, pane-only rows, per-agent cost from the cost ledger, cost breakdown, Deft panels, Ship, linked conversations, stack disclosure). The conversation header's branch chip gets a copy button and the strip marks a phase live from a live backend pane. No Stage file, server file, route, contract or store field changes.",
+      "NonGoals": "- No edit to any file under src/dashboard/frontend/src/components/Stage/ (IssueMissionControl.tsx included); the Stage issue tab renders exactly as before; deleting the cockpit copies (D-14) is PAN-5246\n- No change to the legacy page return or the rail branch of IssueDetail, or to IssueDetailShell.tsx, beyond PAGE_HIDDEN_TABS\n- No change to the drawer title row or frame (IssueDrawer.tsx header)\n- No change to components/issue-view/inventory.ts, densitySections.ts or tests/unit/dashboard/frontend/issue-view-no-loss.test.ts\n- No edit to ConversationPanel, NeedsYouSlot.tsx, IssueActionMenu/*, the SkillOverridesPanel body or the full PickupGateControls variant\n- No skill row redesign (PAN-5245)\n- No opening of a pane-only session's conversation from the issue view\n- No Create PR link, visible next-step line, or shell-specific Details block (PAN-5246)\n- No server, route, contract, store-shape or new query-hook change; no new HTTP endpoint\n- No merge log and no new status-history data source: Status history is the existing ActivityTab\n- No test deleted, skipped or marked .only; no raise of a scripts/file-size-allowlist.txt row\n- No @container on IssueDetail's root (it would shrink the popover click-away overlay)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep PAN-5253 as one issue and set plan.metadata.sizeJustification instead of splitting into sibling issues.",
+        "rationale": "The issue is already part 1 of a fixed three-issue sequence (PAN-5244 -> PAN-5253 -> PAN-5246) on the same components; the surface is one frontend area plus tests and docs; splitting would add a fourth serialized issue on the same files."
+      },
+      {
+        "summary": "Status history maps to the existing ActivityTab; Feed is HappenedFeed above DrawerActivityPanel; Ship has no merge log.",
+        "rationale": "The PRD (D-10, mockup deltas 2, 3, 5) already decided this from the code: no status-history view or merge log exists, and NFR-1 forbids new data sources."
+      },
+      {
+        "summary": "The no-loss test's new-tab case asserts the entry resolveIssueTab returns and mocks Deft so Decisions is listed.",
+        "rationale": "On main the test asserts drawer-tab-<value>, which does not exist for checks/prd/history/code/timeline; this was PRD drift found against post-PAN-5244 main and corrected in the PRD."
+      },
+      {
+        "summary": "The copied StackDrawer replaces its inline style colours with token classes.",
+        "rationale": "The style guide (restated in the PRD) bans inline colours in new code; the cockpit original keeps its own until PAN-5246 deletes it."
+      },
+      {
+        "summary": "Breakage in IssueDrawer.test.tsx caused by the Details items is fixed in regression-sweep, not in the Details items.",
+        "rationale": "IssueDrawer.test.tsx is also edited by the IssueDetail chain; routing all Details-caused fixes to one later item avoids a shared-file conflict between the two parallel chains."
+      }
+    ],
+    "items": [
+      {
+        "id": "tab-table",
+        "title": "Create issueTabs.ts: the one table of tab values with resolveIssueTab and entryClickValue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5253",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/issueTabs.ts",
+            "src/dashboard/frontend/src/components/issue-detail/issueTabs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/issueTabs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "issueTabs.test.ts passes with every test green",
+            "typecheck completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ],
+          "foundationFor": [
+            "tab-strip",
+            "tab-bodies",
+            "tab-bodies-wire",
+            "test-subset"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1, 'Create components/issue-detail/issueTabs.ts'. Create the file with no React import, exactly as the PRD's code block: types IssueTabEntryId, IssueTabView, IssueTabValue; ISSUE_DETAIL_TABS (9 entries, order session, tasks, plan, changes, activity, decisions, discussion, skills, overview; label of overview is 'Details'); ResolvedIssueTab; the private TAB_TABLE with the 20 keys of the PRD 'Tab values' table; resolveIssueTab using Object.prototype.hasOwnProperty; ISSUE_TAB_VIEWS for session, plan, changes, activity; entryClickValue. Create issueTabs.test.ts with the four tests named in WI-1 'Tests' (one it.each row per 'Tab values' row). Do not edit IssueDetail.tsx in this item."
+        },
+        "items": [
+          {
+            "id": "tab-table.ac1",
+            "title": "Given each of the 20 tab values in the PRD 'Tab values' table, when resolveIssueTab runs, then it returns that row's entry, view and canonical value (issueTabs.test.ts it.each passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-table.ac2",
+            "title": "Given an unknown value, '', null, 'constructor' or 'toString', when resolveIssueTab runs, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-table.ac3",
+            "title": "Given entryClickValue('session','terminal') and entryClickValue('changes','checks'), then it returns 'terminal' and 'checks'; given ('changes','conversation'), ('activity','overview'), ('overview','files'), then it returns 'files', 'activity', 'overview'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tab-strip",
+        "title": "Drive IssueDetail's tab strip from the shared tab table",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/issue-session-tabs.no-loss.test.tsx",
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDetail.test.tsx src/components/issue-detail/issue-session-tabs.no-loss.test.tsx src/components/drawer/IssueDrawer.test.tsx src/components/issue-detail/issueTabs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the four named test files pass",
+            "typecheck completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 steps 1-5 on components/issue-detail/IssueDetail.tsx: delete the local ISSUE_DETAIL_TABS and re-export it from './issueTabs'; IssueDetailTabId = IssueTabValue; keep SESSION_TAB_IDS for the legacy page return; IssueDetailTabs computes active with resolveIssueTab(tab)?.entry === entry.id and clicks emit entryClickValue(entry.id, tab); nav aria-label becomes 'Issue sections'; add const resolved/entry before the rail return; in the drawer branch replace SESSION_TAB_IDS.has(tab) with entry === 'session'; replace the drawer's hiddenTabIds with the useMemo over skillsUnavailable and useDeftIssueSummary(issueId).isDeft; rename HIDDEN_SKILLS to PAGE_HIDDEN_TABS = new Set(['skills','discussion','decisions']) used only by the legacy page return. Do not change the rail branch or anything else in the legacy return. Apply the authorised test edits from WI-1 'Tests': issue-session-tabs.no-loss.test.tsx edits (a) and (c); IssueDrawer.test.tsx tab-order test (eight ids, click drawer-tab-changes still yields tab 'files') and the artifacts test (drawer-tab-changes selected); IssueDetail.test.tsx page-density test also asserts no drawer-tab-discussion. Until tab-bodies-wire lands, the cockpit-only values (changes, code, prd, …) still render the placeholder body; that intermediate state is expected."
+        },
+        "items": [
+          {
+            "id": "tab-strip.ac1",
+            "title": "Given the drawer, when its tab strip renders for a non-Deft issue, then the role=tab buttons' data-testid values in DOM order are drawer-tab-session, -tasks, -plan, -changes, -activity, -discussion, -skills, -overview (IssueDrawer.test.tsx passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-strip.ac2",
+            "title": "Given tab='files' or tab='artifacts', when the drawer renders, then drawer-tab-changes has aria-selected=true and the Files or Artifacts panel renders (issue-session-tabs.no-loss.test.tsx passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-strip.ac3",
+            "title": "Given the operator clicks drawer-tab-changes from Details, then the store's drawer.tab becomes 'files' and the URL becomes ?issue=PAN-1&tab=files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-strip.ac4",
+            "title": "Given density='page' or density='rail', when IssueDetail renders, then the rail and page-density tests in IssueDetail.test.tsx pass and the page density shows no drawer-tab-skills and no drawer-tab-discussion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prd-body",
+        "title": "Extract useIssuePrdQuery and PrdBody from PrdViewer so the PRD renders without a dialog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/PrdViewer.tsx",
+            "src/dashboard/frontend/src/components/PrdViewer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/PrdViewer.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "PrdViewer.test.tsx passes with four tests",
+            "typecheck completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ],
+          "acJustification": "Two criteria cover the whole extraction: the new inline body and the unchanged dialog."
+        },
+        "narrative": {
+          "Action": "PRD WI-2, 'File: components/PrdViewer.tsx'. Export useIssuePrdQuery(issueId) holding the existing useQuery (queryKey ['issue-prd', issueId], same queryFn and retry:false). Export PrdBody({ issueId }) rendering the four existing branches (loading, error, empty, ChatMarkdown) unchanged. PrdViewer calls useIssuePrdQuery for its header path line and renders <PrdBody issueId={issueId} /> inside its existing scroll div. The dialog's markup and Escape handling do not change. Add the test 'PrdBody renders the PRD without a dialog' to components/PrdViewer.test.tsx; the three existing tests pass unedited."
+        },
+        "items": [
+          {
+            "id": "prd-body.ac1",
+            "title": "Given PrdBody rendered alone with a PRD response, then the PRD text renders and screen.queryByRole('dialog') returns null (new PrdViewer.test.tsx test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prd-body.ac2",
+            "title": "Given PrdViewer, when it opens, then the three existing PrdViewer.test.tsx tests pass unedited (dialog, empty state, Escape/close/scrim)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "activity-panel-issue-id",
+        "title": "Let DrawerActivityPanel take an issue id instead of reading the open drawer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/drawer/DrawerSecondaryPanels.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/drawer/IssueDrawer.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueDrawer.test.tsx passes",
+            "typecheck completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-7"
+          ],
+          "acJustification": "A one-prop change; a grep and the existing drawer tests cover it."
+        },
+        "narrative": {
+          "Action": "PRD WI-2, 'File: components/drawer/DrawerSecondaryPanels.tsx'. DrawerActivityPanel gains an optional prop issueId; it reads drawer.issueId from useDashboardStore only as the fallback and calls useIssueData(issueId ?? drawerIssueId) (the pattern of components/issue-detail/IssuePhaseRail.tsx:55). Replace the useDrawerData import with useIssueData if nothing else in the file uses it. Update the file's comments if they describe the panel as drawer-bound (PRD WI-6 step 5). The legacy page return's <DrawerActivityPanel /> keeps working through the fallback."
+        },
+        "items": [
+          {
+            "id": "activity-panel-issue-id.ac1",
+            "title": "Given the change, when `git grep -n \"useDrawerData()\" src/dashboard/frontend/src/components/drawer/DrawerSecondaryPanels.tsx` runs, then it returns no line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-panel-issue-id.ac2",
+            "title": "Given ?tab=activity on an open drawer, when IssueDrawer.test.tsx runs, then its activity tests pass unedited (the fallback still reads the open drawer)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "checks-panel",
+        "title": "Create IssueChecksPanel: the PR's check runs for the Changes > Checks view",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/IssueChecksPanel.tsx",
+            "src/dashboard/frontend/src/components/issue-view/IssueChecksPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-view/IssueChecksPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueChecksPanel.test.tsx passes with five tests",
+            "typecheck completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2, 'Create components/issue-view/IssueChecksPanel.tsx'. Render exactly the PRD's markup: section data-testid='issue-checks-panel' aria-label='Checks'; the heading cases (Loading checks / No pull request yet / '<passed> of <total> checks passed on #<n>' with the PR link / No check runs reported); the error paragraph with badge-border-destructive badge-bg-destructive; one CheckRow per run (list-row class, <a target=_blank rel=noreferrer> when htmlUrl ?? detailsUrl exists, data-check-state = statusColor({status, conclusion: conclusion ?? undefined}).label, lucide icons Check/X/Minus/Loader2 by label, state text with underscores replaced by spaces); the summary line. Data: useIssueCheckRunsQuery(issueId). Do not import or edit CheckRunList/GitHubCiPanel in Stage/cockpit; no unicode glyphs, no inline style colours, no CockpitPill. Create IssueChecksPanel.test.tsx with the five tests in WI-2 'Tests'."
+        },
+        "items": [
+          {
+            "id": "checks-panel.ac1",
+            "title": "Given no pull request, when IssueChecksPanel renders, then the heading reads 'No pull request yet'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "checks-panel.ac2",
+            "title": "Given a PR #1661 with runs lint (success) and test (failure), then the heading reads '1 of 2 checks passed on #1661' linking the PR URL and the rows carry data-check-state='pass' and 'fail' with text 'failure'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "checks-panel.ac3",
+            "title": "Given a run with htmlUrl, then its row renders as a link; given a response error, then the error text renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "checks-panel.ac4",
+            "title": "Given the new file, when `git grep -nE \"style=\\{|rounded-full|CockpitPill\" src/dashboard/frontend/src/components/issue-view/IssueChecksPanel.tsx` runs, then it returns no line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tab-bodies",
+        "title": "Create IssueDetailTabBodies: Tasks, Plan, Changes, Activity and Discussion bodies with view switches",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetailTabBodies.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetailTabBodies.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDetailTabBodies.test.tsx",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "IssueDetailTabBodies.test.tsx passes with seven tests",
+            "typecheck completes with exit code 0",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-10",
+            "NFR-3",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2, 'Create components/issue-detail/IssueDetailTabBodies.tsx'. Implement ViewSwitch (ViewToggle from components/shared/ViewToggle.tsx, options from ISSUE_TAB_VIEWS), IssueTasksBody, IssuePlanBody, IssueChangesBody, IssueActivityBody and IssueDiscussionBody exactly as the PRD's code block, with the listed test ids and data-section markers. Imports: HappenedFeed and ChangedFilesView from ../Stage/cockpit/ (import only, never edit), ActivityTab and DiscussionsTab from ../CommandDeck/ZoneCOverviewTabs/, Deft components from ../deft/, PrdBody from ../PrdViewer, DrawerPlanPanel and DrawerActivityPanel from ../drawer/DrawerSecondaryPanels, DrawerArtifactsPanel, TasksPanel, IssueChecksPanel. The file must not import drawer/DrawerAgentSession, IssueDetailShell or ./IssueDetail. Create IssueDetailTabBodies.test.tsx with the seven tests in WI-2 'Tests'."
+        },
+        "items": [
+          {
+            "id": "tab-bodies.ac1",
+            "title": "Given IssuePlanBody with value 'plan', then issue-plan-map renders; with value 'prd', then issue-plan-prd renders; when the operator clicks the PRD tab inside the tablist named 'Plan views', then onSelect receives 'prd'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-bodies.ac2",
+            "title": "Given IssueChangesBody with values 'files', 'checks', 'artifacts', then drawer-tab-panel-files, issue-checks-panel and issue-changes-artifacts render respectively; clicking Checks emits 'checks'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-bodies.ac3",
+            "title": "Given IssueActivityBody with value 'activity', then HappenedFeed renders above DrawerActivityPanel, which receives the issue id; with 'history', then issue-activity-history renders ActivityTab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-bodies.ac4",
+            "title": "Given each body on its view, then the markers DrawerTasksList, 'DrawerPlanPanel / XBriefViewer', DrawerArtifactsPanel and 'DrawerActivityRail / DrawerActivityPanel' render as data-section attributes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-bodies.ac5",
+            "title": "Given the new file, when `git grep -nE \"from '(\\./IssueDetail|\\./IssueDetailShell|\\.\\./drawer/DrawerAgentSession)'\" src/dashboard/frontend/src/components/issue-detail/IssueDetailTabBodies.tsx` runs, then it returns no line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tab-bodies-wire",
+        "title": "Render the new tab bodies from IssueDetail's drawer branch",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.test.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/issue-session-tabs.no-loss.test.tsx",
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDetail.test.tsx src/components/issue-detail/issue-session-tabs.no-loss.test.tsx src/components/drawer/IssueDrawer.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three named test files pass",
+            "typecheck completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2, 'File: components/issue-detail/IssueDetail.tsx, drawer branch only'. Replace the drawer branch's body expression with the PRD's After block (entry === 'session' … tasks … plan … changes … activity … discussion … decisions → DeftDecisionsTab … skills … overview … TabPlaceholder). Leave the secondaryPanel constant and the legacy page return unedited. The drawer branch's other reads of sessionTab become entry === 'session'. Tests: IssueDetail.test.tsx gains 'adds a Decisions tab before Discussion for a Deft issue', 'opens Decisions from tab=\"decisions\"' and 'an unknown tab value renders the placeholder'; issue-session-tabs.no-loss.test.tsx gets the WI-2 authorised edits (extended NEW_ISSUE_DETAIL_TABS, selected assertion via resolveIssueTab(newTab)!.entry, the ../deft/queries mock with isDeft true, and the listed leaf mocks). IssueDrawer.test.tsx's two console-marker tests pass unedited."
+        },
+        "items": [
+          {
+            "id": "tab-bodies-wire.ac1",
+            "title": "Given tab='checks', 'prd', 'history', 'discussion', 'decisions', 'changes', 'code' or 'timeline', when the drawer renders, then the destination test id in the PRD's extended NEW_ISSUE_DETAIL_TABS table renders and the entry resolveIssueTab gives is aria-selected (no-loss test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-bodies-wire.ac2",
+            "title": "Given a Deft issue, then drawer-tab-decisions renders directly before drawer-tab-discussion; given a non-Deft issue, then no drawer-tab-decisions renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-bodies-wire.ac3",
+            "title": "Given tab='no-such-tab', when the drawer renders, then drawer-tab-panel-no-such-tab renders with the text 'This drawer section will appear here as data streams in.' and no tab button is aria-selected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-bodies-wire.ac4",
+            "title": "Given IssueDrawer.test.tsx, when it runs, then 'renders every console inventory marker on a visible element' and 'the marker table covers DENSITY_SECTIONS.console exactly' pass unedited",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "banner-slot",
+        "title": "Create IssueBannerSlot with a shell-independent useNeedsYouActions hook",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/useNeedsYouActions.ts",
+            "src/dashboard/frontend/src/components/issue-view/IssueBannerSlot.tsx",
+            "src/dashboard/frontend/src/components/issue-view/IssueBannerSlot.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-view/IssueBannerSlot.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueBannerSlot.test.tsx passes with nine tests",
+            "typecheck completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-6",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create components/issue-view/useNeedsYouActions.ts as a copy of Stage/cockpit/useCockpitNeedsYouActions.ts (do not edit the original): signature useNeedsYouActions(agentIds: ReadonlySet<string>, onOpenAgentConversation: (agentId) => void); the awaiting_input branch resolves 'Open conversation' by agentIds.has(sessionId) with the PRD's description and disabledReason; the paused and stopped/stuck branches are copied unchanged. Create components/issue-view/IssueBannerSlot.tsx exactly as the PRD's code block: useIssueView(issueId), useIssueActions(issueId), the D-7 first-match rule (awaiting_input/stuck → NeedsYouSlot; any paused agent → PausedBanner; any other item → NeedsYouSlot; else nothing), root data-section='DrawerPausedBanner' data-testid='issue-banner-slot' with data-banner = needs-you | paused | none. NeedsYouSlot and PausedBanner are used unedited. Create IssueBannerSlot.test.tsx with the nine tests in WI-3 'Tests'."
+        },
+        "items": [
+          {
+            "id": "banner-slot.ac1",
+            "title": "Given no needs-you item and no paused agent, then the slot renders data-banner='none' with no needs-you-slot and no drawer-paused-banner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner-slot.ac2",
+            "title": "Given items [blocker] and one paused agent, then data-banner='paused'; given items [awaiting_input, paused] and one paused agent, then data-banner='needs-you' with the prompt text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner-slot.ac3",
+            "title": "Given an awaiting_input item for agent-pan-1-review-security that is in agents, when the operator clicks Open conversation, then the callback receives 'agent-pan-1-review-security'; given the agent is not in agents, then the action is disabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner-slot.ac4",
+            "title": "Given useNeedsYouActions with a paused item for agent-pan-1-review-security, when its action is invoked, then unpause.mutate receives { agentId: 'agent-pan-1-review-security' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner-slot.ac5",
+            "title": "Given any state, then the slot root carries data-section='DrawerPausedBanner'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "banner-slot-wire",
+        "title": "Mount the banner slot under the pipeline strip in the drawer branch",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.test.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/issue-session-tabs.no-loss.test.tsx",
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDetail.test.tsx src/components/issue-detail/issue-session-tabs.no-loss.test.tsx src/components/drawer/IssueDrawer.test.tsx src/components/issue-view/NeedsYouSlot.test.tsx src/components/issue-detail/IssueDetailSections.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the four named test files pass",
+            "typecheck completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-9",
+            "FR-10",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3, 'File: components/issue-detail/IssueDetail.tsx, drawer branch only'. Replace the drawer branch's <div data-section=\"DrawerPausedBanner\"><PausedBanner agents={agents} /></div> with <IssueBannerSlot issueId={issueId} agents={agents} onOpenAgentConversation={openAgentConversation} />. The search string matches twice; leave the legacy page return's copy. Update the IssueDetail.tsx header comment (PRD WI-6 step 5): the drawer branch is 'pipeline strip + banner slot + tab strip with views + full-width tab body', and PAN-5246 removes the legacy page return. Tests: issue-session-tabs.no-loss.test.tsx mocks ../issue-view/IssueBannerSlot as null; IssueDetail.test.tsx mocks it as mock-banner-slot and adds 'renders the banner slot between the strip and the tabs'; run IssueDrawer.test.tsx against the real slot and fix any duplicate-text collision only by scoping the query with within(...), never by changing the banner. The PausedBanner tests in IssueDetailSections.test.tsx pass unedited. If IssueDrawer.test.tsx crashes because its mockFetch answers the new activity or cost request with { success: true }, add explicit answers to mockFetch: a URL ending in /activity returns { issueId: 'PAN-1', sections: [] } and a URL ending in /costs returns { issueId: 'PAN-1', totalCost: 0, totalTokens: 0, sessions: [], byModel: {} }; that is the only other authorised edit."
+        },
+        "items": [
+          {
+            "id": "banner-slot-wire.ac1",
+            "title": "Given the drawer, when IssueDetail renders, then mock-pipeline-strip precedes mock-banner-slot, which precedes drawer-tabs, by compareDocumentPosition (new IssueDetail.test.tsx test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner-slot-wire.ac2",
+            "title": "Given the real IssueBannerSlot mounted in the drawer, when IssueDrawer.test.tsx and IssueDetailSections.test.tsx run, then both pass, and IssueDetailSections.test.tsx's PausedBanner tests pass unedited",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner-slot-wire.ac3",
+            "title": "Given density='page', when IssueDetail renders, then the legacy page return still renders its own DrawerPausedBanner wrapper and no issue-banner-slot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stack-drawer",
+        "title": "Copy StackDrawer into issue-view as a shell-independent stack disclosure",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/StackDrawer.tsx",
+            "src/dashboard/frontend/src/components/issue-view/StackDrawer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-view/StackDrawer.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "StackDrawer.test.tsx passes with four tests",
+            "typecheck completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4, 'Create components/issue-view/StackDrawer.tsx'. Copy function StackDrawer from Stage/cockpit/AgentsLane.tsx (search 'function StackDrawer'); do not edit AgentsLane.tsx. In the copy: props { issueId, branch }; delete feature, onExpandSpine, rd/prs, the Pull requests block, the '· {prs.length} PR' summary part and the compact control button; early return if (!ws?.exists) return null; keep data-section='StackDrawer', the toggle, Services, Containers (UatStackStatus), Git and the three stack actions; import styles from ../Stage/cockpit/agentsLane.module.css; replace '↗' with lucide ExternalLink at 11px; replace every inline style attribute with the token classes the PRD lists (bg-muted-foreground / bg-destructive / bg-success for the health dot, inline-flex items-center gap-[6px], gap-[12px], font-mono-ui text-[10px]). Create StackDrawer.test.tsx with the four tests in WI-4 'Tests'."
+        },
+        "items": [
+          {
+            "id": "stack-drawer.ac1",
+            "title": "Given no workspace, when StackDrawer renders, then it renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stack-drawer.ac2",
+            "title": "Given a workspace, when the operator clicks the Stack toggle, then Containers, Git and the branch name render, and the root carries data-section='StackDrawer'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stack-drawer.ac3",
+            "title": "Given an enabled syncMain action, when the operator clicks it, then its invoke callback runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stack-drawer.ac4",
+            "title": "Given the new file, when `git grep -nE \"style=\\{\\{|↗|stack-compact-control\" src/dashboard/frontend/src/components/issue-view/StackDrawer.tsx` runs, then it returns no line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "details-container-status",
+        "title": "Details: switch columns by container width and add the Status section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDrawerDetails.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueDrawerDetails.test.tsx passes",
+            "typecheck completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 steps 1 and 2 on components/issue-detail/IssueDrawerDetails.tsx. Root becomes <div data-testid='drawer-tab-panel-overview' className='@container'>; the grid moves to a child data-testid='drawer-details-grid' with @[900px]:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] (replacing min-[900px]:). Never put @container on IssueDetail's root. Add the Status section first in the left column: section data-testid='drawer-details-status', heading 'Status', <StatusNarrative issueId hasPlan workRunning /> imported unedited from ../Stage/cockpit/StatusNarrative, with hasPlan = useIssueActions(issueId).state.hasPlan and workRunning = any work agent with status running or starting. Both implementation checkpoints and fallbacks of WI-4 step 1 apply; the browser check runs in visual-evidence. Do not edit IssueDrawer.test.tsx in this item; a breakage there is fixed in regression-sweep. Extend IssueDrawerDetails.test.tsx with 'the Status section shows the narrative' and add the mocks the PRD lists for the file."
+        },
+        "items": [
+          {
+            "id": "details-container-status.ac1",
+            "title": "Given derived state changes-requested, when Details renders, then drawer-details-status contains 'The reviewer asked for changes'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "details-container-status.ac2",
+            "title": "Given the Details markup, then drawer-details-grid renders as a child of drawer-tab-panel-overview and IssueDetail's root element carries no @container class",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "details-container-status.ac3",
+            "title": "Given the change, when `git grep -n \"min-\\[900px\\]\" src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.tsx` runs, then it returns no line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "details-pipeline-sessions",
+        "title": "Details pipeline table: model and harness line, live duration, and pane-only rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDrawerDetails.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueDrawerDetails.test.tsx passes",
+            "typecheck completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 step 3, the 'Pane fallback', 'Agent cell' and 'Outcome cell' bullets, on IssueDrawerDetails.tsx. panes = useBackendPanes(issueId); per phase pick the first pane with ROLE_TO_PHASE[pane.role] === phase and presenceForPaneState(pane.state) !== 'ended', preferring an active one. Agent cell line 1: agent id, else pane.agentId, else 'backend pane' muted, else 'none'; never render pane.id. Line 2 (text-[11.5px] muted): shortModel(agent.model ?? pane.model) · (agent.harness ?? agent.runtime ?? pane.harness), omitting a missing half. Outcome: a live agent reads 'Running now · <duration>' from useSharedTick() and agent.startedAt via a local formatDuration copied from Stage/cockpit/CockpitPhaseRail.tsx:50-57 (omit when the start does not parse); a pane-only row reads 'Running now' when active, else 'Idle'; a pane-only row has no Open conversation button. Tests in IssueDrawerDetails.test.tsx: 'a phase row shows the agent's model and harness', 'a phase with a live pane and no agent shows the pane's model and Running now, and no pane id', 'an exited pane adds no row content', 'a live agent row shows its running duration' (mock useSharedTick; no real waits)."
+        },
+        "items": [
+          {
+            "id": "details-pipeline-sessions.ac1",
+            "title": "Given a work agent with model claude-opus-5 and harness claude-code, then the work row shows 'opus-5 · claude-code' on its second line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "details-pipeline-sessions.ac2",
+            "title": "Given a working review pane { id: 'pane-review-1', model: 'claude-opus-5' } and no agents, then the review row contains 'opus-5' and 'Running now', the document does not contain 'pane-review-1', and no drawer-details-open-review renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "details-pipeline-sessions.ac3",
+            "title": "Given only an exited review pane, then the review row renders the same text as a phase with no agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "details-pipeline-sessions.ac4",
+            "title": "Given a live agent started 125 seconds before the mocked tick, then its outcome reads 'Running now · 2m'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "details-cost",
+        "title": "Details pipeline table: per-agent cost column, issue total and cost breakdown disclosure",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDrawerDetails.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueDrawerDetails.test.tsx passes",
+            "typecheck completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 step 3, the 'Cost cell', 'Total row' and 'Under the table' bullets, on IssueDrawerDetails.tsx. sessions = useIssueCostsQuery(issueId).data?.sessions ?? []; costOf sums every entry whose agentId or sessionId equals the agent id; the cost cell (before the Open conversation cell, right-aligned, font-mono-ui text-[12px] tabular-nums text-signal-cost-foreground, data-testid drawer-details-cost-<phase>) shows $<cost.toFixed(2)> above 0, else empty. A <tfoot> Total row with data-testid drawer-details-cost-total and title 'Whole issue, including agents not listed above' renders only when resolvedTotalCost ?? totalCost ?? 0 is above 0. Under the table: <DeftSubagentRows issueId />, then the 'Cost breakdown' disclosure button (data-testid drawer-details-costs-toggle, aria-expanded) that mounts <CostsTab issueId /> in drawer-details-costs only while open. Tests: 'the cost column sums an agent's cost rows and shows the issue total' and 'the cost breakdown disclosure mounts CostsTab only while open'."
+        },
+        "items": [
+          {
+            "id": "details-cost.ac1",
+            "title": "Given cost sessions [{agentId:'agent-pan-1',cost:1},{agentId:'agent-pan-1',cost:0.5},{agentId:'agent-pan-1-review-security',cost:0.5}] and resolvedTotalCost 2, then drawer-details-cost-work reads '$1.50' and drawer-details-cost-total reads '$2.00'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "details-cost.ac2",
+            "title": "Given a zero total, then no drawer-details-cost-total renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "details-cost.ac3",
+            "title": "Given the disclosure closed, then CostsTab is not mounted; when the operator clicks drawer-details-costs-toggle, then aria-expanded becomes true and drawer-details-costs renders CostsTab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "details-ship-linked",
+        "title": "Details: Deft gate panels, the Ship section and linked conversations",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDrawerDetails.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueDrawerDetails.test.tsx passes",
+            "typecheck completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 steps 4, 5 and 6 on IssueDrawerDetails.tsx. After the Review section: <DeftGatesPanel issueId /> and <DeftReviewCyclePanel issueId />. Then the Ship section exactly as the PRD's block: data-testid drawer-details-ship, heading 'Ship', <ShipProgress ship={deriveShip(derived)} />, the drawer-details-diff line from usePrQuery(issueId).data?.pr (+additions −deletions · N file(s), and 'merged as <oid>' from mergeCommit string or .oid), <DeftDeliveryChip issueId />. Then, only when derived?.pr?.url exists, <div data-testid='drawer-details-linked'><LinkedConversations prUrl={derived.pr.url} /></div> (LinkedConversations imported unedited from ../Stage/cockpit/). Tests: 'the Ship section renders the merge gate for a ready issue', 'the Ship section shows the diff size and the merge commit', 'linked conversations render only when the issue has a pull request'."
+        },
+        "items": [
+          {
+            "id": "details-ship-linked.ac1",
+            "title": "Given a ready-to-merge issue, then drawer-details-ship contains [data-section='ship-progress-full'] [data-ship-status='ready']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "details-ship-linked.ac2",
+            "title": "Given a PR with additions 12, deletions 3, changedFiles 1 and mergeCommit { oid: 'abc1234' }, then drawer-details-diff reads '+12 −3 · 1 file · merged as abc1234'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "details-ship-linked.ac3",
+            "title": "Given derived state with no PR, then no drawer-details-linked renders; given a PR URL, then drawer-details-linked renders LinkedConversations with that URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "details-stack",
+        "title": "Details: put the stack disclosure in the workspace section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDrawerDetails.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueDrawerDetails.test.tsx passes",
+            "typecheck completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ],
+          "acJustification": "A one-line mount; placement and the branch fallback are the two observable facts."
+        },
+        "narrative": {
+          "Action": "PRD WI-4 step 7 on IssueDrawerDetails.tsx. Inside the DrawerWorkspaceSection wrapper, after <ResourcesFacet … variant='inline' />, render <StackDrawer issueId={issueId} branch={derived?.branch?.name ?? `feature/${issueId.toLowerCase()}`} /> from ../issue-view/StackDrawer. Test: 'the stack disclosure sits in the workspace section' (mocked StackDrawer inside [data-section='DrawerWorkspaceSection'], receiving the derived branch name)."
+        },
+        "items": [
+          {
+            "id": "details-stack.ac1",
+            "title": "Given Details renders, then the mocked StackDrawer renders inside [data-section='DrawerWorkspaceSection'] after the resources facet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "details-stack.ac2",
+            "title": "Given derived branch name feature/pan-1, then StackDrawer receives branch 'feature/pan-1'; given no derived branch for issue PAN-7, then it receives 'feature/pan-7'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "branch-copy",
+        "title": "Add a copy button to the conversation header's branch chip",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx",
+            "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/drawer/DrawerAgentSession.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "DrawerAgentSession.test.tsx passes",
+            "typecheck completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5, 'File: components/drawer/DrawerAgentSession.tsx'. In the conversation-header layout only, inside the drawer-agent-branch-chip span after the branch text, when gitInfo?.actualBranch exists and the workspace is not missing, add the PRD's button (data-testid drawer-agent-branch-copy, aria-label and title 'Copy branch name', onClick writes gitInfo.actualBranch through navigator.clipboard?.writeText, lucide Copy at 11px). The toolbar layout's chip is not changed. Tests in DrawerAgentSession.test.tsx: 'the branch chip copies the branch name' and 'the toolbar layout has no copy button'."
+        },
+        "items": [
+          {
+            "id": "branch-copy.ac1",
+            "title": "Given the conversation-header layout and git info { actualBranch: 'feature/pan-1' }, when the operator clicks drawer-agent-branch-copy, then navigator.clipboard.writeText receives 'feature/pan-1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "branch-copy.ac2",
+            "title": "Given the toolbar layout, when the branch chip renders, then no drawer-agent-branch-copy renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "branch-copy.ac3",
+            "title": "Given a missing workspace, then no drawer-agent-branch-copy renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "strip-pane-live",
+        "title": "Mark a pipeline phase live when a live backend pane of its role exists",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/IssuePipelineStrip.tsx",
+            "src/dashboard/frontend/src/components/issue-view/IssuePipelineStrip.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-view/IssuePipelineStrip.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssuePipelineStrip.test.tsx passes",
+            "typecheck completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ],
+          "acJustification": "One new input to an existing derivation; one new behaviour and one regression guard."
+        },
+        "narrative": {
+          "Action": "PRD WI-5, 'File: components/issue-view/IssuePipelineStrip.tsx'. usePipelineRail also returns panes. PipelineStripView gets livePhases?: ReadonlySet<Phase> and passes info?.live === true || livePhases?.has(phase) === true as the live argument of pipelineStepKind. IssuePipelineStrip derives livePhases with useMemo over panes: ROLE_TO_PHASE[pane.role] when presenceForPaneState(pane.state) === 'active' (presenceForPaneState from @overdeck/contracts). A phase with no agent stays disabled and its title is '<Label> is running' with no 'Open its conversation' suffix. Test in IssuePipelineStrip.test.tsx: 'a phase with a live pane and no agent is live and disabled'."
+        },
+        "items": [
+          {
+            "id": "strip-pane-live.ac1",
+            "title": "Given livePhases new Set(['review']) and no agents, when PipelineStripView renders, then the review button has data-kind='live', is disabled, and has the title 'Review is running'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strip-pane-live.ac2",
+            "title": "Given no live panes, then every existing IssuePipelineStrip.test.tsx test passes unedited",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the shared tab set, banner slot, Details additions and pane-only rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ISSUE-VIEW.md",
+            "docs/TERMINAL-BACKENDS.md",
+            "features/skill-packs.mdx",
+            "changelog.d/pan-5253.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 steps 1-4. docs/ISSUE-VIEW.md: add bullets for resolveIssueTab, IssueBannerSlot, IssueChecksPanel and StackDrawer under 'The kit currently owns these reusable pieces'; in 'Drawer layout (PAN-5244)' replace the tab list with the D-3 entries and the D-8 to D-10 views, add the PRD's 'Tab values' table, replace the paused-banner position with the D-7 banner slot rule, add D-11, D-12 and D-13, and update the section-map rows for the five sections in 'Console sections this issue moves'; in 'Cockpit layout' add the sentence after the six-destination list and change the Activity bullet's 'Feed and Status history segments' to 'the action status feed'. docs/TERMINAL-BACKENDS.md: add IssuePipelineStrip and IssueDrawerDetails (full paths) to the presenceForPaneState consumer list after 'Its consumers:'. features/skill-packs.mdx line with '**Decisions tab.**': 'A Deft issue's cockpit and its issue drawer gain a Decisions tab'. Create changelog.d/pan-5253.md with the PRD's text. Never edit the top of changelog.mdx."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given docs/ISSUE-VIEW.md, then its Drawer layout section lists the nine entries Conversation, Tasks, Plan, Changes, Activity, Decisions, Discussion, Skills, Details and contains the Tab values table with the rows prd, checks, history, code, timeline, costs and ship",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given docs/TERMINAL-BACKENDS.md, then the presenceForPaneState consumer list names src/dashboard/frontend/src/components/issue-view/IssuePipelineStrip.tsx and src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given features/skill-packs.mdx, then the Decisions tab bullet says the issue drawer gains the tab too; and changelog.d/pan-5253.md exists under '#### Improved' linking issue #5253",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "Given the doc edits, when `npm run lint:docs` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-subset",
+        "title": "List the five new frontend test files in the CI test subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c -E 'IssueDetailTabBodies.test.tsx|issueTabs.test.ts|IssueBannerSlot.test.tsx|IssueChecksPanel.test.tsx|StackDrawer.test.tsx' scripts/frontend-test-subset.txt"
+          ],
+          "expected_outputs": [
+            "grep prints 5"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5"
+          ],
+          "acJustification": "A five-line list edit; count and order are the only observable facts."
+        },
+        "narrative": {
+          "Action": "Repo rule 'CI test list' in the PRD. Add, each in sorted position, to scripts/frontend-test-subset.txt (paths relative to src/dashboard/frontend): src/components/issue-detail/IssueDetailTabBodies.test.tsx, src/components/issue-detail/issueTabs.test.ts, src/components/issue-view/IssueBannerSlot.test.tsx, src/components/issue-view/IssueChecksPanel.test.tsx, src/components/issue-view/StackDrawer.test.tsx. This item runs after the items that create those files, so every listed path exists."
+        },
+        "items": [
+          {
+            "id": "test-subset.ac1",
+            "title": "Given scripts/frontend-test-subset.txt, when `grep -c -E 'IssueDetailTabBodies.test.tsx|issueTabs.test.ts|IssueBannerSlot.test.tsx|IssueChecksPanel.test.tsx|StackDrawer.test.tsx' scripts/frontend-test-subset.txt` runs, then it prints 5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-subset.ac2",
+            "title": "Given the edited list, then each new line sits between neighbours that sort before and after it in C-locale order (the order the file already uses), and `for p in src/components/issue-detail/IssueDetailTabBodies.test.tsx src/components/issue-detail/issueTabs.test.ts src/components/issue-view/IssueBannerSlot.test.tsx src/components/issue-view/IssueChecksPanel.test.tsx src/components/issue-view/StackDrawer.test.tsx; do test -f src/dashboard/frontend/$p || exit 1; done` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "regression-sweep",
+        "title": "Run the regression sweep and the quality gates; fix only breakage this issue caused",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/conformance-gates.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/conformance-gates.test.ts src/components/drawer/IssueDrawer.test.tsx src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes with exit code 0",
+            "lint exits 0",
+            "conformance-gates, IssueDrawer and IssueMissionControl tests pass"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD 'Repo rules that apply' > Regression sweep and Quality gates. Run every test file listed by `git grep -lE \"IssueDetail\\b|DrawerAgentSession|IssueDrawerDetails|IssuePipelineStrip|DrawerActivityPanel|PrdViewer|ISSUE_DETAIL_TABS|drawer-tab-\" -- 'src/dashboard/frontend/src/**/*.test.ts*'` (paths relative to src/dashboard/frontend), including lib/__tests__/conformance-gates.test.ts, src/__tests__/store.test.ts, src/__tests__/fr7-conversation-pending-input.test.tsx, NeedsYouSlot.test.tsx and the three Stage/cockpit/IssueMissionControl*.test.tsx files. Fix only breakage this issue caused, in the non-Stage file that caused it; conformance-gates.test.ts and every Stage test pass unedited. This is the item that fixes IssueDrawer.test.tsx breakage caused by the Details items. Then run npm run typecheck and npm run lint (lint:file-size, lint:circular, lint:source-introspection, lint:docs). If no file changes, commit with `git commit --allow-empty` carrying the Item trailer."
+        },
+        "items": [
+          {
+            "id": "regression-sweep.ac1",
+            "title": "Given the branch, when `git diff --stat origin/main...HEAD -- src/dashboard/frontend/src/components/Stage src/dashboard/frontend/src/lib/__tests__/conformance-gates.test.ts` runs, then it lists no file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "regression-sweep.ac2",
+            "title": "Given the sweep list, when each listed test file runs, then every file passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "regression-sweep.ac3",
+            "title": "Given the branch, when `npm run typecheck` and `npm run lint` run, then both exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "regression-sweep.ac4",
+            "title": "Given the branch, when `git diff --stat origin/main...HEAD -- src/dashboard/server packages/contracts` runs, then it lists no file (NFR-1: no server or contract change)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "visual-evidence",
+        "title": "Capture the ten drawer screenshots and report the four mechanical checks on the PR",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T08:09:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.tsx"
+          ],
+          "files_scope_confidence": "low",
+          "verify_commands": [
+            "npm run build"
+          ],
+          "expected_outputs": [
+            "build completes; screenshots saved under .tmp/pan-5253/ and attached to the PR"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-4",
+            "NFR-6",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. With an isolated Playwright browser instance and profile of its own (never another agent's browser session), open the real drawer at a 1440x900 viewport and take the ten screenshots in the WI-7 table, saving them under .tmp/pan-5253/ (gitignored). Dark is document.documentElement.classList.add('dark'). Run the four mechanical checks in the page: no horizontal overflow on [data-testid='issue-drawer']; two Details columns (different getBoundingClientRect().left for the two children of drawer-details-grid); the pickup popover closes when the issue title is clicked and the drawer stays open; the Stage issue tab still shows the cockpit header, phase rail, six-entry tab band and crew spine toggle. Also run the two WI-4 step 1 implementation checkpoints (container columns at 980px vs a 900px window; the workspace 'Open in' picker placement and outside-click close) and apply their stated fallbacks if they fail. To serve the drawer, run the frontend from this workspace (the /pan-dev skill: Vite dev server with the Node 22 server) or use the Playwright seeding pattern of src/dashboard/frontend/tests/pan-4523-river-bands.spec.ts (seed localStorage['pan-snapshot-cache-v1'] with addInitScript and close /ws/rpc) to put a working agent, a paused agent, a waiting agent and an issue with a PR in the store; never add a production store hook. Commit: the fallback edit if one was applied; otherwise `git commit --allow-empty` whose body records the four check results and carries the Item: visual-evidence trailer. Attach the screenshots and results to the PR."
+        },
+        "items": [
+          {
+            "id": "visual-evidence.ac1",
+            "title": "Given the drawer at 1440x900, then the PR carries the ten screenshots listed in the WI-7 table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "visual-evidence.ac2",
+            "title": "Given each screenshot state, when scrollWidth and clientWidth of [data-testid='issue-drawer'] are compared, then scrollWidth <= clientWidth, and the PR reports the result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "visual-evidence.ac3",
+            "title": "Given Details in the 980px drawer, then the two children of drawer-details-grid have different left offsets; given a 900px browser window, then they share one left offset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "visual-evidence.ac4",
+            "title": "Given the strip's pickup popover open, when the operator clicks the issue title, then the popover closes and the drawer stays open; given the Command Deck issue tab, then the cockpit header, phase rail, six-entry tab band and crew spine toggle still render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "tab-table",
+        "to": "tab-strip",
+        "type": "blocks"
+      },
+      {
+        "from": "tab-table",
+        "to": "tab-bodies",
+        "type": "blocks"
+      },
+      {
+        "from": "prd-body",
+        "to": "tab-bodies",
+        "type": "blocks"
+      },
+      {
+        "from": "activity-panel-issue-id",
+        "to": "tab-bodies",
+        "type": "blocks"
+      },
+      {
+        "from": "checks-panel",
+        "to": "tab-bodies",
+        "type": "blocks"
+      },
+      {
+        "from": "tab-strip",
+        "to": "tab-bodies-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "tab-bodies",
+        "to": "tab-bodies-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "tab-bodies-wire",
+        "to": "banner-slot-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "banner-slot",
+        "to": "banner-slot-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "details-container-status",
+        "to": "details-pipeline-sessions",
+        "type": "blocks"
+      },
+      {
+        "from": "details-pipeline-sessions",
+        "to": "details-cost",
+        "type": "blocks"
+      },
+      {
+        "from": "details-cost",
+        "to": "details-ship-linked",
+        "type": "blocks"
+      },
+      {
+        "from": "details-ship-linked",
+        "to": "details-stack",
+        "type": "blocks"
+      },
+      {
+        "from": "stack-drawer",
+        "to": "details-stack",
+        "type": "blocks"
+      },
+      {
+        "from": "tab-table",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "checks-panel",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "tab-bodies",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "banner-slot",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "stack-drawer",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "banner-slot-wire",
+        "to": "regression-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "details-stack",
+        "to": "regression-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "branch-copy",
+        "to": "regression-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "strip-pane-live",
+        "to": "regression-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "test-subset",
+        "to": "regression-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "docs",
+        "to": "regression-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "banner-slot-wire",
+        "to": "visual-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "details-stack",
+        "to": "visual-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "branch-copy",
+        "to": "visual-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "strip-pane-live",
+        "to": "visual-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "visual-evidence",
+        "to": "regression-sweep",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
