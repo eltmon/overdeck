@@ -12,7 +12,7 @@ vi.mock('../../lib/wsTransport', () => ({
 import type { ReactElement } from 'react';
 import { useDashboardStore } from '../../lib/store';
 import { SkillOverridesPanel, type SkillOverridesPanelProps, type SkillState } from './SkillOverridesPanel';
-import { IssueSkillsSection, ProjectSkillsSection } from './SkillOverridesSections';
+import { IssueSkillsSection, IssueSkillsTabPanel, ProjectSkillsSection } from './SkillOverridesSections';
 
 function skill(overrides: Partial<SkillState> & { name: string }): SkillState {
   return {
@@ -216,6 +216,15 @@ describe('skill override sections', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Skills for this issue' }));
     await waitFor(() => expect(fetchImpl).toHaveBeenCalledWith('/api/skills/overrides?issue=TST-1'));
+  });
+
+  it('IssueSkillsTabPanel fetches on mount and renders the panel without a disclosure', async () => {
+    mockApi({ project: 'tst', issue: 'TST-1', skills: [GRILLING] });
+    renderSection(<IssueSkillsTabPanel issueId="TST-1" onUnavailable={vi.fn()} />);
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledWith('/api/skills/overrides?issue=TST-1'));
+    expect(screen.queryByRole('button', { name: 'Skills for this issue' })).toBeNull();
+    expect(document.querySelector('[aria-expanded]')).toBeNull();
+    expect(screen.getByTestId('drawer-tab-panel-skills')).toHaveAttribute('data-section', 'SkillOverrides');
   });
 
   it('hides the issue section when no project owns the issue', async () => {
