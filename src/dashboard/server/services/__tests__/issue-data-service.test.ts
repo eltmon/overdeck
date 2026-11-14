@@ -13,6 +13,23 @@ vi.mock('../issue-title-fallback.js', () => ({
   resolveMissingIssueTitles: vi.fn(async () => new Map()),
 }));
 
+// PAN-5224: refreshDerivedStates' last-start-wins guard (WI-13).
+const mockLoadIssueStatesForProject = vi.hoisted(() => vi.fn());
+vi.mock('../../../../lib/overdeck/derived-issue-state.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../lib/overdeck/derived-issue-state.js')>();
+  return { ...actual, loadIssueStatesForProject: mockLoadIssueStatesForProject };
+});
+const mockGetBackendPanes = vi.hoisted(() => vi.fn(async () => []));
+vi.mock('../backend-inventory.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../backend-inventory.js')>();
+  return { ...actual, getBackendPanes: mockGetBackendPanes };
+});
+const mockResolveProjectFromIssueSync = vi.hoisted(() => vi.fn(() => ({ projectKey: 'overdeck', projectPath: '/repos/overdeck' })));
+vi.mock('../../../../lib/projects.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../lib/projects.js')>();
+  return { ...actual, resolveProjectFromIssueSync: mockResolveProjectFromIssueSync };
+});
+
 describe('computeTaskCounts', () => {
   function makeDoc(items: Array<{ status: string }>): XBriefDocument {
     return {
@@ -460,5 +477,86 @@ describe('IssueDataService.backfillIssue (PAN-3659)', () => {
     expect(row.id).toBe('backfill-linear-min-663');
     expect(row.priority).toBe(2);
     expect(row.completedAt).toBeUndefined();
+  });
+});
+
+// PAN-5224 WI-13: an older refreshDerivedStates run must never clobber a
+// later-started run's result for the same issue.
+describe('IssueDataService.refreshDerivedStates last-start-wins (PAN-5224)', () => {
+  function makeService() {
+    return new IssueDataService({ getBackoffMs: () => 0 } as any);
+  }
+
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  }
+
+  function stateFor(stateLabel: string): any {
+    return { issueId: 'PAN-7', stateLabel };
+  }
+
+  beforeEach(() => {
+    mockLoadIssueStatesForProject.mockReset();
+    mockResolveProjectFromIssueSync.mockReturnValue({ projectKey: 'overdeck', projectPath: '/repos/overdeck' });
+  });
+
+  it('run B resolving in_review, then run A resolving in_progress: in_review wins (ac1)', async () => {
+    const svc = makeService();
+    const runA = deferred<Map<string, any>>();
+    const runB = deferred<Map<string, any>>();
+    mockLoadIssueStatesForProject
+      .mockReturnValueOnce(runA.promise)
+      .mockReturnValueOnce(runB.promise);
+
+    const a = (svc as any).refreshDerivedStates(['PAN-7']);
+    const b = (svc as any).refreshDerivedStates(['PAN-7']);
+
+    runB.resolve(new Map([['PAN-7', stateFor('in_review')]]));
+    await b;
+    runA.resolve(new Map([['PAN-7', stateFor('in_progress')]]));
+    await a;
+
+    expect(svc.getDerivedState('PAN-7')).toEqual(stateFor('in_review'));
+  });
+
+  it('run A resolving before run B: B\'s state wins (ac2)', async () => {
+    const svc = makeService();
+    const runA = deferred<Map<string, any>>();
+    const runB = deferred<Map<string, any>>();
+    mockLoadIssueStatesForProject
+      .mockReturnValueOnce(runA.promise)
+      .mockReturnValueOnce(runB.promise);
+
+    const a = (svc as any).refreshDerivedStates(['PAN-7']);
+    const b = (svc as any).refreshDerivedStates(['PAN-7']);
+
+    runA.resolve(new Map([['PAN-7', stateFor('in_progress')]]));
+    await a;
+    runB.resolve(new Map([['PAN-7', stateFor('in_review')]]));
+    await b;
+
+    expect(svc.getDerivedState('PAN-7')).toEqual(stateFor('in_review'));
+  });
+
+  it('run B rejecting leaves run A\'s later-landing result written (ac3)', async () => {
+    const svc = makeService();
+    const runA = deferred<Map<string, any>>();
+    const runB = deferred<Map<string, any>>();
+    mockLoadIssueStatesForProject
+      .mockReturnValueOnce(runA.promise)
+      .mockReturnValueOnce(runB.promise);
+
+    const a = (svc as any).refreshDerivedStates(['PAN-7']);
+    const b = (svc as any).refreshDerivedStates(['PAN-7']);
+
+    runB.reject(new Error('forge read failed'));
+    await b;
+    runA.resolve(new Map([['PAN-7', stateFor('in_progress')]]));
+    await a;
+
+    expect(svc.getDerivedState('PAN-7')).toEqual(stateFor('in_progress'));
   });
 });

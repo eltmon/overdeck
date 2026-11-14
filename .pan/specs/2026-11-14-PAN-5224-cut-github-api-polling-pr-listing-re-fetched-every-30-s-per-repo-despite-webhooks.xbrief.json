@@ -1,0 +1,974 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T02:57:52Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5224: Cut GitHub API polling: PR listing re-fetched every 30 s per repo despite webhooks",
+    "updated": "2026-11-14T03:12:15.511Z"
+  },
+  "plan": {
+    "id": "pan-5224",
+    "title": "Cut GitHub API polling: PR listing re-fetched every 30 s per repo despite webhooks",
+    "status": "running",
+    "uid": "bd179e5a-3438-48e2-8db8-3ca78245a7dd",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-14T02:57:52Z",
+    "updated": "2026-11-14T03:12:15.511Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5224",
+        "label": "PAN-5224",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5227",
+        "label": "PAN-5227 (follow-up: close-out App REST)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "github-quota",
+      "webhooks",
+      "pr-cache",
+      "pipeline-membership",
+      "performance"
+    ],
+    "narratives": {
+      "Problem": "Idle, the dashboard spends ~48% of the user pool's hourly GitHub GraphQL bucket and ~14% of its REST bucket (ledger 2026-11-14 02:00-02:40 UTC). pr-cache re-reads the open PR listing of every repo with open PRs every 30 s (stablyai/orca, eltmon/lexerra, eltmon/overdeck), and pipeline-membership re-gathers every project on every 5-minute convergence tick, although PR changes already arrive by webhook for eltmon/overdeck.",
+      "Proposal": "Webhooks drive freshness, polling is the fallback. A new policy module (src/lib/overdeck/pr-freshness.ts) holds the TTLs and a webhook-health provider that only the primary dashboard registers from the existing system-health 'smee-relay' row. While it is running, the PR listing's active TTL is 5 min and its idle/closed TTL 15 min (30 s / 5 min otherwise; an UNKNOWN mergeable row keeps 30 s), the membership PR snapshot's TTL is 5 min, and periodic convergence re-gathers a GitHub-tracked project's membership at most every 30 min. pull_request, pull_request_review, check_suite, check_run (created / failing completed) and status webhooks invalidate the repo's caches (even mid-read) and refresh the named issues' derived state through a 6 s per-repo coalescer. Overdeck's own review door and merge.completed refresh regardless of coverage, and a tracker poll that changes an issue's state or labels refreshes that project's membership.",
+      "NonGoals": "- Changing the App pool's close-out spend (closed-issue reaper); that is PAN-5227\n- Changing getPrFacts, its 60 s cache, or the merge gate; merge-time decisions keep their targeted reads\n- Detecting webhook coverage per repo or adding any new health signal, config key or persisted state\n- Subscribing the GitHub App to issues events or installing it on more repos (operator action)\n- Changing the pull-request-sync sweep cadence; conversation PR chips stay at 60 s\n- Caching gatherMergeEligibility (merge-train merge-next stays an uncached gather)\n- Changing the ci-repair, issue-poller, agent or pr-sync callers\n- Editing src/dashboard/server/services/issue-data-service.ts (6 lines from its file-size cap)\n- Deploying the change; the after-measurement is posted after the Flywheel reloads the dashboard"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The poll tier is chosen by the global webhook-relay health row, not per repo",
+        "rationale": "Only eltmon/overdeck delivers webhooks, but orca and lexerra make two-thirds of the 30 s tier's spend; keeping them at 30 s alone costs ~14% of user GraphQL, so the 15% target is unreachable. The issue says to reuse the existing signal, which is the relay row; repo-notes marks expire after 6 h and cannot stand in for coverage. Uncovered repos lag up to 5 min, stated in docs and the PR body."
+      },
+      {
+        "summary": "The 15% target (NFR-1) applies to the user pool's GraphQL and REST buckets; the App pool figure is reported beside it",
+        "rationale": "The issue reports 'user-pool pace'. The App pool is dominated by close-out (~1,240 calls/h, 25%), a separate subsystem now tracked in PAN-5227."
+      },
+      {
+        "summary": "Membership fallback is 30 min only for GitHub-tracked projects while webhooks are healthy; other trackers keep the 5-minute convergence",
+        "rationale": "Linear/Jira/GitLab trackers have no webhook into Overdeck, and their GitHub cost is small (lexerra only)."
+      },
+      {
+        "summary": "The tracker trigger comes from the issue poller (read-model onIssuesChanged), diffed per identifier on state and labels",
+        "rationale": "Zero issues webhooks have ever been received; createIssueDelta is index-based and would mark every row changed on an insertion; issue-data-service.ts is 6 lines from its file-size cap."
+      },
+      {
+        "summary": "Coalescer spacing is 6 s with a leading fire and one trailing fire; check_run triggers only on created or failing completed",
+        "rationale": "check_run is ~80% of receipts; 6 s bounds cost at 10 fires/min/repo while keeping worst-case freshness about 7 s, inside the 10 s requirement."
+      },
+      {
+        "summary": "The after-measurement is posted to the PR after the Flywheel deploys; the PR body carries the before table, the budget model and the recipe",
+        "rationale": "Work agents do not deploy; deploys are the Flywheel's pan reload."
+      },
+      {
+        "summary": "Keep one plan despite more than 25 files in scope",
+        "rationale": "The 15% target is one budget across pr-cache and pipeline-membership; both halves share the policy module and the coalescer, and splitting would leave the issue's acceptance target unmeasurable in either PR."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "31 files, mostly small edits plus their tests: the 15% budget (NFR-1) spans pr-cache and pipeline-membership, which share one policy module (pr-freshness.ts) and one webhook coalescer; a split would leave the issue's single measurable target unverifiable in either PR. Each item is independently reviewable and commits on its own.",
+      "canonicalFilename": "2026-11-14-PAN-5224-cut-github-api-polling-pr-listing-re-fetched-every-30-s-per-repo-despite-webhooks.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "cache-invalidate-in-flight",
+        "title": "Add opt-in in-flight invalidation to createSettledTtlPromiseCache",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T02:57:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/concurrency.ts",
+            "tests/unit/lib/concurrency.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/concurrency.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "concurrency.test.ts passes including the two new includeInFlight cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5224.md WI-1: change SettledTtlPromiseCache.invalidate(key?, options = {}) so { includeInFlight: true } deletes the entry even while its load is in flight (also for the key-less form); update the interface signature. Without the option the behavior is byte-for-byte today's. Use the before/after snippet in WI-1."
+        },
+        "items": [
+          {
+            "id": "cache-invalidate-in-flight.ac1",
+            "title": "Given a load in flight, when invalidate(key, { includeInFlight: true }) runs and get(key) is called again, then load is called a second time and the first promise still resolves to its own value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cache-invalidate-in-flight.ac2",
+            "title": "Given a load in flight, when invalidate(key) runs without the option, then the next get(key) returns the same in-flight promise and load is called once (today's behavior preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pr-freshness-policy",
+        "title": "Create the PR freshness policy module with the webhook-health provider and TTL helpers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T02:57:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5224",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/pr-freshness.ts",
+            "tests/unit/lib/overdeck/pr-freshness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/pr-freshness.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pr-freshness.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-9"
+          ],
+          "foundationFor": [
+            "pr-listing-webhook-ttl",
+            "membership-pr-snapshot-ttl",
+            "webhook-health-wiring",
+            "membership-fallback-convergence"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5224.md WI-2: new dependency-free module exporting PR_LISTING_ACTIVE_TTL_MS=30_000, PR_LISTING_ACTIVE_TTL_HEALTHY_MS=300_000, PR_LISTING_IDLE_TTL_MS=300_000, PR_LISTING_IDLE_TTL_HEALTHY_MS=900_000, MEMBERSHIP_FALLBACK_MS=300_000, MEMBERSHIP_FALLBACK_HEALTHY_MS=1_800_000, setWebhookHealthProvider(fn) returning a restore function, webhooksHealthy() (default false; a throwing provider reads as false), prListingActiveTtlMs(), prListingIdleTtlMs(), membershipFallbackMs(trackerIsGitHub). No imports from src/dashboard."
+        },
+        "items": [
+          {
+            "id": "pr-freshness-policy.ac1",
+            "title": "Given no provider is registered, prListingActiveTtlMs() returns 30000 and prListingIdleTtlMs() returns 300000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-freshness-policy.ac2",
+            "title": "Given a provider returning true, prListingActiveTtlMs() returns 300000, prListingIdleTtlMs() returns 900000 and membershipFallbackMs(true) returns 1800000 while membershipFallbackMs(false) returns 300000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-freshness-policy.ac3",
+            "title": "Given a provider that throws, webhooksHealthy() returns false, and calling the restore function returned by setWebhookHealthProvider falls back to the default false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pr-listing-webhook-ttl",
+        "title": "Make the PR listing caches use the health-dependent TTLs and in-flight invalidation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T02:57:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/pr-listing.ts",
+            "src/lib/overdeck/pr-cache-policy.ts",
+            "tests/unit/lib/overdeck/pr-listing-webhook-ttl.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/pr-listing-webhook-ttl.test.ts tests/unit/lib/overdeck/pr-listing-failure.test.ts tests/unit/lib/overdeck/derived-issue-state-pr-listing.test.ts src/lib/overdeck/__tests__/open-pr-listing.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all four test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5224.md WI-3: prListingTtlMs keeps 30 s when any OPEN row has mergeable UNKNOWN, uses prListingIdleTtlMs() for a listing with no OPEN row; the open cache's ttlFor uses prListingActiveTtlMs() for a settled listing and PR_CACHE_TTL_MS (30 s) for a failed (null) read; the closed cache uses prListingIdleTtlMs() when settled and 30 s on failure; invalidateRepoPullRequests passes { includeInFlight: true } to both caches and bumps closedGeneration. Keep PR_CACHE_TTL_MS and PR_CACHE_IDLE_TTL_MS exported. New test file mocks runGh and node:child_process like src/lib/overdeck/__tests__/open-pr-listing.test.ts and uses vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "pr-listing-webhook-ttl.ac1",
+            "title": "Given webhooks are healthy and the open listing has an OPEN row, when it is read twice 4 min 59 s apart, then runGh is called once for the open read, and a read after 5 min calls it again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-listing-webhook-ttl.ac2",
+            "title": "Given webhooks are not healthy, when the same listing is read 31 s after the first read, then runGh is called again (30 s TTL preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-listing-webhook-ttl.ac3",
+            "title": "Given webhooks are healthy and an OPEN row has mergeable UNKNOWN, when the listing is read 31 s later, then runGh is called again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-listing-webhook-ttl.ac4",
+            "title": "Given a settled healthy listing, when invalidateRepoPullRequests(path) runs, then the next read calls runGh again inside the 5-minute TTL; and when it runs while a read is in flight, a following read starts a second runGh call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "membership-pr-snapshot-ttl",
+        "title": "Give the membership open-PR snapshot the health-dependent TTL and an invalidation door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T02:57:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pipeline-membership-gather.ts",
+            "tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts",
+            "npm run typecheck",
+            "npm run lint:pipeline-membership"
+          ],
+          "expected_outputs": [
+            "pipeline-membership-gather.test.ts passes",
+            "typecheck completes without errors",
+            "lint:pipeline-membership exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5224.md WI-4: cachedOpenPullRequests gets ttlFor () => prListingActiveTtlMs(); export invalidateOpenPullRequestsSnapshot(owner, repo) that calls invalidate with the lower-cased owner/repo key and { includeInFlight: true }. Use the WI-4 after snippet."
+        },
+        "items": [
+          {
+            "id": "membership-pr-snapshot-ttl.ac1",
+            "title": "Given webhooks are healthy, when listOpenPullRequestsSnapshot('o','r') is called twice 4 minutes apart, then runGh is called once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "membership-pr-snapshot-ttl.ac2",
+            "title": "Given a settled snapshot, when invalidateOpenPullRequestsSnapshot('O','R') runs, then the next listOpenPullRequestsSnapshot('o','r') calls runGh again (case-insensitive key)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "membership-pr-snapshot-ttl.ac3",
+            "title": "Given webhooks are not healthy, when the snapshot is read 31 s after the first read, then runGh is called again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "webhook-health-wiring",
+        "title": "Register the webhook-relay health provider in the primary dashboard only",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T02:57:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/system-health-service.ts",
+            "src/dashboard/server/services/pr-webhook-freshness.ts",
+            "src/dashboard/server/main.ts",
+            "tests/unit/dashboard/server/services/pr-webhook-freshness.test.ts",
+            "src/dashboard/server/services/__tests__/system-health-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/pr-webhook-freshness.test.ts src/dashboard/server/services/__tests__/system-health-service.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "pr-webhook-freshness.test.ts passes",
+            "typecheck completes without errors",
+            "lint:file-size and lint:circular exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5224.md WI-5: add isWebhookRelayRunningInLastSample() to system-health-service.ts exactly as in WI-5: it returns true only when the sampler assessment's freshness.status is 'fresh', its observedAt is at most WEBHOOK_RELAY_SAMPLE_MAX_AGE_MS (60 s) old, and metrics.accepted.services has the smee-relay row with status running. New pr-webhook-freshness.ts exports startPrWebhookFreshness({ isPeerDashboard }) which is a no-op for a peer and otherwise calls setWebhookHealthProvider(() => isWebhookRelayRunningInLastSample()) and returns the restore function. main.ts: import, one start line beside startGitHubQuotaSampler (line ~601) and one stop call beside stopGitHubQuotaSampler() (line ~801); at most 3 added lines."
+        },
+        "items": [
+          {
+            "id": "webhook-health-wiring.ac1",
+            "title": "Given startPrWebhookFreshness({ isPeerDashboard: true }), when webhooksHealthy() is read, then it returns false even when the relay check would return true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webhook-health-wiring.ac2",
+            "title": "Given startPrWebhookFreshness({ isPeerDashboard: false }) and a mocked relay check returning true, webhooksHealthy() returns true, and after the returned stop function runs it returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webhook-health-wiring.ac3",
+            "title": "Given a sampler assessment that is measuring or stale with a running smee-relay row, isWebhookRelayRunningInLastSample() returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webhook-health-wiring.ac4",
+            "title": "Given a fresh assessment with a running smee-relay row, isWebhookRelayRunningInLastSample() returns true when observed 30 s ago and false when observed 61 s ago",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webhook-health-wiring.ac5",
+            "title": "Given the change, wc -l src/dashboard/server/main.ts prints 984 or less",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "webhook-coalescer",
+        "title": "Add the per-repo webhook coalescer that invalidates listings and refreshes derived state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T02:57:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5224",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/pr-webhook-freshness.ts",
+            "tests/unit/dashboard/server/services/pr-webhook-freshness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/pr-webhook-freshness.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "pr-webhook-freshness.test.ts passes including the coalescer cases",
+            "typecheck completes without errors",
+            "lint:circular exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "webhook-handlers-invalidate"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5224.md WI-6: notePullRequestWebhook(repoFullName, issueIds, reason) with PR_WEBHOOK_REFRESH_SPACING_MS = 6000: fire at once when the repo has not fired in the last 6 s, else one trailing fire at lastFire + 6 s carrying the union of issue ids. A fire resolves the project via resolveProjectForRepo + getProjectSync, calls invalidateRepoPullRequests for path and resolve(path), invalidateOpenPullRequestsSnapshot(owner, repo), and scheduleDerivedStateRefreshForIssues for the ids when non-empty; logs one [pr-webhook] line; never throws; timers unref'd. Export resetPrWebhookCoalescerForTests. Tests use vi.useFakeTimers() and vi.advanceTimersByTimeAsync()."
+        },
+        "items": [
+          {
+            "id": "webhook-coalescer.ac1",
+            "title": "Given no prior fire, when notePullRequestWebhook('eltmon/overdeck', ['PAN-7'], 'pull_request:synchronize') is called, then invalidateRepoPullRequests, invalidateOpenPullRequestsSnapshot and scheduleDerivedStateRefreshForIssues([{ identifier: 'PAN-7' }]) are called before any timer advances",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webhook-coalescer.ac2",
+            "title": "Given a fire just happened, when 20 events arrive within 6 s, then exactly one more fire happens at +6 s and its derived refresh carries the union of their issue ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webhook-coalescer.ac3",
+            "title": "Given one event every 500 ms from t=0 to t=59.5 s and timers advanced to t=59999 ms, then exactly 10 fires happen and consecutive fires are at least 6000 ms apart",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webhook-coalescer.ac4",
+            "title": "Given an untracked or unresolvable repo, when notePullRequestWebhook is called, then nothing is invalidated and no error is thrown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "webhook-handlers-invalidate",
+        "title": "Call the coalescer from the pull_request, review, check and status webhook handlers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T02:57:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/webhook-handlers.ts",
+            "tests/unit/lib/webhook-handlers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/webhook-handlers.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "webhook-handlers.test.ts passes",
+            "typecheck completes without errors",
+            "lint:circular exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5224.md WI-7: in each handler, after the tracked-repo and payload checks and before any early return, dynamically import ../dashboard/server/services/pr-webhook-freshness.js and call notePullRequestWebhook(repo, issueIds, '<event>:<action>') per the WI-7 table: pull_request any action, pull_request_review any action, check_suite when pull_requests non-empty or head_branch maps to an issue, check_run only on created or completed-with-failing-conclusion, status when branches non-empty. Keep every existing call (refreshIssuePullRequestStateNow, enqueueProjectResourceRefresh, relays) unchanged; update the module header. Inside the existing opened|closed|reopened|ready_for_review block of handlePullRequest, call invalidateOpenPullRequestsSnapshot(owner, repo) (dynamic import of ./pipeline-membership-gather.js) before enqueueProjectResourceRefresh."
+        },
+        "items": [
+          {
+            "id": "webhook-handlers-invalidate.ac1",
+            "title": "Given a pull_request synchronize payload for feature/pan-7 on eltmon/overdeck, when handlePullRequest runs, then notePullRequestWebhook is called with ('eltmon/overdeck', ['PAN-7'], 'pull_request:synchronize')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webhook-handlers-invalidate.ac2",
+            "title": "Given a successful check_suite with empty pull_requests and head_branch feature/pan-7, when handleCheckSuite runs, then notePullRequestWebhook is called with ['PAN-7']; and given head_branch main with no pull_requests, it is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webhook-handlers-invalidate.ac3",
+            "title": "Given a check_run completed with conclusion success, when handleCheckRun runs, then notePullRequestWebhook is not called; given action created, it is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webhook-handlers-invalidate.ac4",
+            "title": "Given a pull_request_review submitted or a status pending on feature/pan-7, the handler calls notePullRequestWebhook; given an untracked repository, no handler calls it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webhook-handlers-invalidate.ac5",
+            "title": "Given a pull_request opened payload, when handlePullRequest runs, then invalidateOpenPullRequestsSnapshot('eltmon','overdeck') is called before enqueueProjectResourceRefresh (mock.invocationCallOrder)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "own-actions-refresh",
+        "title": "Refresh listing, membership PR snapshot and membership on the review door and merge.completed",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T02:57:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/issue-pr-refresh.ts",
+            "src/dashboard/server/services/__tests__/issue-pr-refresh.test.ts",
+            "src/lib/pipeline-membership-gather.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/issue-pr-refresh.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "issue-pr-refresh.test.ts passes",
+            "typecheck completes without errors",
+            "lint:circular exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5224.md WI-8: refreshIssuePullRequestStateNow invalidates the listing, then (for a project with github_repo owner/repo) invalidateOpenPullRequestsSnapshot(owner, repo), then enqueueProjectResourceRefresh(project, 'review-door'). invalidatePullRequestListingOnApproval additionally handles entry.type === 'merge.completed': invalidate the listing, invalidate the membership PR snapshot, schedule a derived refresh for the issue, then enqueue reason 'merge.completed'. Resolve ProjectConfig as webhook-handlers.ts lines 320-324 do; use dynamic imports if a static one creates a cycle. Keep both names and the main.ts caller unchanged."
+        },
+        "items": [
+          {
+            "id": "own-actions-refresh.ac1",
+            "title": "Given a webhook-healthy listOpenPullRequestsSnapshot cache prepopulated for o/r and a project with github_repo o/r, when a merge.completed entry for its issue is handled, then the next listOpenPullRequestsSnapshot('o','r') calls runGh again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "own-actions-refresh.ac2",
+            "title": "Given a merge.completed entry, then invalidateOpenPullRequestsSnapshot is called before enqueueProjectResourceRefresh(project, 'merge.completed') and scheduleDerivedStateRefreshForIssues([{ identifier: 'PAN-7' }]) is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "own-actions-refresh.ac3",
+            "title": "Given refreshIssuePullRequestStateNow('pan-7') with a resolvable project, then the membership PR snapshot is invalidated and enqueueProjectResourceRefresh is called with reason 'review-door'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "own-actions-refresh.ac4",
+            "title": "Given a review.verdict CHANGES_REQUESTED entry, or an issue with no resolvable project, then nothing is enqueued and no error is thrown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "membership-fallback-convergence",
+        "title": "Make periodic convergence re-gather membership only when the fallback interval has elapsed",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T02:57:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/project-resource-refresh-queue.ts",
+            "src/dashboard/server/services/resource-discovery.ts",
+            "src/dashboard/server/services/pipeline-membership.ts",
+            "tests/unit/dashboard/project-resource-refresh-queue.test.ts",
+            "tests/unit/dashboard/pipeline-membership-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/project-resource-refresh-queue.test.ts tests/unit/dashboard/project-resource-refresh-queue-stagger.test.ts tests/unit/dashboard/pipeline-membership-service.test.ts",
+            "npm run typecheck",
+            "npm run lint:pipeline-membership"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors",
+            "lint:pipeline-membership exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5224.md WI-9: export membershipSnapshotAgeMs(projectPath, now) from pipeline-membership.ts; add 'review-door', 'merge.completed' and 'tracker:issues-changed' to MEMBERSHIP_REFRESH_REASONS; add membershipRefreshForProject(project, reasons, deps) exactly as in WI-9 (immediate for any membership reason other than periodic-convergence; periodic-convergence only when age is null or age >= membershipFallbackMs(trackerType === 'github')); the queue passes a per-project predicate; widen RefreshResourceAllocatedProjectsOptions.refreshMembership to boolean | ((project) => boolean) and evaluate it per project in refreshResourceAllocatedProjects."
+        },
+        "items": [
+          {
+            "id": "membership-fallback-convergence.ac1",
+            "title": "Given webhooks healthy, a GitHub-tracker project, membership age 10 min and reasons {periodic-convergence}, then membershipRefreshForProject returns false; with age 31 min or age null it returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "membership-fallback-convergence.ac2",
+            "title": "Given a Linear-tracker project with age 6 min and reasons {periodic-convergence}, or webhooks not healthy with age 6 min, then membershipRefreshForProject returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "membership-fallback-convergence.ac3",
+            "title": "Given reasons {periodic-convergence, pull_request:opened} it returns true, and given {agent.started} it returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "membership-fallback-convergence.ac4",
+            "title": "Given refreshResourceAllocatedProjects receives a predicate, when two projects refresh, then refreshMembershipSnapshotsForProjects runs only for the project whose predicate returned true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "membership-tracker-trigger",
+        "title": "Refresh a project's membership when a tracker poll changes an issue's state or labels",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T02:57:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/membership-tracker-trigger.ts",
+            "src/dashboard/server/read-model.ts",
+            "tests/unit/dashboard/server/services/membership-tracker-trigger.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/membership-tracker-trigger.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "membership-tracker-trigger.test.ts passes",
+            "typecheck completes without errors",
+            "lint:circular exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5224.md WI-10: export seedTrackerIssues(issues) and noteTrackerIssues(issues). Fingerprint by upper-cased identifier -> state|sorted label names; noteTrackerIssues collects changed, new and disappeared identifiers, enqueues enqueueProjectsResourceRefresh(uniqueProjects, 'tracker:issues-changed') once, then stores the new baseline; without a prior seed it seeds only. Never diffs by index; never throws. read-model.ts: call seedTrackerIssues(issueService.getIssues({ cycle: 'all' })) immediately before issueService.onIssuesChanged(...) is installed, and noteTrackerIssues(issueService.getIssues({ cycle: 'all' })) as the first statement in the callback (the callback's own argument is cycle-filtered). Do not edit issue-data-service.ts in this item."
+        },
+        "items": [
+          {
+            "id": "membership-tracker-trigger.ac1",
+            "title": "Given seedTrackerIssues ran with PAN-7 in the baseline, when the first noteTrackerIssues call carries a label change on PAN-7, then enqueueProjectsResourceRefresh is called once with the PAN project and reason 'tracker:issues-changed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "membership-tracker-trigger.ac2",
+            "title": "Given PAN-7 is in the baseline, when the next noteTrackerIssues call omits it (moved to backlog or canceled), then its project is enqueued",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "membership-tracker-trigger.ac3",
+            "title": "Given a seeded baseline, when only an issue's title changes or the array is reordered, then nothing is enqueued",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "membership-tracker-trigger.ac4",
+            "title": "Given two changed issues in one project, that project is enqueued once; and given noteTrackerIssues with no prior seed, nothing is enqueued",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "derived-refresh-last-start-wins",
+        "title": "Stop an older derived-state refresh from overwriting a later-started one",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T03:20:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/issue-data-service.ts",
+            "src/dashboard/server/services/__tests__/issue-data-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/issue-data-service.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size",
+            "wc -l src/dashboard/server/services/issue-data-service.ts"
+          ],
+          "expected_outputs": [
+            "issue-data-service.test.ts passes including the old-run-finishes-last case",
+            "typecheck completes without errors",
+            "lint:file-size exits 0",
+            "wc -l prints 1754 or less"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-7",
+            "NFR-2",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5224.md WI-13: add private derivedRefreshRun = 0 and derivedWrittenRun = new Map<string, number>() next to derivedRefreshIssueIds; in refreshDerivedStates take const run = ++this.derivedRefreshRun at the top, and in the per-issue loop skip an issue whose derivedWrittenRun entry is greater than run, else set it to run before writing derivedStatesCache. At most 6 added lines (file 1,748, cap 1,754). Tests stub loadIssueStatesForProject with deferred promises."
+        },
+        "items": [
+          {
+            "id": "derived-refresh-last-start-wins.ac1",
+            "title": "Given run A starts, then run B starts, when B resolves with in_review and A then resolves with in_progress, then svc.getDerivedState('PAN-7') returns the in_review state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "derived-refresh-last-start-wins.ac2",
+            "title": "Given run A resolves before run B, then svc.getDerivedState('PAN-7') returns B's state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "derived-refresh-last-start-wins.ac3",
+            "title": "Given run B rejects for its project and run A resolves afterwards, then A's state is written",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Document webhook-driven PR freshness, update the quota policy and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T02:57:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/EXTERNAL-EVENT-STREAM.md",
+            "docs/PIPELINE-GATES.md",
+            "changelog.d/pan-5224.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'Webhooks drive PR freshness (PAN-5224)' docs/EXTERNAL-EVENT-STREAM.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints the new heading"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5224.md WI-11 and WI-12: add the '## Webhooks drive PR freshness (PAN-5224)' section to docs/EXTERNAL-EVENT-STREAM.md before '## Example Consumers' with the content listed in WI-11 step 1; rewrite the PR-cache bullet in docs/PIPELINE-GATES.md 'GitHub quota policy (PAN-4264)' with the healthy/unhealthy TTLs and add the membership-fallback bullet; add changelog.d/pan-5224.md exactly as in WI-11 step 3. The PR body carries the before table, the D-1 lag statement with the App-install recommendation, and the WI-12 measurement recipe with an unchecked 'After (post-deploy)' checkbox."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "Given the change, docs/EXTERNAL-EVENT-STREAM.md contains the heading '## Webhooks drive PR freshness (PAN-5224)' and states the 5 min, 15 min and 30 s values and that repos without the GitHub App can lag up to 5 minutes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "Given the change, the PR-cache bullet in docs/PIPELINE-GATES.md names the webhook-healthy 5-minute TTL and the 30-second fallback, and a bullet states the 30-minute membership fallback for GitHub-tracked projects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac3",
+            "title": "Given the change, changelog.d/pan-5224.md exists with a '#### Improved' heading and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac4",
+            "title": "Given the PR is opened, its body contains the before table from the PRD, the uncovered-repo lag statement and the measurement recipe",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "cache-invalidate-in-flight",
+        "to": "pr-listing-webhook-ttl",
+        "type": "blocks"
+      },
+      {
+        "from": "cache-invalidate-in-flight",
+        "to": "membership-pr-snapshot-ttl",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-freshness-policy",
+        "to": "pr-listing-webhook-ttl",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-freshness-policy",
+        "to": "membership-pr-snapshot-ttl",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-freshness-policy",
+        "to": "webhook-health-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-freshness-policy",
+        "to": "membership-fallback-convergence",
+        "type": "blocks"
+      },
+      {
+        "from": "webhook-health-wiring",
+        "to": "webhook-coalescer",
+        "type": "blocks"
+      },
+      {
+        "from": "membership-pr-snapshot-ttl",
+        "to": "webhook-coalescer",
+        "type": "blocks"
+      },
+      {
+        "from": "webhook-coalescer",
+        "to": "webhook-handlers-invalidate",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
