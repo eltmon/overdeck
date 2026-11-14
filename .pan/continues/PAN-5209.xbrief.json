@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5209",
   "created": "2026-11-14T01:28:12.101Z",
-  "updated": "2026-11-14T01:52:05.979Z",
+  "updated": "2026-11-14T02:00:03.029Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,9 +80,30 @@
       "doneAt": "2026-11-14T01:51:59.563Z"
     },
     "gitlab-mr-head-tolerance": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5209",
-      "claimedAt": "2026-11-14T01:52:05.979Z"
+      "claimedAt": "2026-11-14T01:52:05.979Z",
+      "doneAt": "2026-11-14T02:00:03.029Z"
+    },
+    "gitlab-mr-head-tolerance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:00:03.029Z"
+    },
+    "gitlab-mr-head-tolerance.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:00:03.029Z"
+    },
+    "gitlab-mr-head-tolerance.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:00:03.029Z"
+    },
+    "gitlab-mr-head-tolerance.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:00:03.029Z"
+    },
+    "gitlab-mr-head-tolerance.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:00:03.029Z"
     }
   }
 }
