@@ -251,3 +251,68 @@ describe('mergeEditWorkspace and discardEditWorkspace', () => {
     expect(removeEditWorkspace).not.toHaveBeenCalled();
   });
 });
+
+describe('CodeRabbit fixes on PR #5226', () => {
+  const listOpen = JSON.stringify([{ number: 5, url: 'https://github.com/o/r/pull/5', state: 'OPEN' }])
+  const viewClean = JSON.stringify({ mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN', headRefOid: 'head1', state: 'OPEN', isDraft: false })
+  const failingList: GhRunner = async (args) => {
+    if (args[1] === 'list') throw new Error('HTTP 502')
+    return { stdout: '' }
+  }
+
+  it('discard with closePr stops with PR_LOOKUP_FAILED when the PR lookup fails, and removes nothing', async () => {
+    const removeEditWorkspace = vi.fn(async (..._args: unknown[]) => {})
+    const d = { ...deps({ github_repo: 'o/r' }, failingList), removeEditWorkspace: removeEditWorkspace as EditWorkspacePrDeps['removeEditWorkspace'] }
+    await expect(discardEditWorkspace('w1', { closePr: true }, d)).rejects.toMatchObject({ code: 'PR_LOOKUP_FAILED', status: 502 })
+    expect(removeEditWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('discard without closePr keeps the remote branch when the PR lookup fails', async () => {
+    const removeEditWorkspace = vi.fn(async (..._args: unknown[]) => {})
+    const d = { ...deps({ github_repo: 'o/r' }, failingList), removeEditWorkspace: removeEditWorkspace as EditWorkspacePrDeps['removeEditWorkspace'] }
+    expect(await discardEditWorkspace('w1', { closePr: false }, d)).toEqual({ removed: true, prClosed: false })
+    expect(removeEditWorkspace).toHaveBeenCalledWith(expect.anything(), { force: true, deleteRemoteBranch: false })
+  })
+
+  it('status reports unpushedCommits when HEAD is not the open PR head', async () => {
+    const gh: GhRunner = async (args) => ({ stdout: args[1] === 'list' ? listOpen : viewClean })
+    const ahead = await getEditWorkspaceStatus('w1', { ...deps({ github_repo: 'o/r' }, gh), headSha: async () => 'local2' })
+    expect(ahead.unpushedCommits).toBe(true)
+    const even = await getEditWorkspaceStatus('w1', { ...deps({ github_repo: 'o/r' }, gh), headSha: async () => 'head1' })
+    expect(even.unpushedCommits).toBe(false)
+  })
+
+  it('runs lifecycle operations on one workspace one at a time', async () => {
+    const events: string[] = []
+    let releaseMerge!: () => void
+    const gh: GhRunner = async (args) => ({ stdout: args[1] === 'list' ? listOpen : args[1] === 'view' ? viewClean : '' })
+    const base = deps({ github_repo: 'o/r' }, gh)
+    const merging = mergeEditWorkspace('w1', {
+      ...base,
+      isClean: async () => true,
+      headSha: async () => 'head1',
+      mergePr: async () => {
+        events.push('merge start')
+        await new Promise<void>((resolve) => (releaseMerge = resolve))
+        events.push('merge end')
+      },
+      removeEditWorkspace: (async () => {
+        events.push('merge remove')
+      }) as EditWorkspacePrDeps['removeEditWorkspace'],
+    })
+    const pushing = createDirectPr('w1', { title: 't', body: '', draft: false }, {
+      ...base,
+      commitAll: (async () => {
+        events.push('commit')
+        return { committed: true }
+      }) as EditWorkspacePrDeps['commitAll'],
+      pushHead: async () => {},
+    })
+    await vi.waitFor(() => expect(events).toContain('merge start'))
+    expect(events).not.toContain('commit')
+    releaseMerge()
+    await merging
+    await pushing
+    expect(events).toEqual(['merge start', 'merge end', 'merge remove', 'commit'])
+  })
+})

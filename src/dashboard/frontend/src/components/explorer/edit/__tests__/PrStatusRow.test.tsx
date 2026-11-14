@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import type { EditWorkspacePr } from '@overdeck/contracts'
 import { describe, expect, it, vi } from 'vitest'
-import { PrStatusRow, UNCOMMITTED_REASON } from '../PrStatusRow'
+import { PrStatusRow, UNCOMMITTED_REASON, UNSAVED_REASON } from '../PrStatusRow'
 
 function pr(over: Partial<EditWorkspacePr> = {}): EditWorkspacePr {
   return {
@@ -51,5 +51,22 @@ describe('PrStatusRow', () => {
     render(<PrStatusRow pr={pr({ state: 'MERGED', canMerge: false, reason: 'Already merged' })} hasChanges={false} merging={false} {...handlers()} />)
     expect(screen.getByText('Merged')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Merge' })).toBeNull()
+  })
+})
+
+describe('PrStatusRow with commits or edits not on the PR', () => {
+  it('offers Push changes and blocks Merge when the branch has unpushed commits', () => {
+    const h = handlers()
+    render(<PrStatusRow pr={pr()} hasChanges={false} unpushedCommits merging={false} {...h} />)
+    expect(screen.getByRole('button', { name: 'Merge' })).toBeDisabled()
+    expect(screen.getByTestId('edit-pr-merge-reason').textContent).toBe(UNCOMMITTED_REASON)
+    fireEvent.click(screen.getByRole('button', { name: 'Push changes' }))
+    expect(h.onPush).toHaveBeenCalledTimes(1)
+  })
+
+  it('blocks Merge while a code pane holds unsaved edits', () => {
+    render(<PrStatusRow pr={pr()} hasChanges={false} hasUnsavedEdits merging={false} {...handlers()} />)
+    expect(screen.getByRole('button', { name: 'Merge' })).toBeDisabled()
+    expect(screen.getByTestId('edit-pr-merge-reason').textContent).toBe(UNSAVED_REASON)
   })
 })

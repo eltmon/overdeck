@@ -31,7 +31,7 @@ import {
   type Sleep,
 } from './edit-workspace-gh.js';
 import { removeEditWorkspace } from './edit-workspace-remove.js';
-import { editSupport, resolveEditWorkspace, type EditWorkspaceDeps } from './edit-workspace.js';
+import { editSupport, resolveEditWorkspace, withEditWorkspaceLock, type EditWorkspaceDeps } from './edit-workspace.js';
 
 export interface EditWorkspacePrDeps extends EditWorkspaceDeps {
   sleep?: Sleep;
@@ -64,6 +64,15 @@ export async function getEditWorkspaceStatus(workspaceId: string, deps: EditWork
       console.warn(`[explorer-edit] PR lookup failed: ${messageOf(error)}`);
     }
   }
+  // Commits on the edit branch that the open PR does not have yet (a push that failed after its commit).
+  let unpushedCommits = false;
+  if (pr?.state === 'OPEN') {
+    try {
+      unpushedCommits = (await (deps.headSha ?? headSha)(root.absPath)) !== pr.headSha;
+    } catch (error) {
+      console.warn(`[explorer-edit] reading HEAD failed: ${messageOf(error)}`);
+    }
+  }
   return {
     workspace: {
       id: row.id,
@@ -75,15 +84,24 @@ export async function getEditWorkspaceStatus(workspaceId: string, deps: EditWork
       path: root.absPath,
     },
     pr,
+    unpushedCommits,
     prSupport: support.prSupport,
     pipelineSupport: support.pipelineSupport,
   };
 }
 
-export async function createDirectPr(
+export function createDirectPr(
   workspaceId: string,
   input: { title: string; body: string; draft: boolean },
   deps: EditWorkspacePrDeps = {},
+): Promise<Extract<EditWorkspaceCreatePrResult, { mode: 'direct' }>> {
+  return withEditWorkspaceLock(workspaceId, () => createDirectPrLocked(workspaceId, input, deps));
+}
+
+async function createDirectPrLocked(
+  workspaceId: string,
+  input: { title: string; body: string; draft: boolean },
+  deps: EditWorkspacePrDeps,
 ): Promise<Extract<EditWorkspaceCreatePrResult, { mode: 'direct' }>> {
   const { root, row, project } = await resolveEditWorkspace(workspaceId, deps);
   const support = editSupport(project.config);
@@ -114,7 +132,11 @@ export async function createDirectPr(
   }
 }
 
-export async function mergeEditWorkspace(workspaceId: string, deps: EditWorkspacePrDeps = {}): Promise<{ merged: true }> {
+export function mergeEditWorkspace(workspaceId: string, deps: EditWorkspacePrDeps = {}): Promise<{ merged: true }> {
+  return withEditWorkspaceLock(workspaceId, () => mergeEditWorkspaceLocked(workspaceId, deps));
+}
+
+async function mergeEditWorkspaceLocked(workspaceId: string, deps: EditWorkspacePrDeps): Promise<{ merged: true }> {
   const { root, row, project } = await resolveEditWorkspace(workspaceId, deps);
   const { repo } = editSupport(project.config);
   const branch = row.branchName as string;
@@ -145,10 +167,18 @@ export async function mergeEditWorkspace(workspaceId: string, deps: EditWorkspac
   return { merged: true };
 }
 
-export async function discardEditWorkspace(
+export function discardEditWorkspace(
   workspaceId: string,
   input: { closePr: boolean },
   deps: EditWorkspacePrDeps = {},
+): Promise<{ removed: true; prClosed: boolean }> {
+  return withEditWorkspaceLock(workspaceId, () => discardEditWorkspaceLocked(workspaceId, input, deps));
+}
+
+async function discardEditWorkspaceLocked(
+  workspaceId: string,
+  input: { closePr: boolean },
+  deps: EditWorkspacePrDeps,
 ): Promise<{ removed: true; prClosed: boolean }> {
   const { root, row, project } = await resolveEditWorkspace(workspaceId, deps);
   const { repo } = editSupport(project.config);
@@ -156,11 +186,18 @@ export async function discardEditWorkspace(
   const branch = row.branchName as string;
 
   let existing: BranchPr | null = null;
+  // A failed lookup must not read as "no open PR": that would delete the
+  // remote branch of a PR the operator chose to keep, or skip a requested close.
+  let lookupFailed = false;
   if (repo) {
     try {
       existing = await findBranchPr(gh, repo, branch, root.absPath);
     } catch (error) {
-      console.warn(`[explorer-edit] PR lookup failed: ${messageOf(error)}`);
+      if (input.closePr) {
+        throw new EditWorkspaceError('PR_LOOKUP_FAILED', 502, `Looking up the PR for ${branch} failed: ${messageOf(error)}`);
+      }
+      lookupFailed = true;
+      console.warn(`[explorer-edit] PR lookup failed, keeping the remote branch: ${messageOf(error)}`);
     }
   }
   const open = existing?.state === 'OPEN';
@@ -174,7 +211,7 @@ export async function discardEditWorkspace(
   const prStillOpen = open && !input.closePr;
   await (deps.removeEditWorkspace ?? removeEditWorkspace)(
     { row, primaryPath: project.config.path },
-    { force: true, deleteRemoteBranch: !prStillOpen },
+    { force: true, deleteRemoteBranch: !prStillOpen && !lookupFailed },
   );
   return { removed: true, prClosed: input.closePr && open };
 }

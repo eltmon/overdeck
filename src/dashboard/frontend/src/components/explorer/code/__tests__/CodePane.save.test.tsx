@@ -280,3 +280,27 @@ describe('CodePane saving on project and edit roots (PAN-5191)', () => {
     expect(mocks.writeFile.mock.calls[0]![0]).toMatchObject({ rootId: 'workspace:w1', text: 'two\n', allowMissing: false })
   })
 })
+
+describe('closing the last project-root pane with unsaved text (PAN-5191)', () => {
+  it('saves the moved draft on the edit root although no pane mounts there', async () => {
+    mocks.readFile.mockResolvedValue(textRead({ writable: false }))
+    // Like the real ensureEditRoot: move the draft to the edit root and mark it for a pending save.
+    mocks.ensureEditRoot.mockImplementation(async () => {
+      const from = draftKey('project:p', path)
+      const to = draftKey('workspace:w1', path)
+      useCodeDrafts.getState().rekey(from, to)
+      useEditWorkspaceStore.getState().markPendingSave(to)
+      return 'workspace:w1'
+    })
+    const id = usePanesStore.getState().addPane(WS, { paneType: 'code', label: 'f', explorerRootId: 'project:p', explorerPath: path })
+    const pane = usePanesStore.getState().panesByWorkspace[WS]!.find((p) => p.paneId === id)!
+    const view = render(<CodePane pane={pane} ctx={ctx} />)
+    await flush()
+    type('two\n')
+    view.unmount()
+    await flush()
+    expect(mocks.ensureEditRoot).toHaveBeenCalledWith('project:p')
+    expect(mocks.writeFile).toHaveBeenCalledTimes(1)
+    expect(mocks.writeFile.mock.calls[0]![0]).toMatchObject({ rootId: 'workspace:w1', path, text: 'two\n', allowMissing: false })
+  })
+})

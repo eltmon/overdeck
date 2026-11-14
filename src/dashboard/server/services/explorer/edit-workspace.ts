@@ -172,6 +172,15 @@ export function beginEdit(projectKey: string, forceNew: boolean, deps: EditWorks
   return serialized(projectKey, () => beginEditNow(projectKey, forceNew, deps));
 }
 
+/**
+ * Runs one lifecycle operation (direct PR, merge, discard, pipeline send) on
+ * an edit workspace after every earlier one has settled, so a commit made by
+ * one cannot land while another is between its checks and its cleanup.
+ */
+export function withEditWorkspaceLock<T>(workspaceId: string, fn: () => Promise<T>): Promise<T> {
+  return serialized(`workspace:${workspaceId}`, fn);
+}
+
 async function beginEditNow(projectKey: string, forceNew: boolean, deps: EditWorkspaceDeps): Promise<ExplorerBeginEditResult> {
   const listProjects = deps.listProjects ?? listProjectsAsync;
   const git = deps.runGit ?? runGit;

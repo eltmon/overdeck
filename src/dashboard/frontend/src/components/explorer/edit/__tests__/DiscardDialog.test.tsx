@@ -19,6 +19,7 @@ function status(pr: EditWorkspaceStatus['pr'] = null): EditWorkspaceStatus {
       projectKey: 'p', defaultBranch: 'main', path: '/p/workspaces/scratch-edit-1113-1405',
     },
     pr,
+    unpushedCommits: false,
     prSupport: { available: true, reason: null },
     pipelineSupport: { available: true, reason: null },
   }

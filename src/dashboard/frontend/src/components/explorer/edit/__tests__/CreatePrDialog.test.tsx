@@ -22,6 +22,7 @@ function status(over: Partial<EditWorkspaceStatus> = {}): EditWorkspaceStatus {
       path: '/p/workspaces/scratch-edit-1113-1405',
     },
     pr: null,
+    unpushedCommits: false,
     prSupport: { available: true, reason: null },
     pipelineSupport: { available: true, reason: null },
     ...over,

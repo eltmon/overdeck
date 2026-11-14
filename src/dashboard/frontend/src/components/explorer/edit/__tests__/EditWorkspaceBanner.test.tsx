@@ -25,6 +25,7 @@ vi.mock('../edit-workspace-switch', () => ({
   openNewEditWorkspace: mocks.openNewEditWorkspace,
 }))
 
+import { draftKey, useCodeDrafts } from '../../code/code-drafts'
 import { EditWorkspaceBanner } from '../EditWorkspaceBanner'
 
 const SENTENCE = 'Editing in edit workspace edit-1113-1405 (branch scratch/edit-1113-1405). The main checkout is not changed.'
@@ -40,6 +41,7 @@ function status(pr: EditWorkspaceStatus['pr'] = null): EditWorkspaceStatus {
       projectKey: 'p', defaultBranch: 'main', path: '/p/workspaces/scratch-edit-1113-1405',
     },
     pr,
+    unpushedCommits: false,
     prSupport: { available: true, reason: null },
     pipelineSupport: { available: true, reason: null },
   }
@@ -66,6 +68,7 @@ beforeEach(() => {
   mocks.toast.success.mockReset()
   mocks.toast.error.mockReset()
   mocks.openNewEditWorkspace.mockResolvedValue('workspace:w2')
+  useCodeDrafts.setState({ drafts: {} })
 })
 
 describe('EditWorkspaceBanner', () => {
@@ -120,6 +123,30 @@ describe('EditWorkspaceBanner', () => {
     const message = String(mocks.toast.success.mock.calls[0]?.[0])
     expect(message).toContain('PAN-77')
     expect(message).toContain('#88')
+  })
+})
+
+describe('EditWorkspaceBanner with unsaved edits', () => {
+  it('blocks Merge while a draft on the edit root is unsaved', async () => {
+    answerStatus(status(OPEN_PR))
+    const key = draftKey('workspace:w1', 'README.md')
+    useCodeDrafts.getState().loaded(key, 'one\n', 'sig-one')
+    useCodeDrafts.getState().edited(key, 'two\n')
+    renderBanner()
+    expect(await screen.findByRole('button', { name: 'Merge' })).toBeDisabled()
+    expect(screen.getByTestId('edit-pr-merge-reason').textContent).toBe('Save or discard your unsaved edits first.')
+    expect(mocks.mergeEditWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('refuses to open Create PR while a draft is unsaved', async () => {
+    answerStatus(status())
+    const key = draftKey('workspace:w1', 'README.md')
+    useCodeDrafts.getState().loaded(key, 'one\n', 'sig-one')
+    useCodeDrafts.getState().edited(key, 'two\n')
+    renderBanner()
+    fireEvent.click(await screen.findByRole('button', { name: 'Create PR' }))
+    expect(mocks.toast.error).toHaveBeenCalledWith('Save or discard your unsaved edits first: README.md.')
+    expect(screen.queryByTestId('create-pr-dialog')).toBeNull()
   })
 })
 

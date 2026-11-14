@@ -14,7 +14,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
-import { draftKey, isDraftDirty, useCodeDrafts } from '../code/code-drafts'
+import { draftKey, isDraftDirty, useCodeDrafts, type CodeDraft } from '../code/code-drafts'
 import { ExplorerHttpError } from '../explorer-http'
 import { explorerErrorMessage } from '../explorer-rpc'
 import { CreatePrDialog } from './CreatePrDialog'
@@ -55,9 +55,9 @@ export function EditWorkspaceNote({ rootId }: { rootId: string }) {
   )
 }
 
-function unsavedPathsUnder(rootId: string): string[] {
+function unsavedPathsIn(drafts: Record<string, CodeDraft>, rootId: string): string[] {
   const prefix = draftKey(rootId, '')
-  return Object.entries(useCodeDrafts.getState().drafts)
+  return Object.entries(drafts)
     .filter(([key, draft]) => key.startsWith(prefix) && isDraftDirty(draft))
     .map(([key]) => key.slice(prefix.length))
 }
@@ -90,6 +90,10 @@ export function EditWorkspaceBanner({
   const status = useEditWorkspaceStatus(workspaceId)
   const [dialog, setDialog] = useState<'pr' | 'discard' | null>(null)
   const [merging, setMerging] = useState(false)
+  // Unsaved code-pane edits never reach a commit, and leaving the edit workspace drops
+  // its drafts, so merge, Create PR and Push changes wait until they are saved.
+  const unsavedList = useCodeDrafts((s) => unsavedPathsIn(s.drafts, rootId).join('\n'))
+  const unsavedPaths = unsavedList === '' ? [] : unsavedList.split('\n')
   const refresh = () => void refreshEditWorkspaceStatus(queryClient, workspaceId)
 
   if (status.isPending) return null
@@ -110,8 +114,16 @@ export function EditWorkspaceBanner({
   const pr = data.pr
   const leave = () => leaveEditWorkspace(rootId, projectKey)
 
+  const openPrDialog = () => {
+    if (unsavedPaths.length > 0) {
+      toast.error(`Save or discard your unsaved edits first: ${unsavedPaths.join(', ')}.`)
+      return
+    }
+    setDialog('pr')
+  }
+
   const merge = async () => {
-    if (!pr) return
+    if (!pr || unsavedPaths.length > 0) return
     setMerging(true)
     try {
       await mergeEditWorkspace(workspaceId)
@@ -156,7 +168,7 @@ export function EditWorkspaceBanner({
         <EditSentence status={data} />
         <div className="ml-auto flex shrink-0 items-center gap-1">
           {pr?.state !== 'OPEN' && (
-            <button type="button" className={BUTTON} onClick={() => setDialog('pr')}>
+            <button type="button" className={BUTTON} onClick={openPrDialog}>
               Create PR
             </button>
           )}
@@ -172,10 +184,12 @@ export function EditWorkspaceBanner({
         <PrStatusRow
           pr={pr}
           hasChanges={hasChanges}
+          unpushedCommits={data.unpushedCommits}
+          hasUnsavedEdits={unsavedPaths.length > 0}
           merging={merging}
           onMerge={() => void merge()}
           onRefresh={refresh}
-          onPush={() => setDialog('pr')}
+          onPush={openPrDialog}
         />
       )}
       {dialog === 'pr' && (
@@ -185,7 +199,7 @@ export function EditWorkspaceBanner({
         <DiscardDialog
           status={data}
           uncommittedPaths={uncommittedPaths}
-          unsavedPaths={unsavedPathsUnder(rootId)}
+          unsavedPaths={unsavedPaths}
           onClose={() => setDialog(null)}
           onDiscarded={onDiscarded}
         />

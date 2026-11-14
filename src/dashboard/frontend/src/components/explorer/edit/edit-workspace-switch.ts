@@ -57,7 +57,13 @@ export function switchRoot(fromRootId: string, toRootId: string, opts: { name?: 
     const { rootId, path } = splitDraftKey(key)
     if (rootId !== fromRootId) continue
     const target = draftKey(toRootId, path)
-    if (isDraftDirty(useCodeDrafts.getState().drafts[target])) {
+    const targetDirty = isDraftDirty(useCodeDrafts.getState().drafts[target])
+    if (targetDirty && !isDraftDirty(draft)) {
+      // A clean source has nothing to save: keep the unsaved target.
+      useCodeDrafts.getState().drop(key)
+      continue
+    }
+    if (targetDirty) {
       toast.warning(`Unsaved edits to ${path} in edit workspace ${name} were replaced by your newer edit.`)
     }
     useCodeDrafts.getState().rekey(key, target)

@@ -25,7 +25,7 @@ import { commitAll, headSha, pushHead } from './edit-workspace-git.js';
 import { createGitHubIssue, defaultGh, findBranchPr } from './edit-workspace-gh.js';
 import { baseRefFor, type EditWorkspacePrDeps } from './edit-workspace-pr.js';
 import { removeEditWorkspace } from './edit-workspace-remove.js';
-import { editSupport, resolveEditWorkspace } from './edit-workspace.js';
+import { editSupport, resolveEditWorkspace, withEditWorkspaceLock } from './edit-workspace.js';
 
 export const PIPELINE_ISSUE_FOOTER = 'Created from the Overdeck file explorer.';
 
@@ -55,7 +55,15 @@ function lowerFirst(text: string): string {
   return text.charAt(0).toLowerCase() + text.slice(1);
 }
 
-export async function sendThroughPipeline(
+export function sendThroughPipeline(
+  workspaceId: string,
+  input: { title: string; body: string },
+  deps: EditWorkspacePipelineDeps,
+): Promise<Extract<EditWorkspaceCreatePrResult, { mode: 'pipeline' }>> {
+  return withEditWorkspaceLock(workspaceId, () => sendThroughPipelineLocked(workspaceId, input, deps));
+}
+
+async function sendThroughPipelineLocked(
   workspaceId: string,
   input: { title: string; body: string },
   deps: EditWorkspacePipelineDeps,

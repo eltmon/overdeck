@@ -86,12 +86,28 @@ export function createExplorerActions(deps: ExplorerActionsDeps): ExplorerAction
   const parsedRoot = parseRootId(rootId)
   const isProject = parsedRoot?.kind === 'project'
 
-  /** PAN-5191: the same actions on the project's edit root, after the switch. */
-  const editActions = async (): Promise<ExplorerActions> =>
-    createExplorerActions({ ...deps, rootId: await ensureEditRoot(rootId), reloadDirs: () => {}, refreshGit: () => {} })
+  /** PAN-5191: the same actions on an edit root of this project. */
+  const actionsOn = (editRootId: string): ExplorerActions =>
+    createExplorerActions({ ...deps, rootId: editRootId, reloadDirs: () => {}, refreshGit: () => {} })
+  /** The edit root the last write from these actions went to; undo and redo follow it. */
+  let lastEditRoot: string | null = null
+  /** Op ids from a project-root delete, by the edit root that holds their history. */
+  const opRoots = new Map<string, string>()
+  const editActions = async (): Promise<ExplorerActions> => {
+    lastEditRoot = await ensureEditRoot(rootId)
+    return actionsOn(lastEditRoot)
+  }
+  /** History calls go to the edit root a write used, else the project's active one. */
+  const historyActions = (editRootId?: string): ExplorerActions | null => {
+    const target = editRootId ?? lastEditRoot ?? (parsedRoot ? useEditWorkspaceStore.getState().active[parsedRoot.key] : undefined)
+    return target ? actionsOn(target) : null
+  }
 
   const runWrite = async <T>(op: (id: string) => Promise<T>): Promise<T> => {
-    if (isProject) return op(await ensureEditRoot(rootId))
+    if (isProject) {
+      lastEditRoot = await ensureEditRoot(rootId)
+      return op(lastEditRoot)
+    }
     return op(rootId)
   }
 
@@ -269,10 +285,7 @@ export function createExplorerActions(deps: ExplorerActionsDeps): ExplorerAction
     recordCreated: (paths, label) => {
       if (isProject) {
         // An upload ran runWrite first, which switched the project to its edit root.
-        const active = parsedRoot ? useEditWorkspaceStore.getState().active[parsedRoot.key] : undefined
-        return active
-          ? createExplorerActions({ ...deps, rootId: active, reloadDirs: () => {}, refreshGit: () => {} }).recordCreated(paths, label)
-          : ''
+        return historyActions()?.recordCreated(paths, label) ?? ''
       }
       if (!writable || paths.length === 0) return ''
       afterWrite(paths.map(parentPath))
@@ -291,8 +304,15 @@ export function createExplorerActions(deps: ExplorerActionsDeps): ExplorerAction
     create: async (...args) => (await editActions()).create(...args),
     rename: async (...args) => (await editActions()).rename(...args),
     duplicate: async (...args) => (await editActions()).duplicate(...args),
-    remove: async (...args) => (await editActions()).remove(...args),
+    remove: async (...args) => {
+      const opId = await (await editActions()).remove(...args)
+      if (opId && lastEditRoot) opRoots.set(opId, lastEditRoot)
+      return opId
+    },
     move: async (...args) => (await editActions()).move(...args),
+    undo: async () => historyActions()?.undo(),
+    redo: async () => historyActions()?.redo(),
+    undoEntry: async (opId) => historyActions(opRoots.get(opId))?.undoEntry(opId),
   }
 }
 

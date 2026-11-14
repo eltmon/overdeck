@@ -283,6 +283,8 @@ export interface EditWorkspacePr {
 export interface EditWorkspaceStatus {
   workspace: EditWorkspaceInfo
   pr: EditWorkspacePr | null
+  /** True when the PR is open and the edit branch's HEAD is not its head commit. */
+  unpushedCommits: boolean
   prSupport: EditWorkspaceSupport
   pipelineSupport: EditWorkspaceSupport
 }

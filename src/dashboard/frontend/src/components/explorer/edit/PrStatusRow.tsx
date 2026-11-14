@@ -8,6 +8,7 @@
 import type { EditWorkspacePr } from '@overdeck/contracts'
 
 export const UNCOMMITTED_REASON = 'Commit and push your changes first.'
+export const UNSAVED_REASON = 'Save or discard your unsaved edits first.'
 
 const BUTTON =
   'h-6 rounded border border-border px-2 text-xs text-foreground transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-40'
@@ -16,6 +17,10 @@ export interface PrStatusRowProps {
   pr: EditWorkspacePr
   /** The edit root's git status shows uncommitted changes. */
   hasChanges: boolean
+  /** The edit branch has commits the open PR does not have (a push that failed). */
+  unpushedCommits?: boolean
+  /** A code pane on the edit root holds edits not yet saved to disk. */
+  hasUnsavedEdits?: boolean
   onMerge(): void
   onRefresh(): void
   onPush(): void
@@ -28,9 +33,25 @@ export function prStateWord(pr: EditWorkspacePr): string {
   return pr.isDraft ? 'Draft' : 'Open'
 }
 
-export function PrStatusRow({ pr, hasChanges, onMerge, onRefresh, onPush, merging }: PrStatusRowProps) {
+export function PrStatusRow({
+  pr,
+  hasChanges,
+  unpushedCommits = false,
+  hasUnsavedEdits = false,
+  onMerge,
+  onRefresh,
+  onPush,
+  merging,
+}: PrStatusRowProps) {
   const open = pr.state === 'OPEN'
-  const blocked = !pr.canMerge ? (pr.reason ?? 'GitHub does not allow this merge.') : hasChanges ? UNCOMMITTED_REASON : null
+  const needsPush = hasChanges || unpushedCommits
+  const blocked = !pr.canMerge
+    ? (pr.reason ?? 'GitHub does not allow this merge.')
+    : hasUnsavedEdits
+      ? UNSAVED_REASON
+      : needsPush
+        ? UNCOMMITTED_REASON
+        : null
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="edit-pr-row">
       <a href={pr.url} target="_blank" rel="noreferrer" className="font-mono text-foreground underline-offset-2 hover:underline">
@@ -42,7 +63,7 @@ export function PrStatusRow({ pr, hasChanges, onMerge, onRefresh, onPush, mergin
           {merging ? 'Merging…' : 'Merge'}
         </button>
       )}
-      {open && hasChanges && (
+      {open && needsPush && (
         <button type="button" className={BUTTON} onClick={onPush}>
           Push changes
         </button>

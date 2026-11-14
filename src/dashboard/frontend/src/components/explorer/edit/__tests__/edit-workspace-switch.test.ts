@@ -165,3 +165,14 @@ describe('leaveEditWorkspace', () => {
     expect(useEditWorkspaceStore.getState().active.p).toBeUndefined()
   })
 })
+
+describe('switchRoot with a clean source', () => {
+  it('keeps a dirty target draft when the source draft is clean', () => {
+    dirtyDraft(EDIT, 'README.md', 'unsaved in edit root\n')
+    useCodeDrafts.getState().loaded(draftKey(PROJECT, 'README.md'), 'base\n', 'sig-base')
+    switchRoot(PROJECT, EDIT)
+    expect(useCodeDrafts.getState().drafts[draftKey(EDIT, 'README.md')]?.text).toBe('unsaved in edit root\n')
+    expect(useCodeDrafts.getState().drafts[draftKey(PROJECT, 'README.md')]).toBeUndefined()
+    expect(mocks.warning).not.toHaveBeenCalled()
+  })
+})

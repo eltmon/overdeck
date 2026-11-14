@@ -61,6 +61,13 @@ export const codeSaveQueue = createSaveQueue({
 
 const isDirty = (key: string) => isDraftDirty(useCodeDrafts.getState().drafts[key])
 
+/** Save a draft a root switch marked for a pending save, once. */
+function savePending(key: string): void {
+  if (!useEditWorkspaceStore.getState().consumePendingSave(key) || !isDirty(key)) return
+  const draft = useCodeDrafts.getState().drafts[key]
+  if (draft) codeSaveQueue.enqueue(key, { text: draft.text, allowMissing: false })
+}
+
 function dropIfUnused(key: string): void {
   if (!mountedPanes.has(key) && !isDirty(key)) useCodeDrafts.getState().drop(key)
 }
@@ -99,7 +106,14 @@ export function useCodePaneSave(opts: {
       const draft = useCodeDrafts.getState().drafts[key]
       if (!draft) return
       if (parseRootId(rootId)?.kind === 'project') {
-        void ensureEditRoot(rootId).catch(() => {}) // the toast is ensureEditRoot's; the draft stays dirty
+        // The switch moves the draft to the edit root and marks it for a pending save.
+        // Save it here: the pane that asked may be closing (an unmount flush), and then
+        // no pane on the edit root would ever mount to save it. Whoever consumes the
+        // mark first saves, so a pane that remounts on the edit root never saves twice.
+        void ensureEditRoot(rootId).then(
+          (editRootId) => savePending(draftKey(editRootId, path)),
+          () => {}, // the toast is ensureEditRoot's; the draft stays dirty
+        )
         return
       }
       codeSaveQueue.enqueue(key, { text: draft.text, allowMissing: reason === 'explicit' })
@@ -121,10 +135,7 @@ export function useCodePaneSave(opts: {
   // effect above, so a DISK_CONFLICT answer reaches this pane's listener.
   const pending = useEditWorkspaceStore((s) => s.pending[key] === true)
   useEffect(() => {
-    if (!writable || !pending) return
-    if (!useEditWorkspaceStore.getState().consumePendingSave(key) || !isDirty(key)) return
-    const draft = useCodeDrafts.getState().drafts[key]
-    if (draft) codeSaveQueue.enqueue(key, { text: draft.text, allowMissing: false })
+    if (writable && pending) savePending(key)
   }, [key, writable, pending])
 
   useEffect(() => {

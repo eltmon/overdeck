@@ -2068,7 +2068,7 @@ per project. The routes live in `routes/explorer-edit-workspaces.ts`, all
 | `GET /api/explorer/edit-workspaces/:workspaceId` | — | 200 `EditWorkspaceStatus` | 404 `ROOT_NOT_FOUND`, 409 `NOT_AN_EDIT_WORKSPACE` |
 | `POST /api/explorer/edit-workspaces/:workspaceId/pr` | `EditWorkspaceCreatePrInput` | 201 `EditWorkspaceCreatePrResult` | 400 `INVALID_INPUT`, 409 `NOTHING_TO_COMMIT`, 409 `PR_UNSUPPORTED`, 409 `PIPELINE_UNSUPPORTED`, 409 `PR_EXISTS`, 422 `COMMIT_REFUSED`, 502 `PUSH_FAILED`, 502 `PR_CREATE_FAILED`, 502 `ISSUE_CREATE_FAILED` |
 | `POST /api/explorer/edit-workspaces/:workspaceId/merge` | `{}` | 200 `{ merged: true }` | 404 `NO_PR`, 409 `NOT_MERGEABLE`, 409 `UNPUSHED_CHANGES`, 502 `MERGE_FAILED`, 500 `REMOVE_FAILED` |
-| `POST /api/explorer/edit-workspaces/:workspaceId/discard` | `{ closePr: boolean }` | 200 `{ removed: true, prClosed }` | 409 `REMOVE_FAILED`, 502 `PR_CLOSE_FAILED` |
+| `POST /api/explorer/edit-workspaces/:workspaceId/discard` | `{ closePr: boolean }` | 200 `{ removed: true, prClosed }` | 409 `REMOVE_FAILED`, 502 `PR_CLOSE_FAILED`, 502 `PR_LOOKUP_FAILED` |
 
 **Commits run the repository's hooks.** The commit is made as the operator's
 global git identity, never with `--no-verify`; a refused commit or push returns
@@ -2083,6 +2083,13 @@ the edit workspace, then start PR adoption (`adoptPrAndStartReview`) in the
 background, which builds the pipeline workspace and starts review. The
 webhook for the new PR may adopt first; adoption coalesces concurrent calls,
 and the explorer skips its call when the feature workspace already exists.
+
+**One operation at a time.** Direct PR, merge, discard and send through
+pipeline on one edit workspace are serialized (`withEditWorkspaceLock`), so a
+commit from one can never land between another's checks and its cleanup. A
+discard whose PR lookup fails refuses with `PR_LOOKUP_FAILED` when asked to
+close the PR, and otherwise keeps the remote branch, so a lookup error never
+deletes the branch of an open PR.
 
 **Merge refuses unpushed work.** It re-reads the PR, refuses unless the merge
 verdict allows it, and answers `UNPUSHED_CHANGES` when the worktree is dirty

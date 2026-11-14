@@ -352,3 +352,25 @@ describe('recordCreated and undo errors', () => {
     expect(toastMock.error).not.toHaveBeenCalled()
   })
 })
+
+describe('history on a project root (PAN-5191)', () => {
+  it("routes the delete toast's undo to the edit root that holds the delete", async () => {
+    rpc.trashPath.mockResolvedValue('t9')
+    const actions = createExplorerActions(makeDeps({ rootId: 'project:p' }))
+    const opId = await actions.remove(['a.ts'])
+    expect(opId).not.toBe('')
+    expect(rpc.trashPath).toHaveBeenCalledWith('workspace:w1', 'a.ts')
+    await actions.undoEntry(opId)
+    expect(rpc.restoreEntry).toHaveBeenCalledWith('workspace:w1', 't9')
+  })
+
+  it('undo and redo on a project root act on the edit root of the last write', async () => {
+    rpc.trashPath.mockResolvedValue('t1')
+    const actions = createExplorerActions(makeDeps({ rootId: 'project:p' }))
+    await actions.create('', 'n.txt', 'file')
+    await actions.undo()
+    expect(rpc.trashPath).toHaveBeenCalledWith('workspace:w1', 'n.txt')
+    await actions.redo()
+    expect(rpc.restoreEntry).toHaveBeenCalledWith('workspace:w1', 't1')
+  })
+})
