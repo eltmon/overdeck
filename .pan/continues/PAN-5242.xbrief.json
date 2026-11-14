@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5242",
   "created": "2026-11-14T05:32:10.178Z",
-  "updated": "2026-11-14T06:24:23.094Z",
+  "updated": "2026-11-14T06:24:32.673Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,11 @@
     "candidate-tallies.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T06:24:23.094Z"
+    },
+    "relay-fail-fast": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5242",
+      "claimedAt": "2026-11-14T06:24:32.673Z"
     }
   }
 }
