@@ -18,7 +18,7 @@ How Overdeck's TypeScript source is built into distributable artifacts.
 
 ## Running the CLI from a checkout
 
-A source checkout has no npm-managed bin link for `pan`/`overdeck`, unlike an `npm install -g` install. `src/lib/pan-cli-shim.ts` (PAN-2630) renders an exec shim for both names into `~/.overdeck/cli-bin`, run as the generating process's own `node` by absolute path (never a `#!/usr/bin/env node` shebang, so it can't pick up a missing or stale `node` from PATH). Every non-remote launcher, `pan install`, and `pan sync` (re)write it — the launcher at spawn time, so agents always run the same CLI build as the process that spawned them.
+A source checkout has no npm-managed bin link for `pan`/`overdeck`, unlike an `npm install -g` install. `src/lib/pan-cli-shim.ts` (PAN-2630) renders an exec shim for both names into `~/.overdeck/cli-bin`, run as the generating process's own `node` by absolute path (never a `#!/usr/bin/env node` shebang, so it can't pick up a missing or stale `node` from PATH). Every non-remote launcher, `pan install`, `pan sync`, and `pan reload` activation (re)write it — the launcher at spawn time, so agents always run the same CLI build as the process that spawned them. Reload rewrites it to the activated generation because the shim is first on PATH (ahead of the npm-global link PAN-3538 repoints) and so shadows it — before PAN-5225 a reload left the shell `pan` on the previous generation until the next agent launch or `pan sync`.
 
 ## Build Gates
 

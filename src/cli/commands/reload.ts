@@ -21,6 +21,7 @@ import {
   writeActiveDashboardBundle,
 } from '../../lib/deploy/active-dashboard-bundle.js';
 import { repointGlobalCliToDeployment } from '../../lib/deploy/global-cli-link.js';
+import { writePanCliShims } from '../../lib/pan-cli-shim.js';
 import { acquireReloadLock, reloadSupersedeDetail } from '../../lib/deploy/reload-supersede.js';
 import { readRunningBuildCommit, readRunningDashboardBootGates } from '../../lib/deploy/running-boot-gates.js';
 import { formatBootGateState, type BootGateState } from '../../lib/boot-gates.js';
@@ -45,13 +46,24 @@ import {
 } from './restart.js';
 
 /**
+ * Repoint the global `pan` link and the cli-bin shim at the just-activated
+ * generation and narrate the outcome. Returns an error string when either
+ * repoint failed — the caller decides whether that fails the reload.
+ */
+async function reportCliRepoint(deployRoot: string): Promise<string | null> {
+  const linkError = await reportGlobalCliRepoint(deployRoot);
+  const shimError = await reportCliShimRepoint(deployRoot);
+  return linkError ?? shimError;
+}
+
+/**
  * Repoint the global `pan` link at the just-activated generation and narrate
  * the outcome. Returns an error string when the repoint (or its verification)
  * failed — the caller decides whether that fails the reload. `absent` and
  * `foreign` are healthy no-ops: no global link, or an operator-managed
  * install we must not clobber.
  */
-async function reportCliRepoint(deployRoot: string): Promise<string | null> {
+async function reportGlobalCliRepoint(deployRoot: string): Promise<string | null> {
   const result = await repointGlobalCliToDeployment(deployRoot);
   switch (result.status) {
     case 'repointed':
@@ -69,6 +81,23 @@ async function reportCliRepoint(deployRoot: string): Promise<string | null> {
       return message;
     }
   }
+}
+
+/**
+ * PAN-5225: `~/.overdeck/cli-bin` comes first on PATH, so it must follow the
+ * activated generation too — `pan reload` only ever repointed the second-on-PATH
+ * npm-global link, which let the shell `pan` keep running the previous build.
+ */
+async function reportCliShimRepoint(deployRoot: string): Promise<string | null> {
+  const result = await writePanCliShims({ root: deployRoot });
+  if (result.status === 'written') {
+    console.log(chalk.dim(`  pan CLI shim → ${deployRoot}`));
+    return null;
+  }
+  const reason = result.status === 'missing-bundle' ? `CLI bundle missing at ${result.bundle}` : result.message;
+  const message = `pan CLI shim repoint failed — the shell pan still runs the previous generation (PAN-5225): ${reason}`;
+  console.error(chalk.red(`✗ ${message}`));
+  return message;
 }
 
 export interface ReloadOptions {

@@ -37,6 +37,7 @@ const mocks = vi.hoisted(() => ({
   acquireReloadLock: vi.fn(),
   reloadSupersedeDetail: vi.fn(),
   readRestartHold: vi.fn(),
+  writePanCliShims: vi.fn(),
 }));
 
 vi.mock('../../../lib/composer-commands/reload.js', () => ({ reportComposerReloadProgress: mocks.reportComposerReloadProgress }));
@@ -52,6 +53,12 @@ vi.mock('../../../lib/dev-supervisor.js', () => ({
 
 vi.mock('../../../lib/deploy/global-cli-link.js', () => ({
   repointGlobalCliToDeployment: mocks.repointGlobalCliToDeployment,
+}));
+
+// PAN-5225: without this mock, every test that activates a deployment would
+// write the real ~/.overdeck/cli-bin/pan.
+vi.mock('../../../lib/pan-cli-shim.js', () => ({
+  writePanCliShims: mocks.writePanCliShims,
 }));
 
 // PAN-3899: reload reads the running dashboard's boot gates over HTTP first.
@@ -264,6 +271,7 @@ describe('reloadCommand', () => {
     mocks.waitForRestartApproval.mockResolvedValue({ proceed: true, reason: 'ungated', detail: 'no gate in tests' });
     mocks.readRunningDashboardBootGates.mockResolvedValue({ gates: null, reason: 'no dashboard in tests' });
     mocks.repointGlobalCliToDeployment.mockResolvedValue({ status: 'absent' });
+    mocks.writePanCliShims.mockResolvedValue({ status: 'written', dir: '/tmp/cli-bin' });
     mocks.fsAccess.mockImplementation(async (path: string) => {
       if (path === '/usr/bin/bun') return;
       throw Object.assign(new Error(`ENOENT: ${path}`), { code: 'ENOENT' });
@@ -617,6 +625,22 @@ describe('reloadCommand', () => {
     expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
     expect(mocks.writeRestartStatus).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
     expect(process.exitCode).toBeUndefined();
+    // PAN-5225: the cli-bin shim comes first on PATH, so it must follow the
+    // activated generation alongside the npm-global link.
+    expect(mocks.repointGlobalCliToDeployment).toHaveBeenCalledWith(DEFAULT_BUILD_WORKTREE);
+    expect(mocks.writePanCliShims).toHaveBeenCalledWith({ root: DEFAULT_BUILD_WORKTREE });
+  });
+
+  it('fails the reload when the shim cannot be written', async () => {
+    mocks.writePanCliShims.mockResolvedValue({ status: 'error', message: 'EACCES' });
+    mockSpawnExits();
+
+    await reloadCommand({});
+
+    expect(mocks.writeRestartStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ success: false, error: expect.stringContaining('pan CLI shim repoint failed') }),
+    );
+    expect(process.exitCode).toBe(1);
   });
 
   it('reuses the inactive generation and restores the active generation across repeated restart failures', async () => {
@@ -721,6 +745,7 @@ describe('reloadCommand', () => {
     expect(mocks.writeActiveDashboardBundle).toHaveBeenLastCalledWith(previousBundle);
     expect(mocks.fsRename).toHaveBeenCalledWith(`/repo/dist.rollback.${process.pid}`, '/repo/dist');
     expect(mocks.repointGlobalCliToDeployment).not.toHaveBeenCalled();
+    expect(mocks.writePanCliShims).not.toHaveBeenCalled();
     expect(mocks.fsRm).toHaveBeenLastCalledWith(DEFAULT_BUILD_WORKTREE, { recursive: true, force: true });
     expect(process.exitCode).toBe(1);
   });

@@ -235,4 +235,72 @@ describe('dod-forge-merge: assessRepoLanding', () => {
     expect(result.state).toBe('unverifiable');
     expect(result.reason.startsWith('fe: git read failed:')).toBe(true);
   });
+
+  async function createAddsNoChangesFixture(): Promise<string> {
+    tmpRoot = join(tmpdir(), `overdeck-dod-forge-merge-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(tmpRoot, { recursive: true });
+    const originPath = join(tmpRoot, 'origin.git');
+    const repoPath = join(tmpRoot, 'repo');
+
+    mkdirSync(originPath, { recursive: true });
+    await run('git init --bare --initial-branch=main', originPath);
+    await run(`git clone ${originPath} ${repoPath}`, tmpRoot);
+    await run(`git ${GIT_IDENTITY} checkout -B main`, repoPath);
+    await commit(repoPath, 'c1.txt', 'c1');
+    await run('git push origin main', repoPath);
+
+    await run(`git ${GIT_IDENTITY} checkout -b feature/pan-900`, repoPath);
+    await commit(repoPath, 'x.txt', 'add x');
+    await run(`git ${GIT_IDENTITY} rm x.txt`, repoPath);
+    await run(`git ${GIT_IDENTITY} commit -m "remove x"`, repoPath);
+    await run('git push origin feature/pan-900', repoPath);
+
+    await run(`git ${GIT_IDENTITY} checkout main`, repoPath);
+    return repoPath;
+  }
+
+  it('(f) returns no-branch-work when the branch is off main but adds no changes', async () => {
+    const repoPath = await createAddsNoChangesFixture();
+    stubFindMergedArtifact(vi.fn().mockResolvedValue(null));
+
+    const result = await assessRepoLanding(makeRepo({ repoKey: 'myn-skills', repoPath }));
+
+    expect(result).toEqual({
+      repoKey: 'myn-skills',
+      state: 'no-branch-work',
+      reason: 'myn-skills: feature/pan-900 adds no changes over origin/main',
+    });
+  });
+
+  it('(g) stays no-branch-work after main advances', async () => {
+    const repoPath = await createAddsNoChangesFixture();
+    stubFindMergedArtifact(vi.fn().mockResolvedValue(null));
+    await commit(repoPath, 'c2.txt', 'c2');
+    await run('git push origin main', repoPath);
+
+    const result = await assessRepoLanding(makeRepo({ repoKey: 'myn-skills', repoPath }));
+
+    expect(result).toEqual({
+      repoKey: 'myn-skills',
+      state: 'no-branch-work',
+      reason: 'myn-skills: feature/pan-900 adds no changes over origin/main',
+    });
+  });
+
+  it('(h) still returns unlanded when the off-main branch adds changes', async () => {
+    const repoPath = await createAddsNoChangesFixture();
+    stubFindMergedArtifact(vi.fn().mockResolvedValue(null));
+    await run(`git ${GIT_IDENTITY} checkout feature/pan-900`, repoPath);
+    await commit(repoPath, 'c2.txt', 'c2');
+    await run('git push origin feature/pan-900', repoPath);
+    await run(`git ${GIT_IDENTITY} checkout main`, repoPath);
+
+    const result = await assessRepoLanding(makeRepo({ repoKey: 'myn-skills', repoPath }));
+
+    expect(result).toEqual({
+      repoKey: 'myn-skills',
+      state: 'unlanded',
+      reason: 'myn-skills: feature/pan-900 is not on origin/main and has no merged review artifact',
+    });
+  });
 });
