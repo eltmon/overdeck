@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5275",
   "created": "2026-11-14T17:57:35.883Z",
-  "updated": "2026-11-14T19:05:00.493Z",
+  "updated": "2026-11-14T19:05:08.119Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "row-click-target.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T19:05:00.493Z"
+    },
+    "docs-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5275",
+      "claimedAt": "2026-11-14T19:05:08.118Z"
     }
   }
 }
