@@ -13,7 +13,7 @@ export function openConversationTab(
   label: string,
   target?: {
     messageId: string;
-    messageIndex: number;
+    messageIndex?: number;
     nonce: number;
     subagentId?: string;
   },

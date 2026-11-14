@@ -159,7 +159,7 @@ interface CommandDeckProps {
   pendingConversationTarget?: {
     conversationName: string;
     messageId: string;
-    messageIndex: number;
+    messageIndex?: number;
     nonce: number;
     label: string;
     subagentId?: string;
@@ -548,7 +548,7 @@ export function CommandDeck({
 
   const openConversationTabIn = useCallback((projectKey: string, name: string, label: string, target?: {
     messageId: string;
-    messageIndex: number;
+    messageIndex?: number;
     nonce: number;
     subagentId?: string;
   }, viewMode?: ViewMode) => openConversationTab(projectKey, name, label, target, viewMode), []);

@@ -38,7 +38,7 @@ import { BackendConnectionBoundary } from './BackendConnectionBoundary';
 export interface PendingConversationTarget {
   conversationName: string;
   messageId: string;
-  messageIndex: number;
+  messageIndex?: number;
   nonce: number;
   label: string;
   /** Bare subagent id when the target lives in a subagent transcript (PAN-3982). */
