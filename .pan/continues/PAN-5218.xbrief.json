@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5218",
   "created": "2026-11-14T02:30:48.079Z",
-  "updated": "2026-11-14T02:42:36.831Z",
+  "updated": "2026-11-14T02:43:45.255Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,26 @@
     "followup-filer.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T02:42:36.830Z"
+    },
+    "postmerge-wiring": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:43:45.255Z"
+    },
+    "postmerge-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:43:45.255Z"
+    },
+    "postmerge-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:43:45.255Z"
+    },
+    "postmerge-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:43:45.255Z"
+    },
+    "postmerge-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:43:45.255Z"
     }
   }
 }
