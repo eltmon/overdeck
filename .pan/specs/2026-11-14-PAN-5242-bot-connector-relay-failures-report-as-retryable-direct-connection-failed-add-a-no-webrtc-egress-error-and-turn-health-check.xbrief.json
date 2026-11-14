@@ -4,17 +4,17 @@
     "created": "2026-11-14T04:41:40Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5242: Bot connector: relay failures report as retryable 'direct connection failed'; add a no-webrtc-egress error and TURN health check",
-    "updated": "2026-11-14T05:01:44.676Z"
+    "updated": "2026-11-14T05:30:52.011Z"
   },
   "plan": {
     "id": "pan-5242",
     "title": "Bot connector: relay failures report as retryable 'direct connection failed'; add a no-webrtc-egress error and TURN health check",
-    "status": "proposed",
+    "status": "running",
     "uid": "7b3041bd-30e0-4ac2-a9ad-703547af9ae1",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T04:41:40Z",
-    "updated": "2026-11-14T05:01:44.676Z",
+    "updated": "2026-11-14T05:30:52.011Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5242",
@@ -930,5 +930,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
