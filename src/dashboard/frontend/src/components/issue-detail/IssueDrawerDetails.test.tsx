@@ -265,6 +265,22 @@ describe('IssueDrawerDetails', () => {
     expect(screen.getByTestId('drawer-details-diff')).toHaveTextContent('+12 −3 · 1 file · merged as abc1234');
   });
 
+  it('the Ship section offers Create PR when there is no pull request', () => {
+    renderDetails();
+    const link = within(screen.getByTestId('drawer-details-ship')).getByTestId('drawer-details-create-pr');
+    expect(link).toHaveAttribute('href', 'https://github.com/eltmon/overdeck/compare/main...feature%2Fpan-1?expand=1');
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+
+  it('the Ship section shows no Create PR link once a pull request exists', () => {
+    usePrQueryMock.mockReturnValue({
+      data: { issueId: 'PAN-1', pr: { additions: 1, deletions: 0, changedFiles: 1 } },
+    });
+    renderDetails();
+    expect(screen.getByTestId('drawer-details-diff')).toBeInTheDocument();
+    expect(screen.queryByTestId('drawer-details-create-pr')).toBeNull();
+  });
+
   it('renders no linked conversations without a pull request', () => {
     renderDetails();
     expect(screen.queryByTestId('drawer-details-linked')).not.toBeInTheDocument();

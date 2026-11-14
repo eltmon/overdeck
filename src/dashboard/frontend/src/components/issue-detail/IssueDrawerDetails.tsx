@@ -14,6 +14,7 @@ import { presenceForPaneState, type BackendPane } from '@overdeck/contracts';
 
 import type { Agent } from '../../types';
 import { cn } from '../../lib/utils';
+import { githubCompareUrl, trackerIssueUrl } from '../../lib/issueLinks';
 import { PHASES, phaseLabel, type Phase, type PhaseStepState } from '../../lib/simple/phases';
 import { isEndedAgent } from '../../lib/agentConversation';
 import { useAgentSessionOutcome } from '../../lib/useSessionOutcome';
@@ -182,7 +183,7 @@ export function IssueDrawerDetails({
   footer,
 }: IssueDrawerDetailsProps) {
   const { rail, derived } = usePipelineRail(issueId);
-  const { activityRail } = useIssueData(issueId);
+  const { activityRail, issue } = useIssueData(issueId);
   const { data: workspace } = useDrawerWorkspace(issueId);
   const panes = useBackendPanes(issueId);
   const now = useSharedTick();
@@ -205,6 +206,7 @@ export function IssueDrawerDetails({
   const totalCost = costsData?.resolvedTotalCost ?? costsData?.totalCost ?? 0;
   const pr = usePrQuery(issueId).data?.pr ?? null;
   const mergeOid = typeof pr?.mergeCommit === 'string' ? pr.mergeCommit : pr?.mergeCommit?.oid;
+  const createPrHref = githubCompareUrl(trackerIssueUrl(issueId, issue?.url), derived?.branch?.name ?? `feature/${issueId.toLowerCase()}`);
 
   return (
     <div data-testid="drawer-tab-panel-overview" className="@container">
@@ -311,6 +313,8 @@ export function IssueDrawerDetails({
               <span className="text-success-foreground">+{pr.additions}</span> <span className="text-destructive-foreground">−{pr.deletions}</span> · {pr.changedFiles} file{pr.changedFiles === 1 ? '' : 's'}
               {mergeOid ? <> · merged as <span className="font-mono-ui text-foreground">{mergeOid}</span></> : null}
             </p>
+          ) : createPrHref ? (
+            <a data-testid="drawer-details-create-pr" href={createPrHref} target="_blank" rel="noreferrer" className="mt-[6px] inline-block text-[12px] text-primary-ink hover:underline">Create PR</a>
           ) : null}
           <DeftDeliveryChip issueId={issueId} />
         </section>
