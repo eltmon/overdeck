@@ -1,0 +1,659 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T04:01:03Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5236: Dashboard tabs keep running old frontend code after a deploy, silently: show a reload banner",
+    "updated": "2026-11-14T04:01:05.715Z"
+  },
+  "plan": {
+    "id": "pan-5236",
+    "title": "Dashboard tabs keep running old frontend code after a deploy, silently: show a reload banner",
+    "status": "proposed",
+    "uid": "bbc21c0b-1fc5-4cb3-9044-25cba34696b7",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-14T04:01:03Z",
+    "updated": "2026-11-14T04:01:05.715Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5236",
+        "label": "PAN-5236",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "deploy",
+      "mobile"
+    ],
+    "narratives": {
+      "Problem": "After a deploy an open dashboard tab keeps running the frontend it loaded earlier and nothing says so. Verified fixes (PAN-5184) look like regressions. StaleBuildChip only compares the server build with origin/main; nothing compares the tab's bundle with the server.",
+      "Proposal": "vite build compiles the checkout commit into the bundle (__OVERDECK_FRONTEND_BUILD_COMMIT__, null under vite serve). A new lib/buildDrift.ts fetches /api/health buildCommit once per /ws/rpc stream rising edge (connect and every reconnect, no polling) and a new NewBuildBanner shows 'A newer Overdeck is running. Reload to update.' with a Reload button when both commits are known and differ, noting that unsent drafts are kept (existing pagehide flush). Mounted in the app shell, the web /m shell and the conversation popout. Full detail: .pan/drafts/PAN-5236.md.",
+      "NonGoals": "- No change to /api/health, the server build, the contracts, the dashboard snapshot, or EventRouter.tsx\n- No automatic reload of any kind; recovery.tsx chunk-failure reload is unchanged\n- No banner in the native phone app (apps/mobile), the terminal popout, the diff popout or the Flywheel popout\n- No dismiss button or snooze beyond the same-server-commit suppression after a tried reload\n- No commit-ancestry check (a rollback reads the same text)\n- No detection of a dirty rebuild of the same commit\n- No change to StaleBuildChip or useDeployStaleness\n- No new polling interval"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Server commit comes from one GET /api/health per stream rising edge, not a snapshot field or new RPC",
+        "rationale": "/api/health already returns buildCommit; the cached snapshot is synced before bootstrap and would compare against the old server; no server/contract change and no polling."
+      },
+      {
+        "summary": "Banner shows only when both commits are non-empty and differ; the Vite define is null under vite serve",
+        "rationale": "pan dev hot-rebuilds only the server, so dev tabs would always drift and Reload could not fix them; null means unknown, and unknown must not nag."
+      },
+      {
+        "summary": "No automatic reload anywhere in this change",
+        "rationale": "Issue requirement 4 forbids auto-reload with drafts or dialogs open; never auto-reloading satisfies it with no dialog/draft detection logic."
+      },
+      {
+        "summary": "Reload relies on the existing pagehide draft flush and states 'Unsent drafts are kept.' when a draft exists",
+        "rationale": "ComposerPromptEditor already flushes on pagehide (tested); the issue allows 'say so or flush'."
+      },
+      {
+        "summary": "After a Reload that did not clear the mismatch for the same server commit, the banner stays hidden (sessionStorage key)",
+        "rationale": "A server-only rebuild cannot be fixed by reloading; repeating the banner would nag with no remedy."
+      },
+      {
+        "summary": "Surfaces: app shell, web /m shell, conversation popout; not the native phone app or the terminal/diff/Flywheel popouts",
+        "rationale": "The conversation popout has a composer (the motivating bug); the native app bundle cannot be reloaded to update; the other popouts have no composer."
+      },
+      {
+        "summary": "No dismiss button; amber warning tone matching DegradedModeBanner",
+        "rationale": "The issue asks for a banner with a Reload button only; style guide maps amber to 'a human must act'."
+      }
+    ],
+    "items": [
+      {
+        "id": "build-commit-define",
+        "title": "Compile the bundle commit into the frontend build (vite define)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:01:03Z",
+        "metadata": {
+          "issueLabel": "pan-5236",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/vite.config.ts",
+            "src/dashboard/frontend/src/vite-build-commit.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/vite-build-commit.test.ts src/vite-proxy-config.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vite-build-commit.test.ts passes 4 tests and vite-proxy-config.test.ts still passes 5",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/dashboard/frontend/vite.config.ts add and export async resolveFrontendBuildCommit(command: 'build'|'serve', readHead = git rev-parse HEAD at repo root via promisified execFile): returns null for 'serve', trimmed HEAD for 'build', null when readHead rejects or returns blank. Make the default export `defineConfig(async ({ command, mode }) => ({ ... define: { __OVERDECK_FRONTEND_BUILD_COMMIT__: JSON.stringify(await resolveFrontendBuildCommit(command)) }, ... }))`; nothing else in the config changes. Add src/dashboard/frontend/src/vite-build-commit.test.ts (import from '../vite.config' like src/vite-proxy-config.test.ts) with the four cases in PRD WI-1, and insert `src/vite-build-commit.test.ts` into scripts/frontend-test-subset.txt in sorted position. Resolve the repo root with fileURLToPath(new URL('../../..', import.meta.url)), not import.meta.dirname; keep resolveProxy a plain named export."
+        },
+        "items": [
+          {
+            "id": "build-commit-define.ac1",
+            "title": "Given command 'serve', resolveFrontendBuildCommit returns null and never calls readHead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "build-commit-define.ac2",
+            "title": "Given command 'build' and readHead resolving 'abc123\\n', resolveFrontendBuildCommit returns 'abc123'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "build-commit-define.ac3",
+            "title": "Given command 'build' and readHead rejecting or resolving whitespace, resolveFrontendBuildCommit returns null and the build config still resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "build-commit-define.ac4",
+            "title": "scripts/frontend-test-subset.txt contains the line src/vite-build-commit.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "build-drift-lib",
+        "title": "Add lib/buildDrift.ts: bundle commit, drift rule, /api/health fetch on stream rising edge",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:01:03Z",
+        "metadata": {
+          "issueLabel": "pan-5236",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "new-build-banner",
+            "mount-app-shell",
+            "mount-mobile-shell",
+            "mount-conversation-popout"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/buildDrift.ts",
+            "src/dashboard/frontend/src/lib/__tests__/buildDrift.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/lib/__tests__/buildDrift.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "buildDrift.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors (no new circular import)"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/dashboard/frontend/src/lib/buildDrift.ts with exactly the exports named in PRD WI-2: bundleBuildCommit (module-level `declare const __OVERDECK_FRONTEND_BUILD_COMMIT__` read through a typeof guard, never vite-env.d.ts), isBuildDrift (true only for two different non-empty strings), BUILD_DRIFT_FETCH_TIMEOUT_MS=3000, fetchServerBuildCommit (GET /api/health, cache 'no-store', AbortController+setTimeout timeout like probeServerHealth in lib/connectionState.ts; returns {ok:true, commit} or {ok:false}), the useBuildDrift zustand store {serverCommit, setServerCommit}, RELOADED_FOR_KEY='overdeck.build-drift.reloaded-for' with markReloadedFor/reloadAlreadyTriedFor (sessionStorage in try/catch), and startBuildDriftWatch(fetchImpl) that checks once if streamLive is already true and then on every streamLive false->true transition via useConnectionState.subscribe, dedupes in-flight checks, keeps the previous commit on {ok:false}, and returns an unsubscribe that also voids late results. connectionState.ts must not import buildDrift.ts. Add src/dashboard/frontend/src/lib/__tests__/buildDrift.test.ts covering every case in PRD WI-2 with vi.useFakeTimers for the timeout, and insert `src/lib/__tests__/buildDrift.test.ts` into scripts/frontend-test-subset.txt in sorted position. The in-flight and disposed flags are local to each startBuildDriftWatch call, never module-level."
+        },
+        "items": [
+          {
+            "id": "build-drift-lib.ac1",
+            "title": "isBuildDrift returns true for ('a','b') and false for ('a','a'), (null,'b'), ('a',null) and ('','b')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "build-drift-lib.ac2",
+            "title": "Given a fake fetch, startBuildDriftWatch calls GET /api/health with cache 'no-store' exactly once per streamLive false->true transition and never on a true->true update",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "build-drift-lib.ac3",
+            "title": "Given a fetch that rejects or never settles, fetchServerBuildCommit returns {ok:false} (the hung case after 3000 ms of fake time) and the stored serverCommit keeps its previous value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "build-drift-lib.ac4",
+            "title": "Given the unsubscribe returned by startBuildDriftWatch has run, when streamLive rises from false to true again, then the fake fetch is never called and serverCommit is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "build-drift-lib.ac5",
+            "title": "reloadAlreadyTriedFor returns true after markReloadedFor with the same commit and returns false when sessionStorage.getItem throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "new-build-banner",
+        "title": "Add the NewBuildBanner component and hasSavedDraft helper",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:01:03Z",
+        "metadata": {
+          "issueLabel": "pan-5236",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/NewBuildBanner.tsx",
+            "src/dashboard/frontend/src/components/__tests__/NewBuildBanner.test.tsx",
+            "src/dashboard/frontend/src/lib/composerDraft.ts",
+            "src/dashboard/frontend/src/lib/__tests__/composerDraft.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/__tests__/NewBuildBanner.test.tsx src/lib/__tests__/composerDraft.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "NewBuildBanner.test.tsx and composerDraft.test.ts pass",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add hasSavedDraft() to src/dashboard/frontend/src/lib/composerDraft.ts (true when any non-empty conv-draft:* localStorage key exists; try/catch -> false) and extend src/lib/__tests__/composerDraft.test.ts. Create src/dashboard/frontend/src/components/NewBuildBanner.tsx with props {bundleCommit?, reload?, fetchImpl?, safeAreaTop?} exactly as in PRD WI-3: starts startBuildDriftWatch in an effect, renders null unless isBuildDrift(bundle, serverCommit) && !reloadAlreadyTriedFor(serverCommit), otherwise a role=status row with data-component=\"new-build-banner\", the text 'A newer Overdeck is running. Reload to update.', the extra sentence ' Unsent drafts are kept.' when hasSavedDraft(), and a Reload button whose handler calls markReloadedFor(serverCommit) then reload() (default window.location.reload()). Use the amber classes from PRD D-11; no timer, no automatic reload, no dismiss button. Add src/dashboard/frontend/src/components/__tests__/NewBuildBanner.test.tsx with every case in PRD WI-3 and insert `src/components/__tests__/NewBuildBanner.test.tsx` into scripts/frontend-test-subset.txt in sorted position. Narrow bundle and serverCommit to string with explicit null checks before slicing; safeAreaTop adds pt-[calc(env(safe-area-inset-top)+0.375rem)]."
+        },
+        "items": [
+          {
+            "id": "new-build-banner.ac1",
+            "title": "Given bundle 'aaa111' and /api/health buildCommit 'bbb222', the banner renders [data-component=\"new-build-banner\"] with 'A newer Overdeck is running. Reload to update.' and a Reload button; given equal commits, a null bundle, or a body without buildCommit, it renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-build-banner.ac2",
+            "title": "Given localStorage conv-draft:c1='half-typed', the banner text includes 'Unsent drafts are kept.'; with no saved draft the sentence is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-build-banner.ac3",
+            "title": "Clicking Reload calls the injected reload exactly once, leaves localStorage conv-draft:c1 equal to 'half-typed', and persists sessionStorage overdeck.build-drift.reloaded-for='bbb222'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-build-banner.ac4",
+            "title": "After a remount with reloaded-for='bbb222' and the same mismatch the banner renders nothing; with server 'ccc333' it renders again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-build-banner.ac5",
+            "title": "With fake timers advanced 10 minutes while the banner shows, reload is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mount-app-shell",
+        "title": "Render NewBuildBanner in the app shell after DegradedModeBanner",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:01:03Z",
+        "metadata": {
+          "issueLabel": "pan-5236",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/App/AppChrome.tsx"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "traces": [
+            "FR-8"
+          ],
+          "acJustification": "One-line mount; observable behavior is proven by the WI-7 browser journeys."
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/dashboard/frontend/src/App/AppChrome.tsx import NewBuildBanner from '../components/NewBuildBanner' and render <NewBuildBanner /> immediately after the <DegradedModeBanner ... /> element, with the comment {/* PAN-5236: this tab runs older frontend code than the server — offer Reload. */}. No other change."
+        },
+        "items": [
+          {
+            "id": "mount-app-shell.ac1",
+            "title": "AppChrome renders <NewBuildBanner /> as the element directly after <DegradedModeBanner> and no other AppChrome markup changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-app-shell.ac2",
+            "title": "AppChrome imports NewBuildBanner from '../components/NewBuildBanner' and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mount-mobile-shell",
+        "title": "Render NewBuildBanner in the web /m shell, never in the native phone app",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:01:03Z",
+        "metadata": {
+          "issueLabel": "pan-5236",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileApp.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileApp.test.tsx"
+          ],
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/mobile/__tests__/MobileApp.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MobileApp.test.tsx passes including the new cases",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In src/dashboard/frontend/src/components/mobile/MobileApp.tsx import NewBuildBanner from '../NewBuildBanner' and insert `{!native && <NewBuildBanner safeAreaTop />}` (with the PAN-5236 comment from the PRD) as the first child of the signed-in fragment, before `{!fullScreen && (<MobileScreenHeader`, so it shows in list screens and full-screen conversation/issue views. Extend src/dashboard/frontend/src/components/mobile/__tests__/MobileApp.test.tsx: vi.mock('../../NewBuildBanner') to a stub rendering data-component=\"new-build-banner\" plus data-safe-area-top echoing its safeAreaTop prop; assert it renders on the web shell (list and full-screen conversation route) and not when globalThis.__OVERDECK_NATIVE__ = true (reuse the file's existing native setup/cleanup pattern)."
+        },
+        "items": [
+          {
+            "id": "mount-mobile-shell.ac1",
+            "title": "In the web /m shell MobileApp renders [data-component=\"new-build-banner\"] on the list screen and on a full-screen conversation route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-mobile-shell.ac2",
+            "title": "With globalThis.__OVERDECK_NATIVE__ = true MobileApp renders no [data-component=\"new-build-banner\"]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-mobile-shell.ac3",
+            "title": "The stubbed banner in MobileApp renders data-safe-area-top=\"true\", proving MobileApp passes safeAreaTop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mount-conversation-popout",
+        "title": "Render NewBuildBanner in the standalone conversation popout",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:01:03Z",
+        "metadata": {
+          "issueLabel": "pan-5236",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/App/StandaloneRoutes.tsx"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "traces": [
+            "FR-8"
+          ],
+          "acJustification": "Layout-only mount; behavior is proven by browser-spec journey 4."
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In src/dashboard/frontend/src/App/StandaloneRoutes.tsx, StandaloneConversationPopoutRoute only: change the wrapper to `flex h-screen flex-col overflow-hidden bg-background`, render <NewBuildBanner /> right after <EventRouter />, and wrap the existing invalid/loading/error/ConversationPanel ternary in `<div className=\"min-h-0 flex-1\">...</div>`. Import NewBuildBanner from '../components/NewBuildBanner'. Terminal, diff and Flywheel popout routes stay unchanged."
+        },
+        "items": [
+          {
+            "id": "mount-conversation-popout.ac1",
+            "title": "StandaloneConversationPopoutRoute renders NewBuildBanner between EventRouter and a min-h-0 flex-1 wrapper that contains the existing content, and the other three standalone routes are byte-identical",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-conversation-popout.ac2",
+            "title": "The wrapper div of StandaloneConversationPopoutRoute carries the classes flex h-screen flex-col overflow-hidden bg-background and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "browser-spec",
+        "title": "Add the Playwright spec for the new-build banner on an isolated dashboard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:01:03Z",
+        "metadata": {
+          "issueLabel": "pan-5236",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "medium",
+          "difficulty": "medium",
+          "kind": "test",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-5236-new-build-banner.spec.ts"
+          ],
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-5236-new-build-banner.spec.ts"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "6 Playwright journeys pass on an isolated dashboard"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Create src/dashboard/frontend/tests/pan-5236-new-build-banner.spec.ts modeled on tests/pan-4279-degraded-mode.spec.ts: startIsolatedDashboard() per test, stop() after, fresh browser context, never port 3011. Implement the six journeys in PRD WI-7 (match; drift via page.route rewriting /api/health buildCommit to forty zeros; reload keeps a seeded conv-draft and the banner stays hidden for the same server commit; conversation popout; web /m; open across a server restart: no banner, add the rewrite, dashboard.stop({keepHome:true}) then startIsolatedDashboard({port, home}), banner appears without a page reload). Screenshots to test-results/pan-5236/. Requires npm run build first."
+        },
+        "items": [
+          {
+            "id": "browser-spec.ac1",
+            "title": "Given the real /api/health, the main dashboard shows no [data-component=\"new-build-banner\"] after 5 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-spec.ac2",
+            "title": "Given /api/health with buildCommit rewritten to forty zeros, the main dashboard, /m and /popout/conversation/1 each render the banner text 'A newer Overdeck is running. Reload to update.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-spec.ac3",
+            "title": "Given a seeded localStorage conv-draft:pan-5236-probe='keep me', the banner shows 'Unsent drafts are kept.'; after clicking Reload the key still equals 'keep me' and the banner is absent for the same server commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-spec.ac4",
+            "title": "Given a page loaded with matching commits and no banner, when the /api/health rewrite is installed and the isolated server restarts on the same port and home, the banner appears without a page reload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-changelog",
+        "title": "Document the new-build banner and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:01:03Z",
+        "metadata": {
+          "issueLabel": "pan-5236",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "configuration/phone.mdx",
+            "changelog.d/pan-5236.md"
+          ],
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. (1) docs/DASHBOARD-ARCHITECTURE.md: add `## New-build banner (PAN-5236)` directly after the `## Degraded mode (PAN-4279)` section, covering every point listed in PRD WI-8 step 1 (bundle commit from vite build and null under vite serve; server commit from /api/health once per stream rising edge, never polled; drift rule; text and Reload; drafts kept via pagehide flush; sessionStorage key overdeck.build-drift.reloaded-for and the server-only-rebuild reason; no auto-reload; surfaces app shell, web /m, conversation popout; no banner in the native phone app; difference from StaleBuildChip). (2) configuration/phone.mdx: one bullet under `## What the phone can and cannot do` as in PRD WI-8 step 2. (3) changelog.d/pan-5236.md with the exact #### Improved bullet from the PRD. Run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "docs-and-changelog.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a '## New-build banner (PAN-5236)' heading placed after the Degraded mode section and names overdeck.build-drift.reloaded-for, /api/health buildCommit and StaleBuildChip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac2",
+            "title": "configuration/phone.mdx contains the phrase 'A newer Overdeck is running' and states the Overdeck app shows no banner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac3",
+            "title": "changelog.d/pan-5236.md contains exactly one '#### Improved' heading with one bullet linking issue #5236, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "build-drift-lib",
+        "to": "new-build-banner",
+        "type": "blocks"
+      },
+      {
+        "from": "build-commit-define",
+        "to": "browser-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "new-build-banner",
+        "to": "mount-app-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "new-build-banner",
+        "to": "mount-mobile-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "new-build-banner",
+        "to": "mount-conversation-popout",
+        "type": "blocks"
+      },
+      {
+        "from": "mount-app-shell",
+        "to": "browser-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "mount-mobile-shell",
+        "to": "browser-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "mount-conversation-popout",
+        "to": "browser-spec",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-14-PAN-5236-dashboard-tabs-keep-running-old-frontend-code-after-a-deploy-silently-show-a-reload-banner.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
