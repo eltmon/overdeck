@@ -4,17 +4,17 @@
     "created": "2026-11-14T02:57:52Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5224: Cut GitHub API polling: PR listing re-fetched every 30 s per repo despite webhooks",
-    "updated": "2026-11-14T03:10:56.015Z"
+    "updated": "2026-11-14T03:12:15.511Z"
   },
   "plan": {
     "id": "pan-5224",
     "title": "Cut GitHub API polling: PR listing re-fetched every 30 s per repo despite webhooks",
-    "status": "proposed",
+    "status": "running",
     "uid": "bd179e5a-3438-48e2-8db8-3ca78245a7dd",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T02:57:52Z",
-    "updated": "2026-11-14T03:10:56.015Z",
+    "updated": "2026-11-14T03:12:15.511Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5224",
@@ -970,5 +970,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
