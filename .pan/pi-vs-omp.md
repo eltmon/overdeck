@@ -1,6 +1,8 @@
 # PAN-5212 checkpoint: pi 0.85.0 vs oh-my-pi (omp) 17.4.1
 
-Verified on 2026-11-13 against the installed binaries (`pi` 0.85.0 from
+Verified on 2026-11-13 against `pi` 0.85.0 and 1.5.2 (npm `latest`, in a
+scratch prefix: same flags, extension events, control channel, `--session`
+resume and session format), and the installed binaries (`pi` 0.85.0 from
 `@earendil-works/pi-coding-agent`, `omp/17.4.1`), pi's bundled docs
 (`<pkg>/docs/{extensions,rpc,session-format,models}.md`), and a live
 `pi --mode rpc` run with a probe extension (session dir, FIFO stdin,
@@ -117,7 +119,7 @@ Overdeck tier models vs pi 0.85.0's bundled catalog (pi-ai
 | google | `google` | `gemini-4-argon` |
 | minimax | `minimax` | `MiniMax-M3.1-Flash` (lowercase m2.7 ids resolve by case) |
 | zai | `zai` | `glm-5.3-flashx`, `glm-5.1`, `glm-4.7-flash` |
-| mimo | `xiaomi` | `mimo-v2.6-pro`, `mimo-v2.6-flash`, `mimo-v2.6-pro-ultraspeed` |
+| mimo | `xiaomi-token-plan-sgp` (Overdeck MiMo keys are token-plan SGP keys; pi's `xiaomi` is the `api.xiaomimimo.com` billing endpoint) | `mimo-v2.6-pro`, `mimo-v2.6-flash`, `mimo-v2.6-pro-ultraspeed` |
 | xai | `xai` | `grok-build-0.1`, `grok-4.7` |
 | groq | `groq` | none |
 | cerebras | `cerebras` | none |
@@ -130,6 +132,36 @@ omp 17.4.1 resolves `grok-build-0.1` and `glm-5.1` natively but also misses
 `mimo-v2.6-pro` and `MiniMax-M3.1-Flash` (it falls through to zenmux), so
 pi's provisioning list is longer than omp's (dashscope + google).
 
+**The catalog changes between pi versions.** pi 1.5.2 (npm `latest` on
+2026-11-13) ships `gemini-4-argon`, `MiniMax-M3.1-Flash`, the MiMo v2.6 ids
+and `grok-4.7`, and a `models.json` entry with a built-in id *replaces* the
+built-in definition. So provisioning reads the installed pi's catalog
+(`pi-ai/dist/providers/data/<provider>.json`, found from the `pi` binary) and
+writes only the ids it lacks; an Overdeck entry is removed once pi ships the
+id. Verified: on 0.85.0 all planned ids were written; on 1.5.2 only
+`glm-5.3-flashx`, `glm-5.1`, `glm-4.7-flash`, `mimo-v2.6-pro-ultraspeed` and
+`grok-build-0.1`.
+
+DashScope's OpenAI-compatible endpoint rejects the `developer` role
+(`developer is not one of ['system', ...]`), so its provider entry sets
+`compat.supportsDeveloperRole: false`.
+
+### Per-provider launch matrix (2026-11-13)
+
+Every model of every provider that now defaults to pi was run through the
+branch's real provisioning, `qualifyPiModel(..., 'pi')` and
+`getProviderEnvForModel(..., 'pi')`, then one `pi -p` turn. All 38 bound the
+intended provider and model on pi 0.85.0, and the 1.5.2 rerun matched.
+
+| Provider | Result |
+| --- | --- |
+| google (7 models) | real reply from every model, incl. provisioned `gemini-4-argon` (0.85) and built-in (1.5.2) |
+| openrouter (`qwen/qwen3.7-flash`) | real reply |
+| nous (`qwen/qwen3.6-plus`) | real reply through the provisioned `nous` provider |
+| dashscope | real reply (`qwen3.7-plus`) after the compat fix |
+| minimax, zai, mimo | bound correctly; no real turn: this machine's accounts are out of balance, out of quota, and failing auth (Overdeck's own pre-flight reports it) |
+| xai, groq, cerebras, mistral | bound correctly; no key configured here, so the endpoint rejected a dummy key |
+
 ## Auth
 
 pi reads provider keys from env (`OPENROUTER_API_KEY`, `GEMINI_API_KEY`,
@@ -137,11 +169,12 @@ pi reads provider keys from env (`OPENROUTER_API_KEY`, `GEMINI_API_KEY`,
 `CEREBRAS_API_KEY`, `MISTRAL_API_KEY`, `ANTHROPIC_API_KEY`/`ANTHROPIC_OAUTH_TOKEN`,
 ...) and from `~/.pi/agent/auth.json` (`/login`). Overdeck's launcher exports
 the provider key under each of those names (`getProviderEnv` in
-`src/lib/providers.ts`), with two gaps: MiMo is exported as `MIMO_API_KEY`
-but pi's `xiaomi` provider reads `XIAOMI_API_KEY`, and Nous/DashScope have no
-pi provider. The provisioned `models.json` entries reference the Overdeck
-names (`$MIMO_API_KEY`, `$NOUS_API_KEY`, `$DASHSCOPE_API_KEY`), which closes
-both gaps without new env vars. `pi auth check --provider <p>` reports
+`src/lib/providers.ts`), with gaps closed in PAN-5212: MiMo is also
+exported as `XIAOMI_TOKEN_PLAN_SGP_API_KEY` (pi's token-plan provider);
+Google launches got only the CLIProxy (Anthropic-compatible) env and no
+`GEMINI_API_KEY` for any harness, so pi-family Google launches now get
+`GEMINI_API_KEY`; Nous and DashScope are custom providers whose `models.json`
+entries reference `$NOUS_API_KEY` / `$DASHSCOPE_API_KEY`. `pi auth check --provider <p>` reports
 readiness.
 
 ## Stored `pi` rows

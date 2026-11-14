@@ -21,7 +21,7 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 | Harness | Binary | Default for | Notes |
 | --- | --- | --- | --- |
 | `claude-code` | [Anthropic Claude Code](https://github.com/anthropics/claude-code) | All workflows | Default if you don't pick. Required for Anthropic-subscription users. |
-| `pi` | [Pi Coding Agent](https://pi.dev) (`pi`) | Google, xAI, MiniMax, Z.AI, MiMo, OpenRouter, Nous, DashScope, Groq, Cerebras and Mistral models (built-in default) | RPC over a named pipe, like oh-my-pi; runs on Node; verified with 0.85.0. |
+| `pi` | [Pi Coding Agent](https://pi.dev) (`pi`) | Google, xAI, MiniMax, Z.AI, MiMo, OpenRouter, Nous, DashScope, Groq, Cerebras and Mistral models (built-in default) | RPC over a named pipe, like oh-my-pi; runs on Node; verified with 0.85.0 and 1.5.2. |
 | `ohmypi` | [oh-my-pi](https://github.com/oh-my-pi/pi-coding-agent) (`omp`) | Opt-in multi-provider work | Adds oh-my-pi RPC over a named pipe; reads `~/.claude/skills` for skill parity. Set `providerHarnesses.<provider>: ohmypi` to keep using it. |
 | `codex` | [OpenAI Codex CLI](https://github.com/openai/codex) (`codex`) | OpenAI-model work | Uses persistent `codex app-server` sessions by default; requires Codex CLI `0.144.0` or newer. |
 | `acp` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Opt-in Kimi work | Uses the open Agent Client Protocol over a persistent authenticated host; Kimi is the first wired ACP agent. |
@@ -304,7 +304,7 @@ pi is oh-my-pi's upstream, so Overdeck drives both the same way: RPC mode
 (`pi --mode rpc`) over the `rpc.in` named pipe for work agents, the TUI for
 conversations, and a vendored extension (`packages/pi-extension/`) that writes
 `ready.json`, heartbeats, the session index and the `/pan-done` marker. The
-differences Overdeck follows (verified against pi 0.85.0 in
+differences Overdeck follows (verified against pi 0.85.0 and 1.5.2 in
 `.pan/pi-vs-omp.md`):
 
 - **Resume** uses `pi --session <id>`; pi's `--resume` opens a picker.
@@ -315,8 +315,10 @@ differences Overdeck follows (verified against pi 0.85.0 in
   `openrouter/<vendor>/<model>`). pi fuzzy-matches an unknown id to another
   provider instead of failing, so Overdeck merge-writes the tier models pi's
   catalog lacks into `~/.pi/agent/models.json` before each launch (for example
-  `xai/grok-build-0.1`, the MiMo v2.6 ids, and custom `nous` and `dashscope`
-  providers). Your own entries in that file are kept.
+  `xai/grok-build-0.1` and custom `nous` and `dashscope` providers). It reads
+  the installed pi's catalog first, so a model pi ships keeps pi's own
+  definition, and it removes its own entry once pi ships that id. Your own
+  entries in that file are kept.
 - **Questions:** pi has no `ask` tool, so a question is plain assistant text
   and the dashboard answers it with a message.
 - **No MCP:** pi ships no MCP client, so the Overdeck MCP server is not
@@ -958,7 +960,9 @@ exists. `pan sync` adds `~/.claude/skills` to `~/.pi/agent/settings.json` so pi
 loads the same skills as Claude Code. pi reads provider keys from the
 environment (`GEMINI_API_KEY`, `XAI_API_KEY`, `OPENROUTER_API_KEY`, ...), and
 Overdeck exports the configured key under that name at launch; MiMo is
-exported as both `MIMO_API_KEY` and pi's `XIAOMI_API_KEY`.
+exported as both `MIMO_API_KEY` and `XIAOMI_TOKEN_PLAN_SGP_API_KEY`, and runs on
+pi's `xiaomi-token-plan-sgp` provider (Overdeck MiMo keys are token-plan keys).
+Google runs on `GEMINI_API_KEY` directly, not through CLIProxy.
 
 ## Installing oh-my-pi
 
