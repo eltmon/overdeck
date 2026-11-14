@@ -164,6 +164,7 @@ src/components/chat/__tests__/heldKickoff.test.tsx
 src/components/chat/__tests__/queuedPromptSend.test.ts
 src/components/chat/__tests__/resetClippedScroll.test.ts
 src/components/chat/__tests__/scheduledMessages.test.ts
+src/components/chat/__tests__/useComposerRestoreTarget.test.tsx
 src/components/chat/__tests__/useFloatingPickerPosition.test.tsx
 src/components/chat/__tests__/useOlderHistory.test.ts
 src/components/chat/citations/__tests__/CitationChips.test.tsx
