@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5224",
   "created": "2026-11-14T03:12:38.408Z",
-  "updated": "2026-11-14T04:02:40.607Z",
+  "updated": "2026-11-14T04:02:50.191Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,6 +154,11 @@
     "webhook-handlers-invalidate.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T04:02:40.607Z"
+    },
+    "own-actions-refresh": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5224",
+      "claimedAt": "2026-11-14T04:02:50.190Z"
     }
   }
 }
