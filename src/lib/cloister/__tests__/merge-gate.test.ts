@@ -151,7 +151,11 @@ describe('evaluateIssueMergeGate — mergeability not yet computed (PAN-4540)', 
         .mockResolvedValueOnce(readyFacts('PAN-4540', { mergeable: null, mergeableState: 'unknown' }))
         .mockResolvedValueOnce(readyFacts('PAN-4540'));
 
-      const verdict = evaluateIssueMergeGate('PAN-4540', { getFacts, ciTestsRequired: () => false });
+      // PAN-5238: isDeftPipeline is stubbed because the real resolver now runs
+      // an Effect fiber (resolveProjectFromIssue); under vi.useFakeTimers() its
+      // scheduling never settles within vi.advanceTimersByTimeAsync's bounded
+      // sweep, hanging a case that isn't exercising Deft pipeline behavior at all.
+      const verdict = evaluateIssueMergeGate('PAN-4540', { getFacts, ciTestsRequired: () => false, isDeftPipeline: async () => false });
       await vi.advanceTimersByTimeAsync(MERGEABILITY_REREAD_MS);
 
       expect(await verdict).toMatchObject({ ready: true });
@@ -167,7 +171,12 @@ describe('evaluateIssueMergeGate — mergeability not yet computed (PAN-4540)', 
     try {
       // The approving review is not read for an unmergeable PR, so the head is unproven.
       const unknown = readyFacts('PAN-4540', { mergeable: null, approvedAtHead: false });
-      const verdict = evaluateIssueMergeGate('PAN-4540', { getFacts: async () => unknown, ciTestsRequired: () => false });
+      // PAN-5238: see isDeftPipeline note above.
+      const verdict = evaluateIssueMergeGate('PAN-4540', {
+        getFacts: async () => unknown,
+        ciTestsRequired: () => false,
+        isDeftPipeline: async () => false,
+      });
       await vi.advanceTimersByTimeAsync(MERGEABILITY_REREAD_MS);
 
       const result = await verdict;
