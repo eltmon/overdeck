@@ -24,6 +24,7 @@ import type { Issue } from '../../types';
 import { DialogProvider } from '../DialogProvider';
 import { IssueDrawer } from './IssueDrawer';
 import { resetDrawerIssueSubscriptionForTest } from './useDrawerData';
+import { DENSITY_SECTIONS } from '../issue-view/densitySections';
 
 const issue: Issue = {
   id: 'PAN-1',
@@ -208,6 +209,7 @@ describe('IssueDrawer', () => {
       'drawer-tab-files',
       'drawer-tab-activity',
       'drawer-tab-artifacts',
+      'drawer-tab-skills',
       'drawer-tab-overview',
     ]);
 
@@ -557,15 +559,14 @@ describe('IssueDrawer', () => {
         { id: 'other', timestamp: '2026-05-18T00:10:00.000Z', source: 'review', level: 'info', message: 'Other issue', issueId: 'PAN-2' },
       ],
     } as Parameters<typeof useDashboardStore.setState>[0]);
-    useDashboardStore.getState().openIssue('PAN-1', 'activity');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     const { queryClient, rerender } = renderDrawer();
     const rail = screen.getByTestId('drawer-activity-rail');
     const scrollArea = screen.getByTestId('drawer-activity-rail-scroll');
 
-    expect(rail).toHaveClass('w-[320px]', 'border-l', 'bg-card/70');
-    // Scope text + dot assertions to the rail; the Activity tab panel renders
-    // its own copy of these entries when drawer.tab === 'activity'.
+    // PAN-5244: the rail is the compact Live activity list in Details.
+    expect(rail).toHaveClass('w-full');
     expect(within(rail).getByText('Merged branch')).toBeInTheDocument();
     expect(within(rail).getByText('Work started')).toBeInTheDocument();
     expect(within(rail).queryByText('Other issue')).not.toBeInTheDocument();
@@ -620,10 +621,8 @@ describe('IssueDrawer', () => {
     useDashboardStore.getState().openIssue('PAN-1', 'activity');
 
     renderDrawer();
-    const rail = screen.getByTestId('drawer-activity-rail');
+    const rail = screen.getByTestId('drawer-tab-panel-activity');
 
-    // Scope to the rail; the Activity tab panel also renders these entries
-    // when drawer.tab === 'activity'.
     expect(within(rail).getByText('Security reviewer active')).toBeInTheDocument();
     expect(within(rail).queryByText('Other reviewer active')).not.toBeInTheDocument();
   });
@@ -643,24 +642,24 @@ describe('IssueDrawer', () => {
 
     renderDrawer();
 
-    // PAN-2908 C-VOCAB: the drawer renders the shared six-phase rail.
-    const timeline = screen.getByTestId('drawer-phase-timeline');
+    // PAN-5244: the drawer renders the compact six-phase pipeline strip.
+    const timeline = screen.getByTestId('drawer-pipeline-strip');
     expect(within(timeline).getByText('Plan')).toBeInTheDocument();
     expect(within(timeline).getByText('Work')).toBeInTheDocument();
     expect(within(timeline).getByText('Review')).toBeInTheDocument();
     expect(within(timeline).getByText('Test')).toBeInTheDocument();
     expect(within(timeline).getByText('Ship')).toBeInTheDocument();
     expect(within(timeline).getByText('Done')).toBeInTheDocument();
-    const steps = timeline.querySelectorAll('[data-component="phase-rail"] > button');
+    const steps = timeline.querySelectorAll('button[data-phase]');
     expect(steps).toHaveLength(6);
     // Fixture: review passed, ready to merge → plan..test done, ship current, done pending.
     expect(steps[0].getAttribute('data-state')).toBe('done');
     expect(steps[3].getAttribute('data-state')).toBe('done');
     expect(steps[4].getAttribute('data-state')).toBe('current');
     expect(steps[5].getAttribute('data-state')).toBe('pending');
-    // Legacy when-stamps are preserved as meta where the old timeline had them.
-    expect(within(steps[4] as HTMLElement).getByText('05/18')).toBeInTheDocument();
-    expect(within(steps[5] as HTMLElement).getByText('—')).toBeInTheDocument();
+    // Legacy when-stamps are preserved in the step title.
+    expect(steps[0].getAttribute('title')).toContain('05/18');
+    expect(steps[4].getAttribute('data-kind')).toBe('next');
   });
 
   it('renders the PR check-run gate from drawer data with PRD border tones', async () => {
@@ -712,7 +711,7 @@ describe('IssueDrawer', () => {
     renderDrawer();
 
     expect(screen.getByTestId('active-agent-panel')).toHaveClass('border-l-[3px]', 'border-l-signal-review');
-    expect(screen.getByText('agent-PAN-1')).toHaveClass('font-mono', 'text-[13px]');
+    expect(within(screen.getByTestId('active-agent-panel')).getByText('agent-PAN-1')).toHaveClass('font-mono', 'text-[13px]');
     expect(screen.getByText('WORK RUNNING').closest('[data-component="verb-badge"]')).toHaveClass('text-[9px]');
     expect(screen.getByText(/GPT-5\.5 · claude-code · spend loading/)).toHaveClass('text-right', 'font-mono');
     // PAN-2908 C-DETAIL: the stream-excerpt box and its "No recent stream
@@ -929,12 +928,32 @@ describe('IssueDrawer', () => {
     expect(screen.getByText('No active agent.')).toHaveClass('text-muted-foreground');
   });
 
-  it('renders console inventory markers on the real overview shell', () => {
-    useDashboardStore.getState().openIssue('PAN-1', 'overview');
-    const { container } = renderDrawer();
-    for (const section of ['DrawerActionBar', 'PhaseTimeline', 'DrawerTabs', 'DrawerPickupSection / PickupGateControls', 'DrawerWorkspaceSection', 'UatEnvironmentPanel', 'DrawerActiveAgent', 'DrawerPausedBanner', 'DrawerVerificationGates', 'SpecialistStrip', 'DrawerTasksList', 'DrawerActivityRail / DrawerActivityPanel', 'StartAgentCta']) {
-      expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
+  // PAN-5244 FR-18: every console inventory marker, on the tab that renders it.
+  const MARKERS_BY_TAB: Array<{ tab: string; sections: string[] }> = [
+    { tab: 'conversation', sections: ['DrawerActionBar', 'PhaseTimeline', 'DrawerTabs', 'DrawerPausedBanner', 'DrawerAgentSession', 'StartAgentCta'] },
+    { tab: 'overview', sections: ['DrawerPickupSection / PickupGateControls', 'DrawerWorkspaceSection', 'UatEnvironmentPanel', 'DrawerActiveAgent', 'DrawerVerificationGates', 'DrawerReviewSpecialists', 'DrawerActivityRail / DrawerActivityPanel'] },
+    { tab: 'tasks', sections: ['DrawerTasksList'] },
+    { tab: 'plan', sections: ['DrawerPlanPanel / XBriefViewer'] },
+    { tab: 'artifacts', sections: ['DrawerArtifactsPanel'] },
+    { tab: 'activity', sections: ['DrawerActivityRail / DrawerActivityPanel'] },
+  ];
+
+  it('renders every console inventory marker on a visible element', () => {
+    for (const { tab, sections } of MARKERS_BY_TAB) {
+      useDashboardStore.getState().openIssue('PAN-1', tab);
+      const { container, unmount } = renderDrawer();
+      for (const section of sections) {
+        const el = container.querySelector(`[data-section="${section}"]`);
+        expect(el, `${tab}: ${section}`).toBeInTheDocument();
+        expect(el?.closest('[hidden]'), `${tab}: ${section} is hidden`).toBeNull();
+      }
+      unmount();
+      resetDrawerIssueSubscriptionForTest();
     }
+  });
+
+  it('the marker table covers DENSITY_SECTIONS.console exactly', () => {
+    expect(new Set(MARKERS_BY_TAB.flatMap((row) => row.sections))).toEqual(new Set(DENSITY_SECTIONS.console));
   });
 
   it('renders four review specialist rows from drawer data with status dots', () => {
@@ -951,16 +970,11 @@ describe('IssueDrawer', () => {
 
     renderDrawer();
 
-    // PAN-2908 C-DETAIL: specialists render via the shared SpecialistStrip
-    // (clickable — each chip opens that specialist's conversation).
-    const strip = document.querySelector('[data-component="specialist-strip"]');
-    expect(strip).not.toBeNull();
-    expect(strip!.querySelector('[data-specialist="security"]')).not.toBeNull();
-    expect(strip!.querySelector('[data-specialist="correctness"]')).not.toBeNull();
-    expect(strip!.querySelector('[data-specialist="performance"]')).not.toBeNull();
-    expect(strip!.querySelector('[data-specialist="requirements"]')).not.toBeNull();
-    expect(strip!.querySelector('[data-specialist="security"]')!.getAttribute('data-status')).toBe('running');
-    expect(strip!.querySelector('[data-specialist="correctness"]')!.getAttribute('data-status')).toBe('done');
+    // PAN-5244: the Details tab lists the four review specialists.
+    const review = screen.getByTestId('drawer-details-review');
+    expect(review.querySelectorAll('[data-reviewer]')).toHaveLength(4);
+    expect(review.querySelector('[data-reviewer="security"]')!.getAttribute('data-status')).toBe('running');
+    expect(review.querySelector('[data-reviewer="correctness"]')!.getAttribute('data-status')).toBe('done');
   });
 
   it('resolves a legacy Conversation URL to the consolidated Session surface', () => {
@@ -972,8 +986,8 @@ describe('IssueDrawer', () => {
     expect(screen.queryByTestId('drawer-tab-conversation')).not.toBeInTheDocument();
     expect(screen.queryByTestId('drawer-tab-terminal')).not.toBeInTheDocument();
     const panel = screen.getByTestId('drawer-tab-panel-conversation');
-    expect(within(panel).getByText(/Nothing here yet — no agent has started/)).toBeInTheDocument();
-    expect(within(panel).getByText(/Start work and the live conversation appears here/)).toBeInTheDocument();
+    expect(within(panel).getByText('No agent has run on this issue yet')).toBeInTheDocument();
+    expect(within(panel).getByText(/each agent's conversation appears here/)).toBeInTheDocument();
   });
 
   it('resolves a legacy Terminal URL to the consolidated Session surface', () => {
@@ -1056,27 +1070,27 @@ describe('conversation switching (PAN-2908 C-DETAIL)', () => {
     useDashboardStore.getState().openIssue('PAN-1', 'overview');
     renderDrawer();
 
-    const reviewStep = document.querySelector('[data-component="phase-rail"] [data-phase="review"]') as HTMLButtonElement;
+    const reviewStep = document.querySelector('[data-component="pipeline-strip"] [data-phase="review"]') as HTMLButtonElement;
     expect(reviewStep.disabled).toBe(false);
     fireEvent.click(reviewStep);
 
     expect(useDashboardStore.getState().drawer.tab).toBe('conversation');
-    const select = screen.getByLabelText('Select agent session') as HTMLSelectElement;
-    expect(select.value).toBe('agent-pan-1-review');
+    expect(screen.getByTestId('drawer-agent-meta')).toHaveTextContent('agent-pan-1-review');
   });
 
   it('clicking a specialist chip opens THAT specialist conversation', () => {
     seedWithAgents();
-    useDashboardStore.getState().openIssue('PAN-1', 'overview');
+    useDashboardStore.getState().openIssue('PAN-1');
     renderDrawer();
 
+    // The reviewer chips render only while a review agent is selected.
+    fireEvent.click(document.querySelector('[data-component="pipeline-strip"] [data-phase="review"]') as HTMLButtonElement);
     const chip = document.querySelector('[data-specialist="security"]') as HTMLButtonElement;
     expect(chip.disabled).toBe(false);
     fireEvent.click(chip);
 
     expect(useDashboardStore.getState().drawer.tab).toBe('conversation');
-    const select = screen.getByLabelText('Select agent session') as HTMLSelectElement;
-    expect(select.value).toBe('agent-pan-1-review-security');
+    expect(screen.getByTestId('drawer-agent-meta')).toHaveTextContent('agent-pan-1-review-security');
   });
 });
 
