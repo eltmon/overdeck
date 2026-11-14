@@ -4,17 +4,17 @@
     "created": "2026-11-14T04:01:33Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5237: Composer: cancel a message while it shows Sending…",
-    "updated": "2026-11-14T04:10:30.960Z"
+    "updated": "2026-11-14T04:15:43.510Z"
   },
   "plan": {
     "id": "pan-5237",
     "title": "Composer: cancel a message while it shows Sending…",
-    "status": "proposed",
+    "status": "running",
     "uid": "2f7cfa52-b113-4303-87d8-c10de96fc385",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-14T04:01:33Z",
-    "updated": "2026-11-14T04:10:30.960Z",
+    "updated": "2026-11-14T04:15:43.510Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5237",
@@ -774,5 +774,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
