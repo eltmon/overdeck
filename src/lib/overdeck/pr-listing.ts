@@ -5,7 +5,11 @@
  * read board reads use. PAN-5224: both caches' settled TTLs come from the PR
  * freshness policy (`pr-freshness.js`) — 30 s/5 min while webhooks are not
  * healthy, 5 min/15 min while they are — and a webhook can drop a settled or
- * in-flight entry via `invalidateRepoPullRequests`.
+ * in-flight entry via `invalidateRepoPullRequests`. PAN-5261: the open read
+ * lists at most 30 rows unless the repo's last open read returned 30 or
+ * more, in which case it reads at 100 directly; a 30-row read is re-run at
+ * 100 before it settles, so a settled listing never holds fewer rows than a
+ * flat 100-row read would.
  */
 
 import { createSettledTtlPromiseCache } from '../concurrency.js';
@@ -67,7 +71,10 @@ type ClosedListing = SettledListing & { readonly generation: number };
  * open PR is cached for `prListingIdleTtlMs()` instead, since nothing in it
  * can change without a new PR opening. PAN-5224: while webhooks are healthy
  * a settled listing is cached for `prListingActiveTtlMs()` (5 min) instead of
- * the flat 30 s; a failed (null) read always keeps the 30 s retry.
+ * the flat 30 s; a failed (null) read always keeps the 30 s retry. PAN-5261:
+ * the underlying `gh pr list` read lists 30 rows unless the repo's last read
+ * returned 30 or more, in which case it reads at 100 directly (see
+ * `loadOpenPullRequests`).
  */
 const cachedOpenPullRequests = createSettledTtlPromiseCache<string, SettledListing | null>(
   PR_CACHE_TTL_MS,
@@ -158,6 +165,21 @@ function logPrListingRecovery(projectPath: string, listing: PrListingKind): void
   console.log(`[pr-cache] ${projectPath}: ${listing} PR listing recovered`);
 }
 
+/**
+ * PAN-5261: `gh pr list --limit 30` dry-runs at 1 GraphQL point, `--limit 100`
+ * at 3. A repo whose last open read returned 30+ rows reads at 100 directly.
+ */
+const OPEN_READ_SMALL_LIMIT = 30;
+const OPEN_READ_FULL_LIMIT = 100;
+const fullOpenReadRepos = new Set<string>();
+
+async function listOpenRows(projectPath: string, limit: number): Promise<GhPrRow[]> {
+  const { stdout } = await runGh([
+    'pr', 'list', '--state', 'open', '--limit', String(limit), '--json', GH_PR_FIELDS,
+  ], { caller: 'pr-cache', cwd: projectPath, timeout: 20_000 });
+  return JSON.parse(stdout || '[]') as GhPrRow[];
+}
+
 async function loadOpenPullRequests(projectPath: string): Promise<SettledListing | null> {
   try {
     // PAN-4291: no tracker means gh could never answer; a `git remote`
@@ -171,10 +193,14 @@ async function loadOpenPullRequests(projectPath: string): Promise<SettledListing
     // PAN-4264: metered as caller pr-cache; a pause or refusal lands in the
     // catch below, is logged once per distinct reason, and reads as "failed"
     // (null), never as "no PRs".
-    const { stdout } = await runGh([
-      'pr', 'list', '--state', 'open', '--limit', '100', '--json', GH_PR_FIELDS,
-    ], { caller: 'pr-cache', cwd: projectPath, timeout: 20_000 });
-    const rows = JSON.parse(stdout || '[]') as GhPrRow[];
+    let rows = await listOpenRows(projectPath, fullOpenReadRepos.has(projectPath) ? OPEN_READ_FULL_LIMIT : OPEN_READ_SMALL_LIMIT);
+    if (!fullOpenReadRepos.has(projectPath) && rows.length >= OPEN_READ_SMALL_LIMIT) {
+      // Possibly truncated: never settle a short listing.
+      fullOpenReadRepos.add(projectPath);
+      rows = await listOpenRows(projectPath, OPEN_READ_FULL_LIMIT);
+    } else if (fullOpenReadRepos.has(projectPath) && rows.length < OPEN_READ_SMALL_LIMIT) {
+      fullOpenReadRepos.delete(projectPath);
+    }
     const numbers = new Set(rows.map((row) => row.number).filter((n): n is number => typeof n === 'number'));
     const previous = lastOpenNumbers.get(projectPath);
     if (previous && [...previous].some((n) => !numbers.has(n))) {

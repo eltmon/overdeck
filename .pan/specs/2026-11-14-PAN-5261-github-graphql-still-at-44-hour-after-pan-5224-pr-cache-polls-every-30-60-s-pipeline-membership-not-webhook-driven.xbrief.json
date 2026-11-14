@@ -4,17 +4,17 @@
     "created": "2026-11-14T08:15:58.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5261: GitHub GraphQL still at ~44%/hour after PAN-5224: pr-cache polls every 30-60 s, pipeline-membership not webhook-driven",
-    "updated": "2026-11-14T08:27:23.130Z"
+    "updated": "2026-11-14T08:28:39.414Z"
   },
   "plan": {
     "id": "pan-5261",
     "title": "GitHub GraphQL still at ~44%/hour after PAN-5224: pr-cache polls every 30-60 s, pipeline-membership not webhook-driven",
-    "status": "proposed",
+    "status": "running",
     "uid": "5dcadd09-31e4-4457-9204-53173eab1ab4",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T08:15:58.000Z",
-    "updated": "2026-11-14T08:27:23.130Z",
+    "updated": "2026-11-14T08:28:39.414Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5261",
@@ -690,5 +690,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
