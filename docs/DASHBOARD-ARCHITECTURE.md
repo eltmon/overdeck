@@ -879,7 +879,8 @@ door that does not exist; a real record read door would be a separate change.
   `pane-finished` or `idle` run a second time 5 s later and stops it only if it still reads done;
   after the stop it waits up to 3 s for the backend to drop the pane.
 
-**Issue views:** Rail, cockpit, and console issue surfaces share the kit documented in
+**Issue views:** The drawer and the Stage issue tab render one shared issue view;
+the rail row is the third issue surface. See the kit documented in
 `docs/ISSUE-VIEW.md`. Route new issue sections through `IssueViewModel`, the shared
 components, and `DENSITY_SECTIONS`; update the inventory and real `data-section`
 marker so the no-loss gate proves that no existing surface disappeared.

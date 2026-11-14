@@ -36,8 +36,7 @@ identify, not a dead one. Only `exited` (or no pane at all) ends a session.
 `presenceForPaneState` in `packages/contracts/src/backend-pane.ts` is the one
 place this mapping lives. Its consumers: `deriveSessionPresence`
 (`src/dashboard/server/services/session-presence.ts`), `nodeStatusFor`
-(`src/dashboard/server/routes/command-deck.ts`), `IssueTreeLane.paneStatus`
-(`src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.tsx`),
+(`src/dashboard/server/routes/command-deck.ts`),
 `buildSpecialistSessionNodes` (`src/dashboard/server/routes/session-tree-specialists.ts`),
 `IssuePipelineStrip` (`src/dashboard/frontend/src/components/issue-view/IssuePipelineStrip.tsx`),
 and `IssueDrawerDetails` (`src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.tsx`).

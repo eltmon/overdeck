@@ -39,19 +39,20 @@ When you click a feature, the main panel shows all agent sessions unified into o
 
 ## Issue cockpit data sources
 
-The issue cockpit (the per-issue Mission Control view) builds its session tree from
-three layers, in order:
+The Stage issue tab (the per-issue Mission Control view) renders the shared issue
+view (see `docs/ISSUE-VIEW.md`, "One view, two shells") and builds no session tree
+of its own (PAN-5246). The issue view reads two sources:
 
-1. **`/api/session-trees` (primary)** — harness-carrying nodes from the server-side
-   session tree resolver. This is the richest source: it knows each session's
-   harness, tmux session, and runtime state.
-2. **Activity sections fallback** — when the session-trees endpoint returns a
-   feature but no tree sessions, the cockpit falls back to the activity-derived
-   sessions (`/api/command-deck/activity/:issueId`). This keeps live planning and
-   work agents visible when only their activity section exists.
-3. **Resource-allocated deep-link fallback** — when the cockpit is opened on an
-   `?issue=` deep-link without a project name, it resolves the project from the
-   resource-allocated list and still attempts the session-trees + activity lookup.
+1. **The dashboard store's agents** — the issue's conversations: the conversation
+   header's agent menu, the pipeline strip's phase buttons and the Details
+   pipeline table's agent rows.
+2. **The backend pane inventory** — live phases and pane-only rows: a phase with a
+   live backend pane and no agent record is live in the strip and has its own row
+   in the Details pipeline table.
+
+The session tree is the Command Deck issue tree, fed by `/api/session-trees`: its
+rows exist because a backend pane exists, and it carries each session's harness,
+terminal session and runtime state.
 
 ### Lint node (PAN-2665)
 
