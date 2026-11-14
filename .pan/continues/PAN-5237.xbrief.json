@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5237",
+  "created": "2026-11-14T04:16:13.968Z",
+  "updated": "2026-11-14T04:16:13.968Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "receipt-cancel-gate": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5237",
+      "claimedAt": "2026-11-14T04:16:13.968Z"
+    }
+  }
+}
