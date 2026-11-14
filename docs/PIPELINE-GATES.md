@@ -1811,7 +1811,7 @@ the identity spent: `user` (the `gh` CLI token), `pat` (`GITHUB_TOKEN`) or
 minutes from the current and previous hour files; files older than 3 hours
 are deleted on the hour rollover. The dashboard, the deacon child, CLI
 processes and the agent
-`gh` shim (beside the agent git guard; conversations get it alone), which
+`gh` shim (beside the agent git guard; conversations get it beside a trailer-only `git` shim, PAN-5281), which
 counts every call and, for agent panes and the Flywheel conversation, refuses
 grant-label writes (PAN-4343), all write it.
 `src/lib/github-quota/` owns it: `runGh` (metered `gh` exec),

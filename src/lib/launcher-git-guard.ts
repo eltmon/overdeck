@@ -42,6 +42,16 @@
  * item's branch. Detached HEAD is refused too. Like the rest of default mode
  * this is cheap-path prevention: `--git-dir`, `GIT_DIR` and `--work-tree` are
  * not followed.
+ *
+ * PAN-5281: for `git commit`, the agent shim adds the trailer
+ * `Overdeck-Agent: <agentId>` (the id is written into the shim at launch) and
+ * passes `-c trailer.Overdeck-Agent.ifexists=addIfDifferent` so an amend never
+ * duplicates it, plus `-c trailer.Overdeck-Agent.ifmissing=add` so a repository
+ * `trailer.ifmissing=doNothing` cannot drop it. Conversations get a trailer-only `git` shim beside their `gh`
+ * shim that adds `Overdeck-Conversation: <id>` and refuses nothing. The bypass
+ * skips the trailer; an absolute `/usr/bin/git` is not attributed; git older
+ * than 2.32 (no `commit --trailer`) gets no trailer.
+ * `src/lib/git/attributed-commits.ts` reads the trailers back.
  */
 import { join } from 'node:path';
 import { getOverdeckHome } from './paths.js';
@@ -277,6 +287,85 @@ function branchCheckShimLines(): string[] {
 }
 
 /**
+ * The shim's subcommand finder: prints the first plain word after git's global
+ * options. Already escaped for the launcher's unquoted heredoc. Shared by the
+ * agent shim and the conversation shim (PAN-5281).
+ */
+const FIND_COMMAND_SHIM_LINES: readonly string[] = [
+  '_overdeck_git_find_command() {',
+  '  while [ "\\$#" -gt 0 ]; do',
+  '    case "\\$1" in',
+  '      -C|-c|--git-dir|--work-tree|--namespace|--config-env|--super-prefix|--attr-source)',
+  '        shift',
+  '        [ "\\$#" -gt 0 ] && shift',
+  '        ;;',
+  '      -C?*|-c?*|--git-dir=*|--work-tree=*|--namespace=*|--config-env=*|--super-prefix=*|--attr-source=*)',
+  '        shift',
+  '        ;;',
+  '      --)',
+  '        shift',
+  '        break',
+  '        ;;',
+  '      -*)',
+  '        shift',
+  '        ;;',
+  '      *)',
+  '        printf "%s\\n" "\\$1"',
+  '        return',
+  '        ;;',
+  '    esac',
+  '  done',
+  '  [ "\\$#" -gt 0 ] && printf "%s\\n" "\\$1"',
+  '}',
+];
+
+/**
+ * PAN-5281: add `--trailer "<key>: <value>"` right after the `commit`
+ * subcommand, and prepend `-c trailer.<key>.ifexists=addIfDifferent` so an
+ * amend never duplicates it and `-c trailer.<key>.ifmissing=add` so a
+ * configured `trailer.ifmissing=doNothing` cannot drop it. The option walk mirrors
+ * `_overdeck_git_find_command`. POSIX sh has no arrays, so the arguments are
+ * rotated through `set --`: each one is shifted off the front and appended
+ * to the back, and the trailer is appended right after the subcommand.
+ * Inline on purpose: `set --` inside a function cannot change the script's
+ * `"$@"`. Every `$` is a runtime expansion, escaped by `trailerShimLines`.
+ */
+const TRAILER_SH = [
+  'if [ "$_overdeck_git_command" = "commit" ] && [ "$_OVERDECK_GIT_TRAILERS" = "1" ]; then',
+  '  _ot_n=$#',
+  '  _ot_state=opts',
+  '  while [ "$_ot_n" -gt 0 ]; do',
+  '    _ot_arg="$1"',
+  '    shift',
+  '    _ot_n=$((_ot_n - 1))',
+  '    set -- "$@" "$_ot_arg"',
+  '    case "$_ot_state" in',
+  '      value) _ot_state=opts ;;',
+  '      opts)',
+  '        case "$_ot_arg" in',
+  '          -C|-c|--git-dir|--work-tree|--namespace|--config-env|--super-prefix|--attr-source) _ot_state=value ;;',
+  '          --) _ot_state=cmd ;;',
+  '          -*) ;;',
+  '          *) set -- "$@" --trailer "$_OVERDECK_TRAILER_KEY: $_OVERDECK_TRAILER_VALUE"; _ot_state=done ;;',
+  '        esac',
+  '        ;;',
+  '      cmd) set -- "$@" --trailer "$_OVERDECK_TRAILER_KEY: $_OVERDECK_TRAILER_VALUE"; _ot_state=done ;;',
+  '    esac',
+  '  done',
+  '  set -- -c "trailer.$_OVERDECK_TRAILER_KEY.ifexists=addIfDifferent" -c "trailer.$_OVERDECK_TRAILER_KEY.ifmissing=add" "$@"',
+  'fi',
+];
+
+/** The trailer rewrite with its key and value baked in, escaped for the unquoted heredoc. */
+function trailerShimLines(key: 'Overdeck-Agent' | 'Overdeck-Conversation', value: string): string[] {
+  return [
+    `_OVERDECK_TRAILER_KEY=${key}`,
+    `_OVERDECK_TRAILER_VALUE=${heredocShellQuote(value)}`,
+    ...TRAILER_SH.map((line) => line.replace(/\$/g, '\\$')),
+  ];
+}
+
+/**
  * PAN-4343: the `gh` shim's grant-label deny. `released`, `auto-merge` and
  * `hold-for-uat` carry operator decisions, so adding or removing one is
  * refused: `gh issue|pr edit|create` label flags (comma lists, `=` and
@@ -380,6 +469,10 @@ export function buildGitGuardLines(agentId: string, guardRoot: string, mode: Git
     // "real git" to the foreign shim and delegate every call back into it.
     ...dropInheritedGuardDirLines(),
     '_OVERDECK_REAL_GIT="$(command -v git)"',
+    // PAN-5281: `commit --trailer` needs git 2.32; probe once at launch so an
+    // older git commits without the trailer instead of failing every commit.
+    '_OVERDECK_GIT_TRAILERS=0',
+    'case "$("$_OVERDECK_REAL_GIT" commit -h 2>&1)" in *--trailer*) _OVERDECK_GIT_TRAILERS=1 ;; esac',
     // Resolve the worktree once, at launch, so the shim compares canonical paths.
     `_OVERDECK_GUARD_ROOT="$(cd ${shellQuote(guardRoot)} 2>/dev/null && pwd -P)"`,
     `[ -n "$_OVERDECK_GUARD_ROOT" ] || _OVERDECK_GUARD_ROOT=${shellQuote(guardRoot)}`,
@@ -392,35 +485,12 @@ export function buildGitGuardLines(agentId: string, guardRoot: string, mode: Git
     '#!/bin/sh',
     '_OVERDECK_REAL_GIT="$_OVERDECK_REAL_GIT"',
     '_OVERDECK_GUARD_ROOT="$_OVERDECK_GUARD_ROOT"',
+    '_OVERDECK_GIT_TRAILERS="$_OVERDECK_GIT_TRAILERS"',
     ...(readOnly ? ['_OVERDECK_GUARD_COMMON="$_OVERDECK_GUARD_COMMON"'] : []),
     'if [ "\\$OVERDECK_PAN_GIT_OP" = "1" ]; then',
     '  exec "\\$_OVERDECK_REAL_GIT" "\\$@"',
     'fi',
-    '_overdeck_git_find_command() {',
-    '  while [ "\\$#" -gt 0 ]; do',
-    '    case "\\$1" in',
-    '      -C|-c|--git-dir|--work-tree|--namespace|--config-env|--super-prefix|--attr-source)',
-    '        shift',
-    '        [ "\\$#" -gt 0 ] && shift',
-    '        ;;',
-    '      -C?*|-c?*|--git-dir=*|--work-tree=*|--namespace=*|--config-env=*|--super-prefix=*|--attr-source=*)',
-    '        shift',
-    '        ;;',
-    '      --)',
-    '        shift',
-    '        break',
-    '        ;;',
-    '      -*)',
-    '        shift',
-    '        ;;',
-    '      *)',
-    '        printf "%s\\n" "\\$1"',
-    '        return',
-    '        ;;',
-    '    esac',
-    '  done',
-    '  [ "\\$#" -gt 0 ] && printf "%s\\n" "\\$1"',
-    '}',
+    ...FIND_COMMAND_SHIM_LINES,
     // Which directory does this invocation actually operate on? `-C` values
     // accumulate relative to the previous one, exactly as real git resolves them.
     '_overdeck_git_target_dir() {',
@@ -469,6 +539,9 @@ export function buildGitGuardLines(agentId: string, guardRoot: string, mode: Git
     '  fi',
     '}',
     '_overdeck_git_command="\\$(_overdeck_git_find_command "\\$@")"',
+    // PAN-5281: rewrite "$@" once, before every exit site, so each `exec` of a
+    // commit carries the Overdeck-Agent trailer.
+    ...trailerShimLines('Overdeck-Agent', agentId),
     ...(readOnly ? readOnlyShimLines() : [
       'case "\\$_overdeck_git_command" in',
       '  rebase|stash|reset|commit|push|merge|cherry-pick) ;;',
@@ -544,18 +617,40 @@ function dropInheritedGuardDirLines(): string[] {
 }
 
 /**
- * PAN-4343: the `gh` shim alone, for conversation launchers. Conversations get
- * no git guard (they are operator sessions), but the Flywheel runs as one, so
- * it needs the grant-label deny. The directory is named `git-guard` so the
- * launcher prelude and `pan restart` strip it from inherited PATHs.
+ * PAN-4343 / PAN-5281: the conversation shims — the `gh` shim and a
+ * trailer-only `git` shim. Conversations get no git guard (they are operator
+ * sessions), so the git shim refuses nothing: it adds
+ * `Overdeck-Conversation: <id>` to `git commit` and execs the real git. The
+ * Flywheel runs as a conversation, so its `gh` shim needs the grant-label
+ * deny. The directory is named `git-guard` so the launcher prelude and
+ * `pan restart` strip it from inherited PATHs.
  */
-export function buildConversationGhShimLines(conversationId: string, denyGrantLabels: boolean): string[] {
+export function buildConversationShimLines(conversationId: string, denyGrantLabels: boolean): string[] {
   const guardDir = join(getOverdeckHome(), 'conversations', conversationId, 'git-guard');
+  const gitPath = join(guardDir, 'git');
   const pathForDoubleQuotes = guardDir.replace(/([\\"$`])/g, '\\$1');
   return [
-    // Drop inherited guard dirs first, so "real gh" is never a foreign shim.
+    // Drop inherited guard dirs first, so "real git"/"real gh" is never a foreign shim.
     ...dropInheritedGuardDirLines(),
     `mkdir -p ${shellQuote(guardDir)}`,
+    '_OVERDECK_REAL_GIT="$(command -v git 2>/dev/null || true)"',
+    'if [ -n "$_OVERDECK_REAL_GIT" ]; then',
+    '_OVERDECK_GIT_TRAILERS=0',
+    'case "$("$_OVERDECK_REAL_GIT" commit -h 2>&1)" in *--trailer*) _OVERDECK_GIT_TRAILERS=1 ;; esac',
+    `cat > ${shellQuote(gitPath)} <<EOF`,
+    '#!/bin/sh',
+    '_OVERDECK_REAL_GIT="$_OVERDECK_REAL_GIT"',
+    '_OVERDECK_GIT_TRAILERS="$_OVERDECK_GIT_TRAILERS"',
+    'if [ "\\$OVERDECK_PAN_GIT_OP" = "1" ]; then',
+    '  exec "\\$_OVERDECK_REAL_GIT" "\\$@"',
+    'fi',
+    ...FIND_COMMAND_SHIM_LINES,
+    '_overdeck_git_command="\\$(_overdeck_git_find_command "\\$@")"',
+    ...trailerShimLines('Overdeck-Conversation', conversationId),
+    'exec "\\$_OVERDECK_REAL_GIT" "\\$@"',
+    'EOF',
+    `chmod 0755 ${shellQuote(gitPath)}`,
+    'fi',
     ...buildGhShimLines(conversationId, guardDir, denyGrantLabels),
     `export PATH="${pathForDoubleQuotes}:$PATH"`,
   ];

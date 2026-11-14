@@ -9,7 +9,7 @@ import { buildPiFamilyCommand, provisionPiFamilyModel } from './launcher-pi-comm
 import { shellQuoteModelId } from './model-validation.js';
 import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
 import { getOverdeckHome, packageRoot } from './paths.js';
-import { buildConversationGhShimLines, buildGitGuardLines, type GitGuardMode } from './launcher-git-guard.js';
+import { buildConversationShimLines, buildGitGuardLines, type GitGuardMode } from './launcher-git-guard.js';
 import { buildCodexCommand, type CodexNativeEndpointOption } from './launcher-codex-command.js';
 import { shellQuote } from './shell-quote.js';
 import { overdeckMcpArgs } from './mcp/overdeck-mcp-args.js';
@@ -387,7 +387,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
     }
   }
 
-  if (config.spawnMode === 'conversation') lines.push(...(config.ghShim ? buildConversationGhShimLines(config.ghShim.id, config.ghShim.denyGrantLabels) : []));
+  if (config.spawnMode === 'conversation') lines.push(...(config.ghShim ? buildConversationShimLines(config.ghShim.id, config.ghShim.denyGrantLabels) : []));
   else if (config.overdeckEnv?.agentId) lines.push(...buildGitGuardLines(config.overdeckEnv.agentId, config.workingDir, config.gitGuardMode ?? 'default'));
 
   // Extra env exports

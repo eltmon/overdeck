@@ -1,0 +1,387 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T18:28:51Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5281: Commit attribution: stamp every agent and conversation commit with an Overdeck-Conversation / Overdeck-Agent trailer",
+    "updated": "2026-11-14T18:36:31.926Z"
+  },
+  "plan": {
+    "id": "pan-5281",
+    "title": "Commit attribution: stamp every agent and conversation commit with an Overdeck-Conversation / Overdeck-Agent trailer",
+    "status": "running",
+    "uid": "4c21d66a-b9c6-49ff-92c1-2f28cf7ac6e0",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-14T18:28:51Z",
+    "updated": "2026-11-14T18:36:31.926Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5281",
+        "label": "PAN-5281",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5281/.pan/drafts/pan-5281.md",
+        "label": "PRD draft (.pan/drafts/pan-5281.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "git-guard",
+      "launcher",
+      "attribution",
+      "trailers",
+      "conversations"
+    ],
+    "narratives": {
+      "Problem": "Nothing ties a commit to the Overdeck conversation or agent that made it, so a conversation working on a shared main cannot show only its own commits. The per-conversation Changes view (parent #5183, mockup approved 2026-11-14) needs exact attribution.",
+      "Proposal": "Make the git shim on every agent's PATH add `--trailer \"Overdeck-Agent: <agentId>\"` (plus a per-call `-c trailer.Overdeck-Agent.ifexists=addIfDifferent`) to `git commit`, with the id written into the shim at launch. Give conversations a new trailer-only git shim beside their gh shim that adds `Overdeck-Conversation: <session name>` and refuses nothing. Probe `git commit -h` at launch and skip the trailer on git without `--trailer`. Add an async library reader `listAttributedCommits` in src/lib/git/attributed-commits.ts that filters `git log --no-merges --grep` by trailer and parses `diff-tree -z` file stats. Document the behavior in docs/WORKSPACES-AND-PROJECTS.md, docs/PIPELINE-GATES.md, reference/workers.mdx and changelog.d/pan-5281.md. Full detail, exact sh and before/after code: .pan/drafts/pan-5281.md.",
+      "NonGoals": "- No Changes view, HTTP route or UI (later issue).\n- No attribution of uncommitted edits or of commits made before this ships.\n- No change to remote (Fly) agent launchers.\n- No git hook, and no persistent `git config` write of any `trailer.*` key; only the per-invocation `-c` is allowed.\n- No trailer on merge, cherry-pick, revert, rebase or am; only `git commit`.\n- The conversation git shim must not refuse any git command and must not run the branch check.\n- No attribution for an absolute /usr/bin/git, git aliases, library git implementations, or the dashboard server's own commits.\n- No removal of duplicate trailers already present in old commits.\n- No rename of the LauncherConfig.ghShim field.\n- No allowlist raise in scripts/file-size-allowlist.txt."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Write the agent id and conversation id into the shim at launch instead of reading OVERDECK_AGENT_ID / OVERDECK_CONVERSATION at commit time (revises PRD D-2).",
+        "rationale": "The gh shim already bakes its id for robustness; it makes attribution immune to env drift in harness shells and removes the 'both variables set' ambiguity. The baked value equals the exported env value at both call sites."
+      },
+      {
+        "summary": "Prepend a per-invocation `-c trailer.<Key>.ifexists=addIfDifferent` (revises PRD D-4).",
+        "rationale": "Reproduced on git 2.43: the default addIfDifferentNeighbor duplicates the agent trailer when an amend follows a different trailer; the key-scoped -c prevents it and touches no persistent config."
+      },
+      {
+        "summary": "Probe `git commit -h` for `--trailer` at launch and skip the trailer when absent (new D-10/FR-7).",
+        "rationale": "The shim otherwise only needs git 2.22; an unconditional --trailer would break every agent commit on git 2.22-2.31."
+      },
+      {
+        "summary": "The reader filters with `git log --no-merges -E --grep`, confirms the trailer, then caps to maxCount in JS, and parses `git diff-tree -z` output (revises PRD WI-3).",
+        "rationale": "Capping in git before the trailer check returns too few results (reproduced: a newer body-only match takes the only slot); `--numstat -M` rename paths do not join with --name-status; merge diffs would mislead the Changes view."
+      },
+      {
+        "summary": "Put the new agent-shim tests in a new launcher-git-guard-trailer.test.ts instead of extending the 590-line behavior test.",
+        "rationale": "Keeps the existing file untouched (its tests must pass unchanged as FR-3 evidence) and isolates the ambient-env controls NFR-3 requires."
+      },
+      {
+        "summary": "Keep the rename buildConversationGhShimLines -> buildConversationShimLines from the PRD.",
+        "rationale": "The function now writes two shims; there is one caller and one test importer, so the rename is cheap."
+      }
+    ],
+    "items": [
+      {
+        "id": "agent-shim-trailer",
+        "title": "Agent git shim adds the Overdeck-Agent trailer to git commit",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T18:28:51Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5281",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "conversation-shim-trailer"
+          ],
+          "files_scope": [
+            "src/lib/launcher-git-guard.ts",
+            "src/lib/__tests__/launcher-git-guard-trailer.test.ts",
+            "src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/launcher-git-guard-trailer.test.ts src/lib/__tests__/launcher-git-guard-behavior.test.ts src/lib/__tests__/launcher-generator.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "launcher-git-guard-trailer.test.ts, launcher-git-guard-behavior.test.ts and launcher-generator.test.ts all pass",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "FR-8",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "It is the first item on its file set (launcher-git-guard.ts, the new trailer test, launcher-generator.test.ts); the only other item touching those files (conversation-shim-trailer) is ordered after it by a blocks edge, and the reader and docs items share no file with it."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. In src/lib/launcher-git-guard.ts: (1) move the `_overdeck_git_find_command() {` ... `}` lines verbatim into `const FIND_COMMAND_SHIM_LINES` and spread them back; (2) add the plain-sh `TRAILER_SH` constant and `trailerShimLines(key, value)` from the PRD — the rewrite is INLINE top-level sh (a POSIX function cannot change the script's \"$@\"); (3) add the launch-time probe `_OVERDECK_GIT_TRAILERS=0` + `case \"$(\"$_OVERDECK_REAL_GIT\" commit -h 2>&1)\" in *--trailer*) _OVERDECK_GIT_TRAILERS=1 ;; esac` after `_OVERDECK_REAL_GIT=` and bake `_OVERDECK_GIT_TRAILERS=\"$_OVERDECK_GIT_TRAILERS\"` into the heredoc; (4) insert `...trailerShimLines('Overdeck-Agent', agentId),` directly after the `_overdeck_git_command=` line and before the read-only/default split, so every commit exit site (guard-root passthrough, BRANCH_CHECK_SH exec, read-only execs) execs the rewritten args; (5) add the PAN-5281 paragraph to the module header comment. Write the new test file src/lib/__tests__/launcher-git-guard-trailer.test.ts with the nine tests listed in WI-1, using NFR-3 env isolation (fixture git with OVERDECK_PAN_GIT_OP=1, OVERDECK_AGENT_ID/OVERDECK_CONVERSATION deleted, fixed GIT_AUTHOR_*/GIT_COMMITTER_*). Regenerate the two inline snapshots in launcher-generator.test.ts (plan-abc and spec-123) with `-u` and confirm the diff contains only trailer lines. Do not edit launcher-git-guard-behavior.test.ts."
+        },
+        "items": [
+          {
+            "id": "agent-shim-trailer.ac1",
+            "title": "Given a shim from buildGitGuardLines('agent-pan-5281-test', repo), when `commit --allow-empty -m msg` runs through it in the guarded worktree, in an unrelated temp repo, and (read-only mode) in an unrelated temp repo, then `git log -1 --format=%(trailers:key=Overdeck-Agent,valueonly)` returns `agent-pan-5281-test` for each, and a read-only commit in the guarded repo still exits 1 with the read-only message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-shim-trailer.ac2",
+            "title": "Given two modified files, when `commit -m \"two words\" -- a.txt` runs through the shim, then the commit subject is `two words`, `git show --name-only --format=` lists only a.txt, and the trailer is present; and `-C commit commit --allow-empty -m x` from the parent of a repo named `commit` exits 0 with the trailer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-shim-trailer.ac3",
+            "title": "Given a commit followed by shim `commit --amend --no-edit`, a real-git amend adding `Overdeck-Conversation: c`, and another shim amend, then `%(trailers:key=Overdeck-Agent,valueonly)` prints exactly one line; and a commit with OVERDECK_PAN_GIT_OP=1, a `merge --no-ff` through the shim, and a commit through a shim materialized behind a fake git whose `commit -h` lacks `--trailer` each exit 0 with no Overdeck-Agent trailer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-shim-trailer.ac4",
+            "title": "When `npx vitest run src/lib/__tests__/launcher-git-guard-behavior.test.ts` runs with that file unmodified, then every pre-existing test passes; and `git diff src/lib/__tests__/launcher-generator.test.ts` shows changes only inside the plan-abc and spec-123 inline snapshots, consisting of the probe, baked `_OVERDECK_GIT_TRAILERS`/`_OVERDECK_TRAILER_KEY`/`_OVERDECK_TRAILER_VALUE` lines and the TRAILER_SH block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-shim-trailer",
+        "title": "Conversations get a trailer-only git shim that adds Overdeck-Conversation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T18:28:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5281",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launcher-git-guard.ts",
+            "src/lib/launcher-generator.ts",
+            "src/lib/__tests__/launcher-conversation-git-shim.test.ts",
+            "src/lib/__tests__/launcher-git-guard-gh-shim.test.ts",
+            "src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/launcher-conversation-git-shim.test.ts src/lib/__tests__/launcher-git-guard-gh-shim.test.ts src/lib/__tests__/launcher-generator.test.ts src/lib/__tests__/launcher-git-guard-trailer.test.ts",
+            "! rg -q buildConversationGhShimLines src",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "all four test files pass",
+            "the negated rg exits 0 because no match exists",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 exactly. Rename buildConversationGhShimLines to buildConversationShimLines in src/lib/launcher-git-guard.ts with the new doc comment; after dropInheritedGuardDirLines() and mkdir, emit the guarded block from the PRD: resolve `_OVERDECK_REAL_GIT=\"$(command -v git 2>/dev/null || true)\"`, and only when non-empty run the --trailer probe and write `<guardDir>/git` (bypass first, FIND_COMMAND_SHIM_LINES, `_overdeck_git_command=` line, `...trailerShimLines('Overdeck-Conversation', conversationId)`, final exec), then chmod; then the existing gh shim and PATH export. No refusals, no branch check, no _OVERDECK_GUARD_ROOT. Update the import and the single call in src/lib/launcher-generator.ts. Update launcher-git-guard-gh-shim.test.ts (rename import and call; replace 'writes only a gh shim in the conversation guard dir' with a test asserting both gh and git exist) and the 'gives conversations a gh-only shim when ghShim is set (PAN-4343)' test in launcher-generator.test.ts as the PRD states. Leave 'adds the git guard only to issue-bound agent launchers' unchanged. Write src/lib/__tests__/launcher-conversation-git-shim.test.ts with the four WI-2 tests under NFR-3 env isolation."
+        },
+        "items": [
+          {
+            "id": "conversation-shim-trailer.ac1",
+            "title": "Given buildConversationShimLines('conv-5281-test', false) materialized with bash -ec, when `commit --allow-empty -m x` runs through `<home>/conversations/conv-5281-test/git-guard/git`, then `%(trailers:key=Overdeck-Conversation,valueonly)` returns `conv-5281-test`; with OVERDECK_PAN_GIT_OP=1 it returns nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-shim-trailer.ac2",
+            "title": "When `stash push`, `reset --hard HEAD` and `rebase main` (on branch side) run through the conversation shim in a temp repo, then each exits 0 and its stderr does not contain `Overdeck`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-shim-trailer.ac3",
+            "title": "Given one bash script that runs the conversation shim lines and then buildGitGuardLines('agent-in-conv', fixtureRepo) lines, when it runs `git -C <fixtureRepo> commit --allow-empty -m x` through PATH, then the commit carries `Overdeck-Agent: agent-in-conv` and no Overdeck-Conversation trailer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-shim-trailer.ac4",
+            "title": "When `rg buildConversationGhShimLines src` runs, then it finds no match; the gh-shim test asserts both `gh` and `git` exist in the conversation guard dir; and the launcher-generator conversation test asserts the script contains `conversations/conv-123/git-guard/git' <<EOF` and does not contain `_OVERDECK_GUARD_ROOT`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "attributed-commits-reader",
+        "title": "Add listAttributedCommits reader in src/lib/git/attributed-commits.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:28:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5281",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/git/attributed-commits.ts",
+            "src/lib/git/__tests__/attributed-commits.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/git/__tests__/attributed-commits.test.ts",
+            "! rg -q \"execSync|spawnSync|execFileSync\" src/lib/git/attributed-commits.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "attributed-commits.test.ts passes",
+            "the negated rg exits 0 because no sync process call exists",
+            "typecheck completes without errors",
+            "lint completes without errors (including lint:circular)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 exactly. Create src/lib/git/attributed-commits.ts exporting AttributionKey, AttributedCommitFile, AttributedCommit and async listAttributedCommits({ repoPath, key, value, since?, maxCount? }). Use promisify(execFile) with `git -C <repoPath> -c log.showSignature=false`, maxBuffer 16 MiB; import nothing from other src/lib modules. Empty value -> []; no HEAD -> [] if `rev-parse --git-dir` succeeds, else rethrow. List with `git log HEAD --no-merges --no-color -E --grep=^<escKey>:[[:space:]]*<escValue>[[:space:]]*$ [--since=] --format=%H%x1f%s%x1f%aI%x1f%(trailers:key=<key>,valueonly,separator=%x1d)` with NO --max-count (git would cap before the trailer check), keep only lines whose trailer list includes the value, then take the first `maxCount ?? 200`. For each sha in that slice only, sequentially, parse `git diff-tree --root -r -M -z --no-commit-id --numstat` and `--name-status` exactly as the PRD describes (rename = empty path then old,new; key by new; binary '-' -> 0; R* -> R, A, D, everything else -> M). Add the module header comment. Write the test file with the five-commit fixture plus a --no-ff merge, under NFR-3 env isolation."
+        },
+        "items": [
+          {
+            "id": "attributed-commits-reader.ac1",
+            "title": "Given the PRD's five-commit fixture plus a --no-ff merge whose message carries `Overdeck-Conversation: conv-a`, when listAttributedCommits is called with key Overdeck-Conversation and value conv-a, then it returns exactly commits 4 and 1 in that order (newest first), excluding the body-only commit 5 and the merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "attributed-commits-reader.ac2",
+            "title": "When the same call returns, then commit 4's files include `{ path: 'b.txt', status: 'R' }` with the additions and deletions git reports and the binary file as `{ status: 'A', additions: 0, deletions: 0 }`, and the root commit 1's files are exactly `[{ path: 'a.txt', status: 'A', ... }]`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "attributed-commits-reader.ac3",
+            "title": "When called with `maxCount: 1`, then it returns exactly commit 4 even though the newer commit 5 matches the grep through its body; when called on a repository with no commits or with an empty value, then it returns []; when called on a directory that is not a git repository, then the promise rejects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "attributed-commits-reader.ac4",
+            "title": "When `rg \"execSync|spawnSync|execFileSync\" src/lib/git/attributed-commits.ts` runs, then it finds no match, and `npm run lint` (including lint:circular) exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-commit-attribution",
+        "title": "Document commit attribution in docs, the workers reference and the changelog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:28:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5281",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "docs/PIPELINE-GATES.md",
+            "reference/workers.mdx",
+            "changelog.d/pan-5281.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "rg -n \"## Commit attribution \\(PAN-5281\\)\" docs/WORKSPACES-AND-PROJECTS.md",
+            "! rg -q \"conversations get it alone\" docs/PIPELINE-GATES.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "the heading is found once",
+            "the negated rg exits 0 because the old phrase is gone"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 exactly. Add `## Commit attribution (PAN-5281)` to docs/WORKSPACES-AND-PROJECTS.md immediately before `## Wrapper-repo git posture (polyrepo projects)`, covering the two keys and values, commit-only scope, no hook, the unattributed cases (OVERDECK_PAN_GIT_OP=1, absolute /usr/bin/git, git aliases, git older than 2.32, remote Fly agents), and listAttributedCommits in src/lib/git/attributed-commits.ts listing non-merge commits from HEAD. Replace the 'conversations get it alone' phrase in docs/PIPELINE-GATES.md's GitHub quota section with the PRD text. Add the PRD sentence to reference/workers.mdx after the 'Every worker that is not read-only also runs behind the default `git` shim.' paragraph. Create changelog.d/pan-5281.md with the PRD's exact `#### Improved` bullet. Do not edit changelog.mdx."
+        },
+        "items": [
+          {
+            "id": "docs-commit-attribution.ac1",
+            "title": "docs/WORKSPACES-AND-PROJECTS.md contains the heading `## Commit attribution (PAN-5281)` directly before `## Wrapper-repo git posture (polyrepo projects)`, and that section names `Overdeck-Agent`, `Overdeck-Conversation`, `OVERDECK_PAN_GIT_OP=1`, `/usr/bin/git`, git 2.32 and `listAttributedCommits`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-commit-attribution.ac2",
+            "title": "When `rg \"conversations get it alone\" docs/PIPELINE-GATES.md` runs, then it finds no match, and the GitHub quota section contains the phrase `trailer-only \\`git\\` shim`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-commit-attribution.ac3",
+            "title": "reference/workers.mdx contains `Overdeck-Agent: <agent id>`; changelog.d/pan-5281.md exists with exactly one `#### Improved` heading and a bullet linking https://github.com/eltmon/overdeck/issues/5281; and `npm run lint:docs` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "agent-shim-trailer",
+        "to": "conversation-shim-trailer",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-14-PAN-5281-commit-attribution-stamp-every-agent-and-conversation-commit-with-an-overdeck-conversation-overdeck-agent-trailer.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

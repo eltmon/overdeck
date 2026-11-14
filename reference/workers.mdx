@@ -128,6 +128,9 @@ In its own worktree the shim refuses `git commit`, `push`, `merge` and
 `cherry-pick` unless the worktree is on `<feature-branch>-worker-<n>`, and
 refuses them on a detached HEAD.
 
+Every worker commit, read-only or not, carries an `Overdeck-Agent: <agent id>`
+trailer that the shim adds, so Overdeck can tell which agent made it.
+
 `--read-only` puts a `git` shim first on the worker's `PATH`. The shim
 prevents accidental git writes to the issue's repository: the primary
 checkout, every worktree of it (the issue workspace included), and their
