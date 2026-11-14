@@ -18,7 +18,7 @@
  */
 import { existsSync } from 'node:fs';
 
-import type { WorkspaceRow } from '../workspaces/resolver.js';
+import type { WorkspaceRow } from '../workspaces/types.js';
 import { advisoryCandidates, advisoryDeliveryData, isAdvisoryCandidateClosed } from './advisory-followup-settlement.js';
 import { fileAdvisoryFollowups, isAdvisoryKeyResolvedInProcess, type AdvisoryFollowupOutcome } from './advisory-followup.js';
 import { readPipelineJournal, type PipelineJournalEntry } from './pipeline-journal.js';
