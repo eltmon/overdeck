@@ -8,10 +8,12 @@
  *
  * It must not import `drawer/DrawerAgentSession` or `IssueDetailShell`.
  */
+import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { presenceForPaneState, type BackendPane } from '@overdeck/contracts';
 
 import type { Agent } from '../../types';
+import { cn } from '../../lib/utils';
 import { PHASES, phaseLabel, type Phase, type PhaseStepState } from '../../lib/simple/phases';
 import { isEndedAgent } from '../../lib/agentConversation';
 import { useAgentSessionOutcome } from '../../lib/useSessionOutcome';
@@ -25,7 +27,10 @@ import { ActiveAgentPanel } from '../issue-view/ActiveAgentPanel';
 import { usePipelineRail } from '../issue-view/IssuePipelineStrip';
 import { UatEnvironmentPanel } from '../CommandDeck/UatEnvironmentPanel';
 import { useIssueActions } from '../IssueActionMenu/useIssueActions';
+import { useIssueCostsQuery } from '../CommandDeck/ZoneCOverviewTabs/queries';
+import { CostsTab } from '../CommandDeck/ZoneCOverviewTabs/CostsTab';
 import { StatusNarrative } from '../Stage/cockpit/StatusNarrative';
+import { DeftSubagentRows } from '../deft/DeftSubagentRows';
 import { ROLE_TO_PHASE, pickPhaseAgent } from './IssuePhaseRail';
 import { agentsToReviewerSessions, deriveSpecialistChips } from './deriveSpecialists';
 import { PickupSection, ResourcesFacet, WorkspaceSection, useDrawerWorkspace } from './IssueDetailSections';
@@ -83,12 +88,13 @@ function pickPhasePane(panes: readonly BackendPane[], phase: Phase): BackendPane
   return candidates.find((pane) => presenceForPaneState(pane.state) === 'active') ?? candidates[0];
 }
 
-function PipelineRow({ phase, state, agent, pane, now, onOpenAgentConversation }: {
+function PipelineRow({ phase, state, agent, pane, now, cost, onOpenAgentConversation }: {
   phase: Phase;
   state: PhaseStepState;
   agent: Agent | undefined;
   pane: BackendPane | undefined;
   now: Date;
+  cost: number;
   onOpenAgentConversation: (agentId: string) => void;
 }) {
   // A hook, so each row is its own component.
@@ -129,6 +135,9 @@ function PipelineRow({ phase, state, agent, pane, now, onOpenAgentConversation }
         {metaLine ? <span className="block text-[11.5px] text-muted-foreground">{metaLine}</span> : null}
       </td>
       <td className="py-[7px] pr-[12px] text-muted-foreground">{outcomeText}</td>
+      <td data-testid={`drawer-details-cost-${phase}`} className="py-[7px] pr-[12px] text-right font-mono-ui text-[12px] tabular-nums text-signal-cost-foreground">
+        {cost > 0 ? `$${cost.toFixed(2)}` : ''}
+      </td>
       <td className="py-[7px] text-right">
         {agent ? (
           <button
@@ -163,6 +172,14 @@ export function IssueDrawerDetails({
   const reviewStarted = chips.some((chip) => chip.status !== 'queued');
   const hasPlan = useIssueActions(issueId).state.hasPlan;
   const workRunning = agents.some((agent) => agent.role === 'work' && (agent.status === 'running' || agent.status === 'starting'));
+  const [costsOpen, setCostsOpen] = useState(false);
+  const costsData = useIssueCostsQuery(issueId).data;
+  const sessions = costsData?.sessions ?? [];
+  // An agent can own several cost rows (a restart or a session rollover): sum them.
+  const costOf = (agentId: string) => sessions
+    .filter((entry) => entry.agentId === agentId || entry.sessionId === agentId)
+    .reduce((sum, entry) => sum + (entry.cost ?? 0), 0);
+  const totalCost = costsData?.resolvedTotalCost ?? costsData?.totalCost ?? 0;
 
   return (
     <div data-testid="drawer-tab-panel-overview" className="@container">
@@ -180,19 +197,50 @@ export function IssueDrawerDetails({
           <h3 className={HEADING_CLASS}>Pipeline</h3>
           <table className="w-full border-collapse text-[13px]">
             <tbody>
-              {PHASES.map((phase) => (
-                <PipelineRow
-                  key={phase}
-                  phase={phase}
-                  state={rail[phase]}
-                  agent={pickPhaseAgent(agents, phase)}
-                  pane={pickPhasePane(panes, phase)}
-                  now={now}
-                  onOpenAgentConversation={onOpenAgentConversation}
-                />
-              ))}
+              {PHASES.map((phase) => {
+                const agent = pickPhaseAgent(agents, phase);
+                return (
+                  <PipelineRow
+                    key={phase}
+                    phase={phase}
+                    state={rail[phase]}
+                    agent={agent}
+                    pane={pickPhasePane(panes, phase)}
+                    now={now}
+                    cost={agent ? costOf(agent.id) : 0}
+                    onOpenAgentConversation={onOpenAgentConversation}
+                  />
+                );
+              })}
             </tbody>
+            {totalCost > 0 ? (
+              <tfoot>
+                <tr className="border-t border-border">
+                  <td colSpan={3} className="py-[7px] pr-[12px] font-medium">Total</td>
+                  <td
+                    data-testid="drawer-details-cost-total"
+                    title="Whole issue, including agents not listed above"
+                    className="py-[7px] pr-[12px] text-right font-mono-ui text-[12px] tabular-nums text-signal-cost-foreground"
+                  >
+                    ${totalCost.toFixed(2)}
+                  </td>
+                  <td />
+                </tr>
+              </tfoot>
+            ) : null}
           </table>
+          <DeftSubagentRows issueId={issueId} />
+          <button
+            type="button"
+            data-testid="drawer-details-costs-toggle"
+            aria-expanded={costsOpen}
+            onClick={() => setCostsOpen((open) => !open)}
+            className="mt-[8px] inline-flex items-center gap-[6px] text-[12px] text-primary-ink hover:underline"
+          >
+            <ChevronRight aria-hidden className={cn('h-3 w-3 transition-transform', costsOpen && 'rotate-90')} />
+            Cost breakdown
+          </button>
+          {costsOpen ? <div data-testid="drawer-details-costs" className="mt-[8px]"><CostsTab issueId={issueId} /></div> : null}
         </section>
 
         <section data-section="DrawerReviewSpecialists" data-testid="drawer-details-review">

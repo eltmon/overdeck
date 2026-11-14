@@ -24,6 +24,13 @@ const useSharedTickMock = vi.fn(() => new Date('2026-05-22T00:00:00.000Z'));
 vi.mock('../../lib/useSharedTick', () => ({
   useSharedTick: (...args: unknown[]) => useSharedTickMock(...args),
 }));
+const useIssueCostsQueryMock = vi.fn(() => ({ data: undefined }));
+vi.mock('../CommandDeck/ZoneCOverviewTabs/queries', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../CommandDeck/ZoneCOverviewTabs/queries')>()),
+  useIssueCostsQuery: (...args: unknown[]) => useIssueCostsQueryMock(...args),
+}));
+vi.mock('../CommandDeck/ZoneCOverviewTabs/CostsTab', () => ({ CostsTab: () => <div data-testid="mock-costs-tab" /> }));
+vi.mock('../deft/DeftSubagentRows', () => ({ DeftSubagentRows: () => null }));
 
 import type { Agent } from '../../types';
 import { useDashboardStore } from '../../lib/store';
@@ -71,6 +78,7 @@ function renderDetails(props: Partial<IssueDrawerDetailsProps> = {}) {
 beforeEach(() => {
   stubWorkspace({ exists: true, path: '/tmp/pan-1', containers: {} });
   useSharedTickMock.mockReturnValue(new Date('2026-05-22T00:00:00.000Z'));
+  useIssueCostsQueryMock.mockReturnValue({ data: undefined });
 });
 
 afterEach(() => {
@@ -146,6 +154,47 @@ describe('IssueDrawerDetails', () => {
     renderDetails({ agents: [agent({ id: 'agent-pan-1', role: 'work', startedAt: '2026-05-22T00:00:00.000Z' })] });
     const row = screen.getByTestId('drawer-details-pipeline').querySelector('tr[data-phase="work"]') as HTMLElement;
     expect(row).toHaveTextContent('Running now · 2m');
+  });
+
+  it("the cost column sums an agent's cost rows and shows the issue total", () => {
+    useIssueCostsQueryMock.mockReturnValue({
+      data: {
+        issueId: 'PAN-1',
+        totalCost: 1.5,
+        resolvedTotalCost: 2,
+        totalTokens: 0,
+        sessions: [
+          { sessionId: 's1', agentId: 'agent-pan-1', startedAt: '', endedAt: null, type: 'work', model: 'claude-sonnet-4-6', cost: 1 },
+          { sessionId: 's2', agentId: 'agent-pan-1', startedAt: '', endedAt: null, type: 'work', model: 'claude-sonnet-4-6', cost: 0.5 },
+          { sessionId: 's3', agentId: 'agent-pan-1-review-security', startedAt: '', endedAt: null, type: 'review', model: 'claude-sonnet-4-6', cost: 0.5 },
+        ],
+      },
+    });
+    renderDetails({ agents: [agent({ id: 'agent-pan-1', role: 'work' })] });
+
+    expect(screen.getByTestId('drawer-details-cost-work')).toHaveTextContent('$1.50');
+    expect(screen.getByTestId('drawer-details-cost-total')).toHaveTextContent('$2.00');
+  });
+
+  it('shows no total row when the resolved total is zero', () => {
+    useIssueCostsQueryMock.mockReturnValue({
+      data: { issueId: 'PAN-1', totalCost: 0, resolvedTotalCost: 0, totalTokens: 0, sessions: [] },
+    });
+    renderDetails();
+    expect(screen.queryByTestId('drawer-details-cost-total')).toBeNull();
+  });
+
+  it('the cost breakdown disclosure mounts CostsTab only while open', () => {
+    renderDetails();
+    expect(screen.queryByTestId('mock-costs-tab')).not.toBeInTheDocument();
+
+    const toggle = screen.getByTestId('drawer-details-costs-toggle');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('drawer-details-costs')).toBeInTheDocument();
+    expect(screen.getByTestId('mock-costs-tab')).toBeInTheDocument();
   });
 
   it('a phase without an agent shows no Open conversation button', () => {
