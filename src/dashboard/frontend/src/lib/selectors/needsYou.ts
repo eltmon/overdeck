@@ -20,7 +20,8 @@ import { formatIssueRef } from '../issueLabel'
 import { requestRevealNeedsYou } from '../flywheelReveal'
 import { useFlywheelStatus } from '../flywheelApi'
 import { navigateToIssue } from '../../components/AgentPillPopoverRow'
-import { needsYouRows, type NeedsYouRow } from '../../components/flywheel/FlywheelStatusPane'
+// PAN-5283 replaced FlywheelStatusPane's needsYouRows with buildNeedsYouCards; with no in-flight rows it yields one card per tick item.
+import { buildNeedsYouCards, type NeedsYouCard as NeedsYouRow } from '../flywheelNeedsYou'
 import { useProjectResolver, type ProjectResolver } from './projectOf'
 
 export type NeedsYouKind = 'pending-input' | 'issue' | 'flywheel' | 'decision'
@@ -51,7 +52,7 @@ export interface NeedsYouSources {
   subjects: readonly PendingInputSubject[]
   resolution: SubjectResolution
   derived: Readonly<Record<string, DerivedIssueState>>
-  /** needsYouRows(status.lastTick) when lastTick exists, else []. */
+  /** buildNeedsYouCards(status.lastTick, []) when lastTick exists, else []. */
   flywheelRows: readonly NeedsYouRow[]
   decisions: readonly Decision[]
   issueTitles: ReadonlyMap<string, string>
@@ -227,7 +228,7 @@ export function useNeedsYouItems(opts?: { projectKey?: string }): NeedsYouItem[]
 
   const issueTitles = useMemo(() => issueTitleMap(issues), [issues])
   const lastTick = flywheelStatus?.lastTick
-  const flywheelRows = useMemo(() => (lastTick ? needsYouRows(lastTick) : []), [lastTick])
+  const flywheelRows = useMemo(() => (lastTick ? buildNeedsYouCards(lastTick, []) : []), [lastTick])
 
   return useMemo(
     () =>
