@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5218",
   "created": "2026-11-14T02:30:48.079Z",
-  "updated": "2026-11-14T02:43:45.255Z",
+  "updated": "2026-11-14T02:45:33.062Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,26 @@
     "postmerge-wiring.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T02:43:45.255Z"
+    },
+    "followup-patrol": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:45:33.062Z"
+    },
+    "followup-patrol.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:45:33.062Z"
+    },
+    "followup-patrol.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:45:33.062Z"
+    },
+    "followup-patrol.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:45:33.062Z"
+    },
+    "followup-patrol.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:45:33.062Z"
     }
   }
 }
