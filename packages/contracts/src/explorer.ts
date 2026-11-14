@@ -247,6 +247,22 @@ export const ExplorerBeginEditResult = Schema.Struct({
 })
 export type ExplorerBeginEditResult = typeof ExplorerBeginEditResult.Type
 
+/** An edit workspace's PR with its merge verdict (PAN-5191 D-F7). */
+export interface EditWorkspacePr {
+  url: string
+  number: number
+  state: 'OPEN' | 'MERGED' | 'CLOSED'
+  isDraft: boolean
+  /** MERGEABLE | CONFLICTING | UNKNOWN */
+  mergeable: string
+  /** CLEAN | DIRTY | BLOCKED | ... */
+  mergeStateStatus: string
+  headSha: string
+  canMerge: boolean
+  /** D-F7 text; null when canMerge. */
+  reason: string | null
+}
+
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
 /** Values of PanRpcError.code that explorer methods return. */
