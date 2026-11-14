@@ -74,6 +74,17 @@ const NEW_DESTINATION_TEST_IDS: Record<(typeof NEW_ISSUE_DETAIL_TABS)[number], s
   skills: 'drawer-tab-panel-skills',
 };
 
+const SELECTED_ENTRY: Record<(typeof OLD_ISSUE_DETAIL_TABS)[number], string> = {
+  overview: 'overview',
+  plan: 'plan',
+  tasks: 'tasks',
+  conversation: 'session',
+  terminal: 'session',
+  activity: 'activity',
+  files: 'changes',
+  artifacts: 'changes',
+};
+
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ exists: false })));
 });
@@ -100,11 +111,7 @@ describe('issue session tab no-loss audit', () => {
     renderLegacyTab(legacyTab);
 
     expect(screen.getByTestId(DESTINATION_TEST_IDS[legacyTab])).toBeInTheDocument();
-    if (legacyTab === 'conversation' || legacyTab === 'terminal') {
-      expect(screen.getByTestId('drawer-tab-session')).toHaveAttribute('aria-selected', 'true');
-    } else {
-      expect(screen.getByTestId(`drawer-tab-${legacyTab}`)).toHaveAttribute('aria-selected', 'true');
-    }
+    expect(screen.getByTestId(`drawer-tab-${SELECTED_ENTRY[legacyTab]}`)).toHaveAttribute('aria-selected', 'true');
   });
 
   it.each(NEW_ISSUE_DETAIL_TABS)('renders a destination for the new %s tab', (newTab) => {
@@ -119,9 +126,10 @@ describe('issue session tab no-loss audit', () => {
       'session',
       'tasks',
       'plan',
-      'files',
+      'changes',
       'activity',
-      'artifacts',
+      'decisions',
+      'discussion',
       'skills',
       'overview',
     ]);

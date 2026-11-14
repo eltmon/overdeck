@@ -249,6 +249,7 @@ describe('IssueDetail (C-DETAIL one component)', () => {
     expect(screen.queryByTestId('mock-pipeline-strip')).not.toBeInTheDocument();
     expect(screen.getByTestId('mock-agent-session-conversation')).toHaveAttribute('data-layout', 'toolbar');
     expect(screen.queryByTestId('drawer-tab-skills')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('drawer-tab-discussion')).not.toBeInTheDocument();
   });
 
   it('page density keeps the Overview body with the skills disclosure and the tasks panel', () => {
