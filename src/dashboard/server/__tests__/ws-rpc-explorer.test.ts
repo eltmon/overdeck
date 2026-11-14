@@ -11,9 +11,11 @@ const mocks = vi.hoisted(() => ({
   listener: null as WatchListener | null,
   unsubscribe: vi.fn(),
   subscribe: vi.fn(),
+  beginEdit: vi.fn(),
 }));
 
 vi.mock('../services/explorer/roots.js', () => ({ resolveExplorerRoot: mocks.resolveExplorerRoot }));
+vi.mock('../services/explorer/edit-workspace.js', () => ({ beginEdit: mocks.beginEdit }));
 vi.mock('../services/explorer/watch-supervisor.js', () => ({
   getExplorerWatchSupervisor: () => ({ subscribe: mocks.subscribe, dispose: async () => {} }),
 }));
@@ -199,13 +201,21 @@ describe('explorerRpcHandlers write methods', () => {
   });
 });
 
-describe('explorerRpcHandlers unshipped methods', () => {
-  it('pan.explorerBeginEdit fails NOT_IMPLEMENTED naming PAN-5191', async () => {
-    const exit = await Effect.runPromiseExit(
-      explorerRpcHandlers[WS_METHODS.explorerBeginEdit]({ projectKey: 'overdeck', forceNew: false }),
+describe('pan.explorerBeginEdit', () => {
+  it('forwards projectKey and forceNew to beginEdit and returns its result', async () => {
+    const result = {
+      rootId: 'workspace:w1',
+      workspaceId: 'w1',
+      name: 'edit-1113-1405',
+      branch: 'scratch/edit-1113-1405',
+      path: '/p/workspaces/scratch-edit-1113-1405',
+      created: true,
+    };
+    mocks.beginEdit.mockResolvedValue(result);
+    const answer = await Effect.runPromise(
+      explorerRpcHandlers[WS_METHODS.explorerBeginEdit]({ projectKey: 'overdeck', forceNew: true }),
     );
-    const error = failureOf(exit);
-    expect(error.code).toBe('NOT_IMPLEMENTED');
-    expect(error.message).toContain('PAN-5191');
+    expect(mocks.beginEdit).toHaveBeenCalledWith('overdeck', true);
+    expect(answer).toEqual(result);
   });
 });

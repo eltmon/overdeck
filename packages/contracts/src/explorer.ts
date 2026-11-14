@@ -247,6 +247,9 @@ export const ExplorerBeginEditResult = Schema.Struct({
 })
 export type ExplorerBeginEditResult = typeof ExplorerBeginEditResult.Type
 
+/** Whether an edit workspace can open a PR or use the pipeline, and why not (PAN-5191). */
+export interface EditWorkspaceSupport { available: boolean; reason: string | null }
+
 /** An edit workspace's PR with its merge verdict (PAN-5191 D-F7). */
 export interface EditWorkspacePr {
   url: string
