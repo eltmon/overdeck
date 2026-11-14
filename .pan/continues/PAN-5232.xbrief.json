@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5232",
   "created": "2026-11-14T03:50:14.887Z",
-  "updated": "2026-11-14T04:17:43.374Z",
+  "updated": "2026-11-14T04:17:53.244Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,11 @@
     "resume-guard.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T04:17:43.374Z"
+    },
+    "contract-test": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5232",
+      "claimedAt": "2026-11-14T04:17:53.244Z"
     }
   }
 }
