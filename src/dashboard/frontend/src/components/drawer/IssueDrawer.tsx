@@ -36,7 +36,9 @@ export function IssueDrawer() {
     if (!drawer.issueId) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeIssue();
+      // PAN-5244: a popover inside the drawer that handles Escape calls
+      // preventDefault(); that Escape closes the popover, not the drawer.
+      if (event.key === 'Escape' && !event.defaultPrevented) closeIssue();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);

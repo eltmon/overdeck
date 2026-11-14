@@ -522,6 +522,19 @@ describe('IssueDrawer', () => {
     scroller.remove();
   });
 
+  it('stays open when an Escape keydown was already handled (defaultPrevented)', () => {
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
+    renderDrawer();
+
+    const event = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
+    event.preventDefault();
+    window.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(useDashboardStore.getState().drawer.issueId).toBe('PAN-1');
+    expect(screen.getByTestId('issue-drawer')).toBeTruthy();
+  });
+
   it('renders most-recent-first activity rail items with phase dots and scroll reset', async () => {
     useDashboardStore.setState({
       recentActivity: [
