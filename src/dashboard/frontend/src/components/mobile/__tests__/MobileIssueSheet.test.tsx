@@ -21,11 +21,15 @@ function issue(overrides: Partial<Issue>): Issue {
   };
 }
 
-function renderSheet(issueId: string, onBack = vi.fn()) {
+function renderSheet(
+  issueId: string,
+  onBack = vi.fn(),
+  event?: Parameters<typeof MobileIssueSheet>[0]['event'],
+) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MobileIssueSheet issueId={issueId} onBack={onBack} />
+      <MobileIssueSheet issueId={issueId} event={event} onBack={onBack} />
     </QueryClientProvider>,
   );
 }
@@ -146,6 +150,51 @@ describe('MobileIssueSheet', () => {
 
     renderSheet('PAN-9');
     expect(screen.getAllByText('Needs you').length).toBeGreaterThan(0);
+  });
+
+  it('renders a What happened line naming the PR for merge.completed', () => {
+    useDashboardStore.setState({
+      issuesRaw: [issue({ identifier: 'PAN-6' })],
+      derivedIssueStateByIssueId: {
+        'PAN-6': {
+          issueId: 'PAN-6',
+          state: 'ready',
+          pr: { url: 'https://example.com/pr/12', number: 12, reviewState: 'approved', checks: 'green', mergeable: true },
+        },
+      } satisfies Record<string, DerivedIssueState>,
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderSheet('PAN-6', vi.fn(), { kind: 'merge.completed', at: '2026-11-13T19:43:00.000Z' });
+    expect(screen.getByTestId('mobile-issue-event')).toHaveTextContent('Merged PR #12 at ');
+  });
+
+  it('renders no What happened line without an event', () => {
+    useDashboardStore.setState({
+      issuesRaw: [issue({ identifier: 'PAN-6' })],
+      derivedIssueStateByIssueId: {
+        'PAN-6': { issueId: 'PAN-6', state: 'working' },
+      } satisfies Record<string, DerivedIssueState>,
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderSheet('PAN-6');
+    expect(screen.queryByTestId('mobile-issue-event')).not.toBeInTheDocument();
+  });
+
+  it('renders Phase and State from derived state for a 404 record instead of returning early', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 404 })));
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: {
+        'PAN-404': { issueId: 'PAN-404', state: 'working' },
+      } satisfies Record<string, DerivedIssueState>,
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderSheet('PAN-404');
+
+    expect(await screen.findByText('not found on tracker')).toBeInTheDocument();
+    expect(screen.getByText('Work')).toBeInTheDocument();
+    expect(screen.getByText('working')).toBeInTheDocument();
   });
 
   it('renders exactly one button (Back), and tapping it calls onBack', () => {
