@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5236",
   "created": "2026-11-14T04:12:49.397Z",
-  "updated": "2026-11-14T04:33:35.627Z",
+  "updated": "2026-11-14T04:33:45.976Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
     "build-drift-lib.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T04:33:35.626Z"
+    },
+    "new-build-banner": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5236",
+      "claimedAt": "2026-11-14T04:33:45.975Z"
     }
   }
 }
