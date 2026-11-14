@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5275",
   "created": "2026-11-14T17:57:35.883Z",
-  "updated": "2026-11-14T19:17:24.837Z",
+  "updated": "2026-11-14T19:17:55.515Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,6 +54,14 @@
     "docs-changelog.ac2": {
       "status": "completed",
       "doneAt": "2026-11-14T19:17:24.837Z"
+    },
+    "browser-hover-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:17:55.515Z"
+    },
+    "browser-hover-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:17:55.515Z"
     }
   }
 }
