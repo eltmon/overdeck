@@ -1,0 +1,778 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T04:01:33Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5237: Composer: cancel a message while it shows Sending…",
+    "updated": "2026-11-14T04:10:30.960Z"
+  },
+  "plan": {
+    "id": "pan-5237",
+    "title": "Composer: cancel a message while it shows Sending…",
+    "status": "proposed",
+    "uid": "2f7cfa52-b113-4303-87d8-c10de96fc385",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-14T04:01:33Z",
+    "updated": "2026-11-14T04:10:30.960Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5237",
+        "label": "PAN-5237",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5237.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "composer",
+      "conversations",
+      "frontend",
+      "server"
+    ],
+    "metadata": {
+      "sizeJustification": "One client/server contract: the client cancel flow cannot be verified without the server's cancelled/delivered/unknown outcome, and the server gate and route have no user-visible effect alone. The surface is ~26 files only because each slice carries its own tests and the change touches docs, changelog and the frontend test subset list (each a separate path prefix).",
+      "canonicalFilename": "2026-11-14-PAN-5237-composer-cancel-a-message-while-it-shows-sending.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "A composer message in the Sending… state cannot be cancelled. Since PAN-5184 a message is Sending… while it waits in the per-conversation client send queue or while its POST /api/conversations/<name>/message is in flight (up to 120 s). Held messages only offer Discard, which loses the text.",
+      "Proposal": "Server: the message receipt (conversation-message-receipts.ts) gains a delivery gate (isCancelled/commit) and cancel outcomes; deliverConversationMessage checks the gate before the pane work and commits immediately before every irreversible step (paste, Pi control channel, native compact, composer command); a new POST /api/conversations/:name/message/cancel answers cancelled | delivered | unknown and writes a tombstone for an id it has not seen. Client: bubbles carry sendPhase/sendRoute/cancelState; a shared runCancellableSend wraps the three send sites (deliverQueuedPrompt, releaseHeldMessages, retryFailed); cancelSend cancels queued and held bubbles locally and in-flight ones through the server, never aborting the fetch; a cancelled message's text goes back into the empty mounted composer through a registered restore target, otherwise to the outbox as Cancelled with Resend. See .pan/drafts/PAN-5237.md (D1–D10, WI-1..WI-7).",
+      "NonGoals": "- Cancelling /pan commands, scheduled (when-limits-reset) messages, held-kickoff starts or Shared Sessions prompts\n- Cancelling an in-flight send to /api/agents/:id/message (that route has no receipts)\n- Cancelling after the paste started: no un-paste, no Escape or other keys sent to the agent to undo input\n- Aborting the in-flight HTTP request from the client (the AbortController stays timeout-only)\n- Keeping the steer/follow-up delivery mode when a Cancelled entry is resent\n- A new MCP tool or pan CLI verb for cancel\n- Making composer bubbles survive a page reload\n- Growing src/dashboard/server/routes/conversations.ts beyond 1034 lines or raising any file-size allowlist cap"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The client never aborts an in-flight POST it cancelled; it removes the bubble on a server 'cancelled' outcome and waits for the server's own 409 cancelled before the next queued send starts.",
+        "rationale": "The issue text says to abort the request, but the server has no per-conversation serialization: aborting would let the next queued message start while the cancelled handler may still send ensure-main keys (Down/Up/Enter/Escape) to the same pane, which can submit a partial paste and breaks requirement 5 (never reorder or disturb other messages)."
+      },
+      {
+        "summary": "The cancel route answers three outcomes: cancelled, delivered, unknown. An id the server has never seen gets a tombstone and the answer unknown.",
+        "rationale": "Requirement 'never claim a cancel that didn't happen': with no receipt the server cannot tell a not-yet-arrived POST from a receipt lost to a restart. The tombstone still refuses a late POST, whose 409 cancelled then settles the bubble truthfully."
+      },
+      {
+        "summary": "A cancel is final once the server reaches its commit point (immediately before paste, Pi control-channel delivery, native compaction or a composer command); after it the answer is 'delivered' and the UI says \"Already delivered, can't cancel\".",
+        "rationale": "Cancelling between paste and Enter would leave text in the agent's input box; one synchronous commit per irreversible step is the smallest truthful boundary."
+      },
+      {
+        "summary": "In-flight sends to /api/agents/:id/message show no Cancel control; they are cancellable only while queued or held.",
+        "rationale": "That route ignores clientMessageId and has no receipts, so a server-side cancel cannot be confirmed; adding receipts to agent messaging is a separate change."
+      },
+      {
+        "summary": "Composer 'empty' means blank editor text, no pending attachments and no pending citations, and only a mounted composer (a registered restore target) can take text back; otherwise the message becomes a Cancelled outbox entry.",
+        "rationale": "The mounted Lexical editor rewrites the draft from its own latestTextRef on unmount (ComposerPromptEditor.tsx), so writing localStorage directly would be lost; a deterministic outbox fallback never drops the text."
+      },
+      {
+        "summary": "On held (permission-pending) bubbles, Cancel replaces Discard and discardHeld is removed.",
+        "rationale": "Requirement 4 says held messages cancel the same way; Cancel keeps the text (composer or outbox, where Discard remains), so no capability is lost."
+      },
+      {
+        "summary": "Offline-held outbox entries (PAN-4279) get a Cancel button that clears heldOffline and turns the entry into a Cancelled entry (or returns the text to the empty composer).",
+        "rationale": "They already sit in the outbox; cancelling them means stopping the automatic reconnect send, and clearing heldOffline is what makes flushHeldMessages skip them."
+      },
+      {
+        "summary": "A Cancelled outbox entry has code 'cancelled', deliveryUnknown false, retryable true and a Resend button; Resend uses a fresh clientMessageId and the default delivery mode.",
+        "rationale": "deliveryUnknown false already makes retryFailed mint a fresh id (the receipt for the old id replays the 409 cancelled); the optimistic bubble never stored deliverAs, so preserving steer would need new plumbing outside this issue."
+      },
+      {
+        "summary": "The plan stays one issue with plan.metadata.sizeJustification instead of sibling issues.",
+        "rationale": "The server endpoint has no user-observable effect without the client, and the client's acceptance tests depend on the server's outcome contract."
+      }
+    ],
+    "items": [
+      {
+        "id": "receipt-cancel-gate",
+        "title": "Receipts: delivery gate, cancel outcomes and tombstones",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T04:01:33Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5237",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "handler-delivery-gate",
+            "cancel-route"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/conversation-message-receipts.ts",
+            "src/dashboard/server/services/__tests__/conversation-message-receipts.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-message-receipts.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-message-receipts.test.ts passes including the new cancel and tombstone cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Add phase 'pending'|'committed'|'cancelled' and nullable fingerprint (tombstone) to Receipt. Export ConversationDeliveryGate, OPEN_DELIVERY_GATE, ConversationMessageCancelOutcome and cancelledBeforeDeliveryResponse() (409 {error:'Cancelled before delivery', code:'cancelled', deliveryUnknown:false, retryable:false}). createConversationMessageReceipts() returns { deliver(name, body, run: (gate) => Promise<Response>), cancel(name, id) }: no clientMessageId -> run(OPEN_DELIVERY_GATE); a tombstone previous returns its result before the fingerprint check; cancel follows PRD decision D2 (pending -> cancelled; settled without commit -> cancelled; cancelled -> cancelled; committed -> delivered; unknown id -> write tombstone, answer unknown; tombstone -> unknown until a POST hit it and was refused (refusedPost), then cancelled; invalid id -> 'invalid'). Export singletons withConversationMessageReceipt = receipts.deliver and cancelConversationMessage = receipts.cancel, plus handleConversationMessageCancel(name, body, conversationExists) returning 404 / 400 / 200 {outcome}. The module must not import the conversation database. Update existing tests to call .deliver and add the PRD's cases with vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "receipt-cancel-gate.ac1",
+            "title": "Given a pending receipt, when cancel(name, id) runs, then it returns 'cancelled' and the receipt's gate.commit() returns false and gate.isCancelled() returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "receipt-cancel-gate.ac2",
+            "title": "Given a receipt whose gate.commit() already returned true, when cancel runs, then it returns 'delivered' (also after the receipt settles)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "receipt-cancel-gate.ac3",
+            "title": "Given an id the receipts have never seen, when cancel runs (once or twice), then it returns 'unknown'; a later deliver() with that id returns 409 code 'cancelled' without invoking run, and a cancel after that returns 'cancelled'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "receipt-cancel-gate.ac4",
+            "title": "Given a receipt that settled without calling commit (e.g. run returned 409 permission-pending), when cancel runs, then it returns 'cancelled'; an id failing ^[a-zA-Z0-9_-]{1,128}$ returns 'invalid'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "receipt-cancel-gate.ac5",
+            "title": "handleConversationMessageCancel returns 404 when conversationExists is false, 400 for an invalid id, and 200 {outcome} otherwise; a tombstone is pruned after 24 h of fake time so a new POST delivers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handler-delivery-gate",
+        "title": "Delivery handler checks the gate before pane work and commits before each irreversible step",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T04:01:33Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5237",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-message.ts",
+            "src/lib/overdeck/__tests__/conversation-message-delivery-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-message-delivery-gate.test.ts src/lib/overdeck/__tests__/conversation-message-permission-hold.test.ts src/lib/overdeck/__tests__/conversation-message-delivery-result.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three conversation-message test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add optional deliveryGate?: ConversationDeliveryGate to ConversationMessageDependencies (absent = OPEN_DELIVERY_GATE, so scheduled-message delivery and the Shared Sessions submit queue are unchanged). In deliverConversationMessage: commit before handleComposerCommandMessage when isComposerCommandMessage(message); commit before compactConversationNative; commit before deliverConversationViaControlChannel; isCancelled() check as the first statement of the non-Pi branch (before conversationPendingPermission and ensureMainInputTarget); one commit after the Kimi session wait and immediately before whichever deliver(...) call runs. Each failed check returns cancelledBeforeDeliveryResponse(). New test file stubs the dependencies like conversation-message-permission-hold.test.ts."
+        },
+        "items": [
+          {
+            "id": "handler-delivery-gate.ac1",
+            "title": "Given a gate whose commit() returns false, when handleConversationMessage runs for a claude-code conversation, then it returns 409 code 'cancelled' and the deliverAgentMessage stub is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handler-delivery-gate.ac2",
+            "title": "Given a gate whose isCancelled() returns true, when the handler runs, then neither the conversationPendingPermission nor the ensureMainInputTarget stub is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handler-delivery-gate.ac3",
+            "title": "Given a permission prompt is up, when the handler runs, then it returns 409 permission-pending and commit() is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handler-delivery-gate.ac4",
+            "title": "Given an open gate, when a normal message is sent, then commit() is called exactly once and before deliverAgentMessage; given no deliveryGate dependency, the message delivers as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cancel-route",
+        "title": "POST /api/conversations/:name/message/cancel route and gate wiring in the message route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T04:01:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5237",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/conversation-message-cancel.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts",
+            "wc -l src/dashboard/server/routes/conversations.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "no-loss-matrix and route-scopes tests pass",
+            "conversations.ts has at most 1034 lines",
+            "typecheck completes without errors",
+            "file-size guard reports no violations"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In conversations.ts change lines 620-621 (line-count neutral) to pass (deliveryGate) => handleConversationMessage(name, body, { ...conversationMessageDependencies, deliveryGate }). Create routes/conversation-message-cancel.ts exporting conversationMessageCancelRouteLayer = HttpRouter.add('POST', '/api/conversations/:name/message/cancel', ...) with validateOrigin (403), JSON body parse (400 'Invalid JSON body'), then handleConversationMessageCancel(name, body, (n) => getConversationByName(n) !== null). Keep the HttpRouter.add( / 'POST', / path layout on separate lines so no-loss-matrix.test.ts enumerates it. Register it in server.ts next to conversationScheduledMessagesRouteLayer. Add a 'tell' row in route-scopes.ts after the message row and a WRITE row in tests/unit/lib/overdeck/no-loss-matrix.ts after line 231."
+        },
+        "items": [
+          {
+            "id": "cancel-route.ac1",
+            "title": "wc -l src/dashboard/server/routes/conversations.ts prints a count at or below 1034 and the message route passes a deliveryGate into handleConversationMessage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cancel-route.ac2",
+            "title": "tests/unit/lib/overdeck/no-loss-matrix.test.ts passes with a row for 'POST /api/conversations/:name/message/cancel'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cancel-route.ac3",
+            "title": "grep -n \"message/cancel\" src/dashboard/server/route-scopes.ts returns a POST row with scope 'tell', and route-scopes.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cancel-route.ac4",
+            "title": "server.ts merges conversationMessageCancelRouteLayer into the router and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "client-cancel-store",
+        "title": "Client cancel core: bubble send phases, runCancellableSend, cancelSend / settleCancelled / cancelHeldOffline",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T04:01:33Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5237",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "queued-send-cancel",
+            "bubble-cancel-controls",
+            "outbox-cancel-controls",
+            "composer-restore-target"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/chat-types.ts",
+            "src/dashboard/frontend/src/lib/composerSend.ts",
+            "src/dashboard/frontend/src/lib/composerStore.ts",
+            "src/dashboard/frontend/src/lib/composerEchoes.ts",
+            "src/dashboard/frontend/src/components/chat/useStableComposerProps.ts",
+            "src/dashboard/frontend/src/lib/__tests__/composerCancel.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/composerCancel.test.ts src/lib/__tests__/composerStore.test.ts src/components/chat/__tests__/composerHeldMessages.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "composerCancel.test.ts, composerStore.test.ts and composerHeldMessages.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "It has no DAG predecessors and shares no file with the server items (receipt-cancel-gate, handler-delivery-gate, cancel-route) or the docs item; the client calls the cancel route by URL and its tests stub fetch, so it can run in its own slot beside them."
+        },
+        "narrative": {
+          "Action": "PRD WI-4 steps 1-6 and the releaseHeldMessages/retryFailed parts of step 7. ChatMessage gains sendPhase, sendRoute, cancelState. composerSend.ts gains requestConversationMessageCancel(name, id): Promise<'cancelled'|'delivered'|'unknown'> (15 s timeout, throws on non-2xx or a bad body); sendConversationMessage is unchanged (no signal). composerStore.ts: module-level cancelledSendIds + restoreTargets with exported registerComposerRestoreTarget and consumeCancelledSend; sendPhase is opt-in: SendIdentity (composerEchoes.ts) gains sendPhase?: 'queued', and the only two addOptimistic callers (useStableComposerProps onSend and retryFailed) pass sendPhase 'queued'; a bubble without sendPhase (and not held) is never cancellable; markSendStarted(name, id, route?) sets 'in-flight' + sendRoute; exported runCancellableSend; new actions settleCancelled (idempotent; empty restore target gets the text, else a Cancelled outbox entry {code:'cancelled', retryable:true, deliveryUnknown:false}), cancelSend(messageId) (queued/held -> local; in-flight conversation route -> server; agent route -> no-op; never aborts the fetch), cancelHeldOffline(failedId); releaseHeldMessages and retryFailed (prompt kind) send through runCancellableSend. Keep discardHeld for now (bubble-cancel-controls removes it). resetComposerStore clears the new module state. Add composerCancel.test.ts to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "client-cancel-store.ac1",
+            "title": "Given an in-flight conversation-route bubble, when cancelSend runs and the cancel POST returns outcome 'cancelled', then the bubble is removed, the later 409 code 'cancelled' from the message POST adds no outbox entry, and the message POST's fetch signal is never aborted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-cancel-store.ac2",
+            "title": "Given an in-flight bubble, when the cancel POST returns 'delivered', then the bubble stays with cancelState 'too-late'; when it returns 'unknown' or rejects, then the bubble stays with cancelState 'unconfirmed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-cancel-store.ac3",
+            "title": "Given a held bubble, when cancelSend runs, then it is removed and releaseHeld posts nothing for it; given an offline-held entry, when cancelHeldOffline runs, then the entry has code 'cancelled' and no heldOffline flag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-cancel-store.ac4",
+            "title": "Given a registered restore target whose isEmpty() returns true, when a message is cancelled, then setText receives the message text and no outbox entry is added; with isEmpty() false the outbox gains a 'cancelled' entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-cancel-store.ac5",
+            "title": "Given a Cancelled outbox entry, when retryFailed runs, then the POST body carries a new clientMessageId and no retry: true flag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "queued-send-cancel",
+        "title": "deliverQueuedPrompt skips cancelled sends and runs through runCancellableSend",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T04:01:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5237",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/queuedPromptSend.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/queuedPromptSend.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/queuedPromptSend.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "queuedPromptSend.test.ts passes including the queued-cancel ordering case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 step 7 (deliverQueuedPrompt). First statement: if (consumeCancelledSend(clientMessageId)) return. Keep holdBehindHeld. Replace markSendStarted + sendConversationMessage with runCancellableSend(name, clientMessageId, prompt.agentId ? 'agent' : 'conversation', () => sendConversationMessage(...same arguments...)); on { cancelled: true } return with no toast, no onFailed, no onAcknowledged. The existing catch (permission-pending hold, toast, onFailed) stays for other errors. Add tests to queuedPromptSend.test.ts: three prompts through enqueueConversationSend + deliverQueuedPrompt with the first POST held open on a deferred promise; cancelSend on the second while queued; resolve the first; the recorded POST bodies are exactly [first, third] in order and the second's text is in the outbox as 'cancelled' (no restore target registered)."
+        },
+        "items": [
+          {
+            "id": "queued-send-cancel.ac1",
+            "title": "Given three queued prompts with the first POST still open, when the second is cancelled and the first resolves, then fetch receives exactly the first and third messages, in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "queued-send-cancel.ac2",
+            "title": "Given a cancelled queued prompt, when its queue turn comes, then deliverQueuedPrompt returns without calling fetch, onFailed, onAcknowledged or toast.error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "queued-send-cancel.ac3",
+            "title": "Given an in-flight prompt whose POST answers 409 code 'cancelled', when deliverQueuedPrompt settles, then onFailed and toast.error are not called and the bubble is gone from optimistic",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bubble-cancel-controls",
+        "title": "Sending… and held bubbles render a Cancel control and cancel-state labels",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:01:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5237",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.test.tsx",
+            "src/dashboard/frontend/src/lib/composerStore.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/messagesTimeline/messageRows.test.tsx",
+            "grep -rn discardHeld src/dashboard/frontend/src",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "messageRows.test.tsx passes",
+            "grep for discardHeld prints nothing",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 steps 1-2 and 4 (bubble half). Pending bubble status text precedence: cancelling -> 'Cancelling…', too-late -> \"Already delivered, can't cancel\", unconfirmed -> \"Couldn't confirm the cancel\", deliveryState unknown -> 'Delivery not confirmed', else 'Sending…'; spinner only for Sending…, Delivery not confirmed, Cancelling…. Render ' · ' and <button type=\"button\" aria-label=\"Cancel this message\">Cancel</button> (inline style copied from the held Discard button) when message.clientMessageId and message.sendPhase are set, cancelState is neither 'cancelling' nor 'too-late', and not (sendPhase 'in-flight' and sendRoute 'agent'); onClick calls void useComposerStore.getState().cancelSend(message.id). Held bubble: replace Discard with the same Cancel button and update its title to say Cancel keeps the text. Remove discardHeld from composerStore.ts (interface and implementation)."
+        },
+        "items": [
+          {
+            "id": "bubble-cancel-controls.ac1",
+            "title": "Given a queued Sending… bubble, the row renders a button named 'Cancel this message' whose click calls cancelSend with the bubble id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bubble-cancel-controls.ac2",
+            "title": "Given an in-flight bubble with sendRoute 'agent', the row renders 'Sending…' and no Cancel button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bubble-cancel-controls.ac3",
+            "title": "Given cancelState 'too-late' the row renders \"Already delivered, can't cancel\" with no Cancel button; given 'unconfirmed' it renders \"Couldn't confirm the cancel\" with a Cancel button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bubble-cancel-controls.ac4",
+            "title": "Given a held bubble, the row renders a Cancel button and no Discard button, and grep -rn discardHeld src/dashboard/frontend/src returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "outbox-cancel-controls",
+        "title": "Outbox renders Cancelled entries with Resend and a Cancel button on offline-held entries",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:01:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5237",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/MessagesTimeline.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MessagesTimeline.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 step 3. In the failed-message outbox label chain add : fm.code === 'cancelled' ? 'Cancelled' right after the heldOffline branch. The retry button reads 'Resend' with title 'Send this message again' for fm.code === 'cancelled' (alongside the existing notFoundInTranscript / not-delivered cases). For fm.heldOffline rows render a Cancel button (failedMessageBtn class, title \"Don't send this when the server reconnects\") before Discard that calls useComposerStore.getState().cancelHeldOffline(fm.id); import useComposerStore from ../../../lib/composerStore. Add MessagesTimeline tests for both."
+        },
+        "items": [
+          {
+            "id": "outbox-cancel-controls.ac1",
+            "title": "Given a failed entry with code 'cancelled', the outbox renders the label 'Cancelled' and a 'Resend' button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outbox-cancel-controls.ac2",
+            "title": "Given an offline-held entry, the outbox renders a 'Cancel' button whose click calls cancelHeldOffline with the entry id, and the Discard button still renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-restore-target",
+        "title": "Mounted composer registers a restore target so cancelled text returns to an empty editor",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:01:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5237",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/useComposerRestoreTarget.ts",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/useComposerRestoreTarget.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/useComposerRestoreTarget.test.tsx",
+            "wc -l src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "useComposerRestoreTarget.test.tsx passes",
+            "ComposerFooter.tsx has fewer than 1000 lines",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. New useComposerRestoreTarget(editorRef, conversationName) registers { isEmpty, setText } with registerComposerRestoreTarget in a useEffect keyed on [conversationName, editorRef] and returns the unregister as cleanup. isEmpty: false when editorRef.current is null; else blank trimmed editor text AND getConversationAttachments(name).length === 0 AND getConversationCitations(name).length === 0. setText: editor.update(() => { root.clear(); one paragraph per line }) as in useSeedHeldKickoff (heldKickoff.tsx lines 152-160), then editor.focus(); the editor's OnChangePlugin saves the draft. ComposerFooter.tsx calls useComposerRestoreTarget(editorRef, conversation.name) next to useSeedHeldKickoff (two added lines: import and call). New test useComposerRestoreTarget.test.tsx (listed in scripts/frontend-test-subset.txt) drives a headless Lexical editor (createEditor from 'lexical') through renderHook and cancelSend on a sendPhase 'queued' bubble. Browser UAT (isolated Playwright profile) proves the mounted flow."
+        },
+        "items": [
+          {
+            "id": "composer-restore-target.ac1",
+            "title": "Given an open conversation with an in-flight send and a second queued message and an empty composer, when the operator clicks Cancel on the queued bubble, then the bubble disappears and its text renders in the composer (browser UAT)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-restore-target.ac2",
+            "title": "Given the operator has typed text in the composer, when a queued message is cancelled, then the typed text is preserved unchanged and the cancelled message renders in the outbox as 'Cancelled' (browser UAT)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-restore-target.ac3",
+            "title": "useComposerRestoreTarget.test.tsx passes: with an empty headless editor the cancelled text renders as the editor's text and no outbox entry exists; with text in the editor the text is preserved and the outbox gains a 'cancelled' entry; after unmount the cancelled message goes to the outbox",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-restore-target.ac4",
+            "title": "wc -l src/dashboard/frontend/src/components/chat/ComposerFooter.tsx prints fewer than 1000 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-changelog",
+        "title": "Document message cancel in the dashboard architecture doc, the conversations page, the changelog and the codebase map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:01:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5237",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "features/conversations.mdx",
+            "changelog.d/pan-5237.md",
+            ".overdeck/context/codebase/concerns.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n \"message/cancel\" docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n \"Cancelling a message that is still sending\" features/conversations.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "the architecture doc names the cancel route",
+            "the conversations page has the new subsection"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. docs/DASHBOARD-ARCHITECTURE.md: extend the pending-bubble paragraph (search 'A pending user bubble's `deliveryState` renders') with the cancel flow — queued/held cancel is local, in-flight cancel calls POST /api/conversations/:name/message/cancel with outcomes cancelled / delivered / unknown, the server commit point, the client never aborts the POST and why, agent-endpoint sends cancellable only while queued, the empty-composer rule, the Cancelled outbox entry and Resend; in '**Held messages.**' replace 'with Discard' by 'with Cancel, which keeps the text'. features/conversations.mdx: add '### Cancelling a message that is still sending' under 'The conversation surface' in user terms. changelog.d/pan-5237.md: the '#### New' bullet from the PRD. .overdeck/context/codebase/concerns.md: extend the 'Composer receipts cache every response for 24 h' entry with the PAN-5237 gate, tombstones and the no-abort rule; leave the last-verified line unchanged."
+        },
+        "items": [
+          {
+            "id": "docs-and-changelog.ac1",
+            "title": "grep -n \"message/cancel\" docs/DASHBOARD-ARCHITECTURE.md prints a line, and the composer paragraph contains the three outcomes cancelled/delivered/unknown and the rule that the client never aborts a cancelled POST",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac2",
+            "title": "features/conversations.mdx contains a 'Cancelling a message that is still sending' subsection that quotes \"Already delivered, can't cancel\" and says where the cancelled text goes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac3",
+            "title": "changelog.d/pan-5237.md exists with exactly one '#### New' heading and a bullet linking issue #5237, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "receipt-cancel-gate",
+        "to": "handler-delivery-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "receipt-cancel-gate",
+        "to": "cancel-route",
+        "type": "blocks"
+      },
+      {
+        "from": "handler-delivery-gate",
+        "to": "cancel-route",
+        "type": "blocks"
+      },
+      {
+        "from": "client-cancel-store",
+        "to": "queued-send-cancel",
+        "type": "blocks"
+      },
+      {
+        "from": "client-cancel-store",
+        "to": "bubble-cancel-controls",
+        "type": "blocks"
+      },
+      {
+        "from": "client-cancel-store",
+        "to": "outbox-cancel-controls",
+        "type": "blocks"
+      },
+      {
+        "from": "client-cancel-store",
+        "to": "composer-restore-target",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
