@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5209",
+  "created": "2026-11-14T01:28:12.101Z",
+  "updated": "2026-11-14T01:28:12.101Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "extract-verify-merged": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5209",
+      "claimedAt": "2026-11-14T01:28:12.101Z"
+    }
+  }
+}
