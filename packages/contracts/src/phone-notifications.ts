@@ -67,3 +67,39 @@ export function notificationAllowed(
   if (category === "summary") return true
   return !prefs.muted.includes(category)
 }
+
+/** What an issue notification reports (PAN-5219 D-3): `stopped` plus the notifying pipeline-journal entry types. */
+export type PhoneIssueEvent =
+  | "stopped"
+  | "verification.started"
+  | "merge.completed"
+  | "merge.failed"
+  | "review.stall-escalated"
+  | "conflict.repair-escalated"
+
+export const PHONE_ISSUE_EVENT_LABELS: Readonly<Record<PhoneIssueEvent, string>> = {
+  stopped: "Agent stopped responding",
+  "verification.started": "Work finished; verification started",
+  "merge.completed": "Merged",
+  "merge.failed": "Merge failed",
+  "review.stall-escalated": "Review stalled and needs you",
+  "conflict.repair-escalated": "Conflict repair needs you",
+}
+
+/** The kind when `value` is a known event, else null; never throws. */
+export function parsePhoneIssueEvent(value: unknown): PhoneIssueEvent | null {
+  // hasOwnProperty, not Object.hasOwn: the frontend compiles contracts with lib ES2020.
+  return typeof value === "string" && Object.prototype.hasOwnProperty.call(PHONE_ISSUE_EVENT_LABELS, value)
+    ? (value as PhoneIssueEvent)
+    : null
+}
+
+/** `/m/pipeline?issue=<id>[&event=<kind>&at=<iso>]`: the phone issue sheet (PAN-5219 D-1). */
+export function phoneIssueSheetPath(issueId: string, event?: { kind: PhoneIssueEvent; at: string } | null): string {
+  const params = new URLSearchParams({ issue: issueId })
+  if (event) {
+    params.set("event", event.kind)
+    params.set("at", event.at)
+  }
+  return `/m/pipeline?${params.toString()}`
+}
