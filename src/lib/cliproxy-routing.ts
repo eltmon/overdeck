@@ -12,11 +12,23 @@
  * disabled account or one whose usage could not be read; to take an account
  * out of rotation, set `disabled: true` on it.
  *
+ * The controller (`startCliproxyRoutingController`, host dashboards only) runs
+ * 10 seconds after start and then every 5 minutes. A tick lists the accounts
+ * locally and reads upstream usage only when a ranked provider has 2+ enabled
+ * accounts; with one account, ranking cannot change anything. `refreshPool` is
+ * the only caller of `setAccountPriority`. The snapshot lives in memory only.
+ *
  * It never logs or stores the management key, tokens or upstream text; the
  * snapshot it keeps comes from `cliproxy-pool.ts`, which already excludes them.
  */
 
-import type { PoolAccount } from './cliproxy-pool.js';
+import {
+  listPoolAccounts,
+  readPool,
+  setAccountPriority,
+  type PoolAccount,
+  type PoolSnapshot,
+} from './cliproxy-pool.js';
 
 const RANKED_PROVIDERS = ['codex', 'claude'] as const;
 const PRIORITY_STEP = 10;
@@ -73,4 +85,88 @@ export function planPriorities(accounts: readonly PoolAccount[]): Map<string, nu
     }
   }
   return changes;
+}
+
+export const ROUTING_FIRST_TICK_MS = 10_000;
+export const ROUTING_INTERVAL_MS = 5 * 60_000;
+
+let lastSnapshot: PoolSnapshot | null = null;
+
+/** The latest pool snapshot this dashboard read, or null before the first read. */
+export function getPoolSnapshot(): PoolSnapshot | null {
+  return lastSnapshot;
+}
+
+/** Read the pool and store the snapshot. Never changes a priority. */
+export async function readPoolSnapshot(): Promise<PoolSnapshot> {
+  const snapshot = await readPool();
+  lastSnapshot = snapshot;
+  return snapshot;
+}
+
+/**
+ * Read the pool, set every priority planPriorities says must change (one
+ * PATCH at a time), store the snapshot with the applied priorities, and return
+ * it. A failed PATCH is logged by account name only and leaves that account's
+ * priority as it was.
+ */
+export async function refreshPool(): Promise<PoolSnapshot> {
+  const snapshot = await readPool();
+  const changes = planPriorities(snapshot.accounts);
+  const applied = new Map<string, number>();
+  for (const [name, priority] of changes) {
+    try {
+      await setAccountPriority(name, priority);
+      applied.set(name, priority);
+    } catch {
+      console.error(`[cliproxy-routing] priority update failed for ${name}`);
+    }
+  }
+  const updated: PoolSnapshot = {
+    ...snapshot,
+    accounts: snapshot.accounts.map((account) =>
+      applied.has(account.name) ? { ...account, priority: applied.get(account.name) ?? null } : account,
+    ),
+  };
+  lastSnapshot = updated;
+  return updated;
+}
+
+function someProviderHasTwoEnabled(accounts: readonly PoolAccount[]): boolean {
+  return RANKED_PROVIDERS.some((provider) =>
+    accounts.filter((account) => account.provider === provider && !account.disabled).length >= 2,
+  );
+}
+
+/**
+ * Start the reset-first routing controller: one tick 10 s after start, then
+ * one every 5 minutes. A tick that starts while another runs is skipped.
+ * Errors are logged, never thrown. Returns a function that stops the timers.
+ */
+export function startCliproxyRoutingController(): () => void {
+  let tickInFlight = false;
+
+  async function tick(): Promise<void> {
+    if (tickInFlight) return;
+    tickInFlight = true;
+    try {
+      const list = await listPoolAccounts();
+      if (!list.managementAvailable || !someProviderHasTwoEnabled(list.accounts)) return;
+      await refreshPool();
+    } catch (err) {
+      console.error(
+        '[cliproxy-routing] refresh failed:',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      tickInFlight = false;
+    }
+  }
+
+  const firstTick = setTimeout(() => void tick(), ROUTING_FIRST_TICK_MS);
+  const interval = setInterval(() => void tick(), ROUTING_INTERVAL_MS);
+  return () => {
+    clearTimeout(firstTick);
+    clearInterval(interval);
+  };
 }
