@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const SCRIPT_SOURCE = new URL('../../../scripts/lint-frontend-types.sh', import.meta.url);
+// PAN-5248: the lane runs through the admitted tsc wrapper.
+const WRAPPER_SOURCE = new URL('../../../scripts/tsc-admitted.mjs', import.meta.url);
 const BASELINE_HEADER = [
   '# frontend type-error baseline for lint-frontend-types.sh (PAN-3192).',
   "# One baselined 'error TS' line per row, sorted. Lower with: bash scripts/lint-frontend-types.sh --update",
@@ -24,6 +26,7 @@ function makeTempGuard(baselineErrors: string[]): string {
     readFileSync(SCRIPT_SOURCE, 'utf-8'),
     { mode: 0o755 },
   );
+  writeFileSync(join(root, 'scripts', 'tsc-admitted.mjs'), readFileSync(WRAPPER_SOURCE, 'utf-8'));
   writeFileSync(
     join(root, 'scripts', 'frontend-types-baseline.txt'),
     `${[...BASELINE_HEADER, ...baselineErrors.sort()].join('\n')}\n`,
@@ -51,6 +54,8 @@ function runGuard(root: string, args: string[] = [], tscExit = 0): GuardResult {
         ...process.env,
         FAKE_TSC_OUTPUT: join(root, 'tsc-output.txt'),
         FAKE_TSC_EXIT: String(tscExit),
+        // H5: take the wrapper's bypass path so the fake tsc runs without admission.
+        OVERDECK_GATE_ADMISSION: '0',
       },
     });
     return { ok: true, output };
@@ -134,6 +139,16 @@ describe('lint-frontend-types.sh', () => {
     expect(result.ok).toBe(false);
     expect(result.output).toContain('typecheck command failed (exit 137) without TypeScript diagnostics');
     expect(result.output).toContain('simulated compiler crash');
+  });
+
+  it('passes tsc\'s exit code through the wrapper (PAN-5248)', () => {
+    const root = makeTempGuard([]);
+    writeFileSync(join(root, 'tsc-output.txt'), '');
+
+    const result = runGuard(root, [], 2);
+
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain('failed (exit 2) without TypeScript diagnostics');
   });
 
   it('fails when the local compiler is missing', () => {

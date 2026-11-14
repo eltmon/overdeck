@@ -33,6 +33,7 @@ import {
   type QualityGateAdmissionDeps,
   type QualityGatePressureSample,
 } from '../../../../src/lib/cloister/quality-gate-admission.js'
+import { recordGateFootprintPeak } from '../../../../src/lib/cloister/quality-gate-memory.js'
 
 const homes: string[] = []
 const low: QualityGatePressureSample = { cpuUtilization: 0.2, loadPerCore: 0.2, psiSomeAvg10: null, pressured: false }
@@ -55,6 +56,8 @@ function deps(rootDir: string, samples: QualityGatePressureSample[] = [low]): Qu
     slots: 1,
     isProcessAlive: (pid) => pid === process.pid,
     samplePressure: vi.fn(async () => samples[Math.min(sampleIndex++, samples.length - 1)]!),
+    // PAN-5248: memory-agnostic unless a case opts in.
+    sampleMemory: async () => null,
   }
 }
 
@@ -494,6 +497,246 @@ describe('quality gate admission', () => {
       expect(existsSync(deadTemp)).toBe(false)
       expect(readdirSync(rootDir).filter((entry) => entry.startsWith('.tmp-'))).toEqual([])
     })
+  })
+})
+
+describe('memory admission (PAN-5248)', () => {
+  const GiB = 1024 ** 3
+  const MiB = 1024 ** 2
+  const keyed = { workspacePath: '/tmp/one', gateName: 'test', attempt: 1, footprintKey: 'tsc:tsconfig.json' }
+  const OTHER_PID = 424_242
+
+  function memDeps(
+    rootDir: string,
+    createdAt: number,
+    available: () => number,
+    extra: Partial<QualityGateAdmissionDeps> = {},
+  ): QualityGateAdmissionDeps {
+    return {
+      ...deps(rootDir),
+      now: () => createdAt,
+      softReserveBytes: 12 * GiB,
+      sampleMemory: async () => ({ memAvailableBytes: available(), memTotalBytes: 64 * GiB }),
+      readTreeRssBytes: async () => 100 * MiB,
+      ...extra,
+    }
+  }
+
+  function settledFlag(promise: Promise<unknown>): () => boolean {
+    let settled = false
+    promise.finally(() => { settled = true }).catch(() => undefined)
+    return () => settled
+  }
+
+  function ownerFiles(rootDir: string): string[] {
+    return readdirSync(rootDir).filter((entry) => entry === 'owner.json' || /^slot-\d+\.json$/.test(entry))
+  }
+
+  /** A live slot-0 owner held by OTHER_PID with the given memory fields. */
+  function writeOtherOwner(rootDir: string, fields: Record<string, unknown>): void {
+    writeFileSync(join(rootDir, 'owner.json'), JSON.stringify({ ...JSON.parse(ownerJson(OTHER_PID, 1)), ...fields }))
+  }
+
+  const otherAlive = (pid: number) => pid === process.pid || pid === OTHER_PID
+
+  it('waits on memory until MemAvailable recovers', async () => {
+    const rootDir = home()
+    let available = 13 * GiB
+    const onWaiting = vi.fn()
+    const promise = acquireQualityGateAdmission(keyed, memDeps(rootDir, 1, () => available, { onWaiting }))
+    const settled = settledFlag(promise)
+
+    await drive(10)
+    expect(settled()).toBe(false)
+    expect(onWaiting).toHaveBeenCalledTimes(1)
+    expect(onWaiting).toHaveBeenCalledWith({
+      kind: 'memory',
+      memAvailableBytes: 13 * GiB,
+      reservationsBytes: 0,
+      footprintBytes: 2.5 * GiB,
+      softReserveBytes: 12 * GiB,
+    })
+
+    available = 20 * GiB
+    const handle = await driveUntilResolved(promise)
+    expect(handle.footprintBytes).toBe(2.5 * GiB)
+    await handle.release()
+  })
+
+  it('replays the incident: a second gate waits on memory with a slot free', async () => {
+    const rootDir = home()
+    const onWaiting = vi.fn()
+    const slotDeps = (createdAt: number, extra: Partial<QualityGateAdmissionDeps> = {}) =>
+      memDeps(rootDir, createdAt, () => 16 * GiB, { slots: 2, ...extra })
+
+    const first = await driveUntilResolved(acquireQualityGateAdmission(keyed, slotDeps(1)))
+    const secondPromise = acquireQualityGateAdmission(keyed, slotDeps(2, { onWaiting }))
+    const thirdPromise = acquireQualityGateAdmission(keyed, slotDeps(3))
+    const secondSettled = settledFlag(secondPromise)
+    const thirdSettled = settledFlag(thirdPromise)
+
+    await drive(20)
+    expect(secondSettled()).toBe(false)
+    expect(thirdSettled()).toBe(false)
+    expect(ownerFiles(rootDir)).toEqual(['owner.json'])
+    expect(readdirSync(rootDir).filter((entry) => entry.startsWith('waiter-'))).toHaveLength(2)
+    // The first owner has grown 0 bytes above its baseline, so it still reserves its whole 2.5 GiB.
+    expect(onWaiting).toHaveBeenCalledWith(expect.objectContaining({ kind: 'memory', reservationsBytes: 2.5 * GiB }))
+
+    await first.release()
+    const second = await driveUntilResolved(secondPromise)
+    await second.release()
+    const third = await driveUntilResolved(thirdPromise)
+    await third.release()
+  })
+
+  it('uses a recorded peak instead of the default estimate', async () => {
+    const rootDir = home()
+    await recordGateFootprintPeak(keyed.footprintKey, 512 * MiB, rootDir)
+    const handle = await driveUntilResolved(acquireQualityGateAdmission(keyed, memDeps(rootDir, 1, () => 13 * GiB)))
+    expect(handle.footprintBytes).toBe(512 * MiB)
+    await handle.release()
+
+    const emptyRoot = home()
+    let available = 13 * GiB
+    const onWaiting = vi.fn()
+    const promise = acquireQualityGateAdmission(keyed, memDeps(emptyRoot, 1, () => available, { onWaiting }))
+    const settled = settledFlag(promise)
+    await drive(10)
+    expect(settled()).toBe(false)
+    expect(onWaiting).toHaveBeenCalledWith(expect.objectContaining({ kind: 'memory', footprintBytes: 2.5 * GiB }))
+    available = 20 * GiB
+    await (await driveUntilResolved(promise)).release()
+  })
+
+  it('falls back to slot and CPU rules when memory is unreadable', async () => {
+    for (const sampleMemory of [async () => null, async () => { throw new Error('no /proc/meminfo') }]) {
+      const rootDir = home()
+      const handle = await driveUntilResolved(acquireQualityGateAdmission(keyed, memDeps(rootDir, 1, () => 0, { sampleMemory })))
+      expect(handle.footprintBytes).toBe(2.5 * GiB)
+      await handle.release()
+    }
+  })
+
+  it('counts nothing for an old-version owner without footprintBytes', async () => {
+    const rootDir = home()
+    writeFileSync(join(rootDir, 'owner.json'), ownerJson(OTHER_PID, 1))
+    // 15 - 0 - 2.5 = 12.5 >= 12: admitted only if the old owner reserves 0.
+    const handle = await driveUntilResolved(acquireQualityGateAdmission(
+      keyed,
+      memDeps(rootDir, 1, () => 15 * GiB, { slots: 2, isProcessAlive: otherAlive }),
+    ))
+    expect(handle.slot).toBe(1)
+    await handle.release()
+  })
+
+  it('subtracts an owner\'s growth above its baseline, unless it reserves fully', async () => {
+    const cases = [
+      { fields: { footprintBytes: 2.5 * GiB, rssBaselineBytes: 1 * GiB }, treeRss: 1.1 * GiB, reserved: 2.4 * GiB },
+      { fields: { footprintBytes: 2.5 * GiB, rssBaselineBytes: 1 * GiB, fullReservation: true }, treeRss: 3 * GiB, reserved: 2.5 * GiB },
+    ]
+    for (const { fields, treeRss, reserved } of cases) {
+      const rootDir = home()
+      writeOtherOwner(rootDir, fields)
+      const onWaiting = vi.fn()
+      const promise = acquireQualityGateAdmission(keyed, memDeps(rootDir, 1, () => 16 * GiB, {
+        slots: 2,
+        isProcessAlive: otherAlive,
+        readTreeRssBytes: async (pid) => (pid === OTHER_PID ? treeRss : 100 * MiB),
+        onWaiting,
+      }))
+      const settled = settledFlag(promise)
+      await drive(10)
+      expect(settled()).toBe(false)
+      const reason = onWaiting.mock.calls[0]![0]
+      expect(reason.kind).toBe('memory')
+      expect(reason.reservationsBytes).toBeCloseTo(reserved, 0)
+
+      unlinkSync(join(rootDir, 'owner.json'))
+      await (await driveUntilResolved(promise)).release()
+    }
+  })
+
+  async function driveUntilRejected(promise: Promise<unknown>): Promise<unknown> {
+    let error: unknown
+    let done = false
+    promise.then(() => { done = true }, (reason: unknown) => { error = reason; done = true })
+    await driveUntil(() => done)
+    return error
+  }
+
+  it('re-checks memory after the settle and gives the slot back when it dropped', async () => {
+    const rootDir = home()
+    let reads = 0
+    let recovered = false
+    const onWaiting = vi.fn()
+    const promise = acquireQualityGateAdmission(keyed, memDeps(rootDir, 1, () => {
+      reads++
+      return reads === 1 || recovered ? 20 * GiB : 13 * GiB
+    }, { onWaiting }))
+    const settled = settledFlag(promise)
+
+    await drive(15)
+    expect(reads).toBeGreaterThan(2)
+    expect(settled()).toBe(false)
+    expect(ownerFiles(rootDir)).toEqual([])
+    expect(readdirSync(rootDir).filter((entry) => entry.startsWith('waiter-'))).toHaveLength(1)
+    expect(onWaiting).toHaveBeenCalledWith(expect.objectContaining({ kind: 'memory', memAvailableBytes: 13 * GiB }))
+
+    recovered = true
+    await (await driveUntilResolved(promise)).release()
+  })
+
+  it('times out with lastWaitReason memory when memory never recovers', async () => {
+    const rootDir = home()
+    let clock = 0
+    const error = await driveUntilRejected(acquireQualityGateAdmission(keyed, memDeps(rootDir, 1, () => {
+      clock += 1_000
+      return 13 * GiB
+    }, { now: () => clock, maxWaitMs: 5_000 })))
+
+    expect(error).toBeInstanceOf(QualityGateAdmissionTimeoutError)
+    expect(error).toMatchObject({ lastWaitReason: 'memory', lastMemory: { memAvailableBytes: 13 * GiB } })
+    expect(readdirSync(rootDir).filter((entry) => entry.startsWith('waiter-'))).toEqual([])
+  })
+
+  it('times out with lastWaitReason cpu when CPU never recovers', async () => {
+    const rootDir = home()
+    let clock = 0
+    const error = await driveUntilRejected(acquireQualityGateAdmission(keyed, memDeps(rootDir, 1, () => 64 * GiB, {
+      now: () => clock,
+      maxWaitMs: 5_000,
+      samplePressure: async () => {
+        clock += 1_000
+        return high
+      },
+    })))
+
+    expect(error).toBeInstanceOf(QualityGateAdmissionTimeoutError)
+    expect(error).toMatchObject({ lastWaitReason: 'cpu', lastMemory: undefined })
+  })
+
+  it('records a peak that the next acquire for the same key uses', async () => {
+    const rootDir = home()
+    const handle = await driveUntilResolved(acquireQualityGateAdmission(keyed, memDeps(rootDir, 1, () => 64 * GiB)))
+    await handle.recordPeak(3 * GiB)
+    expect(readdirSync(join(rootDir, 'footprints')).filter((entry) => !entry.startsWith('.tmp-'))).toHaveLength(1)
+    await handle.release()
+
+    const next = await driveUntilResolved(acquireQualityGateAdmission(keyed, memDeps(rootDir, 2, () => 64 * GiB)))
+    expect(next.footprintBytes).toBe(3 * GiB)
+    expect(JSON.parse(readFileSync(join(rootDir, 'owner.json'), 'utf8')).footprintBytes).toBe(3 * GiB)
+    await next.release()
+
+    const unkeyedRoot = home()
+    const unkeyed = await driveUntilResolved(acquireQualityGateAdmission(
+      { workspacePath: '/tmp/one', gateName: 'test', attempt: 1 },
+      { ...deps(unkeyedRoot), now: () => 1 },
+    ))
+    await unkeyed.recordPeak(3 * GiB)
+    expect(unkeyed.footprintBytes).toBe(0)
+    expect(existsSync(join(unkeyedRoot, 'footprints'))).toBe(false)
+    await unkeyed.release()
   })
 })
 

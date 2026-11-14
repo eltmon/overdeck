@@ -4,13 +4,24 @@ import { basename, dirname, join } from 'node:path'
 
 import { getOverdeckHome } from '../paths.js'
 import { readCpuPsi, type CpuPsi } from '../system-health/cpu-psi.js'
+import { readProcessTreeRssBytes } from '../system-health/process-tree-rss.js'
+import {
+  evaluateMemoryHeadroom,
+  ownerReservationBytes,
+  readGateFootprintEstimate,
+  recordGateFootprintPeak,
+  resolveSoftReserveBytes,
+} from './quality-gate-memory.js'
 
 /**
- * Machine-wide CPU admission for quality gates and direct Vitest runs.
- * Admission has N slots (`resources.quality_gate_slots`, default 2): slot 0 is
- * `owner.json`, slot i >= 1 is `slot-<i>.json`. Waiters queue FIFO, and every
- * slot needs an unpressured sample before and after settling, so a pressured
- * sample blocks every new admission while running gates keep their slots.
+ * Machine-wide CPU and memory admission for quality gates, direct Vitest runs
+ * and tsc lanes. Admission has N slots (`resources.quality_gate_slots`,
+ * default 2): slot 0 is `owner.json`, slot i >= 1 is `slot-<i>.json`. Waiters
+ * queue FIFO, and every slot needs an unpressured sample before and after
+ * settling, so a pressured sample blocks every new admission while running
+ * gates keep their slots. A request with a `footprintKey` also waits while
+ * MemAvailable minus the live owners' reservations and its own measured
+ * footprint would fall below the governor's soft reserve (PAN-5248).
  * Admitted parents set OVERDECK_GATE_ADMITTED=1 for child-process reentrancy.
  */
 
@@ -45,6 +56,21 @@ export interface QualityGateAdmissionRequest {
   workspacePath: string
   gateName: string
   attempt: number
+  /** PAN-5248: names the gate kind for memory estimation; omitted = no memory rule for this caller's own footprint. */
+  footprintKey?: string
+  /** PAN-5248 FR-12: reserve the whole footprint until release (container gates, whose memory is outside the host tree). */
+  fullReservation?: boolean
+}
+
+export type QualityGateWaitReason =
+  | { kind: 'queue' }
+  | { kind: 'slots' }
+  | { kind: 'cpu'; sample: QualityGatePressureSample }
+  | { kind: 'memory'; memAvailableBytes: number; reservationsBytes: number; footprintBytes: number; softReserveBytes: number }
+
+export interface QualityGateMemorySample {
+  memAvailableBytes: number
+  memTotalBytes: number
 }
 
 export interface QualityGateAdmissionHandle {
@@ -53,6 +79,10 @@ export interface QualityGateAdmissionHandle {
   slot: number
   /** Slot count the lease was admitted under. */
   slots: number
+  /** Footprint estimate the lease was admitted with; 0 without a `footprintKey`. */
+  footprintBytes: number
+  /** Record the gate's peak RSS under its footprint key (D12); no-op without a key, never throws. */
+  recordPeak(peakBytes: number): Promise<void>
   release(): Promise<void>
 }
 
@@ -60,10 +90,13 @@ interface AdmissionTicket extends QualityGateAdmissionRequest {
   ticketId: string
   pid: number
   createdAt: number
+  footprintBytes?: number
 }
 
 interface AdmissionOwner extends AdmissionTicket {
   acquiredAt: number
+  /** Owner tree RSS just before publishing (FR-11). */
+  rssBaselineBytes?: number
 }
 
 interface AdmissionBreaker {
@@ -84,11 +117,23 @@ export interface QualityGateAdmissionDeps {
   tornGraceMs?: number
   slots?: number
   maxWaitMs?: number
+  sampleMemory?: () => Promise<QualityGateMemorySample | null>
+  readTreeRssBytes?: (pid: number) => Promise<number | null>
+  softReserveBytes?: number
+  readFootprintEstimate?: (key: string) => Promise<number>
+  onWaiting?: (reason: QualityGateWaitReason) => void
 }
 
+type MemoryWaitReason = Extract<QualityGateWaitReason, { kind: 'memory' }>
+
 export class QualityGateAdmissionTimeoutError extends Error {
-  constructor(readonly maxWaitMs: number) {
-    super(`quality-gate CPU admission timed out after ${maxWaitMs}ms`)
+  constructor(
+    readonly maxWaitMs: number,
+    /** FR-9: the kind of the last wait reason; 'memory' tells callers not to start the gate. */
+    readonly lastWaitReason: QualityGateWaitReason['kind'] | null = null,
+    readonly lastMemory?: MemoryWaitReason,
+  ) {
+    super(`quality-gate admission timed out after ${maxWaitMs}ms${lastWaitReason ? ` waiting on ${lastWaitReason}` : ''}`)
     this.name = 'QualityGateAdmissionTimeoutError'
   }
 }
@@ -336,6 +381,40 @@ async function resolveQualityGateSlots(): Promise<number> {
   }
 }
 
+async function sampleProcMemory(): Promise<QualityGateMemorySample | null> {
+  const { readProcMemory } = await import('../../dashboard/server/services/proc-memory.js')
+  const { memAvailable, memTotal } = await readProcMemory()
+  return { memAvailableBytes: memAvailable, memTotalBytes: memTotal }
+}
+
+/** NFR-2: an unreadable or zero MemAvailable skips the memory rule. */
+async function readMemory(
+  sample: () => Promise<QualityGateMemorySample | null>,
+): Promise<QualityGateMemorySample | null> {
+  try {
+    const memory = await sample()
+    return memory && memory.memAvailableBytes > 0 ? memory : null
+  } catch {
+    return null
+  }
+}
+
+/** Sum of the live owners' unallocated footprints (D4). */
+async function sumReservations(
+  owners: AdmissionOwner[],
+  readTreeRssBytes: (pid: number) => Promise<number | null>,
+): Promise<number> {
+  let total = 0
+  for (const owner of owners) {
+    if (!owner.footprintBytes) continue
+    const treeRss = owner.fullReservation || owner.rssBaselineBytes === undefined
+      ? null
+      : await readTreeRssBytes(owner.pid).catch(() => null)
+    total += ownerReservationBytes(owner, treeRss)
+  }
+  return total
+}
+
 /** Pids of every live-file slot owner, for the runaway patrol (D9); never throws. */
 export async function readQualityGateAdmissionOwnerPids(rootDir?: string): Promise<number[]> {
   try {
@@ -366,18 +445,60 @@ export async function acquireQualityGateAdmission(
   const tornGraceMs = deps.tornGraceMs ?? QUALITY_GATE_ADMISSION_TORN_GRACE_MS
   const slots = Number.isInteger(deps.slots) && deps.slots! >= 1 ? deps.slots! : await resolveQualityGateSlots()
   const maxWaitMs = deps.maxWaitMs
+  const footprintKey = request.footprintKey
+  const sampleMemory = deps.sampleMemory ?? sampleProcMemory
+  const readTreeRssBytes = deps.readTreeRssBytes ?? ((treePid: number) => readProcessTreeRssBytes(treePid))
+  const readFootprintEstimate = deps.readFootprintEstimate ?? ((key: string) => readGateFootprintEstimate(key, root))
 
   await mkdir(root, { recursive: true })
+  const estimate = footprintKey ? await readFootprintEstimate(footprintKey) : 0
+  const softReserveBytes = footprintKey ? deps.softReserveBytes ?? await resolveSoftReserveBytes() : 0
   const createdAt = now()
   const ticketId = `${String(createdAt).padStart(16, '0')}-${String(pid).padStart(10, '0')}-${String(ticketSequence++).padStart(6, '0')}`
-  const ticket: AdmissionTicket = { ...request, ticketId, pid, createdAt }
+  const ticket: AdmissionTicket = {
+    ...request,
+    ticketId,
+    pid,
+    createdAt,
+    ...(footprintKey ? { footprintBytes: estimate } : {}),
+  }
+
+  let lastWaitKind: QualityGateWaitReason['kind'] | null = null
+  let lastMemory: MemoryWaitReason | undefined
+  const notifyWaiting = (reason: QualityGateWaitReason): void => {
+    if (reason.kind === 'memory') lastMemory = reason
+    if (reason.kind === lastWaitKind) return
+    lastWaitKind = reason.kind
+    try {
+      deps.onWaiting?.(reason)
+    } catch {
+      // A listener must never break admission.
+    }
+  }
+
+  /** FR-2: the memory reason this waiter must wait on, or null when it may start. */
+  const memoryBlock = async (owners: AdmissionOwner[]): Promise<MemoryWaitReason | null> => {
+    if (!footprintKey) return null
+    const memory = await readMemory(sampleMemory)
+    if (!memory) return null
+    const reservationsBytes = await sumReservations(owners, readTreeRssBytes)
+    const verdict = evaluateMemoryHeadroom({ ...memory, softReserveBytes, estimateBytes: estimate, reservationsBytes })
+    if (verdict.ok) return null
+    return {
+      kind: 'memory',
+      memAvailableBytes: memory.memAvailableBytes,
+      reservationsBytes,
+      footprintBytes: verdict.footprintBytes,
+      softReserveBytes,
+    }
+  }
   const ownTicketPath = ticketPath(root, ticketId)
   await publishExclusive(ownTicketPath, ticket)
 
   try {
     for (;;) {
       if (maxWaitMs != null && now() - createdAt > maxWaitMs) {
-        throw new QualityGateAdmissionTimeoutError(maxWaitMs)
+        throw new QualityGateAdmissionTimeoutError(maxWaitMs, lastWaitKind, lastWaitKind === 'memory' ? lastMemory : undefined)
       }
       const waiters = await listLiveTickets(root, isProcessAlive, tornGraceMs)
       if (!waiters.some((waiter) => waiter.ticketId === ticketId)) {
@@ -391,12 +512,14 @@ export async function acquireQualityGateAdmission(
         continue
       }
       if (waiters[0]?.ticketId !== ticketId) {
+        notifyWaiting({ kind: 'queue' })
         await sleep(pollMs)
         continue
       }
 
       let reclaimed = false
       const taken = new Set<number>()
+      const liveOwners: AdmissionOwner[] = []
       for (const { slot, path } of await listSlotOwnerFiles(root)) {
         const observed = await readJson<AdmissionOwner>(path)
         if (observed) {
@@ -405,6 +528,7 @@ export async function acquireQualityGateAdmission(
             reclaimed = true
           } else {
             taken.add(slot)
+            liveOwners.push(observed)
           }
           continue
         }
@@ -421,12 +545,21 @@ export async function acquireQualityGateAdmission(
       }
       // `taken` counts every slot file, so a held slot above a lowered N still counts (D3).
       if (reclaimed || taken.size >= slots) {
+        if (taken.size >= slots) notifyWaiting({ kind: 'slots' })
+        await sleep(pollMs)
+        continue
+      }
+
+      const memoryReason = await memoryBlock(liveOwners)
+      if (memoryReason) {
+        notifyWaiting(memoryReason)
         await sleep(pollMs)
         continue
       }
 
       const pressure = await samplePressure()
       if (pressure.pressured) {
+        notifyWaiting({ kind: 'cpu', sample: pressure })
         await sleep(pollMs)
         continue
       }
@@ -435,7 +568,12 @@ export async function acquireQualityGateAdmission(
       let slot = 0
       while (taken.has(slot)) slot++
       const path = slotOwnerPath(root, slot)
-      const owner: AdmissionOwner = { ...ticket, acquiredAt: now() }
+      const baseline = footprintKey ? await readTreeRssBytes(pid).catch(() => null) : null
+      const owner: AdmissionOwner = {
+        ...ticket,
+        acquiredAt: now(),
+        ...(baseline != null ? { rssBaselineBytes: baseline } : {}),
+      }
       try {
         await publishExclusive(path, owner)
       } catch (error) {
@@ -452,11 +590,28 @@ export async function acquireQualityGateAdmission(
       await sleep(settleMs)
       const settledPressure = await samplePressure()
       if (settledPressure.pressured) {
+        notifyWaiting({ kind: 'cpu', sample: settledPressure })
         if (sameOwner(await readJson<AdmissionOwner>(path), owner)) {
           await unlinkIfExists(path)
         }
         await sleep(pollMs)
         continue
+      }
+
+      if (footprintKey) {
+        // FR-10: re-check memory against the other live owners after settling.
+        const others: AdmissionOwner[] = []
+        for (const { path: otherPath } of await listSlotOwnerFiles(root)) {
+          const other = await readJson<AdmissionOwner>(otherPath)
+          if (other && other.ticketId !== ticketId && !ownerIsStale(other, now(), staleMs, isProcessAlive)) others.push(other)
+        }
+        const settledMemory = await memoryBlock(others)
+        if (settledMemory) {
+          notifyWaiting(settledMemory)
+          if (sameOwner(await readJson<AdmissionOwner>(path), owner)) await unlinkIfExists(path)
+          await sleep(pollMs)
+          continue
+        }
       }
 
       await unlinkIfExists(ownTicketPath)
@@ -465,6 +620,15 @@ export async function acquireQualityGateAdmission(
         admittedAt: new Date(owner.acquiredAt).toISOString(),
         slot,
         slots,
+        footprintBytes: estimate,
+        async recordPeak(peakBytes: number) {
+          if (!footprintKey) return
+          try {
+            await recordGateFootprintPeak(footprintKey, peakBytes, root)
+          } catch {
+            // D12: recording is best-effort.
+          }
+        },
         async release() {
           if (released) return
           released = true

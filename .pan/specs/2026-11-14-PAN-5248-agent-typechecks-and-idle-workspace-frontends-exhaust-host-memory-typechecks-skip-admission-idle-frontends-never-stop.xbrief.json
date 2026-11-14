@@ -1,0 +1,1049 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T05:20:06Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5248: Agent typechecks and idle workspace frontends exhaust host memory: typechecks skip admission, idle frontends never stop (admission half; container half split to PAN-5250)",
+    "updated": "2026-11-14T05:37:13.080Z"
+  },
+  "plan": {
+    "id": "pan-5248",
+    "title": "Agent typechecks and idle workspace frontends exhaust host memory: typechecks skip admission, idle frontends never stop",
+    "status": "running",
+    "uid": "26ea10a8-134d-48fe-9b24-44023b29da58",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-14T05:20:06Z",
+    "updated": "2026-11-14T05:37:13.080Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5248",
+        "label": "PAN-5248",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5250",
+        "label": "PAN-5250 (sibling: idle frontend/dev container stop)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5248.md",
+        "label": "PRD draft",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "admission-queue",
+      "memory",
+      "typecheck",
+      "quality-gates",
+      "cloister"
+    ],
+    "metadata": {
+      "sizeJustification": "The plan touches 24 files (under the 25-file cap). The subsystem count is inflated by the heuristic, not by scope: root files (package.json, CLAUDE.md), each scripts/ file, tests/vitest-cpu-admission.ts, and the docs/changelog files the docs rule requires each count as their own 'subsystem'. Functionally this is one subsystem — the shared admission queue (src/lib/cloister/quality-gate-admission.ts) and its three callers. The separable container half of the issue was already split into PAN-5250.",
+      "canonicalFilename": "2026-11-14-PAN-5248-agent-typechecks-and-idle-workspace-frontends-exhaust-host-memory-typechecks-skip-admission-idle-frontends-never-stop.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Agent-shell typechecks never enter the machine-wide admission queue: acquireQualityGateAdmission is called only by verification gates (src/lib/cloister/validation.ts) and the Vitest globalSetup (tests/vitest-cpu-admission.ts), so every tsc lane of npm run typecheck and the tsc lanes inside scripts/lint-effect-diagnostics.sh, lint-dashboard-types.sh and lint-frontend-types.sh run unadmitted. The queue also checks only CPU (sampleQualityGatePressure), never memory. On 2026-11-14 three overlapping typechecks (2.4, 2.2 and 1.2 GB) took MemAvailable to 2.4 GiB with swap full. Sampling MemAvailable alone would not have prevented it, because the three started seconds apart before any had allocated.",
+      "Proposal": "Wrap every tsc lane in a new scripts/tsc-admitted.mjs that takes one admission per tsc process (bypassing under CI, OVERDECK_GATE_ADMISSION=0 and OVERDECK_GATE_ADMITTED=1 without loading tsx). Make the queue memory-aware: the head waiter waits while MemAvailable minus the reservations of admitted-but-unpeaked owners minus its own footprint estimate would fall below resources.governor_soft_reserve_gb. Footprint estimates come from measured peak process-tree RSS, stored per footprint key (tsc:<tsconfig>, vitest:<dir>, gate:<name>:<command>) as the max of the last 5 peaks, with a 2.5 GiB default. A leaf /proc sampler measures peaks for the wrapper, Vitest and host verification gates; the admission handle records them. Docs, CLAUDE.md and a changelog entry describe the new rule.",
+      "NonGoals": "- Stopping, restarting, pinning or probing workspace containers (idle frontend/dev stop, in-use detection, restart on demand, activity-feed stop entries) — moved verbatim to PAN-5250.\n- Admitting hand-typed npx tsc, node_modules/.bin/tsc or bare tsc invocations, sub-package package.json typecheck scripts, test:drizzle-smoke, eslint, or builds (tsdown, vite build).\n- Admitting other projects' typechecks run in agent shells (only verification gates, which are already admitted, cover them).\n- A PATH shim for tsc in the agent guard directory.\n- Measuring peaks for container or remote gates; remote gates stay unadmitted.\n- Peak sampling on macOS or Windows (the default estimate applies there).\n- Shedding, pausing or killing running gates or agents under memory pressure (#3429).\n- New config keys; the existing resources.governor_soft_reserve_gb and resources.quality_gate_slots are reused.\n- Changing the existing '[quality-gate] Queued for CPU admission:' log text.\n- A lint guard that fails when a future tsc lane skips the wrapper."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split the issue: PAN-5248 keeps requirement 1 (typecheck admission and the memory-aware queue) plus its tests, PIPELINE-GATES/CLAUDE.md docs and changelog; requirements 2-4, the idle-timeout tests and the WORKSPACES doc moved verbatim to the new sibling issue PAN-5250.",
+        "rationale": "Both halves together touch about 40 files against finalize's 25-file cap, and they share no code (admission queue vs idle-stack reaper and Docker). The planning contract prefers independently shippable sibling issues."
+      },
+      {
+        "summary": "Cover typechecks with an explicit wrapper (scripts/tsc-admitted.mjs) in every root typecheck lane and the three ratchet scripts, not a PATH shim; hand-typed npx tsc stays unadmitted.",
+        "rationale": "npm run and npx put node_modules/.bin first on PATH, so a tsc shim in the agent guard directory would never see the lanes that caused the incident. The issue's '`tsc --noEmit`' bullet is read as the root lane of npm run typecheck."
+      },
+      {
+        "summary": "Subtract reservations of admitted owners: reservation = max(0, owner.footprintBytes - currentTreeRss(owner.pid)); an unreadable tree RSS reserves the full footprint.",
+        "rationale": "Sampling MemAvailable alone admits several gates that start seconds apart before any has allocated, which is exactly the incident."
+      },
+      {
+        "summary": "Estimate = max of the last 5 recorded peaks per key; default 2.5 GiB; estimates clamp to memTotal - softReserve.",
+        "rationale": "Max keeps broad keys such as Vitest conservative; the default sits just above the largest measured lane (2.4 GB); the clamp stops a gate larger than the host from waiting forever."
+      },
+      {
+        "summary": "No new config keys: reuse resources.governor_soft_reserve_gb (global config, loaded like quality_gate_slots) with a computeGovernorReserveDefaultsGb fallback.",
+        "rationale": "The issue names the soft reserve as the threshold, and config-yaml/schema.ts and merge.ts sit at their file-size allowlist caps."
+      },
+      {
+        "summary": "The wrapper waits at most 30 minutes, then proceeds unadmitted with a warning, like the Vitest globalSetup.",
+        "rationale": "Keeps one consistent fail-open contract for agent-shell callers; verification gates keep their unbounded wait."
+      },
+      {
+        "summary": "Footprint keys use the raw gate.command (before {{placeholder}} substitution) for verification gates.",
+        "rationale": "Placeholders such as {{CHANGED_BASE}} change every run and would fragment the store into single-use keys."
+      },
+      {
+        "summary": "After the plan critique: a memory-wait timeout fails closed (exit 75 for the wrapper, a thrown error for Vitest); memory is re-checked after the settle; reservations subtract growth above an RSS baseline; container gates wait on memory with a full reservation.",
+        "rationale": "Each change answers a blocks-the-design finding in .pan/drafts/PAN-5248-critique.md; see the PRD's Critique response."
+      }
+    ],
+    "items": [
+      {
+        "id": "process-tree-rss",
+        "title": "Add a leaf /proc process-tree RSS reader and peak sampler",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T05:20:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5248",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/system-health/process-tree-rss.ts",
+            "src/lib/system-health/__tests__/process-tree-rss.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/system-health/__tests__/process-tree-rss.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "process-tree-rss.test.ts reports all cases green",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create src/lib/system-health/process-tree-rss.ts exporting readProcessTreeRssBytes(rootPid, reader?, platform?) and startPeakRssSampler(rootPid, { intervalMs = 2000, read }). Build the ppid map from /proc/<n>/stat (ppid is the second field after the last ')'), walk descendants breadth-first, sum VmRSS kB x 1024 from /proc/<pid>/status for tree members only, skip vanished members, return null on non-Linux or an unreadable root. The sampler reads once at start and on an unref'd interval, tracks the max non-null value, and stop() clears the interval, awaits an in-flight read and returns the max or null. Import only node built-ins (NFR-6: never import runaway-process-patrol.ts or memory-governor.ts). Tests use an in-memory ProcReader and fake timers."
+        },
+        "items": [
+          {
+            "id": "process-tree-rss.ac1",
+            "title": "Given an in-memory /proc with a 3-process tree and an unrelated sibling, readProcessTreeRssBytes returns the sum of VmRSS for the root and its 2 descendants only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "process-tree-rss.ac2",
+            "title": "Given a stat line whose comm contains ') (', the reader still parses ppid and includes the child in the tree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "process-tree-rss.ac3",
+            "title": "When platform is not linux, readProcessTreeRssBytes returns null without reading /proc",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "process-tree-rss.ac4",
+            "title": "Given fake timers and reads of 100, 300, 200 bytes across ticks, stop() returns 300; when every read is null, stop() returns null and no read runs after stop()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "quality-gate-memory",
+        "title": "Add the footprint store and memory headroom rule module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T05:20:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5248",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/quality-gate-memory.ts",
+            "tests/unit/lib/cloister/quality-gate-memory.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-memory.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "quality-gate-memory.test.ts reports all cases green",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "FR-12",
+            "FR-2",
+            "FR-3",
+            "NFR-3",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 (decisions D5, D8, D9). Create src/lib/cloister/quality-gate-memory.ts exporting DEFAULT_GATE_FOOTPRINT_BYTES = 2.5 GiB, GATE_FOOTPRINT_HISTORY = 5, footprintStoreDir(root) = join(root, 'footprints'), readGateFootprintEstimate(key, root) (max of stored peaks, default when missing or torn), recordGateFootprintPeak(key, peakBytes, root, now?) (ignore non-finite or <= 0, keep newest 5, write temp file in the footprints dir then rename over <sha256(key) first 24 hex>.json holding { key, peaks: [{ bytes, at }] }), resolveSoftReserveBytes() (dynamic import of ../config-yaml/load.js, loadGlobalConfigNoMigration().config.resources.governorSoftReserveGb x GiB; on any error computeGovernorReserveDefaultsGb(os.totalmem()/GiB).soft x GiB from ../config-yaml/governor-reserves.js), evaluateMemoryHeadroom({ memAvailableBytes, memTotalBytes, softReserveBytes, estimateBytes, reservationsBytes }) -> { ok, footprintBytes, headroomBytes } with footprintBytes = min(estimate, max(0, memTotal - softReserve)), headroom = memAvailable - reservations - footprint, ok = headroom >= softReserve, and ownerReservationBytes(owner: { footprintBytes?, rssBaselineBytes?, fullReservation? }, treeRss|null) implementing PRD D4: the whole footprintBytes ?? 0 when fullReservation is true, the baseline is undefined or treeRss is null, else max(0, footprint - max(0, treeRss - baseline)). Never import memory-governor.ts."
+        },
+        "items": [
+          {
+            "id": "quality-gate-memory.ac1",
+            "title": "readGateFootprintEstimate returns 2.5 GiB for a key with no file or a torn file, and returns the max of the recorded peaks otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quality-gate-memory.ac2",
+            "title": "When a 6th peak is recorded for one key, the stored file contains only the newest 5 peaks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quality-gate-memory.ac3",
+            "title": "evaluateMemoryHeadroom returns ok=true exactly when headroom equals the soft reserve and ok=false one byte below it, and clamps footprintBytes to memTotal - softReserve on a host smaller than the estimate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quality-gate-memory.ac4",
+            "title": "ownerReservationBytes returns 2.4 GiB for a 2.5 GiB footprint with a 1 GiB baseline and a 1.1 GiB tree, and returns the whole footprint when the baseline is missing, the tree RSS is null or fullReservation is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quality-gate-memory.ac5",
+            "title": "When the mocked loadGlobalConfigNoMigration throws, resolveSoftReserveBytes falls back to the computeGovernorReserveDefaultsGb soft value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "admission-memory-rule",
+        "title": "Add the memory rule and peak recording to acquireQualityGateAdmission",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T05:20:06Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5248",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "admission-settle-and-timeout",
+            "admitted-command-runner",
+            "vitest-footprint",
+            "verification-gate-footprint"
+          ],
+          "files_scope": [
+            "src/lib/cloister/quality-gate-admission.ts",
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "quality-gate-admission.test.ts reports all cases green including the new memory cases",
+            "typecheck exits 0",
+            "file-size guard prints no violation for quality-gate-admission.ts"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Touches only quality-gate-admission.ts and its test; no other item edits those files.",
+          "traces": [
+            "FR-11",
+            "FR-12",
+            "FR-2",
+            "FR-4",
+            "FR-8",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4",
+            "NFR-5"
+          ],
+          "acJustification": "Six criteria: the memory rule, the incident replay, the recorded estimate, fail-open reads, recordPeak, and the baseline/full-reservation arithmetic are distinct observable behaviors of one loop change."
+        },
+        "narrative": {
+          "Action": "PRD WI-3 (D4, D10, D11, D12). In src/lib/cloister/quality-gate-admission.ts: add optional footprintKey and fullReservation to QualityGateAdmissionRequest; optional footprintBytes to AdmissionTicket (owners inherit it and fullReservation through the existing { ...ticket, acquiredAt } spread); optional rssBaselineBytes to AdmissionOwner, set from await readTreeRssBytes(pid) immediately before publishExclusive(path, owner) and omitted when null; footprintBytes and recordPeak(peakBytes) to QualityGateAdmissionHandle; deps sampleMemory, readTreeRssBytes, softReserveBytes, readFootprintEstimate, onWaiting; and export type QualityGateWaitReason = queue | slots | cpu | memory (memory carries memAvailableBytes, reservationsBytes, footprintBytes, softReserveBytes). Before publishing the ticket resolve the estimate when a key is present. During the slot scan collect non-stale observed owners; put the reservation sum in a local sumReservations(owners, readTreeRssBytes) helper that calls ownerReservationBytes(owner, treeRss) so the post-settle re-check (admission-settle-and-timeout) can reuse it. After the slots-full check and before samplePressure: when the request has a footprintKey and sampleMemory returns non-null with memAvailableBytes > 0 (a throw counts as null), sum the reservations of live owners, run evaluateMemoryHeadroom, and on !ok notify memory, sleep pollMs, continue. Requests without a footprintKey skip the memory rule. onWaiting fires only when the reason kind changes and listener errors are swallowed. Default deps: sampleMemory dynamically imports ../../dashboard/server/services/proc-memory.js and maps { memAvailable, memTotal }; readTreeRssBytes = readProcessTreeRssBytes; softReserveBytes resolved once per acquire via resolveSoftReserveBytes; readFootprintEstimate reads under the admission root. recordPeak writes recordGateFootprintPeak under the same root inside try/catch and is a no-op without a key. Update the module header comment. In the test file add sampleMemory: async () => null to the deps() helper, then add the six PRD WI-3 cases (case 5 includes the 1 GiB-baseline owner and the fullReservation owner) with fake timers and the existing drive helpers. Keep the file under its size cap (481 lines today; stay at or below 650 lines after both admission items)."
+        },
+        "items": [
+          {
+            "id": "admission-memory-rule.ac1",
+            "title": "Given 13 GiB available, a 12 GiB soft reserve and a 2.5 GiB default estimate, the waiter is not admitted after 10 polls and onWaiting receives kind 'memory' once; when sampleMemory then returns 20 GiB the waiter resolves with a handle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admission-memory-rule.ac2",
+            "title": "Given 2 slots, 3 keyed requests, 16 GiB available, a 12 GiB soft reserve and owners at 100 MiB tree RSS, the first is admitted and the second waits on memory with a slot free, leaving exactly one owner file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admission-memory-rule.ac3",
+            "title": "Given a footprint file with one 512 MiB peak for the key and 13 GiB available against a 12 GiB reserve, the waiter is admitted; without that file the same setup blocks on memory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admission-memory-rule.ac4",
+            "title": "When sampleMemory returns null or throws, admission falls back to the slot and CPU rules; a live owner file without footprintBytes reserves nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admission-memory-rule.ac5",
+            "title": "handle.recordPeak(3 GiB) creates a file under <rootDir>/footprints/ and a later acquire for the same key stores footprintBytes 3 GiB in its owner record; recordPeak without a footprintKey creates no file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admission-memory-rule.ac6",
+            "title": "Given a live owner with footprintBytes 2.5 GiB, rssBaselineBytes 1 GiB and a 1.1 GiB tree RSS, the head waiter's memory check counts a 2.4 GiB reservation; given fullReservation true, it counts 2.5 GiB even when the tree reads 3 GiB",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "admission-settle-and-timeout",
+        "title": "Re-check memory after the settle and carry the wait reason on admission timeouts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T05:20:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5248",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/quality-gate-admission.ts",
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "quality-gate-admission.test.ts reports all cases green including the post-settle and timeout-reason cases",
+            "typecheck exits 0",
+            "file-size guard prints no violation"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3b (FR-9 error part, FR-10, D10 post-settle part, D15). In src/lib/cloister/quality-gate-admission.ts: give QualityGateAdmissionTimeoutError a readonly lastWaitReason: QualityGateWaitReason['kind'] | null (second constructor argument, default null) and, for 'memory', readonly lastMemory with the memory reason's numbers; the loop keeps the last reason passed to notifyWaiting and passes it when it throws on maxWaitMs. After await sleep(settleMs) and the existing CPU re-sample pass, when the request has a footprintKey: re-scan the slot files, keep live owners whose ticketId differs from its own, sampleMemory() again, run evaluateMemoryHeadroom with sumReservations(otherOwners) and its own footprint; on !ok unlink its own owner file only while sameOwner still holds, notifyWaiting memory, sleep pollMs, continue. A null or throwing sampleMemory passes. Tests with fake timers: memory drops from 20 to 13 GiB during the settle (owner file removed, waiter still queued, later admitted at 20 GiB); a memory-blocked waiter with maxWaitMs 5000 rejects with lastWaitReason 'memory', a CPU-blocked one with 'cpu'."
+        },
+        "items": [
+          {
+            "id": "admission-settle-and-timeout.ac1",
+            "title": "Given 20 GiB before publish and 13 GiB after the settle (12 GiB reserve, 2.5 GiB estimate), the queue deletes its own owner file, keeps the ticket queued and reports kind 'memory'; when reads return 20 GiB again the waiter resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admission-settle-and-timeout.ac2",
+            "title": "When a memory-blocked waiter passes maxWaitMs, acquire rejects with QualityGateAdmissionTimeoutError whose lastWaitReason is 'memory'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admission-settle-and-timeout.ac3",
+            "title": "When a CPU-blocked waiter passes maxWaitMs, acquire rejects with lastWaitReason 'cpu'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "admitted-command-runner",
+        "title": "Add the admitted-command runner behind the tsc wrapper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T05:20:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5248",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/gate-admission-run.ts",
+            "tests/unit/lib/cloister/gate-admission-run.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/gate-admission-run.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "gate-admission-run.test.ts reports all cases green",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Create src/lib/cloister/gate-admission-run.ts exporting tscFootprintKey(args) (tsc:<-p/--project value with leading ./ stripped>, else tsc:tsconfig.json), shouldBypassAdmission(env) (CI non-empty, OVERDECK_GATE_ADMISSION === '0', OVERDECK_GATE_ADMITTED === '1'), and runAdmittedCommand({ footprintKey, command, args, cwd }, deps) resolving to the exit code to use. Bypass: spawn directly. Otherwise acquire({ workspacePath: cwd, gateName: footprintKey, attempt: 1, footprintKey }, { maxWaitMs: 30 * 60_000, onWaiting }) where onWaiting writes one '[gate-admission] <key> waiting for memory: available X GiB, reserved Y GiB, needs Z GiB, soft reserve W GiB' line (one decimal) per reason change to stderr; on a QualityGateAdmissionTimeoutError whose lastWaitReason is 'memory' print '[gate-admission] refusing to start <key>: waited 30 minutes for memory (available X GiB, reserved Y GiB, needs Z GiB, soft reserve W GiB)' and resolve 75 without spawning; on any other throw warn '[gate-admission] proceeding without admission: <message>' and run unadmitted. Spawn with stdio inherit and OVERDECK_GATE_ADMITTED=1 in the env when admitted, start startPeakRssSampler on child.pid, forward SIGINT/SIGTERM/SIGHUP, remove listeners on exit. On exit: stop the sampler, recordPeak when code !== null and peak !== null, release in finally, resolve code or 128 + os.constants.signals[signal]. A spawn error releases, warns and resolves 1. No message may contain 'error TS'. All deps (acquire, spawn, startSampler, warn, env, maxWaitMs) are injectable."
+        },
+        "items": [
+          {
+            "id": "admitted-command-runner.ac1",
+            "title": "When env has CI, OVERDECK_GATE_ADMISSION=0 or OVERDECK_GATE_ADMITTED=1, runAdmittedCommand spawns the command without calling acquire",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admitted-command-runner.ac2",
+            "title": "Given a fake child that exits with code 2 and a sampler peak of 2 GiB, runAdmittedCommand resolves 2, calls recordPeak with 2 GiB and then release",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admitted-command-runner.ac3",
+            "title": "Given a fake child killed by SIGINT, runAdmittedCommand resolves 130 and records no peak",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admitted-command-runner.ac4",
+            "title": "When acquire rejects with a CPU timeout or a generic error, runAdmittedCommand prints a 'proceeding without admission' warning and still spawns the command; when it rejects with lastWaitReason 'memory', it prints 'refusing to start', resolves 75 and never calls spawn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admitted-command-runner.ac5",
+            "title": "tscFootprintKey returns 'tsc:src/x/tsconfig.json' for ['--noEmit','-p','./src/x/tsconfig.json'], accepts --project, and defaults to 'tsc:tsconfig.json' without -p",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tsc-admitted-wrapper",
+        "title": "Add scripts/tsc-admitted.mjs as the admitted tsc entry point",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T05:20:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5248",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/tsc-admitted.mjs"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "env -u CI -u OVERDECK_GATE_ADMITTED node scripts/tsc-admitted.mjs --noEmit -p packages/contracts/tsconfig.json; echo exit=$?",
+            "OVERDECK_GATE_ADMISSION=0 node scripts/tsc-admitted.mjs --noEmit -p packages/contracts/tsconfig.json; echo exit=$?",
+            "ls ~/.overdeck/verification-workers/admission/footprints/"
+          ],
+          "expected_outputs": [
+            "both runs print exit=0",
+            "the footprints directory contains a JSON file whose key is tsc:packages/contracts/tsconfig.json"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 (D3). Create scripts/tsc-admitted.mjs (plain ESM, header comment naming PAN-5248 and usage 'node scripts/tsc-admitted.mjs <tsc args>'). Resolve tscBin = <cwd>/node_modules/.bin/tsc; when it is not executable print the ratchet scripts' '✖ missing node_modules/.bin/tsc — run 'bun install' first (never falling back to the npm registry).' line to stderr and exit 1 (never npx, PAN-3605). Bypass env: spawn tscBin with stdio inherit using only node: built-ins and exit with its code (128 + signal number on a signal). Otherwise: import { register } from 'tsx/esm/api', register(), dynamically import new URL('../src/lib/cloister/gate-admission-run.ts', import.meta.url).href, and set process.exitCode = await runAdmittedCommand({ footprintKey: tscFootprintKey(args), command: tscBin, args, cwd }). If register or the import throws, print '[gate-admission] proceeding without admission: <message>' and fall back to the direct spawn. IMPLEMENTATION CHECKPOINT: run the first verify command; if tsx register cannot resolve the .js -> .ts imports, switch to spawning process.execPath with ['--import', 'tsx', <runner entry>.ts, ...] and say so in the commit message."
+        },
+        "items": [
+          {
+            "id": "tsc-admitted-wrapper.ac1",
+            "title": "When run on the host without CI or OVERDECK_GATE_ADMITTED, the wrapper exits 0 for packages/contracts/tsconfig.json and creates a footprints JSON file whose key is tsc:packages/contracts/tsconfig.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tsc-admitted-wrapper.ac2",
+            "title": "When OVERDECK_GATE_ADMISSION=0, the wrapper exits with tsc's own exit code and creates no waiter or owner file in the admission directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tsc-admitted-wrapper.ac3",
+            "title": "When node_modules/.bin/tsc is missing in the cwd, the wrapper prints the '✖ missing node_modules/.bin/tsc' line to stderr and exits 1 without calling npx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "package-json-lanes",
+        "title": "Route the root package.json typecheck lanes through the wrapper",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T05:20:06Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-5248",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -nE '\"typecheck[^\"]*\": \"[^\"]*(^|[ &])tsc ' package.json || echo none",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the grep prints none",
+            "npm run typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In the root package.json replace 'tsc --noEmit' with 'node scripts/tsc-admitted.mjs --noEmit' in typecheck (first lane), typecheck:acp, typecheck:anywhere-channel, typecheck:mobile, typecheck:account, both commands of typecheck:share, typecheck:connect, typecheck:contracts, typecheck:hooks and typecheck:evals. Leave typecheck:dashboard, typecheck:frontend, test:drizzle-smoke and every sub-package package.json unchanged."
+        },
+        "items": [
+          {
+            "id": "package-json-lanes.ac1",
+            "title": "After the change, the grep for a typecheck script that calls bare 'tsc ' in package.json prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "package-json-lanes.ac2",
+            "title": "npm run typecheck exits 0 and its root lane creates a footprints file keyed tsc:tsconfig.json when run outside CI",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "effect-diag-lanes",
+        "title": "Route the effect-diagnostics tsc lanes through the wrapper",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T05:20:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5248",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-effect-diagnostics.sh",
+            "tests/unit/scripts/lint-effect-diagnostics.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/lint-effect-diagnostics.test.ts",
+            "bash scripts/lint-effect-diagnostics.sh"
+          ],
+          "expected_outputs": [
+            "lint-effect-diagnostics.test.ts reports all cases green",
+            "the script prints '✓ Effect diagnostics guard passed'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In scripts/lint-effect-diagnostics.sh line 77 replace \"$TSC_BIN\" --noEmit -p \"$tsconfig\" with node scripts/tsc-admitted.mjs --noEmit -p \"$tsconfig\"; keep the TSC_BIN existence check; change the Reproduce hints at lines 86 and 142 to the wrapper command. In tests/unit/scripts/lint-effect-diagnostics.test.ts, makeTempGuard also copies scripts/tsc-admitted.mjs into <root>/scripts/, and every execFileSync env sets OVERDECK_GATE_ADMISSION: '0' so the wrapper's bypass path runs the fake node_modules/.bin/tsc."
+        },
+        "items": [
+          {
+            "id": "effect-diag-lanes.ac1",
+            "title": "Given a temp root with the copied wrapper and a fake tsc, the existing guard cases still pass with the fake tsc output counted per lane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effect-diag-lanes.ac2",
+            "title": "The script's lane loop contains 'node scripts/tsc-admitted.mjs --noEmit -p' and git grep for '\"$TSC_BIN\" --noEmit' in this script prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-types-lane",
+        "title": "Route the dashboard-types tsc lane through the wrapper",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T05:20:06Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-5248",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-dashboard-types.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-dashboard-types.sh"
+          ],
+          "expected_outputs": [
+            "the script prints '✓ dashboard-types guard passed'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. In scripts/lint-dashboard-types.sh line 50 replace \"$TSC_BIN\" --noEmit -p \"$TSCONFIG\" with node scripts/tsc-admitted.mjs --noEmit -p \"$TSCONFIG\" (keep '2>&1 || true'); change the line 68 Reproduce hint to the wrapper command; keep the TSC_BIN existence check."
+        },
+        "items": [
+          {
+            "id": "dashboard-types-lane.ac1",
+            "title": "bash scripts/lint-dashboard-types.sh prints '✓ dashboard-types guard passed' with the unchanged baseline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-types-lane.ac2",
+            "title": "The script contains 'node scripts/tsc-admitted.mjs --noEmit -p \"$TSCONFIG\"' and its Reproduce hint names the wrapper",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-types-lane",
+        "title": "Route the frontend-types tsc lane through the wrapper",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T05:20:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5248",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-frontend-types.sh",
+            "tests/unit/scripts/lint-frontend-types.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/lint-frontend-types.test.ts",
+            "bash scripts/lint-frontend-types.sh"
+          ],
+          "expected_outputs": [
+            "lint-frontend-types.test.ts reports all cases green",
+            "the script prints '✓ frontend-types guard passed'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. In scripts/lint-frontend-types.sh line 52 replace \"$TSC_BIN\" --noEmit -p \"$TSCONFIG\" with node scripts/tsc-admitted.mjs --noEmit -p \"$TSCONFIG\"; change the Reproduce hints at lines 63 and 94; keep the TSC_BIN check. In tests/unit/scripts/lint-frontend-types.test.ts copy scripts/tsc-admitted.mjs into the temp root, set OVERDECK_GATE_ADMISSION: '0' in runGuard's env, and add a case: FAKE_TSC_EXIT=2 with no diagnostics prints 'failed (exit 2) without TypeScript diagnostics'."
+        },
+        "items": [
+          {
+            "id": "frontend-types-lane.ac1",
+            "title": "Given the copied wrapper and a fake tsc, the existing guard cases still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-types-lane.ac2",
+            "title": "Given FAKE_TSC_EXIT=2 and no diagnostics, the guard prints 'failed (exit 2) without TypeScript diagnostics', which shows the wrapper preserves tsc's exit code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vitest-footprint",
+        "title": "Give the Vitest globalSetup a footprint key and peak recording",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T05:20:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5248",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/vitest-cpu-admission.ts",
+            "tests/unit/vitest-cpu-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/vitest-cpu-admission.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest-cpu-admission.test.ts reports all cases green",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10 (D13). In tests/vitest-cpu-admission.ts export vitestFootprintKey(cwd) (walk up to the first directory with a .git entry via existsSync; return vitest:<relative path> or vitest:.), pass footprintKey in the acquire request, start startPeakRssSampler(process.pid) after a successful acquire (injectable deps.startSampler), and in teardown stop it and call admission.recordPeak(peak) when peak !== null before release(). Change the warning to 'proceeding without admission: <reason>'. A QualityGateAdmissionTimeoutError with lastWaitReason 'memory' is not swallowed: setup throws new Error('[gate-admission] refusing to start vitest: waited 30 minutes for memory (…)'), which stops the run; other errors keep failing open. Update tests/unit/vitest-cpu-admission.test.ts: the expected warning substring, the request carries a footprintKey starting with 'vitest:', teardown calls recordPeak then release, a null peak skips recordPeak, vitestFootprintKey on a temp tree returns vitest:a/b."
+        },
+        "items": [
+          {
+            "id": "vitest-footprint.ac1",
+            "title": "When setup runs outside CI, it calls acquire with a request whose footprintKey starts with 'vitest:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vitest-footprint.ac2",
+            "title": "Given a sampler that returns 1 GiB, teardown calls recordPeak(1 GiB) before release; given a sampler that returns null, teardown skips recordPeak and still releases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vitest-footprint.ac3",
+            "title": "Given a temp tree with .git at the top and cwd at <top>/a/b, vitestFootprintKey returns 'vitest:a/b'; at the top it returns 'vitest:.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vitest-footprint.ac4",
+            "title": "When acquire rejects with lastWaitReason 'memory', setup rejects with an error containing 'refusing to start'; when it rejects with a CPU timeout, setup resolves and warns 'proceeding without admission'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verification-gate-footprint",
+        "title": "Give verification gates footprint keys, peak recording and memory-wait logs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T05:20:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5248",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/validation.ts",
+            "tests/unit/lib/cloister/validation.test.ts",
+            "tests/cloister/verification-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/validation.test.ts tests/cloister/verification-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "validation.test.ts and verification-gate.test.ts report all cases green",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "FR-3",
+            "FR-5",
+            "FR-8"
+          ],
+          "acJustification": "Five criteria map to the five observable verification-gate changes: raw key, memory log, unchanged existing cases, container full reservation, and host peak recording."
+        },
+        "narrative": {
+          "Action": "PRD WI-11 (D7, D13, D14). In src/lib/cloister/validation.ts add footprintKey: `gate:${name}:${gate.command}` (raw command, before placeholder substitution) to the acquireQualityGateAdmission request around line 465 for every admitted gate, plus fullReservation: true for container gates (gate.container && gate.container_name; they wait on memory and reserve their whole estimate until release because their memory never appears in the host tree), and pass deps { onWaiting } that, for kind 'memory', console.logs '[quality-gate] Waiting for memory: <identity> available X GiB, reserved Y GiB, needs Z GiB, soft reserve W GiB' and calls opts.onLog?.(`Waiting for memory before ${name}…`). Keep the existing 'Queued for CPU admission:' line. After registerGateProcessGroup, for host gates (useHostCwd) with a defined child pid, start startPeakRssSampler(child.pid). On pass stop it and call admission.recordPeak(peak) when admission exists and peak != null; in catch stop it and record only when typeof error.code === 'number' && !error.killed && !error.signal; stop it again in finally (idempotent). Container gates and remote gates record nothing. Add recordPeak: vi.fn(async () => undefined) to the admission mocks in tests/unit/lib/cloister/validation.test.ts and tests/cloister/verification-gate.test.ts, vi.mock the process-tree-rss module in validation.test.ts with a sampler whose stop() resolves 1 GiB, and in validation.test.ts assert the request's footprintKey keeps a literal {{CHANGED_BASE}} from gate.command."
+        },
+        "items": [
+          {
+            "id": "verification-gate-footprint.ac1",
+            "title": "Given a gate whose command contains the literal {{CHANGED_BASE}} token and a CHANGED_BASE substitution value, acquire receives footprintKey 'gate:<name>:<command with {{CHANGED_BASE}} kept literally>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-gate-footprint.ac2",
+            "title": "When the admission mock reports a memory wait through onWaiting, runQualityGates logs a line starting '[quality-gate] Waiting for memory:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-gate-footprint.ac3",
+            "title": "Given recordPeak added to both admission mocks, the existing validation.test.ts and verification-gate.test.ts cases still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-gate-footprint.ac4",
+            "title": "Given a container gate (container: true with container_name), acquire receives a request with fullReservation true and the sampler is never started",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-gate-footprint.ac5",
+            "title": "Given a sampler that resolves 1 GiB, a passing host gate calls recordPeak(1 GiB) before release, and a gate whose exec rejects with killed true and signal SIGTERM calls no recordPeak",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-admission",
+        "title": "Document memory-aware admission and the tsc wrapper",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T05:20:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5248",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "configuration/memory-governor.mdx",
+            "CLAUDE.md",
+            "changelog.d/pan-5248.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'governor_soft_reserve_gb' docs/PIPELINE-GATES.md",
+            "grep -c 'tsc-admitted.mjs' docs/PIPELINE-GATES.md CLAUDE.md configuration/memory-governor.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "each grep count is at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-10",
+            "FR-2",
+            "FR-3",
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. docs/PIPELINE-GATES.md: in 'Why verification is slow' extend the 'Agent shells share the queue' bullet with scripts/tsc-admitted.mjs, the lanes that use it (root typecheck* scripts and the three ratchet scripts, one admission per tsc) and that hand-typed npx tsc is not admitted; extend 'The pressure rule' and rename the 'CPU admission (PAN-4311, PAN-4546)' section to 'CPU and memory admission (PAN-4311, PAN-4546, PAN-5248)', adding the memory rule (MemAvailable - reservations - footprint >= resources.governor_soft_reserve_gb), reservations, the estimate (max of last 5 peaks, 2.5 GiB default), the footprints/ store path, the key formats, the RSS baseline, the post-settle memory re-check, container gates' full reservation, the clamp, the fail-open memory read, the fail-closed memory timeout ('refusing to start', exit 75) and the '[quality-gate] Waiting for memory:' log line. configuration/memory-governor.mdx (around line 130): the paragraph and the resources.quality_gate_slots row say typecheck lanes join the queue and gates also wait on memory against resources.governor_soft_reserve_gb. CLAUDE.md line 37: replace 'every local Vitest run enters the shared CPU admission queue' with the PRD WI-12 wording naming scripts/tsc-admitted.mjs and the memory rule. changelog.d/pan-5248.md: one '#### Improved' bullet in the changelog.d/README.md format ending with the #5248 link."
+        },
+        "items": [
+          {
+            "id": "docs-admission.ac1",
+            "title": "docs/PIPELINE-GATES.md contains a 'CPU and memory admission' heading that states the MemAvailable - reservations - footprint >= governor_soft_reserve_gb rule and the footprints/ store path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-admission.ac2",
+            "title": "CLAUDE.md no longer contains 'every local Vitest run enters the shared CPU admission queue' and its invariant names scripts/tsc-admitted.mjs and the soft-reserve memory rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-admission.ac3",
+            "title": "configuration/memory-governor.mdx contains a sentence stating that typecheck lanes join the admission queue and that a gate waits while starting it would drop MemAvailable below resources.governor_soft_reserve_gb",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-admission.ac4",
+            "title": "changelog.d/pan-5248.md contains an '#### Improved' heading with one bullet, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "process-tree-rss",
+        "to": "admission-memory-rule",
+        "type": "blocks"
+      },
+      {
+        "from": "quality-gate-memory",
+        "to": "admission-memory-rule",
+        "type": "blocks"
+      },
+      {
+        "from": "admission-settle-and-timeout",
+        "to": "admitted-command-runner",
+        "type": "blocks"
+      },
+      {
+        "from": "admitted-command-runner",
+        "to": "tsc-admitted-wrapper",
+        "type": "blocks"
+      },
+      {
+        "from": "tsc-admitted-wrapper",
+        "to": "package-json-lanes",
+        "type": "blocks"
+      },
+      {
+        "from": "tsc-admitted-wrapper",
+        "to": "effect-diag-lanes",
+        "type": "blocks"
+      },
+      {
+        "from": "tsc-admitted-wrapper",
+        "to": "dashboard-types-lane",
+        "type": "blocks"
+      },
+      {
+        "from": "tsc-admitted-wrapper",
+        "to": "frontend-types-lane",
+        "type": "blocks"
+      },
+      {
+        "from": "admission-settle-and-timeout",
+        "to": "vitest-footprint",
+        "type": "blocks"
+      },
+      {
+        "from": "admission-memory-rule",
+        "to": "verification-gate-footprint",
+        "type": "blocks"
+      },
+      {
+        "from": "tsc-admitted-wrapper",
+        "to": "docs-admission",
+        "type": "blocks"
+      },
+      {
+        "from": "admission-memory-rule",
+        "to": "admission-settle-and-timeout",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
