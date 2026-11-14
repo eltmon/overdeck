@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5225",
   "created": "2026-11-14T03:19:12.068Z",
-  "updated": "2026-11-14T03:45:58.879Z",
+  "updated": "2026-11-14T03:54:26.386Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,9 +72,22 @@
       "doneAt": "2026-11-14T03:45:51.769Z"
     },
     "extract-post-merge-row": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5225",
-      "claimedAt": "2026-11-14T03:45:58.879Z"
+      "claimedAt": "2026-11-14T03:45:58.879Z",
+      "doneAt": "2026-11-14T03:54:26.386Z"
+    },
+    "extract-post-merge-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:54:26.386Z"
+    },
+    "extract-post-merge-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:54:26.386Z"
+    },
+    "extract-post-merge-row.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:54:26.386Z"
     }
   }
 }
