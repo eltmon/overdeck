@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5218",
   "created": "2026-11-14T02:30:48.079Z",
-  "updated": "2026-11-14T02:39:24.163Z",
+  "updated": "2026-11-14T02:40:16.351Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,18 @@
     "settlement-facts-fetch.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T02:39:24.163Z"
+    },
+    "app-create-issue": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:40:16.351Z"
+    },
+    "app-create-issue.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:40:16.351Z"
+    },
+    "app-create-issue.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:40:16.351Z"
     }
   }
 }
