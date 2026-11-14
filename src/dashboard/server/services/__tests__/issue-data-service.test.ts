@@ -478,6 +478,58 @@ describe('IssueDataService.backfillIssue (PAN-3659)', () => {
     expect(row.priority).toBe(2);
     expect(row.completedAt).toBeUndefined();
   });
+
+  it('backfill schedules a derived refresh for the backfilled row (PAN-5310)', async () => {
+    const svc = makeService();
+    mockResolveMissingIssue.mockResolvedValue(trackerIssue());
+
+    await svc.backfillIssue('PAN-2925');
+
+    expect(svc.scheduleDerivedStateRefreshForIssues).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ identifier: 'PAN-2925' })]),
+    );
+  });
+
+  it('a later pushUpdated still schedules the backfilled row', async () => {
+    const svc = makeService();
+    mockResolveMissingIssue.mockResolvedValue(trackerIssue());
+    await svc.backfillIssue('PAN-2925');
+    (svc.scheduleDerivedStateRefreshForIssues as any).mockClear();
+
+    (svc as any).pushUpdated();
+
+    expect(svc.scheduleDerivedStateRefreshForIssues).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ identifier: 'PAN-2925' })]),
+    );
+  });
+
+  it('getCachedTrackerIssues() never includes backfilled rows', async () => {
+    const svc = makeService();
+    mockResolveMissingIssue.mockResolvedValue(trackerIssue());
+    await svc.backfillIssue('PAN-2925');
+
+    expect(svc.getCachedTrackerIssues().some((issue: any) => issue.identifier === 'PAN-2925')).toBe(false);
+  });
+
+  it('refreshDerivedStates uses the backfilled tracker row', async () => {
+    const svc = makeService();
+    mockResolveMissingIssue.mockResolvedValue(trackerIssue());
+    await svc.backfillIssue('PAN-2925');
+
+    mockLoadIssueStatesForProject.mockReset();
+    mockLoadIssueStatesForProject.mockResolvedValue(
+      new Map([['PAN-2925', { issueId: 'PAN-2925', state: 'closed' }]]),
+    );
+
+    await (svc as any).refreshDerivedStates(['PAN-2925']);
+
+    expect(mockLoadIssueStatesForProject).toHaveBeenCalledWith(
+      '/repos/overdeck',
+      ['PAN-2925'],
+      expect.objectContaining({ issues: expect.objectContaining({ 'PAN-2925': expect.objectContaining({ open: false }) }) }),
+    );
+    expect(svc.getDerivedState('PAN-2925')).toEqual({ issueId: 'PAN-2925', state: 'closed' });
+  });
 });
 
 // PAN-5224 WI-13: an older refreshDerivedStates run must never clobber a

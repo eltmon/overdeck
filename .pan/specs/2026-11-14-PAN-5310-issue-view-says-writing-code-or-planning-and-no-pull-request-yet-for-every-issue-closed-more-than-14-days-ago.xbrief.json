@@ -4,17 +4,17 @@
     "created": "2026-11-14T22:31:40Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5310: Issue view says 'writing code' or 'planning' and 'No pull request yet' for every issue closed more than 14 days ago",
-    "updated": "2026-11-14T22:37:29.125Z"
+    "updated": "2026-11-14T22:38:44.800Z"
   },
   "plan": {
     "id": "pan-5310",
     "title": "Issue view says 'writing code' or 'planning' and 'No pull request yet' for every issue closed more than 14 days ago",
-    "status": "proposed",
+    "status": "running",
     "uid": "4f5b0c1f-8b01-4178-accf-bf01a70af715",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T22:31:40Z",
-    "updated": "2026-11-14T22:37:29.125Z",
+    "updated": "2026-11-14T22:38:44.800Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5310",
@@ -782,5 +782,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }

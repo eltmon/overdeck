@@ -792,7 +792,7 @@ export class IssueDataService {
     this.pruneBackfilledIssues();
     const cachedIssues = this.getCachedTrackerIssues();
     this.schedulePlanningRefreshForIssues(cachedIssues);
-    this.scheduleDerivedStateRefreshForIssues(cachedIssues);
+    this.scheduleDerivedStateRefreshForIssues([...cachedIssues, ...this.backfilledIssues.values()]); // PAN-5310: backfilled rows too
     this._onIssuesChanged?.(this.getIssues());
   }
 
