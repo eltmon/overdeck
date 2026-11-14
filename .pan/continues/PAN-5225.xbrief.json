@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5225",
   "created": "2026-11-14T03:19:12.068Z",
-  "updated": "2026-11-14T03:19:12.068Z",
+  "updated": "2026-11-14T03:36:29.515Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,26 @@
   "sessionHistory": [],
   "items": {
     "reload-shim-repoint": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5225",
-      "claimedAt": "2026-11-14T03:19:12.068Z"
+      "claimedAt": "2026-11-14T03:19:12.068Z",
+      "doneAt": "2026-11-14T03:36:29.514Z"
+    },
+    "reload-shim-repoint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:36:29.514Z"
+    },
+    "reload-shim-repoint.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:36:29.514Z"
+    },
+    "reload-shim-repoint.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:36:29.514Z"
+    },
+    "reload-shim-repoint.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:36:29.514Z"
     }
   }
 }
