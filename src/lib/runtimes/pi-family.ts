@@ -8,7 +8,9 @@
  * instead of comparing harness names (PAN-4562). Each difference was verified
  * against pi 0.85.0 and omp 17.4.1 in .pan/pi-vs-omp.md.
  *
- * Leaf module: imports only node and paths.ts.
+ * Leaf module: imports only node and paths.ts. The paths.ts exports are read
+ * inside the profile functions, never at import time, so a test that mocks
+ * paths.js without them can still import this module.
  */
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -53,8 +55,8 @@ const PROFILES: Record<PiFamilyHarness, PiFamilyProfile> = {
     resumeFlag: '--session',
     launchArgs: ['--no-approve'],
     userAgentDir: () => process.env.PI_CODING_AGENT_DIR?.trim() || join(homedir(), '.pi', 'agent'),
-    extensionCandidates: piExtensionCandidates,
-    resolveExtensionPath: resolvePiExtensionPath,
+    extensionCandidates: () => piExtensionCandidates(),
+    resolveExtensionPath: () => resolvePiExtensionPath(),
     checksOmpCodexAuth: false,
     providerOverrides: { mimo: 'xiaomi-token-plan-sgp', nous: 'nous' },
   },
@@ -64,8 +66,8 @@ const PROFILES: Record<PiFamilyHarness, PiFamilyProfile> = {
     resumeFlag: '--resume',
     launchArgs: [],
     userAgentDir: () => join(homedir(), '.omp', 'agent'),
-    extensionCandidates: ohmypiExtensionCandidates,
-    resolveExtensionPath: resolveOhmypiExtensionPath,
+    extensionCandidates: () => ohmypiExtensionCandidates(),
+    resolveExtensionPath: () => resolveOhmypiExtensionPath(),
     checksOmpCodexAuth: true,
     providerOverrides: {},
   },
