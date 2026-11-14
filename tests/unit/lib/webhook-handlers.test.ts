@@ -801,7 +801,7 @@ describe('notePullRequestWebhook coalescer calls (PAN-5224)', () => {
     }));
 
     expect(mockNotePullRequestWebhook).toHaveBeenCalledWith(
-      'test-owner/test-repo', ['PAN-7'], 'pull_request:synchronize',
+      'test-owner/test-repo', ['PAN-7'], 'pull_request:synchronize', 'pr-state',
     );
   });
 
@@ -813,7 +813,7 @@ describe('notePullRequestWebhook coalescer calls (PAN-5224)', () => {
       },
     }));
     expect(mockNotePullRequestWebhook).toHaveBeenCalledWith(
-      'test-owner/test-repo', ['PAN-7'], 'check_suite:completed',
+      'test-owner/test-repo', ['PAN-7'], 'check_suite:completed', 'pr-status',
     );
 
     mockNotePullRequestWebhook.mockClear();
@@ -845,7 +845,7 @@ describe('notePullRequestWebhook coalescer calls (PAN-5224)', () => {
       },
     }));
     expect(mockNotePullRequestWebhook).toHaveBeenCalledWith(
-      'test-owner/test-repo', ['PAN-7'], 'check_run:created',
+      'test-owner/test-repo', ['PAN-7'], 'check_run:created', 'pr-status',
     );
   });
 
@@ -856,7 +856,7 @@ describe('notePullRequestWebhook coalescer calls (PAN-5224)', () => {
       review: { state: 'commented' },
     }));
     expect(mockNotePullRequestWebhook).toHaveBeenCalledWith(
-      'test-owner/test-repo', ['PAN-7'], 'pull_request_review:submitted',
+      'test-owner/test-repo', ['PAN-7'], 'pull_request_review:submitted', 'pr-status',
     );
 
     mockNotePullRequestWebhook.mockClear();
@@ -866,7 +866,7 @@ describe('notePullRequestWebhook coalescer calls (PAN-5224)', () => {
       branches: [{ name: 'feature/pan-7' }],
     }));
     expect(mockNotePullRequestWebhook).toHaveBeenCalledWith(
-      'test-owner/test-repo', ['PAN-7'], 'status:pending',
+      'test-owner/test-repo', ['PAN-7'], 'status:pending', 'pr-status',
     );
 
     mockNotePullRequestWebhook.mockClear();
@@ -889,5 +889,109 @@ describe('notePullRequestWebhook coalescer calls (PAN-5224)', () => {
     const invalidateOrder = mockInvalidateOpenPullRequestsSnapshot.mock.invocationCallOrder[0]!;
     const enqueueOrder = mockEnqueueProjectResourceRefresh.mock.invocationCallOrder[0]!;
     expect(invalidateOrder).toBeLessThan(enqueueOrder);
+  });
+});
+
+describe('webhook fire filters: no PR and no issue branch never fire the coalescer (PAN-5261)', () => {
+  it('handleCheckRun: created on main with empty pull_requests never calls notePullRequestWebhook (ac1)', async () => {
+    await handleCheckRun(makePayload({
+      action: 'created',
+      check_run: {
+        id: 1, name: 'build',
+        check_suite: { head_branch: 'main' },
+        pull_requests: [],
+      },
+    }));
+
+    expect(mockNotePullRequestWebhook).not.toHaveBeenCalled();
+  });
+
+  it('handleCheckRun: created with empty pull_requests on an issue branch calls notePullRequestWebhook with pr-status (ac2)', async () => {
+    await handleCheckRun(makePayload({
+      action: 'created',
+      check_run: {
+        id: 1, name: 'build',
+        check_suite: { head_branch: 'feature/pan-7' },
+        pull_requests: [],
+      },
+    }));
+
+    expect(mockNotePullRequestWebhook).toHaveBeenCalledWith(
+      'test-owner/test-repo', ['PAN-7'], 'check_run:created', 'pr-status',
+    );
+  });
+
+  it('handleCheckRun: two distinct created check_run events on the same head SHA both reach notePullRequestWebhook (ac3, D-6: no per-SHA dedup)', async () => {
+    await handleCheckRun(makePayload({
+      action: 'created',
+      check_run: {
+        id: 1, name: 'build',
+        head_sha: 'cafe',
+        check_suite: { head_branch: 'feature/pan-7' },
+        pull_requests: [],
+      },
+    }));
+
+    await handleCheckRun(makePayload({
+      action: 'created',
+      check_run: {
+        id: 2, name: 'lint',
+        head_sha: 'cafe',
+        check_suite: { head_branch: 'feature/pan-7' },
+        pull_requests: [],
+      },
+    }));
+
+    expect(mockNotePullRequestWebhook).toHaveBeenCalledTimes(2);
+  });
+
+  it('handleStatus: branches naming only main never calls notePullRequestWebhook, an issue branch among them does (ac4)', async () => {
+    await handleStatus(makePayload({
+      state: 'pending',
+      branches: [{ name: 'main' }],
+    }));
+    expect(mockNotePullRequestWebhook).not.toHaveBeenCalled();
+
+    await handleStatus(makePayload({
+      state: 'pending',
+      branches: [{ name: 'main' }, { name: 'feature/pan-7' }],
+    }));
+    expect(mockNotePullRequestWebhook).toHaveBeenCalledWith(
+      'test-owner/test-repo', ['PAN-7'], 'status:pending', 'pr-status',
+    );
+  });
+
+  it("handlePullRequest passes 'pr-state'; handlePullRequestReview and check_suite completed pass 'pr-status' (ac5)", async () => {
+    await handlePullRequest(makePayload({
+      action: 'synchronize',
+      pull_request: { number: 9, head: { ref: 'feature/pan-7', sha: 'abc' } },
+    }));
+    expect(mockNotePullRequestWebhook).toHaveBeenCalledWith(
+      'test-owner/test-repo', ['PAN-7'], 'pull_request:synchronize', 'pr-state',
+    );
+
+    mockNotePullRequestWebhook.mockClear();
+
+    await handlePullRequestReview(makePayload({
+      action: 'submitted',
+      pull_request: { number: 9, head: { ref: 'feature/pan-7', sha: 'abc' } },
+      review: { state: 'commented' },
+    }));
+    expect(mockNotePullRequestWebhook).toHaveBeenCalledWith(
+      'test-owner/test-repo', ['PAN-7'], 'pull_request_review:submitted', 'pr-status',
+    );
+
+    mockNotePullRequestWebhook.mockClear();
+
+    await handleCheckSuite(makePayload({
+      action: 'completed',
+      check_suite: {
+        status: 'completed', conclusion: 'success',
+        head_branch: 'feature/pan-7', pull_requests: [],
+      },
+    }));
+    expect(mockNotePullRequestWebhook).toHaveBeenCalledWith(
+      'test-owner/test-repo', ['PAN-7'], 'check_suite:completed', 'pr-status',
+    );
   });
 });
