@@ -167,7 +167,7 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
                       data-testid="flywheel-needs-you-item"
                       className={
                         jumpId
-                          ? 'group -mx-1 flex cursor-pointer items-baseline gap-1.5 rounded-sm px-1 hover:bg-warning/[0.14]'
+                          ? 'group -mx-1 flex cursor-pointer items-baseline gap-1.5 rounded-sm px-1 hover:bg-[color-mix(in_srgb,var(--warning)_14%,transparent)]'
                           : '-mx-1 flex items-baseline gap-1.5 px-1'
                       }
                       onClick={

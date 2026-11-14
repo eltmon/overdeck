@@ -219,7 +219,7 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
       render(<FlywheelStatusPane status={jumpableRowStatus()} unreachable={false} nowMs={NOW} />);
       const row = screen.getAllByTestId('flywheel-needs-you-item')[0]!;
       expect(row.className).toContain('cursor-pointer');
-      expect(row.className).toContain('hover:bg-warning/[0.14]');
+      expect(row.className).toContain('hover:bg-[color-mix(in_srgb,var(--warning)_14%,transparent)]');
       expect(row).not.toHaveAttribute('role');
       expect(row).not.toHaveAttribute('tabindex');
     });
