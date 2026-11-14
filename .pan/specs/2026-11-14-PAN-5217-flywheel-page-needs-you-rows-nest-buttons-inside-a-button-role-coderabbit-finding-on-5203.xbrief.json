@@ -1,0 +1,223 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T01:05:31Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5217: Flywheel page: Needs-you rows nest buttons inside a button role (CodeRabbit finding on #5203)",
+    "updated": "2026-11-14T01:06:40.706Z"
+  },
+  "plan": {
+    "id": "pan-5217",
+    "title": "Flywheel page: Needs-you rows nest buttons inside a button role (CodeRabbit finding on #5203)",
+    "status": "proposed",
+    "uid": "b3f974e6-ab72-43f4-a97c-3cc024f6eac0",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-14T01:05:31Z",
+    "updated": "2026-11-14T01:06:40.706Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5217",
+        "label": "PAN-5217",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/5203",
+        "label": "PR #5203 (CodeRabbit finding)",
+        "type": "pull-request"
+      },
+      {
+        "uri": "https://www.w3.org/WAI/standards-guidelines/act/rules/307n5z/",
+        "label": "ACT rule 307n5z",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "flywheel",
+      "accessibility",
+      "dashboard"
+    ],
+    "narratives": {
+      "Problem": "Each Needs-you row on the Flywheel page's Status tab is an <li role=\"button\" tabIndex={0}> with row-level click and key handlers that wraps issue <button>s and PR <a>s (src/dashboard/frontend/src/components/flywheel/FlywheelStatusPane.tsx lines 146-196). A button role has presentational children, so nested interactive controls lose focus and naming in browser and assistive-technology combinations that flatten button descendants (W3C ACT rule 307n5z). stopPropagation stops double-firing but does not fix the nesting.",
+      "Proposal": "Make the <li> non-interactive and give each row one leading native <button type=\"button\" aria-label=\"Show where this was raised\" data-testid=\"flywheel-needs-you-jump\"> holding an aria-hidden lucide-react MessageSquare icon; it calls onNeedsYouClick(row.messageId). Wrap the segments in a <span>, drop stopPropagation and onKeyDown from the issue buttons and PR links, keep resolveNeedsYouAction and FlywheelPage.handleNeedsYouClick untouched. Retarget the FlywheelStatusPane and FlywheelPage tests from the row to the jump button and add a render-based test that no button-role element contains a button or link. Update docs/FLYWHEEL.md line 29 and add changelog.d/pan-5217.md. Full detail, before/after snippets and decisions D-1..D-7 are in .pan/drafts/PAN-5217.md.",
+      "NonGoals": "- No change to resolveNeedsYouAction(), FlywheelPage.handleNeedsYouClick, needsYouRows() or needsYouSegments().\n- No change to the app-header NeedsYouIndicator, the in-flight table or the live-agents list.\n- No change to the needs-you block container (data-testid=\"flywheel-needs-you\"), which FlywheelPage.tsx line 102 queries for the reveal scroll.\n- No new keyboard shortcuts and no row-level hover highlight.\n- No edit to scripts/frontend-test-subset.txt (both touched test files are already listed).\n- No deleted tests: existing row-click tests are retargeted to the jump button.\n- No Playwright or browser UAT test added."
+    },
+    "autoDecisions": [
+      {
+        "summary": "The jump button is the <li>'s first child (leading), before the row text.",
+        "rationale": "Leading buttons line up in one column regardless of text length, and the tab order in a row becomes jump then issue/PR controls in text order. The issue only requires 'beside the text, not around it'."
+      },
+      {
+        "summary": "Icon is lucide-react MessageSquare at h-3 w-3, aria-hidden, muted text-muted-foreground hover:text-foreground.",
+        "rationale": "It is installed and already used in the dashboard; lucide-react is already imported in components/flywheel; muted styling follows pan-style-guide."
+      },
+      {
+        "summary": "The jump button renders on every row, even when row.messageId is undefined or onNeedsYouClick is absent.",
+        "rationale": "The page handler's reopen-question path needs no message id and falls back to the newest tick id; a conditional button would remove the only row path to reopen the pending question (FR-5)."
+      },
+      {
+        "summary": "The <li> keeps data-testid=\"flywheel-needs-you-item\"; the jump button gets data-testid=\"flywheel-needs-you-jump\".",
+        "rationale": "Tests count rows and read row text through the li testid; the action needs its own handle."
+      },
+      {
+        "summary": "Existing row-click tests are retargeted to the jump button; the fireEvent.keyDown Enter assertion is dropped.",
+        "rationale": "A native button activates on Enter and Space without a handler, and jsdom's keyDown does not synthesize a click, so that assertion no longer tests anything real."
+      },
+      {
+        "summary": "Component change and both test files (FlywheelStatusPane.test.tsx, FlywheelPage.test.tsx) are one plan item; docs is a second item with no edge.",
+        "rationale": "Changing the component without retargeting FlywheelPage.test.tsx leaves CI red because both test files are in scripts/frontend-test-subset.txt; the docs files are disjoint and can run in parallel."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-14-PAN-5217-flywheel-page-needs-you-rows-nest-buttons-inside-a-button-role-coderabbit-finding-on-5203.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "row-jump-button",
+        "title": "Replace the needs-you row button role with a leading native jump button",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T01:05:31Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5217",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelStatusPane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx src/pages/__tests__/FlywheelPage.test.tsx",
+            "npm run typecheck",
+            "npm run lint",
+            "grep -n 'stopPropagation\\|role=\"button\"\\|tabIndex' src/dashboard/frontend/src/components/flywheel/FlywheelStatusPane.tsx"
+          ],
+          "expected_outputs": [
+            "FlywheelStatusPane.test.tsx and FlywheelPage.test.tsx pass with zero failures, including the new 'no button-role element contains another button or link (PAN-5217, ACT 307n5z)' test",
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "the grep prints nothing (exit status 1)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow WI-1 in .pan/drafts/PAN-5217.md exactly. (1) In FlywheelStatusPane.tsx add `import { MessageSquare } from 'lucide-react';` above the @overdeck/contracts imports. (2) Replace the needs-you <li> block (grep anchor role=\"button\", lines 146-196) with the PRD's 'after' snippet: <li key={row.key} data-testid=\"flywheel-needs-you-item\" className=\"flex items-baseline gap-1.5\"> containing first a <button type=\"button\" aria-label=\"Show where this was raised\" title=\"Show the message that first raised this, or the question the flywheel is waiting on\" data-testid=\"flywheel-needs-you-jump\" className=\"shrink-0 self-center rounded-sm text-muted-foreground hover:text-foreground\" onClick={() => onNeedsYouClick?.(row.messageId)}> with <MessageSquare className=\"h-3 w-3\" aria-hidden=\"true\" />, then a <span className=\"min-w-0\"> holding the unchanged segment map, where the issue <button> has onClick={() => onNavigateIssue?.(segment.issueId)} and no onKeyDown, and the PR <a> has no onClick and no onKeyDown. The <li> has no role, tabIndex, title, onClick, onKeyDown, cursor-pointer or hover classes. Leave the surrounding role=\"group\" div (data-testid=\"flywheel-needs-you\"), label span and <ul> untouched. (3) In FlywheelStatusPane.test.tsx retarget the tests at lines 43, 65, 82 and 92 to click screen.getByTestId('flywheel-needs-you-jump'), delete the mockClear + fireEvent.keyDown Enter lines in the line-65 test, extend the line-30 test with a 3-jump-button count and no role/tabindex per row, and add the PRD's render-based 'no button-role element contains another button or link (PAN-5217, ACT 307n5z)' test (fixture needsYou: 'waive PAN-5095 test removal; PR #4001 merge', asserts flywheel-needs-you-issue and flywheel-needs-you-pr exist, then for every getAllByRole('button') querySelector('button, a, [role=\"button\"], [role=\"link\"]') is null). (4) In FlywheelPage.test.tsx change findAllByTestId('flywheel-needs-you-item') to findAllByTestId('flywheel-needs-you-jump') in the four tests at lines 195, 210, 238 and 254, keeping every assertion. Do not edit resolveNeedsYouAction, FlywheelPage.tsx, or scripts/frontend-test-subset.txt. Do not add skip/skipIf/only and do not read source files in tests."
+        },
+        "items": [
+          {
+            "id": "row-jump-button.ac1",
+            "title": "Given a tick with three needs-you items, when the Status pane renders, then each <li data-testid=\"flywheel-needs-you-item\"> has no role and no tabindex attribute and the pane renders exactly three button[data-testid=\"flywheel-needs-you-jump\"][aria-label=\"Show where this was raised\"] elements",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-jump-button.ac2",
+            "title": "Given a row whose item has firstRaisedMessageId 'm2', when the jump button is clicked, then onNeedsYouClick is called with 'm2'; given no needsYouItems and tick messageId 'm9', the click calls onNeedsYouClick with 'm9'; with no onNeedsYouClick prop the jump button still renders and a click does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-jump-button.ac3",
+            "title": "When the flywheel-needs-you-issue button for PAN-5095 is clicked, then onNavigateIssue is called with 'PAN-5095' and onNeedsYouClick is not called, and grep for stopPropagation, role=\"button\" and tabIndex in FlywheelStatusPane.tsx returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-jump-button.ac4",
+            "title": "Given a needs-you item that renders both an issue button and a PR link, when the pane renders, then no element returned by getAllByRole('button') contains a button, a, [role=\"button\"] or [role=\"link\"] descendant (the new ACT 307n5z test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-jump-button.ac5",
+            "title": "The four FlywheelPage.test.tsx needs-you tests pass when clicking flywheel-needs-you-jump: with a pending conv-flywheel question the click sets reopenId 'conv-flywheel' and leaves data-target-id empty; without one it sets data-target-id to the first-raised or tick message id and increments data-target-nonce",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Describe the needs-you jump button in docs/FLYWHEEL.md and changelog.d/pan-5217.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:05:31Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5217",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/FLYWHEEL.md",
+            "changelog.d/pan-5217.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'Clicking a row' docs/FLYWHEEL.md",
+            "grep -c 'Show where this was raised' docs/FLYWHEEL.md changelog.d/pan-5217.md"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "the first grep prints 0",
+            "the second grep prints 1 for each file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow WI-2 in .pan/drafts/PAN-5217.md. (1) In docs/FLYWHEEL.md line 29 (grep anchor '| Needs-you block |'), replace the sentence starting 'Clicking a row reopens the AskUserQuestion dialog' with the PRD's replacement text: each row starts with a jump button labelled \"Show where this was raised\", the row itself is not interactive, and the jump button reopens the AskUserQuestion dialog when conv-flywheel has an unanswered question in GET /api/conversations/pending-input, otherwise switches the conversation pane to the Conversation view and scrolls to the item's first-raised tick message, or the newest tick message when that id is unknown. Keep the rest of the table row unchanged. (2) Create changelog.d/pan-5217.md with a single '#### Fixed' heading and the PRD's bullet naming the 'Show where this was raised' jump button and linking [#5217](https://github.com/eltmon/overdeck/issues/5217). Do not edit changelog.mdx."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "docs/FLYWHEEL.md's Needs-you block row states that each row starts with a 'Show where this was raised' jump button and that the row itself is not interactive, and grep -c 'Clicking a row' docs/FLYWHEEL.md prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "changelog.d/pan-5217.md exists with exactly one '#### Fixed' heading and one bullet naming the jump button and linking issue #5217, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "proposed"
+}
