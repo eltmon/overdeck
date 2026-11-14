@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5282",
   "created": "2026-11-14T19:03:45.838Z",
-  "updated": "2026-11-14T20:44:52.465Z",
+  "updated": "2026-11-14T20:44:54.078Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -207,6 +207,11 @@
     "docs-harnesses.ac2": {
       "status": "completed",
       "doneAt": "2026-11-14T20:44:52.465Z"
+    },
+    "docs-cliproxy-skill": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5282",
+      "claimedAt": "2026-11-14T20:44:54.077Z"
     }
   }
 }
