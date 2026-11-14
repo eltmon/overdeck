@@ -16,6 +16,7 @@ import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
 import { pickViewer } from '../viewers/viewer-router'
 import styles from '../../Stage/stage.module.css'
 import type { PaneWrapperProps } from '../../Stage/types'
+import { EditWorkspaceNote } from '../edit/EditWorkspaceBanner'
 import { useEditWorkspaceStore } from '../edit/edit-workspace-store'
 import { explorerErrorCode, explorerErrorMessage, parseRootId, readFile } from '../explorer-rpc'
 import { openCodePane } from '../openCodePane'
@@ -272,6 +273,7 @@ function CodePaneForFile({
           {creatingEdit ? CREATING_EDIT_NOTE : PROJECT_EDIT_NOTE}
         </div>
       ) : null}
+      {rootRef?.kind === 'workspace' ? <EditWorkspaceNote rootId={rootId} /> : null}
       {diff === 'head' || diskDiff !== undefined ? (
         <div className="min-h-0 flex-1" data-testid="code-pane-changes">
           <ChangesView
