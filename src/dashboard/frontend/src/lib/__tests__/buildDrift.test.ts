@@ -104,6 +104,33 @@ describe('startBuildDriftWatch', () => {
     stop();
   });
 
+  it('runs a queued check once the in-flight one finishes, for a rising edge that arrived mid-check', async () => {
+    let resolveFirst: (() => void) | undefined;
+    const fetchImpl = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveFirst = () => resolve(jsonResponse({ status: 'ok', buildCommit: 'srv1' }));
+          }),
+      )
+      .mockImplementation(async () => jsonResponse({ status: 'ok', buildCommit: 'srv2' }));
+
+    const stop = startBuildDriftWatch(fetchImpl);
+    useConnectionState.setState({ streamLive: true });
+    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+
+    // A reconnect wobble while the first check is still in flight: queued, not dropped.
+    useConnectionState.setState({ streamLive: false });
+    useConnectionState.setState({ streamLive: true });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+    resolveFirst?.();
+    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(useBuildDrift.getState().serverCommit).toBe('srv2'));
+    stop();
+  });
+
   it('keeps the previous serverCommit when a check fails', async () => {
     useBuildDrift.setState({ serverCommit: 'keep-me' });
     const fetchImpl = vi.fn(async () => {

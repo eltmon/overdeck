@@ -82,9 +82,16 @@ export function reloadAlreadyTriedFor(serverCommit: string | null): boolean {
 export function startBuildDriftWatch(fetchImpl: typeof fetch = fetch): () => void {
   let disposed = false;
   let inFlight = false;
+  let pending = false;
 
   const check = async () => {
-    if (inFlight || disposed) return;
+    if (disposed) return;
+    if (inFlight) {
+      // A rising edge arrived mid-check: run once more right after this one
+      // finishes, so that edge's reconnect is not silently dropped.
+      pending = true;
+      return;
+    }
     inFlight = true;
     try {
       const result = await fetchServerBuildCommit(fetchImpl);
@@ -94,6 +101,10 @@ export function startBuildDriftWatch(fetchImpl: typeof fetch = fetch): () => voi
       }
     } finally {
       inFlight = false;
+      if (pending && !disposed) {
+        pending = false;
+        void check();
+      }
     }
   };
 

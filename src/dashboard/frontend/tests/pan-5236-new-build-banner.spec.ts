@@ -51,9 +51,15 @@ async function installDriftRoute(page: Page): Promise<void> {
 }
 
 test('matching commits: the main dashboard shows no banner', async ({ page }) => {
+  // Registered before navigation: the buildDrift check's /api/health fetch
+  // can fire during bootstrap, before the snapshot-cache wait below resolves.
+  const healthChecked = page.waitForResponse((res) => res.url().includes('/api/health'), { timeout: 60_000 });
   await page.goto(`${dashboard.baseUrl}/pipeline`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => localStorage.getItem('pan-snapshot-cache-v1') !== null, undefined, { timeout: 60_000 });
-  await page.waitForTimeout(5_000);
+  // Wait for the buildDrift check itself before asserting absence —
+  // otherwise "no banner" can pass for free, before the check has even run.
+  await healthChecked;
+  await page.waitForTimeout(2_000);
   await expect(page.locator(BANNER)).toHaveCount(0);
 });
 
@@ -106,14 +112,14 @@ test('drift: the conversation popout shows the banner', async ({ browser }) => {
 test('reload keeps a seeded draft and hides the banner once the same server commit has been tried', async ({ browser }) => {
   const context = await browser.newContext();
   try {
-    await context.addInitScript(() => {
-      if (localStorage.getItem('conv-draft:pan-5236-probe') === null) {
-        localStorage.setItem('conv-draft:pan-5236-probe', 'keep me');
-      }
-    });
     const page = await context.newPage();
     await installDriftRoute(page);
     await page.goto(`${dashboard.baseUrl}/pipeline`, { waitUntil: 'domcontentloaded' });
+    // Seed the draft once, directly, after the initial load — not via
+    // addInitScript, which would re-run on the reload under test too and
+    // silently re-plant the draft if the reload path ever cleared it,
+    // masking exactly the regression this journey exists to catch.
+    await page.evaluate(() => localStorage.setItem('conv-draft:pan-5236-probe', 'keep me'));
 
     const banner = page.locator(BANNER);
     await expect(banner).toBeVisible({ timeout: 60_000 });
@@ -138,9 +144,12 @@ test('open across a deploy: the banner appears on a server restart, without a pa
   const context = await browser.newContext();
   try {
     const page = await context.newPage();
+    // Registered before navigation: see the "matching commits" journey above.
+    const healthChecked = page.waitForResponse((res) => res.url().includes('/api/health'), { timeout: 60_000 });
     await page.goto(`${dashboard.baseUrl}/pipeline`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => localStorage.getItem('pan-snapshot-cache-v1') !== null, undefined, { timeout: 60_000 });
-    await page.waitForTimeout(5_000);
+    await healthChecked;
+    await page.waitForTimeout(2_000);
     await expect(page.locator(BANNER)).toHaveCount(0);
 
     await installDriftRoute(page);
