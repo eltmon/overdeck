@@ -4,17 +4,17 @@
     "created": "2026-11-14T03:38:47Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5233: Workspaces rail shows machine-made workspaces: rows carry no origin, and reaped issue rows never archive",
-    "updated": "2026-11-14T03:45:17.051Z"
+    "updated": "2026-11-14T03:57:04.568Z"
   },
   "plan": {
     "id": "pan-5233",
     "title": "Workspaces rail shows machine-made workspaces: rows carry no origin, and reaped issue rows never archive",
-    "status": "proposed",
+    "status": "running",
     "uid": "4b4e2850-283c-46f2-961d-116bc14126b6",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T03:38:47Z",
-    "updated": "2026-11-14T03:45:17.051Z",
+    "updated": "2026-11-14T03:57:04.568Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5233",
@@ -856,5 +856,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
