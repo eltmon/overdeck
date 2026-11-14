@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getProjectSync: vi.fn(),
   resolveProjectFromIssueSync: vi.fn(),
   invalidateRepoPullRequests: vi.fn(),
+  invalidateOpenRepoPullRequests: vi.fn(),
   invalidateOpenPullRequestsSnapshot: vi.fn(),
   scheduleDerivedStateRefreshForIssues: vi.fn(),
 }));
@@ -25,7 +26,11 @@ vi.mock('../../../../../src/lib/projects.js', async (importOriginal) => {
 
 vi.mock('../../../../../src/lib/overdeck/pr-listing.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../../src/lib/overdeck/pr-listing.js')>();
-  return { ...actual, invalidateRepoPullRequests: mocks.invalidateRepoPullRequests };
+  return {
+    ...actual,
+    invalidateRepoPullRequests: mocks.invalidateRepoPullRequests,
+    invalidateOpenRepoPullRequests: mocks.invalidateOpenRepoPullRequests,
+  };
 });
 
 vi.mock('../../../../../src/lib/pipeline-membership-gather.js', async (importOriginal) => {
@@ -79,6 +84,7 @@ describe('notePullRequestWebhook coalescer (PAN-5224)', () => {
     mocks.getProjectSync.mockReset();
     mocks.resolveProjectFromIssueSync.mockReset();
     mocks.invalidateRepoPullRequests.mockReset();
+    mocks.invalidateOpenRepoPullRequests.mockReset();
     mocks.invalidateOpenPullRequestsSnapshot.mockReset();
     mocks.scheduleDerivedStateRefreshForIssues.mockReset();
     mocks.resolveProjectForRepo.mockReturnValue({ projectKey: 'overdeck', repo: 'eltmon/overdeck', branch: 'main' });
@@ -153,5 +159,87 @@ describe('notePullRequestWebhook coalescer (PAN-5224)', () => {
     expect(mocks.invalidateRepoPullRequests).not.toHaveBeenCalled();
     expect(mocks.invalidateOpenPullRequestsSnapshot).not.toHaveBeenCalled();
     expect(mocks.scheduleDerivedStateRefreshForIssues).not.toHaveBeenCalled();
+  });
+});
+
+describe('coalescer change kinds (PAN-5261)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    resetPrWebhookCoalescerForTests();
+    mocks.resolveProjectForRepo.mockReset();
+    mocks.getProjectSync.mockReset();
+    mocks.resolveProjectFromIssueSync.mockReset();
+    mocks.invalidateRepoPullRequests.mockReset();
+    mocks.invalidateOpenRepoPullRequests.mockReset();
+    mocks.invalidateOpenPullRequestsSnapshot.mockReset();
+    mocks.scheduleDerivedStateRefreshForIssues.mockReset();
+    mocks.resolveProjectForRepo.mockReturnValue({ projectKey: 'overdeck', repo: 'eltmon/overdeck', branch: 'main' });
+    mocks.getProjectSync.mockReturnValue({ name: 'overdeck', path: '/project' });
+    mocks.resolveProjectFromIssueSync.mockReturnValue({ projectKey: 'overdeck', projectPath: '/project' });
+  });
+
+  afterEach(() => {
+    resetPrWebhookCoalescerForTests();
+    vi.useRealTimers();
+  });
+
+  it("a 'pr-status' fire invalidates only the open PR read (ac1)", () => {
+    notePullRequestWebhook('eltmon/overdeck', ['PAN-7'], 'check_run:created', 'pr-status');
+
+    expect(mocks.invalidateOpenRepoPullRequests).toHaveBeenCalledWith('/project');
+    expect(mocks.invalidateRepoPullRequests).not.toHaveBeenCalled();
+    expect(mocks.invalidateOpenPullRequestsSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("a 'pr-state' fire invalidates the repo PR listing and membership snapshot, as before (ac2)", () => {
+    notePullRequestWebhook('eltmon/overdeck', ['PAN-7'], 'pull_request:synchronize', 'pr-state');
+
+    expect(mocks.invalidateRepoPullRequests).toHaveBeenCalledWith('/project');
+    expect(mocks.invalidateOpenPullRequestsSnapshot).toHaveBeenCalledWith('eltmon', 'overdeck');
+    expect(mocks.invalidateOpenRepoPullRequests).not.toHaveBeenCalled();
+  });
+
+  it("a 'pr-status' event and a 'pr-state' event merged into one trailing fire act as 'pr-state' (ac3)", async () => {
+    notePullRequestWebhook('eltmon/overdeck', ['PAN-1'], 'leading', 'pr-status');
+    mocks.invalidateRepoPullRequests.mockClear();
+    mocks.invalidateOpenRepoPullRequests.mockClear();
+    mocks.invalidateOpenPullRequestsSnapshot.mockClear();
+
+    notePullRequestWebhook('eltmon/overdeck', ['PAN-2'], 'check_run:created', 'pr-status');
+    notePullRequestWebhook('eltmon/overdeck', ['PAN-3'], 'pull_request:synchronize', 'pr-state');
+    await vi.advanceTimersByTimeAsync(PR_WEBHOOK_REFRESH_SPACING_MS);
+
+    expect(mocks.invalidateRepoPullRequests).toHaveBeenCalled();
+    expect(mocks.invalidateOpenPullRequestsSnapshot).toHaveBeenCalled();
+    expect(mocks.invalidateOpenRepoPullRequests).not.toHaveBeenCalled();
+  });
+
+  it("two successive trailing windows where only the first holds a 'pr-state' event: the second calls only invalidateOpenRepoPullRequests (ac4)", async () => {
+    notePullRequestWebhook('eltmon/overdeck', ['PAN-1'], 'leading', 'pr-status');
+    mocks.invalidateRepoPullRequests.mockClear();
+    mocks.invalidateOpenRepoPullRequests.mockClear();
+    mocks.invalidateOpenPullRequestsSnapshot.mockClear();
+
+    notePullRequestWebhook('eltmon/overdeck', ['PAN-2'], 'pull_request:synchronize', 'pr-state');
+    await vi.advanceTimersByTimeAsync(PR_WEBHOOK_REFRESH_SPACING_MS);
+    expect(mocks.invalidateRepoPullRequests).toHaveBeenCalled();
+    mocks.invalidateRepoPullRequests.mockClear();
+    mocks.invalidateOpenRepoPullRequests.mockClear();
+    mocks.invalidateOpenPullRequestsSnapshot.mockClear();
+
+    notePullRequestWebhook('eltmon/overdeck', ['PAN-3'], 'check_run:created', 'pr-status');
+    await vi.advanceTimersByTimeAsync(PR_WEBHOOK_REFRESH_SPACING_MS);
+
+    expect(mocks.invalidateOpenRepoPullRequests).toHaveBeenCalled();
+    expect(mocks.invalidateRepoPullRequests).not.toHaveBeenCalled();
+    expect(mocks.invalidateOpenPullRequestsSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("an omitted change acts as 'pr-state' (ac5)", () => {
+    notePullRequestWebhook('eltmon/overdeck', ['PAN-7'], 'pull_request:synchronize');
+
+    expect(mocks.invalidateRepoPullRequests).toHaveBeenCalledWith('/project');
+    expect(mocks.invalidateOpenPullRequestsSnapshot).toHaveBeenCalledWith('eltmon', 'overdeck');
+    expect(mocks.invalidateOpenRepoPullRequests).not.toHaveBeenCalled();
   });
 });

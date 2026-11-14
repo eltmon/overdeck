@@ -1,0 +1,189 @@
+{
+  "version": "1",
+  "issueId": "PAN-5261",
+  "created": "2026-11-14T08:29:10.265Z",
+  "updated": "2026-11-14T09:05:32.972Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "open-read-limit-30": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5261",
+      "claimedAt": "2026-11-14T08:29:10.265Z",
+      "doneAt": "2026-11-14T08:42:50.242Z"
+    },
+    "open-read-limit-30.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:42:50.242Z"
+    },
+    "open-read-limit-30.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:42:50.242Z"
+    },
+    "open-read-limit-30.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:42:50.242Z"
+    },
+    "open-read-limit-30.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:42:50.242Z"
+    },
+    "unknown-pin-issue-branch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5261",
+      "claimedAt": "2026-11-14T08:42:56.763Z",
+      "doneAt": "2026-11-14T08:46:47.153Z"
+    },
+    "unknown-pin-issue-branch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:46:47.153Z"
+    },
+    "unknown-pin-issue-branch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:46:47.153Z"
+    },
+    "unknown-pin-issue-branch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:46:47.153Z"
+    },
+    "coalescer-change-kinds": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5261",
+      "claimedAt": "2026-11-14T08:46:51.978Z",
+      "doneAt": "2026-11-14T08:49:59.405Z"
+    },
+    "coalescer-change-kinds.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:49:59.405Z"
+    },
+    "coalescer-change-kinds.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:49:59.405Z"
+    },
+    "coalescer-change-kinds.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:49:59.405Z"
+    },
+    "coalescer-change-kinds.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:49:59.405Z"
+    },
+    "coalescer-change-kinds.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:49:59.405Z"
+    },
+    "webhook-fire-filters": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5261",
+      "claimedAt": "2026-11-14T08:50:05.068Z",
+      "doneAt": "2026-11-14T08:52:57.071Z"
+    },
+    "webhook-fire-filters.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:52:57.071Z"
+    },
+    "webhook-fire-filters.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:52:57.071Z"
+    },
+    "webhook-fire-filters.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:52:57.071Z"
+    },
+    "webhook-fire-filters.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:52:57.071Z"
+    },
+    "webhook-fire-filters.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:52:57.071Z"
+    },
+    "tracker-trigger-raw-rows": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5261",
+      "claimedAt": "2026-11-14T08:53:02.109Z",
+      "doneAt": "2026-11-14T08:56:56.501Z"
+    },
+    "tracker-trigger-raw-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:56:56.501Z"
+    },
+    "tracker-trigger-raw-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:56:56.501Z"
+    },
+    "tracker-trigger-raw-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:56:56.501Z"
+    },
+    "issue-state-cache": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5261",
+      "claimedAt": "2026-11-14T08:57:01.929Z",
+      "doneAt": "2026-11-14T09:00:27.777Z"
+    },
+    "issue-state-cache.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T09:00:27.777Z"
+    },
+    "issue-state-cache.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T09:00:27.777Z"
+    },
+    "issue-state-cache.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T09:00:27.777Z"
+    },
+    "issue-state-cache.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T09:00:27.777Z"
+    },
+    "issue-state-cache.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T09:00:27.777Z"
+    },
+    "issue-state-cache-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5261",
+      "claimedAt": "2026-11-14T09:00:35.191Z",
+      "doneAt": "2026-11-14T09:03:52.897Z"
+    },
+    "issue-state-cache-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T09:03:52.897Z"
+    },
+    "issue-state-cache-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T09:03:52.897Z"
+    },
+    "issue-state-cache-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T09:03:52.897Z"
+    },
+    "issue-state-cache-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T09:03:52.897Z"
+    },
+    "docs-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5261",
+      "claimedAt": "2026-11-14T09:03:58.535Z",
+      "doneAt": "2026-11-14T09:05:32.971Z"
+    },
+    "docs-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T09:05:32.971Z"
+    },
+    "docs-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T09:05:32.971Z"
+    },
+    "docs-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T09:05:32.971Z"
+    }
+  }
+}

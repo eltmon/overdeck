@@ -1,0 +1,9 @@
+plan-digest: 4cfcd5ba326928a3c0fdd6f2d12c19aa8db78493ba6ffb7729d947621772a316
+
+## blocks-the-design: Cache treats any null alias as a durable non-issue
+
+`src/lib/github-graphql-run.ts:70-81` returns GraphQL envelopes with per-field errors when partial data exists. `src/lib/pipeline-membership-gather.ts:157-175` accepts an explicit null alias, ignores `response.errors`, and omits that number from the returned states; `tests/unit/lib/pipeline-membership-gather.test.ts:1364-1375` confirms this path. WI-6 then caches every omitted number as `null` for 30 minutes. A null caused by a field error other than a confirmed nonexistent issue is therefore cached as “not an issue”; `src/lib/pipeline-membership-gather.ts:713-716` removes that issue from membership on every gather until expiry, even if the raw tracker rows do not change. Revise WI-6 to cache negative answers only when the lookup can establish they are terminal, or leave omitted numbers uncached and recalculate the quota budget. Add a test for a per-field error on a real issue followed by a successful lookup.
+
+## sharpens-framing: Freshness bound excludes events the plan drops
+
+PRD NFR-2 says no change delays the first webhook event that changes a PR row, but FR-4 and the Non-goals deliberately drop `check_run` events with no listed PR and no issue branch, and `status` events with no issue branch. The current `handleCheckRun` calls the coalescer for every `created` or failing `completed` event (`src/lib/webhook-handlers.ts:269-281`); WI-4 removes those calls, so an open PR on a non-issue branch can wait for the fallback TTL despite its check row changing. The smallest clarification is to state the exact branch/PR-association scope of NFR-2 and its acceptance test, or retain invalidation for every event that can change an open PR row.

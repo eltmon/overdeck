@@ -24,8 +24,8 @@ import {
 } from '../../../../src/lib/overdeck/pr-listing.js';
 import { setWebhookHealthProvider } from '../../../../src/lib/overdeck/pr-freshness.js';
 
-function openRow(number: number, mergeable = 'MERGEABLE') {
-  return { number, state: 'OPEN', mergeable };
+function openRow(number: number, mergeable = 'MERGEABLE', headRefName = 'feature/pan-7') {
+  return { number, state: 'OPEN', mergeable, headRefName };
 }
 
 describe('PR listing webhook-health TTLs (PAN-5224)', () => {
@@ -68,14 +68,32 @@ describe('PR listing webhook-health TTLs (PAN-5224)', () => {
     expect(mocks.runGh).toHaveBeenCalledTimes(2);
   });
 
-  it('healthy provider, OPEN row with mergeable UNKNOWN: re-reads after 31s (ac3)', async () => {
+  it('healthy provider, OPEN row with mergeable UNKNOWN on an issue branch: re-reads after 31s (ac3)', async () => {
     setWebhookHealthProvider(() => true);
-    mocks.runGh.mockResolvedValue({ stdout: JSON.stringify([openRow(1, 'UNKNOWN')]) });
+    mocks.runGh.mockResolvedValue({ stdout: JSON.stringify([openRow(1, 'UNKNOWN', 'feature/pan-7')]) });
 
-    await expect(readOpenRepoPullRequests(repo)).resolves.toEqual([openRow(1, 'UNKNOWN')]);
+    await expect(readOpenRepoPullRequests(repo)).resolves.toEqual([openRow(1, 'UNKNOWN', 'feature/pan-7')]);
     await vi.advanceTimersByTimeAsync(PR_CACHE_TTL_MS + 1_000);
-    await expect(readOpenRepoPullRequests(repo)).resolves.toEqual([openRow(1, 'UNKNOWN')]);
+    await expect(readOpenRepoPullRequests(repo)).resolves.toEqual([openRow(1, 'UNKNOWN', 'feature/pan-7')]);
 
+    expect(mocks.runGh).toHaveBeenCalledTimes(2);
+  });
+
+  it('healthy provider, OPEN row with mergeable UNKNOWN on a non-issue branch: no re-read at 31s, re-reads just past 5 min (PAN-5261)', async () => {
+    setWebhookHealthProvider(() => true);
+    mocks.runGh.mockResolvedValue({ stdout: JSON.stringify([openRow(1, 'UNKNOWN', 'contrib/night-cycle')]) });
+
+    await expect(readOpenRepoPullRequests(repo)).resolves.toEqual([openRow(1, 'UNKNOWN', 'contrib/night-cycle')]);
+    await vi.advanceTimersByTimeAsync(PR_CACHE_TTL_MS + 1_000); // past the 30 s UNKNOWN pin; not on an issue branch
+    await expect(readOpenRepoPullRequests(repo)).resolves.toEqual([openRow(1, 'UNKNOWN', 'contrib/night-cycle')]);
+    expect(mocks.runGh).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(4 * 60_000 + 28_000); // just under 5 min total
+    await expect(readOpenRepoPullRequests(repo)).resolves.toEqual([openRow(1, 'UNKNOWN', 'contrib/night-cycle')]);
+    expect(mocks.runGh).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(2_000); // just past 5 min total
+    await expect(readOpenRepoPullRequests(repo)).resolves.toEqual([openRow(1, 'UNKNOWN', 'contrib/night-cycle')]);
     expect(mocks.runGh).toHaveBeenCalledTimes(2);
   });
 

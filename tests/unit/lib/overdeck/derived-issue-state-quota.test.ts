@@ -99,21 +99,25 @@ describe('readRepoPullRequests quota metering (PAN-4264)', () => {
     ]);
   });
 
-  it('lists 100 PRs and records the per-page price for the open read, and the closed read omits the heavy fields (PAN-4291)', async () => {
+  it('lists 100 PRs and records the per-page price for the open read, and the closed read omits the heavy fields (PAN-4291, PAN-5261)', async () => {
     gh.stdout = JSON.stringify(Array.from({ length: 100 }, (_, i) => ({ number: i, state: 'OPEN' })));
 
     await readRepoPullRequests(`/repos/quota-${++repoSeq}`);
-    expect(gh.calls).toHaveLength(2);
-    expect(gh.calls[0]).toContain('100');
-    expect(gh.calls[0]).not.toContain('200');
+    // PAN-5261: the open read tries --limit 30 first; 100 rows come back, so
+    // it re-reads at --limit 100 before settling, then the closed read runs.
+    expect(gh.calls).toHaveLength(3);
+    expect(gh.calls[0]).toContain('30');
+    expect(gh.calls[1]).toContain('100');
+    expect(gh.calls[1]).not.toContain('200');
     // The closed read never asks for the fields only an open PR's status needs.
-    const closedFields = gh.calls[1]![gh.calls[1]!.indexOf('--json') + 1]!;
+    const closedFields = gh.calls[2]![gh.calls[2]!.indexOf('--json') + 1]!;
     expect(closedFields).not.toContain('statusCheckRollup');
     expect(closedFields).not.toContain('reviewRequests');
     expect(closedFields).not.toContain('mergeable');
 
     await flushLedgerWrites();
     expect(readLedgerWindow(Date.now())).toEqual([
+      expect.objectContaining({ caller: 'pr-cache', cost: 1 }),
       expect.objectContaining({ caller: 'pr-cache', cost: 3 }),
       expect.objectContaining({ caller: 'pr-cache', cost: 1 }),
     ]);

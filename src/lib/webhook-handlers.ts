@@ -223,7 +223,7 @@ export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {
         ? [...new Set(listedPrs.map((listedPr) => issueIdFromBranch(listedPr.head.ref)).filter((id): id is string => Boolean(id)))]
         : [branchIssueId!];
       const { notePullRequestWebhook } = await import('../dashboard/server/services/pr-webhook-freshness.js');
-      notePullRequestWebhook(repo, ids, `check_suite:${payload.action ?? 'unknown'}`);
+      notePullRequestWebhook(repo, ids, `check_suite:${payload.action ?? 'unknown'}`, 'pr-status');
     }
   }
 
@@ -273,11 +273,14 @@ export async function handleCheckRun(payload: WebhookPayload): Promise<void> {
     if (coalescerTrigger) {
       const listedRuns = run.pull_requests ?? [];
       const branchIssueId = run.check_suite?.head_branch ? issueIdFromBranch(run.check_suite.head_branch) : null;
-      const ids = listedRuns.length > 0
-        ? [...new Set(listedRuns.map((listedPr) => issueIdFromBranch(listedPr.head.ref)).filter((id): id is string => Boolean(id)))]
-        : (branchIssueId ? [branchIssueId] : []);
-      const { notePullRequestWebhook } = await import('../dashboard/server/services/pr-webhook-freshness.js');
-      notePullRequestWebhook(repo, ids, `check_run:${payload.action ?? 'unknown'}`);
+      // PAN-5261: a check_run naming no PR and on no issue branch (e.g. main) can never change a PR row.
+      if (listedRuns.length > 0 || branchIssueId !== null) {
+        const ids = listedRuns.length > 0
+          ? [...new Set(listedRuns.map((listedPr) => issueIdFromBranch(listedPr.head.ref)).filter((id): id is string => Boolean(id)))]
+          : [branchIssueId!];
+        const { notePullRequestWebhook } = await import('../dashboard/server/services/pr-webhook-freshness.js');
+        notePullRequestWebhook(repo, ids, `check_run:${payload.action ?? 'unknown'}`, 'pr-status');
+      }
     }
   }
 
@@ -340,7 +343,7 @@ export async function handlePullRequest(payload: WebhookPayload): Promise<void> 
   const issueId = issueIdFromBranch(pr.head.ref);
   {
     const { notePullRequestWebhook } = await import('../dashboard/server/services/pr-webhook-freshness.js');
-    notePullRequestWebhook(repo, issueId ? [issueId] : [], `pull_request:${payload.action ?? 'unknown'}`);
+    notePullRequestWebhook(repo, issueId ? [issueId] : [], `pull_request:${payload.action ?? 'unknown'}`, 'pr-state');
   }
   if (!issueId) return;
   bumpIssuePrTabCacheGeneration(issueId);
@@ -467,7 +470,7 @@ export async function handlePullRequestReview(payload: WebhookPayload): Promise<
   const issueId = issueIdFromBranch(pr.head.ref);
   {
     const { notePullRequestWebhook } = await import('../dashboard/server/services/pr-webhook-freshness.js');
-    notePullRequestWebhook(repo, issueId ? [issueId] : [], `pull_request_review:${payload.action ?? 'unknown'}`);
+    notePullRequestWebhook(repo, issueId ? [issueId] : [], `pull_request_review:${payload.action ?? 'unknown'}`, 'pr-status');
   }
   if (!issueId) return;
   bumpIssuePrTabCacheGeneration(issueId);
@@ -517,8 +520,11 @@ export async function handleStatus(payload: WebhookPayload): Promise<void> {
   const branches = payload.branches;
   if (branches && branches.length > 0) {
     const ids = [...new Set(branches.map((branch) => issueIdFromBranch(branch.name)).filter((id): id is string => Boolean(id)))];
-    const { notePullRequestWebhook } = await import('../dashboard/server/services/pr-webhook-freshness.js');
-    notePullRequestWebhook(repo, ids, `status:${payload.state ?? 'unknown'}`);
+    // PAN-5261: a status on no issue branch (e.g. main) can never change a PR row.
+    if (ids.length > 0) {
+      const { notePullRequestWebhook } = await import('../dashboard/server/services/pr-webhook-freshness.js');
+      notePullRequestWebhook(repo, ids, `status:${payload.state ?? 'unknown'}`, 'pr-status');
+    }
   }
 
   const state = payload.state;

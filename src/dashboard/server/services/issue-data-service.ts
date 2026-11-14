@@ -908,7 +908,7 @@ export class IssueDataService {
     };
   }
 
-  private getCachedTrackerIssues(): any[] {
+  getCachedTrackerIssues(): any[] {
     return [
       ...this.trackers.github.lastFetchedIssues,
       ...this.trackers.linear.lastFetchedIssues,

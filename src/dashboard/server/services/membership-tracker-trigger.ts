@@ -4,6 +4,7 @@
  * membership now, instead of at the 30-minute fallback. Diffs per identifier
  * (never by array index). Never throws.
  */
+import { invalidateCachedIssueState } from '../../../lib/pipeline-membership-gather.js';
 import { listProjectsSync, resolveProjectFromIssueSync, type ProjectConfig } from '../../../lib/projects.js';
 import { enqueueProjectsResourceRefresh } from './project-resource-refresh-queue.js';
 
@@ -84,6 +85,13 @@ export function noteTrackerIssues(issues: readonly unknown[]): void {
     for (const identifier of changed) {
       const project = resolveProject(identifier);
       if (project) projects.set(project.path, project);
+      // PAN-5261: drop the GraphQL issue-state cache's answer for the
+      // identifier that just changed, before the refresh below re-asks it.
+      const digits = identifier.match(/-(\d+)$/)?.[1];
+      const repoParts = project?.github_repo?.split('/');
+      if (digits && repoParts?.length === 2) {
+        invalidateCachedIssueState(repoParts[0]!, repoParts[1]!, Number(digits));
+      }
     }
     if (projects.size > 0) enqueueProjectsResourceRefresh([...projects.values()], 'tracker:issues-changed');
   } catch (error) {

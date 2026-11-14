@@ -177,6 +177,86 @@ export async function listIssueStatesBatched(
   return states;
 }
 
+/** PAN-5261: how long a GraphQL issue-state answer is reused across gathers. */
+export const ISSUE_STATE_CACHE_TTL_MS = 30 * 60_000;
+
+type CachedIssueState = { state: 'open' | 'closed' | null; at: number };
+const issueStateCache = new Map<string, CachedIssueState>();
+/** Bumped by every invalidation; a lookup stores its answer only if the key's generation did not move while it ran. */
+const issueStateGeneration = new Map<string, number>();
+let issueStateCacheEnabled = false;
+
+function issueStateKey(owner: string, repo: string, number: number): string {
+  return `${owner}/${repo}#${number}`.toLowerCase();
+}
+
+/**
+ * Turn on issue-state reuse for this process. Only a process that also runs
+ * the tracker-change trigger may: the trigger drops answers that changed
+ * (`invalidateCachedIssueState`). Returns a function that turns it off and
+ * clears it.
+ */
+export function enableIssueStateCache(): () => void {
+  issueStateCacheEnabled = true;
+  return () => { issueStateCacheEnabled = false; issueStateCache.clear(); };
+}
+
+export function invalidateCachedIssueState(owner: string, repo: string, number: number): void {
+  const key = issueStateKey(owner, repo, number);
+  issueStateCache.delete(key);
+  issueStateGeneration.set(key, (issueStateGeneration.get(key) ?? 0) + 1);
+}
+
+/**
+ * `list` for the numbers without a fresh answer; cached answers for the rest.
+ * A number `list` omits (not an issue) is cached as null. Before calling
+ * `list`, read each missed key's generation; after it resolves, store a
+ * number's answer only when that key's generation is unchanged — an
+ * invalidation that landed mid-lookup means the answer may predate the
+ * tracker change, so it is returned to this caller but never cached.
+ */
+export async function listIssueStatesCached(
+  owner: string,
+  repo: string,
+  numbers: number[],
+  list: PipelineMembershipGatherDeps['listIssueStates'],
+  now: number = Date.now(),
+): Promise<Array<{ number: number; state: 'open' | 'closed' }>> {
+  if (!issueStateCacheEnabled) return list(owner, repo, numbers);
+
+  const results = new Map<number, 'open' | 'closed'>();
+  const missed: number[] = [];
+  for (const number of numbers) {
+    const cached = issueStateCache.get(issueStateKey(owner, repo, number));
+    if (cached && now - cached.at < ISSUE_STATE_CACHE_TTL_MS) {
+      if (cached.state) results.set(number, cached.state);
+    } else {
+      missed.push(number);
+    }
+  }
+
+  if (missed.length > 0) {
+    const generationsBeforeLookup = new Map(
+      missed.map((number) => [number, issueStateGeneration.get(issueStateKey(owner, repo, number)) ?? 0]),
+    );
+    const answers = await list(owner, repo, missed);
+    const answeredByNumber = new Map(answers.map((entry) => [entry.number, entry.state]));
+    for (const number of missed) {
+      const key = issueStateKey(owner, repo, number);
+      const state = answeredByNumber.get(number) ?? null;
+      if (state) results.set(number, state);
+      if ((issueStateGeneration.get(key) ?? 0) === generationsBeforeLookup.get(number)) {
+        issueStateCache.set(key, { state, at: now });
+      }
+    }
+  }
+
+  return numbers.flatMap((number) => {
+    const state = results.get(number);
+    return state ? [{ number, state }] : [];
+  });
+}
+
 export interface ProjectTrackerIssueRow {
   issueId: string;
   state: 'open' | 'closed';
@@ -705,7 +785,7 @@ async function gatherProjectLensSignalsMetered(
     const issueStates = issueStateCandidates.length > 0
       ? await withUnavailableReason(
           'forge_unavailable',
-          () => deps.listIssueStates(owner, repo, issueStateCandidates.map(issueNumber)),
+          () => listIssueStatesCached(owner, repo, issueStateCandidates.map(issueNumber), deps.listIssueStates),
           trackerContext,
         )
       : [];

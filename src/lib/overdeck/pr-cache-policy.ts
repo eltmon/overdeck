@@ -51,18 +51,28 @@ export async function shouldListPullRequests(projectPath: string): Promise<boole
 /** How long a PR listing with no open PR is trusted: nothing there can change without a new PR. */
 export const PR_CACHE_IDLE_TTL_MS = PR_LISTING_IDLE_TTL_MS;
 
+/** An Overdeck issue branch (same pattern as `issueIdFromBranch` in webhook-handlers.ts; inlined to avoid an import cycle). */
+const ISSUE_BRANCH_PATTERN = /(?:feature|strike|bypass)\/[a-z]+-\d+$/i;
+
 /**
  * `activeTtlMs`, or `prListingIdleTtlMs()` when `rows` is a listing with no
  * OPEN row: a repo with only merged/closed PRs in its window can't produce a
  * state change until a new PR opens, so the next read need not hit the forge
  * as often as one still tracking an open PR. An OPEN row with
- * `mergeable: 'UNKNOWN'` (GitHub still computing mergeability) keeps the 30 s
- * fallback cadence regardless of webhook health (FR-1) — a stale UNKNOWN
- * blocks merge-gating readers.
+ * `mergeable: 'UNKNOWN'` (GitHub still computing mergeability) on an issue
+ * branch keeps the 30 s fallback cadence regardless of webhook health
+ * (FR-1/FR-2) — a stale UNKNOWN blocks merge-gating readers; an UNKNOWN row
+ * on any other branch follows the normal health-dependent TTL (PAN-5261),
+ * since nothing here reads its mergeability.
  */
-export function prListingTtlMs(rows: readonly { state?: string; mergeable?: string }[] | null, activeTtlMs: number): number {
+export function prListingTtlMs(
+  rows: readonly { state?: string; mergeable?: string; headRefName?: string }[] | null,
+  activeTtlMs: number,
+): number {
   if (!rows) return activeTtlMs;
   const openRows = rows.filter((row) => row.state?.toUpperCase() === 'OPEN');
-  if (openRows.some((row) => row.mergeable === 'UNKNOWN')) return PR_LISTING_ACTIVE_TTL_MS;
+  if (openRows.some((row) => row.mergeable === 'UNKNOWN' && ISSUE_BRANCH_PATTERN.test(row.headRefName ?? ''))) {
+    return PR_LISTING_ACTIVE_TTL_MS;
+  }
   return openRows.length > 0 ? activeTtlMs : prListingIdleTtlMs();
 }
