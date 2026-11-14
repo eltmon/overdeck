@@ -880,6 +880,49 @@ describe('head-of-line fairness (PAN-5285)', () => {
     expect(await driveUntilRejected(headPromise)).toMatchObject({ lastWaitReason: 'memory' })
   })
 
+  it('counts the bound from the head\'s first memory block, not from when it queued', async () => {
+    const rootDir = home()
+    await seedPeaks(rootDir)
+    writeFileSync(join(rootDir, 'owner.json'), ownerJson(OTHER_PID, 1))
+    let clock = 1
+    const held = { isProcessAlive: otherAlive, staleMs: 600_000 }
+    const headPromise = acquireQualityGateAdmission(big, fairDeps(rootDir, () => clock, () => 16 * GiB, held))
+    const headSettled = settledFlag(headPromise)
+    await drive(5)
+    // Long past the bound in queue age, but it has waited on the slot, not on memory.
+    clock = 10_000
+    unlinkSync(join(rootDir, 'owner.json'))
+    await drive(10)
+    expect(headSettled()).toBe(false)
+
+    clock = 10_500
+    const second = await driveUntilResolved(acquireQualityGateAdmission(small, fairDeps(rootDir, () => clock, () => 16 * GiB, held)))
+    expect(headSettled()).toBe(false)
+    await second.release()
+
+    clock = 12_000
+    const head = await driveUntilResolved(headPromise)
+    expect(head.admittedAlone).toBe(true)
+    await head.release()
+  })
+
+  it('passes an older-version head that looks as if it fits but stays queued past the grace', async () => {
+    const rootDir = home()
+    await seedPeaks(rootDir)
+    // Froze 3 GiB under a 14 GiB reserve: by today's 12 GiB reserve it fits, yet it never starts.
+    writeFileSync(join(rootDir, 'waiter-0000000000000000-0000525285-000000.json'), JSON.stringify({
+      ...big, ticketId: '0000000000000000-0000525285-000000', pid: OTHER_PID, createdAt: 0, footprintBytes: 3 * GiB,
+    }))
+    let clock = 1
+    const promise = acquireQualityGateAdmission(small, fairDeps(rootDir, () => clock, () => 16 * GiB, { isProcessAlive: otherAlive }))
+    const settled = settledFlag(promise)
+    await drive(10)
+    expect(settled()).toBe(false)
+
+    clock = 40_000
+    await (await driveUntilResolved(promise)).release()
+  })
+
   it('passes an older-version head that froze a huge estimate, even past the bound', async () => {
     const rootDir = home()
     await seedPeaks(rootDir)

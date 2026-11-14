@@ -18,7 +18,7 @@ import {
   ownerReservationBytes,
   readGateFootprintEstimate,
   recordGateFootprintPeak,
-  resolveHardReserveBytes,
+  resolveGateReserveBytes,
   resolveSoftReserveBytes,
 } from '../../../../src/lib/cloister/quality-gate-memory.js'
 
@@ -157,12 +157,15 @@ describe('resolveSoftReserveBytes (PAN-5248)', () => {
     await expect(resolveSoftReserveBytes()).resolves.toBe(expected)
   })
 
-  it('resolves the hard reserve the same way (PAN-5285)', async () => {
+  it('resolves the soft and hard reserves from one config read (PAN-5285)', async () => {
     configMocks.loadGlobalConfigNoMigration.mockResolvedValue({
       config: { resources: { governorSoftReserveGb: 12, governorHardReserveGb: 5 } },
     })
-    await expect(resolveHardReserveBytes()).resolves.toBe(5 * GiB)
+    await expect(resolveGateReserveBytes()).resolves.toEqual({ softBytes: 12 * GiB, hardBytes: 5 * GiB })
+    expect(configMocks.loadGlobalConfigNoMigration).toHaveBeenCalledTimes(1)
+
     configMocks.loadGlobalConfigNoMigration.mockRejectedValue(new Error('config unreadable'))
-    await expect(resolveHardReserveBytes()).resolves.toBe(computeGovernorReserveDefaultsGb(totalmem() / GiB).hard * GiB)
+    const defaults = computeGovernorReserveDefaultsGb(totalmem() / GiB)
+    await expect(resolveGateReserveBytes()).resolves.toEqual({ softBytes: defaults.soft * GiB, hardBytes: defaults.hard * GiB })
   })
 })

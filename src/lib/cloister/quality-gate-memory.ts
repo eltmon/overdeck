@@ -98,26 +98,32 @@ export async function recordGateFootprintPeak(
   }
 }
 
-async function resolveReserveBytes(level: 'soft' | 'hard'): Promise<number> {
+function reserveBytes(gb: unknown, fallbackGb: number): number {
+  return typeof gb === 'number' && Number.isFinite(gb) && gb >= 0 ? gb * GiB : fallbackGb * GiB
+}
+
+/**
+ * PAN-5285: `resources.governor_soft_reserve_gb` and `governor_hard_reserve_gb`
+ * in bytes from one global-config read (D9), each falling back to its RAM-share
+ * default. The hard reserve is the floor for a head admitted alone.
+ */
+export async function resolveGateReserveBytes(): Promise<{ softBytes: number; hardBytes: number }> {
+  const defaults = computeGovernorReserveDefaultsGb(totalmem() / GiB)
   try {
     const { loadGlobalConfigNoMigration } = await import('../config-yaml/load.js')
     const { resources } = (await loadGlobalConfigNoMigration()).config
-    const gb = level === 'soft' ? resources.governorSoftReserveGb : resources.governorHardReserveGb
-    if (typeof gb === 'number' && Number.isFinite(gb) && gb >= 0) return gb * GiB
+    return {
+      softBytes: reserveBytes(resources.governorSoftReserveGb, defaults.soft),
+      hardBytes: reserveBytes(resources.governorHardReserveGb, defaults.hard),
+    }
   } catch {
-    // Fall through to the RAM-share default.
+    return { softBytes: defaults.soft * GiB, hardBytes: defaults.hard * GiB }
   }
-  return computeGovernorReserveDefaultsGb(totalmem() / GiB)[level] * GiB
 }
 
 /** `resources.governor_soft_reserve_gb` in bytes (global config only, D9), or the RAM-share default. */
-export function resolveSoftReserveBytes(): Promise<number> {
-  return resolveReserveBytes('soft')
-}
-
-/** PAN-5285: `resources.governor_hard_reserve_gb` in bytes, the floor for a head admitted alone. */
-export function resolveHardReserveBytes(): Promise<number> {
-  return resolveReserveBytes('hard')
+export async function resolveSoftReserveBytes(): Promise<number> {
+  return (await resolveGateReserveBytes()).softBytes
 }
 
 export interface MemoryHeadroomInput {

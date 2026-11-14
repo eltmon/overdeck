@@ -539,8 +539,11 @@ already queued, without killing them:
   places. A waiter ahead that fits, or that waits on a slot or on CPU, keeps
   everyone behind it in place.
 - **Admitted alone (PAN-5285).** Later gates may pass the head for 5 minutes,
-  counted from when the head joined the queue. After that the head is due to
-  run alone: nobody passes it while any slot is held, the slots drain, and
+  counted from the first poll where the head failed the memory rule as head;
+  time spent waiting on a slot or on CPU does not count, and the clock clears
+  once the head fits. The head writes that moment into its ticket
+  (`memoryBlockedSince`) so the waiters behind it see it. After that the head
+  is due to run alone: nobody passes it while any slot is held, the slots drain, and
   once none is held the head starts even though it fails the soft-reserve
   rule. The safety floor is the governor's hard reserve: the head starts alone
   only while `MemAvailable − footprint ≥ resources.governor_hard_reserve_gb`.
@@ -548,7 +551,10 @@ already queued, without killing them:
   back if another gate joined it. A head that would break the hard reserve is
   never forced; smaller gates keep passing it until memory recovers or its
   wait times out. Tickets from checkouts older than PAN-5285 cannot run
-  alone, so later gates pass them with no time limit.
+  alone, so later gates pass them with no time limit. Such a ticket also froze
+  its estimate and reserve at enqueue, so after a reserve change it can look
+  as if it fits and still never start; one that has looked that way for 30 s
+  with a slot free is treated as blocked on memory.
 - **Logs.** A waiting gate says why. The wrapper and a local Vitest run print
   `[gate-admission] <key> waiting for memory: available X GiB, reserved Y GiB,
   needs Z GiB, soft reserve W GiB`, `… waiting in the admission queue at
