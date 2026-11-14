@@ -1014,6 +1014,31 @@ Verified live on 2026-09-18 against the running `overdeck` session.
   `invalid_request: … unexpected end of hex escape` (PAN-4506) — the kickoff never lands.
   `herdr-api.ts` replaces every lone surrogate with U+FFFD (`src/lib/well-formed-text.ts`,
   `toWellFormedText`) before writing `call` and `stream` requests to the wire.
+- **`call()` returns `result` unchanged, so readers must use the per-method key.** `pane.read`
+  answers `{"type":"pane_read","read":{…,"text":…}}`, so the text is `result.read.text`. Every
+  reader goes through `herdrPaneReadText` (`src/lib/terminal-backends/herdr-pane-read.ts`), which
+  also accepts a legacy `{text}` and returns `''` with one warning for anything else. Until
+  PAN-5232, three readers took `result.text` and every Herdr pane read was empty.
+
+  Audit of every `api.call` in `herdr*.ts`, `herdr-residue-reaper.ts`, `herdr-host.ts` and
+  `agent-pane-io.ts` (verified live and against the schema fixture, 2026-11-14):
+
+  | Method | Key the code reads | Schema variant (`result.type`) → key | Verified |
+  |--------|--------------------|----------------------|----------|
+  | `pane.read` | `result.read.text` (via `herdrPaneReadText`) | `pane_read` → `read.text` | live + schema |
+  | `agent.get` | `agent` | `agent_info` → `agent` | live + schema |
+  | `agent.list` | `agents` | `agent_list` → `agents` | live + schema |
+  | `agent.wait` | `agent` | `agent_info` → `agent` | live + schema |
+  | `agent.prompt` | `agent` | `agent_prompted` → `agent` | schema only (mutating) |
+  | `pane.get` | `pane` | `pane_info` → `pane` | live + schema |
+  | `pane.process_info` | `process_info.{shell_pid,foreground_processes}` | `pane_process_info` → `process_info` | live + schema |
+  | `pane.layout` | `layout.panes` | `pane_layout` → `layout.panes` | live + schema |
+  | `session.snapshot` | `snapshot.panes` | `session_snapshot` → `snapshot.panes` | live + schema |
+  | `workspace.list` | `workspaces` | `workspace_list` → `workspaces` | live + schema |
+  | `workspace.create` | `workspace` | `workspace_created` → `workspace` | schema only (mutating) |
+  | `tab.create` | `root_pane` | `tab_created` → `root_pane` | schema only (mutating) |
+  | `ping` | `version`, `protocol` | `pong` → `version`, `protocol` | live + schema |
+  | `pane.send_*`, `pane.close`, `pane.report_metadata`, `agent.rename`, `workspace.report_metadata`, `workspace.close` | result not read | — | — |
 
 ### Why `startAgent` does not call `agent.start`
 
