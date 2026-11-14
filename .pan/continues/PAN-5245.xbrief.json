@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5245",
   "created": "2026-11-14T05:12:59.498Z",
-  "updated": "2026-11-14T05:17:56.324Z",
+  "updated": "2026-11-14T05:18:06.694Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "ci-subset-test-harness.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T05:17:56.324Z"
+    },
+    "level-switch-control": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5245",
+      "claimedAt": "2026-11-14T05:18:06.694Z"
     }
   }
 }
