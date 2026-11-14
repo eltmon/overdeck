@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5298",
   "created": "2026-11-14T21:08:19.124Z",
-  "updated": "2026-11-14T21:31:57.127Z",
+  "updated": "2026-11-14T21:32:05.344Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
     "issue-tree-isolation.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T21:31:57.127Z"
+    },
+    "issue-tree-diagnostics": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5298",
+      "claimedAt": "2026-11-14T21:32:05.343Z"
     }
   }
 }
