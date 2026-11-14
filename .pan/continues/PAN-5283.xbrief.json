@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5283",
   "created": "2026-11-14T19:04:13.506Z",
-  "updated": "2026-11-14T20:15:26.678Z",
+  "updated": "2026-11-14T20:15:56.202Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,9 +202,18 @@
       "doneAt": "2026-11-14T20:15:03.394Z"
     },
     "wi9-route-wiring": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5283",
-      "claimedAt": "2026-11-14T20:15:26.678Z"
+      "claimedAt": "2026-11-14T20:15:26.678Z",
+      "doneAt": "2026-11-14T20:15:56.201Z"
+    },
+    "wi9-route-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:15:56.201Z"
+    },
+    "wi9-route-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:15:56.201Z"
     }
   }
 }
