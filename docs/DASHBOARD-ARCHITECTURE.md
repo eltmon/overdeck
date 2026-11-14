@@ -1717,8 +1717,10 @@ File bytes move over the download and upload HTTP routes instead (see
 Every request names an explorer root by id. `resolveExplorerRoot` (`roots.ts`)
 turns it into a realpath'd directory, and any failure is `ROOT_NOT_FOUND`:
 
-- `project:<key>` is the project's primary checkout. It is read-only: a write
-  fails with `EDIT_WORKSPACE_REQUIRED` before anything is changed.
+- `project:<key>` is the project's primary checkout. The server never writes
+  it: a write fails with `EDIT_WORKSPACE_REQUIRED` before anything is changed.
+  The client routes every save and file action on it through an edit workspace
+  (`pan.explorerBeginEdit`, PAN-5191).
 - `issue:<ID>` is the issue's feature workspace, `workspaces/feature-<id>`. Its
   canonical id is upper-cased (`issue:PAN-1`).
 - `workspace:<id>` is a scratch edit workspace from the workspace registry. A
@@ -1757,7 +1759,7 @@ t3code).
 | `pan.explorerCopy` | write | PAN-5187 | Copy a file or folder |
 | `pan.explorerDelete` | write | PAN-5187 | Move paths to the Overdeck trash |
 | `pan.explorerRestore` | write | PAN-5187 | Move a trash entry back to its path |
-| `pan.explorerBeginEdit` | write | PAN-5191 | Stub: `NOT_IMPLEMENTED` |
+| `pan.explorerBeginEdit` | write | PAN-5191 | Reuse the project's open edit workspace or create `scratch/edit-<slug>` |
 
 Errors are `PanRpcError`s whose `code` is one of `EXPLORER_ERROR_CODES`:
 `ROOT_NOT_FOUND`, `PATH_OUTSIDE_ROOT`, `PATH_IN_GIT_DIR`, `NOT_FOUND`,
@@ -1928,8 +1930,11 @@ other page pays for it; `lib/monaco-setup.ts` gives every Monaco editor its
 local web workers and never loads from a CDN. The slot keys the pane by root
 and path, so a retargeted preview tab mounts a fresh pane. The language comes
 from the path against Monaco's own language list (`monaco-language.ts`), not
-from the server's Shiki id. A `project` root opens read-only with the note
-"Read-only: the main checkout is never edited directly." The pane asks
+from the server's Shiki id. A `project` root opens editable with the note
+"Edits here are saved to an edit workspace. The main checkout is never
+changed." Its first save calls `ensureEditRoot` (PAN-5191), which moves the
+draft to the edit workspace and marks it for a pending save; the pane on the
+edit root saves it once. The pane asks
 PAN-5188's `pickViewer` how to show a file: a binary or large-text read renders
 the `FileViewer` host (images, PDF, audio, fonts, archives, large text); a text
 file a viewer can show (CSV, TSV, SVG) opens in Preview with an Edit tab that
@@ -2046,6 +2051,49 @@ themselves, because the remote request gate lets trusted local callers through.
 - `POST /api/explorer/upload?root=<rootId>&dir=<rel>&name=<filename>` takes a
   raw `application/octet-stream` body and writes one new file, answering
   `201 { path, size, mtimeMs }`.
+
+### Edit workspaces and PR routes (PAN-5191)
+
+An edit workspace is a `scratch` registry row on a `scratch/edit-<MMDD-HHMM>`
+branch. `pan.explorerBeginEdit` (`services/explorer/edit-workspace.ts`) reuses
+the project's newest one whose PR is missing or open, or creates one through
+`resolveWorkspaceCreateIntent` + `performWorkspaceCreate`. Calls are serialized
+per project. The routes live in `routes/explorer-edit-workspaces.ts`, all
+`admin` scope, and accept only an edit workspace: any other workspace answers
+`409 NOT_AN_EDIT_WORKSPACE` before anything runs. Error bodies are
+`{ error, code }`.
+
+| Method and path | Body | Success | Errors |
+|---|---|---|---|
+| `GET /api/explorer/edit-workspaces/:workspaceId` | — | 200 `EditWorkspaceStatus` | 404 `ROOT_NOT_FOUND`, 409 `NOT_AN_EDIT_WORKSPACE` |
+| `POST /api/explorer/edit-workspaces/:workspaceId/pr` | `EditWorkspaceCreatePrInput` | 201 `EditWorkspaceCreatePrResult` | 400 `INVALID_INPUT`, 409 `NOTHING_TO_COMMIT`, 409 `PR_UNSUPPORTED`, 409 `PIPELINE_UNSUPPORTED`, 409 `PR_EXISTS`, 422 `COMMIT_REFUSED`, 502 `PUSH_FAILED`, 502 `PR_CREATE_FAILED`, 502 `ISSUE_CREATE_FAILED` |
+| `POST /api/explorer/edit-workspaces/:workspaceId/merge` | `{}` | 200 `{ merged: true }` | 404 `NO_PR`, 409 `NOT_MERGEABLE`, 409 `UNPUSHED_CHANGES`, 502 `MERGE_FAILED`, 500 `REMOVE_FAILED` |
+| `POST /api/explorer/edit-workspaces/:workspaceId/discard` | `{ closePr: boolean }` | 200 `{ removed: true, prClosed }` | 409 `REMOVE_FAILED`, 502 `PR_CLOSE_FAILED` |
+
+**Commits run the repository's hooks.** The commit is made as the operator's
+global git identity, never with `--no-verify`; a refused commit or push returns
+the last 4,000 characters of git's stderr, and the Create PR dialog shows it.
+Every `gh` call is an argument vector (`edit-workspace-gh.ts`), so a title with
+quotes or `$(` reaches GitHub as plain text.
+
+**Send through pipeline runs in a fixed order**
+(`edit-workspace-pipeline.ts`): commit, create the GitHub issue, push the
+commit as `feature/<issue-lower>`, open its PR with `ensurePRExists`, remove
+the edit workspace, then start PR adoption (`adoptPrAndStartReview`) in the
+background, which builds the pipeline workspace and starts review. The
+webhook for the new PR may adopt first; adoption coalesces concurrent calls,
+and the explorer skips its call when the feature workspace already exists.
+
+**Merge refuses unpushed work.** It re-reads the PR, refuses unless the merge
+verdict allows it, and answers `UNPUSHED_CHANGES` when the worktree is dirty
+or local `HEAD` is not the PR head. It squash-merges through the GitHub forge
+adapter pinned to that head, then removes the edit workspace.
+
+**Removal order** (`edit-workspace-remove.ts`): `git worktree remove [--force]
+-- <path>`, `git branch -D <edit branch>`, `git push origin --delete <edit
+branch>` (only when the branch was pushed and its PR is no longer open), then
+the registry row. Only the worktree removal can fail the call. None of these
+commands touches the primary checkout's working tree or index.
 
 **Downloads are never active content.** Repo files are served from the
 dashboard origin, so a file that ran script would run with the operator's
@@ -2164,15 +2212,16 @@ Delete appear in the right-click menu; New file and New folder also appear as
 header buttons. While the tree has focus, `F2` renames the single selected
 row, `Delete` (or `Meta+Backspace`) deletes the selection, `Ctrl/Cmd+Z` undoes
 and `Ctrl/Cmd+Shift+Z` redoes. All of this renders and works only in a
-writable tree: an `issue:` or `workspace:` root with the Changed filter off.
-A `project` root gets no write action, and the Changed view gets none either,
-because its rows are synthesized from git status. Dragging rows to a composer
+writable tree: any root with the Changed filter off. On a `project` root
+every write action first switches to the project's edit workspace and replays
+there (PAN-5191). The Changed view gets no write action, because its rows are
+synthesized from git status. Dragging rows to a composer
 still works there, because it writes nothing.
 
 **One write seam.** Every create, rename, copy, delete, restore and upload call
-goes through `runWrite` in `explorer/actions/useExplorerActions.ts`. It refuses
-a `project` root with "The main checkout is read-only." PAN-5191 wraps this one
-function with its edit workspace to make project roots writable.
+goes through `runWrite` in `explorer/actions/useExplorerActions.ts`. On a
+`project` root it calls `ensureEditRoot` first and runs the op on the edit root,
+so the primary checkout is never written (PAN-5191).
 
 **Undo stack** (`actions/undo-stack.ts`, a port of Orca's
 `fileExplorerUndoRedo.ts`). Each root keeps up to 50 ops in memory; a page
