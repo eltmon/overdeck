@@ -541,9 +541,10 @@ already queued, without killing them:
   places. A waiter ahead that fits, or that waits on a slot or on CPU, keeps
   everyone behind it in place.
 - **Admitted alone (PAN-5285).** Later gates may pass the head for 5 minutes,
-  counted from the first poll where the head failed the memory rule as head;
-  time spent waiting on a slot or on CPU does not count, and the clock clears
-  once the head fits. The head writes that moment into its ticket
+  counted from the first poll where the head failed the memory rule as head.
+  Time the head spent waiting on a slot or on CPU before that poll does not
+  count. Once started, the clock keeps running through later slot or CPU
+  waits, and it clears only when the head fits. The head writes that moment into its ticket
   (`memoryBlockedSince`) so the waiters behind it see it. After that the head
   is due to run alone: nobody passes it while any slot is held, the slots drain, and
   once none is held the head starts even though it fails the soft-reserve
