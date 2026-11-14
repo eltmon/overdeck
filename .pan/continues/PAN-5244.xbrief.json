@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5244",
   "created": "2026-11-14T05:28:55.884Z",
-  "updated": "2026-11-14T06:20:02.828Z",
+  "updated": "2026-11-14T06:20:16.472Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -204,6 +204,11 @@
     "conversation-header-layout.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T06:20:02.827Z"
+    },
+    "conversation-start-surfaces": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T06:20:16.471Z"
     }
   }
 }
