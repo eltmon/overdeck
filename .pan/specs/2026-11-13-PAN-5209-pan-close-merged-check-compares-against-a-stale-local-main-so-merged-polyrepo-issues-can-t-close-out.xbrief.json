@@ -4,17 +4,17 @@
     "created": "2026-11-13T21:49:04Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5209: pan close: merged check compares against a stale local main, so merged polyrepo issues can't close out",
-    "updated": "2026-11-13T22:06:03.150Z"
+    "updated": "2026-11-14T01:26:55.795Z"
   },
   "plan": {
     "id": "pan-5209",
     "title": "pan close: merged check compares against a stale local main, so merged polyrepo issues can't close out",
-    "status": "proposed",
+    "status": "running",
     "uid": "5a75040e-0842-44a6-afd2-ba22acb27113",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-13T21:49:04Z",
-    "updated": "2026-11-13T22:06:03.150Z",
+    "updated": "2026-11-14T01:26:55.795Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5209",
@@ -635,5 +635,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
