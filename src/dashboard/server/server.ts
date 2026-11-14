@@ -172,6 +172,7 @@ import { backlogRouteLayer } from './routes/backlog.js';
 import { featureRegistryRouteLayer } from './routes/feature-registry.js';
 import { fsRouteLayer } from './routes/fs.js';
 import { explorerRouteLayer } from './routes/explorer.js';
+import { explorerEditWorkspacesRouteLayer } from './routes/explorer-edit-workspaces.js';
 import { internalEventsRouteLayer } from './routes/internal-events.js';
 import { restartGateRouteLayer } from './routes/restart-gate.js';
 import { dashboardSessionPreflightRouteLayer, dashboardSessionRouteLayer } from './routes/dashboard-session.js';
@@ -473,6 +474,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   featureRegistryRouteLayer,
   fsRouteLayer,
   explorerRouteLayer,
+  explorerEditWorkspacesRouteLayer,
   backlogRouteLayer,
   internalEventsRouteLayer,
   restartGateRouteLayer,

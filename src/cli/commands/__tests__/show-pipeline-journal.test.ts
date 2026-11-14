@@ -25,6 +25,15 @@ function entry(
 }
 
 describe('summarizePipelineEntry', () => {
+  it('summarizes advisory follow-up entries (PAN-5218)', () => {
+    expect(summarizePipelineEntry(entry('feedback.undelivered', { kind: 'coderabbit', reason: 'no agent' })))
+      .toBe('coderabbit feedback not delivered — no agent');
+    expect(summarizePipelineEntry(entry('feedback.followup_filed', { kind: 'coderabbit', issueNumber: 12 })))
+      .toBe('coderabbit follow-up filed: #12');
+    expect(summarizePipelineEntry(entry('feedback.followup_failed', { kind: 'coderabbit', reason: 'no App' })))
+      .toBe('coderabbit follow-up not filed — no App');
+  });
+
   it('shows the verified head, truncated', () => {
     expect(summarizePipelineEntry(entry('verification.passed', { head: 'a7b64f7c0000' })))
       .toBe('head=a7b64f7c');

@@ -307,11 +307,19 @@ describe('ExplorerPane', () => {
       expect(screen.getByRole('textbox', { name: 'New file name' })).toBeInTheDocument()
     })
 
-    it('shows no New buttons on a project root', async () => {
+    it('shows the New buttons on a project root (PAN-5191: writes go to an edit workspace)', async () => {
       renderPane(explorerPaneSpec({ explorerRootId: 'project:overdeck' }))
       await screen.findByText('README.md')
-      expect(screen.queryByRole('button', { name: 'New file' })).toBeNull()
-      expect(screen.queryByRole('button', { name: 'New folder' })).toBeNull()
+      expect(screen.getByRole('button', { name: 'New file' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'New folder' })).toBeInTheDocument()
+    })
+
+    it('shows Rename and Delete but no Stage in a project-root context menu', async () => {
+      renderPane(explorerPaneSpec({ explorerRootId: 'project:overdeck' }))
+      fireEvent.contextMenu(await screen.findByText('README.md'))
+      expect(await screen.findByRole('menuitem', { name: 'Rename' })).toBeInTheDocument()
+      expect(screen.getByRole('menuitem', { name: /^Delete/ })).toBeInTheDocument()
+      expect(screen.queryByRole('menuitem', { name: 'Stage' })).toBeNull()
     })
 
     it('shows no New buttons while the Changed filter is on', async () => {

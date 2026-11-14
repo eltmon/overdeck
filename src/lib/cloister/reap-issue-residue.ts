@@ -10,6 +10,8 @@ import { killSession, listSessionNames } from '../tmux.js';
 import { teardownWorkspaceDockerByName } from '../workspace-manager/docker.js';
 import { pruneAgentStateDir } from '../agents/state-dir-removal.js';
 import { reapWorkerWorktrees } from '../workspaces/worker-worktrees.js';
+import { getWorkspaceForIssue } from '../workspaces/resolver.js';
+import { archiveWorkspace } from '../workspaces/writer.js';
 
 const execAsync = promisify(exec);
 
@@ -78,6 +80,15 @@ export async function reapIssueResidue(projectPath: string, issueId: string): Pr
     return actions;
   }
 
+  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+  // PAN-5218: the journal dies with the workspace; file any advisory follow-up still pending first.
+  try {
+    const { flushAdvisoryFollowupsBeforeReap } = await import('./advisory-followup-patrol.js');
+    await flushAdvisoryFollowupsBeforeReap(issueId, workspacePath);
+  } catch {
+    // Never holds the reap.
+  }
+
   // PAN-3920: registered workers' `.swarm/worker-<n>` worktrees and their
   // `<feature>-worker-<n>` branches go with the issue.
   try {
@@ -86,7 +97,6 @@ export async function reapIssueResidue(projectPath: string, issueId: string): Pr
     // Git unavailable — the workspace removal below still runs.
   }
 
-  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
   if (existsSync(workspacePath)) {
     try {
       await execAsync(`git worktree remove "${workspacePath}" --force`, { cwd: projectPath });
@@ -98,6 +108,22 @@ export async function reapIssueResidue(projectPath: string, issueId: string): Pr
       } catch {
         // Already gone or inaccessible.
       }
+    }
+  }
+
+  // PAN-5233: retire the registry row once its directory is gone, whoever
+  // removed it. Without this every reaped issue left a live `kind='issue'` row
+  // pointing at a deleted path. Archive, never delete — the row owns the
+  // issue's memory home.
+  if (!existsSync(workspacePath)) {
+    try {
+      const row = getWorkspaceForIssue(issueId.toUpperCase());
+      if (row) {
+        await archiveWorkspace(row.id);
+        actions.push(`archived workspace row ${row.name}`);
+      }
+    } catch {
+      // Registry unavailable — the disk reap above already succeeded.
     }
   }
 

@@ -1,0 +1,61 @@
+---
+title: File explorer
+description: Browse, edit and ship changes to any project's files from the dashboard
+---
+
+# File explorer
+
+The file explorer shows a project's files in a tree beside your conversations. You can read any file, edit it in a full code editor, and turn your edits into a pull request without leaving the dashboard. The main checkout of a project is never changed by the explorer: edits made there go to a separate edit workspace.
+
+## Opening the explorer
+
+Click **Files** on a project home to browse the project's main checkout, or **Files** on an issue tab to browse that issue's workspace. Each deck keeps one explorer per root, so clicking **Files** again focuses the explorer that is already open instead of opening a second one.
+
+## The tree
+
+Folders load when you expand them, so a large repository opens quickly. The eye button shows or hides dotfiles, and the **Changed** filter shows only the files git reports as changed.
+
+Files carry git colors and a status letter: `U` untracked, `A` added, `M` modified, `D` deleted, `R` renamed and `C` copied. A folder takes the color of its most important changed child, so you can find a change without expanding every folder. Ignored files and folders are dimmed.
+
+## Search
+
+Press `Ctrl/Cmd+P` to open quick open and jump to a file by name. Press `Ctrl/Cmd+Shift+F` to search file contents, or right-click a folder and choose **Find in folder** to search only inside it. Content search has toggles for case sensitivity and regular expressions, and a result opens the file at the matching line.
+
+## Editing files
+
+A file opens in a Monaco code pane. Your edits save automatically one second after you stop typing and when the editor loses focus, and `Ctrl/Cmd+S` saves at once. A single click on a file opens a preview tab, shown in italics, that the next single click replaces; a double click pins the tab.
+
+The **Changes** view compares your file with the last commit. `Alt+Z` toggles word wrap, and a Markdown file has a **Preview** tab.
+
+## When a file changes on disk
+
+If an agent or another program changes a file you have open and you have no unsaved edits, the pane reloads the new content. If you do have unsaved edits, a banner offers **Compare**, **Reload from disk**, **Keep my edits** and **Overwrite**, so nothing is overwritten without your choice. A file that is deleted or renamed on disk is marked as such in its pane.
+
+## Viewers
+
+Files that are not plain text open in a viewer: images, PDF, audio, fonts, large text and CSV files, zip archives, SQLite databases, Office documents, Jupyter notebooks and Mermaid diagrams. Any other binary file offers **Download**.
+
+## File actions
+
+Right-click in the tree, or use the header buttons, to create files and folders, rename, duplicate and delete. Drag rows to move them. A deleted entry goes to the Overdeck trash in `~/.overdeck/trash/` and stays there for 7 days. `Ctrl/Cmd+Z` undoes the last file action and `Ctrl/Cmd+Shift+Z` redoes it.
+
+Drop files from your computer onto a folder to upload them. You can download a file, or a folder as a `.tar.gz` archive, and drag rows into a conversation composer to reference those files.
+
+## Edit workspaces
+
+The explorer never changes a project's main checkout. When you first save a file or run a file action there, Overdeck creates an **edit workspace**: a git worktree on the branch `scratch/edit-<MMDD-HHMM>`, stored under the project's `workspaces/scratch-edit-*` directory and cut from the remote default branch. Your edit is saved there, and every explorer and code pane on the project switches to the edit workspace.
+
+While a project has an edit workspace that is not merged or closed, later edits reuse it. **New edit workspace** starts a second one for the explorer pane you are in. A file that exists only in your main checkout, such as an untracked file or a commit you have not pushed, does not exist in the edit workspace, so the pane reports that the file no longer exists and keeps your text in memory.
+
+## Create PR and merge
+
+The banner on an edit workspace offers **Create PR**, **Discard** and **New edit workspace**. **Create PR** commits every change in the edit workspace with the title you enter. The default title is a conventional-commit subject, such as `chore: edit README.md`, because the repository's commit hooks run on this commit and may reject a plain sentence. If a hook refuses the commit, the dialog shows its output so you can fix the title.
+
+You then choose how to ship the change. Both choices need a project with a GitHub repository:
+
+- **Open PR** pushes the edit branch and opens a pull request to the default branch, optionally as a draft.
+- **Send through pipeline** creates a GitHub issue from the title and body, pushes the commit as that issue's feature branch, opens its PR, and hands it to Overdeck's review pipeline. It needs a project whose tracker is GitHub Issues and that has an issue prefix.
+
+While a PR is open, the dialog becomes **Commit and push**, which adds your newer edits to the same PR. The banner shows the PR with **Merge**, **Refresh** and **Push changes**. **Merge** squash-merges the PR only when GitHub reports it can merge and every edit is pushed; otherwise the button is disabled and the reason is shown, for example "Conflicts with the base branch" or "Required checks or reviews are not met". After a merge, the edit workspace is removed and the panes return to the main checkout.
+
+**Discard** lists the changes that will be lost and removes the edit workspace. While its PR is open, **Also close PR** (checked by default) closes the PR too.

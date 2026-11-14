@@ -1,0 +1,185 @@
+{
+  "version": "1",
+  "issueId": "PAN-5218",
+  "created": "2026-11-14T02:30:48.079Z",
+  "updated": "2026-11-14T02:47:54.141Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "journal-types": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:30:48.079Z"
+    },
+    "journal-types.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:30:48.079Z"
+    },
+    "journal-types.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:30:48.079Z"
+    },
+    "journal-types.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:30:48.079Z"
+    },
+    "settlement-core": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:32:52.936Z"
+    },
+    "settlement-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:32:52.936Z"
+    },
+    "settlement-core.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:32:52.936Z"
+    },
+    "settlement-core.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:32:52.936Z"
+    },
+    "settlement-core.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:32:52.936Z"
+    },
+    "settlement-core.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:32:52.936Z"
+    },
+    "relay-records": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:34:21.759Z"
+    },
+    "relay-records.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:34:21.759Z"
+    },
+    "relay-records.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:34:21.759Z"
+    },
+    "relay-records.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:34:21.759Z"
+    },
+    "relay-records.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:34:21.759Z"
+    },
+    "settlement-facts-fetch": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:39:24.163Z"
+    },
+    "settlement-facts-fetch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:39:24.163Z"
+    },
+    "settlement-facts-fetch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:39:24.163Z"
+    },
+    "settlement-facts-fetch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:39:24.163Z"
+    },
+    "app-create-issue": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:40:16.351Z"
+    },
+    "app-create-issue.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:40:16.351Z"
+    },
+    "app-create-issue.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:40:16.351Z"
+    },
+    "followup-filer": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:42:36.830Z"
+    },
+    "followup-filer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:42:36.830Z"
+    },
+    "followup-filer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:42:36.830Z"
+    },
+    "followup-filer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:42:36.830Z"
+    },
+    "followup-filer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:42:36.830Z"
+    },
+    "followup-filer.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:42:36.830Z"
+    },
+    "postmerge-wiring": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:43:45.255Z"
+    },
+    "postmerge-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:43:45.255Z"
+    },
+    "postmerge-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:43:45.255Z"
+    },
+    "postmerge-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:43:45.255Z"
+    },
+    "postmerge-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:43:45.255Z"
+    },
+    "followup-patrol": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:45:33.062Z"
+    },
+    "followup-patrol.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:45:33.062Z"
+    },
+    "followup-patrol.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:45:33.062Z"
+    },
+    "followup-patrol.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:45:33.062Z"
+    },
+    "followup-patrol.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:45:33.062Z"
+    },
+    "docs": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:47:54.141Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:47:54.141Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:47:54.141Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:47:54.141Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:47:54.141Z"
+    }
+  }
+}

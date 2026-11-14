@@ -226,6 +226,13 @@ src/components/explorer/code/__tests__/monaco-language.test.ts
 src/components/explorer/code/__tests__/save-queue.test.ts
 src/components/explorer/code/__tests__/self-write-registry.test.ts
 src/components/explorer/code/__tests__/useExternalChange.test.tsx
+src/components/explorer/edit/__tests__/CreatePrDialog.test.tsx
+src/components/explorer/edit/__tests__/DiscardDialog.test.tsx
+src/components/explorer/edit/__tests__/EditWorkspaceBanner.test.tsx
+src/components/explorer/edit/__tests__/PrStatusRow.test.tsx
+src/components/explorer/edit/__tests__/default-pr-title.test.ts
+src/components/explorer/edit/__tests__/edit-workspace-http.test.ts
+src/components/explorer/edit/__tests__/edit-workspace-switch.test.ts
 src/components/explorer/git/__tests__/git-decoration.test.ts
 src/components/explorer/git/__tests__/git-status-scheduler.test.ts
 src/components/explorer/git/__tests__/useExplorerGitStatus.test.tsx

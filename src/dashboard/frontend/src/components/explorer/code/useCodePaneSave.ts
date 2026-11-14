@@ -11,11 +11,17 @@
  * When the last pane of a file unmounts and its draft is clean, the draft
  * is dropped, so the store does not grow with every file ever opened. A
  * dirty draft stays, so reopening the file restores the unsaved text.
+ *
+ * PAN-5191: on a project root a save never writes. It calls ensureEditRoot,
+ * which moves the draft to an edit workspace and marks it for a pending
+ * save; the pane on the edit root then saves it once.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { usePanesStore } from '../../../lib/panesStore'
-import { explorerErrorCode, explorerErrorMessage, writeFile } from '../explorer-rpc'
+import { useEditWorkspaceStore } from '../edit/edit-workspace-store'
+import { ensureEditRoot } from '../edit/edit-workspace-switch'
+import { explorerErrorCode, explorerErrorMessage, parseRootId, writeFile } from '../explorer-rpc'
 import { createAutosave, type Autosave, type AutosaveReason } from './autosave'
 import { draftKey, isDraftDirty, useCodeDrafts } from './code-drafts'
 import { createSaveQueue } from './save-queue'
@@ -55,6 +61,13 @@ export const codeSaveQueue = createSaveQueue({
 
 const isDirty = (key: string) => isDraftDirty(useCodeDrafts.getState().drafts[key])
 
+/** Save a draft a root switch marked for a pending save, once. */
+function savePending(key: string): void {
+  if (!useEditWorkspaceStore.getState().consumePendingSave(key) || !isDirty(key)) return
+  const draft = useCodeDrafts.getState().drafts[key]
+  if (draft) codeSaveQueue.enqueue(key, { text: draft.text, allowMissing: false })
+}
+
 function dropIfUnused(key: string): void {
   if (!mountedPanes.has(key) && !isDirty(key)) useCodeDrafts.getState().drop(key)
 }
@@ -91,7 +104,19 @@ export function useCodePaneSave(opts: {
     if (!writable) return
     const save = (reason: AutosaveReason) => {
       const draft = useCodeDrafts.getState().drafts[key]
-      if (draft) codeSaveQueue.enqueue(key, { text: draft.text, allowMissing: reason === 'explicit' })
+      if (!draft) return
+      if (parseRootId(rootId)?.kind === 'project') {
+        // The switch moves the draft to the edit root and marks it for a pending save.
+        // Save it here: the pane that asked may be closing (an unmount flush), and then
+        // no pane on the edit root would ever mount to save it. Whoever consumes the
+        // mark first saves, so a pane that remounts on the edit root never saves twice.
+        void ensureEditRoot(rootId).then(
+          (editRootId) => savePending(draftKey(editRootId, path)),
+          () => {}, // the toast is ensureEditRoot's; the draft stays dirty
+        )
+        return
+      }
+      codeSaveQueue.enqueue(key, { text: draft.text, allowMissing: reason === 'explicit' })
     }
     const controller = createAutosave({ save, isDirty: () => isDirty(key) })
     autosave.current = controller
@@ -104,7 +129,14 @@ export function useCodePaneSave(opts: {
       if (autosave.current === controller) autosave.current = null
       errorListeners.delete(key)
     }
-  }, [key, writable])
+  }, [key, writable, rootId])
+
+  // PAN-5191: a root switch moved a dirty draft here; save it once. After the
+  // effect above, so a DISK_CONFLICT answer reaches this pane's listener.
+  const pending = useEditWorkspaceStore((s) => s.pending[key] === true)
+  useEffect(() => {
+    if (writable && pending) savePending(key)
+  }, [key, writable, pending])
 
   useEffect(() => {
     mountedPanes.set(key, (mountedPanes.get(key) ?? 0) + 1)
@@ -132,10 +164,10 @@ export function useCodePaneSave(opts: {
   const saveNow = useCallback(() => autosave.current?.saveNow(), [])
   const overwrite = useCallback(() => {
     const draft = useCodeDrafts.getState().drafts[key]
-    if (!writable || !draft) return
+    if (!writable || !draft || parseRootId(rootId)?.kind === 'project') return
     setConflict(false)
     codeSaveQueue.enqueue(key, { text: draft.text, allowMissing: true, overwrite: true })
-  }, [key, writable])
+  }, [key, writable, rootId])
   const clearConflict = useCallback(() => setConflict(false), [])
 
   return { onChange, onBlur, saveNow, overwrite, conflict, clearConflict }

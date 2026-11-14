@@ -269,6 +269,11 @@ export async function postMergeLifecycle(
           source: 'post-merge-lifecycle',
           data: { reason: mergeVerification.reason, ...(sourceBranch ? { sourceBranch } : {}) },
         });
+        // PAN-5218: advisory review findings the work agent never settled become a follow-up
+        // issue. Never awaited: the merge has already happened, and nothing here may hold it.
+        void import('./advisory-followup.js')
+          .then(({ fileAdvisoryFollowups }) => fileAdvisoryFollowups(issueId.toUpperCase(), workspacePath))
+          .catch((err) => console.warn(`[merge-agent] Advisory follow-up for ${issueId} failed: ${err instanceof Error ? err.message : String(err)}`));
       }
     } catch { /* journalling must never block the lifecycle */ }
 

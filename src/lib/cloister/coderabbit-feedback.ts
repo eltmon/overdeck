@@ -16,7 +16,10 @@
  *   journal (`feedback.delivered`, kind `coderabbit`) and against relays still
  *   running in this process, since GitHub can deliver one event twice.
  * - No reachable agent (an adopted PR has none), or a delivery that is not
- *   accepted, raises Needs-you with the feedback file.
+ *   accepted, raises Needs-you with the feedback file and journals
+ *   `feedback.undelivered` (PAN-5218).
+ * - Both journal entries carry the PR, the review and every thread, so a
+ *   post-merge follow-up can quote them (`advisory-followup.ts`, PAN-5218).
  *
  * Nothing here touches merge readiness, and no merge gate reads it.
  */
@@ -27,7 +30,7 @@ import { messageAgent, type MessageDeliveryOutcome } from '../agents/messaging.j
 import { runGh } from '../github-quota/run-gh.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { fetchCodeRabbitReviewThreads, type CodeRabbitThread, type GhRunner } from './coderabbit-ingestion.js';
-import { feedbackAlreadyDelivered, recordFeedbackDelivered } from './feedback-delivery-record.js';
+import { feedbackAlreadyDelivered, recordFeedbackDelivered, recordFeedbackUndelivered } from './feedback-delivery-record.js';
 import {
   resolveIssueFeedbackTarget,
   surfaceIssueFeedbackNeedsYou,
@@ -60,6 +63,7 @@ export interface CodeRabbitFeedbackDeps {
   writeFeedback?: typeof writeFeedbackFile;
   alreadyDelivered?: (workspacePath: string, dedupKey: string) => boolean;
   recordDelivered?: typeof recordFeedbackDelivered;
+  recordUndelivered?: typeof recordFeedbackUndelivered;
   resolveTarget?: (issueId: string) => Promise<IssueFeedbackTarget>;
   deliver?: (agentId: string, message: string, dedupKey: string) => Promise<MessageDeliveryOutcome>;
   surfaceNeedsYou?: (issueId: string, reason: string, details: Record<string, unknown>) => Promise<void>;
@@ -120,10 +124,10 @@ export function buildCodeRabbitFeedbackBody(event: CodeRabbitReviewEvent, thread
     '2. If you agree with a finding, fix it.',
     '3. If you reject a finding, reply on its thread with your reason:',
     `   \`gh api repos/${event.repo}/pulls/${event.prNumber}/comments/<thread id>/replies -f body="<reason>"\``,
-    `4. If you changed code: run the quality gates on what you touched, commit, push, then run \`pan review request ${id}\`.`,
+    `4. If you changed code: run the quality gates on what you touched, commit, push, then run \`pan review request ${id} -m "CodeRabbit <thread ids>: <what you changed>"\`.`,
     '   If you only replied, you are done.',
-    `5. If PR #${event.prNumber} has already merged when you read this, nothing more lands on it: open a follow-up issue`,
-    '   for the findings you agree with instead of pushing.',
+    `5. If PR #${event.prNumber} has already merged when you read this, stop: after the merge Overdeck files a follow-up issue`,
+    '   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id.',
   ].join('\n');
 }
 
@@ -166,8 +170,17 @@ async function runRelay(event: CodeRabbitReviewEvent, dedupKey: string, deps: Co
     return { kind: 'no-findings' };
   }
 
+  // PAN-5218: what a post-merge follow-up needs, journaled with the delivery or the Needs-you.
+  const details = {
+    repo: event.repo, prNumber: event.prNumber, reviewId: event.reviewId,
+    reviewUrl: `https://github.com/${event.repo}/pull/${event.prNumber}#pullrequestreview-${event.reviewId}`,
+    threads: threads.map(({ id, path, line, severity, title, url }) => ({ id, path, line, severity, title, url })),
+  };
   const surface = deps.surfaceNeedsYou ?? surfaceIssueFeedbackNeedsYou;
   const needsYou = async (reason: string, feedbackPath?: string): Promise<CodeRabbitRelayOutcome> => {
+    (deps.recordUndelivered ?? recordFeedbackUndelivered)(workspacePath, {
+      issueId, kind: 'coderabbit', dedupKey, reason, source: SOURCE, details,
+    });
     try {
       await surface(issueId, reason, { specialist: 'coderabbit', prNumber: event.prNumber, ...(feedbackPath ? { feedbackPath } : {}) });
     } catch (err) {
@@ -196,7 +209,8 @@ async function runRelay(event: CodeRabbitReviewEvent, dedupKey: string, deps: Co
   const message = `CODERABBIT FINDINGS for ${issueId}: ${threads.length} inline finding(s) on PR #${event.prNumber}.\n\n`
     + `MUST READ: ${file.filePath}\n\n`
     + 'Fix each finding you agree with. For each one you reject, reply on its PR thread with your reason (the file has the command). '
-    + `If you changed code, commit, push, and run pan review request ${issueId}. Nothing waits for these findings.`;
+    + `If you changed code, commit, push, and run pan review request ${issueId} -m "CodeRabbit <thread ids>: <what you changed>". `
+    + 'Nothing waits for these findings.';
   let outcome: MessageDeliveryOutcome;
   try {
     outcome = await (deps.deliver ?? defaultDeliver)(target.agentId, message, dedupKey);
@@ -207,7 +221,7 @@ async function runRelay(event: CodeRabbitReviewEvent, dedupKey: string, deps: Co
     return needsYou(`CodeRabbit findings could not reach ${target.agentId}: ${outcome.reason ?? 'delivery was not accepted'}`, file.filePath);
   }
   (deps.recordDelivered ?? recordFeedbackDelivered)(workspacePath, {
-    issueId, kind: 'coderabbit', dedupKey, agentId: target.agentId, source: SOURCE,
+    issueId, kind: 'coderabbit', dedupKey, agentId: target.agentId, source: SOURCE, details,
   });
   log(`[${SOURCE}] ${issueId}: routed ${threads.length} CodeRabbit finding(s) from review ${event.reviewId} to ${target.agentId}`);
   return { kind: 'delivered', agentId: target.agentId, threads: threads.length, feedbackPath: file.filePath };

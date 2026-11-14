@@ -858,11 +858,56 @@ reads it (`lint:no-coderabbit-merge-gate`). When it does post a review, the
   kind `coderabbit`, and the same review is never delivered twice, also when
   GitHub sends its event twice at once.
 - With no reachable work agent (an adopted PR has none), or a delivery that is
-  not accepted, the relay raises Needs-you with the feedback file.
+  not accepted, the relay raises Needs-you with the feedback file and journals
+  `feedback.undelivered`.
+- Both entries carry what a follow-up needs: `repo`, `prNumber`, `reviewId`,
+  `reviewUrl` and every relayed thread (`threads`: id, path, line, severity,
+  title, link). The feedback file asks the agent to name the thread ids it
+  changed in `pan review request <id> -m "CodeRabbit <thread ids>: …"`.
 
 The relay runs on the webhook only, so a review posted while the dashboard is
 down is not routed later. The reviewer context still lists CodeRabbit findings
 as advisory (`cloister/review-context.ts`).
+
+**Unsettled findings become a follow-up issue after merge (PAN-5218).** A merge
+can land minutes after CodeRabbit posts, before the work agent answers. So after
+the merge, `fileAdvisoryFollowups` (`cloister/advisory-followup.ts`) reads the
+journal's CodeRabbit deliveries and files one follow-up issue per delivery that
+still has unsettled threads. Nothing here waits for CodeRabbit or gates a merge:
+it runs only after the forge said "merged".
+
+- Two triggers run the same filer. The post-merge kick starts it right after
+  `merge.completed` and never awaits it (`cloister/merge-agent.ts`). The
+  deacon-lite patrol (`recoverAdvisoryFollowups` in
+  `cloister/advisory-followup-patrol.ts`) re-runs it for a merged issue whose
+  journal still holds a pending delivery, once `merge.completed` is at least
+  10 minutes old and the delivery at least 2 minutes old. That covers a
+  restart mid-filing and a relay that journals after the merge. Close-out and
+  the closed-issue reaper file any pending delivery before they delete the
+  workspace, because the journal goes with it.
+- Settlement is per thread. A thread is settled by a reply on it from anyone
+  but CodeRabbit, by a single-parent PR commit authored after the delivery that changed its
+  file (author date, which a rebase keeps), or
+  by a later `review.requested` note naming its id in a `CodeRabbit <ids>:`
+  segment (ids match exactly). A failed forge read counts as no evidence, so
+  the thread is filed. A commit to a file settles every thread on that file.
+- One issue per delivery key, created through the GitHub App, so its bot is the
+  author, with `eltmon` as assignee. Before creating, the filer searches the tracker repo for a
+  `CodeRabbit follow-up for` issue whose body holds the delivery key. A hit
+  repairs the journal instead of filing again, and a failed search files
+  nothing. Each filing is journaled as `feedback.followup_filed`. The body lists
+  every unsettled thread.
+- When filing fails (a tracker that is not GitHub, no App configured, a failed
+  duplicate search, a forge error, or the App lacking the **Issues: Read and
+  write** permission), the filer raises Needs-you with every unsettled finding
+  and journals `feedback.followup_failed`. Either entry closes the key for good.
+  The App needs that permission granted in its GitHub App settings and accepted
+  on the installation before any follow-up can be filed.
+- A delivery that was settled, or that was journaled before this change
+  (no `threads`), is remembered in the process and never re-read.
+- Each follow-up is assigned to `eltmon`. The Flywheel's author gate is
+  unchanged: it accepts the bot-authored issue through its assignee rule, and
+  the issue still waits for the operator's `released` label before any pickup.
 
 The UAT verdict comment ends with a machine marker carrying the outcome and
 the commit UAT exercised, `<!-- overdeck-uat: failed sha=<commit> -->` (the
@@ -1815,7 +1860,9 @@ One piece of stored pipeline state came back, and it is not a status.
 | `merge.failed` | merge-ops' own `setStatus`, the single funnel every failing exit of `triggerMerge` passes through |
 | `merge.completed` | `cloister/merge-agent.ts` `postMergeLifecycle`, right after the forge answers "merged" |
 | `review.stale-approval-rerequested` | `dashboard/server/services/stale-approval-rereview.ts`, when the auto-merge scheduler asked the guarded review door for a head whose approval is stale, once per head, written only when the door answered `started` or `already-running` (`data.head`, `data.outcome`, PAN-4772) |
-| `feedback.delivered` / `feedback.skipped` | `cloister/feedback-delivery-record.ts`, from the review and UAT relays (kind `review`, `uat`) and the CodeRabbit relay `cloister/coderabbit-feedback.ts` (kind `coderabbit`, keyed per CodeRabbit review; it writes `feedback.delivered` only) (`data.kind`, `dedupKey`, `agentId`) |
+| `feedback.delivered` / `feedback.skipped` | `cloister/feedback-delivery-record.ts`, from the review and UAT relays (kind `review`, `uat`) and the CodeRabbit relay `cloister/coderabbit-feedback.ts` (kind `coderabbit`, keyed per CodeRabbit review; it writes `feedback.delivered`, carrying `repo`, `prNumber`, `reviewId`, `reviewUrl` and `threads`, and `feedback.undelivered` on each Needs-you branch) (`data.kind`, `dedupKey`, `agentId`) |
+| `feedback.followup_filed` | `cloister/advisory-followup.ts` `fileAdvisoryFollowups`, from the post-merge kick or the deacon-lite patrol, once per delivery key with unsettled threads (`data.kind`, `dedupKey`, `issueNumber`, `issueUrl`, `repo`, `prNumber`, `threads`, `recovered`) |
+| `feedback.followup_failed` | the same function, when filing failed and Needs-you was raised (`data.kind`, `dedupKey`, `reason`) |
 | `conflict.repair-requested` | `cloister/conflict-repair.ts` `tickConflictRepair`, once the sync-main repair for a merge-ready but conflicting head (`data.head`) was delivered, with `data.staleApproval: true` when the approval stood at an older head (PAN-4467) |
 | `conflict.repair-escalated` | `cloister/conflict-repair.ts` `tickConflictRepair`, when that head still conflicts after the 45-minute grace or its work agent cannot be reached (`data.head`, `data.reason`) |
 | `blocked.declared` | `pan task block <issue> <item> --on <ref>...` (source `pan-task-block`), with `data.item` and canonical `data.blockers` |

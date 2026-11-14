@@ -10,9 +10,11 @@ const rpc = vi.hoisted(() => ({
 }))
 
 const toastMock = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }))
+const editMock = vi.hoisted(() => ({ ensureEditRoot: vi.fn() }))
 
 vi.mock('sonner', () => ({ toast: toastMock }))
 vi.mock('../../../../lib/wsTransport', () => ({ getTransport: () => ({}) }))
+vi.mock('../../edit/edit-workspace-switch', () => ({ ensureEditRoot: editMock.ensureEditRoot }))
 vi.mock('../../explorer-rpc', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../explorer-rpc')>()),
   ...rpc,
@@ -21,10 +23,11 @@ vi.mock('../../explorer-rpc', async (importOriginal) => ({
 import { selectPanesForWorkspace, usePanesStore } from '../../../../lib/panesStore'
 import { draftKey, useCodeDrafts } from '../../code/code-drafts'
 import { codeSaveQueue } from '../../code/useCodePaneSave'
+import { useEditWorkspaceStore } from '../../edit/edit-workspace-store'
 import { useExplorerStore } from '../../explorerStore'
 import { openCodePane } from '../../openCodePane'
 import { clearUndoHistory, hasUndo } from '../undo-stack'
-import { READ_ONLY_MESSAGE, createExplorerActions, type ExplorerActionsDeps } from '../useExplorerActions'
+import { createExplorerActions, type ExplorerActionsDeps } from '../useExplorerActions'
 
 const ROOT = 'issue:PAN-1'
 const DECK_A = 'PAN-1'
@@ -68,6 +71,13 @@ beforeEach(() => {
   usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} })
   usePanesStore.getState().ensureHome(DECK_A)
   usePanesStore.getState().ensureHome(DECK_B)
+  useEditWorkspaceStore.setState({ creating: {}, active: {}, pending: {} })
+  editMock.ensureEditRoot.mockReset()
+  // Like the real ensureEditRoot: switch, record the active edit root, answer its id.
+  editMock.ensureEditRoot.mockImplementation(async (projectRootId: string) => {
+    useEditWorkspaceStore.getState().setActive(projectRootId.replace(/^project:/, ''), 'workspace:w1')
+    return 'workspace:w1'
+  })
 })
 
 describe('rename', () => {
@@ -145,7 +155,7 @@ describe('create', () => {
     await actions.create('src', 'new.ts', 'file')
     expect(rpc.createEntry).toHaveBeenCalledWith(ROOT, 'src/new.ts', 'file')
     expect(useExplorerStore.getState().roots[ROOT].selection).toEqual(['src/new.ts'])
-    expect(deps.openFile).toHaveBeenCalledWith('src/new.ts')
+    expect(deps.openFile).toHaveBeenCalledWith('src/new.ts', ROOT)
     expect(deps.reloadDirs).toHaveBeenCalledWith(['src'])
 
     await actions.undo()
@@ -164,17 +174,27 @@ describe('create', () => {
 })
 
 describe('project roots and read-only trees', () => {
-  it('runWrite rejects on a project root and create sends no RPC', async () => {
-    const actions = createExplorerActions(makeDeps({ rootId: 'project:overdeck', writable: false }))
-    await expect(actions.runWrite(async () => 'x')).rejects.toThrow(READ_ONLY_MESSAGE)
-    await actions.create('', 'a.ts', 'file')
-    expect(rpc.createEntry).not.toHaveBeenCalled()
+  it('create on a project root switches to the edit root and creates and opens the file there', async () => {
+    const deps = makeDeps({ rootId: 'project:p' })
+    await createExplorerActions(deps).create('', 'a.txt', 'file')
+    expect(editMock.ensureEditRoot).toHaveBeenCalledWith('project:p')
+    expect(rpc.createEntry).toHaveBeenCalledWith('workspace:w1', 'a.txt', 'file')
+    expect(deps.openFile).toHaveBeenCalledWith('a.txt', 'workspace:w1')
+    expect(hasUndo('workspace:w1')).toBe(true)
   })
 
-  it('runWrite rejects on a project root even when the caller passes writable', async () => {
-    const actions = createExplorerActions(makeDeps({ rootId: 'project:overdeck' }))
-    await expect(actions.create('', 'a.ts', 'file')).rejects.toThrow(READ_ONLY_MESSAGE)
-    expect(rpc.createEntry).not.toHaveBeenCalled()
+  it('runWrite on a project root passes the edit root to its op', async () => {
+    const op = vi.fn(async (id: string) => id)
+    await expect(createExplorerActions(makeDeps({ rootId: 'project:p' })).runWrite(op)).resolves.toBe('workspace:w1')
+    expect(op).toHaveBeenCalledWith('workspace:w1')
+  })
+
+  it('recordCreated after an upload on a project root commits undo history under the edit root', async () => {
+    const actions = createExplorerActions(makeDeps({ rootId: 'project:p' }))
+    await actions.runWrite(async () => undefined)
+    expect(actions.recordCreated(['up.txt'], 'upload of up.txt')).not.toBe('')
+    expect(hasUndo('workspace:w1')).toBe(true)
+    expect(hasUndo('project:p')).toBe(false)
   })
 
   it('a tree that is not writable makes no call', async () => {
@@ -330,5 +350,27 @@ describe('recordCreated and undo errors', () => {
     await createExplorerActions(makeDeps()).undo()
     expect(toastMock).not.toHaveBeenCalled()
     expect(toastMock.error).not.toHaveBeenCalled()
+  })
+})
+
+describe('history on a project root (PAN-5191)', () => {
+  it("routes the delete toast's undo to the edit root that holds the delete", async () => {
+    rpc.trashPath.mockResolvedValue('t9')
+    const actions = createExplorerActions(makeDeps({ rootId: 'project:p' }))
+    const opId = await actions.remove(['a.ts'])
+    expect(opId).not.toBe('')
+    expect(rpc.trashPath).toHaveBeenCalledWith('workspace:w1', 'a.ts')
+    await actions.undoEntry(opId)
+    expect(rpc.restoreEntry).toHaveBeenCalledWith('workspace:w1', 't9')
+  })
+
+  it('undo and redo on a project root act on the edit root of the last write', async () => {
+    rpc.trashPath.mockResolvedValue('t1')
+    const actions = createExplorerActions(makeDeps({ rootId: 'project:p' }))
+    await actions.create('', 'n.txt', 'file')
+    await actions.undo()
+    expect(rpc.trashPath).toHaveBeenCalledWith('workspace:w1', 'n.txt')
+    await actions.redo()
+    expect(rpc.restoreEntry).toHaveBeenCalledWith('workspace:w1', 't1')
   })
 })

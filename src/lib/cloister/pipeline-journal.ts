@@ -38,6 +38,7 @@ export type PipelineJournalEntryType =
   | 'review.stalled' | 'review.stall-escalated' | 'review.dispatch-failed' | 'review.resume-declined'
   | 'review.approval-carried' | 'review.stale-approval-rerequested'
   | 'uat.verdict' | 'feedback.delivered' | 'feedback.skipped'
+  | 'feedback.undelivered' | 'feedback.followup_filed' | 'feedback.followup_failed'
   | 'merge.attempted' | 'merge.completed' | 'merge.failed'
   | 'strike.landed'
   | 'conflict.repair-requested' | 'conflict.repair-escalated'

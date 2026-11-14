@@ -748,6 +748,32 @@ path only inside a confirmed polyrepo wrapper; it still refuses a tracked or
 staged edit to one of those paths, every other untracked path, and — in a
 monorepo project — every sync path at all.
 
+## Edit workspaces (PAN-5191)
+
+The file explorer never writes a project's primary checkout. Its first save or
+file action on a `project:<key>` root creates an **edit workspace**: a
+`scratch` row on a `scratch/edit-<MMDD-HHMM>[-n]` branch, made through
+`resolveWorkspaceCreateIntent` + `performWorkspaceCreate` as an isolated
+worktree under `workspaces/scratch-edit-*`, cut from `origin/<default branch>`.
+
+**Reuse rule.** Unless the operator asks for a new one, `beginEdit` takes the
+project's edit rows newest first and reuses the first whose root still
+resolves and whose branch has no PR or an open PR. A failed PR lookup counts
+as no PR. Calls are serialized per project, so two concurrent saves share one
+workspace.
+
+**How an edit workspace ends.** It ends in one of three ways, and each removes
+it (worktree, local branch and registry row):
+
+- **Merge** squash-merges its PR, then removes it with its remote branch.
+- **Discard** force-removes it, optionally closing its PR; the remote branch
+  survives only while its PR stays open.
+- **Send through pipeline** removes it after its commit is pushed as
+  `feature/<issue>`; PR adoption then creates `workspaces/feature-<issue>`.
+
+The edit-workspace routes refuse any other scratch workspace with
+`NOT_AN_EDIT_WORKSPACE`, so a `pan workspace new` scratch row is never touched.
+
 ## No-loss discipline
 
 This domain was built additively alongside the pre-existing PAN-428
