@@ -216,3 +216,15 @@ export function configNeedsWrite(
   }
   return !isDeepStrictEqual(copy, generated);
 }
+
+export type CliproxyStartPlan = 'write-config-only' | 'install-write-spawn' | 'write-spawn' | 'upgrade-running';
+
+/**
+ * What `startCliproxy` does (PAN-5282 FR-8). The v8 config is written only
+ * once the installed binary is the pin, because a running proxy hot-reloads
+ * `config.yaml` and an older one cannot read the v8 layout.
+ */
+export function planCliproxyStart(state: { running: boolean; binaryCurrent: boolean }): CliproxyStartPlan {
+  if (state.running) return state.binaryCurrent ? 'write-config-only' : 'upgrade-running';
+  return state.binaryCurrent ? 'write-spawn' : 'install-write-spawn';
+}
