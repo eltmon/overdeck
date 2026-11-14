@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5287",
   "created": "2026-11-14T19:49:14.970Z",
-  "updated": "2026-11-14T20:42:38.458Z",
+  "updated": "2026-11-14T20:42:39.954Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -208,6 +208,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5287",
       "claimedAt": "2026-11-14T20:42:38.458Z"
+    },
+    "emergency-stop-shortcut": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:42:39.954Z"
     }
   }
 }
