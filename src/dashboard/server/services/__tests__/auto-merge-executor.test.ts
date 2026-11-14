@@ -264,7 +264,7 @@ describe('auto-merge executor', () => {
       markFailed,
     });
 
-    expect(mergeIssue).toHaveBeenCalledWith('PAN-1486', 'aaaaaaaaaaaaaaaa');
+    expect(mergeIssue).toHaveBeenCalledWith('PAN-1486', 'aaaaaaaaaaaaaaaa', 'feature');
     expect(markMerged).toHaveBeenCalledWith(1);
     expect(markFailed).not.toHaveBeenCalled();
   });
@@ -613,7 +613,7 @@ describe('auto-merge executor', () => {
       markMerged,
     });
 
-    expect(mergeIssue).toHaveBeenCalledWith('PAN-1486', 'aaaaaaaaaaaaaaaa');
+    expect(mergeIssue).toHaveBeenCalledWith('PAN-1486', 'aaaaaaaaaaaaaaaa', 'feature');
     expect(markMerged).toHaveBeenCalledWith(1);
   });
 

@@ -132,9 +132,9 @@ describe('overdeck schema top-ups', () => {
   it('adds pending_auto_merges.kind with default feature (PAN-4753)', () => {
     const db = getOverdeckDatabase(makeDbPath());
     const column = db
-      .prepare(`SELECT name, dflt_value, "notnull" AS notnull FROM pragma_table_info('pending_auto_merges') WHERE name = 'kind'`)
-      .get<{ name: string; dflt_value: string; notnull: number }>();
-    expect(column).toEqual({ name: 'kind', dflt_value: "'feature'", notnull: 1 });
+      .prepare(`SELECT name, dflt_value, [notnull] AS not_null FROM pragma_table_info('pending_auto_merges') WHERE name = 'kind'`)
+      .get<{ name: string; dflt_value: string; not_null: number }>();
+    expect(column).toEqual({ name: 'kind', dflt_value: "'feature'", not_null: 1 });
   });
 
   it('creates the live issue-referencing tables WITHOUT the dead issues FK in a fresh database (PAN-3963)', () => {

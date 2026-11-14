@@ -187,6 +187,7 @@ beforeEach(() => {
   routeMocks.pushLocalReviewBranches.mockImplementation(() => new Promise<void>(() => {}));
   routeMocks.resolveEffort.mockReturnValue({ effort: 'high', source: 'default', requested: 'high', clamped: false });
   routeMocks.answerMissingWorkspace.mockResolvedValue(null);
+  routeMocks.strikeReviewRequestAnswer.mockResolvedValue(null);
   routeMocks.answerAdoptionInFlight.mockReturnValue(null);
   routeMocks.isDeftPipelineIssue.mockResolvedValue(false);
 });

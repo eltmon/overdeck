@@ -38,7 +38,8 @@ export const HOLD_FOR_UAT_LABEL = 'hold-for-uat';
 export type AutoMergeEligibility = { eligible: true } | { eligible: false; reason: string };
 
 export interface AutoMergeEligibilityDeps {
-  getFacts?: (issueId: string, deps?: Record<string, never>, options?: { preferBranch?: string }) => Promise<PrFacts>;
+  /** Same shape as the merge gate's `getFacts`: a strike passes `{ preferBranch }`. */
+  getFacts?: (issueId: string, options?: { preferBranch?: string }) => Promise<PrFacts>;
   getIssueLabels?: (issueId: string) => Promise<string[]>;
   getProjectDefault?: typeof getProjectAutoMergeDefault;
   isGlobalUatRequired?: () => boolean;
@@ -182,9 +183,10 @@ export async function isAutoMergeEligible(
   deps: AutoMergeEligibilityDeps = {},
   options: { preferBranch?: string } = {},
 ): Promise<AutoMergeEligibility> {
-  const read = options.preferBranch
-    ? (deps.getFacts ?? getPrFacts)(issueId, {}, { preferBranch: options.preferBranch })
-    : (deps.getFacts ?? getPrFacts)(issueId);
+  const branch = options.preferBranch ? { preferBranch: options.preferBranch } : null;
+  const read = deps.getFacts
+    ? (branch ? deps.getFacts(issueId, branch) : deps.getFacts(issueId))
+    : (branch ? getPrFacts(issueId, {}, branch) : getPrFacts(issueId));
   const facts = await withForgeApprovalAtHead(await read, deps.readReviews, deps.overdeckLogins);
   // The UAT policy is applied below as the hold itself: an issue that requires
   // UAT is never auto-merged, so a failed UAT verdict (#4036) cannot reach here.

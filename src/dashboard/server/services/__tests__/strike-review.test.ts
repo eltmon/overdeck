@@ -26,13 +26,14 @@ function prFacts(overrides: Partial<PrFacts> = {}): PrFacts {
 }
 
 /** A strike-only issue whose journal lives in memory. */
-function world(overrides: Partial<StrikeReviewDeps> & { facts?: PrFacts; head?: string | null } = {}) {
+function world(options: Omit<Partial<StrikeReviewDeps>, 'facts'> & { facts?: PrFacts; head?: string | null } = {}) {
+  const { facts, head, ...overrides } = options;
   const journal: PipelineJournalEntry[] = [];
   const dispatch = vi.fn(async () => ({ success: true, message: 'dispatched' }));
   const deps: StrikeReviewDeps = {
     target: () => ({ kind: 'strike', workspacePath: WORKSPACE, branch: 'strike/pan-9' }),
-    facts: async () => overrides.facts ?? prFacts(),
-    workspaceHead: async () => (overrides.head !== undefined ? overrides.head : HEAD),
+    facts: async () => facts ?? prFacts(),
+    workspaceHead: async () => (head !== undefined ? head : HEAD),
     journal: () => journal,
     append: (_path, entry) => { journal.push({ at: new Date().toISOString(), ...entry }); },
     reviewerAlive: async () => false,

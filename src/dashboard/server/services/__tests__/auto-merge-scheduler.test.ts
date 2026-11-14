@@ -165,7 +165,7 @@ function world(options: WorldOptions = {}) {
     listProjects: () => [OVERDECK],
     forgeOf: (): 'github' | 'gitlab' => 'github',
     listCandidates,
-    policyRefusal: (issueId: string) => autoMergePolicyRefusal(issueId, policy),
+    policyRefusal: (issueId: string, options?: { branch?: string }) => autoMergePolicyRefusal(issueId, policy, options),
     latestAutoMerge: () => options.latest ?? null,
     mergeGate,
     schedule: (issueId: string, canSchedule: (latest: PendingAutoMerge) => boolean, kind?: 'feature' | 'strike') => postAutoMergeSchedulePayload({ issueId, ...(kind ? { kind } : {}) }, {
