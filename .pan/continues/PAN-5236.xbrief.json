@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5236",
   "created": "2026-11-14T04:12:49.397Z",
-  "updated": "2026-11-14T04:40:01.221Z",
+  "updated": "2026-11-14T04:40:07.280Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,11 @@
     "new-build-banner.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T04:40:01.220Z"
+    },
+    "mount-app-shell": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5236",
+      "claimedAt": "2026-11-14T04:40:07.280Z"
     }
   }
 }
