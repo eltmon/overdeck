@@ -505,7 +505,7 @@ already queued, without killing them:
   Vitest run, and `gate:<name>:<raw gate command>` for a verification gate.
   Placeholders such as `{{CHANGED_BASE}}` stay literal in the key. A Vitest run
   is `files` only when it names at most 10 filters and every one is an
-  existing file. Vitest matches filters as path substrings, so anything else
+  existing file (Vitest's `<file>:<line>` location form counts). Vitest matches filters as path substrings, so anything else
   counts as `suite`: no filters, a directory (`vitest run tests/unit`), a
   pattern such as `.test.ts` or `admission`, or the frontend subset's long
   list. The two shapes never share peaks, so a full-suite peak

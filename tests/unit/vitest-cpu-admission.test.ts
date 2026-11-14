@@ -148,6 +148,10 @@ describe('Vitest CPU admission', () => {
       expect(vitestRunShape(top, ['.test.ts'])).toBe('suite')
       expect(vitestRunShape(top, ['admission'])).toBe('suite')
       expect(vitestRunShape(top, ['tests/a.test.ts', 'admission'])).toBe('suite')
+      // Vitest's location form targets one file; a non-numeric suffix stays a substring filter.
+      expect(vitestRunShape(top, ['tests/a.test.ts:171'])).toBe('files')
+      expect(vitestRunShape(top, ['tests/a.test.ts:abc'])).toBe('suite')
+      expect(vitestRunShape(top, ['tests/missing.test.ts:12'])).toBe('suite')
     } finally {
       rmSync(top, { recursive: true, force: true })
     }

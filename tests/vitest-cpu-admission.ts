@@ -47,14 +47,21 @@ function isFile(path: string): boolean {
 }
 
 /**
- * PAN-5285: `files` only when every filter names an existing file and there
- * are at most a few of them. Vitest matches filters as path substrings, so a
+ * PAN-5285: `files` only when every filter names an existing file (a
+ * `<file>:<line>` location counts) and there are at most a few of them. Vitest matches filters as path substrings, so a
  * directory, a pattern such as `.test.ts` or `admission`, no filters, or a
  * long list may select a suite-sized run, and those count as `suite`.
  */
 export function vitestRunShape(cwd: string, filters: readonly string[] | undefined): 'suite' | 'files' {
   if (!filters?.length || filters.length > FILES_SHAPE_MAX_FILTERS) return 'suite'
-  return filters.every((filter) => isFile(resolve(cwd, filter))) ? 'files' : 'suite'
+  return filters.every((filter) => isFileFilter(cwd, filter)) ? 'files' : 'suite'
+}
+
+/** A filter naming one file, including Vitest's `<file>:<line>` location form. */
+function isFileFilter(cwd: string, filter: string): boolean {
+  if (isFile(resolve(cwd, filter))) return true
+  const location = /^(.+):\d+$/.exec(filter)
+  return location !== null && isFile(resolve(cwd, location[1]!))
 }
 
 /** D13 + PAN-5285: `vitest:<path from the nearest .git ancestor to cwd, or .>:<run shape>`. */
