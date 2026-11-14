@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5232",
   "created": "2026-11-14T03:50:14.887Z",
-  "updated": "2026-11-14T04:26:54.113Z",
+  "updated": "2026-11-14T04:27:01.290Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,11 @@
     "docs-wire-shape.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T04:26:54.112Z"
+    },
+    "live-verification": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5232",
+      "claimedAt": "2026-11-14T04:27:01.290Z"
     }
   }
 }
