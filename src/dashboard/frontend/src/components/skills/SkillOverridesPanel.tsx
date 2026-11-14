@@ -217,6 +217,12 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
             <span className="dot-metadata"><span className="text-foreground">{counts.all - counts.off}</span> on</span>
             <span aria-hidden>·</span>
             <span className="dot-metadata"><span className={cn(counts.off > 0 && 'text-foreground')}>{counts.off}</span> off</span>
+            {level !== 'global' && (
+              <>
+                <span aria-hidden>·</span>
+                <span className="dot-metadata"><span className={cn(counts.here > 0 && 'text-foreground')}>{counts.here}</span> changed here</span>
+              </>
+            )}
             <span aria-hidden>·</span>
             <span className="dot-metadata">{counts.core} core</span>
             {packs && packs.length > 0 && (

@@ -165,7 +165,7 @@ describe('SkillOverridesPanel — issue', () => {
     expect(document.querySelector('[data-skill="pan-done"]')).toBeNull();
     expect(screen.getByText('1 core skills, always on')).toBeTruthy();
     expect(within(rowIn('project', 'local')).getByText('project skill')).toBeTruthy();
-    expect(screen.getByTestId('skills-summary').textContent).toBe('3 on·2 off·1 core');
+    expect(screen.getByTestId('skills-summary').textContent).toBe('3 on·2 off·2 changed here·1 core');
   });
 
   it('offers All, Changed here and Off, with counts', async () => {
