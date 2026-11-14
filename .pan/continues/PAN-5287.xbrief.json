@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5287",
   "created": "2026-11-14T19:49:14.970Z",
-  "updated": "2026-11-14T20:44:23.291Z",
+  "updated": "2026-11-14T20:46:02.048Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -192,7 +192,7 @@
     "app-migration": {
       "status": "in_progress",
       "claimedBy": "agent-pan-5287",
-      "claimedAt": "2026-11-14T20:27:33.584Z"
+      "claimedAt": "2026-11-14T20:46:02.048Z"
     },
     "stage-shortcuts": {
       "status": "in_progress",
