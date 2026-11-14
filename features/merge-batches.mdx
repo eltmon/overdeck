@@ -112,13 +112,16 @@ it by itself, because a lone merge voids the batch you are testing.
 row has its own **Merge** button, which merges that one feature through the
 merge gate after you confirm. On a batch, **Merge alone…** on a member does the
 same for a feature already in the batch; it voids that batch, and the
-confirmation says so. **Rebuild** assembles a fresh batch at once, including
-after a failed assembly.
+confirmation says so. **Rebuild** on a ready batch assembles a fresh one at
+once. These Merge buttons show only while the train is on, because the merge
+door refuses them while it is off; the issue page's Merge button still works
+then.
 
-**A failed assembly is named, not hidden.** After three failed attempts in a
-row, the train stops retrying on its own. Failures more than six hours old no
-longer count toward that limit, so the train recovers once the cause is fixed.
-**Rebuild** tries again at once.
+**A failed assembly is named, not hidden.** The failed batch stays listed with
+its reason, and the card offers **Retry batch assembly**, which asks first and
+then builds a new batch at once. After three failed attempts in a row, the
+train stops retrying on its own. Failures more than six hours old no longer
+count toward that limit, so the train recovers once the cause is fixed.
 
 ## Projects that span several repos
 

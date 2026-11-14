@@ -145,3 +145,48 @@ describe('pickHeroBatch', () => {
     expect(pickHeroBatch([a])).toBeNull();
   });
 });
+
+/** Ported from the retired view's PAN-4598 retry-assembly tests (review of #5300). */
+describe('ProjectTrainCard retry batch assembly', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const FAILED = gen({ name: 'uat/pan-onyx-0920-6', status: 'failed' });
+  const twoHeld = [
+    car({ issueId: 'PAN-1', state: 'held', route: 'batch' }),
+    car({ issueId: 'PAN-2', state: 'held', route: 'batch' }),
+  ];
+
+  it('offers Retry batch assembly when the newest batch failed and none is testable, and POSTs a forced assemble', async () => {
+    const fetchImpl = mockFetch({ 'POST /api/merge-train/assemble': { projects: [{ projectKey: 'overdeck', result: { action: 'assembled' } }] } });
+    renderCard(project({ batches: [FAILED], cars: twoHeld }));
+    fireEvent.click(screen.getByTestId('merge-train-retry-assembly-overdeck'));
+    await waitFor(() => expect(callsTo(fetchImpl, 'POST', '/api/merge-train/assemble')).toHaveLength(1));
+    const [, init] = callsTo(fetchImpl, 'POST', '/api/merge-train/assemble')[0]!;
+    expect(JSON.parse(String(init!.body))).toEqual({ project: 'overdeck' });
+  });
+
+  it('a newer non-failed batch means the failure is history: no retry', () => {
+    mockFetch({});
+    renderCard(project({ batches: [gen({ name: 'uat/pan-onyx-1024', status: 'invalidated' }), FAILED], cars: twoHeld }));
+    expect(screen.queryByTestId('merge-train-retry-assembly-overdeck')).toBeNull();
+  });
+
+  it('one unheld feature merges on its own: no retry that could not build a batch', () => {
+    mockFetch({});
+    renderCard(project({ batches: [FAILED], cars: [car({ issueId: 'PAN-1', state: 'ready', route: 'auto-merge' })] }));
+    expect(screen.queryByTestId('merge-train-retry-assembly-overdeck')).toBeNull();
+  });
+
+  it('with the train off: no retry and no Merge buttons, since merge-next refuses', () => {
+    mockFetch({});
+    renderCard(project({ enabled: false, batches: [FAILED], cars: twoHeld }));
+    expect(screen.queryByTestId('merge-train-retry-assembly-overdeck')).toBeNull();
+    expect(screen.queryByTestId('car-merge-PAN-1')).toBeNull();
+  });
+
+  it('the train-off banner says held features wait in a hold project', () => {
+    mockFetch({});
+    renderCard(project({ mode: 'hold', enabled: false }));
+    expect(screen.getByTestId('train-off-banner-overdeck').textContent).toContain('features held for UAT wait until the train is on again');
+  });
+});

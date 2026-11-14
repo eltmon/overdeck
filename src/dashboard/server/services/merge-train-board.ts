@@ -286,6 +286,8 @@ async function boardProject(
     const inReadySet = !!facts && facts.approved && facts.checks === 'green' && facts.mergeable === true;
     const failure = run?.phase === 'failed' ? (run.notes ?? 'the last merge failed')
       : row?.status === 'failed' && rowAtHead(row, head) ? (row.failureReason ?? 'the last merge failed')
+      // A row re-armed as pending after the journaled failure is newer evidence.
+      : row?.status === 'pending' ? null
       : journalFailure(journal);
 
     let state: CarState;

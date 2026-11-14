@@ -48,7 +48,11 @@ scheduler, the executor, the reconciler and the UI agree.
 **Merge alone…** (`POST /api/merge-train/merge-next` with `issueId`), the issue
 page Merge button and batch promotion are operator actions, not subject to
 the route rule. In the train UI, merging a live-batch member alone first asks
-for confirmation naming the batch it voids.
+for confirmation naming the batch it voids. `merge-next` refuses while the
+train is off for the project, so the card hides its Merge and Merge alone
+buttons then; the issue page's Merge button still merges one feature. When
+the newest batch failed and no testable batch exists, the card offers
+**Retry batch assembly** (a forced `POST /api/merge-train/assemble`, PAN-4598).
 
 ## Batches and their status reason
 

@@ -141,6 +141,15 @@ describe('getMergeTrainBoard cars (PAN-4753 WI-7)', () => {
     expect(car).toMatchObject({ state: 'cooldown', mergeAt: '2026-11-14T12:03:00.000Z', autoMergeRowId: 7, route: 'auto-merge' });
   });
 
+  it('a pending row re-armed after a journaled failure shows the cooldown, not the old failure (review of #5300)', async () => {
+    const d = deps({
+      trainOn: false, open: [open('PAN-1')], facts: { 'PAN-1': facts('PAN-1') }, rows: { 'PAN-1': row('PAN-1', 'pending') },
+    });
+    d.journal = (issueId) => [{ at: '2026-11-14T11:00:00.000Z', type: 'merge.failed', issueId, data: { reason: 'old failure' } }];
+    const board = await getMergeTrainBoard({}, d);
+    expect(board.projects[0]!.cars[0]).toMatchObject({ state: 'cooldown', autoMergeRowId: 7 });
+  });
+
   it('held: a ready, batch-routed feature not in a live batch', async () => {
     const car = await onlyCar({ open: [open('PAN-1')], facts: { 'PAN-1': facts('PAN-1') } });
     expect(car).toMatchObject({ state: 'held', route: 'batch', effectivePolicy: 'auto', policy: null });

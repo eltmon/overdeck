@@ -73,10 +73,12 @@ export interface BatchCardProps {
   projectName: string;
   /** The hero batch opens "What to UAT" by default and gets the accent border. */
   hero?: boolean;
+  /** False hides Merge alone: merge-next refuses while the train is off. Defaults to true. */
+  mergeEnabled?: boolean;
   onNavigateIssue?: (issueId: string) => void;
 }
 
-export function BatchCard({ gen, projectKey, projectName, hero = false, onNavigateIssue }: BatchCardProps) {
+export function BatchCard({ gen, projectKey, projectName, hero = false, mergeEnabled = true, onNavigateIssue }: BatchCardProps) {
   const confirm = useConfirm();
   const invalidate = useInvalidateBoard();
   const now = useNow(60_000);
@@ -221,7 +223,8 @@ export function BatchCard({ gen, projectKey, projectName, hero = false, onNaviga
     if (await confirm(mergeAloneConfirm(issueId, gen.name))) mergeAlone.mutate(issueId);
   };
 
-  const live = gen.status === 'ready' || gen.status === 'assembling';
+  // The member menu opens only when it has an item: Merge alone (train on) or Open issue.
+  const live = (gen.status === 'ready' || gen.status === 'assembling') && (mergeEnabled || !!onNavigateIssue);
   const promotable = isPromotable(gen.status);
   const reasonShown = gen.statusReason && (gen.status === 'superseded' || gen.status === 'invalidated');
   const shipPending = gen.status === 'promoted' && gen.versionSyncConfigured === true && gen.shipStatus?.status !== 'passed';
@@ -273,15 +276,17 @@ export function BatchCard({ gen, projectKey, projectName, hero = false, onNaviga
                       Open issue
                     </button>
                   )}
-                  <button
-                    type="button"
-                    role="menuitem"
-                    disabled={mergeAlone.isPending}
-                    onClick={() => void onMergeAlone(m.issueId)}
-                    className="rounded px-2 py-1 text-left text-[11px] text-foreground hover:bg-accent disabled:opacity-50"
-                  >
-                    {MERGE_ALONE_LABEL}
-                  </button>
+                  {mergeEnabled && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={mergeAlone.isPending}
+                      onClick={() => void onMergeAlone(m.issueId)}
+                      className="rounded px-2 py-1 text-left text-[11px] text-foreground hover:bg-accent disabled:opacity-50"
+                    >
+                      {MERGE_ALONE_LABEL}
+                    </button>
+                  )}
                 </span>
               )}
             </span>

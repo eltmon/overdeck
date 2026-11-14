@@ -39,6 +39,8 @@ export interface TrainCarRowProps {
   projectName: string;
   /** The live merge run, which advances the step between board polls. */
   run?: LiveMergeRun;
+  /** False hides Merge: merge-next refuses while the train is off. Defaults to true. */
+  mergeEnabled?: boolean;
   onNavigateIssue?: (issueId: string) => void;
 }
 
@@ -46,7 +48,7 @@ type MergeNextResult = { outcomes?: Array<{ issueId: string; result: string; rea
 
 const ACTION_CLASS = 'shrink-0 rounded-md border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-foreground hover:bg-accent disabled:opacity-50';
 
-export function TrainCarRow({ car, order, projectKey, projectName, run, onNavigateIssue }: TrainCarRowProps) {
+export function TrainCarRow({ car, order, projectKey, projectName, run, mergeEnabled = true, onNavigateIssue }: TrainCarRowProps) {
   const [expanded, setExpanded] = useState(false);
   const confirm = useConfirm();
   const invalidate = useInvalidateBoard();
@@ -97,7 +99,7 @@ export function TrainCarRow({ car, order, projectKey, projectName, run, onNaviga
         {retry.isPending ? 'Retrying…' : 'Retry'}
       </button>
     );
-  } else if (car.state === 'ready' || car.state === 'held') {
+  } else if (mergeEnabled && (car.state === 'ready' || car.state === 'held')) {
     action = (
       <button type="button" className={ACTION_CLASS} disabled={merge.isPending} onClick={() => void onMerge()} data-testid={`car-merge-${car.issueId}`}>
         {merge.isPending ? 'Merging…' : 'Merge'}

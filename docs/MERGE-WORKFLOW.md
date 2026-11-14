@@ -222,8 +222,14 @@ is the merge control. It renders on the Flywheel rail and on Awaiting Merge
    merge gate re-checks that one feature and the issue closes out through the
    normal post-merge flow. An `issueId` outside the project's ready set gets
    a 409.
-3. **Rebuild.** **Rebuild** on the batch is a forced `/api/merge-train/assemble`
-   for that project, including after a failed assembly.
+3. **Rebuild and Retry batch assembly.** **Rebuild** on a ready batch, and
+   **Retry batch assembly** on the card when the newest batch failed and no
+   testable batch exists, are a forced `/api/merge-train/assemble` for that
+   project. Both confirm first.
+
+The Merge and Merge alone buttons show only while the train is on for the
+project: `/api/merge-train/merge-next` refuses with 409 while it is off. The
+issue page's Merge button (`POST /api/issues/:issueId/merge`) still works then.
 
 A promote of a batch that is no longer `ready` or `superseded` (PAN-4970)
 returns 409 `wrong-status` before any forge read; the card shows the refusal

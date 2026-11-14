@@ -453,10 +453,20 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
   );
 }
 
-/** PAN-4753: scroll to the project's merge train card on the same page. */
+/**
+ * PAN-4753: scroll to the project's merge train card on the same page. The
+ * sparse project Home (no features) renders no card, so the link then opens
+ * Awaiting Merge, which always shows the merge train.
+ */
 function scrollToMergeTrain(event: React.MouseEvent): void {
   event.preventDefault();
-  document.getElementById('merge-train')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const card = document.getElementById('merge-train');
+  if (card) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  window.history.pushState({}, '', '/awaiting-merge');
+  window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
 /** The project's board card and its newest testable batch (ready, then assembling, then superseded). */

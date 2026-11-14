@@ -233,6 +233,14 @@ describe('ProjectSettingsDisclosure', () => {
     card.remove();
   });
 
+  it('opens Awaiting Merge when the page has no merge train card (sparse project Home)', async () => {
+    const pushState = vi.spyOn(window.history, 'pushState');
+    renderDisclosure();
+    fireEvent.click(await screen.findByRole('link', { name: /Merge train ↓/ }));
+    expect(pushState).toHaveBeenCalledWith({}, '', '/awaiting-merge');
+    pushState.mockRestore();
+  });
+
   it('reports an off train on the collapsed summary line (ac3)', async () => {
     // The collapsed line reads the server-computed effective flag off the same
     // aggregate payload as the ready count, not the raw per-project override.

@@ -479,7 +479,9 @@ export async function cleanupUatGenerations(
     if (!cleaned) continue;
     const cleanedAt = new Date().toISOString();
     if (gen.status === 'ready' || gen.status === 'superseded') {
-      deps.store.update(gen.name, { status: 'invalidated', cleanedAt, statusReason: `trimmed: older than the newest ${keep} batches` });
+      const trimmed = `trimmed: older than the newest ${keep} batches`;
+      // Keep why a superseded batch was replaced; the trim only adds to it.
+      deps.store.update(gen.name, { status: 'invalidated', cleanedAt, statusReason: gen.statusReason ? `${gen.statusReason}; ${trimmed}` : trimmed });
       log(`[uat-generation] cleanup: trimmed ${gen.name} (beyond newest ${keep})`);
     } else {
       deps.store.update(gen.name, { cleanedAt });

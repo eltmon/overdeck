@@ -39,8 +39,17 @@ export const TRAIN_SWITCH_TITLE_OFF = 'The merge train is off for this project. 
  * its own after the cooldown (only `OVERDECK_DISABLE_AUTO_MERGE=1` stops
  * automatic merges), so the banners say that rather than "nothing merges".
  */
-export const TRAIN_OFF_BANNER = 'Train off. No batches assemble; each ready PR merges on its own after the cooldown.';
-export const MASTER_OFF_BANNER = 'Merge train is off for all projects. No batches assemble; each ready PR merges on its own after the cooldown.';
+const OFF_AUTO = 'No batches assemble; each ready PR merges on its own after the cooldown.';
+// A hold project batches every held feature (R1 rule 1), and batching stops
+// with the train off, so nothing there merges on its own.
+const OFF_HOLD = 'No batches assemble, so features held for UAT wait until the train is on again. The issue page\'s Merge button still merges one by hand.';
+export function trainOffBanner(mode: BoardProject['mode']): string {
+  return `Train off. ${mode === 'hold' ? OFF_HOLD : OFF_AUTO}`;
+}
+export function masterOffBanner(mode: BoardProject['mode']): string {
+  return `Merge train is off for all projects. ${mode === 'hold' ? OFF_HOLD : OFF_AUTO}`;
+}
+export const RETRY_ASSEMBLY_LABEL = 'Retry batch assembly';
 
 /** The card's intro line, by mode and batch window (D4). */
 export function introLine(project: Pick<BoardProject, 'mode' | 'polyrepo' | 'window' | 'cooldownMinutes'>): string {
