@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5310",
   "created": "2026-11-14T22:39:01.503Z",
-  "updated": "2026-11-14T23:21:54.835Z",
+  "updated": "2026-11-14T23:45:08.562Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,30 @@
       "doneAt": "2026-11-14T23:21:47.167Z"
     },
     "merged-pr-read-for-backfilled": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5310",
-      "claimedAt": "2026-11-14T23:21:54.835Z"
+      "claimedAt": "2026-11-14T23:21:54.835Z",
+      "doneAt": "2026-11-14T23:45:08.561Z"
+    },
+    "merged-pr-read-for-backfilled.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:45:08.561Z"
+    },
+    "merged-pr-read-for-backfilled.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:45:08.561Z"
+    },
+    "merged-pr-read-for-backfilled.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:45:08.561Z"
+    },
+    "merged-pr-read-for-backfilled.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:45:08.561Z"
+    },
+    "merged-pr-read-for-backfilled.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:45:08.561Z"
     }
   }
 }
