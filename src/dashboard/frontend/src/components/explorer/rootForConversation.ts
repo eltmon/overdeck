@@ -1,0 +1,133 @@
+// Which explorer root a conversation works in (PAN-5287 §6.4, WI-S4).
+//
+// Root ids: `project:<key>` (primary checkout), `issue:<ID>` (feature
+// workspace), `workspace:<id>` (scratch edit workspace). `null` means the
+// explorer cannot show this conversation's files: it runs on another machine,
+// or its folder is outside every project. Child B renders those messages.
+
+import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { fetchRegisteredProjects } from '../CommandDeck/UnknownProjectState'
+import { useDashboardStore, selectIssues } from '../../lib/store'
+
+export interface RootContext {
+  /** GET /api/registered-projects */
+  projects: readonly { key: string; name?: string; path: string; linearTeam?: string | null }[]
+  /** GET /api/workspace-registry */
+  workspaces: readonly { id: string; projectId: string; kind: 'main' | 'issue' | 'scratch'; name: string; issueId: string | null }[]
+}
+
+export interface RootConversation {
+  cwd?: string | null
+  issueId?: string | null
+  workspaceId?: string | null
+  origin?: string | null
+}
+
+function trimSlash(path: string): string {
+  return path.length > 1 ? path.replace(/\/+$/, '') : path
+}
+
+function isAtOrUnder(path: string, base: string): boolean {
+  return path === base || path.startsWith(`${base}/`)
+}
+
+/** Map a conversation to its explorer root id, or null (rules in §6.4, first match wins). */
+export function rootIdForConversation(conv: RootConversation, ctx: RootContext): string | null {
+  // 1. The explorer reads this machine's disk; a linked conversation runs elsewhere.
+  if (conv.origin === 'linked') return null
+  // 2. An issue conversation works in the issue's feature workspace.
+  if (conv.issueId) return `issue:${conv.issueId.toUpperCase()}`
+  // 3. A registered workspace row.
+  if (conv.workspaceId) {
+    const row = ctx.workspaces.find((w) => w.id === conv.workspaceId)
+    if (row) {
+      if (row.kind === 'scratch') return `workspace:${row.id}`
+      if (row.kind === 'main') return `project:${row.projectId}`
+      if (row.kind === 'issue' && row.issueId) return `issue:${row.issueId.toUpperCase()}`
+    }
+  }
+  if (!conv.cwd) return null
+  const cwd = trimSlash(conv.cwd)
+  // 4. A feature workspace lives inside its project folder, so check it before rule 5.
+  for (const project of ctx.projects) {
+    const workspacesDir = `${trimSlash(project.path)}/workspaces`
+    if (!cwd.startsWith(`${workspacesDir}/`)) continue
+    const first = cwd.slice(workspacesDir.length + 1).split('/')[0]
+    const slug = first.startsWith('feature-') ? first.slice('feature-'.length) : ''
+    return slug ? `issue:${slug.toUpperCase()}` : null
+  }
+  // 5. The primary checkout or any folder under it; the longest project path wins.
+  let best: { key: string; length: number } | null = null
+  for (const project of ctx.projects) {
+    const path = trimSlash(project.path)
+    if (isAtOrUnder(cwd, path) && (!best || path.length > best.length)) best = { key: project.key, length: path.length }
+  }
+  // 6. Outside every project.
+  return best ? `project:${best.key}` : null
+}
+
+const TITLE_MAX = 40
+
+function truncate(text: string): string {
+  return text.length > TITLE_MAX ? `${text.slice(0, TITLE_MAX)}…` : text
+}
+
+/** A human label for an explorer root id. */
+export function rootLabelFor(rootId: string, ctx: RootContext & { issueTitles: ReadonlyMap<string, string> }): string {
+  const sep = rootId.indexOf(':')
+  if (sep <= 0) return rootId
+  const kind = rootId.slice(0, sep)
+  const value = rootId.slice(sep + 1)
+  if (!value) return rootId
+  if (kind === 'project') {
+    const project = ctx.projects.find((p) => p.key === value)
+    return project?.name || value
+  }
+  if (kind === 'issue') {
+    const title = ctx.issueTitles.get(value)
+    return title ? `${value} · ${truncate(title)}` : value
+  }
+  if (kind === 'workspace') {
+    return ctx.workspaces.find((w) => w.id === value)?.name || 'Edit workspace'
+  }
+  return rootId
+}
+
+async function fetchWorkspaceRegistry(): Promise<RootContext['workspaces']> {
+  const res = await fetch('/api/workspace-registry')
+  if (!res.ok) return []
+  const data = (await res.json()) as { workspaces?: unknown }
+  return Array.isArray(data?.workspaces) ? (data.workspaces as RootContext['workspaces']) : []
+}
+
+/** Issue id → title, from the store's issue rows (`{ id, title }`, as SessionFeedSidebar and useDecisions read them). */
+export function issueTitleMap(issues: readonly unknown[]): Map<string, string> {
+  const titles = new Map<string, string>()
+  for (const row of issues) {
+    if (!row || typeof row !== 'object') continue
+    const { id, title } = row as Record<string, unknown>
+    if (typeof id === 'string' && id && typeof title === 'string' && title) titles.set(id.toUpperCase(), title)
+  }
+  return titles
+}
+
+/** The label for `rootId` from the shared project, workspace and issue queries; null for a null root. */
+export function useRootLabel(rootId: string | null): string | null {
+  const { data: projects } = useQuery({ queryKey: ['registered-projects'], queryFn: fetchRegisteredProjects })
+  const { data: workspaces } = useQuery({
+    queryKey: ['workspace-registry'],
+    queryFn: fetchWorkspaceRegistry,
+    refetchInterval: 10000,
+  })
+  const issues = useDashboardStore(selectIssues)
+  const issueTitles = useMemo(() => issueTitleMap(issues), [issues])
+  return useMemo(() => {
+    if (rootId === null) return null
+    return rootLabelFor(rootId, {
+      projects: Array.isArray(projects) ? projects : [],
+      workspaces: Array.isArray(workspaces) ? workspaces : [],
+      issueTitles,
+    })
+  }, [rootId, projects, workspaces, issueTitles])
+}
