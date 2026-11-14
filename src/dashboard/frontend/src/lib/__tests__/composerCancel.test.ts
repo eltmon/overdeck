@@ -218,4 +218,22 @@ describe('composer cancel (PAN-5237)', () => {
     expect(messagePosts).toHaveLength(1);
     expect(slice()?.failed).toEqual([expect.objectContaining({ code: 'cancelled', text: 'retry me' })]);
   });
+  it('a held resend starts with no stale cancel state', async () => {
+    cancelResponse = async () => json(200, { outcome: 'unknown' });
+    const send = startSend('c1');
+    await vi.waitFor(() => expect(messagePosts).toHaveLength(1));
+    await state().cancelSend(bubble('c1')!.id);
+    expect(bubble('c1')?.cancelState).toBe('unconfirmed');
+    messageResponses[0]!.resolve(json(409, { error: 'Waiting', code: 'permission-pending', deliveryUnknown: false, retryable: true }));
+    await expect(send).rejects.toMatchObject({ code: 'permission-pending' });
+    state().hold(CONV, 'c1');
+    const held = slice()!.optimistic[0]!;
+    expect(held).toMatchObject({ deliveryState: 'held' });
+    expect(held.cancelState).toBeUndefined();
+    const release = state().releaseHeld(CONV);
+    await vi.waitFor(() => expect(messagePosts).toHaveLength(2));
+    expect(slice()!.optimistic[0]!.cancelState).toBeUndefined();
+    messageResponses[1]!.resolve(new Response('', { status: 200 }));
+    await release;
+  });
 });

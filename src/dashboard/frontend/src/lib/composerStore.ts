@@ -436,7 +436,7 @@ async function releaseHeldMessages(conversationName: string): Promise<void> {
         byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
           ...s,
           optimistic: s.optimistic.map((m) => m.id === message.id
-            ? { ...m, clientMessageId, deliveryState: 'pending' as const, heldAt: undefined, createdAt: new Date().toISOString() }
+            ? { ...m, clientMessageId, deliveryState: 'pending' as const, heldAt: undefined, cancelState: undefined, createdAt: new Date().toISOString() }
             : m),
         })),
       }));
@@ -647,7 +647,7 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
       ...s,
       optimistic: s.optimistic.map((message) => message.clientMessageId === clientMessageId
-        ? { ...message, deliveryState: 'held' as const, heldAt: Date.now() } : message),
+        ? { ...message, deliveryState: 'held' as const, heldAt: Date.now(), cancelState: undefined } : message),
     })),
   })),
 
