@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5191",
   "created": "2026-11-14T01:35:38.518Z",
-  "updated": "2026-11-14T01:54:14.099Z",
+  "updated": "2026-11-14T01:54:15.978Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -168,6 +168,11 @@
     "merge-discard.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T01:54:14.098Z"
+    },
+    "pipeline-pr": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5191",
+      "claimedAt": "2026-11-14T01:54:15.978Z"
     }
   }
 }
