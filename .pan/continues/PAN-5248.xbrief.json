@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5248",
   "created": "2026-11-14T05:37:27.839Z",
-  "updated": "2026-11-14T06:24:44.497Z",
+  "updated": "2026-11-14T06:25:19.345Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -203,9 +203,18 @@
       "claimedAt": "2026-11-14T06:21:25.602Z"
     },
     "effect-diag-lanes": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5248",
-      "claimedAt": "2026-11-14T06:24:44.497Z"
+      "claimedAt": "2026-11-14T06:24:44.497Z",
+      "doneAt": "2026-11-14T06:25:19.344Z"
+    },
+    "effect-diag-lanes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:25:19.344Z"
+    },
+    "effect-diag-lanes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:25:19.344Z"
     }
   }
 }
