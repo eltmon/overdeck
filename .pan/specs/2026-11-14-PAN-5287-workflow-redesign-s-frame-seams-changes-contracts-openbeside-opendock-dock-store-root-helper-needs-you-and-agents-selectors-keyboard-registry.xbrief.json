@@ -4,17 +4,17 @@
     "created": "2026-11-14T19:38:09Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5287: Workflow redesign S: frame seams (changes contracts, openBeside/openDock, dock store, root helper, needs-you and agents selectors, keyboard registry)",
-    "updated": "2026-11-14T19:47:14.007Z"
+    "updated": "2026-11-14T19:48:47.291Z"
   },
   "plan": {
     "id": "pan-5287",
     "title": "Workflow redesign S: frame seams (changes contracts, openBeside/openDock, dock store, root helper, needs-you and agents selectors, keyboard registry)",
-    "status": "proposed",
+    "status": "running",
     "uid": "59307f82-b190-447d-bbbf-866d79ea0479",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T19:38:09Z",
-    "updated": "2026-11-14T19:47:14.007Z",
+    "updated": "2026-11-14T19:48:47.291Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5287",
@@ -1541,5 +1541,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
