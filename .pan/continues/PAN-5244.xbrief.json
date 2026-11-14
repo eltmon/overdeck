@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5244",
   "created": "2026-11-14T05:28:55.884Z",
-  "updated": "2026-11-14T06:38:43.530Z",
+  "updated": "2026-11-14T06:41:27.798Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -282,14 +282,35 @@
       "doneAt": "2026-11-14T06:32:51.691Z"
     },
     "compose-drawer": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5244",
-      "claimedAt": "2026-11-14T06:33:00.934Z"
+      "claimedAt": "2026-11-14T06:33:00.934Z",
+      "doneAt": "2026-11-14T06:41:27.798Z"
     },
     "drawer-test-migration": {
       "status": "in_progress",
       "claimedBy": "agent-pan-5244",
       "claimedAt": "2026-11-14T06:38:43.529Z"
+    },
+    "compose-drawer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:41:27.798Z"
+    },
+    "compose-drawer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:41:27.798Z"
+    },
+    "compose-drawer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:41:27.798Z"
+    },
+    "compose-drawer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:41:27.798Z"
+    },
+    "compose-drawer.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:41:27.798Z"
     }
   }
 }
