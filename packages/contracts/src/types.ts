@@ -84,21 +84,21 @@ export type AgentResolution = typeof AgentResolution.Type
 // consumer that branches on harness MUST go through getHarness() so unknown or
 // legacy values normalize to 'claude-code'.
 //
-// PAN-1989 retired 'pi'; legacy DB rows read as 'ohmypi' via getHarness().
+// PAN-5212 restored 'pi' (the Pi Coding Agent, `pi`) as its own harness. From
+// PAN-1989 until PAN-5212 'pi' was folded into 'ohmypi'; the stored 'pi' rows
+// all predate PAN-1989 and really ran on pi, so they now read as 'pi'.
 // All new write sites use canonical harness literals.
 
-export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok'
+export type Harness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok'
 
-export const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', 'grok'])
+export const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', 'grok'])
 
 /**
  * Normalize a snapshot's runtime field to a known Harness value.
  * Unknown or missing values fall back to 'claude-code' (the default harness).
- * Legacy 'pi' values are normalized to 'ohmypi' on read (PAN-1989).
  */
 export function getHarness(snapshot: { runtime?: string | undefined } | null | undefined): Harness {
   const raw = snapshot?.runtime
-  if (raw === 'pi') return 'ohmypi'
   if (raw && KNOWN_HARNESSES.has(raw)) {
     return raw as Harness
   }

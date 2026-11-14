@@ -1,15 +1,23 @@
 /**
- * Pi Coding Agent helpers (PAN-636).
+ * Pi Coding Agent runtime (PAN-636, restored in PAN-5212).
  *
- * The Pi runtime adapter classes (sync and Effect) were never constructed
- * after PAN-1989 and were deleted in PAN-3958 (#4007). What remains is used by the
- * live pi harness paths: PiSpawnTimeout and the PiSpawnConfig shape. The session
- * layout (piSessionsRoot, findPiTranscriptPath) lives in `storage/pi.ts` (PAN-3958 CH-7).
+ * pi is oh-my-pi's upstream and speaks the same `--mode rpc` protocol, so its
+ * runtime is the shared pi-family adapter in `ohmypi.ts` constructed for
+ * `pi`; the pi-specific launch data (binary `pi`, `--session` resume,
+ * `--no-approve`, `~/.pi/agent/models.json`, the `packages/pi-extension`
+ * bundle) lives in `pi-family.ts`. The session layout (piSessionsRoot,
+ * findPiTranscriptPath) lives in `storage/pi.ts` (PAN-3958 CH-7).
  */
 
 import type {
   SpawnConfig,
 } from './types.js'
+import { OhmypiRuntimeSync } from './ohmypi.js'
+
+/** The registered pi runtime: the pi-family adapter for the `pi` binary. */
+export function createPiRuntimeSync(): OhmypiRuntimeSync {
+  return new OhmypiRuntimeSync('pi')
+}
 
 const SPAWN_READY_TIMEOUT_MS = 30_000
 

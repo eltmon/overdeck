@@ -22,7 +22,7 @@ import { randomUUID } from 'crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'path';
-import { isEffortLevel, isLegacyPiHarnessName, type EffortLevel, type HarnessTranscriptKind } from '@overdeck/contracts';
+import { isEffortLevel, type EffortLevel, type HarnessTranscriptKind } from '@overdeck/contracts';
 import { getOverdeckHome } from './paths.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
 import type { RuntimeName } from './runtimes/types.js';
@@ -80,8 +80,11 @@ const CANDIDATE_KIND_BY_TRANSCRIPT: Record<HarnessTranscriptKind, TranscriptCand
   'prime-agent-jsonl': 'prime-agent',
 };
 
+/** Harnesses whose candidate kind is narrower than their transcript kind: pi shares omp's JSONL but keeps the pi parser (PAN-5212). */
+const CANDIDATE_KIND_BY_HARNESS: Readonly<Record<string, TranscriptCandidateKind>> = { pi: 'pi' };
+
 export function transcriptCandidateKind(harness: string | null | undefined): TranscriptCandidateKind {
-  if (isLegacyPiHarnessName(harness)) return 'pi';
+  if (harness && Object.hasOwn(CANDIDATE_KIND_BY_HARNESS, harness)) return CANDIDATE_KIND_BY_HARNESS[harness]!;
   return CANDIDATE_KIND_BY_TRANSCRIPT[getHarnessBehavior(harness as Parameters<typeof getHarnessBehavior>[0]).transcriptKind];
 }
 

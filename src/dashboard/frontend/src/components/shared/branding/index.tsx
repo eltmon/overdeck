@@ -136,6 +136,7 @@ export const HARNESS_BRANDS: Record<Harness, BrandDef> = {
   muse: { id: 'muse', label: 'Muse Code', color: PROVIDER_BRANDS.meta.color, Icon: Sparkles },
   'claude-code': { id: 'claude-code', label: 'Claude Code', color: PROVIDER_BRANDS.anthropic.color, Icon: AnthropicIcon },
   codex: { id: 'codex', label: 'Codex', color: PROVIDER_BRANDS.openai.color, Icon: OpenAIIcon },
+  pi: { id: 'pi', label: 'Pi', color: '#0d9488', Icon: PiHarnessIcon },
   ohmypi: { id: 'ohmypi', label: 'oh-my-pi', color: '#7c3aed', Icon: PiHarnessIcon },
   acp: { id: 'acp', label: 'ACP', color: '#475569', Icon: AcpHarnessIcon },
   'kimi-code': { id: 'kimi-code', label: 'Kimi Code', color: PROVIDER_BRANDS.kimi.color, Icon: KimiIcon },

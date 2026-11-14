@@ -295,7 +295,7 @@ describe('TieredExecutionSection', () => {
     const warning = screen.getByText('⚠ harness overrides provider default — PAN-1865');
     fireEvent.click(warning.closest('summary')!);
     fireEvent.change(screen.getAllByLabelText('Harness')[0], { target: { value: 'auto' } });
-    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.tiers['trivial-simple-medium-complex-expert'].harness).toBe('ohmypi');
+    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.tiers['trivial-simple-medium-complex-expert'].harness).toBe('pi');
   });
 
   it('hands a collapsed crew difficulties to an heir in one write without toggling the row', () => {

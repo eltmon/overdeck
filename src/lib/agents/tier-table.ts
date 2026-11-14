@@ -152,7 +152,7 @@ export function resolveTieredExecutionEnabledForIssue(
 }
 
 function isRuntimeName(value: string): value is RuntimeName {
-  return value === 'claude-code' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'opencode' || value === 'muse' || value === 'prime-agent' || value === 'grok';
+  return value === 'claude-code' || value === 'pi' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'opencode' || value === 'muse' || value === 'prime-agent' || value === 'grok';
 }
 
 function isDifficulty(value: string): value is XBriefDifficulty {

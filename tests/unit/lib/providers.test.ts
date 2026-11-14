@@ -8,25 +8,26 @@ import { normalizeModelName } from '../../../src/lib/cost-parsers/jsonl-parser.j
 import { getPricing } from '../../../src/lib/cost.js';
 import type { RuntimeName } from '../../../src/lib/runtimes/types.js';
 
+// PAN-5212: pi is the default for every non-Anthropic, non-OpenAI provider omp used to default.
 const EXPECTED_DEFAULT_HARNESSES: Record<ProviderName, RuntimeName> = {
   meta: 'muse',
   anthropic: 'claude-code',
   openai: 'codex',
-  google: 'ohmypi',
+  google: 'pi',
   kimi: 'kimi-code',
-  minimax: 'ohmypi',
-  zai: 'ohmypi',
-  mimo: 'ohmypi',
-  openrouter: 'ohmypi',
-  nous: 'ohmypi',
-  dashscope: 'ohmypi',
+  minimax: 'pi',
+  zai: 'pi',
+  mimo: 'pi',
+  openrouter: 'pi',
+  nous: 'pi',
+  dashscope: 'pi',
       opencode: 'opencode',
       'opencode-go': 'opencode',
   grok: 'grok',
-  xai: 'ohmypi',
-  groq: 'ohmypi',
-  cerebras: 'ohmypi',
-  mistral: 'ohmypi',
+  xai: 'pi',
+  groq: 'pi',
+  cerebras: 'pi',
+  mistral: 'pi',
   quantumllama: 'claude-code',
   ollama: 'claude-code',
 };
@@ -44,6 +45,12 @@ describe('providers', () => {
     expect(getBuiltInDefaultHarness('openai')).toBe('codex');
     expect(getBuiltInDefaultHarness('anthropic')).toBe('claude-code');
     expect(getBuiltInDefaultHarness('kimi')).toBe('kimi-code');
+  });
+
+  it('defaults google, openrouter and xai models to pi (PAN-5212)', () => {
+    for (const model of ['gemini-3-flash-preview', 'deepseek/deepseek-v4', 'grok-4.3']) {
+      expect(getBuiltInDefaultHarness(getProviderForModel(model).name)).toBe('pi');
+    }
   });
 
   it('falls back to claude-code for unknown providers', () => {

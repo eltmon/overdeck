@@ -308,14 +308,14 @@ describe('loadSettingsApi', () => {
     expect(settings.models.provider_default_harnesses).toEqual({
       anthropic: 'claude-code',
       openai: 'codex',
-      google: 'ohmypi',
-      minimax: 'ohmypi',
-      zai: 'ohmypi',
+      google: 'pi',
+      minimax: 'pi',
+      zai: 'pi',
       kimi: 'kimi-code', // PAN-1837 wi7b: native Kimi Code CLI harness, proven end-to-end (wi14-e2e)
-      mimo: 'ohmypi',
-      openrouter: 'ohmypi',
-      nous: 'ohmypi',
-      dashscope: 'ohmypi',
+      mimo: 'pi',
+      openrouter: 'pi',
+      nous: 'pi',
+      dashscope: 'pi',
       opencode: 'opencode',
       'opencode-go': 'opencode',
       grok: 'grok',
@@ -1125,7 +1125,7 @@ describe('validateSettingsApi', () => {
     });
 
     expect(result.valid).toBe(false);
-    expect(result.errors).toContain('roles.flywheel.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, grok, null, or empty string');
+    expect(result.errors).toContain('roles.flywheel.harness must be claude-code, pi, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, grok, null, or empty string');
     expect(result.errors).toContain('roles.flywheel.effort must be one of low, medium, high, xhigh, max');
     expect(result.errors).toContain('roles.flywheel.maxAgents must be a positive integer');
     expect(result.errors).toContain('roles.flywheel.scope must be pan-only or all-tracked-projects');

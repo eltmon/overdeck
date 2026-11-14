@@ -1,7 +1,11 @@
 /**
- * oh-my-pi (omp) coding agent runtime adapter (PAN-1989).
+ * Pi-family coding agent runtime adapter: oh-my-pi (`omp`, PAN-1989) and pi
+ * (`pi`, PAN-5212).
  *
- * Implements AgentRuntime for the `omp` binary running in --mode rpc. The
+ * Implements AgentRuntime for the `omp` or `pi` binary running in --mode rpc.
+ * One class serves both: the constructor takes the harness, and the launch
+ * differences (binary, resume flag, extension bundle) come from its
+ * pi-family profile (pi-family.ts, verified in .pan/pi-vs-omp.md). The
  * adapter wires together three pieces:
  *
  *   - ohmypi-fifo.ts      — per-agent rpc.in named pipe lifecycle
@@ -42,7 +46,8 @@ import type {
   SpawnConfig,
   Agent,
 } from './types.js'
-import { OHMYPI_BEHAVIOR } from './behavior.js'
+import { getRuntimeBehavior } from './behavior.js'
+import { getPiFamilyProfile, type PiFamilyHarness } from './pi-family.js'
 import { sessionExists, killSession, createSession, listSessionsSync, getManagedTmuxSocketName } from '../tmux.js'
 import { isRuntimeAgentAlive } from './runtime-liveness.js'
 import { parseOhmypiSessionSync } from '../cost-parsers/ohmypi-parser.js'
@@ -140,10 +145,14 @@ export function resolveLatestOhmypiSessionId(agentId: string): string | null {
 }
 
 export class OhmypiRuntimeSync implements AgentRuntimeSync {
-  readonly name = 'ohmypi' as const
+  readonly name: PiFamilyHarness
+
+  constructor(harness: PiFamilyHarness = 'ohmypi') {
+    this.name = harness
+  }
 
   getHarnessBehavior(): HarnessBehavior {
-    return OHMYPI_BEHAVIOR
+    return getRuntimeBehavior(this.name)
   }
 
   getSessionPath(agentId: string): string | null {
@@ -249,7 +258,7 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
 
   async sendMessage(agentId: string, message: string): Promise<void> {
     if (!existsSync(readyPathFor(agentId))) {
-      throw new OhmypiNotReady(`omp agent ${agentId}: ready.json not present yet`)
+      throw new OhmypiNotReady(`${this.name} agent ${agentId}: ready.json not present yet`)
     }
     // steer: omp delivers immediately when idle and queues mid-turn; a bare
     // prompt is rejected with AgentBusyError while a run is active.
@@ -318,10 +327,10 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
   async spawnAgent(config: SpawnConfig & { piExtensionPath?: string }): Promise<Agent> {
     const piExtensionPath = config.piExtensionPath
     if (!piExtensionPath) {
-      throw new Error('OhmypiRuntime.spawnAgent requires piExtensionPath in config')
+      throw new Error(`${this.name} runtime spawnAgent requires piExtensionPath in config`)
     }
 
-    const harnessLaunch = await prepareHarnessLaunch('ohmypi')
+    const harnessLaunch = await prepareHarnessLaunch(this.name)
     const agentId = config.agentId
     const dir = agentDirFor(agentId)
     const sessionDir = ohmypiSessionDirFor(agentId)
@@ -335,19 +344,20 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
     const promptFile = config.prompt ? writeAgentPromptFile(agentId, config.prompt) : undefined
 
     // Resume from the stored session index when present, else recover from the
-    // freshest session JSONL (PAN-1988 parity). omp uses --resume (not --session).
+    // freshest session JSONL (PAN-1988 parity). The launcher picks the
+    // harness's resume flag (omp --resume, pi --session).
     const resumeSessionId = readStoredSessionId(agentId) ?? resolveLatestOhmypiSessionId(agentId) ?? undefined
     if (!resumeSessionId && hadPriorSpawn) {
       console.warn(
-        `[ohmypi-runtime] ${agentId}: prior session.jsonl exists but no resumable session id found — spawning a fresh omp session`,
+        `[${this.name}-runtime] ${agentId}: prior session.jsonl exists but no resumable session id found — spawning a fresh session`,
       )
     }
 
     const launcherScript = generateLauncherScript({
       role: 'work',
       workingDir: config.workspace,
-      harness: 'ohmypi',
-      piEffort: resolveEffort({ explicit: config.effort, model: config.model, harness: 'ohmypi' }).effort,
+      harness: this.name,
+      piEffort: resolveEffort({ explicit: config.effort, model: config.model, harness: this.name }).effort,
       piExtensionPath,
       piFifoPath: fifoPath,
       piSessionDir: sessionDir,
@@ -360,7 +370,7 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
       trapHup: true,
     })
 
-    const launcherPath = join(dir, 'ohmypi-launcher.sh')
+    const launcherPath = join(dir, `${this.name}-launcher.sh`)
     writeFileSync(launcherPath, launcherScript)
     chmodSync(launcherPath, 0o755)
 
@@ -374,7 +384,7 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
     return {
       id: agentId,
       sessionId: readyData?.sessionId ?? 'unknown',
-      runtime: 'ohmypi',
+      runtime: this.name,
       model: config.model ?? 'unknown',
       workspace: config.workspace,
       startedAt: new Date(),
@@ -413,17 +423,18 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
 }
 
 export function createOhmypiRuntimeSync(): OhmypiRuntimeSync {
-  return new OhmypiRuntimeSync()
+  return new OhmypiRuntimeSync('ohmypi')
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 export class OhmypiRuntime implements AgentRuntime {
-  readonly name = 'ohmypi' as const
+  readonly name: PiFamilyHarness
   private readonly inner: OhmypiRuntimeSync
 
   constructor(inner: OhmypiRuntimeSync = new OhmypiRuntimeSync()) {
     this.inner = inner
+    this.name = inner.name
   }
 
   getSessionPath(agentId: string): string | null {
@@ -476,15 +487,16 @@ export class OhmypiRuntime implements AgentRuntime {
     return Effect.tryPromise({
       try: () => this.inner.spawnAgent(config),
       catch: (cause) => {
+        const command = getPiFamilyProfile(this.name).binary
         if (cause instanceof OhmypiSpawnTimeout) {
           return new ProcessTimeoutError({
-            command: 'omp',
+            command,
             args: ['--mode', 'rpc'],
             timeoutMs: SPAWN_READY_TIMEOUT_MS,
           })
         }
         return new ProcessSpawnError({
-          command: 'omp',
+          command,
           args: ['--mode', 'rpc'],
           message: cause instanceof Error ? cause.message : String(cause),
           cause,

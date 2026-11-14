@@ -1177,7 +1177,7 @@ export function CommandDeck({
   // caller can open the tab or surface the creation error.
   const createDeckConversation = useCallback(
     (agentId: string, message?: string, viewMode?: ViewMode): Promise<{ name: string } | { error: string }> => {
-      const harness: Harness = agentId === 'codex' ? 'codex' : agentId === 'ohmypi' ? 'ohmypi' : 'claude-code';
+      const harness: Harness = agentId === 'codex' ? 'codex' : agentId === 'pi' ? 'pi' : agentId === 'ohmypi' ? 'ohmypi' : 'claude-code';
       // The No-project bucket creates unscoped conversations (no projectKey).
       const projectKey = selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined;
       return createConversationForProject(projectKey, harness, message, viewMode);

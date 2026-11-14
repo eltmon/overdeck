@@ -93,6 +93,7 @@ describe('RuntimeRegistry.getRuntimeForAgent dispatches by state.harness (PAN-63
     savedRegistry = getGlobalRegistry()
     const fresh = new RuntimeRegistry()
     fresh.register(stubRuntime('claude-code'))
+    fresh.register(stubRuntime('pi'))
     fresh.register(stubRuntime('ohmypi'))
     fresh.register(stubRuntime('codex'))
     fresh.register(stubRuntime('acp'))
@@ -103,9 +104,9 @@ describe('RuntimeRegistry.getRuntimeForAgent dispatches by state.harness (PAN-63
     if (savedRegistry) setGlobalRegistry(savedRegistry)
   })
 
-  it('normalizes legacy pi harness to ohmypi runtime (PAN-1989)', () => {
+  it('returns the pi runtime when state.harness === "pi" (PAN-5212)', () => {
     writeAgentState('agent-pi-1', { harness: 'pi' })
-    expect(getGlobalRegistry().getRuntimeForAgent('agent-pi-1')?.name).toBe('ohmypi')
+    expect(getGlobalRegistry().getRuntimeForAgent('agent-pi-1')?.name).toBe('pi')
   })
 
   it('returns the ohmypi runtime when state.harness === "ohmypi" (PAN-1989)', () => {
@@ -213,8 +214,21 @@ describe('getHarnessBehavior', () => {
     })
   })
 
-  it('normalizes legacy pi to ohmypi behavior switches', () => {
-    expect(getHarnessBehavior('pi')).toBe(getHarnessBehavior('ohmypi'))
+  it('gives pi its own binary on the shared pi-family switches (PAN-5212)', () => {
+    expect(getHarnessBehavior('pi')).not.toBe(getHarnessBehavior('ohmypi'))
+    expect(pickBehaviorFields(getHarnessBehavior('pi'))).toMatchObject({
+      executableName: 'pi',
+      processNames: ['pi'],
+      launchCommandKind: 'ohmypi-rpc',
+      deliveryKind: 'rpc-fifo',
+      readinessKind: 'ohmypi-ready-file',
+      transcriptKind: 'ohmypi-jsonl',
+      contextLayerKind: 'pi',
+      usesRpcFifo: true,
+    })
+  })
+
+  it('preserves ohmypi behavior switches', () => {
     expect(pickBehaviorFields(getHarnessBehavior('ohmypi'))).toMatchObject({
       executableName: 'omp',
       processNames: ['omp'],

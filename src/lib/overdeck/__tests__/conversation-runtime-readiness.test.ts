@@ -54,6 +54,16 @@ describe('conversation readiness on the host backend (PAN-3921)', () => {
     expect(capturePane).not.toHaveBeenCalled();
   });
 
+  it('reads pi 0.85\'s TUI as ready from its footer (no prompt glyph, PAN-5212)', async () => {
+    // Captured from a live pi 0.85.0 TUI pane: the editor box has no ❯ line.
+    readAgentPaneText.mockResolvedValue([
+      '────────────────────────────────────────',
+      '~/Projects/hoff-pan-5212 (feature/pan-5212)',
+      '0.0%/131k (auto)                    (openrouter) openai/gpt-oss-20b • low',
+    ].join('\n'));
+    await expect(waitForPiTuiReady('conv-pi', 5_000)).resolves.toBe(true);
+  });
+
   it('keeps polling while the pane cannot be read yet', async () => {
     readAgentPaneText
       .mockRejectedValueOnce(new Error('herdr holds no pane for conv-x'))

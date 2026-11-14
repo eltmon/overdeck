@@ -101,7 +101,8 @@ describe('ConversationRow model metadata', () => {
 describe('ConversationRow harness label from the declared displayName (PAN-4562)', () => {
   it.each([
     ['muse', 'Muse Code'],
-    ['ohmypi', 'Pi'],
+    ['ohmypi', 'Oh My Pi'],
+    ['pi', 'Pi'],
     ['pi', 'Pi'],
     ['codex', 'Codex'],
   ] as const)('%s renders %s', (harness, label) => {

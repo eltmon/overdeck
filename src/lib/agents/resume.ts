@@ -509,7 +509,7 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
 
     let messageDelivered = false;
     const hostTransport = hostTransportFor(effectiveHarness);
-    if (effectiveHarness === 'ohmypi') {
+    if (getHarnessBehavior(effectiveHarness).usesRpcFifo) {
       // ohmypi does not fire the Claude SessionStart hook; wait for ready.json and
       // deliver the auto-continue prompt through the FIFO JSONL protocol.
       try {

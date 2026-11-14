@@ -12,6 +12,7 @@ import { httpHandler } from './http-handler.js';
 export const COMMANDS_API_HARNESSES = [
   'claude-code',
   'codex',
+  'pi',
   'ohmypi',
   'acp',
 ] as const;

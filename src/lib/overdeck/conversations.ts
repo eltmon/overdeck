@@ -29,6 +29,7 @@ import { ensureDiscoveredSessionsSchema } from './discovered-sessions.js';
 import { localEnvironmentId } from './conversation-environment.js';
 import { readLatestIndexedSessionId } from '../session-history.js';
 import { notifyConversationSessionChanged } from './conversation-session-events.js';
+import { KNOWN_HARNESSES } from '@overdeck/contracts';
 
 // ── Local Drizzle table definitions ──────────────────────────────────────────
 // Mirror locked schema (docs/overdeck-remodel/overdeck-schema.ts:97-163).
@@ -42,8 +43,7 @@ export type  ConversationId   = typeof ConversationId.Type;
 const ConversationName = Schema.String.pipe(Schema.brand('ConversationName'));
 export type  ConversationName = typeof ConversationName.Type;
 
-// Includes legacy 'pi' (pre-rename alias for 'ohmypi', see normalizeHarness) so
-// decoding old DB rows never throws; 'pi' is never written by current code.
+// 'pi' is a live harness again (PAN-5212); its pre-PAN-1989 rows really ran on pi.
 export const Harness     = Schema.Literals(['claude-code', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', 'grok']);
 export type  Harness     = typeof Harness.Type;
 
@@ -459,11 +459,9 @@ export function toMillis(value: Date | string | number = new Date()): number {
   return new Date(value).getTime();
 }
 
-/** Map a raw DB harness string to a canonical RuntimeName, normalizing legacy 'pi' to 'ohmypi' on read. */
+/** Map a raw DB harness string to a canonical RuntimeName; unknown values read as null. */
 export function normalizeHarness(harness: string | null): RuntimeName | null {
-  if (harness === 'pi' || harness === 'ohmypi') return 'ohmypi';
-  if (harness === 'claude-code' || harness === 'codex' || harness === 'acp' || harness === 'kimi-code' || harness === 'opencode' || harness === 'muse' || harness === 'prime-agent' || harness === 'grok') return harness;
-  return null;
+  return harness && KNOWN_HARNESSES.has(harness) ? harness as RuntimeName : null;
 }
 
 function legacyRowIdForConversationId(id: string | null): number | null {

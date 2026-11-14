@@ -7,7 +7,7 @@
  *      `POST /api/conversations/:id/codex-approval` with `{ optionNumber, toolUseId }`.
  *   2. agent → `POST /api/agents/:id/answer-question` with `{ answers, toolUseId }`.
  *   3. a conversation whose harness declares `askAnswerDelivery: 'pi-ask-modal'`
- *      (ohmypi, and the legacy `pi` alias) → `POST /api/conversations/:id/pi-ask-answer`
+ *      (ohmypi; pi has no ask tool and answers by message) → `POST /api/conversations/:id/pi-ask-answer`
  *      with `{ toolUseId, answers }` (PAN-3766 — a pi ask modal holds the
  *      session's input; a queued message is swallowed).
  *   4. any other conversation → `POST /api/conversations/:id/message` with the

@@ -6,8 +6,8 @@ describe('getHarness', () => {
     expect(getHarness({ runtime: 'claude-code' })).toBe('claude-code')
   })
 
-  it('normalizes legacy pi to ohmypi (PAN-1989)', () => {
-    expect(getHarness({ runtime: 'pi' })).toBe('ohmypi')
+  it('reads a stored pi as pi (PAN-5212 restored the pi harness)', () => {
+    expect(getHarness({ runtime: 'pi' })).toBe('pi')
   })
 
   it('returns ohmypi when runtime is ohmypi', () => {

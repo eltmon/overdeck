@@ -12,11 +12,12 @@ import styles from './ModelPicker.module.css';
 export const FALLBACK_COMPACTION_MODEL = 'claude-haiku-5-5';
 
 
-export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok';
+export type Harness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok';
 export type AuthMode = 'api-key' | 'subscription';
 
 export const HARNESS_OPTIONS: Array<{ id: Harness; label: string; description: string }> = [
   { id: 'claude-code', label: 'Claude Code', description: 'Default Claude Code CLI harness' },
+  { id: 'pi', label: 'Pi', description: 'Pi Coding Agent; default for non-Anthropic, non-OpenAI models (pi binary)' },
   { id: 'ohmypi', label: 'oh-my-pi', description: 'Alternative harness for non-Anthropic models (omp binary)' },
   { id: 'codex', label: 'Codex', description: 'OpenAI Codex CLI harness' },
   { id: 'opencode', label: 'OpenCode', description: 'OpenCode with Go and Zen providers' },
@@ -27,7 +28,7 @@ export const HARNESS_OPTIONS: Array<{ id: Harness; label: string; description: s
   { id: 'prime-agent', label: 'Prime Agent', description: 'Prime Intellect coding agent (RPC)' },
 ];
 
-export const PI_TOS_BLOCK_REASON = 'ohmypi cannot run Anthropic models when authenticated via Claude Code subscription (Terms of Service). Switch Anthropic to API-key auth, or pick a non-Anthropic model.';
+export const PI_TOS_BLOCK_REASON = 'pi and ohmypi cannot run Anthropic models when authenticated via Claude Code subscription (Terms of Service). Switch Anthropic to API-key auth, or pick a non-Anthropic model.';
 
 export type HarnessDecision = { allowed: boolean; reason?: string };
 export type HarnessPolicyDecisions = Record<string, Partial<Record<Harness, HarnessDecision>>>;

@@ -10,8 +10,9 @@ extensibility mechanism each one exposes, and what that means for future
 features.
 
 <Note>
-**This is a planning survey, not a support matrix.** Overdeck supports five
-harnesses today — `claude-code`, `ohmypi`, `codex`, native `acp`, and native
+**This is a planning survey, not a support matrix.** Overdeck's supported
+harnesses include `claude-code`, `pi` (the default for non-Anthropic,
+non-OpenAI providers), `ohmypi`, `codex`, native `acp`, and native
 `kimi-code` (see [Harnesses](/configuration/harnesses) for the operational
 guide). Kimi Code CLI is wired two ways: as the first agent through the `acp`
 protocol harness, and natively through `kimi-code`, which drives Kimi's own
@@ -66,13 +67,13 @@ are not competitors — a mature setup uses all three.
   bundled code). By early 2026, ~32 tools read `SKILL.md` — skills are portable
   across harnesses with no modification.
 - **MCP** — the live-tool-connection protocol. Near-universal, with one notable
-  holdout (ohmypi/omp).
+  holdout (pi and its fork ohmypi/omp).
 
 <Info>
 **Why this matters for Overdeck:** `SKILL.md` portability means Overdeck's
 own `skills/` tree is *already* harness-agnostic. The same skill directories
 `pan sync` writes to `~/.claude/skills/` are loadable, unmodified, by Codex,
-Gemini CLI, Cursor, OpenCode, Goose, Amp, Crush, and ohmypi. Adding a harness does
+Gemini CLI, Cursor, OpenCode, Goose, Amp, Crush, pi and ohmypi. Adding a harness does
 **not** mean re-authoring skills — it means teaching that harness where to read
 them.
 </Info>
@@ -82,6 +83,7 @@ them.
 | Harness | Status | Runtime adapter |
 | --- | --- | --- |
 | `claude-code` | **Supported** (default) | none needed — drop-in `claude` |
+| `pi` | **Supported** (default for non-Anthropic, non-OpenAI providers) | `src/lib/runtimes/pi.ts` (shared pi-family adapter in `ohmypi.ts`) + vendored `packages/pi-extension/` |
 | `ohmypi` | **Supported** (alternative) | `src/lib/runtimes/ohmypi.ts` + vendored `packages/ohmypi-extension/` |
 | `codex` | **Supported** (alternative) | `src/lib/runtimes/codex.ts` |
 | `acp` | **Supported** (Kimi first) | `src/lib/runtimes/acp.ts` + vendored `packages/effect-acp/` |
@@ -176,6 +178,36 @@ and should be re-checked before any decision.
   the main thread as a named agent.
 - **Why it's the default:** required for Anthropic-subscription users; the
   largest agent/skill/plugin surface; Overdeck's pipeline prompts assume it.
+
+### Pi Coding Agent (pi) — Supported (default for non-Anthropic, non-OpenAI providers)
+
+- **Vendor / model:** Pi Coding Agent (`@earendil-works/pi-coding-agent`,
+  binary `pi`, verified 0.85.0 and 1.5.2). oh-my-pi is its fork. ~40 providers in its
+  bundled `pi-ai` catalog (Google, xAI, MiniMax, Z.AI, Xiaomi, Groq, Cerebras,
+  Mistral, OpenRouter, Kimi, Anthropic, OpenAI Codex, …), plus custom
+  providers in `~/.pi/agent/models.json`.
+- **OSS / license:** MIT. TypeScript, runs on Node (omp needs Bun).
+- **Install:** `npm install -g @earendil-works/pi-coding-agent`.
+- **Extensibility:**
+  - **Skills** — reads `SKILL.md`; the `settings.json` `skills` array takes
+    arbitrary directories, and `pan sync` adds `~/.claude/skills`.
+  - **Extensions** — TypeScript modules on the same lifecycle-event bus as omp
+    (`session_start`, `turn_end`, `agent_settled`, `tool_execution_end`, …),
+    loaded with `--extension`. Overdeck vendors one at `packages/pi-extension/`.
+    pi's `session_start` carries only `{ reason }`; the session id and file
+    come from `ctx.sessionManager`.
+  - **No MCP** — a deliberate design stance, the same as omp.
+  - **AGENTS.md / CLAUDE.md** read by default; project-local `.pi/` resources
+    need project trust (Overdeck launches with `--no-approve`).
+- **Headless:** `pi --mode rpc` — the same JSONL command/event protocol as omp
+  (Overdeck delivers commands via the `rpc.in` named pipe). Resume is
+  `--session <id>`.
+- **Why it's the default:** multi-provider without CLIProxy, Node-only install,
+  and the same named-pipe RPC as omp; the only ToS-blocked cell is `pi` +
+  Anthropic model + Anthropic subscription auth.
+- **Implementation files:** `src/lib/runtimes/pi.ts`, `src/lib/runtimes/pi-family.ts`,
+  `src/lib/launcher-pi-command.ts`, `src/lib/pi-models.ts`, `packages/pi-extension/`.
+  The full pi-vs-omp comparison is `.pan/pi-vs-omp.md` in the repo.
 
 ### oh-my-pi (ohmypi) — Supported (alternative)
 

@@ -197,7 +197,7 @@ the public contract and lists every allowed value.
 | `forge` | `github`, `gitlab` |
 | `fork_kind` | `summary`, `handoff`, `plain` |
 | `github_caller` | `pipeline_membership`, `pr_cache`, `pr_sync`, `ci_repair`, `issue_poller`, `close_out`, `tracker_client`, `app_rest`, `quota_sampler`, `agent`, `pr_adoption`, `other` |
-| `harness` | `claude-code`, `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, `muse`, `prime-agent`, `grok` |
+| `harness` | `claude-code`, `pi`, `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, `muse`, `prime-agent`, `grok` |
 | `http_method` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `other` |
 | `install_kind` | `user`, `remote_vm`, `dev_checkout`, `container` |
 | `link_failure_reason` | `bad_pairing_url`, `unreachable`, `pairing_refused`, `unsupported`, `identity_mismatch`, `exchange_failed`, `grant_refused`, `offline`, `approval_refused`, `approval_failed`, `other` |

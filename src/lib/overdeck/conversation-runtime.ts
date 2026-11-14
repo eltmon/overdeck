@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { exec, execFile } from 'node:child_process';
 import { existsSync, createReadStream } from 'node:fs';
 import { mkdir, writeFile, readFile, readdir, stat, rename, rm } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
@@ -55,7 +55,7 @@ import { writePtyToken } from '../pty-token.js';
 import { canUseHarness } from '../harness-policy.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
-import { getProviderForModel, piProviderForModel, UnknownModelError } from '../providers.js';
+import { getProviderForModel, UnknownModelError } from '../providers.js';
 import { isValidConversationEffort, resolveConversationEffort } from './conversation-effort.js';
 import { getOhmypiCodexAuthStatus } from '../ohmypi-codex-auth.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -69,7 +69,8 @@ import { getPrimeAgentLauncherFields } from '../prime-agent/launcher-fields.js';
 import { requirePrimeAgentSessionFile } from '../runtimes/storage/prime-agent.js';
 import { claudeGlobalContextFile, codexGlobalContextFile, workspaceContextFile, piGlobalContextFile } from '../context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
-import { getOverdeckHome, resolveOhmypiExtensionPath } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
+import { getPiFamilyProfile, type PiFamilyHarness } from '../runtimes/pi-family.js';
 import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
 import { buildResumeContract, type ResumeCause } from '../resume-contract.js';
@@ -219,7 +220,7 @@ const PI_CONVERSATION_SOURCE_CONTRACT = [
 export async function resolveAllowedHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
   if (!model) return 'claude-code';
   const explicit: RuntimeName | undefined =
-    requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' || requested === 'acp' || requested === 'kimi-code' || requested === 'opencode' || requested === 'muse' || requested === 'prime-agent' || requested === 'grok'
+    requested === 'pi' || requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' || requested === 'acp' || requested === 'kimi-code' || requested === 'opencode' || requested === 'muse' || requested === 'prime-agent' || requested === 'grok'
       ? requested
       : undefined;
   return resolveHarness({ model, explicit });
@@ -243,7 +244,10 @@ async function readConversationPane(tmuxSession: string, lines: number): Promise
 }
 function isPiTuiInputReady(snapshot: string): boolean {
   return /^\s*[❯›>]\s/m.test(snapshot)
-    || /(?:^|\s)0(?:\.\d+)?%\s+context\s+used\b/i.test(snapshot);
+    || /(?:^|\s)0(?:\.\d+)?%\s+context\s+used\b/i.test(snapshot)
+    // pi 0.85 (PAN-5212): the editor box has no prompt glyph; the footer
+    // under it reads `0.0%/131k (auto)` once the TUI accepts input.
+    || /(?:^|\s)\d+(?:\.\d+)?%\/\d+(?:\.\d+)?[kKmM]?\b/.test(snapshot);
 }
 export async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 60_000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
@@ -559,8 +563,8 @@ async function ensurePiConversationSourceContractFile(): Promise<string> {
   await writeFile(path, `${PI_CONVERSATION_SOURCE_CONTRACT}\n`, 'utf-8');
   return path;
 }
-export async function piConversationSystemPromptFiles(cwd: string): Promise<string[]> {
-  const files = await claudeSystemPromptFiles(cwd, 'ohmypi');
+export async function piConversationSystemPromptFiles(cwd: string, harness: RuntimeName = 'ohmypi'): Promise<string[]> {
+  const files = await claudeSystemPromptFiles(cwd, harness);
   files.push(await ensurePiConversationSourceContractFile());
   return files;
 }
@@ -598,7 +602,7 @@ export async function spawnConversationSession(
   let runtimeCommand = `claude ${permissionFlags}`;
   let providerExportsStr = '';
   let piFields: {
-    harness: 'ohmypi';
+    harness: PiFamilyHarness;
     piEffort?: string;
     piMode: 'tui';
     piExtensionPath: string;
@@ -660,7 +664,8 @@ export async function spawnConversationSession(
     runtimeCommand = ensureClaudePermissionFlag(runtimeCommand);
     providerExportsStr = (await getProviderExportsForModel(model, harness)).trim();
     if (behavior.launchCommandKind === 'ohmypi-rpc') {
-      if (getProviderForModel(model).name === 'openai') {
+      const piProfile = getPiFamilyProfile(harness);
+      if (piProfile.checksOmpCodexAuth && getProviderForModel(model).name === 'openai') {
         const auth = await getOhmypiCodexAuthStatus({ refreshIfExpired: true });
         if (auth.status === 'missing' || auth.status === 'expired') {
           throw new Error(
@@ -677,10 +682,10 @@ export async function spawnConversationSession(
         ? readLatestIndexedSessionId(tmuxSession) ?? undefined
         : undefined;
       piFields = {
-        harness: 'ohmypi',
+        harness: piProfile.harness,
         piEffort: launchEffort,
         piMode: 'tui',
-        piExtensionPath: resolveOhmypiExtensionPath() ?? resolve(process.cwd(), 'packages/ohmypi-extension/dist/index.js'),
+        piExtensionPath: piProfile.resolveExtensionPath() ?? piProfile.extensionCandidates().at(-1)!,
         piSessionDir,
         resumeSessionId: storedPiSessionId || undefined,
       };
@@ -742,11 +747,6 @@ export async function spawnConversationSession(
         ...(kimiResumeSessionId ? { resumeSessionId: kimiResumeSessionId } : {}),
       };
     }
-  }
-  let launcherModel = model;
-  if (behavior.contextLayerKind === 'pi' && model) {
-    const piProvider = piProviderForModel(model);
-    if (piProvider) launcherModel = `${piProvider}/${model}`;
   }
   const backend = launch.backend ?? await resolveLaunchBackend();
   const useSupervisor = conversationUsesSupervisor(harness, backend.name, { codexTransport });
@@ -831,7 +831,7 @@ export async function spawnConversationSession(
         appendSystemPromptFiles: bareContext
           ? []
           : piFields
-          ? await piConversationSystemPromptFiles(cwd)
+          ? await piConversationSystemPromptFiles(cwd, harness)
           : codexFields
             ? await codexConversationSystemPromptFiles(cwd)
             : acpFields || museFields || primeLaunch
@@ -839,7 +839,7 @@ export async function spawnConversationSession(
               : kimiCodeFields
                 ? await claudeSystemPromptFiles(cwd, 'kimi-code')
               : await claudeConversationSystemPromptFiles(cwd),
-        model: launcherModel,
+        model,
         ...(piFields ?? codexFields ?? acpFields ?? primeLaunch?.fields ?? kimiCodeFields ?? museFields ?? {
           resumeSessionId: resume ? claudeSessionId : undefined,
           sessionId: resume ? undefined : claudeSessionId,

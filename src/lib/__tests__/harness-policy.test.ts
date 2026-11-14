@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canUseHarness, POLICY_RUNTIME_NAMES, PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON } from '../harness-policy.js'
+import { canUseHarness, PI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON, POLICY_RUNTIME_NAMES, PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON } from '../harness-policy.js'
 import type { RuntimeName } from '../runtimes/types.js'
 import type { AuthMode } from '../subscription-types.js'
 
@@ -76,10 +76,10 @@ describe('canUseHarness', () => {
     }
   })
 
-  it.each(PROVIDERS)('gives pi (legacy) + %s the ohmypi decision on every authMode (never a free pass)', provider => {
+  it.each(PROVIDERS)('gives pi + %s the same allow/block cell as ohmypi on every authMode (PAN-5212)', provider => {
     const model = MODEL_BY_PROVIDER[provider]
     for (const authMode of AUTH_MODES) {
-      expect(canUseHarness('pi', model, authMode)).toEqual(canUseHarness('ohmypi', model, authMode))
+      expect(canUseHarness('pi', model, authMode).allowed).toBe(canUseHarness('ohmypi', model, authMode).allowed)
     }
   })
 
@@ -266,16 +266,15 @@ describe('canUseHarness', () => {
     expect(canUseHarness('prime-agent', 'kimi-code/k3', 'api-key').allowed).toBe(false)
   })
 
-  it('applies the ohmypi ToS block to a raw legacy "pi" harness', () => {
-    expect(canUseHarness('pi' as RuntimeName, 'claude-sonnet-4-6', 'subscription')).toEqual(
-      canUseHarness('ohmypi', 'claude-sonnet-4-6', 'subscription'),
-    )
-    expect(canUseHarness('pi' as RuntimeName, 'claude-sonnet-4-6', 'subscription').allowed).toBe(false)
+  it('blocks pi + Anthropic + subscription with its own Terms of Service reason (PAN-5212)', () => {
+    expect(canUseHarness('pi', 'claude-sonnet-4-6', 'subscription')).toEqual({ allowed: false, reason: PI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON })
+    expect(PI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON).toContain('pi cannot run Anthropic models')
+    expect(canUseHarness('pi', 'claude-sonnet-4-6', 'api-key')).toEqual({ allowed: true })
   })
 
   it('gives every RuntimeName an explicit policy decision', () => {
     expect([...POLICY_RUNTIME_NAMES].sort()).toEqual(
-      ['acp', 'claude-code', 'codex', 'grok', 'kimi-code', 'muse', 'ohmypi', 'opencode', 'prime-agent'],
+      ['acp', 'claude-code', 'codex', 'grok', 'kimi-code', 'muse', 'ohmypi', 'opencode', 'pi', 'prime-agent'],
     )
     for (const harness of POLICY_RUNTIME_NAMES) {
       for (const authMode of AUTH_MODES) {

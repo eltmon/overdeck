@@ -57,7 +57,7 @@ describe('buildHarnessPolicyDecisions', () => {
     expect(ohmypi?.reason).toBe(OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON);
   });
 
-  it('ac2: emits an "ohmypi" key (no legacy "pi" key) for every model', async () => {
+  it('ac2: emits separate "pi" and "ohmypi" keys for every model (PAN-5212)', async () => {
     const decisions = await buildHarnessPolicyDecisions(
       [ANTHROPIC_MODEL, OPENAI_MODEL],
       authModeResolver('subscription'),
@@ -67,8 +67,8 @@ describe('buildHarnessPolicyDecisions', () => {
       const perModel = decisions[model];
       expect(perModel).toBeDefined();
       expect(perModel).toHaveProperty('ohmypi');
-      // The legacy 'pi' key is intentionally absent — pickers query 'ohmypi'.
-      expect(perModel).not.toHaveProperty('pi');
+      // pi is its own harness again (PAN-5212), with its own decision.
+      expect(perModel).toHaveProperty('pi');
       // Runtime-name members are all present.
       expect(perModel).toHaveProperty('claude-code');
       expect(perModel).toHaveProperty('codex');

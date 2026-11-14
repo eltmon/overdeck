@@ -2,6 +2,7 @@ import type { ModelId } from '../settings.js';
 import { resolveModelId } from '../model-capabilities.js';
 import { effortConfigErrors } from '../agents/effort-support.js';
 import { derivePercentPick, pickPercentModelRef, representativeModelRef } from './percent.js';
+import { KNOWN_HARNESSES } from '@overdeck/contracts';
 import {
   PARENT_MODEL_REF,
   WORKHORSE_SLOTS,
@@ -291,8 +292,8 @@ function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
   if (roleConfig.autonomousModel !== undefined && typeof roleConfig.autonomousModel !== 'string') {
     throw new Error(`config.yaml: roles.${role}.autonomousModel must be a scalar model reference`);
   }
-  if (roleConfig.harness !== undefined && roleConfig.harness !== 'claude-code' && roleConfig.harness !== 'ohmypi' && roleConfig.harness !== 'codex' && roleConfig.harness !== 'acp' && roleConfig.harness !== 'kimi-code' && roleConfig.harness !== 'opencode' && roleConfig.harness !== 'muse' && roleConfig.harness !== 'prime-agent' && roleConfig.harness !== 'grok') {
-    throw new Error(`config.yaml: roles.${role}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, or grok`);
+  if (roleConfig.harness !== undefined && !KNOWN_HARNESSES.has(roleConfig.harness)) {
+    throw new Error(`config.yaml: roles.${role}.harness must be claude-code, pi, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, or grok`);
   }
   const effortErrors = effortConfigErrors(`roles.${role}`, roleConfig.effort, []);
   if (effortErrors.length > 0) {

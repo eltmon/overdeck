@@ -37,19 +37,13 @@ export type {
 /**
  * Supported runtime types for agent execution.
  *
- * PAN-636 widened this union to include 'pi' alongside Claude Code.
- * PAN-1989 narrowed the set back to three values: 'pi' is no longer a writable
- * RuntimeName. Legacy 'pi' strings from DB / state.json are normalized to 'ohmypi'
- * by normalizeHarness() on read. normalizeHarness still accepts the raw string
- * 'pi' as input so old rows round-trip safely.
+ * PAN-636 added 'pi'; PAN-1989 folded it into 'ohmypi'; PAN-5212 restored
+ * 'pi' (the Pi Coding Agent) as its own runtime. Stored 'pi' rows read as pi.
  */
-export type RuntimeName = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok';
+export type RuntimeName = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok';
 
-/**
- * Legacy harness strings that can still appear in persisted state or older
- * call sites while PAN-1989 normalization moves them onto current runtimes.
- */
-export type HarnessName = RuntimeName | 'pi';
+/** Kept as an alias of {@link RuntimeName}: 'pi' became a RuntimeName in PAN-5212. */
+export type HarnessName = RuntimeName;
 
 /**
  * Health state of an agent
