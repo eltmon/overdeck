@@ -22,7 +22,7 @@ import { IssueHeaderTitle } from '../issue-view/IssueHeaderTitle';
 import { useIssueRecord } from '../issue-view/useIssueRecord';
 import { PHASE_LABELS } from '../primitives/PhaseHeader';
 import { eventLine } from './issueSheetData';
-import { AgentRow, CostSection, PrChecksSection, SheetHeader, WhatHappened } from './IssueSheetSections';
+import { AgentRow, CostSection, DescriptionSection, PrChecksSection, SheetHeader, WhatHappened } from './IssueSheetSections';
 import { issueNeedsOperator, NeedsYouMark } from './MobilePipeline';
 
 export function MobileIssueSheet({
@@ -77,6 +77,7 @@ export function MobileIssueSheet({
         <PrChecksSection issueId={identifier} derived={derived} />
         <AgentRow issueId={identifier} storeAgents={agents} />
         <CostSection issueId={identifier} />
+        <DescriptionSection text={issue?.description ?? ''} available={Boolean(issue)} />
         {issue && issue.labels.length > 0 && (
           <div>
             <dt className="text-xs text-muted-foreground">Labels</dt>

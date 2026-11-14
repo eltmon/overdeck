@@ -1,4 +1,4 @@
-/** Pure data helpers for the issue sheet (PAN-5219 WI-5 to WI-8). No React. */
+/** Pure data helpers for the issue sheet (PAN-5219 WI-5 to WI-9). No React. */
 import {
   PHONE_ISSUE_EVENT_LABELS,
   type DerivedIssueState,
@@ -193,4 +193,9 @@ export function checksText(checkRuns: IssueCheckRunsResponse | null, derivedPr: 
   }
   if (derivedPr) return { text: CHECKS_FALLBACK_LABELS[derivedPr.checks], href: null };
   return { text: 'Checks not available', href: null };
+}
+
+/** D-9: true when `text` is long enough to start collapsed (jsdom cannot measure overflow). */
+export function shouldCollapseDescription(text: string): boolean {
+  return text.split('\n').length > 4 || text.length > 280;
 }

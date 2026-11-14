@@ -14,6 +14,7 @@ import {
   isLiveDirectoryResponse,
   pickIssueAgent,
   prStateLabel,
+  shouldCollapseDescription,
   stageCostLine,
 } from '../issueSheetData';
 
@@ -286,5 +287,17 @@ describe('checksText', () => {
 
   it('shows "Checks not available" with neither source', () => {
     expect(checksText(null, undefined)).toEqual({ text: 'Checks not available', href: null });
+  });
+});
+
+describe('shouldCollapseDescription', () => {
+  it('stays expanded at 4 lines and 280 characters', () => {
+    expect(shouldCollapseDescription('a\nb\nc\nd')).toBe(false);
+    expect(shouldCollapseDescription('x'.repeat(280))).toBe(false);
+  });
+
+  it('collapses at 5 lines or 281 characters', () => {
+    expect(shouldCollapseDescription('a\nb\nc\nd\ne')).toBe(true);
+    expect(shouldCollapseDescription('x'.repeat(281))).toBe(true);
   });
 });

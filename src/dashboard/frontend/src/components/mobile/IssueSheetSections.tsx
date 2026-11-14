@@ -1,7 +1,9 @@
-/** Sections of the issue sheet moved out of MobileIssueSheet.tsx to keep it small (PAN-5219 WI-5 to WI-8). */
+/** Sections of the issue sheet moved out of MobileIssueSheet.tsx to keep it small (PAN-5219 WI-5 to WI-9). */
 import { useQuery } from '@tanstack/react-query';
 import type { DerivedIssueState, DirectoryEntry } from '@overdeck/contracts';
+import { useState } from 'react';
 
+import { ChatMarkdown } from '../chat/ChatMarkdown';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import type { Agent } from '../../types';
 import type { IssueCheckRunsResponse, IssueCostData } from '../CommandDeck/ZoneCOverviewTabs/queries';
@@ -15,6 +17,7 @@ import {
   pickIssueAgent,
   prStateLabel,
   REVIEW_LABELS,
+  shouldCollapseDescription,
   stageCostLine,
 } from './issueSheetData';
 
@@ -166,5 +169,36 @@ export function WhatHappened({ line }: { line: string }) {
       <span className="block text-xs text-muted-foreground">What happened</span>
       {line}
     </p>
+  );
+}
+
+export function DescriptionSection({ text, available }: { text: string; available: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  let body: string;
+  if (!available) body = 'Description not available.';
+  else if (!text.trim()) body = 'No description.';
+  else body = text;
+  const collapsible = available && body === text && shouldCollapseDescription(text);
+  const collapsed = collapsible && !expanded;
+  return (
+    <div>
+      <dt className="text-xs text-muted-foreground">Description</dt>
+      <dd className="break-words text-sm">
+        {body === text ? (
+          <div data-testid="mobile-issue-description" data-collapsed={collapsed} className={collapsed ? 'max-h-24 overflow-hidden' : undefined}>
+            <ChatMarkdown text={text} cwd={undefined} />
+          </div>
+        ) : body}
+        {collapsible && (
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            className="mt-1 min-h-11 min-w-11 text-xs text-foreground underline"
+          >
+            {collapsed ? 'Show more' : 'Show less'}
+          </button>
+        )}
+      </dd>
+    </div>
   );
 }

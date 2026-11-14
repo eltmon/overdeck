@@ -397,7 +397,45 @@ describe('MobileIssueSheet', () => {
     expect(screen.queryByText(/Checks/)).not.toBeInTheDocument();
   });
 
-  it('renders exactly one button (Back), and tapping it calls onBack', () => {
+  it('renders Markdown inside the description subtree', () => {
+    useDashboardStore.setState({
+      issuesRaw: [issue({ identifier: 'PAN-19', description: '## Steps\n\n- one\n- two' })],
+      derivedIssueStateByIssueId: {
+        'PAN-19': { issueId: 'PAN-19', state: 'working' },
+      } satisfies Record<string, DerivedIssueState>,
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderSheet('PAN-19');
+
+    const description = screen.getByTestId('mobile-issue-description');
+    expect(description).toHaveTextContent('Steps');
+    expect(description.querySelector('h2, h3')).toBeInTheDocument();
+  });
+
+  it('collapses a long description behind Show more / Show less', () => {
+    useDashboardStore.setState({
+      issuesRaw: [issue({ identifier: 'PAN-20', description: 'x'.repeat(400) })],
+      derivedIssueStateByIssueId: {
+        'PAN-20': { issueId: 'PAN-20', state: 'working' },
+      } satisfies Record<string, DerivedIssueState>,
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderSheet('PAN-20');
+
+    const description = screen.getByTestId('mobile-issue-description');
+    expect(description).toHaveAttribute('data-collapsed', 'true');
+    const toggle = screen.getByRole('button', { name: 'Show more' });
+
+    fireEvent.click(toggle);
+
+    expect(screen.getByRole('button', { name: 'Show less' })).toBeInTheDocument();
+    expect(description).toHaveAttribute('data-collapsed', 'false');
+  });
+
+  it('renders exactly one button (Back), no description, one h2, and only GET requests', async () => {
+    const fetchMock = stubDefaultFetch();
     useDashboardStore.setState({
       issuesRaw: [issue({ identifier: 'PAN-7' })],
       derivedIssueStateByIssueId: {
@@ -413,5 +451,13 @@ describe('MobileIssueSheet', () => {
     expect(buttons).toHaveLength(1);
     fireEvent.click(buttons[0]);
     expect(onBack).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('No description.')).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(1);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    for (const [, init] of fetchMock.mock.calls) {
+      const method = (init as RequestInit | undefined)?.method;
+      expect(method === undefined || method === 'GET').toBe(true);
+    }
   });
 });
