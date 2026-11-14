@@ -560,3 +560,32 @@ describe('IssueDataService.refreshDerivedStates last-start-wins (PAN-5224)', () 
     expect(svc.getDerivedState('PAN-7')).toEqual(stateFor('in_progress'));
   });
 });
+
+describe('IssueDataService.getCachedTrackerIssues (PAN-5261)', () => {
+  function makeService() {
+    const svc = new IssueDataService({ getBackoffMs: () => 0 } as any);
+    vi.spyOn(svc as any, 'schedulePlanningRefreshForIssues').mockImplementation(() => {});
+    return svc;
+  }
+
+  beforeEach(() => {
+    mockLoadIssueStatesForProject.mockReset();
+    mockResolveProjectFromIssueSync.mockReturnValue({ projectKey: 'overdeck', projectPath: '/repos/overdeck' });
+  });
+
+  it('getIssues() projects a merged derived state as verifying_on_main, while getCachedTrackerIssues() keeps the raw tracker state (PAN-5261 FR-6)', async () => {
+    const svc = makeService();
+    (svc as any).trackers.github.lastFetchedIssues = [{
+      identifier: 'PAN-7', state: 'in_progress', tracker: 'github', labels: [],
+    }];
+    mockLoadIssueStatesForProject.mockResolvedValue(new Map([['PAN-7', { issueId: 'PAN-7', state: 'merged' }]]));
+
+    await (svc as any).refreshDerivedStates(['PAN-7']);
+
+    const projected = svc.getIssues({ cycle: 'all' }).find((issue: any) => issue.identifier === 'PAN-7');
+    expect(projected?.state).toBe('verifying_on_main');
+
+    const raw = svc.getCachedTrackerIssues().find((issue: any) => issue.identifier === 'PAN-7');
+    expect(raw?.state).toBe('in_progress');
+  });
+});

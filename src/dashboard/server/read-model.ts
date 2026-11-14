@@ -667,10 +667,13 @@ export const ReadModelServiceLive = Layer.effect(
 
         // PAN-5224 FR-5: seed the tracker-change membership trigger with the
         // unfiltered issue set before the callback below can fire against it.
+        // PAN-5261 FR-6: the raw tracker rows, never the projected `getIssues()`
+        // view — a derived-state refresh alone (e.g. `verifying_on_main`) must
+        // never read as a tracker change.
         const { seedTrackerIssues, noteTrackerIssues } = yield* Effect.promise(
           () => import('./services/membership-tracker-trigger.js'),
         );
-        seedTrackerIssues(issueService.getIssues({ cycle: 'all' }));
+        seedTrackerIssues(issueService.getCachedTrackerIssues());
 
         // Wire live issue updates — when IssueDataService polls new data,
         // update the read model directly AND emit to event store for
@@ -678,8 +681,10 @@ export const ReadModelServiceLive = Layer.effect(
         issueService.onIssuesChanged((issues) => {
           // PAN-5224 FR-5: `issues` (the callback's own argument) is
           // cycle-filtered; re-read the unfiltered set for the tracker-change
-          // membership trigger's diff.
-          noteTrackerIssues(issueService.getIssues({ cycle: 'all' }));
+          // membership trigger's diff. PAN-5261 FR-6: the raw tracker rows,
+          // never the projected `getIssues()` view — a derived-state refresh
+          // alone (e.g. `verifying_on_main`) must never read as a tracker change.
+          noteTrackerIssues(issueService.getCachedTrackerIssues());
 
           const cleaned = cleanIssues(issues);
           const delta = createIssueDelta(state.issuesRaw, cleaned);
