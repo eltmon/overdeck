@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5224",
   "created": "2026-11-14T03:12:38.408Z",
-  "updated": "2026-11-14T03:54:06.006Z",
+  "updated": "2026-11-14T03:54:13.037Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,11 @@
     "webhook-coalescer.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T03:54:06.006Z"
+    },
+    "webhook-handlers-invalidate": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5224",
+      "claimedAt": "2026-11-14T03:54:13.037Z"
     }
   }
 }
