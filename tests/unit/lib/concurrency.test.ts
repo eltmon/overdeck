@@ -63,4 +63,37 @@ describe('createSettledTtlPromiseCache', () => {
     await get('repo', load);
     expect(load).toHaveBeenCalledTimes(2);
   });
+
+  it('invalidate(key, { includeInFlight: true }) during a load makes the next get start a new load (PAN-5224)', async () => {
+    let resolveFirst!: (value: string) => void;
+    const load = vi.fn()
+      .mockImplementationOnce(() => new Promise<string>((done) => { resolveFirst = done; }))
+      .mockImplementationOnce(async () => 'second');
+    const get = createSettledTtlPromiseCache<string, string>(30_000, Date.now);
+
+    const first = get('repo', load);
+    get.invalidate('repo', { includeInFlight: true });
+    const second = get('repo', load);
+
+    expect(second).not.toBe(first);
+    expect(load).toHaveBeenCalledTimes(2);
+    resolveFirst('first');
+    await expect(first).resolves.toBe('first');
+    await expect(second).resolves.toBe('second');
+  });
+
+  it('invalidate(key) without the option keeps the in-flight load single-flight (PAN-5224)', async () => {
+    let resolve!: (value: string) => void;
+    const load = vi.fn(() => new Promise<string>((done) => { resolve = done; }));
+    const get = createSettledTtlPromiseCache<string, string>(30_000, Date.now);
+
+    const first = get('repo', load);
+    get.invalidate('repo');
+    const second = get('repo', load);
+
+    expect(second).toBe(first);
+    expect(load).toHaveBeenCalledOnce();
+    resolve('done');
+    await expect(first).resolves.toBe('done');
+  });
 });
