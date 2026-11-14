@@ -4,17 +4,17 @@
     "created": "2026-11-13T22:31:39Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5211: Dashboard holds ~1.2 GB of one Codex transcript's tool output (screenshots) in memory",
-    "updated": "2026-11-13T22:51:47.961Z"
+    "updated": "2026-11-13T22:52:53.153Z"
   },
   "plan": {
     "id": "pan-5211",
     "title": "Dashboard holds ~1.2 GB of one Codex transcript's tool output (screenshots) in memory",
-    "status": "proposed",
+    "status": "running",
     "uid": "1dc71bd0-eb57-4e8c-9999-47642a909e90",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-13T22:31:39Z",
-    "updated": "2026-11-13T22:51:47.961Z",
+    "updated": "2026-11-13T22:52:53.153Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5211",
@@ -1636,5 +1636,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
