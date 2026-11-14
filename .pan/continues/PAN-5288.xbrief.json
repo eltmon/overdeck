@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5288",
   "created": "2026-11-14T23:58:11.612Z",
-  "updated": "2026-11-14T23:59:22.709Z",
+  "updated": "2026-11-14T23:59:29.383Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
     "diffs-parse-worklog.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T23:59:22.709Z"
+    },
+    "change-commits": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5288",
+      "claimedAt": "2026-11-14T23:59:29.383Z"
     }
   }
 }
