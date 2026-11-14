@@ -1,13 +1,24 @@
 /**
- * PAN-5238 WI-1: listSkillCatalog reads its roots and per-skill SKILL.md files
- * concurrently through a bounded fs limiter, with output identical to the
- * sequential version — same entries, same origin, first-root-wins precedence,
- * sorted by name.
+ * PAN-5238 WI-1/WI-2: listSkillCatalog reads its roots and per-skill SKILL.md
+ * files concurrently through a bounded fs limiter, with output identical to
+ * the sequential version — same entries, same origin, first-root-wins
+ * precedence, sorted by name. listPackCatalog reuses a pack's manifest while
+ * its extract dir keeps the same inode, mtime and ctime.
  */
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../skill-packs/sources.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../skill-packs/sources.js')>();
+  return { ...actual, listPacks: vi.fn(), packExtractDir: vi.fn(), packRenderDir: vi.fn() };
+});
+
+vi.mock('../../skill-packs/adapters.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../skill-packs/adapters.js')>();
+  return { ...actual, readPackManifest: vi.fn(actual.readPackManifest) };
+});
 
 const { getCounters } = vi.hoisted(() => {
   let inFlight = 0;
@@ -39,7 +50,9 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   };
 });
 
-const { listSkillCatalog } = await import('../catalog.js');
+const { listSkillCatalog, listPackCatalog } = await import('../catalog.js');
+const { readPackManifest } = await import('../../skill-packs/adapters.js');
+const { listPacks, packExtractDir, packRenderDir } = await import('../../skill-packs/sources.js');
 
 function writeSkill(dir: string, name: string, description: string): void {
   const skillDir = join(dir, name);
@@ -91,5 +104,74 @@ describe('listSkillCatalog', () => {
     const counters = getCounters();
     expect(counters.maxInFlight).toBeGreaterThan(1);
     expect(counters.maxInFlight).toBeLessThanOrEqual(32);
+  });
+});
+
+function buildPackExtractDir(skillName: string): string {
+  const dir = mkdtempSync(join(tmpdir(), 'skill-pack-extract-'));
+  writeSkill(join(dir, 'skills'), skillName, skillName);
+  return dir;
+}
+
+describe('listPackCatalog', () => {
+  const commit = 'a'.repeat(40);
+
+  beforeEach(() => {
+    vi.mocked(readPackManifest).mockClear();
+  });
+
+  it('reuses the manifest for an unchanged extract dir', async () => {
+    const dir = buildPackExtractDir('hello');
+    vi.mocked(listPacks).mockResolvedValue([
+      { id: 'demo', url: 'https://example.invalid/demo', ref: 'v1', commit, adapter: 'plain' },
+    ]);
+    vi.mocked(packExtractDir).mockReturnValue(dir);
+    vi.mocked(packRenderDir).mockReturnValue(join(dir, 'render'));
+
+    const first = await listPackCatalog();
+    const second = await listPackCatalog();
+
+    expect(readPackManifest).toHaveBeenCalledTimes(1);
+    expect(first).toEqual(second);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('re-reads after the extract dir is rebuilt', async () => {
+    const dir = buildPackExtractDir('hello');
+    vi.mocked(listPacks).mockResolvedValue([
+      { id: 'demo', url: 'https://example.invalid/demo', ref: 'v1', commit, adapter: 'plain' },
+    ]);
+    vi.mocked(packExtractDir).mockReturnValue(dir);
+    vi.mocked(packRenderDir).mockReturnValue(join(dir, 'render'));
+
+    await listPackCatalog();
+
+    const rebuilt = buildPackExtractDir('goodbye');
+    rmSync(dir, { recursive: true, force: true });
+    renameSync(rebuilt, dir);
+
+    const second = await listPackCatalog();
+
+    expect(readPackManifest).toHaveBeenCalledTimes(2);
+    expect(second[0]?.manifest?.skills.map((s) => s.name)).toEqual(['goodbye']);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('does not cache a failed read', async () => {
+    const dir = buildPackExtractDir('hello');
+    vi.mocked(listPacks).mockResolvedValue([
+      { id: 'demo', url: 'https://example.invalid/demo', ref: 'v1', commit, adapter: 'plain' },
+    ]);
+    vi.mocked(packExtractDir).mockReturnValue(dir);
+    vi.mocked(packRenderDir).mockReturnValue(join(dir, 'render'));
+    vi.mocked(readPackManifest).mockRejectedValueOnce(new Error('boom'));
+
+    const first = await listPackCatalog();
+    expect(first[0]?.manifest).toBeNull();
+
+    await listPackCatalog();
+
+    expect(readPackManifest).toHaveBeenCalledTimes(2);
+    rmSync(dir, { recursive: true, force: true });
   });
 });

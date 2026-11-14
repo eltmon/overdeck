@@ -3,12 +3,15 @@
  * listing and write validation. A skill is a directory holding a SKILL.md.
  *
  * Pack skills (PAN-4334) have their own catalog, `listPackCatalog()`, because
- * they default off while native skills default on.
+ * they default off while native skills default on. `listPackCatalog` reuses a
+ * pack's manifest while its extract dir keeps the same inode, mtime and ctime
+ * (PAN-5238).
  *
  * Each entry carries the root it was read from as `origin` (PAN-4528):
  * 'overdeck' for `~/.overdeck/skills`, 'personal' for `~/.claude/skills` and
  * `~/.agents/skills`, 'project' for `<projectRoot>/.pan/skills`.
  */
+import type { Stats } from 'node:fs';
 import { lstat, readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -104,21 +107,30 @@ export interface PackCatalogEntry {
   mcp?: true;
 }
 
-async function isDirectory(path: string): Promise<boolean> {
+async function dirStats(path: string): Promise<Stats | null> {
   try {
-    return (await lstat(path)).isDirectory();
+    const stats = await lstat(path);
+    return stats.isDirectory() ? stats : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-/** Registered packs with the manifest of their trusted commit, sorted by id. Reads the cache only; no git. */
+/** Pack manifests by extract dir (PAN-5238); `stamp` is the dir identity plus the read options. */
+const manifestCache = new Map<string, { stamp: string; manifest: PackManifest }>();
+
+/**
+ * Registered packs with the manifest of their trusted commit, sorted by id. Reads the
+ * cache only; no git. Reuses a pack's manifest while its extract dir keeps the same
+ * inode, mtime and ctime (PAN-5238).
+ */
 export async function listPackCatalog(): Promise<PackCatalogEntry[]> {
   const packs = await listPacks();
   return Promise.all(
     packs.map(async (entry): Promise<PackCatalogEntry> => {
       const dir = packExtractDir(entry.id, entry.commit);
-      const extracted = await isDirectory(dir);
+      const stats = await dirStats(dir);
+      const extracted = stats !== null;
       const known = KNOWN_PACKS[entry.id];
       const adapter = entry.adapter ?? known?.adapter ?? (extracted ? await detectAdapter(dir) : 'plain');
       // A runtime pack mounts from its render, so it is usable only once the render is ready (PAN-4727).
@@ -134,17 +146,26 @@ export async function listPackCatalog(): Promise<PackCatalogEntry[]> {
               ? 'ready'
               : 'missing';
       let manifest: PackManifest | null = null;
-      if (cached) {
-        try {
-          manifest = await readPackManifest(dir, adapter, {
-            optIn: known?.optIn ?? [],
-            skillsRoot: known?.skillsRoot,
-            pluginRoot: known?.pluginRoot,
-            browser: browser === 'ready',
-            skillsExclude: known?.skillsExclude,
-          });
-        } catch {
-          manifest = null;
+      if (cached && stats) {
+        const readOpts = {
+          optIn: known?.optIn ?? [],
+          skillsRoot: known?.skillsRoot,
+          pluginRoot: known?.pluginRoot,
+          browser: browser === 'ready',
+          skillsExclude: known?.skillsExclude,
+        };
+        const stamp = `${stats.ino}:${stats.mtimeMs}:${stats.ctimeMs}:${adapter}:${JSON.stringify(readOpts)}`;
+        const hit = manifestCache.get(dir);
+        if (hit?.stamp === stamp) {
+          manifest = hit.manifest;
+        } else {
+          try {
+            manifest = await readPackManifest(dir, adapter, readOpts);
+            manifestCache.set(dir, { stamp, manifest });
+          } catch {
+            manifest = null;
+            manifestCache.delete(dir);
+          }
         }
       }
       return {
