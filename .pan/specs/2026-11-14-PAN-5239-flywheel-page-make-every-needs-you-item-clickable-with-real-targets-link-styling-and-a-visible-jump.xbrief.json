@@ -1,0 +1,777 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T05:00:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5239: Flywheel page: make every Needs-you item clickable, with real targets, link styling, and a visible jump",
+    "updated": "2026-11-14T04:43:13.050Z"
+  },
+  "plan": {
+    "id": "pan-5239",
+    "title": "Flywheel page: make every Needs-you item clickable, with real targets, link styling, and a visible jump",
+    "status": "running",
+    "uid": "988220ba-9062-4151-bba8-d9c16530b489",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-14T05:00:00Z",
+    "updated": "2026-11-14T04:43:13.050Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5239",
+        "label": "PAN-5239",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5239.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "flywheel",
+      "dashboard",
+      "needs-you"
+    ],
+    "narratives": {
+      "Problem": "The Flywheel page's Needs you block lists what the operator must do, but most rows lead nowhere. The jump button scrolls the embedded conversation column and the target is never highlighted, because FlywheelPage clears the target the moment the timeline scrolls and the flash only runs on the bookmark path; rows with no origin fall back to the newest tick. Issue ids are unstyled buttons, a bare cross-repo '#7' cannot be linked, and the tick format cannot carry a destination URL for items such as 'upload AAB'.",
+      "Proposal": "An item may end with '<https://…>'. parseNeedsYouTarget() in packages/contracts splits label and target, and needsYouItemKey() keys by label so adding a target keeps first-raised identity. The status pane renders a targeted item as one link; issue, PR and item links share NEEDS_YOU_LINK_CLASS (underline, pointer, focus ring, monochrome). Qualified owner/repo#n links include a leading 'PR '. Rows with no firstRaisedMessageId lose the jump button. The jump (when no AskUserQuestion is pending) opens conv-flywheel in its Command Deck pane through App's pending conversation target and /conv route; MessagesTimeline flashes a handled target row for 3000 ms. The skill and docs/FLYWHEEL.md document the syntax; changelog.d/pan-5239.md records it; Playwright screenshots go in docs/screenshots/pan-5239/.",
+      "NonGoals": "- No new stored state, endpoint or schema field; the server keeps sending item text verbatim\n- No change to the session-feed Needs-you rows (PAN-3276) or the header NeedsYouIndicator count\n- No change to how resolveNeedsYouItems walks ticks beyond the key ignoring targets\n- No change to the bookmark jump's 1600 ms flash\n- No in-page (embedded column) jump on the Flywheel page\n- No support for ';' inside target URLs or for non-http(s) targets\n- No visible text label added to the jump button\n- pan flywheel status keeps printing the raw needs-you line, URL targets included"
+    },
+    "autoDecisions": [
+      {
+        "summary": "'Main conversation view' means conv-flywheel's own Command Deck pane (/conv/conv-flywheel), not the Flywheel page's embedded column",
+        "rationale": "The issue calls the embedded column 'the narrow side column' and the operator asked to be 'taken to' items; App already has a pending-conversation-target path that CommandDeck consumes on its /conv deep link."
+      },
+      {
+        "summary": "Parse targets in packages/contracts and make needsYouItemKey ignore the target",
+        "rationale": "The key is shared by the server's first-raised walk and the frontend; keying by label means the loop can add a URL later without the item looking newly raised, and no schema field is needed."
+      },
+      {
+        "summary": "A targeted item renders as one whole link; inner issue/PR refs are not segmented",
+        "rationale": "Avoids nesting interactive elements, the PAN-5217 class of accessibility bug."
+      },
+      {
+        "summary": "Hide the jump button on rows without firstRaisedMessageId, as the issue requires, even though the button also reopens a pending question",
+        "rationale": "Pending questions stay reachable from the app-wide pending-input dialogs, Decisions panel and session feed (other requestReopen callers)."
+      },
+      {
+        "summary": "Target jumps flash for 3000 ms; the bookmark flash stays 1600 ms",
+        "rationale": "'A few seconds' per the issue, without changing bookmark behavior or its existing tests."
+      },
+      {
+        "summary": "Link style is underline + pointer + focus ring with monochrome text",
+        "rationale": "The pan-style-guide says action links are monochromatic; the issue accepts underline or link color."
+      },
+      {
+        "summary": "Screenshots are committed under docs/screenshots/pan-5239/ and linked from the PR body",
+        "rationale": ".gitignore names docs/screenshots/<topic>/ as the home for screenshots; PAN-5191 linked committed PNGs with ?raw=true URLs."
+      }
+    ],
+    "items": [
+      {
+        "id": "contracts-target-key",
+        "title": "Parse a needs-you item's trailing <https://…> target in contracts and key items by label",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T05:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5239",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/flywheel-derived.ts",
+            "packages/contracts/src/flywheel-derived.test.ts",
+            "tests/unit/lib/flywheel/tick-marker.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd packages/contracts && npx vitest run --configLoader runner --config vitest.config.ts src/flywheel-derived.test.ts",
+            "npx vitest run tests/unit/lib/flywheel/tick-marker.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "flywheel-derived.test.ts passes including the 'parseNeedsYouTarget (PAN-5239)' describe",
+            "tick-marker.test.ts passes including the target-blind first-raised case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "needs-you-target-link"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow WI-1 in .pan/drafts/PAN-5239.md exactly. In packages/contracts/src/flywheel-derived.ts add NEEDS_YOU_TARGET_RE = /^(.*?)\\s*<(https?:\\/\\/[^\\s<>]+)>\\s*$/i and export parseNeedsYouTarget(text): { label: string; target?: string } (trim; no match or empty label => { label: trimmed } with no target key). Change needsYouItemKey to return parseNeedsYouTarget(text).label.toLowerCase(). Do not add any schema field (NFR-1). Add the PRD's listed tests to flywheel-derived.test.ts in a describe 'parseNeedsYouTarget (PAN-5239)', and to tests/unit/lib/flywheel/tick-marker.test.ts: a marker ending 'needs-you=upload AAB <https://play.google.com/console/x>' plus a closing backtick parses needsYou to the full text; resolveNeedsYouItems over tick 1 'upload AAB' and tick 2 'upload AAB <https://a.test>' returns one item with firstRaisedTick 1."
+        },
+        "items": [
+          {
+            "id": "contracts-target-key.ac1",
+            "title": "Given 'upload AAB <https://play.google.com/console/x>', parseNeedsYouTarget returns label 'upload AAB' and target 'https://play.google.com/console/x'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-target-key.ac2",
+            "title": "Given 'run it <javascript:alert(1)>', '<ftp://x>' or '<https://x.test>' (empty label), parseNeedsYouTarget returns the whole trimmed text as label and no target key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-target-key.ac3",
+            "title": "needsYouItemKey('Upload AAB <https://a.test>') returns the same key as needsYouItemKey('upload aab'), and resolveNeedsYouItems keeps firstRaisedTick 1 when tick 2 adds the target",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-target-key.ac4",
+            "title": "splitNeedsYouItems('open <https://x.test/a;b>') returns two items and parseNeedsYouTarget returns no target for either (documents that ';' is unsupported in URLs)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pr-ref-prefix",
+        "title": "Include a leading 'PR ' in qualified owner/repo#n PR links",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T05:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5239",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/flywheelNeedsYouLinks.ts",
+            "src/dashboard/frontend/src/lib/__tests__/flywheelNeedsYouLinks.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/__tests__/flywheelNeedsYouLinks.test.ts"
+          ],
+          "expected_outputs": [
+            "flywheelNeedsYouLinks.test.ts passes with zero failures, including the two new PAN-5239 cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow WI-2 in .pan/drafts/PAN-5239.md. In src/dashboard/frontend/src/lib/flywheelNeedsYouLinks.ts change REF_RE's first alternative to (?:\\bPR )?\\b([A-Za-z0-9][\\w.-]*\\/[\\w.-]+)#(\\d+)\\b (rest of the regex unchanged); the qualified branch keeps text: full. Update the header comment to mention the optional 'PR ' prefix. Add tests: needsYouSegments('PR eltmon/overdeck-landing#7 merge', []) equals [{kind:'pr', text:'PR eltmon/overdeck-landing#7', url:'https://github.com/eltmon/overdeck-landing/pull/7'}, {kind:'text', text:' merge'}]; needsYouSegments('merge eltmon/overdeck-landing#7', []) links 'eltmon/overdeck-landing#7' to the same URL."
+        },
+        "items": [
+          {
+            "id": "pr-ref-prefix.ac1",
+            "title": "Given 'PR eltmon/overdeck-landing#7 merge', needsYouSegments returns one pr segment with text 'PR eltmon/overdeck-landing#7' and url 'https://github.com/eltmon/overdeck-landing/pull/7' followed by text ' merge'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-ref-prefix.ac2",
+            "title": "Given 'merge eltmon/overdeck-landing#7', needsYouSegments returns a pr segment for 'eltmon/overdeck-landing#7' with the same GitHub pull URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-ref-prefix.ac3",
+            "title": "Given 'PR #7 merge' and no in-flight row with PR 7, needsYouSegments returns the text unlinked, and given 'PAN-5095' it returns an issue segment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "needs-you-target-link",
+        "title": "Render a targeted needs-you item as one link and give issue, PR and item links link styling",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T05:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5239",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelStatusPane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "FlywheelStatusPane.test.tsx passes including the 'Needs-you targets and link styling (PAN-5239)' describe",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow WI-3 in .pan/drafts/PAN-5239.md exactly. In FlywheelStatusPane.tsx import parseNeedsYouTarget from @overdeck/contracts; export NEEDS_YOU_LINK_CLASS = 'cursor-pointer rounded-sm text-foreground underline decoration-muted-foreground/60 underline-offset-2 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'; extend NeedsYouRow with label and optional target from parseNeedsYouTarget(item.text). When row.target is set render <a href={row.target} target=\"_blank\" rel=\"noreferrer noopener\" className={NEEDS_YOU_LINK_CLASS} data-testid=\"flywheel-needs-you-link\">{row.label}</a> and do NOT segment it; otherwise map needsYouSegments(row.label, …) as today, with the issue button className `font-mono ${NEEDS_YOU_LINK_CLASS}` and the PR anchor className `font-mono ${NEEDS_YOU_LINK_CLASS}` and rel 'noreferrer noopener'. Do not change the jump button in this item (WI-4 does). Add the PRD's five tests in a describe 'Needs-you targets and link styling (PAN-5239)'."
+        },
+        "items": [
+          {
+            "id": "needs-you-target-link.ac1",
+            "title": "Given needsYou 'upload AAB <https://play.google.com/console/x>; store fields', the first row renders one flywheel-needs-you-link with href 'https://play.google.com/console/x', text 'upload AAB' and target '_blank', and the second row renders the text 'store fields' with no anchor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-target-link.ac2",
+            "title": "Given needsYou 'run it <javascript:alert(1)>', the row renders no anchor and shows the text 'run it <javascript:alert(1)>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-target-link.ac3",
+            "title": "Given needsYou 'PR eltmon/overdeck-landing#7 merge', flywheel-needs-you-pr renders href 'https://github.com/eltmon/overdeck-landing/pull/7' with text 'PR eltmon/overdeck-landing#7'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-target-link.ac4",
+            "title": "The flywheel-needs-you-issue, flywheel-needs-you-pr and flywheel-needs-you-link elements each renders with the classes underline, cursor-pointer and focus-visible:ring-2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-target-link.ac5",
+            "title": "Given needsYou 'waive PAN-5095 <https://a.test>', the row renders exactly one flywheel-needs-you-link, zero flywheel-needs-you-issue, and no a or button element inside the link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hide-jump-without-origin",
+        "title": "Hide the jump button on needs-you rows that have no first-raised message id",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T05:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5239",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelStatusPane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx src/pages/__tests__/FlywheelPage.test.tsx",
+            "npm run typecheck",
+            "grep -n '?? tick.messageId' src/dashboard/frontend/src/components/flywheel/FlywheelStatusPane.tsx"
+          ],
+          "expected_outputs": [
+            "FlywheelStatusPane.test.tsx and FlywheelPage.test.tsx pass with zero failures",
+            "typecheck completes without errors",
+            "the grep prints nothing (exit status 1)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow WI-4 in .pan/drafts/PAN-5239.md exactly. In needsYouRows drop the '?? tick.messageId' fallback so messageId comes only from item.firstRaisedMessageId; update its doc comment. Change onNeedsYouClick's type to (messageId: string) => void. Render the jump button only when row.messageId is set, with the new title 'Open the conversation at the message that first raised this, or the question the flywheel is waiting on' and 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring' added to its className. Update FlywheelStatusPane.test.tsx per the PRD (the 3-row test expects 0 jump buttons; replace the 'jumps to the tick's messageId without needsYouItems' test with 'renders no jump button when the item has no first-raised id (PAN-5239)'; give the PAN-5217 no-handler test a needsYouItems fixture). In FlywheelPage.test.tsx only add needsYouItems with firstRaisedMessageId 'msg-9' to the two PAN-4751 tests' lastTick fixtures; keep their assertions. FlywheelPage.tsx's handleNeedsYouClick keeps working because a string satisfies its optional parameter."
+        },
+        "items": [
+          {
+            "id": "hide-jump-without-origin.ac1",
+            "title": "Given a lastTick with messageId 'm9' and no needsYouItems, the Needs you block renders zero flywheel-needs-you-jump buttons",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hide-jump-without-origin.ac2",
+            "title": "Given needsYouItems where one item has firstRaisedMessageId 'm2' and another has none, exactly one jump button renders, in the first row, and clicking it calls onNeedsYouClick with 'm2'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hide-jump-without-origin.ac3",
+            "title": "Given the PAN-4751 FlywheelPage fixtures with needsYouItems carrying firstRaisedMessageId 'msg-9', the page renders a jump button and a click with a pending question reopens it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "timeline-target-flash",
+        "title": "Flash the target row for 3000 ms when a conversation timeline handles a target-message jump",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T05:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5239",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/chat/__tests__/MessagesTimeline.test.tsx",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "MessagesTimeline.test.tsx passes including 'MessagesTimeline — target jump flash (PAN-5239)' and the existing bookmark jump tests",
+            "typecheck completes without errors",
+            "lint:file-size passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow WI-5 in .pan/drafts/PAN-5239.md exactly. In MessagesTimeline.tsx add BOOKMARK_FLASH_MS = 1600 and TARGET_FLASH_MS = 3000; replace flashRowId state with flash: { rowId; durationMs } | null and derive flashRowId; bookmark path sets { rowId, durationMs: BOOKMARK_FLASH_MS }; the target effect sets { rowId: targetMessageRow.row.id, durationMs: TARGET_FLASH_MS } right after scrollToRow and before onTargetMessageHandled; the timer effect clears after flash.durationMs; both row wrappers (virtual and tail) get data-flash={flashRowId === row.id ? 'true' : undefined}. Add the PRD's fake-timer test with a parent that clears targetMessageId on handled (as AgentPane.tsx does). Use vi.useFakeTimers()/vi.advanceTimersByTimeAsync(); never real waits."
+        },
+        "items": [
+          {
+            "id": "timeline-target-flash.ac1",
+            "title": "Given a parent that clears targetMessageId in onTargetMessageHandled, after the jump the target row element renders data-flash='true' and the 2px var(--color-primary) outline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "timeline-target-flash.ac2",
+            "title": "With fake timers the target row still renders data-flash='true' at 2999 ms and has no data-flash attribute and no primary outline at 3000 ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "timeline-target-flash.ac3",
+            "title": "When a bookmark jump runs, its row flash clears after 1600 ms, as the existing bookmark test asserts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "optional-message-index",
+        "title": "Make messageIndex optional on pending conversation targets",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T05:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "refactor",
+          "issueLabel": "pan-5239",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/AppRoutes.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/openConversationTab.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "grep -n 'messageIndex: number' src/dashboard/frontend/src/App/AppRoutes.tsx src/dashboard/frontend/src/components/CommandDeck/index.tsx src/dashboard/frontend/src/components/CommandDeck/openConversationTab.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the grep prints nothing (exit status 1)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow WI-6 in .pan/drafts/PAN-5239.md. Type-only: change messageIndex: number to messageIndex?: number in PendingConversationTarget (App/AppRoutes.tsx line 38), in CommandDeckProps.pendingConversationTarget and in openConversationTabIn's target type (components/CommandDeck/index.tsx), and in openConversationTab's target type (components/CommandDeck/openConversationTab.ts). No behavior change; existing callers keep passing numbers."
+        },
+        "items": [
+          {
+            "id": "optional-message-index.ac1",
+            "title": "npm run typecheck exits 0 with messageIndex?: number in AppRoutes.tsx, CommandDeck/index.tsx (two places) and openConversationTab.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "optional-message-index.ac2",
+            "title": "Given the type change, grep for 'messageIndex: number' in those three files returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "jump-opens-command-deck",
+        "title": "Open conv-flywheel in its Command Deck pane at the first-raised message from a Needs-you jump",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T05:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5239",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/App/AppRoutes.tsx",
+            "src/dashboard/frontend/src/pages/FlywheelPage.tsx",
+            "src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/pages/__tests__/FlywheelPage.test.tsx src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx",
+            "npm run typecheck",
+            "npm run lint:file-size",
+            "grep -rn 'FlywheelTickTarget\\|tickTarget' src/dashboard/frontend/src"
+          ],
+          "expected_outputs": [
+            "FlywheelPage.test.tsx and FlywheelConversationPane.test.tsx pass with zero failures",
+            "typecheck completes without errors",
+            "lint:file-size passes",
+            "the grep prints nothing (exit status 1)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "uat-screenshots"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow WI-7 in .pan/drafts/PAN-5239.md exactly. App.tsx: add handleOpenConversationMessage(conversationName, messageId) right after handleOpenConversationHit: setPendingConversationTarget({ conversationName, messageId, nonce: Date.now(), label: 'Flywheel' }); setActiveTab('command-deck'); setConversationRoute(conversationName, 'conversation'); pass it to AppRoutes as onOpenConversationMessage. AppRoutes.tsx: add the prop and pass it to FlywheelPage. FlywheelPage.tsx: add onOpenConversationMessage prop; handleNeedsYouClick(messageId: string) reopens a pending question first (unchanged resolveNeedsYouAction logic), else calls onOpenConversationMessage(FLYWHEEL_CONVERSATION_NAME, messageId); delete tickJump, handleTickTargetHandled and the tickTarget props. FlywheelConversationPane.tsx: delete FlywheelTickTarget, tickTarget/onTickTargetHandled props, the setViewMode effect and the target props on ConversationPanel. Delete the three tickTarget tests in FlywheelConversationPane.test.tsx; rewrite the four jump tests in FlywheelPage.test.tsx as the PRD lists. Implementation checkpoint: in WI-10 confirm the live jump opens the deck pane; if it does not, stop and report via pan tell flywheel-orchestrator rather than restoring the embedded-column jump."
+        },
+        "items": [
+          {
+            "id": "jump-opens-command-deck.ac1",
+            "title": "Given no pending AskUserQuestion, clicking a jump button calls onOpenConversationMessage with ('conv-flywheel', the row's firstRaisedMessageId) and leaves reopenNonce at 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jump-opens-command-deck.ac2",
+            "title": "Given a pending AskUserQuestion on conv-flywheel, clicking a jump button sets reopenId to 'conv-flywheel', increments reopenNonce and does not call onOpenConversationMessage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jump-opens-command-deck.ac3",
+            "title": "grep -rn 'FlywheelTickTarget\\|tickTarget' src/dashboard/frontend/src returns no matches after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jump-opens-command-deck.ac4",
+            "title": "App.tsx passes handleOpenConversationMessage through AppRoutes to FlywheelPage, and the handler sets a pending conversation target, switches to the command-deck tab and routes to /conv/<name>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-tick-targets",
+        "title": "Document needs-you item targets and owner/repo#n PRs in the pan-flywheel skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T05:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5239",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-flywheel/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '<https://' sync-sources/skills/pan-flywheel/SKILL.md",
+            "npm run lint:skills",
+            "npm run lint:prompt-trailer"
+          ],
+          "expected_outputs": [
+            "the grep prints the needs-you bullet line(s)",
+            "lint:skills passes",
+            "lint:prompt-trailer passes (the commit carries a Prompt-Change: trailer)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow WI-8 in .pan/drafts/PAN-5239.md. In sync-sources/skills/pan-flywheel/SKILL.md, section '## Tick marker', replace the needs-you bullet's last sentence with the PRD's replacement text: always write a PR outside this project as owner/repo#<n> (example 'PR eltmon/overdeck-landing#7 merge'); end an item that has a place to act with its URL in angle brackets ('upload AAB <https://play.google.com/console/…>'); only http/https, no spaces, no ';'; adding or changing the URL does not make the item look newly raised. The commit MUST carry the trailer 'Prompt-Change: pan-flywheel tick marker documents needs-you item targets (PAN-5239)' next to its Item: trailer, or lint:prompt-trailer fails."
+        },
+        "items": [
+          {
+            "id": "skill-tick-targets.ac1",
+            "title": "The Tick marker section's needs-you bullet shows the example 'upload AAB <https://play.google.com/console/…>' and states that the URL may contain no spaces and no ';'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-tick-targets.ac2",
+            "title": "The needs-you bullet contains the instruction to always write a PR outside the project as owner/repo#<n>, with the example 'PR eltmon/overdeck-landing#7 merge'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-tick-targets.ac3",
+            "title": "The branch's commit for this item carries a Prompt-Change: trailer and npm run lint:prompt-trailer exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-flywheel-changelog",
+        "title": "Update docs/FLYWHEEL.md for item targets and the Command Deck jump, and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T05:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5239",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/FLYWHEEL.md",
+            "changelog.d/pan-5239.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'parseNeedsYouTarget\\|/conv/conv-flywheel\\|has no jump button' docs/FLYWHEEL.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the grep prints the updated rows",
+            "lint:docs passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow WI-9 in .pan/drafts/PAN-5239.md. In docs/FLYWHEEL.md: (1) line 16 row: items compare by label with any trailing <https://…> target removed, and add parseNeedsYouTarget() to its function list; (2) the '| Needs-you block |' row: replace with the PRD's text (targeted item = one link; non-http <…> stays text; owner/repo#<n> with optional leading 'PR '; underline/pointer/focus ring; no jump button without a first-raised id; jump reopens a pending question or opens /conv/conv-flywheel in the Command Deck at the message, which flashes for 3 seconds); (3) the needs-you key row: append the target syntax, the no-spaces/no-';' rule and the example. Create changelog.d/pan-5239.md with the PRD's '#### Improved' bullet, keeping <https://…> inside backticks."
+        },
+        "items": [
+          {
+            "id": "docs-flywheel-changelog.ac1",
+            "title": "docs/FLYWHEEL.md's Needs-you block row states that a row without a first-raised message id has no jump button and that the jump opens /conv/conv-flywheel in the Command Deck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-flywheel-changelog.ac2",
+            "title": "docs/FLYWHEEL.md's needs-you key row shows the '<https://…>' target syntax with the example 'upload AAB <https://play.google.com/console/…>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-flywheel-changelog.ac3",
+            "title": "changelog.d/pan-5239.md exists with exactly one '#### Improved' heading and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-screenshots",
+        "title": "Verify the Needs-you block and the jump highlight in an isolated browser and attach screenshots to the PR",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T05:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5239",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/screenshots/pan-5239/01-needs-you-block.png",
+            "docs/screenshots/pan-5239/02-jump-highlight.png"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "ls docs/screenshots/pan-5239/01-needs-you-block.png docs/screenshots/pan-5239/02-jump-highlight.png"
+          ],
+          "expected_outputs": [
+            "both PNG files exist and are committed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow WI-10 in .pan/drafts/PAN-5239.md exactly. Own headless Chromium from node_modules/playwright, fresh context; never restart the shared dashboard. Start the branch frontend with `cd src/dashboard/frontend && npx vite --port 3117 --strictPort` (proxies /api and /ws to 127.0.0.1:3011); authenticate by reading ~/.overdeck/internal-token in the script and navigating to http://localhost:3117/flywheel#overdeck_token=<token> (never print or commit it). Fetch live /api/flywheel/status; if lastTick is null stop and pan tell flywheel-orchestrator; else id = needsYouItems[0]?.firstRaisedMessageId ?? lastTick.messageId. page.route the status to serve items 'upload AAB <https://play.google.com/console/>', 'PR eltmon/overdeck-landing#7 merge', 'waive PAN-5095 test removal' (all firstRaisedMessageId id) and 'store fields' (none). Screenshot [data-testid=\"flywheel-needs-you\"] to docs/screenshots/pan-5239/01-needs-you-block.png; click the first jump, wait for path /conv/conv-flywheel, wait up to 60 s for [data-flash=\"true\"], screenshot to 02-jump-highlight.png. Stop Vite. Commit both and link them in the PR body under '## UAT screenshots' with blob ?raw=true URLs."
+        },
+        "items": [
+          {
+            "id": "uat-screenshots.ac1",
+            "title": "In the isolated browser the Needs you block renders one flywheel-needs-you-link, a flywheel-needs-you-pr with href https://github.com/eltmon/overdeck-landing/pull/7, and no jump button on the 'store fields' row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-screenshots.ac2",
+            "title": "When the first row's jump button is clicked, the browser routes to /conv/conv-flywheel and renders a row with data-flash='true' within 60 seconds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-screenshots.ac3",
+            "title": "The branch commits docs/screenshots/pan-5239/01-needs-you-block.png and 02-jump-highlight.png, and the PR body contains links to both under '## UAT screenshots'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-target-key",
+        "to": "needs-you-target-link",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-ref-prefix",
+        "to": "needs-you-target-link",
+        "type": "blocks"
+      },
+      {
+        "from": "needs-you-target-link",
+        "to": "hide-jump-without-origin",
+        "type": "blocks"
+      },
+      {
+        "from": "hide-jump-without-origin",
+        "to": "jump-opens-command-deck",
+        "type": "blocks"
+      },
+      {
+        "from": "optional-message-index",
+        "to": "jump-opens-command-deck",
+        "type": "blocks"
+      },
+      {
+        "from": "jump-opens-command-deck",
+        "to": "uat-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "timeline-target-flash",
+        "to": "uat-screenshots",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One operator-visible feature: a Needs-you row is only useful when its target parsing (contracts), link rendering and styling (flywheel components), jump navigation (App/AppRoutes/CommandDeck types) and the visible highlight (chat timeline) all ship together, plus the skill and docs that teach the loop the syntax. Each slice is small (22 files, mostly one-line type or test edits) and the DAG already serializes the shared files; splitting into sibling issues would ship rows that link but still jump invisibly, or a syntax the loop writes before the page can render it.",
+      "canonicalFilename": "2026-11-14-PAN-5239-flywheel-page-make-every-needs-you-item-clickable-with-real-targets-link-styling-and-a-visible-jump.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

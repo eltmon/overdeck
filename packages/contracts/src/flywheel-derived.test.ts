@@ -5,6 +5,7 @@ import {
   TickMarker,
   decodeFlywheelDerivedStatus,
   needsYouItemKey,
+  parseNeedsYouTarget,
   splitNeedsYouItems,
 } from "./flywheel-derived"
 
@@ -115,5 +116,41 @@ describe("splitNeedsYouItems (PAN-5198)", () => {
     }
     expect(() => decodeFlywheelDerivedStatus(withItems)).not.toThrow()
     expect(() => decodeFlywheelDerivedStatus(running)).not.toThrow()
+  })
+})
+
+describe("parseNeedsYouTarget (PAN-5239)", () => {
+  it("parses a trailing <https://…> target off the label", () => {
+    expect(parseNeedsYouTarget("upload AAB <https://play.google.com/console/x>")).toEqual({
+      label: "upload AAB",
+      target: "https://play.google.com/console/x",
+    })
+  })
+
+  it("returns no target key when there is nothing in angle brackets", () => {
+    expect(parseNeedsYouTarget("upload AAB")).toEqual({ label: "upload AAB" })
+  })
+
+  it("treats a non-http(s) scheme in angle brackets as plain text", () => {
+    expect(parseNeedsYouTarget("run it <javascript:alert(1)>")).toEqual({
+      label: "run it <javascript:alert(1)>",
+    })
+    expect(parseNeedsYouTarget("<ftp://x>")).toEqual({ label: "<ftp://x>" })
+  })
+
+  it("treats an empty label as no target", () => {
+    expect(parseNeedsYouTarget("<https://x.test>")).toEqual({ label: "<https://x.test>" })
+  })
+
+  it("needsYouItemKey ignores the target", () => {
+    expect(needsYouItemKey("Upload AAB <https://a.test>")).toBe(needsYouItemKey("upload aab"))
+  })
+
+  it("documents that ';' inside a URL is unsupported: it splits the item first", () => {
+    const items = splitNeedsYouItems("open <https://x.test/a;b>")
+    expect(items).toEqual(["open <https://x.test/a", "b>"])
+    for (const item of items) {
+      expect(parseNeedsYouTarget(item).target).toBeUndefined()
+    }
   })
 })

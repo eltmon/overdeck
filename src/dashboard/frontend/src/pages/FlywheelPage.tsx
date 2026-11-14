@@ -5,13 +5,15 @@
  * tab come from `GET /api/flywheel/status` (the same deriver `pan flywheel
  * status` prints), State and Stats from the loop's `.pan/flywheel/` files and
  * the tracker, and the right column is the `conv-flywheel` conversation
- * itself. A failed status fetch reads as "can't reach the server", never idle.
+ * itself. A failed status fetch reads as "can't reach the server", never
+ * idle. A Needs-you jump opens the conversation in its own Command Deck pane
+ * at the message (PAN-5239), not in this embedded column.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Activity } from 'lucide-react';
 
-import { FlywheelConversationPane, type FlywheelTickTarget } from '../components/flywheel/FlywheelConversationPane';
+import { FlywheelConversationPane } from '../components/flywheel/FlywheelConversationPane';
 import { FlywheelHeadlineStrip } from '../components/flywheel/FlywheelHeadlineStrip';
 import { FlywheelOrderBookCard } from '../components/flywheel/FlywheelOrderBookCard';
 import { FlywheelReportPane, FlywheelStatePane } from '../components/flywheel/FlywheelStatePane';
@@ -49,9 +51,11 @@ function readStoredSplit(): number {
 interface FlywheelPageProps {
   onOpenSettings?: () => void;
   onNavigateIssue?: (issueId: string) => void;
+  /** PAN-5239: opens conv-flywheel's own Command Deck pane at a message. */
+  onOpenConversationMessage?: (conversationName: string, messageId: string) => void;
 }
 
-export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPageProps) {
+export function FlywheelPage({ onOpenSettings, onNavigateIssue, onOpenConversationMessage }: FlywheelPageProps) {
   const statusQuery = useFlywheelStatus();
   const status = statusQuery.data;
   const unreachable = statusQuery.isError;
@@ -62,7 +66,6 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
   const [tab, setTab] = useState<RailTab>('status');
   const [leftWidth, setLeftWidth] = useState<number>(readStoredSplit);
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const [tickJump, setTickJump] = useState<FlywheelTickTarget | null>(null);
   const leftWidthRef = useRef(leftWidth);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const pendingInputQuery = useQuery({
@@ -71,19 +74,15 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
     refetchInterval: 5_000,
   });
 
-  const handleNeedsYouClick = useCallback((messageId?: string) => {
+  const handleNeedsYouClick = useCallback((messageId: string) => {
     const ui = useAskUserQuestionUiStore.getState();
     const action = resolveNeedsYouAction(pendingInputQuery.data, ui.answeredToolUseIds);
     if (action.kind === 'reopen-question') {
       ui.requestReopen(FLYWHEEL_CONVERSATION_NAME);
       return;
     }
-    setTickJump((prev) => ({ messageId: messageId ?? status?.lastTick?.messageId, nonce: (prev?.nonce ?? 0) + 1 }));
-  }, [pendingInputQuery.data, status?.lastTick?.messageId]);
-
-  const handleTickTargetHandled = useCallback(() => {
-    setTickJump((prev) => (prev ? { nonce: prev.nonce, messageId: undefined } : prev));
-  }, []);
+    onOpenConversationMessage?.(FLYWHEEL_CONVERSATION_NAME, messageId);
+  }, [pendingInputQuery.data, onOpenConversationMessage]);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNowMs(Date.now()), 5_000);
@@ -252,7 +251,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
         />
 
         <div className="min-w-0 flex-1 overflow-hidden" aria-label="Flywheel conversation column">
-          <FlywheelConversationPane onOpenSettings={onOpenSettings} tickTarget={tickJump} onTickTargetHandled={handleTickTargetHandled} />
+          <FlywheelConversationPane onOpenSettings={onOpenSettings} />
         </div>
       </div>
     </div>
