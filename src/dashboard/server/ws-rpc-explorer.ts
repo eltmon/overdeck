@@ -5,13 +5,11 @@
  * spread into `PanRpcGroup.of({...})` in ws-rpc.ts. Each handler resolves
  * the root, calls a Promise service in services/explorer/, and maps any
  * failure to a PanRpcError with an EXPLORER_ERROR_CODES code.
- *
- * A method whose service has not shipped yet answers NOT_IMPLEMENTED with a
- * message naming the issue that owns it: explorerBeginEdit ships in PAN-5191.
  */
 import { Effect, Queue, Stream } from 'effect';
 import { PanRpcGroup, WS_METHODS, type ExplorerWatchBatch, type PanRpcError } from '@overdeck/contracts';
-import { explorerError, toExplorerRpcError } from './services/explorer/errors.js';
+import { beginEdit } from './services/explorer/edit-workspace.js';
+import { toExplorerRpcError } from './services/explorer/errors.js';
 import { gitStage, gitStatus } from './services/explorer/git.js';
 import { listDir, readFile } from './services/explorer/read.js';
 import { resolveExplorerRoot } from './services/explorer/roots.js';
@@ -22,11 +20,6 @@ import { copy, create, rename, writeFile } from './services/explorer/write.js';
 
 /** The 14 pan.explorer* method tags. */
 type ExplorerMethodTag = Extract<(typeof WS_METHODS)[keyof typeof WS_METHODS], `pan.explorer${string}`>;
-
-const BEGIN_EDIT_OWNER = 'PAN-5191';
-
-const notImplemented = (method: string, owner: string) =>
-  Effect.fail(explorerError('NOT_IMPLEMENTED', `${method} ships in ${owner}`));
 
 const run = <A>(fn: () => Promise<A>): Effect.Effect<A, PanRpcError> =>
   Effect.tryPromise({ try: fn, catch: toExplorerRpcError });
@@ -83,5 +76,5 @@ export const explorerRpcHandlers = {
         // so the client gets the error (e.g. ROOT_NOT_FOUND).
       ).pipe(Effect.catch((error) => Queue.fail(queue, error))),
     ),
-  [WS_METHODS.explorerBeginEdit]: () => notImplemented(WS_METHODS.explorerBeginEdit, BEGIN_EDIT_OWNER),
+  [WS_METHODS.explorerBeginEdit]: (input) => run(() => beginEdit(input.projectKey, input.forceNew)),
 } satisfies Pick<Parameters<typeof PanRpcGroup.of>[0], ExplorerMethodTag>;

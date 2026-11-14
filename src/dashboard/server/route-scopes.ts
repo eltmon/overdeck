@@ -229,6 +229,11 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   // PAN-5188: file explorer download and upload (parent PRD PAN-5183 D-8: explicit admin).
   { method: 'GET', path: '/api/explorer/download', scope: 'admin' },
   { method: 'POST', path: '/api/explorer/upload', scope: 'admin' },
+  // PAN-5191: explorer edit workspaces (parent PRD PAN-5183 D-8: explicit admin).
+  { method: 'GET', path: '/api/explorer/edit-workspaces/:workspaceId', scope: 'admin' },
+  { method: 'POST', path: '/api/explorer/edit-workspaces/:workspaceId/pr', scope: 'admin' },
+  { method: 'POST', path: '/api/explorer/edit-workspaces/:workspaceId/merge', scope: 'admin' },
+  { method: 'POST', path: '/api/explorer/edit-workspaces/:workspaceId/discard', scope: 'admin' },
 ];
 
 /** `/ws/terminal` needs `operate`; every other WebSocket path keeps the `admin` default. */

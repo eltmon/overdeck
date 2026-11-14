@@ -16,7 +16,9 @@ import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
 import { pickViewer } from '../viewers/viewer-router'
 import styles from '../../Stage/stage.module.css'
 import type { PaneWrapperProps } from '../../Stage/types'
-import { explorerErrorCode, explorerErrorMessage, readFile } from '../explorer-rpc'
+import { EditWorkspaceNote } from '../edit/EditWorkspaceBanner'
+import { useEditWorkspaceStore } from '../edit/edit-workspace-store'
+import { explorerErrorCode, explorerErrorMessage, parseRootId, readFile } from '../explorer-rpc'
 import { openCodePane } from '../openCodePane'
 import { draftKey, isDraftDirty, useCodeDrafts } from './code-drafts'
 import { MonacoCodeEditor, type CodeEditorInstance, type CodePosition } from './MonacoCodeEditor'
@@ -35,7 +37,9 @@ type LoadState =
 // large text. Its viewers lazy-load in turn (PAN-5188 D-1, the §6.7 seam).
 const FileViewer = lazy(() => import('../viewers/FileViewer'))
 
-export const READ_ONLY_NOTE = 'Read-only: the main checkout is never edited directly.'
+/** PAN-5191: the note on a project root, whose saves go to an edit workspace. */
+export const PROJECT_EDIT_NOTE = 'Edits here are saved to an edit workspace. The main checkout is never changed.'
+export const CREATING_EDIT_NOTE = 'Creating edit workspace…'
 
 function Placeholder({ title, hint, testId }: { title: string; hint?: string; testId: string }) {
   return (
@@ -129,7 +133,11 @@ function CodePaneForFile({
     editor.focus()
   }, [editor, diff])
 
-  const writable = load.status === 'ready' && load.result.kind === 'text' && load.result.writable
+  const rootRef = parseRootId(rootId)
+  const isProjectRoot = rootRef?.kind === 'project'
+  const creatingEdit = useEditWorkspaceStore((s) => (isProjectRoot && rootRef ? s.creating[rootRef.key] === true : false))
+  // PAN-5191: a project root is editable; the first save moves the edit to an edit workspace.
+  const writable = load.status === 'ready' && load.result.kind === 'text' && (load.result.writable || isProjectRoot)
   const preview = pane.explorerPreview === true
   const save = useCodePaneSave({ rootId, path, workspaceId, paneId: pane.paneId, writable, preview })
   const toggleWrap = useCallback(() => setWordWrap((w) => (w === 'on' ? 'off' : 'on')), [])
@@ -260,11 +268,12 @@ function CodePaneForFile({
         onOverwrite={onOverwrite}
         onOpen={onOpenRenamed}
       />
-      {!result.writable ? (
-        <div className="border-b border-border px-3 py-1.5 text-xs text-muted-foreground" data-testid="code-pane-read-only">
-          {READ_ONLY_NOTE}
+      {isProjectRoot ? (
+        <div className="border-b border-border px-3 py-1.5 text-xs text-muted-foreground" data-testid="code-pane-project-note">
+          {creatingEdit ? CREATING_EDIT_NOTE : PROJECT_EDIT_NOTE}
         </div>
       ) : null}
+      {rootRef?.kind === 'workspace' ? <EditWorkspaceNote rootId={rootId} /> : null}
       {diff === 'head' || diskDiff !== undefined ? (
         <div className="min-h-0 flex-1" data-testid="code-pane-changes">
           <ChangesView
@@ -274,7 +283,7 @@ function CodePaneForFile({
             modified={text ?? result.text ?? ''}
             original={diff === 'disk' ? diskDiff : undefined}
             wordWrap={wordWrap}
-            readOnly={!result.writable}
+            readOnly={!writable}
             initialPosition={carriedPosition.current}
             onChange={save.onChange}
             onBlur={save.onBlur}
@@ -299,7 +308,7 @@ function CodePaneForFile({
             path={path}
             value={text ?? result.text ?? ''}
             wordWrap={wordWrap}
-            readOnly={!result.writable}
+            readOnly={!writable}
             onChange={save.onChange}
             onBlur={save.onBlur}
             onSaveShortcut={save.saveNow}

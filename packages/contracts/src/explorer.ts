@@ -247,6 +247,54 @@ export const ExplorerBeginEditResult = Schema.Struct({
 })
 export type ExplorerBeginEditResult = typeof ExplorerBeginEditResult.Type
 
+/** An explorer edit workspace, as GET /api/explorer/edit-workspaces/:workspaceId reports it (PAN-5191). */
+export interface EditWorkspaceInfo {
+  id: string
+  /** 'workspace:<id>' */
+  rootId: string
+  /** 'edit-1113-1405' */
+  name: string
+  /** 'scratch/edit-1113-1405' */
+  branch: string
+  projectKey: string
+  defaultBranch: string
+  path: string
+}
+
+/** Whether an edit workspace can open a PR or use the pipeline, and why not (PAN-5191). */
+export interface EditWorkspaceSupport { available: boolean; reason: string | null }
+
+/** An edit workspace's PR with its merge verdict (PAN-5191 D-F7). */
+export interface EditWorkspacePr {
+  url: string
+  number: number
+  state: 'OPEN' | 'MERGED' | 'CLOSED'
+  isDraft: boolean
+  /** MERGEABLE | CONFLICTING | UNKNOWN */
+  mergeable: string
+  /** CLEAN | DIRTY | BLOCKED | ... */
+  mergeStateStatus: string
+  headSha: string
+  canMerge: boolean
+  /** D-F7 text; null when canMerge. */
+  reason: string | null
+}
+
+export interface EditWorkspaceStatus {
+  workspace: EditWorkspaceInfo
+  pr: EditWorkspacePr | null
+  /** True when the PR is open and the edit branch's HEAD is not its head commit. */
+  unpushedCommits: boolean
+  prSupport: EditWorkspaceSupport
+  pipelineSupport: EditWorkspaceSupport
+}
+
+export interface EditWorkspaceCreatePrInput { mode: 'direct' | 'pipeline'; title: string; body: string; draft: boolean }
+
+export type EditWorkspaceCreatePrResult =
+  | { mode: 'direct'; url: string; number: number; created: boolean }
+  | { mode: 'pipeline'; issueId: string; issueUrl: string; prUrl: string; prNumber: number }
+
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
 /** Values of PanRpcError.code that explorer methods return. */

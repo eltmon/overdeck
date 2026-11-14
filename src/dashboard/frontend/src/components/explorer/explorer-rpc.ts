@@ -7,6 +7,7 @@
 import {
   PanRpcError,
   WS_METHODS,
+  type ExplorerBeginEditResult,
   type ExplorerEntryResult,
   type ExplorerGitStageInput,
   type ExplorerGitStageResult,
@@ -73,6 +74,13 @@ export async function trashPath(rootId: string, path: string): Promise<string> {
 /** Restore a trashed entry to its original path (PAN-5190). */
 export function restoreEntry(rootId: string, trashId: string): Promise<ExplorerRestoreResult> {
   return getTransport().request((client) => (client as PanRpcProtocolClient)[WS_METHODS.explorerRestore]({ rootId, trashId }))
+}
+
+/** Create or reuse the project's edit workspace (PAN-5191). */
+export function beginEdit(projectKey: string, forceNew: boolean): Promise<ExplorerBeginEditResult> {
+  return getTransport().request((client) =>
+    (client as PanRpcProtocolClient)[WS_METHODS.explorerBeginEdit]({ projectKey, forceNew }),
+  )
 }
 
 export function gitStatus(rootId: string): Promise<ExplorerGitStatusResult> {

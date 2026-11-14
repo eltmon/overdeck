@@ -52,7 +52,8 @@ vi.mock('../../viewers/FileViewer', () => ({
   ),
 }))
 
-const { CodePane, READ_ONLY_NOTE } = await import('../CodePane')
+const { CodePane, CREATING_EDIT_NOTE, PROJECT_EDIT_NOTE } = await import('../CodePane')
+const { useEditWorkspaceStore } = await import('../../edit/edit-workspace-store')
 const { draftKey, useCodeDrafts } = await import('../code-drafts')
 const { CodePaneSlot } = await import('../CodePaneSlot')
 
@@ -76,6 +77,7 @@ function textRead(over: Partial<ExplorerReadFileResult> = {}): ExplorerReadFileR
 
 beforeEach(() => {
   useCodeDrafts.setState({ drafts: {} })
+  useEditWorkspaceStore.setState({ creating: {}, active: {}, pending: {} })
   mocks.readFile.mockReset()
   mocks.editor.setPosition.mockReset()
   mocks.editor.revealLineInCenter.mockReset()
@@ -96,15 +98,25 @@ describe('CodePane', () => {
       baseText: 'const a = 1\n',
       baseSignature: 'sig-a',
     })
-    expect(screen.queryByText(READ_ONLY_NOTE)).toBeNull()
+    expect(screen.queryByTestId('code-pane-project-note')).toBeNull()
   })
 
-  it('renders a read-only editor and the note for a file that is not writable', async () => {
+  it('renders an editable editor and the project note on a project root', async () => {
     mocks.readFile.mockResolvedValue(textRead({ writable: false }))
     render(<CodePane pane={pane({ explorerRootId: 'project:overdeck' })} ctx={ctx} />)
     const editor = (await screen.findByTestId('monaco')) as HTMLTextAreaElement
-    expect(editor.readOnly).toBe(true)
-    expect(screen.getByText(READ_ONLY_NOTE)).toBeTruthy()
+    expect(editor.readOnly).toBe(false)
+    expect(screen.getByTestId('code-pane-project-note').textContent).toBe(PROJECT_EDIT_NOTE)
+  })
+
+  it('reads "Creating edit workspace…" while beginEdit runs for the project', async () => {
+    mocks.readFile.mockResolvedValue(textRead({ writable: false }))
+    useEditWorkspaceStore.getState().setCreating('overdeck', true)
+    render(<CodePane pane={pane({ explorerRootId: 'project:overdeck' })} ctx={ctx} />)
+    await screen.findByTestId('monaco')
+    expect(screen.getByTestId('code-pane-project-note').textContent).toBe(CREATING_EDIT_NOTE)
+    act(() => useEditWorkspaceStore.getState().setCreating('overdeck', false))
+    expect(screen.getByTestId('code-pane-project-note').textContent).toBe(PROJECT_EDIT_NOTE)
   })
 
   it('shows unsaved draft text instead of the disk text', async () => {

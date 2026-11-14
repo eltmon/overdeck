@@ -1,0 +1,378 @@
+{
+  "version": "1",
+  "issueId": "PAN-5191",
+  "created": "2026-11-14T01:35:38.518Z",
+  "updated": "2026-11-14T03:05:16.742Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-14T03:05Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-14T03:05:16.742Z"
+    }
+  ],
+  "items": {
+    "edit-gh": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5191",
+      "claimedAt": "2026-11-14T01:35:38.518Z",
+      "doneAt": "2026-11-14T01:38:14.414Z"
+    },
+    "edit-gh.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:38:14.414Z"
+    },
+    "edit-gh.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:38:14.414Z"
+    },
+    "edit-gh.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:38:14.414Z"
+    },
+    "edit-gh.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:38:14.414Z"
+    },
+    "begin-edit": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:43:43.219Z"
+    },
+    "begin-edit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:43:43.219Z"
+    },
+    "begin-edit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:43:43.219Z"
+    },
+    "begin-edit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:43:43.219Z"
+    },
+    "begin-edit.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:43:43.219Z"
+    },
+    "begin-edit.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:43:43.219Z"
+    },
+    "edit-git": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5191",
+      "claimedAt": "2026-11-14T01:43:49.725Z",
+      "doneAt": "2026-11-14T01:45:05.274Z"
+    },
+    "edit-git.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:45:05.274Z"
+    },
+    "edit-git.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:45:05.274Z"
+    },
+    "edit-git.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:45:05.274Z"
+    },
+    "edit-git.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:45:05.274Z"
+    },
+    "edit-remove": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5191",
+      "claimedAt": "2026-11-14T01:45:11.340Z",
+      "doneAt": "2026-11-14T01:46:18.974Z"
+    },
+    "edit-remove.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:46:18.974Z"
+    },
+    "edit-remove.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:46:18.974Z"
+    },
+    "edit-remove.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:46:18.974Z"
+    },
+    "edit-remove.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:46:18.974Z"
+    },
+    "status-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5191",
+      "claimedAt": "2026-11-14T01:46:20.239Z",
+      "doneAt": "2026-11-14T01:49:04.465Z"
+    },
+    "status-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:49:04.465Z"
+    },
+    "status-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:49:04.465Z"
+    },
+    "status-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:49:04.465Z"
+    },
+    "status-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:49:04.465Z"
+    },
+    "direct-pr": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5191",
+      "claimedAt": "2026-11-14T01:49:10.878Z",
+      "doneAt": "2026-11-14T01:51:45.843Z"
+    },
+    "direct-pr.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:51:45.843Z"
+    },
+    "direct-pr.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:51:45.843Z"
+    },
+    "direct-pr.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:51:45.843Z"
+    },
+    "direct-pr.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:51:45.843Z"
+    },
+    "merge-discard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5191",
+      "claimedAt": "2026-11-14T01:51:47.175Z",
+      "doneAt": "2026-11-14T01:54:14.098Z"
+    },
+    "merge-discard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:54:14.098Z"
+    },
+    "merge-discard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:54:14.098Z"
+    },
+    "merge-discard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:54:14.098Z"
+    },
+    "merge-discard.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:54:14.098Z"
+    },
+    "merge-discard.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:54:14.098Z"
+    },
+    "pipeline-pr": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5191",
+      "claimedAt": "2026-11-14T01:54:15.978Z",
+      "doneAt": "2026-11-14T01:56:42.607Z"
+    },
+    "pipeline-pr.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:56:42.607Z"
+    },
+    "pipeline-pr.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:56:42.607Z"
+    },
+    "pipeline-pr.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:56:42.607Z"
+    },
+    "pipeline-pr.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:56:42.607Z"
+    },
+    "pipeline-pr.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:56:42.607Z"
+    },
+    "client-switch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5191",
+      "claimedAt": "2026-11-14T01:56:48.451Z",
+      "doneAt": "2026-11-14T01:59:55.166Z"
+    },
+    "client-switch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:59:55.166Z"
+    },
+    "client-switch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:59:55.166Z"
+    },
+    "client-switch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:59:55.166Z"
+    },
+    "client-switch.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:59:55.166Z"
+    },
+    "client-switch.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:59:55.166Z"
+    },
+    "code-pane-project": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5191",
+      "claimedAt": "2026-11-14T02:00:01.862Z",
+      "doneAt": "2026-11-14T02:02:25.672Z"
+    },
+    "code-pane-project.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:02:25.672Z"
+    },
+    "code-pane-project.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:02:25.672Z"
+    },
+    "code-pane-project.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:02:25.672Z"
+    },
+    "tree-project": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5191",
+      "claimedAt": "2026-11-14T02:02:27.395Z",
+      "doneAt": "2026-11-14T02:05:45.644Z"
+    },
+    "tree-project.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:05:45.644Z"
+    },
+    "tree-project.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:05:45.644Z"
+    },
+    "tree-project.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:05:45.644Z"
+    },
+    "edit-http": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5191",
+      "claimedAt": "2026-11-14T02:05:46.992Z",
+      "doneAt": "2026-11-14T02:10:45.661Z"
+    },
+    "edit-http.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:10:45.661Z"
+    },
+    "edit-http.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:10:45.661Z"
+    },
+    "edit-http.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:10:45.661Z"
+    },
+    "pr-row-discard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5191",
+      "claimedAt": "2026-11-14T02:13:14.834Z",
+      "doneAt": "2026-11-14T02:15:50.929Z"
+    },
+    "create-pr-dialog": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:13:38.878Z"
+    },
+    "create-pr-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:13:38.878Z"
+    },
+    "create-pr-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:13:38.878Z"
+    },
+    "create-pr-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:13:38.878Z"
+    },
+    "create-pr-dialog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:13:38.878Z"
+    },
+    "banner": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5191",
+      "claimedAt": "2026-11-14T02:15:26.420Z",
+      "doneAt": "2026-11-14T02:24:38.232Z"
+    },
+    "pr-row-discard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:15:50.929Z"
+    },
+    "pr-row-discard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:15:50.929Z"
+    },
+    "pr-row-discard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:15:50.929Z"
+    },
+    "docs": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:21:36.718Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:21:36.718Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:21:36.718Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:21:36.718Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:21:36.718Z"
+    },
+    "banner.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:24:38.232Z"
+    },
+    "banner.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:24:38.232Z"
+    },
+    "banner.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:24:38.232Z"
+    },
+    "banner.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:52:59.790Z"
+    },
+    "banner.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:52:59.790Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-14T03:05:16Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5191 (PR #5226)\n\nCodeRabbit posted 8 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4571136491 · .pan/drafts/pan-5191.md:375 [Major]: Do not delete the remote branch when the PR lookup fails.\n  https://github.com/eltmon/overdeck/pull/5226#discussion_r4571136491\n- Thread 4571136494 · src/dashboard/frontend/src/components/explorer/actions/useExplorerActions.ts:295 [Minor]: Route retained undo callbacks to the mutation's edit root.\n  https://github.com/eltmon/overdeck/pull/5226#discussion_r4571136494\n- Thread 4571136498 · src/dashboard/frontend/src/components/explorer/code/useCodePaneSave.ts:102 [Major]: Complete the redirected save when the closed pane was the last code pane.\n  https://github.com/eltmon/overdeck/pull/5226#discussion_r4571136498\n- Thread 4571136500 · src/dashboard/frontend/src/components/explorer/edit/edit-workspace-switch.ts:63 [Major]: Preserve a dirty target when the source draft is clean.\n  https://github.com/eltmon/overdeck/pull/5226#discussion_r4571136500\n- Thread 4571136503 · src/dashboard/frontend/src/components/explorer/edit/EditWorkspaceBanner.tsx:119 [Major]: Protect unsaved drafts before merge or pipeline handoff.\n  https://github.com/eltmon/overdeck/pull/5226#discussion_r4571136503\n- Thread 4571136507 · src/dashboard/frontend/src/components/explorer/edit/PrStatusRow.tsx:45 [Major]: Keep a push action available for an open PR when local commits are not on the PR head.\n  https://github.com/eltmon/overdeck/pull/5226#discussion_r4571136507\n- Thread 4571136508 · src/dashboard/server/services/explorer/edit-workspace-pipeline.ts:82 [Major]: Resume an existing pipeline handoff on retry.\n  https://github.com/eltmon/overdeck/pull/5226#discussion_r4571136508\n- Thread 4571136512 · src/dashboard/server/services/explorer/edit-workspace-pr.ts:138 [Major]: Serialize workspace lifecycle operations so cleanup cannot delete a new commit.\n  https://github.com/eltmon/overdeck/pull/5226#discussion_r4571136512\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5226/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5191`.\n   If you only replied, you are done.\n5. If PR #5226 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
+}

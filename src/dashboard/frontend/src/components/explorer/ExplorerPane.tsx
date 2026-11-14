@@ -23,6 +23,8 @@ import { explorerErrorMessage, listDir, parseRootId, rootLabel } from './explore
 import { useExplorerStore, type RootState, type SelectMode } from './explorerStore'
 import { useExplorerGitStatus } from './git/useExplorerGitStatus'
 import { ExplorerContextMenu, type ExplorerMenuTarget } from './menu/ExplorerContextMenu'
+import { EditWorkspaceBanner } from './edit/EditWorkspaceBanner'
+import { useEditWorkspaceStore } from './edit/edit-workspace-store'
 import { openCodePane, type CodePaneTarget } from './openCodePane'
 import { ContentSearch, type ContentSearchTarget } from './search/ContentSearch'
 import { QuickOpen } from './search/QuickOpen'
@@ -235,6 +237,14 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
     },
     [cancelPreview, openFile, rootId],
   )
+  // PAN-5191: a write on a project root lands on the edit root, so actions open files on the root they wrote.
+  const openFileOnRoot = useCallback(
+    (path: string, id: string) => {
+      cancelPreview()
+      openFile({ rootId: id, path })
+    },
+    [cancelPreview, openFile],
+  )
   const previewFileFromTree = useCallback(
     (path: string) => {
       cancelPreview()
@@ -246,9 +256,16 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
     [cancelPreview, openFile, rootId],
   )
 
-  // PAN-5190 D-E1, D-E2: write actions only on issue/workspace roots with the Changed filter off.
-  const writable = rootKind !== 'project' && !changedOnly
-  const actions = useExplorerActions({ rootId, writable, reloadDirs: reloadLoaded, refreshGit: git.refresh, openFile: openFileFromTree })
+  // PAN-5191: the edit-workspace banner's inputs, from this root's git status.
+  const uncommittedPaths = useMemo(() => (git.result?.entries ?? []).map((e) => e.path), [git.result])
+  const changedPaths = useMemo(
+    () => [...new Set([...uncommittedPaths, ...(git.result?.committed ?? []).map((e) => e.path)])],
+    [uncommittedPaths, git.result],
+  )
+  const creatingEdit = useEditWorkspaceStore((s) => (parsed?.kind === 'project' ? s.creating[parsed.key] === true : false))
+  // PAN-5191: project roots are writable through an edit workspace; the Changed filter still hides write actions.
+  const writable = !changedOnly
+  const actions = useExplorerActions({ rootId, writable, reloadDirs: reloadLoaded, refreshGit: git.refresh, openFile: openFileOnRoot })
   const inline = useInlineEdit({ rootId, root, rows, actions, treeRef })
   const clearSelection = useCallback(() => useExplorerStore.getState().clearSelection(rootId), [rootId])
   const requestDelete = useDeleteFlow(actions, rootId)
@@ -267,8 +284,7 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
     expand: (path) => useExplorerStore.getState().setExpanded(rootId, path, true),
     onMove: (paths, dir) => void actions.move(paths, dir),
     onFiles: (dt, dir) => {
-      if (rootKind === 'project') toast.error("The main checkout is read-only, so files can't be added here.")
-      else if (changedOnly) toast.error('Turn off the Changed filter to add files.')
+      if (changedOnly) toast.error('Turn off the Changed filter to add files.')
       else void uploadDroppedItems(snapshotDroppedItems(dt), dir, actions)
     },
   })
@@ -496,7 +512,22 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
       {git.result?.truncated && (
         <div className="border-b border-border px-3 py-1 text-[11px] text-muted-foreground">Git status shows the first 20,000 changes.</div>
       )}
-      {/* PAN-5191 edit-workspace banner slot */}
+      {parsed?.kind === 'workspace' && (
+        <EditWorkspaceBanner
+          rootId={rootId}
+          deckKey={deckKey}
+          paneId={paneId}
+          changedPaths={changedPaths}
+          hasChanges={uncommittedPaths.length > 0}
+          uncommittedPaths={uncommittedPaths}
+          onGitChanged={git.refresh}
+        />
+      )}
+      {rootKind === 'project' && creatingEdit && (
+        <div className="border-b border-border px-3 py-1.5 text-xs text-muted-foreground" data-testid="explorer-creating-edit">
+          Creating edit workspace…
+        </div>
+      )}
       {contentSearchScope === null ? (
         zonedBody
       ) : (
