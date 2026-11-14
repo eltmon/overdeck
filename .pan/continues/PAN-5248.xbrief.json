@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5248",
   "created": "2026-11-14T05:37:27.839Z",
-  "updated": "2026-11-14T05:48:47.715Z",
+  "updated": "2026-11-14T05:48:58.896Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
     "quality-gate-memory.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T05:48:47.715Z"
+    },
+    "admission-memory-rule": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T05:48:58.896Z"
     }
   }
 }
