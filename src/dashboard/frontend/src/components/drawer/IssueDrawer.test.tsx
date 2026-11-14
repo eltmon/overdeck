@@ -746,7 +746,9 @@ describe('IssueDrawer', () => {
 
     renderDrawer();
 
-    expect(screen.getByTestId('drawer-action-bar')).toHaveClass('px-[22px]', 'py-[12px]', 'border-t', 'bg-card/70');
+    // PAN-5244: the action strip sits in the one-row header; there is no footer.
+    expect(screen.getByTestId('issue-drawer').querySelector('header')).toContainElement(screen.getByTestId('drawer-action-bar'));
+    expect(screen.getByTestId('issue-drawer').querySelector('footer')).toBeNull();
     expect(screen.getByTestId('issue-action-menu')).toBeInTheDocument();
     expect(screen.getByTestId('issue-action-overflow-button')).toBeInTheDocument();
     expect(screen.getByTestId('issue-action-pin-spacer')).toBeInTheDocument();
@@ -760,6 +762,94 @@ describe('IssueDrawer', () => {
     });
     expect(screen.queryByTestId('drawer-action-reset')).toBeNull();
     expect(screen.queryByTestId('drawer-action-stop')).toBeNull();
+  });
+
+  it('renders the header as one row with the state badge and the cost', async () => {
+    const baseFetch = mockFetch();
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => (
+      String(input).endsWith('/costs')
+        ? Response.json({ totalCost: 18.9, totalTokens: 0, sessions: [], byModel: {} })
+        : baseFetch(input, init)
+    )));
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: { 'PAN-1': { issueId: 'PAN-1', state: 'working' } },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    const header = screen.getByTestId('issue-drawer').querySelector('header') as HTMLElement;
+    expect(within(header).getByTestId('drawer-state-badge')).toHaveTextContent('Working');
+    expect(await within(header).findByTestId('drawer-cost')).toHaveTextContent('$18.90');
+    expect(header.querySelector('h2')).toHaveAttribute('title', 'Drawer issue');
+  });
+
+  it('Escape with the pickup popover open closes the popover and keeps the drawer open', async () => {
+    useDashboardStore.setState({
+      issuesRaw: [{ ...issue, hasPlan: true }],
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    fireEvent.click(await screen.findByTestId('pickup-strip-more'));
+    fireEvent.keyDown(screen.getByTestId('pickup-strip-popover'), { key: 'Escape' });
+
+    expect(screen.queryByTestId('pickup-strip-popover')).toBeNull();
+    expect(useDashboardStore.getState().drawer.issueId).toBe('PAN-1');
+  });
+
+  it('Escape with the checks popover open closes the popover and keeps the drawer open', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: {
+        'PAN-1': {
+          issueId: 'PAN-1',
+          state: 'in-review',
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'review-requested', checks: 'green', mergeable: true },
+        },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    const chip = screen.getByTestId('drawer-checks-chip');
+    fireEvent.click(chip);
+    expect(screen.getByTestId('drawer-checks-popover')).toBeInTheDocument();
+    // The popover has nothing focusable, so focus stays on the chip.
+    fireEvent.keyDown(chip, { key: 'Escape' });
+
+    expect(screen.queryByTestId('drawer-checks-popover')).toBeNull();
+    expect(useDashboardStore.getState().drawer.issueId).toBe('PAN-1');
+  });
+
+  it('shows no pickup strip for a merged issue and shows the checks chip', async () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: {
+        'PAN-1': {
+          issueId: 'PAN-1',
+          state: 'merged',
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
+        },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    expect(screen.getByTestId('drawer-checks-chip')).toHaveAttribute('data-status', 'passed');
+    await waitFor(() => expect(screen.queryByTestId('drawer-pickup-strip')).toBeNull());
+  });
+
+  it('opening the drawer issues no skills request', async () => {
+    const fetchMock = mockFetch();
+    vi.stubGlobal('fetch', fetchMock);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    await screen.findByTestId('drawer-pickup-strip');
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/skills/overrides'))).toBe(false);
   });
 
   it('snapshots enabled drawer footer actions for work-running and ready-to-merge phases', () => {
