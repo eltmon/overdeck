@@ -530,6 +530,23 @@ describe('IssueDataService.backfillIssue (PAN-3659)', () => {
     );
     expect(svc.getDerivedState('PAN-2925')).toEqual({ issueId: 'PAN-2925', state: 'closed' });
   });
+
+  it('refreshDerivedStates passes the backfilled id in perIssuePrIds (PAN-5310)', async () => {
+    const svc = makeService();
+    mockResolveMissingIssue.mockResolvedValue(trackerIssue());
+    await svc.backfillIssue('PAN-2925');
+
+    mockLoadIssueStatesForProject.mockReset();
+    mockLoadIssueStatesForProject.mockResolvedValue(new Map());
+
+    await (svc as any).refreshDerivedStates(['PAN-2925']);
+
+    expect(mockLoadIssueStatesForProject).toHaveBeenCalledWith(
+      '/repos/overdeck',
+      ['PAN-2925'],
+      expect.objectContaining({ perIssuePrIds: new Set(['PAN-2925']) }),
+    );
+  });
 });
 
 // PAN-5224 WI-13: an older refreshDerivedStates run must never clobber a

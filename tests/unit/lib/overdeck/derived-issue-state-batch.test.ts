@@ -283,3 +283,72 @@ describe('the batch door lists worktrees once (PAN-4605)', () => {
     expect(states.get('PAN-2')?.attention).toBe('pr-outside-pipeline');
   });
 });
+
+// PAN-5310: a backfilled issue's merged PR has aged out of the repo's
+// ~100-row closed listing, so the batch door reads it one branch at a time —
+// but only for ids the caller names in `perIssuePrIds`.
+describe('the batch door reads a merged PR for a backfilled issue (PAN-5310)', () => {
+  let projectPath: string;
+
+  beforeEach(() => {
+    projectPath = mkdtempSync(join(tmpdir(), 'derived-issue-state-merged-pr-'));
+    git.handler = () => '';
+  });
+
+  afterEach(() => {
+    rmSync(projectPath, { recursive: true, force: true });
+  });
+
+  const mergedPr = {
+    url: 'https://example.test/pr/9', number: 9, reviewState: 'approved' as const,
+    checks: 'green' as const, mergeable: true, merged: true, headSha: sha('a'),
+  };
+
+  it('closes a backfilled issue from its per-issue merged-PR read (ac1)', async () => {
+    const readMergedPr = vi.fn(async () => mergedPr);
+
+    const states = await loadIssueStatesForProject(projectPath, ['PAN-1'], {
+      panes: [],
+      issues: { 'PAN-1': { open: false, labels: [] } },
+      listPullRequests: async () => [],
+      perIssuePrIds: new Set(['PAN-1']),
+      readMergedPr,
+    });
+
+    expect(readMergedPr).toHaveBeenCalledWith('PAN-1', projectPath);
+    expect(states.get('PAN-1')?.state).toBe('closed');
+    expect(states.get('PAN-1')?.pr?.merged).toBe(true);
+    expect(states.get('PAN-1')?.pr?.number).toBe(9);
+  });
+
+  it('never reads the per-issue merged PR without perIssuePrIds (ac2)', async () => {
+    const readMergedPr = vi.fn(async () => mergedPr);
+
+    await loadIssueStatesForProject(projectPath, ['PAN-1'], {
+      panes: [],
+      issues: { 'PAN-1': { open: false, labels: [] } },
+      listPullRequests: async () => [],
+      readMergedPr,
+    });
+
+    expect(readMergedPr).not.toHaveBeenCalled();
+  });
+
+  it('never reads the per-issue merged PR when the listing already has it (ac2)', async () => {
+    const readMergedPr = vi.fn(async () => mergedPr);
+    const listedRow = {
+      number: 9, url: 'https://github.com/o/r/pull/9', state: 'MERGED', mergedAt: '2026-10-24T00:00:00Z',
+      headRefName: 'feature/pan-1', headRefOid: sha('a'),
+    };
+
+    await loadIssueStatesForProject(projectPath, ['PAN-1'], {
+      panes: [],
+      issues: { 'PAN-1': { open: false, labels: [] } },
+      listPullRequests: async () => [listedRow],
+      perIssuePrIds: new Set(['PAN-1']),
+      readMergedPr,
+    });
+
+    expect(readMergedPr).not.toHaveBeenCalled();
+  });
+});

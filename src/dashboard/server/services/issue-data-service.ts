@@ -987,7 +987,7 @@ export class IssueDataService {
     const changedStates: DerivedIssueState[] = [];
     for (const [projectPath, ids] of byProject) {
       try {
-        const states = await loadIssueStatesForProject(projectPath, ids, { issues, panes: await getBackendPanes() });
+        const states = await loadIssueStatesForProject(projectPath, ids, { issues, panes: await getBackendPanes(), perIssuePrIds: new Set(this.backfilledIssues.keys()) });
         for (const [issueId, state] of states) {
           if ((this.derivedWrittenRun.get(issueId) ?? 0) > run) continue;
           this.derivedWrittenRun.set(issueId, run);
