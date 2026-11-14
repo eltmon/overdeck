@@ -44,10 +44,23 @@ export interface WorkspaceNewOptions {
   parentBranch?: string;
   targetPath?: string;
   dryRun?: boolean;
+  origin?: string;
+}
+
+/** PAN-5233 FR-4: an explicit --origin wins; otherwise a managed session is an agent. */
+export function resolveNewWorkspaceOrigin(
+  explicit: string | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): 'operator' | 'agent' {
+  if (explicit === 'operator' || explicit === 'agent') return explicit;
+  if (explicit !== undefined) throw new Error(`Invalid --origin '${explicit}'. Expected operator or agent.`);
+  return env.OVERDECK_AGENT_ID?.trim() || env.OVERDECK_CONVERSATION?.trim() ? 'agent' : 'operator';
 }
 
 export async function workspaceNewCommand(name: string, options: WorkspaceNewOptions): Promise<void> {
   try {
+    const origin = resolveNewWorkspaceOrigin(options.origin);
+
     // Resolution writes nothing, so `--dry-run` leaves no `projects` row, no
     // worktree and no memory home behind — and a rejected `--target-path`
     // leaves no trace either. Seeding happens inside performWorkspaceCreate,
@@ -68,7 +81,7 @@ export async function workspaceNewCommand(name: string, options: WorkspaceNewOpt
       return;
     }
 
-    const { id } = await performWorkspaceCreate(intent);
+    const { id } = await performWorkspaceCreate(intent, { origin });
 
     console.log(chalk.green(`✓ Created scratch workspace '${name}' (${id})`));
     console.log(chalk.dim(`  path: ${intent.path}`));
