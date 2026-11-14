@@ -886,7 +886,8 @@ it runs only after the forge said "merged".
   the closed-issue reaper file any pending delivery before they delete the
   workspace, because the journal goes with it.
 - Settlement is per thread. A thread is settled by a reply on it from anyone
-  but CodeRabbit, by a later single-parent PR commit that changed its file, or
+  but CodeRabbit, by a single-parent PR commit authored after the delivery that changed its
+  file (author date, which a rebase keeps), or
   by a later `review.requested` note naming its id in a `CodeRabbit <ids>:`
   segment (ids match exactly). A failed forge read counts as no evidence, so
   the thread is filed. A commit to a file settles every thread on that file.

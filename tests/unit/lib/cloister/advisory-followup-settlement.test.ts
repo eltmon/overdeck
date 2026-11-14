@@ -79,15 +79,22 @@ describe('settleAdvisoryDelivery: per-thread evidence', () => {
 
   it('P: a later commit settles a thread on its path only', () => {
     const candidate = delivered(5, [thread(11, 'src/a.ts')]);
-    const toB = { commits: [{ sha: 'b', committedAt: AFTER, files: ['src/b.ts'] }], repliedThreadIds: [] };
-    const toA = { commits: [{ sha: 'a', committedAt: AFTER, files: ['src/a.ts'] }], repliedThreadIds: [] };
+    const toB = { commits: [{ sha: 'b', authoredAt: AFTER, files: ['src/b.ts'] }], repliedThreadIds: [] };
+    const toA = { commits: [{ sha: 'a', authoredAt: AFTER, files: ['src/a.ts'] }], repliedThreadIds: [] };
     expect(threadIds(settleAdvisoryDelivery(candidate, [candidate], toB))).toEqual([11]);
     expect(settleAdvisoryDelivery(candidate, [candidate], toA).outcome).toBe('settled');
   });
 
+  it('P: a commit authored before the delivery but rebased after it settles nothing', () => {
+    // The fetch reports author dates, which a rebase keeps; this is the replayed commit's author date.
+    const candidate = delivered(5, [thread(11, 'src/a.ts')]);
+    const rebased = { commits: [{ sha: 'r', authoredAt: BEFORE, files: ['src/a.ts'] }], repliedThreadIds: [] };
+    expect(threadIds(settleAdvisoryDelivery(candidate, [candidate], rebased))).toEqual([11]);
+  });
+
   it('P: an earlier commit settles nothing', () => {
     const candidate = delivered(5, [thread(11, 'src/a.ts')]);
-    const facts = { commits: [{ sha: 'a', committedAt: BEFORE, files: ['src/a.ts'] }], repliedThreadIds: [] };
+    const facts = { commits: [{ sha: 'a', authoredAt: BEFORE, files: ['src/a.ts'] }], repliedThreadIds: [] };
     expect(threadIds(settleAdvisoryDelivery(candidate, [candidate], facts))).toEqual([11]);
   });
 
@@ -116,7 +123,7 @@ describe('settleAdvisoryDelivery: per-thread evidence', () => {
     const reviewA = delivered(100, [thread(11, 'src/a.ts')]);
     const reviewB = delivered(200, [thread(21, 'src/b.ts')]);
     const journal = [reviewA, reviewB, reviewRequested('Agent re-review request (1/3): CodeRabbit 21: guarded b')];
-    const facts = { commits: [{ sha: 'b', committedAt: AFTER, files: ['src/b.ts'] }], repliedThreadIds: [] };
+    const facts = { commits: [{ sha: 'b', authoredAt: AFTER, files: ['src/b.ts'] }], repliedThreadIds: [] };
     expect(settleAdvisoryDelivery(reviewB, journal, facts).outcome).toBe('settled');
     const a = settleAdvisoryDelivery(reviewA, journal, facts);
     expect(a.outcome).toBe('unsettled');
@@ -126,7 +133,7 @@ describe('settleAdvisoryDelivery: per-thread evidence', () => {
   it('failed reads count as no evidence', () => {
     const candidate = delivered(5, [thread(11, 'src/a.ts'), thread(12, 'src/b.ts')]);
     expect(threadIds(settleAdvisoryDelivery(candidate, [candidate], { commits: null, repliedThreadIds: null }))).toEqual([11, 12]);
-    const unreadCommit = { commits: [{ sha: 'a', committedAt: AFTER, files: null }], repliedThreadIds: [] };
+    const unreadCommit = { commits: [{ sha: 'a', authoredAt: AFTER, files: null }], repliedThreadIds: [] };
     expect(threadIds(settleAdvisoryDelivery(candidate, [candidate], unreadCommit))).toEqual([11, 12]);
   });
 });

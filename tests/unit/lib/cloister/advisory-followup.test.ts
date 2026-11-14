@@ -106,7 +106,7 @@ describe('fileAdvisoryFollowups', () => {
   it('files nothing when every thread is settled, and never re-reads the forge for it', async () => {
     const journal = [candidate(900, [thread(11, 'src/a.ts'), thread(12, 'src/b.ts')]), MERGED];
     const deps = harness(journal, {
-      fetchFacts: vi.fn(async () => ({ commits: [{ sha: 's', committedAt: LATER, files: ['src/b.ts'] }], repliedThreadIds: [11] })),
+      fetchFacts: vi.fn(async () => ({ commits: [{ sha: 's', authoredAt: LATER, files: ['src/b.ts'] }], repliedThreadIds: [11] })),
     });
 
     await expect(fileAdvisoryFollowups('PAN-1', WS, deps)).resolves.toEqual([

@@ -205,7 +205,9 @@ async function fetchLaterCommits(repo: string, prNumber: number, since: string, 
   const cutoff = Date.parse(since);
   const rows = jsonLines<{ sha?: string; date?: string; parents?: number }>(await gh([
     'api', '--paginate', `repos/${repo}/pulls/${prNumber}/commits?per_page=100`,
-    '--jq', '.[] | {sha, date: .commit.committer.date, parents: (.parents | length)}',
+    // Author date, not committer date: a rebase rewrites every commit's committer date to the rebase
+    // time, which would make every replayed commit look written after the delivery.
+    '--jq', '.[] | {sha, date: .commit.author.date, parents: (.parents | length)}',
   ]));
   const kept = rows.filter((row): row is { sha: string; date: string; parents: number } =>
     typeof row.sha === 'string' && typeof row.date === 'string' && row.parents === 1 && Date.parse(row.date) > cutoff);
@@ -217,7 +219,7 @@ async function fetchLaterCommits(repo: string, prNumber: number, since: string, 
     } catch {
       files = null;
     }
-    return { sha: row.sha, committedAt: row.date, files };
+    return { sha: row.sha, authoredAt: row.date, files };
   }));
 }
 
@@ -235,7 +237,7 @@ async function fetchRepliedThreadIds(repo: string, prNumber: number, gh: GhRunne
 
 /**
  * PAN-5218: the facts that settle CodeRabbit threads: the PR's single-parent
- * commits later than `since` with their changed files, and the threads someone
+ * commits authored later than `since` with their changed files, and the threads someone
  * other than CodeRabbit replied on. Each failing read yields null (or
  * `files: null` for one commit); never rejects.
  */

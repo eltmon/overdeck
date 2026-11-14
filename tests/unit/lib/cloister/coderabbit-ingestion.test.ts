@@ -158,12 +158,19 @@ describe('fetchPullRequestSettlementFacts (PAN-5218)', () => {
     }) as GhRunner & ReturnType<typeof vi.fn>;
   }
 
+  it('dates commits by author, which a rebase keeps, not by committer', async () => {
+    const gh = fakeGh();
+    await fetchPullRequestSettlementFacts('eltmon/overdeck', 42, SINCE, gh);
+    const listCall = gh.mock.calls.map(([args]) => args as string[]).find((args) => args.some((arg) => arg.includes('/pulls/42/commits')))!;
+    expect(listCall[listCall.indexOf('--jq') + 1]).toContain('date: .commit.author.date');
+  });
+
   it('keeps only later single-parent commits, with files from their commit reads', async () => {
     const gh = fakeGh();
     const facts = await fetchPullRequestSettlementFacts('eltmon/overdeck', 42, SINCE, gh);
     expect(facts.commits).toEqual([
-      { sha: 'later', committedAt: '2026-11-13T21:05:00Z', files: ['src/a.ts'] },
-      { sha: 'later2', committedAt: '2026-11-13T21:07:00Z', files: ['src/b.ts', 'src/c.ts'] },
+      { sha: 'later', authoredAt: '2026-11-13T21:05:00Z', files: ['src/a.ts'] },
+      { sha: 'later2', authoredAt: '2026-11-13T21:07:00Z', files: ['src/b.ts', 'src/c.ts'] },
     ]);
     const reads = gh.mock.calls.map(([args]) => (args as string[]).find((arg) => arg.startsWith('repos/')));
     expect(reads).not.toContain('repos/eltmon/overdeck/commits/merge');
@@ -175,8 +182,8 @@ describe('fetchPullRequestSettlementFacts (PAN-5218)', () => {
       '/commits/later2': async () => { throw new Error('gh: 502'); },
     }));
     expect(facts.commits).toEqual([
-      { sha: 'later', committedAt: '2026-11-13T21:05:00Z', files: ['src/a.ts'] },
-      { sha: 'later2', committedAt: '2026-11-13T21:07:00Z', files: null },
+      { sha: 'later', authoredAt: '2026-11-13T21:05:00Z', files: ['src/a.ts'] },
+      { sha: 'later2', authoredAt: '2026-11-13T21:07:00Z', files: null },
     ]);
   });
 

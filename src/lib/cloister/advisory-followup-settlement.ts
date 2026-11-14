@@ -7,7 +7,8 @@
  * thread. After the merge, each thread is settled when any of these holds:
  *
  * - T: someone other than CodeRabbit replied on the thread;
- * - P: a single-parent PR commit later than the delivery changed the thread's file;
+ * - P: a single-parent PR commit authored later than the delivery changed the
+ *   thread's file (author date: a rebase rewrites committer dates, never author dates);
  * - R: a `review.requested` note later than the delivery names the thread id in
  *   its `CodeRabbit <thread ids>:` segment. Ids match exactly, so `111` never
  *   settles `11`.
@@ -28,10 +29,10 @@ export interface AdvisoryDeliveryData {
   threads: AdvisoryThreadRecord[];
 }
 
-export interface SettlementCommit { sha: string; committedAt: string; /** null when the per-commit read failed */ files: string[] | null }
+export interface SettlementCommit { sha: string; /** git author date: a rebase keeps it */ authoredAt: string; /** null when the per-commit read failed */ files: string[] | null }
 
 export interface PullRequestSettlementFacts {
-  /** Single-parent PR commits later than the cutoff; null when the commit list read failed. */
+  /** Single-parent PR commits authored later than the cutoff; null when the commit list read failed. */
   commits: SettlementCommit[] | null;
   /** Thread ids with a reply from someone other than CodeRabbit; null when the read failed. */
   repliedThreadIds: number[] | null;
@@ -119,7 +120,7 @@ export function settleAdvisoryDelivery(
   const replied = new Set(facts.repliedThreadIds ?? []);
   const changedFiles = new Set<string>();
   for (const commit of facts.commits ?? []) {
-    if (!later(commit.committedAt, deliveredAt)) continue;
+    if (!later(commit.authoredAt, deliveredAt)) continue;
     for (const file of commit.files ?? []) changedFiles.add(file);
   }
   const named = new Set<number>();
