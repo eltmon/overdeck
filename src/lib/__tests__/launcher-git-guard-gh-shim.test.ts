@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { buildConversationGhShimLines, buildGitGuardLines } from '../launcher-git-guard.js';
+import { buildConversationShimLines, buildGitGuardLines } from '../launcher-git-guard.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -170,7 +170,7 @@ describe('grant-label deny (PAN-4343)', () => {
 
 describe('conversation gh shim (PAN-4343)', () => {
   function install(conversationId: string, deny: boolean, path = `${fakeBin}:${process.env.PATH ?? ''}`): string {
-    execFileSync('bash', ['-ec', buildConversationGhShimLines(conversationId, deny).join('\n')], {
+    execFileSync('bash', ['-ec', buildConversationShimLines(conversationId, deny).join('\n')], {
       cwd: home,
       stdio: 'ignore',
       env: { ...process.env, PATH: path },
@@ -186,10 +186,10 @@ describe('conversation gh shim (PAN-4343)', () => {
       );
   }
 
-  it('writes only a gh shim in the conversation guard dir', () => {
+  it('writes a gh shim and a trailer-only git shim in the conversation guard dir', () => {
     const guardDir = install('conv-42', false);
     expect(existsSync(join(guardDir, 'gh'))).toBe(true);
-    expect(existsSync(join(guardDir, 'git'))).toBe(false);
+    expect(existsSync(join(guardDir, 'git'))).toBe(true);
   });
 
   it('passes grant-label writes through for an operator conversation and counts them', async () => {
