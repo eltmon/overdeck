@@ -1,8 +1,9 @@
-/** Pure data helpers for the issue sheet (PAN-5219 WI-5, WI-6). No React. */
+/** Pure data helpers for the issue sheet (PAN-5219 WI-5, WI-6, WI-7). No React. */
 import { PHONE_ISSUE_EVENT_LABELS, type DirectoryEntry, type DirectoryEntryState, type PhoneIssueEvent } from '@overdeck/contracts';
 
 import { classifyDashboardAgent } from '../../lib/agent-classifier';
 import type { Agent } from '../../types';
+import type { IssueCostData } from '../CommandDeck/ZoneCOverviewTabs/queries';
 
 /** D-5: same local calendar day as `now` shows a time; otherwise a date and time. Null for an unparsable `at`. */
 export function formatEventTime(at: string, now: Date): string | null {
@@ -105,4 +106,30 @@ export function pickIssueAgent(
     nowMs,
   );
   return storeAgentSummary(fallback, classification === 'active' ? 'Live' : 'Stopped');
+}
+
+/** D-7: true when `value` has the one field the headline needs; never throws. */
+export function isIssueCostData(value: unknown): value is IssueCostData {
+  return typeof value === 'object' && value !== null && typeof (value as { totalCost?: unknown }).totalCost === 'number';
+}
+
+export function formatUsd(amount: number): string {
+  return `$${amount.toFixed(2)}`;
+}
+
+/** D-7: the headline total, preferring the resolved figure. */
+export function headlineCost(data: IssueCostData): number {
+  return data.resolvedTotalCost ?? data.totalCost;
+}
+
+/** D-7: up to 4 non-zero stages by cost descending, joined with " · ", plus "+N more"; null when every stage is zero or there are none. */
+export function stageCostLine(byStage: Record<string, { cost: number; tokens: number }> | undefined): string | null {
+  if (!byStage) return null;
+  const stages = Object.entries(byStage)
+    .filter(([, { cost }]) => cost > 0)
+    .sort(([, a], [, b]) => b.cost - a.cost);
+  if (stages.length === 0) return null;
+  const shown = stages.slice(0, 4).map(([stage, { cost }]) => `${stage} ${formatUsd(cost)}`);
+  const more = stages.length - shown.length;
+  return more > 0 ? `${shown.join(' · ')} · +${more} more` : shown.join(' · ');
 }

@@ -34,9 +34,25 @@ function renderSheet(
   );
 }
 
-/** Every test's AgentRow fetches the live directory; default it to empty so unrelated tests don't trip the no-unexpected-fetch guard. */
-function stubEmptyLiveDirectory() {
-  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ generatedAt: '2026-01-01T00:00:00.000Z', windowHours: 0, scope: 'live', entries: [] })));
+/** Routes a test's fetch mock by URL substring, falling back to a plain 404. */
+function stubFetch(
+  handlers: Record<string, () => Response | Promise<Response>>,
+  fallback: () => Response | Promise<Response> = () => new Response(null, { status: 404 }),
+) {
+  const mock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = input instanceof Request ? input.url : String(input);
+    const handler = Object.entries(handlers).find(([key]) => url.includes(key))?.[1];
+    return (handler ?? fallback)();
+  });
+  vi.stubGlobal('fetch', mock);
+  return mock;
+}
+
+/** Every test's AgentRow and CostSection fetch; default both to empty/absent so unrelated tests don't trip the no-unexpected-fetch guard. */
+function stubDefaultFetch() {
+  return stubFetch({
+    '/api/agent-directory': () => Response.json({ generatedAt: '2026-01-01T00:00:00.000Z', windowHours: 0, scope: 'live', entries: [] }),
+  });
 }
 
 describe('MobileIssueSheet', () => {
@@ -46,7 +62,7 @@ describe('MobileIssueSheet', () => {
       derivedIssueStateByIssueId: {},
       agentsById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
-    stubEmptyLiveDirectory();
+    stubDefaultFetch();
   });
 
   afterEach(() => {
@@ -241,6 +257,78 @@ describe('MobileIssueSheet', () => {
 
     expect(await screen.findByText('work · opus · claude-code')).toBeInTheDocument();
     expect(screen.getByText(/^Live/)).toBeInTheDocument();
+  });
+
+  it('renders the headline and stage split from a costs response', async () => {
+    const fetchMock = stubDefaultFetch();
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = input instanceof Request ? input.url : String(input);
+      if (url.includes('/agent-directory')) {
+        return Response.json({ generatedAt: '2026-01-01T00:00:00.000Z', windowHours: 0, scope: 'live', entries: [] });
+      }
+      if (url.includes('/costs')) {
+        return Response.json({
+          issueId: 'PAN-13',
+          totalCost: 3.5,
+          resolvedTotalCost: 4.25,
+          totalTokens: 100,
+          sessions: [],
+          byModel: {},
+          byStage: { work: { cost: 3, tokens: 1 }, review: { cost: 1.25, tokens: 1 } },
+        });
+      }
+      return new Response(null, { status: 404 });
+    });
+    useDashboardStore.setState({
+      issuesRaw: [issue({ identifier: 'PAN-13' })],
+      derivedIssueStateByIssueId: {
+        'PAN-13': { issueId: 'PAN-13', state: 'working' },
+      } satisfies Record<string, DerivedIssueState>,
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderSheet('PAN-13');
+
+    expect(await screen.findByText('$4.25')).toBeInTheDocument();
+    expect(screen.getByText('work $3.00 · review $1.25')).toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).includes('/costs')).length).toBe(1);
+  });
+
+  it('renders "Cost not available" for a 403 costs read, fetched exactly once', async () => {
+    const fetchMock = stubFetch({
+      '/api/agent-directory': () => Response.json({ generatedAt: '2026-01-01T00:00:00.000Z', windowHours: 0, scope: 'live', entries: [] }),
+      '/costs': () => new Response(null, { status: 403 }),
+    });
+    useDashboardStore.setState({
+      issuesRaw: [issue({ identifier: 'PAN-14' })],
+      derivedIssueStateByIssueId: {
+        'PAN-14': { issueId: 'PAN-14', state: 'working' },
+      } satisfies Record<string, DerivedIssueState>,
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderSheet('PAN-14');
+
+    expect(await screen.findByText('Cost not available')).toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).includes('/costs')).length).toBe(1);
+  });
+
+  it('renders "No spend recorded" for a zero headline', async () => {
+    stubFetch({
+      '/api/agent-directory': () => Response.json({ generatedAt: '2026-01-01T00:00:00.000Z', windowHours: 0, scope: 'live', entries: [] }),
+      '/costs': () => Response.json({ issueId: 'PAN-15', totalCost: 0, totalTokens: 0, sessions: [], byModel: {} }),
+    });
+    useDashboardStore.setState({
+      issuesRaw: [issue({ identifier: 'PAN-15' })],
+      derivedIssueStateByIssueId: {
+        'PAN-15': { issueId: 'PAN-15', state: 'working' },
+      } satisfies Record<string, DerivedIssueState>,
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderSheet('PAN-15');
+
+    expect(await screen.findByText('No spend recorded')).toBeInTheDocument();
   });
 
   it('renders exactly one button (Back), and tapping it calls onBack', () => {

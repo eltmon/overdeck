@@ -2,7 +2,16 @@ import type { DirectoryEntry } from '@overdeck/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { Agent } from '../../../types';
-import { DIRECTORY_STATE_LABELS, eventLine, formatEventTime, isLiveDirectoryResponse, pickIssueAgent } from '../issueSheetData';
+import {
+  DIRECTORY_STATE_LABELS,
+  eventLine,
+  formatEventTime,
+  headlineCost,
+  isIssueCostData,
+  isLiveDirectoryResponse,
+  pickIssueAgent,
+  stageCostLine,
+} from '../issueSheetData';
 
 function directoryEntry(overrides: Partial<DirectoryEntry>): DirectoryEntry {
   return {
@@ -124,5 +133,61 @@ describe('pickIssueAgent', () => {
   it('ignores conversation entries', () => {
     const picked = pickIssueAgent('PAN-1', [directoryEntry({ kind: 'conversation' })], [], NOW_MS);
     expect(picked).toBeNull();
+  });
+});
+
+function costData(overrides: Partial<import('../../CommandDeck/ZoneCOverviewTabs/queries').IssueCostData>) {
+  return {
+    issueId: 'PAN-1',
+    totalCost: 0,
+    totalTokens: 0,
+    sessions: [],
+    byModel: {},
+    ...overrides,
+  };
+}
+
+describe('isIssueCostData', () => {
+  it('accepts a numeric totalCost and rejects an issue row', () => {
+    expect(isIssueCostData(costData({ totalCost: 1.5 }))).toBe(true);
+    expect(isIssueCostData({ identifier: 'PAN-1', title: 'x' })).toBe(false);
+    expect(isIssueCostData(null)).toBe(false);
+  });
+});
+
+describe('headlineCost', () => {
+  it('prefers resolvedTotalCost over totalCost', () => {
+    expect(headlineCost(costData({ totalCost: 3.5, resolvedTotalCost: 4.25 }))).toBe(4.25);
+  });
+
+  it('falls back to totalCost when resolvedTotalCost is absent', () => {
+    expect(headlineCost(costData({ totalCost: 3.5 }))).toBe(3.5);
+  });
+});
+
+describe('stageCostLine', () => {
+  it('sorts by cost descending and skips zero-cost stages', () => {
+    const line = stageCostLine({
+      work: { cost: 3, tokens: 1 },
+      review: { cost: 1.25, tokens: 1 },
+      plan: { cost: 0, tokens: 1 },
+    });
+    expect(line).toBe('work $3.00 · review $1.25');
+  });
+
+  it('caps at 4 stages and adds "+N more"', () => {
+    const line = stageCostLine({
+      a: { cost: 5, tokens: 1 },
+      b: { cost: 4, tokens: 1 },
+      c: { cost: 3, tokens: 1 },
+      d: { cost: 2, tokens: 1 },
+      e: { cost: 1, tokens: 1 },
+    });
+    expect(line).toBe('a $5.00 · b $4.00 · c $3.00 · d $2.00 · +1 more');
+  });
+
+  it('returns null with no byStage or no non-zero stage', () => {
+    expect(stageCostLine(undefined)).toBeNull();
+    expect(stageCostLine({ work: { cost: 0, tokens: 1 } })).toBeNull();
   });
 });

@@ -1,10 +1,46 @@
-/** Sections of the issue sheet moved out of MobileIssueSheet.tsx to keep it small (PAN-5219 WI-5, WI-6). */
+/** Sections of the issue sheet moved out of MobileIssueSheet.tsx to keep it small (PAN-5219 WI-5 to WI-7). */
 import { useQuery } from '@tanstack/react-query';
 import type { DirectoryEntry } from '@overdeck/contracts';
 
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import type { Agent } from '../../types';
-import { isLiveDirectoryResponse, pickIssueAgent } from './issueSheetData';
+import type { IssueCostData } from '../CommandDeck/ZoneCOverviewTabs/queries';
+import { formatUsd, headlineCost, isIssueCostData, isLiveDirectoryResponse, pickIssueAgent, stageCostLine } from './issueSheetData';
+
+async function fetchIssueCosts(issueId: string): Promise<IssueCostData> {
+  const res = await fetch(`/api/issues/${encodeURIComponent(issueId)}/costs`);
+  if (!res.ok) throw new Error(`issue costs read failed: ${res.status}`);
+  const body: unknown = await res.json();
+  if (!isIssueCostData(body)) throw new Error('issue costs read returned a malformed body');
+  return body;
+}
+
+export function CostSection({ issueId }: { issueId: string }) {
+  const query = useQuery({
+    queryKey: ['mobile-issue-costs', issueId],
+    queryFn: () => fetchIssueCosts(issueId),
+    retry: false,
+    refetchInterval: (q) => (q.state.status === 'error' ? false : 30_000),
+  });
+  const headline = query.data
+    ? headlineCost(query.data) === 0 ? 'No spend recorded' : formatUsd(headlineCost(query.data))
+    : query.isError ? 'Cost not available' : 'Loading…';
+  const stageLine = query.data ? stageCostLine(query.data.byStage) : null;
+  return (
+    <div>
+      <dt className="text-xs text-muted-foreground">Cost</dt>
+      <dd className="break-words text-sm">
+        {headline}
+        {stageLine && (
+          <>
+            <br />
+            <span className="text-xs text-muted-foreground">{stageLine}</span>
+          </>
+        )}
+      </dd>
+    </div>
+  );
+}
 
 async function fetchLiveDirectory(): Promise<DirectoryEntry[]> {
   const res = await fetch('/api/agent-directory?scope=live');

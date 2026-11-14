@@ -22,7 +22,7 @@ import { IssueHeaderTitle } from '../issue-view/IssueHeaderTitle';
 import { useIssueRecord } from '../issue-view/useIssueRecord';
 import { PHASE_LABELS } from '../primitives/PhaseHeader';
 import { eventLine } from './issueSheetData';
-import { AgentRow, SheetHeader, WhatHappened } from './IssueSheetSections';
+import { AgentRow, CostSection, SheetHeader, WhatHappened } from './IssueSheetSections';
 import { issueNeedsOperator, NeedsYouMark } from './MobilePipeline';
 
 export function MobileIssueSheet({
@@ -81,6 +81,7 @@ export function MobileIssueSheet({
           </div>
         )}
         <AgentRow issueId={identifier} storeAgents={agents} />
+        <CostSection issueId={identifier} />
         {issue && issue.labels.length > 0 && (
           <div>
             <dt className="text-xs text-muted-foreground">Labels</dt>
