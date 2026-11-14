@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5191",
   "created": "2026-11-14T01:35:38.518Z",
-  "updated": "2026-11-14T02:52:59.791Z",
+  "updated": "2026-11-14T03:05:16.742Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-14T03:05Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-14T03:05:16.742Z"
+    }
+  ],
   "items": {
     "edit-gh": {
       "status": "completed",
@@ -359,5 +365,14 @@
       "status": "completed",
       "doneAt": "2026-11-14T02:52:59.790Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-14T03:05:16Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5191 (PR #5226)\n\nCodeRabbit posted 8 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4571136491 · .pan/drafts/pan-5191.md:375 [Major]: Do not delete the remote branch when the PR lookup fails.\n  https://github.com/eltmon/overdeck/pull/5226#discussion_r4571136491\n- Thread 4571136494 · src/dashboard/frontend/src/components/explorer/actions/useExplorerActions.ts:295 [Minor]: Route retained undo callbacks to the mutation's edit root.\n  https://github.com/eltmon/overdeck/pull/5226#discussion_r4571136494\n- Thread 4571136498 · src/dashboard/frontend/src/components/explorer/code/useCodePaneSave.ts:102 [Major]: Complete the redirected save when the closed pane was the last code pane.\n  https://github.com/eltmon/overdeck/pull/5226#discussion_r4571136498\n- Thread 4571136500 · src/dashboard/frontend/src/components/explorer/edit/edit-workspace-switch.ts:63 [Major]: Preserve a dirty target when the source draft is clean.\n  https://github.com/eltmon/overdeck/pull/5226#discussion_r4571136500\n- Thread 4571136503 · src/dashboard/frontend/src/components/explorer/edit/EditWorkspaceBanner.tsx:119 [Major]: Protect unsaved drafts before merge or pipeline handoff.\n  https://github.com/eltmon/overdeck/pull/5226#discussion_r4571136503\n- Thread 4571136507 · src/dashboard/frontend/src/components/explorer/edit/PrStatusRow.tsx:45 [Major]: Keep a push action available for an open PR when local commits are not on the PR head.\n  https://github.com/eltmon/overdeck/pull/5226#discussion_r4571136507\n- Thread 4571136508 · src/dashboard/server/services/explorer/edit-workspace-pipeline.ts:82 [Major]: Resume an existing pipeline handoff on retry.\n  https://github.com/eltmon/overdeck/pull/5226#discussion_r4571136508\n- Thread 4571136512 · src/dashboard/server/services/explorer/edit-workspace-pr.ts:138 [Major]: Serialize workspace lifecycle operations so cleanup cannot delete a new commit.\n  https://github.com/eltmon/overdeck/pull/5226#discussion_r4571136512\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5226/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5191`.\n   If you only replied, you are done.\n5. If PR #5226 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
 }
