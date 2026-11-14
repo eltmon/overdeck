@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5248",
   "created": "2026-11-14T05:37:27.839Z",
-  "updated": "2026-11-14T06:21:17.321Z",
+  "updated": "2026-11-14T06:21:25.602Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -196,6 +196,11 @@
     "tsc-admitted-wrapper.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T06:21:17.320Z"
+    },
+    "package-json-lanes": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T06:21:25.602Z"
     }
   }
 }
