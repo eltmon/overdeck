@@ -1,0 +1,919 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T01:40:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5219: Phone: tapping an issue notification opens that issue's sheet, with status, cost, PR, checks and description",
+    "updated": "2026-11-14T01:39:51.368Z"
+  },
+  "plan": {
+    "id": "pan-5219",
+    "title": "Phone: tapping an issue notification opens that issue's sheet, with status, cost, PR, checks and description",
+    "status": "proposed",
+    "uid": "e6c3fed1-4cd6-49ca-aa34-c91181ff9bc5",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-14T01:40:00Z",
+    "updated": "2026-11-14T01:39:51.368Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5219",
+        "label": "PAN-5219",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5219.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "phone",
+      "push-notifications",
+      "mobile",
+      "frontend",
+      "route-scopes"
+    ],
+    "metadata": {
+      "sizeJustification": "One vertical feature: the notification URL (contracts + classifier), the Android link parser that must accept it, the route-scope rows the sheet's new reads need, and the sheet sections that render them. None ships value alone: a URL to a sheet a phone cannot fill, or sheet sections a phone is refused, leaves the operator's tap as broken as today. The subsystem count is inflated by required one-line touches (telemetry contract, docs/TELEMETRY.md, two Mintlify pages, changelog.d, the test subset list) that the route-scope and docs gates force; the file count stays at 25.",
+      "canonicalFilename": "2026-11-14-PAN-5219-phone-tapping-an-issue-notification-opens-that-issue-s-sheet-with-status-cost-pr-checks-and-description.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Tapping a finished, failed or stopped phone notification about an issue opens Needs you (usually empty) because src/lib/push/classify.ts sets url '/m' for agent.heartbeat_dead and pipeline.journal edges. The issue sheet (PAN-4661) lacks description, cost, checks and what happened; a phone cannot read /api/issues/:id/costs or /check-runs (no route-scope rows); and the Android link parser rejects any path but /m.",
+      "Proposal": "A contracts helper builds /m/pipeline?issue=<id>&event=<kind>&at=<iso> from a closed PhoneIssueEvent list; the classifier uses it for issue edges; the Android parser accepts /m/ screens; two route-scope rows (with telemetry and docs entries) open the cost and check-runs reads to phones; the sheet renders What happened, Status (agent from the live Agents Directory), Cost, PR and checks, and a collapsible Markdown description, each with a 'not available' fallback and no early return; Playwright proves it at 390x844 for a pipeline and a Linear issue; docs and changelog say where notifications open. Full detail and decisions D-1..D-16 are in .pan/drafts/PAN-5219.md.",
+      "NonGoals": "- Changing where question and approval notifications open; they keep /m?subject=<id> (D-2)\n- Any action on the sheet (start, stop, merge, tell, retry checks, move); it stays read-only (D-4661-11)\n- A new server route, a pipeline-journal read API, or changes to the /api/issues/:id/costs or /check-runs response shapes\n- Changing the desktop useIssueCostsQuery / useIssueCheckRunsQuery hooks or the desktop issue view\n- Shipping an installed-app build or touching iOS/Android native code (Java and Swift already accept /m/pipeline)\n- Inferring agent idleness in the frontend; idle/live comes from the server's Agents Directory state\n- Summing or recomputing cost numbers in the frontend\n- Listing review sub-agents or conversations in the Agent row beyond a '+N more' count"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Only edge notifications (stopped, finished, failed) link to the issue sheet; question and approval notifications keep /m?subject=<id>.",
+        "rationale": "The issue's Problem and Tests name only the stopped and step notifications; the sheet is read-only, so a question sent there could not be answered."
+      },
+      {
+        "summary": "The What happened line is carried in the URL (event and at parameters) instead of a pipeline-journal read.",
+        "rationale": "No journal read route exists, the notification already knows the event, and the issue lists the URL option first; event is parsed against a closed list so URL text never reaches the screen."
+      },
+      {
+        "summary": "Use /m/pipeline?issue=<id> as the issue specifies and fix the Android link parser, accepting that an older installed Android build opens the machine list until it updates.",
+        "rationale": "The issue names the URL and its test explicitly; a /m?issue= variant would deviate from it. The gap is documented."
+      },
+      {
+        "summary": "Agent live/idle/stopped comes from GET /api/agent-directory?scope=live (server-derived state) with a store-agent fallback.",
+        "rationale": "CLAUDE.md requires one module to answer liveness and idleness; the frontend must not infer idleness."
+      },
+      {
+        "summary": "Cost shows resolvedTotalCost ?? totalCost and the server's byStage entries with raw session_type keys.",
+        "rationale": "Matches the desktop issue header and the issue's 'never compute it in the frontend' rule."
+      },
+      {
+        "summary": "Description collapse is decided by text length (more than 4 lines or 280 characters), and inline Markdown links are exempt from the 44 px tap-target rule.",
+        "rationale": "jsdom cannot measure overflow, and inline prose links cannot be 44 px tall without breaking the text."
+      },
+      {
+        "summary": "Screenshots are committed under apps/mobile/acceptance/ and embedded in the PR body.",
+        "rationale": "Same practice PAN-5208 used for phone screenshots."
+      }
+    ],
+    "items": [
+      {
+        "id": "contracts-phone-issue-event",
+        "title": "Add the PhoneIssueEvent list, labels, parser and sheet path builder to contracts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5219",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/phone-notifications.ts",
+            "tests/unit/contracts/phone-issue-event.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/contracts/phone-issue-event.test.ts",
+            "npm run typecheck:contracts"
+          ],
+          "expected_outputs": [
+            "phone-issue-event.test.ts passes",
+            "typecheck:contracts completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ],
+          "foundationFor": [
+            "classify-issue-urls",
+            "sheet-skeleton-and-event",
+            "mobile-route-issue-event"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Append PhoneIssueEvent, PHONE_ISSUE_EVENT_LABELS, parsePhoneIssueEvent (hasOwnProperty, not Object.hasOwn) and phoneIssueSheetPath to packages/contracts/src/phone-notifications.ts exactly as the PRD snippet shows; add tests/unit/contracts/phone-issue-event.test.ts."
+        },
+        "items": [
+          {
+            "id": "contracts-phone-issue-event.ac1",
+            "title": "Given kind stopped and at 2026-11-13T19:43:00.000Z, phoneIssueSheetPath('PAN-5', event) returns /m/pipeline?issue=PAN-5&event=stopped&at=2026-11-13T19%3A43%3A00.000Z, and without an event returns /m/pipeline?issue=PAN-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-phone-issue-event.ac2",
+            "title": "parsePhoneIssueEvent returns each of the six PhoneIssueEvent keys and returns null for '__proto__', 'toString', '', null and 'merge'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-phone-issue-event.ac3",
+            "title": "PHONE_ISSUE_EVENT_LABELS returns 'Agent stopped responding' for stopped and 'Merged' for merge.completed, and an import from @overdeck/contracts resolves all four new exports",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "classify-issue-urls",
+        "title": "Link stopped and pipeline-step notifications to the issue sheet",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5219",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/push/classify.ts",
+            "tests/unit/lib/push/classify.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/push/classify.test.ts tests/unit/lib/push/dispatcher.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "classify.test.ts and dispatcher.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/lib/push/classify.ts, set url via phoneIssueSheetPath for agent.heartbeat_dead (when issueId is set; else keep '/m') and for pipeline.journal edges with at = entry.at ?? event.timestamp (never the data.head stamp). Type JOURNAL_EDGES keys against PhoneIssueEvent. Leave pending-item (question/approval) URLs unchanged. Update tests/unit/lib/push/classify.test.ts lines 81 and 92 and add the new cases."
+        },
+        "items": [
+          {
+            "id": "classify-issue-urls.ac1",
+            "title": "Given agent.heartbeat_dead with issueId PAN-5, edgeNotificationFromEvent returns url /m/pipeline?issue=PAN-5&event=stopped&at=<encoded event.timestamp>; without issueId it returns url /m",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "classify-issue-urls.ac2",
+            "title": "Given each JOURNAL_EDGES entry type for PAN-9, the notification url equals phoneIssueSheetPath('PAN-9', { kind: type, at }) where at is entry.at when present, else event.timestamp (a SHA in data.head is never used)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "classify-issue-urls.ac3",
+            "title": "A question PendingItem with issueId still produces url /m?subject=<agentId> (D-2)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "android-notification-link-paths",
+        "title": "Let the Android notification link parser open /m/ screens",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:40:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5219",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/notificationLink.ts",
+            "apps/mobile/src/shell/__tests__/notificationLink.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd apps/mobile && npx vitest run --config vitest.config.ts src/shell/__tests__/notificationLink.test.ts",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "notificationLink.test.ts passes",
+            "typecheck:mobile completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In apps/mobile/src/shell/notificationLink.ts accept pathname '/m' or any pathname starting with '/m/' and return parsed.pathname + parsed.search; update the NotificationOpen.path doc comment and add tests. Implementation checkpoint (PRD WI-3): if an iOS Simulator or Android emulator is reachable, confirm a cold load of /m/pipeline?issue=PAN-1 shows the sheet and record it in the PR body; a blank/404 page means stop and pan tell the flywheel; no device means say so in the PR body."
+        },
+        "items": [
+          {
+            "id": "android-notification-link-paths.ac1",
+            "title": "Given a v1 link whose p is /m/pipeline?issue=PAN-5&event=stopped&at=x, parseNotificationLink returns path /m/pipeline?issue=PAN-5&event=stopped&at=x",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "android-notification-link-paths.ac2",
+            "title": "parseNotificationLink still returns null for p=/mx and p=/m/../settings and still returns /m and /m?subject=… for the existing cases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-scopes-issue-reads",
+        "title": "Allow phone credentials to read issue costs and check runs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5219",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/route-scopes.ts",
+            "src/dashboard/server/__tests__/route-scopes.test.ts",
+            "packages/contracts/src/telemetry.ts",
+            "docs/TELEMETRY.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/route-scopes.test.ts tests/unit/telemetry-docs.test.ts tests/unit/contracts/telemetry-client-route.test.ts src/dashboard/server/__tests__/route-scopes-machine.test.ts src/dashboard/server/__tests__/route-scopes-linked.test.ts src/dashboard/server/__tests__/scoped-token-acceptance.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all six listed test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ],
+          "foundationFor": [
+            "sheet-cost-section",
+            "sheet-pr-checks-section"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add GET /api/issues/:id/check-runs (read:state) and GET /api/issues/:id/costs (read:costs) after the /api/issues/:id row in src/dashboard/server/route-scopes.ts; add both paths in sorted order to TELEMETRY_CLIENT_ROUTES in packages/contracts/src/telemetry.ts and to the client_route cell of docs/TELEMETRY.md; extend route-scopes.test.ts. Grep the other ROUTE_SCOPES/requiredScopeFor test files for admin assertions on these paths first."
+        },
+        "items": [
+          {
+            "id": "route-scopes-issue-reads.ac1",
+            "title": "requiredScopeFor('GET', '/api/issues/MIN-1141/costs') returns read:costs and requiredScopeFor('GET', '/api/issues/PAN-1/check-runs') returns read:state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-scopes-issue-reads.ac2",
+            "title": "requiredScopeFor returns admin for POST /api/issues/PAN-1/costs, GET /api/issues/PAN-1/pr and GET /api/issues/PAN-1/tasks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-scopes-issue-reads.ac3",
+            "title": "TELEMETRY_CLIENT_ROUTES and the docs/TELEMETRY.md client_route row list /api/issues/:id/check-runs then /api/issues/:id/costs between /api/issues/:id and /api/issues/resource-allocated, and telemetry-docs.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sheet-skeleton-and-event",
+        "title": "Render the issue sheet without an issue record and show the What happened line",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5219",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileIssueSheet.tsx",
+            "src/dashboard/frontend/src/components/mobile/IssueSheetSections.tsx",
+            "src/dashboard/frontend/src/components/mobile/issueSheetData.ts",
+            "src/dashboard/frontend/src/components/mobile/__tests__/issueSheetData.test.ts",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileIssueSheet.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/mobile/__tests__/MobileIssueSheet.test.tsx src/components/mobile/__tests__/issueSheetData.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "MobileIssueSheet.test.tsx and issueSheetData.test.ts pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-9",
+            "FR-11"
+          ],
+          "foundationFor": [
+            "sheet-agent-status",
+            "sheet-cost-section",
+            "sheet-pr-checks-section",
+            "sheet-description-section",
+            "mobile-route-issue-event"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Create issueSheetData.ts (formatEventTime, eventLine per D-4/D-5) and IssueSheetSections.tsx (WhatHappened). MobileIssueSheet gains an optional event prop, drops the early return (D-10), derives state by issueId when there is no record, and shows 'Not available' for a missing State. Add issueSheetData.test.ts to scripts/frontend-test-subset.txt (sorted)."
+        },
+        "items": [
+          {
+            "id": "sheet-skeleton-and-event.ac1",
+            "title": "Given event { kind: 'merge.completed', at } and derived.pr.number 12, the sheet renders data-testid mobile-issue-event containing 'Merged PR #12 at ' plus the D-5 time; without an event prop no mobile-issue-event element renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sheet-skeleton-and-event.ac2",
+            "title": "Given an id whose GET /api/issues/:id answers 404 and a derived state 'working', the sheet renders 'not found on tracker', the Phase row and State 'working' instead of returning early",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sheet-skeleton-and-event.ac3",
+            "title": "formatEventTime returns null for an unparsable at and eventLine returns 'Agent stopped responding' for kind stopped with at null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sheet-skeleton-and-event.ac4",
+            "title": "scripts/frontend-test-subset.txt contains src/components/mobile/__tests__/issueSheetData.test.ts in sorted position",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sheet-agent-status",
+        "title": "Show the issue's agent with role, model, harness, live status and last activity",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5219",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileIssueSheet.tsx",
+            "src/dashboard/frontend/src/components/mobile/IssueSheetSections.tsx",
+            "src/dashboard/frontend/src/components/mobile/issueSheetData.ts",
+            "src/dashboard/frontend/src/components/mobile/__tests__/issueSheetData.test.ts",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileIssueSheet.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/mobile/__tests__/MobileIssueSheet.test.tsx src/components/mobile/__tests__/issueSheetData.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "MobileIssueSheet.test.tsx and issueSheetData.test.ts pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Add isLiveDirectoryResponse, pickIssueAgent and DIRECTORY_STATE_LABELS to issueSheetData.ts per D-6; read GET /api/agent-directory?scope=live (key ['mobile-issue-agents-live'], retry false, 15 s, stops on error); render the Agent row summary plus '<status> · active <relative time>' or 'No agent'; remove agentSummary."
+        },
+        "items": [
+          {
+            "id": "sheet-agent-status.ac1",
+            "title": "Given a live directory entry { kind: 'agent', issueId: 'PAN-12', role: 'work', model: 'opus', harness: 'claude-code', state: 'working' }, the Agent row renders 'work · opus · claude-code' and 'Live'; state 'idle' renders 'Idle'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sheet-agent-status.ac2",
+            "title": "Given the directory answered with no entry for the issue and a store agent for it, the Agent row renders 'Stopped'; given the directory request fails and the store agent has hasLivePane true, it renders 'Live'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sheet-agent-status.ac3",
+            "title": "pickIssueAgent returns the entry with the latest lastActivityAt, skips kind 'conversation' entries, and returns more = N for N extra live agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sheet-cost-section",
+        "title": "Show the issue's total spend and per-stage split on the sheet",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5219",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileIssueSheet.tsx",
+            "src/dashboard/frontend/src/components/mobile/IssueSheetSections.tsx",
+            "src/dashboard/frontend/src/components/mobile/issueSheetData.ts",
+            "src/dashboard/frontend/src/components/mobile/__tests__/issueSheetData.test.ts",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileIssueSheet.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/mobile/__tests__/MobileIssueSheet.test.tsx src/components/mobile/__tests__/issueSheetData.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "MobileIssueSheet.test.tsx and issueSheetData.test.ts pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Add isIssueCostData, formatUsd, headlineCost and stageCostLine to issueSheetData.ts; CostSection runs useQuery ['mobile-issue-costs', ID] on /api/issues/<id>/costs with retry false and refetchInterval 30 s that turns off after an error, and renders the D-7 texts. The frontend never adds cost numbers."
+        },
+        "items": [
+          {
+            "id": "sheet-cost-section.ac1",
+            "title": "Given a costs response with totalCost 3.5, resolvedTotalCost 4.25 and byStage work 3 / review 1.25, the Cost row renders '$4.25' and 'work $3.00 · review $1.25'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sheet-cost-section.ac2",
+            "title": "Given the costs request answers 403, the Cost row renders 'Cost not available' and fetch is called exactly once for the /costs URL (no retry)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sheet-cost-section.ac3",
+            "title": "Given totalCost 0 and no resolvedTotalCost, the Cost row renders 'No spend recorded'; stageCostLine caps at 4 entries and appends ' · +N more'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sheet-pr-checks-section",
+        "title": "Show the pull request, its state, review decision and checks summary",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5219",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileIssueSheet.tsx",
+            "src/dashboard/frontend/src/components/mobile/IssueSheetSections.tsx",
+            "src/dashboard/frontend/src/components/mobile/issueSheetData.ts",
+            "src/dashboard/frontend/src/components/mobile/__tests__/issueSheetData.test.ts",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileIssueSheet.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/mobile/__tests__/MobileIssueSheet.test.tsx src/components/mobile/__tests__/issueSheetData.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "MobileIssueSheet.test.tsx and issueSheetData.test.ts pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Add isCheckRunsResponse, prStateLabel, REVIEW_LABELS and checksText to issueSheetData.ts per D-8; PrChecksSection runs useQuery ['mobile-issue-check-runs', ID] on /api/issues/<id>/check-runs (retry false, 60 s, stops on error) and replaces the old Pull request row with the PR link row and Checks row (links min-h-11 min-w-11)."
+        },
+        "items": [
+          {
+            "id": "sheet-pr-checks-section.ac1",
+            "title": "Given derived.pr { number: 12, reviewState: 'approved', checks: 'green', merged: true } and a check-runs summary of 4 passed, 1 failed, 0 running, the sheet renders a link '#12', 'Merged', 'Approved' and a link '4 passed · 1 failed · 0 running' whose href ends with /checks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sheet-pr-checks-section.ac2",
+            "title": "Given the check-runs request answers 500 and derived.pr.checks is 'red', the Checks row renders 'Checks failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sheet-pr-checks-section.ac3",
+            "title": "Given no derived.pr and a check-runs response with pr null, the sheet renders 'No pull request' and no Checks row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sheet-description-section",
+        "title": "Render the issue description as collapsible Markdown",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5219",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileIssueSheet.tsx",
+            "src/dashboard/frontend/src/components/mobile/IssueSheetSections.tsx",
+            "src/dashboard/frontend/src/components/mobile/issueSheetData.ts",
+            "src/dashboard/frontend/src/components/mobile/__tests__/issueSheetData.test.ts",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileIssueSheet.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/mobile/__tests__/MobileIssueSheet.test.tsx src/components/mobile/__tests__/issueSheetData.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "MobileIssueSheet.test.tsx and issueSheetData.test.ts pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Add shouldCollapseDescription to issueSheetData.ts (more than 4 lines or 280 characters); DescriptionSection renders ChatMarkdown (cwd undefined) inside data-testid mobile-issue-description with data-collapsed and a Show more/Show less button only when collapsible; 'No description.' when blank, 'Description not available.' with no record."
+        },
+        "items": [
+          {
+            "id": "sheet-description-section.ac1",
+            "title": "Given description '## Steps\\n\\n- one\\n- two', the sheet renders a heading 'Steps' inside mobile-issue-description",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sheet-description-section.ac2",
+            "title": "Given a 400-character description, the sheet renders 'Show more' with data-collapsed='true', and clicking it renders 'Show less' with data-collapsed='false'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sheet-description-section.ac3",
+            "title": "Given no description, the sheet renders 'No description.' and exactly one button (Back), every fetch call during the render uses GET (no POST, PUT, PATCH or DELETE), and the sheet's only h2 is the title",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mobile-route-issue-event",
+        "title": "Carry the event and time from the notification URL into the issue sheet",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5219",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileApp.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileApp.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/mobile/__tests__/MobileApp.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "MobileApp.test.tsx passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. MobileRoute gains optional issueEvent; readMobileRoute sets it only on /m/pipeline with issue and a known event; mobilePath uses phoneIssueSheetPath; MobileApp passes event={route.issueEvent ?? null} to MobileIssueSheet; openIssue/closeIssue drop the event; update the header comment."
+        },
+        "items": [
+          {
+            "id": "mobile-route-issue-event.ac1",
+            "title": "readMobileRoute('?issue=PAN-5&event=stopped&at=2026-11-13T19%3A43%3A00.000Z', '/m/pipeline') returns issueEvent { kind: 'stopped', at: '2026-11-13T19:43:00.000Z' }; event=bogus returns no issueEvent key; an event parameter on /m is ignored",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-route-issue-event.ac2",
+            "title": "Given the window URL /m/pipeline?issue=PAN-5&event=stopped&at=<iso>, MobileApp renders mobile-issue-event containing 'Agent stopped responding'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-route-issue-event.ac3",
+            "title": "Tapping Back from that sheet pushes /m/pipeline with no event or at parameter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "playwright-issue-sheet",
+        "title": "Prove the issue sheet at phone size with Playwright and attach screenshots",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5219",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-5219-mobile-issue-sheet.spec.ts",
+            "src/dashboard/frontend/tests/pan-4661-mobile-pipeline.spec.ts",
+            "src/dashboard/frontend/package.json",
+            "apps/mobile/acceptance/pan-5219-*.png"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-5219-mobile-issue-sheet.spec.ts tests/pan-4661-mobile-pipeline.spec.ts"
+          ],
+          "expected_outputs": [
+            "both Playwright specs pass",
+            "test-results/pan-5219/pipeline-issue.png and linear-issue.png are written"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. New spec tests/pan-5219-mobile-issue-sheet.spec.ts (snapshot-cache seeding, closed /ws/rpc, page.route stubs for costs, check-runs and agent-directory) with Test A (PAN-90010 pipeline issue with event merge.completed) and Test B (MIN-1141 Linear issue with event stopped); extend pan-4661-mobile-pipeline.spec.ts to stub and allow exactly /api/issues/PAN-90002/costs, /api/issues/PAN-90002/check-runs and /api/agent-directory; add the spec to test:playwright; copy the two PNGs to apps/mobile/acceptance/ and embed them in the PR body. Use an isolated browser context; never another agent's Playwright session."
+        },
+        "items": [
+          {
+            "id": "playwright-issue-sheet.ac1",
+            "title": "Given /m/pipeline?issue=PAN-90010&event=merge.completed&at=<iso> at 390x844, the page renders 'Merged PR #90010 at', '$2.50', '3 passed · 0 failed · 1 running', 'Approved', 'Live' and 'Show more', with innerWidth 390 and scrollX 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-issue-sheet.ac2",
+            "title": "Given /m/pipeline?issue=MIN-1141&event=stopped&at=<iso> with costs answering 403, the page renders 'Agent stopped responding at', 'Cost not available', 'No pull request', 'No agent' and the description text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-issue-sheet.ac3",
+            "title": "Every visible button and link outside [data-testid=mobile-issue-description] measures at least 44x44 px in both tests, and pan-4661-mobile-pipeline.spec.ts passes with its Test A permitting (not requiring) only /api/issues/PAN-90002/costs, /api/issues/PAN-90002/check-runs and /api/agent-directory beyond the /m baseline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-issue-sheet.ac4",
+            "title": "The branch contains apps/mobile/acceptance/pan-5219-pipeline-issue.png and pan-5219-linear-issue.png, and the test:playwright script contains tests/pan-5219-mobile-issue-sheet.spec.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-changelog",
+        "title": "Document where issue notifications open and what the sheet shows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5219",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/phone.mdx",
+            "configuration/push-notifications.mdx",
+            "changelog.d/pan-5219.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. Update configuration/phone.mdx ('See the pipeline' and 'Notifications', including the D-14 older-app note), configuration/push-notifications.mdx (Delivery step, line 56-58) and add changelog.d/pan-5219.md with the Improved entry from the PRD."
+        },
+        "items": [
+          {
+            "id": "docs-and-changelog.ac1",
+            "title": "configuration/phone.mdx states that a finished, failed or stopped notification about an issue opens that issue's sheet with a What happened line, that questions still open Needs you, and that an older installed Android app opens the machine list until it updates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac2",
+            "title": "configuration/push-notifications.mdx contains /m/pipeline?issue=<id> as the tap target for finished, failed or stopped items about an issue and /m for items with no issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac3",
+            "title": "changelog.d/pan-5219.md contains exactly one '#### Improved' heading with one bullet linking #5219, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-phone-issue-event",
+        "to": "classify-issue-urls",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-phone-issue-event",
+        "to": "sheet-skeleton-and-event",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-phone-issue-event",
+        "to": "mobile-route-issue-event",
+        "type": "blocks"
+      },
+      {
+        "from": "sheet-skeleton-and-event",
+        "to": "sheet-agent-status",
+        "type": "blocks"
+      },
+      {
+        "from": "sheet-agent-status",
+        "to": "sheet-cost-section",
+        "type": "blocks"
+      },
+      {
+        "from": "sheet-cost-section",
+        "to": "sheet-pr-checks-section",
+        "type": "blocks"
+      },
+      {
+        "from": "sheet-pr-checks-section",
+        "to": "sheet-description-section",
+        "type": "blocks"
+      },
+      {
+        "from": "sheet-skeleton-and-event",
+        "to": "mobile-route-issue-event",
+        "type": "blocks"
+      },
+      {
+        "from": "sheet-description-section",
+        "to": "playwright-issue-sheet",
+        "type": "blocks"
+      },
+      {
+        "from": "mobile-route-issue-event",
+        "to": "playwright-issue-sheet",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
