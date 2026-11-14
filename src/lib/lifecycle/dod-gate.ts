@@ -241,7 +241,7 @@ export interface EvaluateDodGateDeps {
   tests: (issueId: string, settlement?: TerminalVerdictSettlement, landing?: LandingEvidence) => DodRowResult | Promise<DodRowResult>;
   verification: (issueId: string, settlement?: TerminalVerdictSettlement, landing?: LandingEvidence) => DodRowResult | Promise<DodRowResult>;
   merged: (ctx: LifecycleContext) => MergedDodRowResult | Promise<MergedDodRowResult>;
-  postMerge: (ctx: LifecycleContext, merged?: MergedDodRowResult) => DodRowResult | Promise<DodRowResult>;
+  postMerge: (ctx: LifecycleContext, merged?: MergedDodRowResult, landing?: LandingEvidence) => DodRowResult | Promise<DodRowResult>;
   mainVerify: (ctx: LifecycleContext, mergeCommit?: string) => DodRowResult | Promise<DodRowResult>;
   ship: (ctx: LifecycleContext) => DodRowResult | Promise<DodRowResult>;
   deploy: (ctx: LifecycleContext, merge: {
@@ -261,7 +261,7 @@ const defaultEvaluateDodGateDeps: EvaluateDodGateDeps = {
   tests: (issueId, settlement, landing) => checkTestsRow(issueId, defaultDeps, settlement, landing),
   verification: (issueId, settlement, landing) => checkVerificationRow(issueId, defaultDeps, settlement, landing),
   merged: checkMergedRow,
-  postMerge: checkPostMergeRow,
+  postMerge: (ctx, merged, landing) => checkPostMergeRow(ctx, merged, undefined, landing),
   mainVerify: checkMainVerifyRow,
   ship: checkShipRow,
   deploy: checkDeployRow,
@@ -796,7 +796,7 @@ export async function evaluateDodGate(
     deps.review(ctx.issueId, settlement, landing),
     deps.tests(ctx.issueId, settlement, landing),
     deps.verification(ctx.issueId, settlement, landing),
-    deps.postMerge(ctx, merged),
+    deps.postMerge(ctx, merged, landing),
     deps.ship(ctx),
     deps.deploy(ctx, {
       mergedAt: merged.mergedAt,

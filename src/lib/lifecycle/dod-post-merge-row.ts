@@ -7,6 +7,7 @@ import { isAlive, isConfirmedDead, type LivenessVerdict } from '../agents/livene
 import { getAutoCloseOutCanonicalState } from './auto-close-out-canonical-state.js';
 import { PullRequestReadError, readPullRequestWithRetry } from './dod-pr-read.js';
 import { fetchIssuePullRequest } from '../overdeck/pull-requests.js';
+import { readForgeMergeVerdict, type RepoLandingEvidence } from './dod-forge-merge.js';
 import { dodRowResult as result, type DodRowResult } from './dod.js';
 import type { LifecycleContext } from './types.js';
 
@@ -54,6 +55,7 @@ export async function checkPostMergeRow(
   ctx: LifecycleContext,
   merged?: PostMergeMergedEvidence,
   deps: PostMergeRowDeps = defaultPostMergeRowDeps,
+  landing?: { forgeMerge?: () => Promise<RepoLandingEvidence> },
 ): Promise<DodRowResult> {
   try {
     const canonicalState = await deps.readCanonicalState(ctx);
@@ -128,6 +130,18 @@ export async function checkPostMergeRow(
         blockingAgents.length === 0 ? 'pass' : 'miss',
         `non-PR landing (branch-containment evidence) — post-merge lifecycle not applicable; ${agentsObserved}`,
       );
+    }
+    // PAN-5225: a non-GitHub-tracked issue has no canonical state and no PR mergedAt;
+    // complete merged forge artifacts are its mergedAt.
+    if (!lifecycleObserved && landing?.forgeMerge) {
+      const verdict = await readForgeMergeVerdict(landing.forgeMerge);
+      if (verdict.kind === 'complete') {
+        return result(
+          'post-merge',
+          blockingAgents.length === 0 ? 'pass' : 'miss',
+          `${stateObserved}; ${verdict.text} — merged forge artifacts stand in for the PR mergedAt on a non-GitHub-tracked issue; ${agentsObserved}`,
+        );
+      }
     }
     return result(
       'post-merge',

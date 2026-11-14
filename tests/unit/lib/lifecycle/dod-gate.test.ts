@@ -857,6 +857,55 @@ describe('Definition-of-Done post-merge row', () => {
     expect(row).toMatchObject({ status: 'pass' });
     expect(isAliveSpy).not.toHaveBeenCalled();
   });
+
+  // PAN-5225: a non-GitHub-tracked issue has no canonical state and no PR
+  // mergedAt, so complete merged forge artifacts stand in for mergedAt.
+  const nonGitHubCtx = { issueId, projectPath: '/tmp/overdeck' };
+
+  it('passes a non-GitHub issue whose forge merge evidence is complete', async () => {
+    const row = await checkPostMergeRow(nonGitHubCtx, undefined, {
+      readCanonicalState: async () => null,
+      readMergedAt: () => undefined,
+      listAgents: clearAgents,
+      isAlive: aliveAgent,
+    }, {
+      forgeMerge: async () => ({ repos: [{ repoKey: 'fe', state: 'merged', url: 'u', reason: '' }] }),
+    });
+
+    expect(row).toMatchObject({ status: 'pass' });
+    expect(row.observed).toContain('forge merge complete: fe merged (u)');
+    expect(row.observed).toContain('merged forge artifacts stand in for the PR mergedAt');
+  });
+
+  it('still misses when the forge merge evidence is incomplete', async () => {
+    const row = await checkPostMergeRow(nonGitHubCtx, undefined, {
+      readCanonicalState: async () => null,
+      readMergedAt: () => undefined,
+      listAgents: clearAgents,
+      isAlive: aliveAgent,
+    }, {
+      forgeMerge: async () => ({ repos: [{ repoKey: 'openclaw-plugin', state: 'unlanded', reason: 'openclaw-plugin: feature/min-1139 is not on origin/main and has no merged review artifact' }] }),
+    });
+
+    expect(row).toMatchObject({
+      status: 'miss',
+      observed: 'canonical state unavailable; PR mergedAt: not merged; no running work/planning agents',
+    });
+  });
+
+  it('misses when a live work agent blocks despite complete forge evidence', async () => {
+    const row = await checkPostMergeRow(nonGitHubCtx, undefined, {
+      readCanonicalState: async () => null,
+      readMergedAt: () => undefined,
+      listAgents: () => [{ id: 'agent-pan-2715', issueId, role: 'work', status: 'running' }],
+      isAlive: aliveAgent,
+    }, {
+      forgeMerge: async () => ({ repos: [{ repoKey: 'fe', state: 'merged', url: 'u', reason: '' }] }),
+    });
+
+    expect(row).toMatchObject({ status: 'miss' });
+    expect(row.observed).toContain('running agents: agent-pan-2715');
+  });
 });
 
 describe('Definition-of-Done main-verification row', () => {
@@ -1305,7 +1354,7 @@ describe('assembled Definition-of-Done gate', () => {
     expect(gate.rows.map(row => row.id)).toEqual(DOD_ROWS.slice(0, 8).map(row => row.id));
   });
 
-  it('reads repo landing evidence once for a non-GitHub issue, and never for a GitHub issue (PAN-5209)', async () => {
+  it('reads repo landing evidence once for a non-GitHub issue, and never for a GitHub issue (PAN-5209/PAN-5225)', async () => {
     const forgeMergeSpy = vi.fn(async () => ({ repos: [] }));
     const review = async (_issueId: string, _settlement?: unknown, landing?: { forgeMerge?: () => Promise<unknown> }) => {
       await landing?.forgeMerge?.();
@@ -1315,13 +1364,17 @@ describe('assembled Definition-of-Done gate', () => {
       await landing?.forgeMerge?.();
       return makeRow('tests', 'skip');
     };
+    const postMerge = async (_ctx: unknown, _merged?: unknown, landing?: { forgeMerge?: () => Promise<unknown> }) => {
+      await landing?.forgeMerge?.();
+      return makeRow('post-merge', 'skip');
+    };
 
-    await evaluateDodGate(ctx, {}, { ...deps(), review, tests, forgeMerge: forgeMergeSpy });
+    await evaluateDodGate(ctx, {}, { ...deps(), review, tests, postMerge, forgeMerge: forgeMergeSpy });
     expect(forgeMergeSpy).toHaveBeenCalledTimes(1);
 
     forgeMergeSpy.mockClear();
     const githubCtx = { ...ctx, github: { owner: 'eltmon', repo: 'overdeck', number: 100 } };
-    await evaluateDodGate(githubCtx, {}, { ...deps(), review, tests, forgeMerge: forgeMergeSpy });
+    await evaluateDodGate(githubCtx, {}, { ...deps(), review, tests, postMerge, forgeMerge: forgeMergeSpy });
     expect(forgeMergeSpy).not.toHaveBeenCalled();
   });
 
