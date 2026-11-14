@@ -124,9 +124,16 @@ export interface QualityGateAdmissionDeps {
   onWaiting?: (reason: QualityGateWaitReason) => void
 }
 
+type MemoryWaitReason = Extract<QualityGateWaitReason, { kind: 'memory' }>
+
 export class QualityGateAdmissionTimeoutError extends Error {
-  constructor(readonly maxWaitMs: number) {
-    super(`quality-gate CPU admission timed out after ${maxWaitMs}ms`)
+  constructor(
+    readonly maxWaitMs: number,
+    /** FR-9: the kind of the last wait reason; 'memory' tells callers not to start the gate. */
+    readonly lastWaitReason: QualityGateWaitReason['kind'] | null = null,
+    readonly lastMemory?: MemoryWaitReason,
+  ) {
+    super(`quality-gate admission timed out after ${maxWaitMs}ms${lastWaitReason ? ` waiting on ${lastWaitReason}` : ''}`)
     this.name = 'QualityGateAdmissionTimeoutError'
   }
 }
@@ -457,7 +464,9 @@ export async function acquireQualityGateAdmission(
   }
 
   let lastWaitKind: QualityGateWaitReason['kind'] | null = null
+  let lastMemory: MemoryWaitReason | undefined
   const notifyWaiting = (reason: QualityGateWaitReason): void => {
+    if (reason.kind === 'memory') lastMemory = reason
     if (reason.kind === lastWaitKind) return
     lastWaitKind = reason.kind
     try {
@@ -468,7 +477,7 @@ export async function acquireQualityGateAdmission(
   }
 
   /** FR-2: the memory reason this waiter must wait on, or null when it may start. */
-  const memoryBlock = async (owners: AdmissionOwner[]): Promise<QualityGateWaitReason | null> => {
+  const memoryBlock = async (owners: AdmissionOwner[]): Promise<MemoryWaitReason | null> => {
     if (!footprintKey) return null
     const memory = await readMemory(sampleMemory)
     if (!memory) return null
@@ -489,7 +498,7 @@ export async function acquireQualityGateAdmission(
   try {
     for (;;) {
       if (maxWaitMs != null && now() - createdAt > maxWaitMs) {
-        throw new QualityGateAdmissionTimeoutError(maxWaitMs)
+        throw new QualityGateAdmissionTimeoutError(maxWaitMs, lastWaitKind, lastWaitKind === 'memory' ? lastMemory : undefined)
       }
       const waiters = await listLiveTickets(root, isProcessAlive, tornGraceMs)
       if (!waiters.some((waiter) => waiter.ticketId === ticketId)) {
@@ -587,6 +596,22 @@ export async function acquireQualityGateAdmission(
         }
         await sleep(pollMs)
         continue
+      }
+
+      if (footprintKey) {
+        // FR-10: re-check memory against the other live owners after settling.
+        const others: AdmissionOwner[] = []
+        for (const { path: otherPath } of await listSlotOwnerFiles(root)) {
+          const other = await readJson<AdmissionOwner>(otherPath)
+          if (other && other.ticketId !== ticketId && !ownerIsStale(other, now(), staleMs, isProcessAlive)) others.push(other)
+        }
+        const settledMemory = await memoryBlock(others)
+        if (settledMemory) {
+          notifyWaiting(settledMemory)
+          if (sameOwner(await readJson<AdmissionOwner>(path), owner)) await unlinkIfExists(path)
+          await sleep(pollMs)
+          continue
+        }
       }
 
       await unlinkIfExists(ownTicketPath)

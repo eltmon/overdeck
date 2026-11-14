@@ -657,6 +657,65 @@ describe('memory admission (PAN-5248)', () => {
     }
   })
 
+  async function driveUntilRejected(promise: Promise<unknown>): Promise<unknown> {
+    let error: unknown
+    let done = false
+    promise.then(() => { done = true }, (reason: unknown) => { error = reason; done = true })
+    await driveUntil(() => done)
+    return error
+  }
+
+  it('re-checks memory after the settle and gives the slot back when it dropped', async () => {
+    const rootDir = home()
+    let reads = 0
+    let recovered = false
+    const onWaiting = vi.fn()
+    const promise = acquireQualityGateAdmission(keyed, memDeps(rootDir, 1, () => {
+      reads++
+      return reads === 1 || recovered ? 20 * GiB : 13 * GiB
+    }, { onWaiting }))
+    const settled = settledFlag(promise)
+
+    await drive(15)
+    expect(reads).toBeGreaterThan(2)
+    expect(settled()).toBe(false)
+    expect(ownerFiles(rootDir)).toEqual([])
+    expect(readdirSync(rootDir).filter((entry) => entry.startsWith('waiter-'))).toHaveLength(1)
+    expect(onWaiting).toHaveBeenCalledWith(expect.objectContaining({ kind: 'memory', memAvailableBytes: 13 * GiB }))
+
+    recovered = true
+    await (await driveUntilResolved(promise)).release()
+  })
+
+  it('times out with lastWaitReason memory when memory never recovers', async () => {
+    const rootDir = home()
+    let clock = 0
+    const error = await driveUntilRejected(acquireQualityGateAdmission(keyed, memDeps(rootDir, 1, () => {
+      clock += 1_000
+      return 13 * GiB
+    }, { now: () => clock, maxWaitMs: 5_000 })))
+
+    expect(error).toBeInstanceOf(QualityGateAdmissionTimeoutError)
+    expect(error).toMatchObject({ lastWaitReason: 'memory', lastMemory: { memAvailableBytes: 13 * GiB } })
+    expect(readdirSync(rootDir).filter((entry) => entry.startsWith('waiter-'))).toEqual([])
+  })
+
+  it('times out with lastWaitReason cpu when CPU never recovers', async () => {
+    const rootDir = home()
+    let clock = 0
+    const error = await driveUntilRejected(acquireQualityGateAdmission(keyed, memDeps(rootDir, 1, () => 64 * GiB, {
+      now: () => clock,
+      maxWaitMs: 5_000,
+      samplePressure: async () => {
+        clock += 1_000
+        return high
+      },
+    })))
+
+    expect(error).toBeInstanceOf(QualityGateAdmissionTimeoutError)
+    expect(error).toMatchObject({ lastWaitReason: 'cpu', lastMemory: undefined })
+  })
+
   it('records a peak that the next acquire for the same key uses', async () => {
     const rootDir = home()
     const handle = await driveUntilResolved(acquireQualityGateAdmission(keyed, memDeps(rootDir, 1, () => 64 * GiB)))
