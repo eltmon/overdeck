@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5237",
   "created": "2026-11-14T04:16:13.968Z",
-  "updated": "2026-11-14T04:37:04.983Z",
+  "updated": "2026-11-14T04:42:55.853Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,9 +64,10 @@
       "doneAt": "2026-11-14T04:37:04.983Z"
     },
     "client-cancel-store": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5237",
-      "claimedAt": "2026-11-14T04:36:29.167Z"
+      "claimedAt": "2026-11-14T04:36:29.167Z",
+      "doneAt": "2026-11-14T04:42:55.852Z"
     },
     "cancel-route.ac1": {
       "status": "completed",
@@ -83,6 +84,26 @@
     "cancel-route.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T04:37:04.983Z"
+    },
+    "client-cancel-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:42:55.852Z"
+    },
+    "client-cancel-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:42:55.852Z"
+    },
+    "client-cancel-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:42:55.852Z"
+    },
+    "client-cancel-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:42:55.852Z"
+    },
+    "client-cancel-store.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:42:55.852Z"
     }
   }
 }
