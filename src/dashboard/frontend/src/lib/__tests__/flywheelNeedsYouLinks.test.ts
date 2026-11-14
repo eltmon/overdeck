@@ -47,4 +47,18 @@ describe('needsYouSegments (PAN-5198)', () => {
     expect(needsYouSegments('upload AAB', [])).toEqual([{ kind: 'text', text: 'upload AAB' }]);
     expect(needsYouSegments('UTF8 and abc-12', [])).toEqual([{ kind: 'text', text: 'UTF8 and abc-12' }]);
   });
+
+  it('includes a leading "PR " in a qualified owner/repo#n link (PAN-5239 FR-4)', () => {
+    expect(needsYouSegments('PR eltmon/overdeck-landing#7 merge', [])).toEqual([
+      { kind: 'pr', text: 'PR eltmon/overdeck-landing#7', url: 'https://github.com/eltmon/overdeck-landing/pull/7' },
+      { kind: 'text', text: ' merge' },
+    ]);
+  });
+
+  it('links an unqualified-prefix owner/repo#n reference the same way', () => {
+    expect(needsYouSegments('merge eltmon/overdeck-landing#7', [])).toEqual([
+      { kind: 'text', text: 'merge ' },
+      { kind: 'pr', text: 'eltmon/overdeck-landing#7', url: 'https://github.com/eltmon/overdeck-landing/pull/7' },
+    ]);
+  });
 });
