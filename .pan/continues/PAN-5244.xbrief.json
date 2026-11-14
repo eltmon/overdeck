@@ -1,0 +1,33 @@
+{
+  "version": "1",
+  "issueId": "PAN-5244",
+  "created": "2026-11-14T05:28:55.884Z",
+  "updated": "2026-11-14T05:28:55.885Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "sections-leaf-move": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:28:55.884Z"
+    },
+    "sections-leaf-move.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:28:55.884Z"
+    },
+    "sections-leaf-move.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:28:55.884Z"
+    },
+    "sections-leaf-move.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:28:55.884Z"
+    },
+    "sections-leaf-move.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:28:55.884Z"
+    }
+  }
+}
