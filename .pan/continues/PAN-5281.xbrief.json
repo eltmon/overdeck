@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5281",
   "created": "2026-11-14T18:36:54.537Z",
-  "updated": "2026-11-14T19:00:20.287Z",
+  "updated": "2026-11-14T19:03:56.224Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,26 @@
       "doneAt": "2026-11-14T19:00:06.590Z"
     },
     "conversation-shim-trailer": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5281",
-      "claimedAt": "2026-11-14T19:00:20.286Z"
+      "claimedAt": "2026-11-14T19:00:20.286Z",
+      "doneAt": "2026-11-14T19:03:56.223Z"
+    },
+    "conversation-shim-trailer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:03:56.223Z"
+    },
+    "conversation-shim-trailer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:03:56.223Z"
+    },
+    "conversation-shim-trailer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:03:56.223Z"
+    },
+    "conversation-shim-trailer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:03:56.223Z"
     }
   }
 }
