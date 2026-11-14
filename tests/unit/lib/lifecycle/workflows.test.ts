@@ -484,10 +484,10 @@ describe('workflows', () => {
         if (command.startsWith('git merge-base --is-ancestor')) {
           throw new Error('not an ancestor after squash merge');
         }
-        if (command.startsWith('git diff main...feature/pan-100')) {
+        if (command.startsWith('git diff origin/main...feature/pan-100')) {
           return { stdout: 'diff --git a/src/feature.ts b/src/feature.ts\n', stderr: '' };
         }
-        if (command.startsWith('git diff main...strike/pan-100')) {
+        if (command.startsWith('git diff origin/main...strike/pan-100')) {
           return { stdout: 'diff --git a/src/strike.ts b/src/strike.ts\n', stderr: '' };
         }
         if (command.includes('--head "feature/pan-100"')) {
@@ -502,7 +502,7 @@ describe('workflows', () => {
         if (command === 'git rev-parse strike/pan-100 2>/dev/null') {
           return { stdout: 'strike-head\n', stderr: '' };
         }
-        if (command === 'git log main..feature/pan-100 --oneline 2>/dev/null || true') {
+        if (command === 'git log origin/main..feature/pan-100 --oneline 2>/dev/null || true') {
           return { stdout: 'feature-a\nfeature-b\n', stderr: '' };
         }
         if (command.startsWith('gh issue view')) {
@@ -533,13 +533,13 @@ describe('workflows', () => {
         if (command.startsWith('git merge-base --is-ancestor feature/pan-100')) {
           throw new Error('feature is not merged');
         }
-        if (command.startsWith('git diff main...feature/pan-100')) {
+        if (command.startsWith('git diff origin/main...feature/pan-100')) {
           return { stdout: 'diff --git a/src/feature.ts b/src/feature.ts\n', stderr: '' };
         }
         if (command.includes('--head "feature/pan-100"')) {
           return { stdout: '[]', stderr: '' };
         }
-        if (command === 'git log main..feature/pan-100 --oneline 2>/dev/null || true') {
+        if (command === 'git log origin/main..feature/pan-100 --oneline 2>/dev/null || true') {
           return { stdout: 'feature-a\nfeature-b\n', stderr: '' };
         }
         if (command.startsWith('gh issue view')) {
@@ -580,7 +580,7 @@ describe('workflows', () => {
         if (options?.cwd === fePath && command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
           return { stdout: '  feature/pan-100\n', stderr: '' };
         }
-        if (options?.cwd === fePath && command === 'git merge-base --is-ancestor feature/pan-100 main') {
+        if (options?.cwd === fePath && command === 'git merge-base --is-ancestor feature/pan-100 origin/main') {
           throw new Error('not an ancestor after squash merge');
         }
         if (options?.cwd === fePath && command === 'git rev-parse feature/pan-100 2>/dev/null') {
@@ -618,13 +618,13 @@ describe('workflows', () => {
         if (options?.cwd === apiPath && command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
           return { stdout: '  feature/pan-100\n', stderr: '' };
         }
-        if (options?.cwd === apiPath && command === 'git merge-base --is-ancestor feature/pan-100 main') {
+        if (options?.cwd === apiPath && command === 'git merge-base --is-ancestor feature/pan-100 origin/main') {
           throw new Error('not merged');
         }
-        if (options?.cwd === apiPath && command.startsWith('git diff main...feature/pan-100')) {
+        if (options?.cwd === apiPath && command.startsWith('git diff origin/main...feature/pan-100')) {
           return { stdout: 'diff --git a/src/api.ts b/src/api.ts\n', stderr: '' };
         }
-        if (options?.cwd === apiPath && command === 'git log main..feature/pan-100 --oneline 2>/dev/null || true') {
+        if (options?.cwd === apiPath && command === 'git log origin/main..feature/pan-100 --oneline 2>/dev/null || true') {
           return { stdout: 'api-unmerged\n', stderr: '' };
         }
         return { stdout: '', stderr: '' };
@@ -685,8 +685,105 @@ describe('workflows', () => {
 
       expect(verifyStep?.success).toBe(true);
       expect(mockExecAsync).toHaveBeenCalledWith(
-        'git merge-base --is-ancestor feature/pan-100 master',
+        'git merge-base --is-ancestor feature/pan-100 origin/master',
         { cwd: testDir, encoding: 'utf-8' },
+      );
+    });
+
+    it('falls back to local main and notes it in details when the fetch fails but the branch is merged', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command === 'git fetch origin +refs/heads/main:refs/remotes/origin/main') {
+          throw Object.assign(new Error('fetch failed'), { stderr: 'fatal: unable to access origin\n' });
+        }
+        if (command === 'git rev-parse --verify --quiet refs/heads/main^{commit}') {
+          return { stdout: 'deadbeef\n', stderr: '' };
+        }
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor feature/pan-100 main') {
+          return { stdout: '', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const verifyStep = await verifyConventionBranchMerged(ctx, {
+        repoKey: 'overdeck',
+        dir: testDir,
+        sourceBranch: 'feature/pan-100',
+        targetBranch: 'main',
+        forge: 'github',
+      });
+
+      expect(verifyStep?.success).toBe(true);
+      expect(verifyStep?.details).toEqual([
+        'All commits merged to main',
+        'Checked against local main because git fetch origin main failed: fatal: unable to access origin',
+      ]);
+    });
+
+    it('fails with the local-fallback note in parentheses when the fetch fails and the branch is unmerged', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command === 'git fetch origin +refs/heads/main:refs/remotes/origin/main') {
+          throw Object.assign(new Error('fetch failed'), { stderr: 'fatal: unable to access origin\n' });
+        }
+        if (command === 'git rev-parse --verify --quiet refs/heads/main^{commit}') {
+          return { stdout: 'deadbeef\n', stderr: '' };
+        }
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor feature/pan-100 main') {
+          throw new Error('not merged');
+        }
+        if (command.startsWith('git diff main...feature/pan-100')) {
+          return { stdout: 'diff --git a/src/feature.ts b/src/feature.ts\n', stderr: '' };
+        }
+        if (command === 'git log main..feature/pan-100 --oneline 2>/dev/null || true') {
+          return { stdout: 'feature-a\n', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const verifyStep = await verifyConventionBranchMerged(ctx, {
+        repoKey: 'overdeck',
+        dir: testDir,
+        sourceBranch: 'feature/pan-100',
+        targetBranch: 'main',
+        forge: 'github',
+      });
+
+      expect(verifyStep?.success).toBe(false);
+      expect(verifyStep?.error).toBe(
+        '1 unmerged commit(s) on feature/pan-100. Merge before closing out. (Checked against local main because git fetch origin main failed: fatal: unable to access origin)',
+      );
+    });
+
+    it('fails before any git comparison when the fetch fails and no local target branch exists', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command === 'git fetch origin +refs/heads/main:refs/remotes/origin/main') {
+          throw Object.assign(new Error('fetch failed'), { stderr: 'fatal: unable to access origin\n' });
+        }
+        if (command === 'git rev-parse --verify --quiet refs/heads/main^{commit}') {
+          throw new Error('no such branch');
+        }
+        throw new Error('no git comparison should run without a resolved target ref');
+      });
+
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const verifyStep = await verifyConventionBranchMerged(ctx, {
+        repoKey: 'overdeck',
+        dir: testDir,
+        sourceBranch: 'feature/pan-100',
+        targetBranch: 'main',
+        forge: 'github',
+      });
+
+      expect(verifyStep?.success).toBe(false);
+      expect(verifyStep?.error).toBe(
+        'Cannot verify merge: git fetch origin main failed (fatal: unable to access origin) and no local main branch exists',
       );
     });
 
@@ -695,7 +792,7 @@ describe('workflows', () => {
         if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
           return { stdout: '  feature/pan-100\n', stderr: '' };
         }
-        if (command === 'git merge-base --is-ancestor feature/pan-100 main') {
+        if (command === 'git merge-base --is-ancestor feature/pan-100 origin/main') {
           throw new Error('not an ancestor after squash merge');
         }
         if (command === 'git rev-parse feature/pan-100 2>/dev/null') {
@@ -707,7 +804,7 @@ describe('workflows', () => {
             stderr: '',
           };
         }
-        if (command.startsWith('git diff main...feature/pan-100')) {
+        if (command.startsWith('git diff origin/main...feature/pan-100')) {
           throw new Error('containment fallback must not run after GitLab MR confirmation');
         }
         return { stdout: '', stderr: '' };
@@ -723,7 +820,7 @@ describe('workflows', () => {
         'MR !75 is merged and feature/pan-100 matches the merged MR head (https://gitlab.com/acme/app/-/merge_requests/75)',
       ]);
       expect(mockExecAsync.mock.calls.map(([command]) => command)).not.toEqual(
-        expect.arrayContaining([expect.stringContaining('git diff main...feature/pan-100')]),
+        expect.arrayContaining([expect.stringContaining('git diff origin/main...feature/pan-100')]),
       );
     });
 
@@ -732,7 +829,7 @@ describe('workflows', () => {
         if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
           return { stdout: '  feature/pan-100\n', stderr: '' };
         }
-        if (command === 'git merge-base --is-ancestor feature/pan-100 main') {
+        if (command === 'git merge-base --is-ancestor feature/pan-100 origin/main') {
           throw new Error('not an ancestor after squash merge');
         }
         if (command === 'git rev-parse feature/pan-100 2>/dev/null') {
@@ -747,10 +844,10 @@ describe('workflows', () => {
         if (command === 'git ls-remote --heads origin "feature/pan-100" 2>/dev/null || true') {
           return { stdout: 'gitlab-head\trefs/heads/feature/pan-100\n', stderr: '' };
         }
-        if (command === 'git merge-base --is-ancestor origin/feature/pan-100 main') {
+        if (command === 'git merge-base --is-ancestor origin/feature/pan-100 origin/main') {
           throw new Error('remote is squash-merged');
         }
-        if (command.startsWith('git diff main...origin/feature/pan-100')) {
+        if (command.startsWith('git diff origin/main...origin/feature/pan-100')) {
           return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
         }
         if (command === 'git rev-parse origin/feature/pan-100 2>/dev/null') {
@@ -779,7 +876,7 @@ describe('workflows', () => {
         if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
           return { stdout: '  feature/pan-100\n', stderr: '' };
         }
-        if (command === 'git merge-base --is-ancestor feature/pan-100 main') {
+        if (command === 'git merge-base --is-ancestor feature/pan-100 origin/main') {
           throw new Error('not an ancestor after squash merge');
         }
         if (command === 'git rev-parse feature/pan-100 2>/dev/null') {
@@ -791,10 +888,10 @@ describe('workflows', () => {
             stderr: '',
           };
         }
-        if (command.startsWith('git diff main...feature/pan-100')) {
+        if (command.startsWith('git diff origin/main...feature/pan-100')) {
           return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
         }
-        if (command === 'git log main..feature/pan-100 --oneline 2>/dev/null || true') {
+        if (command === 'git log origin/main..feature/pan-100 --oneline 2>/dev/null || true') {
           return { stdout: 'unmerged-commit\n', stderr: '' };
         }
         return { stdout: '', stderr: '' };
@@ -814,7 +911,7 @@ describe('workflows', () => {
         if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
           return { stdout: '  feature/pan-100\n', stderr: '' };
         }
-        if (command === 'git merge-base --is-ancestor feature/pan-100 main') {
+        if (command === 'git merge-base --is-ancestor feature/pan-100 origin/main') {
           throw new Error('not an ancestor after squash merge');
         }
         if (command === 'git rev-parse feature/pan-100 2>/dev/null') {
@@ -823,7 +920,7 @@ describe('workflows', () => {
         if (command === 'glab mr list --source-branch feature/pan-100 --all --output json') {
           return { stdout: '[]', stderr: '' };
         }
-        if (command.startsWith('git diff main...feature/pan-100')) {
+        if (command.startsWith('git diff origin/main...feature/pan-100')) {
           return { stdout: '', stderr: '' };
         }
         return { stdout: '', stderr: '' };
@@ -845,7 +942,7 @@ describe('workflows', () => {
         if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
           return { stdout: '  feature/pan-100\n', stderr: '' };
         }
-        if (command === 'git merge-base --is-ancestor feature/pan-100 main') {
+        if (command === 'git merge-base --is-ancestor feature/pan-100 origin/main') {
           throw new Error('not an ancestor after squash merge');
         }
         if (command === 'git rev-parse feature/pan-100 2>/dev/null') {
@@ -854,10 +951,10 @@ describe('workflows', () => {
         if (command === 'glab mr list --source-branch feature/pan-100 --all --output json') {
           return { stdout: '[]', stderr: '' };
         }
-        if (command.startsWith('git diff main...feature/pan-100')) {
+        if (command.startsWith('git diff origin/main...feature/pan-100')) {
           return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
         }
-        if (command === 'git log main..feature/pan-100 --oneline 2>/dev/null || true') {
+        if (command === 'git log origin/main..feature/pan-100 --oneline 2>/dev/null || true') {
           return { stdout: 'unmerged-commit\n', stderr: '' };
         }
         return { stdout: '', stderr: '' };
@@ -881,7 +978,7 @@ describe('workflows', () => {
         if (command.startsWith('git merge-base --is-ancestor')) {
           throw new Error('not an ancestor after squash merge');
         }
-        if (command.startsWith('git diff main...feature/pan-100')) {
+        if (command.startsWith('git diff origin/main...feature/pan-100')) {
           return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
         }
         if (command.startsWith('gh pr list')) {
@@ -893,7 +990,7 @@ describe('workflows', () => {
         if (command.startsWith('git rev-parse feature/pan-100')) {
           return { stdout: 'abc123\n', stderr: '' };
         }
-        if (command.startsWith('git log main..feature/pan-100')) {
+        if (command.startsWith('git log origin/main..feature/pan-100')) {
           throw new Error('should not count ancestry-only unmerged commits after GitHub squash confirmation');
         }
         return { stdout: '', stderr: '' };
@@ -919,7 +1016,7 @@ describe('workflows', () => {
         if (command.startsWith('git merge-base --is-ancestor')) {
           throw new Error('not an ancestor after squash merge');
         }
-        if (command.startsWith('git diff main...feature/pan-100')) {
+        if (command.startsWith('git diff origin/main...feature/pan-100')) {
           return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
         }
         if (command.startsWith('gh pr list')) {
@@ -942,7 +1039,7 @@ describe('workflows', () => {
           // exemption does NOT apply and the strict rejection is exercised.
           return { stdout: 'src/example.ts\n', stderr: '' };
         }
-        if (command.startsWith('git log main..feature/pan-100')) {
+        if (command.startsWith('git log origin/main..feature/pan-100')) {
           throw new Error('should fail immediately on mismatched merged PR head');
         }
         return { stdout: '', stderr: '' };
@@ -965,10 +1062,10 @@ describe('workflows', () => {
         if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
           return { stdout: '  feature/pan-100\n', stderr: '' };
         }
-        if (command.startsWith('git merge-base --is-ancestor feature/pan-100 main')) {
+        if (command.startsWith('git merge-base --is-ancestor feature/pan-100 origin/main')) {
           throw new Error('not an ancestor after squash merge');
         }
-        if (command.startsWith('git diff main...feature/pan-100')) {
+        if (command.startsWith('git diff origin/main...feature/pan-100')) {
           return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
         }
         if (command.startsWith('gh pr list')) {
@@ -1007,10 +1104,10 @@ describe('workflows', () => {
         if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
           return { stdout: '  feature/pan-100\n', stderr: '' };
         }
-        if (command === 'git merge-base --is-ancestor feature/pan-100 master') {
+        if (command === 'git merge-base --is-ancestor feature/pan-100 origin/master') {
           throw new Error('not an ancestor after squash merge');
         }
-        if (command.startsWith('git diff master...feature/pan-100')) {
+        if (command.startsWith('git diff origin/master...feature/pan-100')) {
           return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
         }
         if (command.startsWith('gh pr list')) {
@@ -1047,10 +1144,10 @@ describe('workflows', () => {
         if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
           return { stdout: '  feature/pan-100\n', stderr: '' };
         }
-        if (command === 'git merge-base --is-ancestor feature/pan-100 master') {
+        if (command === 'git merge-base --is-ancestor feature/pan-100 origin/master') {
           throw new Error('not an ancestor after squash merge');
         }
-        if (command.startsWith('git diff master...feature/pan-100')) {
+        if (command.startsWith('git diff origin/master...feature/pan-100')) {
           return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
         }
         if (command.startsWith('gh pr list')) {
@@ -1100,7 +1197,7 @@ describe('workflows', () => {
         if (command.startsWith('git merge-base --is-ancestor')) {
           throw new Error('not an ancestor after squash merge');
         }
-        if (command.startsWith('git diff main...feature/pan-100')) {
+        if (command.startsWith('git diff origin/main...feature/pan-100')) {
           return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
         }
         if (command.startsWith('gh pr list')) {
@@ -1118,7 +1215,7 @@ describe('workflows', () => {
         if (command.startsWith('git fetch origin feature/pan-100')) {
           return { stdout: '', stderr: '' };
         }
-        if (command.startsWith('git diff main...origin/feature/pan-100')) {
+        if (command.startsWith('git diff origin/main...origin/feature/pan-100')) {
           return { stdout: 'diff --git a/src/remote.ts b/src/remote.ts\n', stderr: '' };
         }
         if (command.startsWith('git diff --name-only')) {
@@ -1134,7 +1231,7 @@ describe('workflows', () => {
         if (command === 'git merge-base --is-ancestor remote-unmerged-commit origin/main') {
           throw new Error('commit is not on main');
         }
-        if (command.startsWith('git log main..origin/feature/pan-100')) {
+        if (command.startsWith('git log origin/main..origin/feature/pan-100')) {
           throw new Error('should fail immediately on mismatched remote merged PR head');
         }
         return { stdout: '', stderr: '' };

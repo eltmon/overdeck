@@ -7,13 +7,55 @@ import { BRANCH_ABSENT_MERGE_ERROR } from './dod.js';
 
 const execAsync = promisify(exec);
 
-export interface MergeVerificationRoot { repoKey: string; dir: string; sourceBranch: string; targetBranch: string; forge: 'github' | 'gitlab' }
+export interface MergeVerificationRoot { repoKey: string; dir: string; sourceBranch: string; targetBranch: string; forge: 'github' | 'gitlab'; comparison?: TargetComparison }
+
+/** The ref the merged check compares against, and why when it is not origin/<target>. */
+export type TargetComparison =
+  | { ref: string; note?: string }
+  | { ref: null; error: string };
+
+function fetchFailureReason(err: unknown): string {
+  const e = err as { stderr?: unknown; message?: unknown } | null | undefined;
+  for (const candidate of [e?.stderr, e?.message, err]) {
+    const text = typeof candidate === 'string' ? candidate : candidate == null ? '' : String(candidate);
+    const line = text.split('\n').map((l) => l.trim()).find((l) => l.length > 0);
+    if (line) return line.slice(0, 200);
+  }
+  return String(err).slice(0, 200);
+}
+
+export async function resolveTargetComparison(dir: string, targetBranch: string): Promise<TargetComparison> {
+  try {
+    await execAsync(
+      `git fetch origin +refs/heads/${targetBranch}:refs/remotes/origin/${targetBranch}`,
+      { cwd: dir, encoding: 'utf-8', timeout: 30000 },
+    );
+    return { ref: `origin/${targetBranch}` };
+  } catch (err) {
+    const reason = fetchFailureReason(err);
+    try {
+      await execAsync(`git rev-parse --verify --quiet refs/heads/${targetBranch}^{commit}`, { cwd: dir, encoding: 'utf-8' });
+    } catch {
+      return { ref: null, error: `Cannot verify merge: git fetch origin ${targetBranch} failed (${reason}) and no local ${targetBranch} branch exists` };
+    }
+    return { ref: targetBranch, note: `Checked against local ${targetBranch} because git fetch origin ${targetBranch} failed: ${reason}` };
+  }
+}
+
+function withComparisonNote(result: StepResult | null, note: string | undefined): StepResult | null {
+  if (!result || !note) return result;
+  if (result.success || result.skipped) {
+    return { ...result, details: [...(result.details ?? []), note] };
+  }
+  return { ...result, error: `${result.error} (${note})` };
+}
 
 async function verifyRootConventionBranches(ctx: LifecycleContext, root: MergeVerificationRoot, issueLower: string): Promise<StepResult | null> {
-  const featureResult = await verifyConventionBranchMerged(ctx, root);
+  const comparison = root.comparison ?? await resolveTargetComparison(root.dir, root.targetBranch);
+  const featureResult = await verifyConventionBranchMerged(ctx, { ...root, comparison });
   if (featureResult?.success) return featureResult;
 
-  const strikeResult = await verifyConventionBranchMerged(ctx, { ...root, sourceBranch: `strike/${issueLower}` });
+  const strikeResult = await verifyConventionBranchMerged(ctx, { ...root, sourceBranch: `strike/${issueLower}`, comparison });
   if (strikeResult?.success && !strikeResult.skipped) {
     return stepOk('close-out:verify-merged', [
       ...(strikeResult.details ?? []),
@@ -86,6 +128,17 @@ interface GitLabMergeMatch {
 }
 
 export async function verifyConventionBranchMerged(ctx: LifecycleContext, root: MergeVerificationRoot): Promise<StepResult | null> {
+  const comparison = root.comparison ?? await resolveTargetComparison(root.dir, root.targetBranch);
+  if (comparison.ref === null) return stepFailed('close-out:verify-merged', comparison.error);
+  const result = await verifyConventionBranchAgainst(ctx, root, comparison);
+  return withComparisonNote(result, comparison.note);
+}
+
+async function verifyConventionBranchAgainst(
+  ctx: LifecycleContext,
+  root: MergeVerificationRoot,
+  comparison: { ref: string },
+): Promise<StepResult | null> {
   const step = 'close-out:verify-merged';
   const gitlabLookup: GitLabMergeLookupCache = { attempted: false };
   const { stdout: branchExists } = await execAsync(
@@ -97,28 +150,28 @@ export async function verifyConventionBranchMerged(ctx: LifecycleContext, root: 
     // Use merge-base --is-ancestor: checks if the branch tip is reachable from main
     try {
       await execAsync(
-        `git merge-base --is-ancestor ${root.sourceBranch} ${root.targetBranch}`,
+        `git merge-base --is-ancestor ${root.sourceBranch} ${comparison.ref}`,
         { cwd: root.dir, encoding: 'utf-8' },
       );
-      const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root, gitlabLookup);
+      const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root, comparison, gitlabLookup);
       if (remoteCheck && !remoteCheck.success) return remoteCheck;
       return stepOk(step, ['All commits merged to main', ...(remoteCheck?.details ?? [])]);
     } catch {
       // --is-ancestor fails for squash merges where the branch still exists.
       const gitlabMerged = await verifySquashMergedMrByBranch(root, root.sourceBranch, gitlabLookup);
       if (gitlabMerged) {
-        const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root, gitlabLookup);
+        const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root, comparison, gitlabLookup);
         if (remoteCheck && !remoteCheck.success) return remoteCheck;
         return stepOk(step, [...(gitlabMerged.result.details ?? []), ...(remoteCheck?.details ?? [])]);
       }
 
       try {
         const { stdout: codeDiff } = await execAsync(
-          `git diff ${root.targetBranch}...${root.sourceBranch} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
+          `git diff ${comparison.ref}...${root.sourceBranch} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
           { cwd: root.dir, encoding: 'utf-8' },
         );
         if (!codeDiff.trim()) {
-          const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root, gitlabLookup);
+          const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root, comparison, gitlabLookup);
           if (remoteCheck && !remoteCheck.success) return remoteCheck;
           return stepOk(step, [
             'Code changes squash-merged to main (only planning artifacts remain on branch)',
@@ -130,10 +183,10 @@ export async function verifyConventionBranchMerged(ctx: LifecycleContext, root: 
       }
 
       const githubMerged = root.forge === 'github'
-        ? await verifySquashMergedPrByBranch(ctx, root, root.sourceBranch)
+        ? await verifySquashMergedPrByBranch(ctx, root, root.sourceBranch, comparison)
         : null;
       if (githubMerged?.success) {
-        const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root, gitlabLookup);
+        const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root, comparison, gitlabLookup);
         if (remoteCheck && !remoteCheck.success) return remoteCheck;
         return stepOk(step, [
           ...(githubMerged.details ?? []),
@@ -143,7 +196,7 @@ export async function verifyConventionBranchMerged(ctx: LifecycleContext, root: 
       if (githubMerged) return githubMerged;
 
       const { stdout: unmerged } = await execAsync(
-        `git log ${root.targetBranch}..${root.sourceBranch} --oneline 2>/dev/null || true`,
+        `git log ${comparison.ref}..${root.sourceBranch} --oneline 2>/dev/null || true`,
         { cwd: root.dir, encoding: 'utf-8' },
       );
       const count = unmerged.trim() ? unmerged.trim().split('\n').length : 0;
@@ -174,7 +227,7 @@ export async function verifyConventionBranchMerged(ctx: LifecycleContext, root: 
 
   if (remoteBranch.trim()) {
     await execAsync(`git fetch origin ${root.sourceBranch}`, { cwd: root.dir }).catch(() => {});
-    const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root, gitlabLookup);
+    const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root, comparison, gitlabLookup);
     if (remoteCheck) return remoteCheck;
   }
 
@@ -224,6 +277,7 @@ type GitHubMergedPr = {
 async function verifyRemoteBranchIfPresent(
   ctx: LifecycleContext,
   root: MergeVerificationRoot,
+  comparison: { ref: string },
   gitlabLookup: GitLabMergeLookupCache,
 ): Promise<StepResult | null> {
   const step = 'close-out:verify-merged';
@@ -239,7 +293,7 @@ async function verifyRemoteBranchIfPresent(
 
   try {
     await execAsync(
-      `git merge-base --is-ancestor ${remoteRef} ${root.targetBranch}`,
+      `git merge-base --is-ancestor ${remoteRef} ${comparison.ref}`,
       { cwd: root.dir, encoding: 'utf-8' },
     );
     return stepOk(step, ['Remote branch fully merged']);
@@ -247,7 +301,7 @@ async function verifyRemoteBranchIfPresent(
     // Squash-merge detection for remote branch
     try {
       const { stdout: codeDiff } = await execAsync(
-        `git diff ${root.targetBranch}...${remoteRef} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
+        `git diff ${comparison.ref}...${remoteRef} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
         { cwd: root.dir, encoding: 'utf-8' },
       );
       if (!codeDiff.trim()) {
@@ -265,12 +319,12 @@ async function verifyRemoteBranchIfPresent(
     }
 
     const githubMerged = root.forge === 'github'
-      ? await verifySquashMergedPrByBranch(ctx, root, remoteRef)
+      ? await verifySquashMergedPrByBranch(ctx, root, remoteRef, comparison)
       : null;
     if (githubMerged) return githubMerged;
 
     const { stdout: remoteUnmerged } = await execAsync(
-      `git log ${root.targetBranch}..${remoteRef} --oneline 2>/dev/null || true`,
+      `git log ${comparison.ref}..${remoteRef} --oneline 2>/dev/null || true`,
       { cwd: root.dir, encoding: 'utf-8' },
     );
     const count = remoteUnmerged.trim() ? remoteUnmerged.trim().split('\n').length : 0;
@@ -297,12 +351,13 @@ async function verifySquashMergedPrByBranch(
   ctx: LifecycleContext,
   root: MergeVerificationRoot,
   branchRef: string,
+  comparison: { ref: string },
 ): Promise<StepResult | null> {
   if (!ctx.github) return null;
 
   const step = 'close-out:verify-merged';
   const { owner, repo } = ctx.github;
-  const remoteTargetRef = `origin/${root.targetBranch}`;
+  const remoteTargetRef = comparison.ref;
 
   try {
     const { stdout: prJson } = await execAsync(
