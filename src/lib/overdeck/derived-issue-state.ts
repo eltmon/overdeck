@@ -645,8 +645,9 @@ export async function listPanesWithBackend(now: number): Promise<readonly Backen
 
 /**
  * The tracker row, from whichever configured tracker knows this issue —
- * GitHub, Linear, GitLab or Rally, in the order the config lists them. `null`
- * when none of them answered: unknown, never "open".
+ * GitHub, Linear, GitLab or Rally. A GitHub-resolved id is read from GitHub
+ * first, ahead of the configured tracker order; otherwise the config order
+ * applies. `null` when none of them answered: unknown, never "open".
  */
 export async function readIssueFromTracker(issueId: string): Promise<TrackerIssueFacts | null> {
   const { loadConfigSync } = await import('../config.js');
@@ -677,7 +678,10 @@ export async function readIssueFromTracker(issueId: string): Promise<TrackerIssu
   // configured repo would answer about a different issue entirely.
   const gh = resolveGitHubIssue(issueId);
 
-  const order = [trackers.primary, ...(trackers.secondary ? [trackers.secondary] : [])];
+  const configured = [trackers.primary, ...(trackers.secondary ? [trackers.secondary] : [])];
+  // PAN-5310: the id's prefix maps it to a GitHub repo, which outranks the
+  // global tracker order — a Linear-primary machine still reads LEX-609 from GitHub.
+  const order = gh.isGitHub ? ['github' as const, ...configured.filter((type) => type !== 'github')] : configured;
   for (const type of order) {
     try {
       if (type === 'github' && !gh.isGitHub) continue;
