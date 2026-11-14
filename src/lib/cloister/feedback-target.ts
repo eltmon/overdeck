@@ -61,6 +61,23 @@ async function findLiveUnregisteredSlot(issueId: string): Promise<{ agentId: str
   return null;
 }
 
+async function findLiveIssueConversation(issueId: string): Promise<string | null> {
+  let sessions: string[];
+  try {
+    // Lazy: overdeck/conversations.js stays out of the cloister import graph
+    // (the same reason messaging.ts imports it lazily).
+    const { listIssueConversations } = await import('../overdeck/conversations.js');
+    sessions = listIssueConversations(issueId).map(c => c.tmuxSession || `conv-${c.name}`);
+  } catch (err) {
+    console.warn(`[feedback-target] Could not list conversations for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
+  for (const session of new Set(sessions)) {
+    if ((await isAlive(session)).alive) return session;
+  }
+  return null;
+}
+
 export async function resolveIssueFeedbackTarget(
   issueId: string,
   opts: ResolveIssueFeedbackTargetOptions = {},
@@ -108,6 +125,12 @@ export async function resolveIssueFeedbackTarget(
       if (await isLiveSession(agent.id)) return { agentId: agent.id };
     }
   }
+
+  // PAN-5271: a handoff conversation that owns an adopted PR has no work-agent
+  // state; its issue link is the conversation row. Only a confirmed-live one is
+  // a target, and it never joins the resurrection candidates below.
+  const conversation = await findLiveIssueConversation(normalizedIssue);
+  if (conversation) return { agentId: conversation };
 
   // PAN-2209 + PAN-2461 — resurrection-first delivery (operator directive 2026-07-11):
   // feedback with no live target is NOT an operator problem until resurrection has been

@@ -571,6 +571,27 @@ export function listConversations(options?: { limit?: number; offset?: number })
   return rows.map(rowToLegacyConversation);
 }
 
+/**
+ * PAN-5271: the unarchived operator-side conversations linked to an issue,
+ * newest first — e.g. the `pan handoff` conversation that owns an adopted PR.
+ * Agent, planning and specialist rows (which also carry the issue) and lanes
+ * (their parent owns the work) are left out.
+ */
+export function listIssueConversations(issueId: string): LegacyConversation[] {
+  const rows = overdeckDb()
+    .prepare(`${LEGACY_CONVERSATION_SELECT}
+      WHERE UPPER(c.issue_id) = ?
+        AND c.archived_at IS NULL
+        AND c.name NOT LIKE 'agent-%'
+        AND c.name NOT LIKE 'planning-%'
+        AND c.name NOT LIKE 'specialist-%'
+        AND c.lane_role IS NULL
+        AND c.origin <> 'vault'
+      ORDER BY c.created_at DESC`)
+    .all(issueId.toUpperCase()) as LegacyConversationRow[];
+  return rows.map(rowToLegacyConversation);
+}
+
 /** PAN-4436: Session Vault browse copies, never returned by listConversations(). */
 export function listVaultBrowseConversations(): LegacyConversation[] {
   const rows = overdeckDb()
