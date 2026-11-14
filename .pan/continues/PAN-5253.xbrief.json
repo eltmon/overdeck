@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5253",
   "created": "2026-11-14T08:19:14.576Z",
-  "updated": "2026-11-14T08:39:43.105Z",
+  "updated": "2026-11-14T08:39:49.765Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,11 @@
     "activity-panel-issue-id.ac2": {
       "status": "completed",
       "doneAt": "2026-11-14T08:39:43.105Z"
+    },
+    "checks-panel": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5253",
+      "claimedAt": "2026-11-14T08:39:49.765Z"
     }
   }
 }
