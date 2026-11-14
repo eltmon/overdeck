@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5278",
   "created": "2026-11-14T18:11:34.102Z",
-  "updated": "2026-11-14T23:10:04.714Z",
+  "updated": "2026-11-14T23:10:29.881Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     },
     "config-affinity-mgmt.ac5": {
       "status": "cancelled"
+    },
+    "bridge-keeps-fields": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5278",
+      "claimedAt": "2026-11-14T23:10:29.881Z"
     }
   },
   "agentModel": "claude-opus-5-5"
