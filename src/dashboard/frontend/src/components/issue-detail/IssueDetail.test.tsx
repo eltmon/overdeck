@@ -293,6 +293,28 @@ describe('IssueDetail (C-DETAIL one component)', () => {
     expect(screen.getByTestId('drawer-tabs').firstElementChild).toHaveClass('overflow-x-auto');
   });
 
+  it('the Tasks chip reads the count itself when no tasksBadge is passed', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => (
+      String(input).endsWith('/api/issues/PAN-1/tasks')
+        ? Response.json({ tasks: [{ id: 't1', title: 'a', status: 'closed' }, { id: 't2', title: 'b', status: 'open' }] })
+        : Response.json({})
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const own = renderDetail(
+      <IssueDetail issueId="PAN-1" density="page" agents={AGENTS} tab="conversation" onSelectTab={() => {}} />,
+    );
+    expect(await screen.findByText('1/2')).toHaveAttribute('data-testid', 'drawer-tab-tasks-count');
+    own.unmount();
+    fetchMock.mockClear();
+
+    renderDetail(
+      <IssueDetail issueId="PAN-1" density="page" agents={AGENTS} tab="conversation" tasksBadge="3/13" onSelectTab={() => {}} />,
+    );
+    expect(screen.getByTestId('drawer-tab-tasks-count')).toHaveTextContent('3/13');
+    expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith('/api/issues/PAN-1/tasks'))).toBe(false);
+  });
+
   it('the strip marks the selected agent only on a session tab', () => {
     const { rerender } = renderDetail(
       <IssueDetail issueId="PAN-1" density="drawer" agents={AGENTS} tab="conversation" onSelectTab={() => {}} />,

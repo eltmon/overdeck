@@ -25,6 +25,7 @@ import type { Agent } from '../../types';
 import type { DerivedIssueState } from '../../types';
 import { cn } from '../../lib/utils';
 import { DrawerAgentSession, pickDefaultDrawerAgent } from '../drawer/DrawerAgentSession';
+import { useIssueTasksBadge } from '../drawer/useDrawerData';
 import { IssueActionMenu } from '../IssueActionMenu';
 import { IssueDetailShell } from './IssueDetailShell';
 import { openIssueOnTracker } from './IssueDetailSections';
@@ -64,7 +65,7 @@ export interface IssueDetailProps {
   onSelectTab: (tab: IssueDetailTabId) => void;
   /** Agent to select in the Conversation/Terminal panes (the drawer's `?agent=` deep link). */
   focusAgentId?: string | undefined;
-  /** "3/13" badge on the Tasks tab. */
+  /** "3/13" badge on the Tasks tab. Omitted: the chip reads the tasks query itself. */
   tasksBadge?: string | undefined;
   /** Conversation pane height in px (rail density). Default 420. */
   conversationHeight?: number | undefined;
@@ -91,10 +92,16 @@ function TabPlaceholder({ tab }: { tab: string }) {
   );
 }
 
+/** The Tasks chip's own count when the shell passes no `tasksBadge` (D-10). */
+function TasksCount({ issueId }: { issueId: string }) {
+  return <>{useIssueTasksBadge(issueId)}</>;
+}
+
 /** Tab count chip: a squared mono chip, never a pill. */
 const TAB_COUNT_CHIP_CLASS = 'ml-[6px] rounded-[4px] border border-border px-[4px] font-mono-ui text-[10.5px] leading-[15px] text-muted-foreground';
 
-function IssueDetailTabs({ tab, onSelectTab, tasksBadge, skillsBadge, hiddenTabIds }: {
+function IssueDetailTabs({ issueId, tab, onSelectTab, tasksBadge, skillsBadge, hiddenTabIds }: {
+  issueId: string;
   tab: string;
   onSelectTab: (tab: IssueDetailTabId) => void;
   tasksBadge?: string | undefined;
@@ -124,7 +131,7 @@ function IssueDetailTabs({ tab, onSelectTab, tasksBadge, skillsBadge, hiddenTabI
               {entry.label}
               {entry.id === 'tasks' ? (
                 <span data-testid="drawer-tab-tasks-count" className={TAB_COUNT_CHIP_CLASS}>
-                  {tasksBadge ?? '0/0'}
+                  {tasksBadge ?? <TasksCount issueId={issueId} />}
                 </span>
               ) : null}
               {entry.id === 'skills' && typeof skillsBadge === 'number' && skillsBadge > 0 ? (
@@ -265,6 +272,7 @@ export function IssueDetail({ issueId, density, agents, derived, tab, onSelectTa
       {showTabs && (
         <div data-section="DrawerTabs">
           <IssueDetailTabs
+            issueId={issueId}
             tab={tab}
             onSelectTab={onSelectTab}
             tasksBadge={tasksBadge}

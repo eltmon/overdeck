@@ -227,6 +227,12 @@ function normalizeTasks(tasks: TaskTask[] | undefined, issueId: string): DrawerT
   });
 }
 
+/** "3/13" for the Tasks tab chip, from the tasks query alone (no store subscription). */
+export function useIssueTasksBadge(issueId: string): string {
+  const tasks = normalizeTasks(useTasksQuery(issueId).data?.tasks, issueId);
+  return tasks.length === 0 ? '0/0' : `${tasks.filter((task) => task.status === 'done').length}/${tasks.length}`;
+}
+
 function gateDetail(status: DrawerVerificationGateStatus) {
   switch (status) {
     case 'passed':
