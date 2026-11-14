@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5283",
   "created": "2026-11-14T19:04:13.506Z",
-  "updated": "2026-11-14T19:18:22.730Z",
+  "updated": "2026-11-14T19:20:01.241Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,9 +64,30 @@
       "doneAt": "2026-11-14T19:18:16.168Z"
     },
     "wi4-board-derivations": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5283",
-      "claimedAt": "2026-11-14T19:18:22.730Z"
+      "claimedAt": "2026-11-14T19:18:22.730Z",
+      "doneAt": "2026-11-14T19:20:01.240Z"
+    },
+    "wi4-board-derivations.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:20:01.240Z"
+    },
+    "wi4-board-derivations.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:20:01.240Z"
+    },
+    "wi4-board-derivations.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:20:01.240Z"
+    },
+    "wi4-board-derivations.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:20:01.240Z"
+    },
+    "wi4-board-derivations.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:20:01.240Z"
     }
   }
 }
