@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   recoverSilentReviewers: vi.fn(async () => [] as string[]),
   retryDeferredHandoffs: vi.fn(async () => [] as string[]),
   reapFinishedRemoteAgents: vi.fn(async () => [] as string[]),
+  recoverAdvisoryFollowups: vi.fn(async () => [] as string[]),
   readRecordedAgentStopAt: vi.fn((): number | null => null),
 }));
 
@@ -98,6 +99,10 @@ vi.mock('../../../../src/lib/cloister/deferred-handoff.js', async (importOrigina
 
 vi.mock('../../../../src/lib/cloister/remote-reap-routine.js', () => ({
   reapFinishedRemoteAgents: mocks.reapFinishedRemoteAgents,
+}));
+
+vi.mock('../../../../src/lib/cloister/advisory-followup-patrol.js', () => ({
+  recoverAdvisoryFollowups: mocks.recoverAdvisoryFollowups,
 }));
 
 const {
@@ -636,6 +641,7 @@ describe('deacon-lite', () => {
       expect(mocks.liveAgentInventory).not.toHaveBeenCalled();
       expect(mocks.reconcileClosedIssueAgents).not.toHaveBeenCalled();
       expect(mocks.reapFinishedRemoteAgents).not.toHaveBeenCalled();
+      expect(mocks.recoverAdvisoryFollowups).not.toHaveBeenCalled();
     });
 
     it('runs the remote reap once, last, after retryDeferredHandoffs (PAN-4295)', async () => {
@@ -648,6 +654,17 @@ describe('deacon-lite', () => {
       expect(mocks.retryDeferredHandoffs).toHaveBeenCalledTimes(1);
       expect(mocks.retryDeferredHandoffs.mock.invocationCallOrder[0])
         .toBeLessThan(mocks.reapFinishedRemoteAgents.mock.invocationCallOrder[0]!);
+    });
+
+    it('runs the advisory follow-up patrol once, after the remote reap (PAN-5218)', async () => {
+      mocks.listAgentStates.mockReturnValue([]);
+      mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+
+      await runDeaconLite();
+
+      expect(mocks.recoverAdvisoryFollowups).toHaveBeenCalledTimes(1);
+      expect(mocks.reapFinishedRemoteAgents.mock.invocationCallOrder[0])
+        .toBeLessThan(mocks.recoverAdvisoryFollowups.mock.invocationCallOrder[0]!);
     });
   });
 

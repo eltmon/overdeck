@@ -38,6 +38,7 @@ import { replayDeferredReviewVerdict } from './deferred-verdict-replay.js';
 import { recoverUndispatchedReviews } from './undispatched-review-recovery.js';
 import { recoverSilentReviewers } from './silent-reviewer-recovery.js';
 import { reapFinishedRemoteAgents } from './remote-reap-routine.js';
+import { recoverAdvisoryFollowups } from './advisory-followup-patrol.js';
 
 export { checkApiErrorAgents, retryDeferredHandoffs, recoverUndispatchedReviews, recoverSilentReviewers };
 
@@ -609,6 +610,8 @@ export async function runDeaconLite(): Promise<void> {
   await retryDeferredHandoffs();
   // PAN-4295: hand finished Fly remote agents to review (the PAN-1676 patrol call the Cut dropped).
   await reapFinishedRemoteAgents();
+  // PAN-5218: file advisory follow-ups the post-merge kick missed (restart, or a relay that finished after the merge).
+  await recoverAdvisoryFollowups();
 }
 
 // ============================================================================
