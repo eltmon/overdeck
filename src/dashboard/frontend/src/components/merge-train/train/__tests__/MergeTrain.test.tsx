@@ -115,3 +115,19 @@ describe('isIdleProject and trainTotals', () => {
     expect(trainTotals(undefined)).toEqual({ waiting: 0, batchesReady: 0, strikes: 0 });
   });
 });
+
+describe('MergeTrain notices (PAN-5277 no-loss audit)', () => {
+  it('says when no merge backend is configured', async () => {
+    mockFetch({ '/api/merge-train/board': BOARD, '/api/merge-train/merge-backend': { available: false, mode: 'none', detail: '' } });
+    renderWithClient(<MergeTrain placement="all-projects" />);
+    expect((await screen.findByTestId('merge-backend-unavailable')).textContent).toContain('Merge backend unavailable');
+  });
+
+  it('shows a project-wide scheduler skip on the card and keeps that project out of the idle footer', async () => {
+    const skipped = project({ projectKey: 'auricle', projectName: 'auricle', notices: ['Not scheduled: the PR listing could not be read'] });
+    expect(isIdleProject(skipped)).toBe(false);
+    mockFetch({ '/api/merge-train/board': board([OVERDECK, skipped]) });
+    renderWithClient(<MergeTrain placement="all-projects" />);
+    expect((await screen.findByTestId('train-notice-auricle')).textContent).toBe('Not scheduled: the PR listing could not be read');
+  });
+});

@@ -41,6 +41,7 @@ import type {
   TrainCar,
   TrainStrike,
 } from './merge-train-board-types.js';
+import { createSettledTtlPromiseCache } from '../../../lib/concurrency.js';
 import { approvalProvenAtHead } from '../../../lib/cloister/approval-at-head.js';
 import { autoMergeFromLabels } from '../../../lib/cloister/auto-merge-eligibility.js';
 import { projectAutoMergeDefault, shouldHoldForUat } from '../../../lib/cloister/auto-merge-policy.js';
@@ -83,6 +84,8 @@ export interface BoardDeps {
   latestAutoMerge(issueId: string): PendingAutoMerge | null;
   /** Active and problem auto-merge rows of every project. */
   autoMergeRows(): PendingAutoMerge[];
+  /** The scheduler's last pass: candidates it left unscheduled, with why (PAN-4772, PAN-5036). */
+  notScheduled(): Array<{ issueId: string; projectKey: string; reason: string; scope?: 'project' }>;
   mergeRuns(): MergeRun[];
   issueLabels(issueId: string): readonly string[];
   issueTitle(issueId: string): string | null;
@@ -104,6 +107,8 @@ const STEP_KEYS: readonly MergeStepKey[] = [
   'verifying', 'reporting-statuses', 'squash-merging', 'post-merge-cleanup',
 ];
 const LIVE_IN_BATCH = new Set(['assembling', 'ready']);
+/** Flip when `POST /api/merge-train/policy/:issueId` (PAN-4753 WI-8) ships. */
+const POLICY_WRITE_ROUTE_AVAILABLE = false;
 const LIVE_BATCH = new Set(['assembling', 'ready', 'superseded']);
 const CAR_ORDER: readonly CarState[] = ['merging', 'cooldown', 'ready', 'held', 'failed', 'blocked'];
 
@@ -235,9 +240,18 @@ async function boardProject(
 
   // Candidates without a forge read (see the module doc).
   const candidates = new Set<string>();
+  // `reviewDecision` is empty without branch protection and the gate caches
+  // answers only for PRs it judged, so a journaled review verdict is the leg
+  // that finds marker-approved PRs.
   for (const pr of openById.values()) {
-    if (pr.reviewDecided || deps.approvalAtHead(pr.issueId, pr.headSha) !== undefined) candidates.add(pr.issueId);
+    if (pr.reviewDecided || deps.approvalAtHead(pr.issueId, pr.headSha) !== undefined
+      || deps.journal(pr.issueId, pr.branch).some((entry) => entry.type === 'review.verdict')) {
+      candidates.add(pr.issueId);
+    }
   }
+  const skips = deps.notScheduled().filter((skip) => skip.projectKey === key);
+  const skipReason = new Map(skips.filter((skip) => skip.scope !== 'project').map((skip) => [skip.issueId.toUpperCase(), skip.reason]));
+  for (const id of skipReason.keys()) candidates.add(id);
   for (const row of deps.autoMergeRows()) {
     if (row.projectKey !== key || now - Date.parse(row.scheduledAt) > ROW_LOOKBACK_MS) continue;
     candidates.add(row.issueId.toUpperCase());
@@ -246,7 +260,9 @@ async function boardProject(
     if (deps.projectKeyOfIssue(id) === key) candidates.add(id);
   }
 
-  const policyWritable = deps.trackerType(config) === 'github';
+  // R9 plus WI-8: the labels are writable only on GitHub, and only once the
+  // write route exists. Until PAN-4753 WI-8 ships, the toggle stays read-only.
+  const policyWritable = POLICY_WRITE_ROUTE_AVAILABLE && deps.trackerType(config) === 'github';
   const cars: TrainCar[] = [];
   const waitingSince: number[] = [];
   for (const issueId of candidates) {
@@ -289,6 +305,9 @@ async function boardProject(
       state = 'held';
     } else {
       state = 'ready';
+    }
+    if (!notes && (state === 'ready' || state === 'held') && skipReason.has(issueId)) {
+      notes = `Not scheduled: ${skipReason.get(issueId)}`;
     }
     if (state === 'held' && !routing.heldForUat) waitingSince.push(pr?.readySince ?? now);
 
@@ -345,7 +364,8 @@ async function boardProject(
     journal: deps.journal,
   });
 
-  return { ...identity, window, cars, strikes, batches, recent };
+  const notices = skips.filter((skip) => skip.scope === 'project').map((skip) => `Not scheduled: ${skip.reason}`);
+  return { ...identity, window, notices, cars, strikes, batches, recent };
 }
 
 async function strikeOf(
@@ -410,7 +430,16 @@ export async function getMergeTrainBoard(
   options: { projectKey?: string } = {},
   deps?: BoardDeps,
 ): Promise<MergeTrainBoard> {
-  const d = deps ?? await defaultBoardDeps();
+  // Several tabs and placements poll the same board; one settled read per
+  // key serves them for a few seconds (NFR-6). Injected deps bypass it.
+  if (!deps) return boardCache(options.projectKey ?? '*', async () => readBoard(options, await defaultBoardDeps()));
+  return readBoard(options, deps);
+}
+
+const BOARD_CACHE_TTL_MS = 5_000;
+const boardCache = createSettledTtlPromiseCache<string, MergeTrainBoard>(BOARD_CACHE_TTL_MS);
+
+async function readBoard(options: { projectKey?: string }, d: BoardDeps): Promise<MergeTrainBoard> {
   const master = d.masterEnabled();
   const projects = d.listProjects().filter((project) => !options.projectKey || project.key === options.projectKey);
   const settled = await Promise.allSettled(projects.map(({ key, config }) => boardProject(key, config, master, d)));
@@ -431,6 +460,7 @@ export async function getMergeTrainBoard(
       return {
         ...identity,
         window: null,
+        notices: [],
         cars: [],
         strikes: [],
         batches: [],
@@ -457,7 +487,7 @@ const STRIKE_FACTS_TTL_MS = 60_000;
 async function defaultBoardDeps(): Promise<BoardDeps> {
   const [
     projects, mergeSync, controls, prFacts, prListing, derived, approval, queue, journalMod,
-    trackerType, issueProjects, uatTrain, mergeRoute, threads, doorPolicy, singleton,
+    trackerType, issueProjects, uatTrain, mergeRoute, threads, doorPolicy, singleton, skipReasons,
   ] = await Promise.all([
     import('../../../lib/projects.js'),
     import('../../../lib/overdeck/merge-sync.js'),
@@ -475,6 +505,7 @@ async function defaultBoardDeps(): Promise<BoardDeps> {
     import('../../../lib/cloister/unresolved-threads.js'),
     import('./auto-merge-door-policy.js'),
     import('./issue-service-singleton.js'),
+    import('./auto-merge-skip-reasons.js'),
   ]);
   const { readySinceFromRollup } = await import('../../../lib/cloister/batch-window.js');
 
@@ -549,6 +580,7 @@ async function defaultBoardDeps(): Promise<BoardDeps> {
     },
     latestAutoMerge: (issueId) => mergeSync.getLatestAutoMerge(issueId),
     autoMergeRows: () => [...mergeSync.listActiveAutoMerges(), ...mergeSync.listProblemAutoMerges()],
+    notScheduled: () => skipReasons.listNotScheduledAutoMerges(),
     mergeRuns: () => queue.listMergeRuns(),
     issueLabels: (issueId) => doorPolicy.cachedIssueLabels(issueId),
     issueTitle: (issueId) => {

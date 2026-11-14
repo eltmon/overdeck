@@ -37,7 +37,7 @@ function renderToggle(
   vi.stubGlobal('fetch', fetchImpl);
   render(
     <QueryClientProvider client={client}>
-      <AutoMergeToggle issueId="pan-3932" {...props} />
+      <AutoMergeToggle issueId="pan-3932" writable {...props} />
     </QueryClientProvider>,
   );
   return fetchImpl;
@@ -88,6 +88,18 @@ describe('AutoMergeToggle read-only tooltip', () => {
 describe('AutoMergeToggle editable', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('is read-only by default until the WI-8 policy route ships', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ issues: [{ issueId: 'PAN-3932', autoMerge: true }] }) }) as Response));
+    render(
+      <QueryClientProvider client={client}>
+        <AutoMergeToggle issueId="pan-3932" />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getAllByTitle(/Set the auto-merge \/ hold-for-uat label in the tracker/)[0]).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: /Hold/ })).toBeNull();
   });
 
   it('clicking Hold writes the hold label and presses Hold', async () => {

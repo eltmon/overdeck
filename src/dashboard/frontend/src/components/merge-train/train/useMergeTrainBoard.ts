@@ -129,3 +129,18 @@ export function useNow(intervalMs: number, enabled = true): number {
   }, [intervalMs, enabled]);
   return now;
 }
+
+/**
+ * Whether no merge backend (GitHub App or `gh` CLI) is configured, from
+ * `GET /api/merge-train/merge-backend`. Carried over from the retired view so
+ * the operator still learns why nothing merges.
+ */
+export function useMergeBackendUnavailable(active: boolean): boolean {
+  const query = useQuery({
+    queryKey: ['merge-train-merge-backend'],
+    queryFn: () => fetchJson<{ available?: boolean }>('/api/merge-train/merge-backend'),
+    refetchInterval: active ? 60_000 : false,
+    retry: false,
+  });
+  return query.data?.available === false;
+}

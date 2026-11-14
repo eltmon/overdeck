@@ -109,6 +109,8 @@ export interface BoardProject {
   /** AUTO_MERGE_COOLDOWN_MS / 60_000. */
   cooldownMinutes: number;
   window: BatchWindowState | null;
+  /** Project-wide notes, e.g. the scheduler skipped the whole project (PAN-5036). */
+  notices: string[];
   cars: TrainCar[];
   strikes: TrainStrike[];
   /** The whole chain (CHAIN_PAYLOAD_LIMIT), newest first, with status reasons. */

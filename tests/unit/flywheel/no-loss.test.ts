@@ -57,8 +57,9 @@ const NO_LOSS: Record<string, Home> = {
     views: [['components/flywheel/FlywheelStatsPanel', 'FlywheelStatsPanel']],
     verbs: [['stats', '--json', '--window']],
   },
+  // PAN-4753 WI-11: the cooldown queue and "Not scheduled" reasons are cars on the rail's merge train.
   'merge queue card': {
-    views: [['components/flywheel/PendingAutoMergesCard', 'PendingAutoMergesCard']],
+    views: [['components/flywheel/FlywheelMergeTrainRail', 'FlywheelMergeTrainRail'], ['components/merge-train/train/MergeTrain', 'MergeTrain']],
   },
   'order book module': {
     views: [['components/flywheel/FlywheelOrderBookCard', 'FlywheelOrderBookCard']],
@@ -85,7 +86,7 @@ const NO_LOSS: Record<string, Home> = {
   },
   // PAN-4199 restored the four v1 surfaces that still had a data source.
   'UAT batches card': {
-    views: [['components/flywheel/FlywheelUatBatchesCard', 'FlywheelUatBatchesCard']],
+    views: [['components/flywheel/FlywheelMergeTrainRail', 'FlywheelMergeTrainRail'], ['components/merge-train/train/BatchCard', 'BatchCard']],
   },
   'headline strip': {
     views: [['components/flywheel/FlywheelHeadlineStrip', 'FlywheelHeadlineStrip']],

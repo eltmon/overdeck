@@ -775,8 +775,9 @@ assembles as before. Before any of that, the reconciler drops every feature
 PAN-4970) assigns to the per-PR auto-merge train from its ready set, so it
 never bundles a feature the train already owns. A live batch that already
 holds such a feature is invalidated with the reason "\<ID> merges through
-the per-PR auto-merge train", not "left the ready queue" — the feature
-never left the ready queue, it just merges through a different path.
+the per-PR auto-merge train", not "\<ID> is no longer ready to merge" —
+the feature is still ready, it just merges through a different path. The
+reason is stored as the batch's `status_reason` ([MERGE-TRAIN.md](MERGE-TRAIN.md)).
 
 ## Deploy progress on the project row
 

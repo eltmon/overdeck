@@ -11,7 +11,9 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
-import { readJsonBody } from '../workspaces.js';
+// Imported from the leaf module so this route does not close a cycle back
+// into routes/workspaces.ts (PAN-5277).
+import { readJsonBody } from '../misc/shared.js';
 
 // ─── Route: POST /api/internal/pipeline/notify ────────────────────────────────
 //

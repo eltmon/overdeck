@@ -67,15 +67,14 @@ export async function listUnresolvedThreadCounts(
   if (!owner || !name) return new Map();
   const read = async (): Promise<ReadonlyMap<number, number>> => {
     const stdout = await (deps.gh ?? defaultGh)(
-      ['api', 'graphql', '-f', `query=${QUERY}`, '-F', `owner=${owner}`, '-F', `name=${name}`],
+      ['api', 'graphql', '-f', `query=${QUERY}`, '-f', `owner=${owner}`, '-f', `name=${name}`],
       cwd,
     );
     return parseUnresolvedThreads(stdout);
   };
-  try {
-    // Injected deps bypass the shared cache so tests stay independent.
-    return deps.gh ? await read() : await cache(repoSlug, read);
-  } catch {
-    return new Map();
-  }
+  // A failed read settles as an empty map, so it is cached like a good one
+  // and a rate-limited repo is not re-read on every board poll.
+  const safeRead = () => read().catch(() => new Map<number, number>());
+  // Injected deps bypass the shared cache so tests stay independent.
+  return deps.gh ? safeRead() : cache(repoSlug, safeRead);
 }

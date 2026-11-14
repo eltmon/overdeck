@@ -61,6 +61,8 @@ interface Fixture {
   listingThrowsFor?: string;
   trackerType?: 'github' | 'linear';
   threads?: Record<number, number>;
+  skips?: Array<{ issueId: string; projectKey: string; reason: string; scope?: 'project' }>;
+  verdicts?: string[];
 }
 
 function deps(f: Fixture): BoardDeps {
@@ -79,11 +81,14 @@ function deps(f: Fixture): BoardDeps {
     facts: async (issueId) => f.facts?.[issueId] ?? null,
     latestAutoMerge: (issueId) => f.rows?.[issueId] ?? null,
     autoMergeRows: () => Object.values(f.rows ?? {}),
+    notScheduled: () => f.skips ?? [],
     mergeRuns: () => f.runs ?? [],
     issueLabels: (issueId) => f.labels?.[issueId] ?? [],
     issueTitle: () => null,
     projectKeyOfIssue: () => 'overdeck',
-    journal: () => [],
+    journal: (issueId) => ((f.verdicts ?? []).includes(issueId)
+      ? [{ at: '2026-11-14T11:00:00.000Z', type: 'review.verdict', issueId, data: { verdict: 'APPROVED' } }]
+      : []),
     generations: async () => f.batches ?? [],
     promoted: () => [],
     droppedFromBatch: (issueId) => (f.dropped ?? []).includes(issueId),
@@ -167,9 +172,34 @@ describe('getMergeTrainBoard cars (PAN-4753 WI-7)', () => {
     expect(byId['PAN-3']).toMatchObject({ route: 'auto-merge', policy: 'auto' });
   });
 
-  it('policyWritable is false for a non-GitHub tracker', async () => {
-    const car = await onlyCar({ trackerType: 'linear', open: [open('PAN-1')], facts: { 'PAN-1': facts('PAN-1') } });
-    expect(car.policyWritable).toBe(false);
+  it('policyWritable is false for a non-GitHub tracker, and for GitHub until the WI-8 route ships', async () => {
+    const linear = await onlyCar({ trackerType: 'linear', open: [open('PAN-1')], facts: { 'PAN-1': facts('PAN-1') } });
+    expect(linear.policyWritable).toBe(false);
+    const github = await onlyCar({ trackerType: 'github', open: [open('PAN-1')], facts: { 'PAN-1': facts('PAN-1') } });
+    expect(github.policyWritable).toBe(false);
+  });
+
+  it('finds a marker-approved PR the forge shows no decision for, through its journaled verdict', async () => {
+    const pr = open('PAN-1', { reviewDecided: false });
+    const none = await getMergeTrainBoard({}, deps({ open: [pr], facts: { 'PAN-1': facts('PAN-1', { checks: 'red' }) } }));
+    expect(none.projects[0]!.cars).toEqual([]);
+    const car = await onlyCar({ open: [pr], facts: { 'PAN-1': facts('PAN-1', { checks: 'red' }) }, verdicts: ['PAN-1'] });
+    expect(car.state).toBe('blocked');
+  });
+
+  it('carries the scheduler skip reason on a ready car, and a project-wide skip as a notice', async () => {
+    const board = await getMergeTrainBoard({}, deps({
+      trainOn: false,
+      open: [open('PAN-1', { reviewDecided: false })],
+      facts: { 'PAN-1': facts('PAN-1') },
+      skips: [
+        { issueId: 'PAN-1', projectKey: 'overdeck', reason: 'the Deft human-merge hold applies' },
+        { issueId: 'overdeck', projectKey: 'overdeck', reason: 'the PR listing could not be read', scope: 'project' },
+        { issueId: 'MIN-1', projectKey: 'myn', reason: 'elsewhere' },
+      ],
+    }));
+    expect(board.projects[0]!.cars[0]).toMatchObject({ issueId: 'PAN-1', state: 'ready', notes: 'Not scheduled: the Deft human-merge hold applies' });
+    expect(board.projects[0]!.notices).toEqual(['Not scheduled: the PR listing could not be read']);
   });
 
   it('skips an open PR nobody approved, and a merged PR', async () => {

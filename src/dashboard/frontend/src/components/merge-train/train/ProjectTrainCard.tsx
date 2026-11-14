@@ -107,6 +107,9 @@ export function ProjectTrainCard({ project, masterEnabled, runs, onNavigateIssue
               {banner}
             </p>
           )}
+          {(project.notices ?? []).map((notice) => (
+            <p key={notice} className="text-[11px] text-muted-foreground" data-testid={`train-notice-${project.projectKey}`}>{notice}</p>
+          ))}
 
           {hero && (
             <div className="space-y-2" data-testid={`hero-batch-${project.projectKey}`}>

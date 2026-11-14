@@ -17,7 +17,7 @@ describe('listUnresolvedThreadCounts (PAN-4753 WI-7)', () => {
       gh: async (args) => { calls.push(args); return answer; },
     });
     expect([...counts]).toEqual([[10, 2]]);
-    expect(calls[0]).toEqual(expect.arrayContaining(['api', 'graphql', '-F', 'owner=eltmon', '-F', 'name=overdeck']));
+    expect(calls[0]).toEqual(expect.arrayContaining(['api', 'graphql', '-f', 'owner=eltmon', '-f', 'name=overdeck']));
   });
 
   it('returns an empty map when the read fails', async () => {

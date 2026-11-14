@@ -137,6 +137,8 @@ export interface BoardProject {
   mode: 'auto' | 'hold';
   cooldownMinutes: number;
   window: BatchWindowState | null;
+  /** Project-wide notes, e.g. the scheduler skipped the whole project (PAN-5036). */
+  notices: string[];
   cars: TrainCar[];
   strikes: TrainStrike[];
   batches: UatGenerationPayload[];

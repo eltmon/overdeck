@@ -792,7 +792,8 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
       resolutions: gen.resolutions,
       versionSyncConfigured,
       shipStatus: null,
-      statusReason: gen.statusReason ?? null,
+      // A reason only explains a voided or replaced batch; a later promote keeps the column.
+      statusReason: gen.status === 'superseded' || gen.status === 'invalidated' ? gen.statusReason ?? null : null,
       repos: (gen.repos ?? []).map((r) => ({
         repoKey: r.repoKey,
         branch: r.branch,

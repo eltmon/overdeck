@@ -25,7 +25,8 @@ import {
   NO_PROJECTS_LINE,
   idleFooter,
 } from './trainCopy';
-import { boardHasMerging, useMergeRuns, useMergeTrainBoard } from './useMergeTrainBoard';
+import { boardHasMerging, useMergeBackendUnavailable, useMergeRuns, useMergeTrainBoard } from './useMergeTrainBoard';
+import { MERGE_BACKEND_UNAVAILABLE } from './trainCopy';
 
 /** localStorage key holding the operator's project-filter selection (shared with the old view). */
 export const MERGE_TRAIN_PROJECT_FILTER_KEY = 'merge-train.projectFilter';
@@ -64,7 +65,7 @@ function writeStoredFilter(keys: string[] | null): void {
  * idle: "train off" and a failed read are both worth a card.
  */
 export function isIdleProject(project: BoardProject): boolean {
-  if (!project.enabled || project.error) return false;
+  if (!project.enabled || project.error || (project.notices ?? []).length > 0) return false;
   return project.cars.length === 0
     && project.strikes.length === 0
     && !project.batches.some((b) => b.status === 'assembling' || b.status === 'ready' || b.status === 'superseded');
@@ -75,6 +76,12 @@ const CHIP = 'rounded-md border px-2 py-0.5 text-[11px]';
 export function MergeTrain({ placement, projectKey, active = true, onNavigateIssue }: MergeTrainProps) {
   const scoped = placement === 'project' ? projectKey : undefined;
   const { data: board, isLoading, isError } = useMergeTrainBoard({ projectKey: scoped, active });
+  const backendUnavailable = useMergeBackendUnavailable(active);
+  const backendNote = backendUnavailable && (
+    <p className="rounded-md border border-border bg-muted px-3 py-2 text-[11px] text-foreground" data-testid="merge-backend-unavailable">
+      {MERGE_BACKEND_UNAVAILABLE}
+    </p>
+  );
   const runs = useMergeRuns(active && boardHasMerging(board));
   const [selected, setSelected] = useState<string[] | null>(() => (placement === 'all-projects' ? readStoredFilter() : null));
   const projects = board?.projects ?? [];
@@ -94,7 +101,8 @@ export function MergeTrain({ placement, projectKey, active = true, onNavigateIss
   if (placement === 'project') {
     const project = projects.find((p) => p.projectKey === projectKey) ?? projects[0];
     return (
-      <div id="merge-train" data-testid="merge-train" className="scroll-mt-4">
+      <div id="merge-train" data-testid="merge-train" className="scroll-mt-4 space-y-2">
+        {backendNote}
         {project
           ? <ProjectTrainCard project={project} masterEnabled={masterEnabled} runs={runs} onNavigateIssue={onNavigateIssue} />
           : <p className="text-[12px] text-muted-foreground">{isLoading ? LOADING_LINE : isError ? LOAD_FAILED_LINE : NO_PROJECTS_LINE}</p>}
@@ -120,6 +128,7 @@ export function MergeTrain({ placement, projectKey, active = true, onNavigateIss
 
   return (
     <div data-testid="merge-train" className="space-y-3">
+      {backendNote}
       {projects.length > 1 && (
         <div className="flex flex-wrap items-center gap-1.5" data-testid="merge-train-project-filter">
           <span className="text-[11px] text-muted-foreground">{FILTER_LABEL}</span>

@@ -76,6 +76,7 @@ export function idleFooter(names: readonly string[]): string {
 }
 
 export const LOADING_LINE = 'Loading the merge train…';
+export const MERGE_BACKEND_UNAVAILABLE = 'Merge backend unavailable: nothing merges automatically until GitHub App credentials or gh CLI authentication are configured.';
 export const NO_PROJECTS_LINE = 'No projects are registered, so there is no merge train to show.';
 export const ALL_FILTERED_LINE = 'Every project is filtered out. Select a project above to see its merge train.';
 export const NOTHING_TO_MERGE_LINE = 'Nothing is waiting to merge. When work passes review and checks, it lines up here.';

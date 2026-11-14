@@ -97,9 +97,12 @@ their status reason, and up to five recent merges. An unknown `project` is a
 404.
 
 **Cars.** Candidates are picked without a forge read: an open `feature/<id>`
-PR whose listing row has a decided review or whose head has a cached gate
-answer, an issue with an active or problem `pending_auto_merges` row from the
-last 7 days, or an issue with a merge run. Only candidates read PR facts,
+PR whose listing row has a decided review, whose head has a cached gate
+answer, or whose workspace journal has a `review.verdict` entry (the leg that
+finds marker-approved PRs: `reviewDecision` is empty without branch
+protection); an issue the scheduler's last pass left unscheduled; an issue
+with an active or problem `pending_auto_merges` row from the last 7 days; or
+an issue with a merge run. Only candidates read PR facts,
 through the 60 s cache the merge gate and the approval refresher already fill.
 State, first match wins: `merging` (a live run or a `merging` row), `failed`
 (a failed run, a failed row at the current head, or the journal's last merge
@@ -108,7 +111,15 @@ row; carries `mergeAt` and the row id for Cancel), `held` (batch-routed, in
 the ready set, not in a live `ready`/`assembling` batch), `ready`. A member of
 a live batch carries `liveBatch`; the UI shows it inside the batch, not as a
 row. `readyAt` is the D4 ready-since clock (newest check completion on the
-head), shown only once the PR is approved.
+head), shown only once the PR is approved. A ready car the scheduler skipped
+carries "Not scheduled: <reason>" in its notes (PAN-4772); a project the pass
+skipped whole (PAN-5036) carries it in the card's `notices`.
+
+**Policy.** `policyWritable` is false until the per-issue policy write route
+(`POST /api/merge-train/policy/:issueId`, PAN-4753 WI-8) ships, so the row's
+Auto/Hold toggle is read-only and names the tracker labels to set instead.
+The board result is cached for 5 seconds per project key, so several tabs and
+placements share one read.
 
 **Blockers** (`merge-blocker-types.ts`): `failing_checks` (with the failing
 check names), `merge_conflict`, `not_mergeable`, `draft_pr`,

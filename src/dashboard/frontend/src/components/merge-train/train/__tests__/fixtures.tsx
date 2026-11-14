@@ -82,6 +82,7 @@ export function project(over: Partial<BoardProject> = {}): BoardProject {
     mode: 'auto',
     cooldownMinutes: 5,
     window: null,
+    notices: [],
     cars: [],
     strikes: [],
     batches: [],
