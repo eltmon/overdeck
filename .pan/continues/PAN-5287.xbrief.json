@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5287",
   "created": "2026-11-14T19:49:14.970Z",
-  "updated": "2026-11-14T20:42:41.482Z",
+  "updated": "2026-11-14T20:42:43.108Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -218,6 +218,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5287",
       "claimedAt": "2026-11-14T20:42:41.482Z"
+    },
+    "explorer-shortcuts": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:42:43.108Z"
     }
   }
 }
