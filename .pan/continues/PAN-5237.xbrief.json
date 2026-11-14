@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5237",
   "created": "2026-11-14T04:16:13.968Z",
-  "updated": "2026-11-14T04:22:52.396Z",
+  "updated": "2026-11-14T04:26:42.865Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,9 +36,26 @@
       "doneAt": "2026-11-14T04:22:19.661Z"
     },
     "handler-delivery-gate": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5237",
-      "claimedAt": "2026-11-14T04:22:52.395Z"
+      "claimedAt": "2026-11-14T04:22:52.395Z",
+      "doneAt": "2026-11-14T04:26:42.865Z"
+    },
+    "handler-delivery-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:26:42.865Z"
+    },
+    "handler-delivery-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:26:42.865Z"
+    },
+    "handler-delivery-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:26:42.865Z"
+    },
+    "handler-delivery-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:26:42.865Z"
     }
   }
 }
