@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5239",
   "created": "2026-11-14T04:43:48.158Z",
-  "updated": "2026-11-14T05:02:41.139Z",
+  "updated": "2026-11-14T05:09:54.456Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,9 +76,22 @@
       "doneAt": "2026-11-14T05:02:29.490Z"
     },
     "hide-jump-without-origin": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5239",
-      "claimedAt": "2026-11-14T05:02:41.139Z"
+      "claimedAt": "2026-11-14T05:02:41.139Z",
+      "doneAt": "2026-11-14T05:09:54.456Z"
+    },
+    "hide-jump-without-origin.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:09:54.456Z"
+    },
+    "hide-jump-without-origin.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:09:54.456Z"
+    },
+    "hide-jump-without-origin.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:09:54.456Z"
     }
   }
 }
