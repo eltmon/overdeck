@@ -99,6 +99,8 @@ interface OverdeckPendingAutoMergeRow {
   cancelled_by: string | null;
   /** #3983: added by a schema top-up; absent on rows written before it. */
   head_sha?: string | null;
+  /** PAN-4753: added by a schema top-up; absent on rows read before it ran. */
+  kind?: string | null;
 }
 
 import type { PendingAutoMerge } from './merge-types.js';
@@ -120,6 +122,7 @@ function rowToPendingAutoMerge(row: OverdeckPendingAutoMergeRow): PendingAutoMer
     cancelledAt: isoFromMillis(row.cancelled_at),
     cancelledBy: row.cancelled_by ?? undefined,
     headSha: row.head_sha ?? undefined,
+    kind: row.kind === 'strike' ? 'strike' : 'feature',
   };
 }
 
@@ -132,7 +135,8 @@ export function listDuePendingAutoMerges(nowIso: string): PendingAutoMerge[] {
   const db = getOverdeckDatabase();
   const nowMs = millisFromIso(nowIso) ?? Date.now();
   const rows = db.prepare(
-    "SELECT * FROM pending_auto_merges WHERE status = 'pending' AND scheduled_merge_at <= ? ORDER BY scheduled_merge_at ASC, id ASC",
+    // PAN-4753 R5: due strike rows merge before due feature rows.
+    "SELECT * FROM pending_auto_merges WHERE status = 'pending' AND scheduled_merge_at <= ? ORDER BY (kind = 'strike') DESC, scheduled_merge_at ASC, id ASC",
   ).all(nowMs) as OverdeckPendingAutoMergeRow[];
   return rows.map(rowToPendingAutoMerge);
 }
@@ -300,6 +304,8 @@ export interface ScheduleAutoMergeInput {
   scheduledAt?: string;
   /** #3983: the PR head the merge gate judged ready. */
   headSha?: string;
+  /** PAN-4753: what is scheduled; `feature` by default. */
+  kind?: 'feature' | 'strike';
   /**
    * #3983: asked with the issue's latest row inside the insert transaction.
    * `false` inserts nothing, so a cancel that lands while the scheduler reads
@@ -334,8 +340,8 @@ export function scheduleAutoMergeWithResult(input: ScheduleAutoMergeInput): Sche
     if (existing) return { entry: rowToPendingAutoMerge(existing), created: false };
 
     const result = db.prepare(`
-      INSERT INTO pending_auto_merges (issue_id, pr_url, project_key, forge, status, scheduled_merge_at, scheduled_at, head_sha)
-      VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)
+      INSERT INTO pending_auto_merges (issue_id, pr_url, project_key, forge, status, scheduled_merge_at, scheduled_at, head_sha, kind)
+      VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?)
     `).run(
       input.issueId,
       input.prUrl,
@@ -344,6 +350,7 @@ export function scheduleAutoMergeWithResult(input: ScheduleAutoMergeInput): Sche
       scheduledMergeAtMs,
       scheduledAtMs,
       input.headSha ?? null,
+      input.kind ?? 'feature',
     );
     const newRow = db.prepare('SELECT * FROM pending_auto_merges WHERE id = ?').get(Number(result.lastInsertRowid)) as OverdeckPendingAutoMergeRow;
     return { entry: rowToPendingAutoMerge(newRow), created: true };

@@ -547,9 +547,9 @@ export interface AutoMergeScheduleDeps {
   isTrainOn?: (issueId: string) => boolean;
   /** PAN-4753: dropped from a batch for a failed combined CI. */
   droppedFromBatch?: (issueId: string) => boolean;
-  isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
+  isEligible?: (issueId: string, options?: { preferBranch?: string }) => Promise<AutoMergeEligibility>;
   /** The one merge gate (#4040); `evaluateIssueMergeGate` by default. */
-  mergeGate?: (issueId: string) => Promise<MergeGateResult>;
+  mergeGate?: (issueId: string, options?: { preferBranch?: string }) => Promise<MergeGateResult>;
   resolveProject?: (issueId: string) => ResolvedProject | null;
   schedule?: (input: ScheduleAutoMergeInput) => ScheduleAutoMergeResult;
   announce?: (issueId: string, entry: PendingAutoMerge) => void;
@@ -572,9 +572,11 @@ export interface AutoMergeCancelDeps {
   removeQueued?: (issueId: string) => number;
 }
 
-function announceAutoMergeScheduled(issueId: string, _entry: PendingAutoMerge): void {
+function announceAutoMergeScheduled(issueId: string, entry: PendingAutoMerge): void {
   emitActivityTts({
-    utterance: `${issueId} auto-merging in 5 minutes; pan merge cancel ${issueId} to abort`,
+    utterance: entry.kind === 'strike'
+      ? `${issueId} strike approved; merging in 5 minutes ahead of the queue; pan merge cancel ${issueId} to abort`
+      : `${issueId} auto-merging in 5 minutes; pan merge cancel ${issueId} to abort`,
     priority: 1,
     issueId,
     source: 'dashboard',
@@ -606,19 +608,30 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
     return { status: 400, body: { error: 'issueId must be a non-empty string' } };
   }
   const issueId = rawIssueId.trim().toUpperCase();
+  // PAN-4753 WI-6: a strike row merges `strike/<id>`; it is high priority, so
+  // only a UAT hold batches it (R4), and it keeps the cooldown (D4).
+  const kind = payload['kind'] ?? 'feature';
+  if (kind !== 'feature' && kind !== 'strike') {
+    return { status: 400, body: { error: "kind must be 'feature' or 'strike'" } };
+  }
+  const branchOptions = kind === 'strike' ? { preferBranch: `strike/${issueId.toLowerCase()}` } : {};
 
-  const refusal = autoMergePolicyRefusal(issueId, deps);
+  const refusal = autoMergePolicyRefusal(issueId, deps, kind === 'strike' ? { branch: branchOptions.preferBranch } : {});
   if (refusal) return refusal;
   const hold = await (deps.deftHold ?? deftAutoMergeHold)(issueId);
   if (hold) return { status: 412, body: { error: hold } };
 
   // #3983: the automatic path needs an approval bound to the PR head.
-  const gate = await (deps.mergeGate ?? ((id: string) => evaluateIssueMergeGate(id)))(issueId);
+  const gate = await (deps.mergeGate ?? ((id: string, options?: { preferBranch?: string }) => evaluateIssueMergeGate(id, {}, options)))(issueId, branchOptions);
   if (!gate.ready) {
     return { status: 422, body: { error: `${issueId} is not ready to merge: ${gate.reason ?? 'the merge gate refused it'}` } };
   }
+  // With no open strike PR the lookup falls back to the feature PR; never schedule that as a strike.
+  if (branchOptions.preferBranch && (gate.facts.headBranch ?? '').toLowerCase() !== branchOptions.preferBranch) {
+    return { status: 422, body: { error: `${issueId} has no open strike PR: the open PR is on ${gate.facts.headBranch ?? 'no branch'}` } };
+  }
 
-  const eligibility = await (deps.isEligible ?? isAutoMergeEligible)(issueId);
+  const eligibility = await (deps.isEligible ?? ((id: string, options?: { preferBranch?: string }) => isAutoMergeEligible(id, {}, options)))(issueId, branchOptions);
   if (!eligibility.eligible) {
     return { status: 422, body: { error: eligibility.reason } };
   }
@@ -646,6 +659,7 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
     scheduledMergeAt: scheduledMergeAt.toISOString(),
     scheduledAt: scheduledAt.toISOString(),
     ...(gate.facts.headSha ? { headSha: gate.facts.headSha } : {}),
+    kind,
   });
   if (result.created) (deps.announce ?? announceAutoMergeScheduled)(issueId, result.entry);
   return { status: 200, body: result.entry };

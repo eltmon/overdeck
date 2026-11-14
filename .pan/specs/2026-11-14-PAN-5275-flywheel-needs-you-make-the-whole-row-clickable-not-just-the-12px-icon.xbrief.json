@@ -1,0 +1,270 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T17:53:52Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5275: Flywheel Needs-you: make the whole row clickable, not just the 12px icon",
+    "updated": "2026-11-14T17:56:45.110Z"
+  },
+  "plan": {
+    "id": "pan-5275",
+    "title": "Flywheel Needs-you: make the whole row clickable, not just the 12px icon",
+    "status": "running",
+    "uid": "0fb3c09f-c371-42e1-82e1-1cd18f3cab10",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-14T17:53:52Z",
+    "updated": "2026-11-14T17:56:45.110Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5275",
+        "label": "PAN-5275",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5275.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "flywheel",
+      "frontend",
+      "a11y",
+      "ux"
+    ],
+    "narratives": {
+      "Problem": "On the Flywheel page's Status tab, a Needs-you row's jump (open conv-flywheel at the message that first raised the item) is only reachable through a 12x12 px icon button. Clicking the row text does nothing and shows the default cursor, so the operator reports the items as not clickable (reproduced on build d0c9b93efe2, 11 rows).",
+      "Proposal": "In src/dashboard/frontend/src/components/flywheel/FlywheelStatusPane.tsx, give each jumpable row (row.messageId set) a mouse onClick on the <li> that calls onNeedsYouClick(row.messageId), plus cursor-pointer, a hover:bg-warning/[0.14] background and group-hover brightening of the jump icon. The <li> gets no role, tabIndex or onKeyDown, so ACT 307n5z (PAN-5217) still holds; the native jump button remains the keyboard path and now stops propagation so one click is one call. Issue buttons, PR links and the item-target link stop propagation so they keep their own action. A click that ends a drag-selection inside the row does not jump. Rows without a first-raised id stay plain text. Docs in docs/FLYWHEEL.md and changelog.d/pan-5275.md; hover and jump screenshots in docs/screenshots/pan-5275/. Full detail: .pan/drafts/PAN-5275.md.",
+      "NonGoals": "- No role=\"button\", role=\"link\", tabIndex or onKeyDown on the Needs-you <li> (ACT 307n5z, PAN-5217).\n- No change to the jump destination, FlywheelPage.handleNeedsYouClick, resolveNeedsYouAction() or the AskUserQuestion reopen behavior.\n- No change to the in-flight table, the live agents list or NeedsYouIndicator.\n- No change to which rows get a jump: rows without a first-raised id stay without one (PAN-5239 FR-7).\n- No title tooltip on the row.\n- No committed Playwright spec; browser verification is a one-off with committed screenshots.\n- No contracts (@overdeck/contracts) or server change."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Make the <li> a mouse-clickable row (onClick only) instead of a row-level button or role=\"button\".",
+        "rationale": "The issue allows either; a row-level button would contain the issue buttons and PR links, which breaks ACT 307n5z and reverts PAN-5217, whose test 'no button-role element contains another button or link' still guards it."
+      },
+      {
+        "summary": "Keyboard support (Enter/Space, focus ring) is provided by the existing native jump button; the row gets no tab stop of its own.",
+        "rationale": "The jump button is a native <button> with a focus-visible ring, so Enter and Space already work; a second tab stop for the same action would need a role, which the ACT constraint forbids."
+      },
+      {
+        "summary": "A click that ends a drag-selection of text inside the row does not jump.",
+        "rationale": "Without the guard, selecting an item's text to copy it would navigate away from the Flywheel page; plain clicks have a collapsed selection and still jump."
+      },
+      {
+        "summary": "On a row with both an item target and a first-raised id, the link text opens the URL and the rest of the row jumps.",
+        "rationale": "The issue requires inner links to keep their own action; the remaining row area is the jump target like any other jumpable row."
+      },
+      {
+        "summary": "The hover screenshot the issue asks for is a one-off Playwright check in an isolated browser, committed under docs/screenshots/pan-5275/ and linked in the PR body.",
+        "rationale": "This follows the PAN-5239 precedent (D10, WI-10); no flywheel Needs-you Playwright spec exists to extend."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-14-PAN-5275-flywheel-needs-you-make-the-whole-row-clickable-not-just-the-12px-icon.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "row-click-target",
+        "title": "Make the whole jumpable Needs-you row a click target in FlywheelStatusPane",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T17:53:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5275",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelStatusPane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx src/pages/__tests__/FlywheelPage.test.tsx",
+            "npm run typecheck",
+            "npx eslint src/dashboard/frontend/src/components/flywheel/FlywheelStatusPane.tsx src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx"
+          ],
+          "expected_outputs": [
+            "FlywheelStatusPane.test.tsx and FlywheelPage.test.tsx pass, including the new 'whole-row jump (PAN-5275)' describe block",
+            "typecheck completes without errors",
+            "eslint reports no errors for the two files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 and decisions D1-D9 in .pan/drafts/PAN-5275.md. In FlywheelStatusPane.tsx: add the module-level endsSelectionWithin(row) helper (D6); for a row with row.messageId give the <li> className 'group -mx-1 flex cursor-pointer items-baseline gap-1.5 rounded-sm px-1 hover:bg-warning/[0.14]' and an onClick that returns early when endsSelectionWithin(e.currentTarget) and otherwise calls onNeedsYouClick?.(row.messageId); a row without messageId gets className '-mx-1 flex items-baseline gap-1.5 px-1' and no onClick. Do not add role, tabIndex, onKeyDown or title to the <li>. The jump button adds group-hover:text-foreground and its onClick becomes (e) => { e.stopPropagation(); onNeedsYouClick?.(row.messageId!); }. Issue buttons call e.stopPropagation() before onNavigateIssue; PR links and the item-target link get onClick={(e) => e.stopPropagation()}. Type the event with import type { MouseEvent } from 'react'. Add the tests listed in PRD WI-1 to a describe('whole-row jump (PAN-5275)') block and add needsYouItems with firstRaisedMessageId to the fixture of the existing ACT 307n5z nesting test.",
+          "Tests": "New tests in FlywheelStatusPane.test.tsx: 'clicking the row text jumps once (ac1)', 'clicking the jump button jumps exactly once (ac2)', 'an inner issue button navigates and does not jump (ac3)', 'inner PR and target links do not jump (ac3)', 'a jumpable row is pointer-styled but not a button (ac4)', 'a row without a first-raised id is plain text (ac5)', 'ending a text selection inside the row does not jump (ac6)'; extended: 'no button-role element contains another button or link (PAN-5217, ACT 307n5z)'."
+        },
+        "items": [
+          {
+            "id": "row-click-target.ac1",
+            "title": "Given a row whose item has firstRaisedMessageId 'm2', when the plain-text segment or the <li> itself is clicked, then onNeedsYouClick is called with 'm2' once per click; and when the jump button is clicked, onNeedsYouClick is called exactly once (toHaveBeenCalledTimes(1)).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-click-target.ac2",
+            "title": "Given a jumpable row, when its flywheel-needs-you-issue button is clicked, then onNavigateIssue is called with 'PAN-5095' and onNeedsYouClick is not called; and when its flywheel-needs-you-pr or flywheel-needs-you-link anchor is clicked, onNeedsYouClick is not called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-click-target.ac3",
+            "title": "A jumpable <li> renders the classes cursor-pointer and hover:bg-warning/[0.14] and has no role and no tabindex attribute; a row without firstRaisedMessageId renders no cursor-pointer class, no flywheel-needs-you-jump button, and a click on it calls nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-click-target.ac4",
+            "title": "Given window.getSelection returns a non-collapsed selection anchored inside the row, when the row is clicked, then onNeedsYouClick is not called; after the spy is restored, the same click calls it once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-click-target.ac5",
+            "title": "The ACT 307n5z test, with a fixture that now includes a jumpable row, passes: no element with the button role contains a button, a link or a [role=button]/[role=link] descendant.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Describe the clickable Needs-you row in docs/FLYWHEEL.md and add changelog.d/pan-5275.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T17:53:52Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5275",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/FLYWHEEL.md",
+            "changelog.d/pan-5275.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0 with changelog.d/pan-5275.md present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In docs/FLYWHEEL.md, in the '| Needs-you block |' table row (line 29), replace the jump-button sentence with the PRD's replacement text: a row with a first-raised message id starts with the jump button and the whole row is a click target for the same jump with a pointer cursor and hover background; issue, PR and item links keep their own action; keyboard users reach the jump through the jump button; a row without a first-raised id has no jump button and is plain text. Keep the AskUserQuestion and /conv/conv-flywheel sentences. Create changelog.d/pan-5275.md with exactly the '#### Fixed' block given in the PRD."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "Given the docs-changelog commit, when docs/FLYWHEEL.md is rendered, then its Needs-you block row renders the text that the whole row of an item with a first-raised message id is a click target with a pointer cursor and hover background, that issue, PR and item links keep their own action, and that the jump button is the keyboard path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "changelog.d/pan-5275.md exists with one '#### Fixed' heading and one bullet linking https://github.com/eltmon/overdeck/issues/5275, and npm run lint:docs exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "browser-hover-check",
+        "title": "Verify the row hover and row-click jump in an isolated browser and commit screenshots",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T17:53:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5275",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/screenshots/pan-5275/01-row-hover.png",
+            "docs/screenshots/pan-5275/02-row-click-jump.png"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "ls docs/screenshots/pan-5275/01-row-hover.png docs/screenshots/pan-5275/02-row-click-jump.png"
+          ],
+          "expected_outputs": [
+            "both PNG files exist and are committed on the feature branch"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ],
+          "acJustification": "Two criteria: one per screenshot, matching the issue's 'verify with a Playwright screenshot of the hover state' plus the click result."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. Use your own headless Chromium (node_modules/playwright) in a fresh context; never touch another agent's browser and never restart or reload the shared dashboard. Serve the branch frontend with 'cd src/dashboard/frontend && npx vite --port 3117 --strictPort', authenticate with the #overdeck_token= hash bootstrap from ~/.overdeck/internal-token (never print or commit the token), mock /api/flywheel/status with page.route when no live item has firstRaisedMessageId, hover a jumpable row's plain text, check computed cursor is 'pointer' and background changed, screenshot, click the row text, wait for /conv/conv-flywheel (or the AskUserQuestion dialog), screenshot. Commit both PNGs and link them in the PR body under '## UAT screenshots' with ?raw=true blob URLs. If no tick exists to anchor a message id, stop and report with pan tell flywheel-orchestrator."
+        },
+        "items": [
+          {
+            "id": "browser-hover-check.ac1",
+            "title": "docs/screenshots/pan-5275/01-row-hover.png is committed and shows a hovered jumpable row with the warning hover background; the script observed getComputedStyle(row).cursor === 'pointer' on that row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-hover-check.ac2",
+            "title": "docs/screenshots/pan-5275/02-row-click-jump.png is committed and shows that clicking the row's plain text navigated to /conv/conv-flywheel (or reopened the pending AskUserQuestion), and the PR body links both PNGs under '## UAT screenshots'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "row-click-target",
+        "to": "browser-hover-check",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
