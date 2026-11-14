@@ -174,10 +174,12 @@ import {
   deepWipe as deepWipeProgram,
   close as closeProgram,
   resetToTodo as resetToTodoProgram,
-  verifyBranchMergedImpl,
-  verifyConventionBranchMerged,
   __testInternals,
 } from '../../../../src/lib/lifecycle/workflows.js';
+import {
+  verifyBranchMergedImpl,
+  verifyConventionBranchMerged,
+} from '../../../../src/lib/lifecycle/verify-merged.js';
 
 // Workflows now return Effects; wrap to keep legacy await-style tests working.
 const approve = (...args: Parameters<typeof approveProgram>) => Effect.runPromise(approveProgram(...args));
