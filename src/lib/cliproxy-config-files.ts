@@ -5,6 +5,9 @@
  * management key file (`~/.overdeck/cliproxy/management-key`, mode 0600) and
  * the operator-owned `config.extra.yaml`, parsed as YAML.
  *
+ * `writeCliproxyConfig` builds the v8 config (`cliproxy-config.ts`) and writes
+ * `config.yaml` in place, mode 0600, only when its parsed content differs.
+ *
  * Every function takes its paths as arguments; the default paths live in
  * `cliproxy.ts`. This module never imports `cliproxy.ts` (lint:circular).
  */
@@ -12,6 +15,7 @@
 import { randomBytes } from 'node:crypto';
 import { chmod, readFile, writeFile } from 'node:fs/promises';
 import { parse as parseYaml } from 'yaml';
+import { buildCliproxyConfigV8, configNeedsWrite } from './cliproxy-config.js';
 
 /** A random management key: 24 bytes as base64url (32 characters). */
 export function generateManagementKey(): string {
@@ -66,4 +70,58 @@ export async function readConfigExtraFile(
     return {};
   }
   return value;
+}
+
+export interface WriteCliproxyConfigOptions {
+  configPath: string;
+  extraPath: string;
+  keyPath: string;
+  host: string;
+  port: number;
+  clientToken: string;
+  authDir: string;
+  geminiApiKey: string | null;
+  log?: (message: string) => void;
+}
+
+/**
+ * Ensure `config.yaml` holds the generated v8 config. The management key file
+ * always ends up holding the active plaintext key (created when missing; an
+ * extra plaintext key is written back). `config.yaml` is written in place with
+ * `writeFile`, never temp file plus rename: CLIProxy's hot-reload watcher
+ * missed a rename in the PAN-5282 probe.
+ */
+export async function writeCliproxyConfig(
+  opts: WriteCliproxyConfigOptions,
+): Promise<{ wrote: boolean; activeManagementKey: string }> {
+  const log = opts.log ?? console.warn;
+  const stored = await readManagementKeyFile(opts.keyPath);
+  const managementKey = stored ?? generateManagementKey();
+  const extra = await readConfigExtraFile(opts.extraPath, log);
+  const out = buildCliproxyConfigV8({
+    host: opts.host,
+    port: opts.port,
+    clientToken: opts.clientToken,
+    authDir: opts.authDir,
+    geminiApiKey: opts.geminiApiKey,
+    managementKey,
+    extra,
+  });
+  for (const warning of out.warnings) log(`[cliproxy] ${warning}`);
+
+  const keyChanged = out.activeManagementKey !== stored;
+  if (keyChanged) await writeManagementKeyFile(opts.keyPath, out.activeManagementKey);
+
+  let existing: string | null;
+  try {
+    existing = await readFile(opts.configPath, 'utf8');
+  } catch {
+    existing = null;
+  }
+  const wrote = configNeedsWrite(existing, out.config, keyChanged);
+  if (wrote) await writeFile(opts.configPath, out.yaml, { mode: 0o600 });
+  // writeFile applies the mode only when it creates the file.
+  await chmod(opts.configPath, 0o600);
+
+  return { wrote, activeManagementKey: out.activeManagementKey };
 }
