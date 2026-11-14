@@ -4,17 +4,17 @@
     "created": "2026-11-14T04:01:03Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5236: Dashboard tabs keep running old frontend code after a deploy, silently: show a reload banner",
-    "updated": "2026-11-14T04:01:05.715Z"
+    "updated": "2026-11-14T04:12:21.735Z"
   },
   "plan": {
     "id": "pan-5236",
     "title": "Dashboard tabs keep running old frontend code after a deploy, silently: show a reload banner",
-    "status": "proposed",
+    "status": "running",
     "uid": "bbc21c0b-1fc5-4cb3-9044-25cba34696b7",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-14T04:01:03Z",
-    "updated": "2026-11-14T04:01:05.715Z",
+    "updated": "2026-11-14T04:12:21.735Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5236",
@@ -655,5 +655,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
