@@ -26,6 +26,8 @@ import {
 import { jsonResponse } from '../../http-helpers.js';
 import { readJsonBody } from './shared.js';
 
+const SLOW_REQUEST_MS = 2000;
+
 const STATUS_BY_CODE: Record<SkillOverrideErrorCode, number> = {
   'core-skill': 409,
   'unknown-skill': 404,
@@ -60,10 +62,18 @@ const getSkillOverridesRoute = HttpRouter.add(
     const issueId = url.searchParams.get('issue') || undefined;
     const checkUpdates = url.searchParams.get('checkUpdates') === '1';
     return yield* Effect.promise(async () => {
+      const started = Date.now();
       try {
         return jsonResponse(await skillStatesResponseBody({ projectKey, issueId }, checkUpdates));
       } catch (error) {
         return errorResponse(error);
+      } finally {
+        const ms = Date.now() - started;
+        if (ms >= SLOW_REQUEST_MS) {
+          console.warn(
+            `[skill-overrides] slow GET level=${issueId ? 'issue' : projectKey ? 'project' : 'global'} project=${projectKey ?? '-'} issue=${issueId ?? '-'} ms=${ms}`,
+          );
+        }
       }
     });
   }),
