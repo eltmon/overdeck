@@ -504,9 +504,11 @@ already queued, without killing them:
   `vitest:<cwd relative to the repo root, or .>:<suite|files>` for a local
   Vitest run, and `gate:<name>:<raw gate command>` for a verification gate.
   Placeholders such as `{{CHANGED_BASE}}` stay literal in the key. A Vitest run
-  is `files` when it names at most 10 filters and none is a directory;
-  otherwise it is `suite` (no filters, `vitest run tests/unit`, or the frontend
-  subset's long list). The two shapes never share peaks, so a full-suite peak
+  is `files` only when it names at most 10 filters and every one is an
+  existing file. Vitest matches filters as path substrings, so anything else
+  counts as `suite`: no filters, a directory (`vitest run tests/unit`), a
+  pattern such as `.test.ts` or `admission`, or the frontend subset's long
+  list. The two shapes never share peaks, so a full-suite peak
   from `npm test` no longer becomes the estimate for `vitest run <file>`
   (PAN-5285). Peaks stored under the old shapeless `vitest:.` key are no
   longer read.
@@ -546,9 +548,12 @@ already queued, without killing them:
   is due to run alone: nobody passes it while any slot is held, the slots drain, and
   once none is held the head starts even though it fails the soft-reserve
   rule. The safety floor is the governor's hard reserve: the head starts alone
-  only while `MemAvailable − footprint ≥ resources.governor_hard_reserve_gb`.
-  It also skips the soft-reserve re-check after settling, but gives its slot
-  back if another gate joined it. A head that would break the hard reserve is
+  only while `MemAvailable − footprint ≥ resources.governor_hard_reserve_gb`,
+  where the footprint is clamped to `memTotal − hard reserve` (not the soft
+  reserve, which would under-count a large estimate). After the settle it
+  skips the soft-reserve re-check but re-reads memory and both reserves, and
+  gives its slot back if the hard-reserve check now fails or another gate
+  joined it. A head that would break the hard reserve is
   never forced; smaller gates keep passing it until memory recovers or its
   wait times out. Tickets from checkouts older than PAN-5285 cannot run
   alone, so later gates pass them with no time limit. Such a ticket also froze

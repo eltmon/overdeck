@@ -38,21 +38,23 @@ export interface VitestCpuAdmissionDeps {
   filters?: readonly string[]
 }
 
-function isDirectory(path: string): boolean {
+function isFile(path: string): boolean {
   try {
-    return statSync(path).isDirectory()
+    return statSync(path).isFile()
   } catch {
     return false
   }
 }
 
 /**
- * PAN-5285: `files` for a run naming at most a few test files, `suite` for no
- * filters, a directory filter (`vitest run tests/unit`) or a long file list.
+ * PAN-5285: `files` only when every filter names an existing file and there
+ * are at most a few of them. Vitest matches filters as path substrings, so a
+ * directory, a pattern such as `.test.ts` or `admission`, no filters, or a
+ * long list may select a suite-sized run, and those count as `suite`.
  */
 export function vitestRunShape(cwd: string, filters: readonly string[] | undefined): 'suite' | 'files' {
   if (!filters?.length || filters.length > FILES_SHAPE_MAX_FILTERS) return 'suite'
-  return filters.some((filter) => isDirectory(resolve(cwd, filter))) ? 'suite' : 'files'
+  return filters.every((filter) => isFile(resolve(cwd, filter))) ? 'files' : 'suite'
 }
 
 /** D13 + PAN-5285: `vitest:<path from the nearest .git ancestor to cwd, or .>:<run shape>`. */

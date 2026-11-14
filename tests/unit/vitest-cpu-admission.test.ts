@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -120,17 +120,34 @@ describe('Vitest CPU admission', () => {
     }
   })
 
-  it('keys a run by its shape: no filters, a directory or a long list is a suite (PAN-5285)', () => {
+  it('keys a run by its shape: only a few existing files is a files run (PAN-5285)', () => {
     const top = mkdtempSync(join(tmpdir(), 'pan-5285-vitest-shape-'))
     try {
       mkdirSync(join(top, '.git'))
       mkdirSync(join(top, 'tests', 'unit'), { recursive: true })
+      const names = Array.from({ length: 11 }, (_, i) => `tests/unit/t${i}.test.ts`)
+      for (const name of names) writeFileSync(join(top, name), '')
       expect(vitestRunShape(top, undefined)).toBe('suite')
       expect(vitestRunShape(top, [])).toBe('suite')
       expect(vitestRunShape(top, ['tests/unit'])).toBe('suite')
-      expect(vitestRunShape(top, Array.from({ length: 11 }, (_, i) => `t${i}.test.ts`))).toBe('suite')
-      expect(vitestRunShape(top, ['tests/unit/a.test.ts', 'admission'])).toBe('files')
-      expect(vitestFootprintKey(top, ['tests/unit/a.test.ts'])).toBe('vitest:.:files')
+      expect(vitestRunShape(top, names)).toBe('suite')
+      expect(vitestRunShape(top, names.slice(0, 2))).toBe('files')
+      expect(vitestFootprintKey(top, [names[0]!])).toBe('vitest:.:files')
+    } finally {
+      rmSync(top, { recursive: true, force: true })
+    }
+  })
+
+  it('treats substring filters that may match many files as a suite (PAN-5285)', () => {
+    const top = mkdtempSync(join(tmpdir(), 'pan-5285-vitest-substring-'))
+    try {
+      mkdirSync(join(top, '.git'))
+      mkdirSync(join(top, 'tests'))
+      writeFileSync(join(top, 'tests', 'a.test.ts'), '')
+      // Vitest matches filters as path substrings: `.test.ts` selects every test file.
+      expect(vitestRunShape(top, ['.test.ts'])).toBe('suite')
+      expect(vitestRunShape(top, ['admission'])).toBe('suite')
+      expect(vitestRunShape(top, ['tests/a.test.ts', 'admission'])).toBe('suite')
     } finally {
       rmSync(top, { recursive: true, force: true })
     }
@@ -140,6 +157,8 @@ describe('Vitest CPU admission', () => {
     const top = mkdtempSync(join(tmpdir(), 'pan-5285-vitest-peak-'))
     try {
       mkdirSync(join(top, '.git'))
+      mkdirSync(join(top, 'tests', 'unit'), { recursive: true })
+      writeFileSync(join(top, 'tests', 'unit', 'a.test.ts'), '')
       await recordGateFootprintPeak(vitestFootprintKey(top), 9.3 * GiB, top)
       await expect(readGateFootprintEstimate(vitestFootprintKey(top), top)).resolves.toBe(9.3 * GiB)
       await expect(readGateFootprintEstimate(vitestFootprintKey(top, ['tests/unit/a.test.ts']), top))
@@ -155,7 +174,7 @@ describe('Vitest CPU admission', () => {
       acquireDeps?.onWaiting?.({ kind: 'queue', position: 2, blocker: { gateName: 'typecheck', issueId: 'PAN-9', workspacePath: '/w' } })
       return { ...admittedHandle(), admittedAlone: true, footprintBytes: 9 * GiB }
     })
-    await setup({ env: {}, acquire: acquire as never, warn, startSampler: noSampler, filters: ['tests/unit/x.test.ts'] })
+    await setup({ env: {}, acquire: acquire as never, warn, startSampler: noSampler, filters: ['tests/unit/vitest-cpu-admission.test.ts'] })
 
     const key = (acquire.mock.calls[0]![0] as { footprintKey: string }).footprintKey
     expect(key).toMatch(/:files$/)

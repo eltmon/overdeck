@@ -782,6 +782,19 @@ describe('head-of-line fairness (PAN-5285)', () => {
     return () => settled
   }
 
+  /** The memoryBlockedSince a waiter ticket for `gateName` recorded, or undefined. */
+  function blockedSince(rootDir: string, gateName: string): number | undefined {
+    for (const entry of readdirSync(rootDir).filter((name) => name.startsWith('waiter-') && name.endsWith('.json'))) {
+      try {
+        const ticket = JSON.parse(readFileSync(join(rootDir, entry), 'utf8'))
+        if (ticket.gateName === gateName && typeof ticket.memoryBlockedSince === 'number') return ticket.memoryBlockedSince
+      } catch {
+        // Mid-replace; the next drive step reads it again.
+      }
+    }
+    return undefined
+  }
+
   async function seedPeaks(rootDir: string): Promise<void> {
     await recordGateFootprintPeak(big.footprintKey, 9 * GiB, rootDir)
     await recordGateFootprintPeak(small.footprintKey, 100 * MiB, rootDir)
@@ -793,7 +806,7 @@ describe('head-of-line fairness (PAN-5285)', () => {
     let clock = 1
     const headPromise = acquireQualityGateAdmission(big, fairDeps(rootDir, () => clock, () => 16 * GiB))
     const headSettled = settledFlag(headPromise)
-    await drive(3)
+    await driveUntil(() => blockedSince(rootDir, 'vitest') === 1)
     clock = 2
     const second = await driveUntilResolved(acquireQualityGateAdmission(small, fairDeps(rootDir, () => clock, () => 16 * GiB)))
 
@@ -815,8 +828,9 @@ describe('head-of-line fairness (PAN-5285)', () => {
     let pressured = true
     const cpu = { slots: 2, samplePressure: async () => (pressured ? high : low) }
     const onWaiting = vi.fn()
-    const firstPromise = acquireQualityGateAdmission(small, fairDeps(rootDir, () => 1, () => 16 * GiB, cpu))
-    await drive(3)
+    const onFirstWaiting = vi.fn()
+    const firstPromise = acquireQualityGateAdmission(small, fairDeps(rootDir, () => 1, () => 16 * GiB, { ...cpu, onWaiting: onFirstWaiting }))
+    await driveUntil(() => onFirstWaiting.mock.calls.some(([reason]) => reason.kind === 'cpu'))
     const secondPromise = acquireQualityGateAdmission(small, fairDeps(rootDir, () => 2, () => 16 * GiB, { ...cpu, onWaiting }))
     const secondSettled = settledFlag(secondPromise)
     await drive(10)
@@ -839,7 +853,8 @@ describe('head-of-line fairness (PAN-5285)', () => {
     const both = { slots: 2, isProcessAlive: otherAlive, staleMs: 60_000 }
     const headPromise = acquireQualityGateAdmission(big, fairDeps(rootDir, () => clock, () => 16 * GiB, both))
     const headSettled = settledFlag(headPromise)
-    await drive(3)
+    // Advance the clock only once the head has recorded its memory block at t=1.
+    await driveUntil(() => blockedSince(rootDir, 'vitest') === 1)
     clock = 2_000
     const secondPromise = acquireQualityGateAdmission(small, fairDeps(rootDir, () => clock, () => 16 * GiB, { ...both, onWaiting: onSecondWaiting }))
     const secondSettled = settledFlag(secondPromise)
@@ -892,7 +907,7 @@ describe('head-of-line fairness (PAN-5285)', () => {
     // Long past the bound in queue age, but it has waited on the slot, not on memory.
     clock = 10_000
     unlinkSync(join(rootDir, 'owner.json'))
-    await drive(10)
+    await driveUntil(() => blockedSince(rootDir, 'vitest') === 10_000)
     expect(headSettled()).toBe(false)
 
     clock = 10_500
@@ -921,6 +936,50 @@ describe('head-of-line fairness (PAN-5285)', () => {
 
     clock = 40_000
     await (await driveUntilResolved(promise)).release()
+  })
+
+  it('clamps the alone footprint against the hard reserve, not the soft reserve', async () => {
+    const rootDir = home()
+    await seedPeaks(rootDir)
+    let clock = 1
+    // 16 GiB host: a soft-reserve clamp would cut the 9 GiB estimate to 4 GiB and pass 10 - 4 >= 4.
+    const promise = acquireQualityGateAdmission(big, fairDeps(rootDir, () => clock, () => 10 * GiB, {
+      maxWaitMs: 10_000,
+      sampleMemory: async () => ({ memAvailableBytes: 10 * GiB, memTotalBytes: 16 * GiB }),
+    }))
+    await driveUntil(() => blockedSince(rootDir, 'vitest') === 1)
+    clock = 5_000
+    await drive(10)
+    expect(readdirSync(rootDir).filter((entry) => entry === 'owner.json')).toEqual([])
+
+    clock = 20_000
+    expect(await driveUntilRejected(promise)).toMatchObject({ lastWaitReason: 'memory' })
+  })
+
+  it('gives an alone slot back when memory drops below the hard reserve during the settle', async () => {
+    const rootDir = home()
+    await seedPeaks(rootDir)
+    let clock = 1
+    let dropWhileHeld = true
+    let droppedOnce = false
+    const sampleMemory = async () => {
+      const held = existsSync(join(rootDir, 'owner.json'))
+      if (held && dropWhileHeld) droppedOnce = true
+      // While it holds the slot, MemAvailable falls to 12 GiB: 12 - 9 = 3 GiB, under the 4 GiB hard reserve.
+      return { memAvailableBytes: held && dropWhileHeld ? 12 * GiB : 16 * GiB, memTotalBytes: 64 * GiB }
+    }
+    const promise = acquireQualityGateAdmission(big, fairDeps(rootDir, () => clock, () => 16 * GiB, { sampleMemory }))
+    const settled = settledFlag(promise)
+    await driveUntil(() => blockedSince(rootDir, 'vitest') === 1)
+    clock = 5_000
+    await driveUntil(() => droppedOnce)
+    await drive(5)
+    expect(settled()).toBe(false)
+
+    dropWhileHeld = false
+    const handle = await driveUntilResolved(promise)
+    expect(handle.admittedAlone).toBe(true)
+    await handle.release()
   })
 
   it('passes an older-version head that froze a huge estimate, even past the bound', async () => {

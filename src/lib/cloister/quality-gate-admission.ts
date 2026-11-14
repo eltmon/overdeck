@@ -724,9 +724,15 @@ export async function acquireQualityGateAdmission(
     footprintBytes: verdict.footprintBytes,
     softReserveBytes: poll.softReserveBytes,
   })
-  /** Alone, the gate would still leave the hard reserve free. */
-  const fitsAlone = (poll: PollMemory, verdict: MemoryHeadroomVerdict): boolean =>
-    poll.memory.memAvailableBytes - verdict.footprintBytes >= poll.hardReserveBytes
+  /**
+   * Alone, the gate would still leave the hard reserve free. Its footprint is
+   * clamped to what the host could give it above the hard reserve, not the
+   * soft reserve, so a large estimate is never under-counted.
+   */
+  const fitsAlone = (poll: PollMemory, estimateBytes: number): boolean => {
+    const footprintBytes = Math.min(estimateBytes, Math.max(0, poll.memory.memTotalBytes - poll.hardReserveBytes))
+    return poll.memory.memAvailableBytes - footprintBytes >= poll.hardReserveBytes
+  }
   /**
    * Why we must keep our place behind `ahead`, or null when we may pass all of
    * them: each is blocked on memory and the head is not due to run alone. A
@@ -763,7 +769,7 @@ export async function acquireQualityGateAdmission(
       legacyFitSince.delete(peer.ticketId)
       const blockedSince = peer.memoryBlockedSince
       if (index === 0 && peer.admissionVersion && blockedSince != null && now() - blockedSince > headBypassMs
-        && (slotsHeld || fitsAlone(poll, verdict))) {
+        && (slotsHeld || fitsAlone(poll, estimate))) {
         return keepPlace(peer, true)
       }
     }
@@ -844,7 +850,7 @@ export async function acquireQualityGateAdmission(
         // once the slots are empty, as long as it would leave the hard reserve free.
         const blockedSince = ticket.memoryBlockedSince
         alone = position === 0 && taken.size === 0 && blockedSince != null && now() - blockedSince > headBypassMs
-          && fitsAlone(poll!, ownVerdict)
+          && fitsAlone(poll!, ticket.footprintBytes!)
         if (!alone) {
           await notifyWaiting(memoryReason(poll!, ownVerdict))
           await sleep(pollMs)
@@ -903,11 +909,16 @@ export async function acquireQualityGateAdmission(
           const other = await readJson<AdmissionOwner>(otherPath)
           if (other && other.ticketId !== ticketId && !ownerIsStale(other, now(), staleMs, isProcessAlive)) others.push(other)
         }
-        // PAN-5285: a head admitted alone skips the soft-reserve re-check, which it
-        // already failed, but gives the slot back if another gate joined it.
-        const settledPoll = alone ? null : await readPollMemory(others)
-        const settledVerdict = settledPoll ? verdictFor(settledPoll, owner.footprintBytes ?? 0) : null
-        if ((alone && others.length > 0) || (settledVerdict && !settledVerdict.ok)) {
+        // PAN-5285: a head admitted alone skips the soft-reserve rule, which it already
+        // failed, but re-checks the hard reserve with fresh memory and reserves, and gives
+        // the slot back if that now fails or another gate joined it.
+        const footprintBytes = owner.footprintBytes ?? 0
+        const settledPoll = await readPollMemory(others)
+        const settledVerdict = settledPoll ? verdictFor(settledPoll, footprintBytes) : null
+        const failed = alone
+          ? others.length > 0 || (settledPoll != null && !fitsAlone(settledPoll, footprintBytes))
+          : settledVerdict != null && !settledVerdict.ok
+        if (failed) {
           if (settledPoll && settledVerdict) await notifyWaiting(memoryReason(settledPoll, settledVerdict))
           if (sameOwner(await readJson<AdmissionOwner>(path), owner)) await unlinkIfExists(path)
           await sleep(pollMs)
