@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5245",
   "created": "2026-11-14T05:12:59.498Z",
-  "updated": "2026-11-14T05:12:59.498Z",
+  "updated": "2026-11-14T05:17:56.324Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,26 @@
   "sessionHistory": [],
   "items": {
     "ci-subset-test-harness": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5245",
-      "claimedAt": "2026-11-14T05:12:59.497Z"
+      "claimedAt": "2026-11-14T05:12:59.497Z",
+      "doneAt": "2026-11-14T05:17:56.324Z"
+    },
+    "ci-subset-test-harness.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:17:56.324Z"
+    },
+    "ci-subset-test-harness.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:17:56.324Z"
+    },
+    "ci-subset-test-harness.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:17:56.324Z"
+    },
+    "ci-subset-test-harness.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:17:56.324Z"
     }
   }
 }
