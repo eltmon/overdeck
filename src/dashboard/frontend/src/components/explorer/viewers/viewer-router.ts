@@ -14,11 +14,13 @@
  * opens Monaco; anything else renders `<FileViewer rootId path read />`. When
  * `textEditable` is true the pane may offer a Preview / Edit toggle.
  *
- * Tier 2 (PAN-5189) inserts its office, notebook and mermaid rows with the
- * other extension rows, before the `read.kind === 'text'` row: notebooks and
- * Mermaid files are text reads, so a row after it would never match.
+ * Tier 2 (PAN-5189) adds the office, notebook and mermaid rows after the
+ * archive row; they sit before the `read.kind === 'text'` row because
+ * notebooks and Mermaid files are text reads.
  */
 import type { ExplorerReadFileResult } from '@overdeck/contracts';
+
+import { OFFICE_DOCUMENT_KINDS, type OfficeDocumentKind } from './office/officePreviewProtocol';
 
 export type ViewerKind =
   | 'text'
@@ -31,7 +33,10 @@ export type ViewerKind =
   | 'large-text'
   | 'archive'
   | 'sqlite'
-  | 'binary';
+  | 'binary'
+  | 'office'
+  | 'notebook'
+  | 'mermaid';
 
 export interface ViewerChoice {
   kind: ViewerKind;
@@ -47,6 +52,7 @@ const AUDIO = new Set(['mp3', 'wav', 'ogg', 'oga', 'opus', 'm4a', 'aac', 'flac',
 const FONT = new Set(['ttf', 'otf', 'woff', 'woff2']);
 const ARCHIVE = new Set(['zip', 'jar', 'tar', 'gz', 'tgz']);
 const SQLITE = new Set(['sqlite', 'sqlite3', 'db']);
+const MERMAID = new Set(['mmd', 'mermaid']);
 
 function extensionOf(path: string): string {
   const base = path.slice(path.lastIndexOf('/') + 1);
@@ -68,9 +74,17 @@ export function pickViewer(path: string, read: Pick<ExplorerReadFileResult, 'kin
   if (AUDIO.has(ext)) return choice('audio');
   if (FONT.has(ext)) return choice('font');
   if (ARCHIVE.has(ext)) return choice('archive');
+  if (OFFICE_DOCUMENT_KINDS.has(ext)) return choice('office');
+  if (ext === 'ipynb' && read.kind !== 'binary') return choice('notebook', null, read.kind === 'text');
+  if (MERMAID.has(ext) && read.kind === 'text') return choice('mermaid', null, true);
   if (delimiter && read.kind === 'text') return choice('table', delimiter, true);
   if (read.kind === 'text') return choice('text');
   if (read.kind === 'large-text' && read.size > LARGE_TEXT_MAX_BYTES) return choice('binary');
   if (read.kind === 'large-text') return choice('large-text', delimiter);
   return choice('binary');
+}
+
+export function officeKindOf(path: string): OfficeDocumentKind | null {
+  const ext = extensionOf(path);
+  return OFFICE_DOCUMENT_KINDS.has(ext) ? (ext as OfficeDocumentKind) : null;
 }

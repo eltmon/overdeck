@@ -330,7 +330,7 @@ for t in table_order:
         if c["pk"]: flags.append("PK")
         if c["ref"]: flags.append("FK")
         if c["uniq"]: flags.append("UK")
-        flagstr = " ".join(flags)
+        flagstr = ",".join(flags)
         mm.append(f"    {mtype(c['type'])} {c['name']} {flagstr}".rstrip())
     mm.append("  }")
 mm.append("")
@@ -345,7 +345,7 @@ for t, d in tables.items():
         seen.add(key)
         mm.append(f"  {t.upper()} }}o--|| {rt.upper()} : {col}")
 for (s, col, rt, rc) in logical:
-    mm.append(f"  {s.upper()} }}o--o{{ {rt.upper()} : {col}  %% logical")
+    mm.append(f"  {s.upper()} }}o--o{{ {rt.upper()} : {col}")
 with open(OUT_MMD, "w") as f:
     f.write("\n".join(mm) + "\n")
 

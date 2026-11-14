@@ -66,6 +66,270 @@
     "commit": "2d8a843e6b"
   },
   {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/shared/imageDimensions.ts",
+    "upstream": "t3code",
+    "path": "packages/shared/src/imageDimensions.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/officePreviewProtocol.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/officePreviewProtocol.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/officeXml.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/officeArchive.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/wordArchive.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/officeArchive.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/sheetArchive.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/officeArchive.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/officeArchive.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/officeArchive.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/links.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/links.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/extendedDocumentPreview.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/extendedDocumentPreview.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/officePreview.worker.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/officePreview.worker.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/DocumentPages.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/DocumentPages.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/worker-rpc.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/worker-rpc.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/fonts.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/fonts.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/image-bitmap.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/image-bitmap.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/vector-pictures.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/vector-pictures.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/OfficePages.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/OfficePages.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/OdfViewer.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/OfficeViewer.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/notebook/notebookParse.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/extendedDocumentPreview.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/notebook/NotebookMarkdown.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/NotebookPreview.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/notebook/NotebookPreview.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/NotebookPreview.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/mermaid/MermaidViewer.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/MermaidViewer.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/word-protocol.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/word-protocol.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/word-glyphs.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/word-glyphs.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/word-images.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/word-images.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/word-text.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/word-text.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/word-document.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/word-document.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/document.worker.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/document.worker.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/WordDocument.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/WordDocument.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/sheet-sizing.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/sheet-sizing.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/sheet-viewport.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/sheet-viewport.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/sheet-protocol.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/sheet-protocol.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/sheet-fonts.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/sheet-fonts.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/sheet-cells.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/sheet-cells.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/sheet-frame.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/sheet-frame.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/sheet-paint.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/sheet-paint.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/spreadsheet.worker.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/spreadsheet.worker.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/Spreadsheet.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/Spreadsheet.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/slide-protocol.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/slide-protocol.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/slide-fonts.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/slide-fonts.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/slide-text.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/slide-text.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/presentation.worker.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/presentation.worker.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/Presentation.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/Presentation.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/OpenXmlOfficeViewer.tsx",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/OpenXmlOfficeViewer.tsx",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/__tests__/sheet-viewport.test.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/sheet-viewport.test.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
+    "local": "src/dashboard/frontend/src/components/explorer/viewers/office/engine/__tests__/sheet-cells.test.ts",
+    "upstream": "t3code",
+    "path": "apps/web/src/components/files/office/sheet-cells.test.ts",
+    "commit": "2d8a843e6b"
+  },
+  {
     "local": "src/dashboard/frontend/src/components/explorer/viewers/font/FontViewer.tsx",
     "upstream": "t3code",
     "path": "apps/web/src/components/files/FontViewer.tsx",

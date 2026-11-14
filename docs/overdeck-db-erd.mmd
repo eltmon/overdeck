@@ -355,19 +355,19 @@ erDiagram
     integer scanned_at
   }
   DISCOVERED_SESSION_TAGS {
-    integer session_id PK FK
+    integer session_id PK,FK
     text tag PK
   }
   DISCOVERED_SESSION_TOOLS {
-    integer session_id PK FK
+    integer session_id PK,FK
     text tool PK
   }
   DISCOVERED_SESSION_FILES {
-    integer session_id PK FK
+    integer session_id PK,FK
     text file_path PK
   }
   SESSION_EMBEDDINGS {
-    integer session_id PK FK
+    integer session_id PK,FK
     text model PK
     integer dim
     blob embedding
@@ -417,11 +417,11 @@ erDiagram
   DISCOVERED_SESSION_TOOLS }o--|| DISCOVERED_SESSIONS : session_id
   DISCOVERED_SESSION_FILES }o--|| DISCOVERED_SESSIONS : session_id
   SESSION_EMBEDDINGS }o--|| DISCOVERED_SESSIONS : session_id
-  COST_EVENTS }o--o{ ISSUES : issue_id  %% logical
-  CONVERSATIONS }o--o{ ISSUES : issue_id  %% logical
-  REVIEW_STATUS }o--o{ ISSUES : issue_id  %% logical
-  GIT_OPERATIONS }o--o{ ISSUES : issue_id  %% logical
-  TRANSCRIPTS }o--o{ ISSUES : pan_issue_id  %% logical
-  DISCOVERED_SESSIONS }o--o{ ISSUES : pan_issue_id  %% logical
-  FLYWHEEL_SUBSTRATE_BUGS }o--o{ ISSUES : discovered_in_issue_id  %% logical
-  AGENTS }o--o{ REVIEW_RUNS : review_run_id  %% logical
+  COST_EVENTS }o--o{ ISSUES : issue_id
+  CONVERSATIONS }o--o{ ISSUES : issue_id
+  REVIEW_STATUS }o--o{ ISSUES : issue_id
+  GIT_OPERATIONS }o--o{ ISSUES : issue_id
+  TRANSCRIPTS }o--o{ ISSUES : pan_issue_id
+  DISCOVERED_SESSIONS }o--o{ ISSUES : pan_issue_id
+  FLYWHEEL_SUBSTRATE_BUGS }o--o{ ISSUES : discovered_in_issue_id
+  AGENTS }o--o{ REVIEW_RUNS : review_run_id
