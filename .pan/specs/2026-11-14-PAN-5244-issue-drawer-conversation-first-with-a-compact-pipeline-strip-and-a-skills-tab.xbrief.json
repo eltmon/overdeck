@@ -1,0 +1,1692 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T06:00:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5244: Issue drawer: conversation first, with a compact pipeline strip and a Skills tab",
+    "updated": "2026-11-14T05:20:54.265Z"
+  },
+  "plan": {
+    "id": "pan-5244",
+    "title": "Issue drawer: conversation first, with a compact pipeline strip and a Skills tab",
+    "status": "proposed",
+    "uid": "4e48f3fa-9d55-46c8-9633-194a8da87e11",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-14T06:00:00Z",
+    "updated": "2026-11-14T05:20:54.265Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5244",
+        "label": "PAN-5244",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5244/.pan/drafts/pan-5244.md",
+        "label": "PRD draft (.pan/drafts/pan-5244.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/design/issue-view-conversation-first.html",
+        "label": "Approved mockup",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "issue-drawer",
+      "issue-view",
+      "ux"
+    ],
+    "metadata": {
+      "sizeJustification": "One drawer redesign with an approved mockup and a single PRD. 19 of the 36 scoped files are source files, all under src/dashboard/frontend/src (components plus lib/store.ts and lib/agentConversation.ts); the rest are their tests, three doc files and the CI test list. Splitting into sibling issues would ship drawer states the mockup never approved (a strip without the composed layout, a Skills tab without a body) and the pieces only become observable once composed in IssueDetail drawer density. The xBRIEF already splits the work into 21 items that are green at their own commits.",
+      "canonicalFilename": "2026-11-14-PAN-5244-issue-drawer-conversation-first-with-a-compact-pipeline-strip-and-a-skills-tab.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The issue drawer opens on the conversation but gives it about 660px of a 980px drawer and loses about 250px of height to chrome: a block above the header, a 52px header, a tall phase rail plus four specialist cards on every tab, a 320px right status rail, and a footer action bar. Skill settings hide inside a disclosure on the Overview tab.",
+      "Proposal": "In IssueDetail density \"drawer\" only: a one-row header (id, title, state badge, cost, the existing IssueActionMenu primary strip, Issue link, close) and no footer; a 34px pipeline strip (six phases that open their agent's conversation, a checks chip, and a strip variant of PickupGateControls); tabs reordered conversation-first with stable ids (Conversation, Tasks, Plan map, Files, Activity, Artifacts, Skills, Details); a full-width Conversation tab with a header row, meta row and agent menu in DrawerAgentSession's new conversation-header layout; a new Skills tab hosting SkillOverridesPanel; a two-column Details tab that absorbs the right rail. New pieces live under components/issue-view so the cockpit can adopt them later. Every DENSITY_SECTIONS.console marker keeps a visible home, proven per tab by a test.",
+      "NonGoals": "- No edit to the cockpit (components/Stage/cockpit/IssueMissionControl.tsx) and no adoption of the new components there.\n- No change to the composition of IssueDetail density \"page\" or \"rail\" (shell, 360px rail, toolbar DrawerAgentSession with <select>, Overview body with IssueSkillsSection and TasksPanel).\n- No edit to components/IssueActionMenu/*, components/chat/ConversationPanel.tsx, the body of SkillOverridesPanel.tsx, or the full variant JSX of PickupGateControls.\n- No redesign of the skill rows (PAN-5245) and no work on the slow /api/skills/overrides endpoint (PAN-5238).\n- No server, route, contract, store-shape change, new endpoint or new polling loop; no no-loss-matrix.ts row.\n- No row added to or removed from ISSUE_VIEW_INVENTORY or DENSITY_SECTIONS; no tab id renamed.\n- No mockup-only features: no Test \"skip\" state, no Synthesis chip, no About/Bookmarks/Copy buttons, no \"Not planned yet\" strip text, no sample data.\n- No change to the closed-drawer store value { issueId: null, tab: \"overview\" }.\n- No raise of scripts/file-size-allowlist.txt and no edit of lib/__tests__/conformance-gates.test.ts."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Lower the existing PRD as written; no operator questions.",
+        "rationale": "The PRD records D-1..D-16 as final, was verified against HEAD 7ece197612f (no frontend drift since its baseline dafeeaf8a7d), and auto mode forbids AskUserQuestion."
+      },
+      {
+        "summary": "Hide the Skills tab in every density until compose-drawer.",
+        "rationale": "ISSUE_DETAIL_TABS gains \"skills\" in tabs-order-labels, but its body exists only after compose-drawer; hiding it keeps every commit free of a bodiless tab."
+      },
+      {
+        "summary": "Move each test edit to the item whose code breaks or enables it.",
+        "rationale": "The no-loss Skills table needs the Skills body (compose-drawer); most WI-10 IssueDrawer.test.tsx rows and the 905 marker test break at the composition step, so drawer-test-migration owns them."
+      },
+      {
+        "summary": "Land the Escape defaultPrevented guard as its own item before compose-drawer.",
+        "rationale": "Once popovers render in the drawer, an unguarded window listener would close the drawer on Escape inside a popover."
+      },
+      {
+        "summary": "Remove the IssueView console StartAgentCta block only after the Conversation tab owns the start surface.",
+        "rationale": "Removing it earlier would leave the drawer with no start or resume control."
+      },
+      {
+        "summary": "One late item owns scripts/frontend-test-subset.txt and the four-file main checkpoint.",
+        "rationale": "Seven items each appending a line would create seven shared-mutation edges for one file."
+      },
+      {
+        "summary": "visual-evidence commits the strip fallback or an empty commit recording the check results.",
+        "rationale": "pan task done requires a pushed commit with the Item: trailer, and the screenshots live in gitignored .tmp/."
+      },
+      {
+        "summary": "Split WI-1, WI-2, WI-6, WI-7 and WI-10 into finer items.",
+        "rationale": "Each half is independently reviewable and testable; the planning contract asks for the smallest defensible items."
+      }
+    ],
+    "items": [
+      {
+        "id": "sections-leaf-move",
+        "title": "Move the shared drawer sections out of IssueDetail.tsx into IssueDetailSections.tsx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetailSections.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx",
+            "src/dashboard/frontend/src/components/issue-view/inventory.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/drawer/IssueDrawer.test.tsx src/components/issue-detail/IssueDetail.test.tsx",
+            "npx vitest run --configLoader runner tests/unit/dashboard/frontend/issue-view-no-loss.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports IssueDrawer.test.tsx and IssueDetail.test.tsx green",
+            "issue-view-no-loss.test.ts green",
+            "lint:circular reports no cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-17",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md WI-1, the move part only: create components/issue-detail/IssueDetailSections.tsx and move PickupSection, useDrawerWorkspace, WorkspaceSection, ResourcesFacet and PausedBanner into it verbatim, exported; add the exported openIssueOnTracker helper and use it in PickupSection; IssueDetail.tsx imports the five from ./IssueDetailSections; re-point the home of the DrawerWorkspaceSection and DrawerPausedBanner rows in components/issue-view/inventory.ts. No visual change. The icon edits and the ResourcesFacet variant are the next item."
+        },
+        "items": [
+          {
+            "id": "sections-leaf-move.ac1",
+            "title": "Given the change, when `git grep -n \"function PausedBanner\\|function WorkspaceSection\\|function ResourcesFacet\" src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx` runs, then it returns nothing and the same grep on IssueDetailSections.tsx returns three lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sections-leaf-move.ac2",
+            "title": "Given the drawer, when IssueDrawer.test.tsx workspace tests (lines 360-446) run unedited, then they pass because the moved WorkspaceSection still renders the open-in picker and branch line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sections-leaf-move.ac3",
+            "title": "Given inventory.ts, when the root no-loss test tests/unit/dashboard/frontend/issue-view-no-loss.test.ts runs, then it passes with the two re-pointed homes resolving to an existing file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sections-leaf-move.ac4",
+            "title": "Given the repo, when `npm run lint:circular` runs, then it reports no new cycle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sections-icons-inline",
+        "title": "Swap the paused-banner and branch glyphs for lucide icons and add the inline ResourcesFacet variant",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetailSections.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetailSections.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDetailSections.test.tsx src/components/drawer/IssueDrawer.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports every test in IssueDetailSections.test.tsx, IssueDrawer.test.tsx green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md WI-1 \"Three edits inside the moved code\" and \"One addition\": in IssueDetailSections.tsx replace the pause glyph with lucide Pause, the Unpause label glyph with lucide Play, the workspace branch glyph with lucide GitBranch, and add variant?: \"rail\" | \"inline\" to ResourcesFacet (inline: data-section=\"DrawerResourcesFacet\", class \"mt-[8px] border-t border-border pt-[8px]\", label Containers). Create components/issue-detail/IssueDetailSections.test.tsx with the four tests WI-1 names."
+        },
+        "items": [
+          {
+            "id": "sections-icons-inline.ac1",
+            "title": "Given a paused agent, when PausedBanner renders, then it shows an \"Unpause\" button, contains two svg elements, and its textContent contains neither the pause nor the play glyph character",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sections-icons-inline.ac2",
+            "title": "Given the Unpause button, when it is clicked, then fetch receives a POST to /api/agents/agent-pan-1/unpause",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sections-icons-inline.ac3",
+            "title": "Given no paused agent, when PausedBanner renders, then it renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sections-icons-inline.ac4",
+            "title": "Given variant=\"inline\" and a workspace with containers, when ResourcesFacet renders, then its label reads Containers and the root keeps data-section=\"DrawerResourcesFacet\"; the default variant output stays byte-identical",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drawer-escape-guard",
+        "title": "Let an open popover consume Escape before the drawer closes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx",
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/drawer/IssueDrawer.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports every test in IssueDrawer.test.tsx green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-19"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md WI-10 step 1: in components/drawer/IssueDrawer.tsx change the window keydown handler to `if (event.key === 'Escape' && !event.defaultPrevented) closeIssue();`. Add one test to components/drawer/IssueDrawer.test.tsx: open the drawer, dispatch on window a cancelable KeyboardEvent(\"keydown\", { key: \"Escape\" }) on which preventDefault() was already called, and assert drawer.issueId is still PAN-1. The existing Escape test at line 500 must stay green unedited."
+        },
+        "items": [
+          {
+            "id": "drawer-escape-guard.ac1",
+            "title": "Given an open drawer, when an Escape keydown whose defaultPrevented is true reaches window, then the drawer stays open (drawer.issueId remains PAN-1)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-escape-guard.ac2",
+            "title": "Given an open drawer, when a plain Escape keydown reaches window, then the drawer closes as the existing line-500 test asserts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tabs-order-labels",
+        "title": "Reorder and relabel the issue detail tabs, add the hidden Skills entry, restyle the count chip",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/issue-session-tabs.no-loss.test.tsx",
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/issue-session-tabs.no-loss.test.tsx src/components/drawer/IssueDrawer.test.tsx src/components/issue-detail/IssueDetail.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports every test in issue-session-tabs.no-loss.test.tsx, IssueDrawer.test.tsx, IssueDetail.test.tsx green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md WI-2, IssueDetail.tsx part (ISSUE_DETAIL_TABS new order and labels; IssueDetailTabs gains skillsBadge and hiddenTabIds, nav/tab/underline/count-chip classes). Introduce the module constant HIDDEN_SKILLS = new Set([\"skills\"]) and pass hiddenTabIds={HIDDEN_SKILLS} in the existing return for EVERY density (compose-drawer later unhides it for the drawer). Edit issue-session-tabs.no-loss.test.tsx assertion (a) only, and IssueDrawer.test.tsx lines 185-205 to the new classes and labels with SEVEN visible tab buttons in DOM order (no drawer-tab-skills)."
+        },
+        "items": [
+          {
+            "id": "tabs-order-labels.ac1",
+            "title": "Given ISSUE_DETAIL_TABS, when the tabs no-loss test reads it, then the ids equal session, tasks, plan, files, activity, artifacts, skills, overview and every old tab id still resolves to its destination",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tabs-order-labels.ac2",
+            "title": "Given the drawer, when the tab strip renders, then drawer-tab-session shows \"Conversation\", drawer-tab-overview shows \"Details\", and the seven non-skills tab buttons appear in the relative DOM order session, tasks, plan, files, activity, artifacts, overview",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tabs-order-labels.ac3",
+            "title": "Given density \"page\" or \"rail\", when IssueDetail renders, then no drawer-tab-skills button exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tabs-order-labels.ac4",
+            "title": "Given a tasks count, when the tab strip renders, then drawer-tab-tasks-count has classes font-mono-ui, text-[10.5px], px-[4px], rounded-[4px] and no rounded-full",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "store-url-default",
+        "title": "Open a ?issue= link without ?tab= on the Conversation tab",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/store.ts",
+            "src/dashboard/frontend/src/__tests__/store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/__tests__/store.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports every test in store.test.ts green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md WI-2, lib/store.ts readDrawerFromUrl part: tab defaults to \"conversation\" when the URL names an issue and keeps \"overview\" otherwise. Do not touch store.ts lines 108, 174 or 240. Add the two named tests to src/__tests__/store.test.ts."
+        },
+        "items": [
+          {
+            "id": "store-url-default.ac1",
+            "title": "Given the URL /?issue=PAN-1, when syncDrawerFromUrl() runs, then drawer equals { issueId: \"PAN-1\", tab: \"conversation\" }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-url-default.ac2",
+            "title": "Given the URL /, when syncDrawerFromUrl() runs, then drawer equals { issueId: null, tab: \"overview\" }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-url-default.ac3",
+            "title": "Given ?tab=overview or ?tab=terminal in the URL, when syncDrawerFromUrl() runs, then that explicit tab is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipeline-strip",
+        "title": "Build IssuePipelineStrip: the compact six-phase strip with per-phase agent links",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5244",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssuePhaseRail.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetailShell.tsx",
+            "src/dashboard/frontend/src/components/issue-view/IssuePipelineStrip.tsx",
+            "src/dashboard/frontend/src/components/issue-view/IssuePipelineStrip.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-view/IssuePipelineStrip.test.tsx src/components/issue-detail/IssueDetail.test.tsx src/lib/__tests__/conformance-gates.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports every test in IssuePipelineStrip.test.tsx, IssueDetail.test.tsx, conformance-gates.test.ts green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-3",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "details-body",
+            "compose-drawer",
+            "visual-evidence"
+          ],
+          "parallelSafeReason": "New file plus two helper exports; no other item edits IssuePhaseRail.tsx or IssueDetailShell.tsx."
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md WI-3: export ROLE_TO_PHASE, agentPhaseInfo and LEGACY_WHEN_TO_PHASE from IssuePhaseRail.tsx; move pickPhaseAgent and ENDED_STATUSES from IssueDetailShell.tsx into IssuePhaseRail.tsx (exported, unchanged; the shell imports pickPhaseAgent back). Create components/issue-view/IssuePipelineStrip.tsx exporting PipelineStepKind, pipelineStepKind, usePipelineRail, PipelineStripView and IssuePipelineStrip with the exact markup and classes of WI-3 and the D-6/D-7 rules. Never import IssueDetailShell or DrawerAgentSession from the new file. Create IssuePipelineStrip.test.tsx with the WI-3 test list."
+        },
+        "items": [
+          {
+            "id": "pipeline-strip.ac1",
+            "title": "Given each row of the D-6 table, when pipelineStepKind runs, then it returns that row's kind, plus (\"done\",\"current\")->\"done\" and (\"work\",\"current\")->\"next\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-strip.ac2",
+            "title": "Given PipelineStripView, when it renders, then it shows six phase buttons in plan, work, review, test, ship, done order, a live phase carries data-kind=\"live\" and the pipeline-step-pulse dot, and paused wins over live",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-strip.ac3",
+            "title": "Given a phase with an agent, when its button is clicked, then onSelectPhase receives that phase; a phase without an agent renders disabled; the active phase has aria-pressed=\"true\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-strip.ac4",
+            "title": "Given reviewCount { done: 2, total: 4 }, when the strip renders, then the Review button shows 2/4; with reviewCount null no pipeline-review-count element renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-strip.ac5",
+            "title": "Given IssueDetailShell.tsx imports pickPhaseAgent from ./IssuePhaseRail, when IssueDetail.test.tsx and lib/__tests__/conformance-gates.test.ts run unedited, then both pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pickup-strip-variant",
+        "title": "Add the strip variant of PickupGateControls with switch chips, popover and Release/Recall",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/backlog/PickupGateControls.tsx",
+            "src/dashboard/frontend/src/components/backlog/PickupGateStrip.tsx",
+            "src/dashboard/frontend/src/components/backlog/__tests__/PickupGateControls.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/backlog/__tests__/PickupGateControls.test.tsx src/components/backlog/__tests__/BacklogDAG.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports every test in PickupGateControls.test.tsx, BacklogDAG.test.tsx green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "Touches only the two backlog pickup files and a new test file; no other item edits them."
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md WI-4: add PickupStage, pickupStageFor and PICKUP_HINT to components/backlog/PickupGateControls.tsx; add variant (\"full\" default) and stage props; disable the query at strip+finished; strip early returns; assign the existing JSX to `full` unchanged and wrap it in PickupGateStrip for the strip variant. Create components/backlog/PickupGateStrip.tsx (presentational: SwitchChip x3 with role=\"switch\", sliders button, plan control, PopoverSurface/MenuOverlay popover, root Escape handler) exactly as WI-4 specifies, with D-10/D-11 rules. Create components/backlog/__tests__/PickupGateControls.test.tsx with the twelve WI-4 tests. The full variant output must not change."
+        },
+        "items": [
+          {
+            "id": "pickup-strip-variant.ac1",
+            "title": "Given the default variant, when PickupGateControls renders, then it shows \"Plan → Release · operator (PAN-2059)\" and \"Pipeline state · operator controls\" and no drawer-pickup-strip element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pickup-strip-variant.ac2",
+            "title": "Given a planned unreleased issue in the strip variant, when Release is clicked, then fetch receives POST /api/backlog/sequence/labels with released: true; for a released issue Recall posts released: false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pickup-strip-variant.ac3",
+            "title": "Given the strip variant, when pickup-strip-ready is clicked, then the POST body is {\"issueId\":\"PAN-1\",\"ready\":true} and the chip's aria-checked becomes true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pickup-strip-variant.ac4",
+            "title": "Given stage \"finished\", when the strip renders, then it renders nothing and fetch is never called for /api/backlog/issue-state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pickup-strip-variant.ac5",
+            "title": "Given the open popover, when Escape is pressed on the popover or on pickup-strip-more, then the popover closes and the keydown event has defaultPrevented true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "checks-chip",
+        "title": "Build IssueChecksChip: PR check state chip with a verification-gates popover",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/IssueChecksChip.tsx",
+            "src/dashboard/frontend/src/components/issue-view/IssueChecksChip.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-view/IssueChecksChip.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports every test in IssueChecksChip.test.tsx green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-19",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md WI-5: create components/issue-view/IssueChecksChip.tsx exactly as specified (renders nothing without a check state; label and data-status per CHECKS; PopoverSurface with VerificationGates mounted only while open; root onKeyDown Escape handler) and IssueChecksChip.test.tsx with the WI-5 tests, mocking ./VerificationGates."
+        },
+        "items": [
+          {
+            "id": "checks-chip.ac1",
+            "title": "Given checks undefined, when IssueChecksChip renders, then it renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "checks-chip.ac2",
+            "title": "Given checks green, red or pending, when the chip renders, then it shows Checks pass / Checks failed / Checks running with data-status passed / failed / running",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "checks-chip.ac3",
+            "title": "Given the chip, when it is clicked, then drawer-checks-popover opens with the gates mounted, and the gates are not mounted before the click",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "checks-chip.ac4",
+            "title": "Given the open popover, when Escape is fired on drawer-checks-chip, then the popover closes and the event has defaultPrevented true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-header-layout",
+        "title": "Add the conversation-header layout to DrawerAgentSession: header row, meta row, agent menu",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/agentConversation.ts",
+            "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx",
+            "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/drawer/DrawerAgentSession.test.tsx src/lib/__tests__/conformance-gates.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports every test in DrawerAgentSession.test.tsx, conformance-gates.test.ts green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-4",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "Only this item and conversation-start-surfaces (ordered after it) touch DrawerAgentSession.tsx and agentConversation.ts."
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md WI-6 except step 3 and the ended-agent StartAgentCta row (those are conversation-start-surfaces): add agentDisplayName to lib/agentConversation.ts; add layout (\"toolbar\" default) and belowHeader props to components/drawer/DrawerAgentSession.tsx; add the pickerOpen/pickerRef/snapshot hooks before the early return; add the conversation-header return with drawer-agent-header, drawer-agent-meta (six items), the MenuSurface agent menu with AgentMenuRow, belowHeader, and the unchanged transcript/terminal branch. Update the file header comment. The toolbar layout output must not change. Extend DrawerAgentSession.test.tsx with the WI-6 tests except the start-surface and ended-row tests."
+        },
+        "items": [
+          {
+            "id": "conversation-header-layout.ac1",
+            "title": "Given layout \"conversation-header\", when DrawerAgentSession renders with an agent, then drawer-agent-header and drawer-agent-meta render, the meta row contains the agent id, and queryByRole(\"combobox\") returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-header-layout.ac2",
+            "title": "Given several agents including agent-pan-1-worker-1, when drawer-agent-picker is clicked, then the drawer-agent-option-* rows appear in sortIssueAgents order and clicking the worker row calls onSelectAgent with agent-pan-1-worker-1 and closes the menu",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-header-layout.ac3",
+            "title": "Given agentDisplayName, when called on slot, worker, security reviewer, review supervisor, plan and work agents, then it returns Slot 2, Worker 3, Security reviewer, Review, Planner, Work agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-header-layout.ac4",
+            "title": "Given a store snapshot with costSoFar 1.5, when the meta row renders, then drawer-agent-cost shows $1.50",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-header-layout.ac5",
+            "title": "Given the pre-existing DrawerAgentSession tests (lines 60-267), when they run unedited, then they pass (toolbar layout preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-start-surfaces",
+        "title": "Give the conversation-header layout its no-agent start surface and ended-agent start/resume row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx",
+            "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/drawer/DrawerAgentSession.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports every test in DrawerAgentSession.test.tsx green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md WI-6 step 3 and the ended-agent row of step 4: in DrawerAgentSession.tsx, the conversation-header layout with no agent renders drawer-start-surface (data-section=\"StartAgentCta\") with the heading \"No agent has run on this issue yet\", the view-specific sentence, and StartAgentCta density=\"console\"; with an ended agent selected it renders the StartAgentCta row under the meta row. The toolbar dashed card stays. Add the start-surface, ended-row and live-agent tests to DrawerAgentSession.test.tsx."
+        },
+        "items": [
+          {
+            "id": "conversation-start-surfaces.ac1",
+            "title": "Given no agent and layout \"conversation-header\", when DrawerAgentSession renders, then it shows \"No agent has run on this issue yet\" and drawer-start-surface carries data-section=\"StartAgentCta\" and contains the mocked Start agent button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-start-surfaces.ac2",
+            "title": "Given a stopped agent and issueId PAN-1, when the conversation-header layout renders, then the mocked Start agent button renders under the meta row; for a live agent it does not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-start-surfaces.ac3",
+            "title": "Given belowHeader content, when the conversation-header layout renders, then that content appears between drawer-agent-meta and the transcript",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skills-count-hook",
+        "title": "Add useIssueSkillOverrideCount: a cache-only count of issue-level skill overrides",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/skills/useIssueSkillOverrideCount.ts",
+            "src/dashboard/frontend/src/components/skills/useIssueSkillOverrideCount.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/skills/useIssueSkillOverrideCount.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports every test in useIssueSkillOverrideCount.test.tsx green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md WI-7 hook part: create components/skills/useIssueSkillOverrideCount.ts with the useSyncExternalStore body shown, keyed [...SKILL_OVERRIDES_QUERY_KEY, \"issue\", null, issueId], and useIssueSkillOverrideCount.test.tsx with the four WI-7 hook tests. Implementation checkpoint and fallback: if React warns about an unstable snapshot, use the enabled:false useQuery fallback WI-7 names. SkillOverridesPanel.tsx is not edited unless that fallback needs the fetchSkillStates export."
+        },
+        "items": [
+          {
+            "id": "skills-count-hook.ac1",
+            "title": "Given an empty react-query cache, when the hook renders, then it returns null and fetch is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-count-hook.ac2",
+            "title": "Given cached data with one core override, one null and two non-core issue overrides (one false, one true), when the hook renders, then it returns 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-count-hook.ac3",
+            "title": "Given cached data that changes inside act(), when the cache emits, then the hook returns the new count; data cached for PAN-2 returns null for PAN-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skills-tab-panel",
+        "title": "Add IssueSkillsTabPanel: the Skills tab host for SkillOverridesPanel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/skills/SkillOverridesSections.tsx",
+            "src/dashboard/frontend/src/components/skills/SkillOverridesPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/skills/SkillOverridesPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports every test in SkillOverridesPanel.test.tsx green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md WI-7 panel part: add the exported IssueSkillsTabPanel to components/skills/SkillOverridesSections.tsx (data-section=\"SkillOverrides\", data-testid=\"drawer-tab-panel-skills\", SkillOverridesPanel level=\"issue\" enabled with onUnavailable and liveAgents from LIVE_PANE_STATES). IssueSkillsSection stays. Extend SkillOverridesPanel.test.tsx with the named IssueSkillsTabPanel test. Do not edit SkillOverridesPanel.tsx."
+        },
+        "items": [
+          {
+            "id": "skills-tab-panel.ac1",
+            "title": "Given IssueSkillsTabPanel issueId=\"TST-1\", when it mounts, then fetch is called with /api/skills/overrides?issue=TST-1 and the panel renders inside an element with data-section=\"SkillOverrides\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-tab-panel.ac2",
+            "title": "Given the tab panel, when it renders, then there is no aria-expanded disclosure button named \"Skills for this issue\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-tab-panel.ac3",
+            "title": "Given the existing IssueSkillsSection tests (SkillOverridesPanel.test.tsx 214-234), when they run unedited, then they pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "details-body",
+        "title": "Build IssueDrawerDetails: the two-column Details tab body",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDrawerDetails.test.tsx src/lib/__tests__/conformance-gates.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports every test in IssueDrawerDetails.test.tsx, conformance-gates.test.ts green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-16",
+            "NFR-3",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "New file pair only; it consumes the leaf modules after they land and no other item edits it."
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md WI-8: create components/issue-detail/IssueDrawerDetails.tsx with the props, root grid, left column (Pipeline table with PipelineRow, Review section with data-section=\"DrawerReviewSpecialists\", Live activity with DrawerActivityRailView compact limit 8 and an All activity link) and right column (PickupSection, VerificationGates, WorkspaceSection + ResourcesFacet variant=\"inline\" + no-workspace line, UatEnvironmentPanel, ActiveAgentPanel density=\"console\", Skills link). Import sections from ./IssueDetailSections and usePipelineRail/pickPhaseAgent from the strip and IssuePhaseRail; never import drawer/DrawerAgentSession or IssueDetailShell. Create IssueDrawerDetails.test.tsx with the eight WI-8 tests."
+        },
+        "items": [
+          {
+            "id": "details-body.ac1",
+            "title": "Given agents for some phases, when IssueDrawerDetails renders, then the Pipeline table has six rows in PHASES order and clicking drawer-details-open-work calls onOpenAgentConversation with the work agent id; a phase without an agent has no Open conversation button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "details-body.ac2",
+            "title": "Given review chips, when the body renders, then drawer-details-review lists four [data-reviewer] rows once review has started and shows \"Review has not started.\" when every chip is queued",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "details-body.ac3",
+            "title": "Given activity, when the body renders, then live activity renders and the All activity link calls onOpenTab(\"activity\"); the Skills link shows the cached count and is absent when skillsAvailable is false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "details-body.ac4",
+            "title": "Given the body, when it renders, then it contains no [data-section=\"DrawerTasksList\"] and no collapsed \"Skills for this issue\" disclosure, and it shows drawer-details-no-workspace when the workspace does not exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "compose-drawer",
+        "title": "Compose drawer density in IssueDetail: strip, paused banner, tabs, full-width body",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5244",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.test.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/issue-session-tabs.no-loss.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDetail.test.tsx src/components/issue-detail/issue-session-tabs.no-loss.test.tsx src/lib/__tests__/conformance-gates.test.ts",
+            "npm run lint:circular",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports IssueDetail.test.tsx, issue-session-tabs.no-loss.test.tsx and conformance-gates.test.ts green",
+            "lint:circular reports no cycle",
+            "lint:file-size reports no file over its allowed count"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-10",
+            "FR-11",
+            "FR-14",
+            "FR-15",
+            "FR-17",
+            "NFR-2",
+            "NFR-5",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "drawer-test-migration",
+            "drawer-header-row",
+            "remove-console-start-block",
+            "visual-evidence"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md WI-9: in components/issue-detail/IssueDetail.tsx add the skills hooks and fallback effect, the sessionPane drawerLayout parameter (layout=\"conversation-header\" + belowHeader reviewersRow), the shared secondaryPanel constant, and the `if (density === \"drawer\")` branch with IssuePipelineStrip (IssueChecksChip + PickupGateControls variant=\"strip\"), PausedBanner, IssueDetailTabs (skillsBadge, hiddenTabIds only when unavailable), and the body switch including IssueSkillsTabPanel and IssueDrawerDetails. Page and rail returns keep hiddenTabIds={HIDDEN_SKILLS} and are otherwise untouched. Update the file header comment. Edit IssueDetail.test.tsx and issue-session-tabs.no-loss.test.tsx exactly as WI-9 lists (including the no-loss Skills table (b)). IssueDrawer.test.tsx is migrated by drawer-test-migration, which must land in the same push: do not run IssueDrawer.test.tsx as this item's proof."
+        },
+        "items": [
+          {
+            "id": "compose-drawer.ac1",
+            "title": "Given density \"drawer\", when IssueDetail renders, then mock-pipeline-strip renders, mock-detail-shell and the 320px right rail are absent, drawer-tab-session is selected, and the session mock has data-layout=\"conversation-header\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compose-drawer.ac2",
+            "title": "Given density \"page\" or \"rail\", when IssueDetail renders, then every pre-existing assertion holds, the session mock has data-layout=\"toolbar\", there is no mock-pipeline-strip and no drawer-tab-skills, and page tab \"overview\" renders mock-issue-skills-section and tasks-panel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compose-drawer.ac3",
+            "title": "Given derived state merged / working / none, when the drawer renders, then mock-pickup-strip has data-stage finished / picked-up / open; the strip receives the selected agent id only on a session tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compose-drawer.ac4",
+            "title": "Given the Skills tab is selected, when the panel reports unavailable, then the tab hides and the selected tab falls back to conversation; given a seeded skills cache, then drawer-tab-skills-count shows 1 and fetch is never called with /api/skills/overrides",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compose-drawer.ac5",
+            "title": "Given the work agent selected, when the drawer renders, then no [data-section=\"SpecialistStrip\"] exists; after the strip opens the review agent, one renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drawer-test-migration",
+        "title": "Migrate IssueDrawer.test.tsx to the composed drawer and prove all 16 console markers per tab",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/drawer/IssueDrawer.test.tsx src/components/issue-view/IssueView.test.tsx",
+            "npx vitest run --configLoader runner tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
+          ],
+          "expected_outputs": [
+            "vitest reports IssueDrawer.test.tsx and IssueView.test.tsx green",
+            "issue-view-no-loss.test.ts green"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "FR-10",
+            "FR-13",
+            "FR-18"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md The IssueDrawer.test.tsx rows of WI-10's table that compose-drawer breaks: 604 (phase timeline -> drawer-pipeline-strip), 525 (activity rail in Details, w-full), 562, 662, 913 (Details review rows), 939 (start surface text), 1027 (strip phase click + drawer-agent-meta), 1041 (Review phase then specialist chip); the tab DOM order assertion at 185-205 now expects all eight ids including drawer-tab-skills; and WI-11: replace the test at 905-911 with the MARKERS_BY_TAB table test \"renders every console inventory marker on a visible element\" plus \"the marker table covers DENSITY_SECTIONS.console exactly\". Leave row 708 (footer) to drawer-header-row."
+        },
+        "items": [
+          {
+            "id": "drawer-test-migration.ac1",
+            "title": "Given each MARKERS_BY_TAB row, when the drawer opens on that tab with the default fixture, then every listed data-section element is in the document and has no [hidden] ancestor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-test-migration.ac2",
+            "title": "Given MARKERS_BY_TAB and DENSITY_SECTIONS.console, when the coverage test runs, then the two sets are equal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-test-migration.ac3",
+            "title": "Given the composed drawer, when the migrated rows 604, 525, 562, 662, 913, 939, 1027 and 1041 run, then they pass against the strip, the Details body and the conversation-header layout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-test-migration.ac4",
+            "title": "Given the drawer tab strip, when it renders, then the eight tab buttons appear in FR-1 order including drawer-tab-skills",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-test-migration.ac5",
+            "title": "Given tests/unit/dashboard/frontend/issue-view-no-loss.test.ts and IssueView.test.tsx, when they run unedited, then they pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "header-facts",
+        "title": "Build IssueStateBadge and IssueCostChip for the drawer header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/IssueHeaderFacts.tsx",
+            "src/dashboard/frontend/src/components/issue-view/IssueHeaderFacts.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-view/IssueHeaderFacts.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports every test in IssueHeaderFacts.test.tsx green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md WI-10 IssueHeaderFacts part: create components/issue-view/IssueHeaderFacts.tsx with TONE_CLASS, IssueStateBadge (resolveFeatureStateBadge over derived state, live plan agents as planning sessions, tracker status) and IssueCostChip (useIssueCostsQuery, resolvedTotalCost ?? totalCost, hidden at zero), and IssueHeaderFacts.test.tsx with the five WI-10 tests."
+        },
+        "items": [
+          {
+            "id": "header-facts.ac1",
+            "title": "Given derived state working, when IssueStateBadge renders, then it shows Working with class badge-bg-info; merged shows Merged with badge-bg-success",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "header-facts.ac2",
+            "title": "Given a live plan agent, when IssueStateBadge renders, then it shows Planning; with no state and no tracker status it renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "header-facts.ac3",
+            "title": "Given costs { totalCost: 12, resolvedTotalCost: 18.9 }, when IssueCostChip renders, then drawer-cost shows $18.90; at zero it renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drawer-header-row",
+        "title": "Make the drawer header one row carrying the action strip, and remove the footer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/drawer/DrawerActionBar.tsx",
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx",
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/drawer/IssueDrawer.test.tsx src/components/drawer/IssueDrawer.tracker-fallback.test.tsx src/lib/__tests__/issue-actions-surface-parity.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports every test in IssueDrawer.test.tsx, IssueDrawer.tracker-fallback.test.tsx, issue-actions-surface-parity.test.tsx green"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-19",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md WI-10 steps 2-3 and DrawerActionBar: DrawerActionBar.tsx root becomes a div (no footer); IssueDrawer.tsx header becomes the 46px single row (id, h2 font-display title with title attribute, IssueStateBadge, spacer, IssueCostChip, DrawerActionBar wrapper with data-section=\"DrawerActionBar\", restyled Issue link, lucide X close button), no z-* class on header or strip; remove the footer DrawerActionBar line; update the component comment. In IssueDrawer.test.tsx edit row 708 and add the four new WI-10 drawer tests (one-row header with badge and cost; Escape with pickup popover or checks popover open keeps the drawer open; merged issue shows checks chip and no pickup strip; opening the drawer issues no skills request)."
+        },
+        "items": [
+          {
+            "id": "drawer-header-row.ac1",
+            "title": "Given an open drawer, when it renders, then drawer-action-bar is inside the drawer <header> and the drawer contains no <footer>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-header-row.ac2",
+            "title": "Given derived state working and a $18.90 cost, when the drawer renders, then drawer-state-badge shows Working, drawer-cost shows $18.90, and the h2 carries title=\"Drawer issue\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-header-row.ac3",
+            "title": "Given the pickup popover (planned issue) or the checks popover (PR, checks green) open, when Escape is fired on the popover or on drawer-checks-chip, then the popover closes and drawer.issueId remains PAN-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-header-row.ac4",
+            "title": "Given a merged issue with a green PR, when the drawer renders, then there is no drawer-pickup-strip and drawer-checks-chip has data-status=\"passed\"; opening the drawer never calls fetch with /api/skills/overrides",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-header-row.ac5",
+            "title": "Given lib/__tests__/issue-actions-surface-parity.test.tsx and IssueDrawer.tracker-fallback.test.tsx, when they run, then they pass with the action strip and Issue link in the header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remove-console-start-block",
+        "title": "Remove the StartAgentCta block IssueView renders above the drawer header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/IssueView.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-view/IssueView.test.tsx src/components/drawer/IssueDrawer.test.tsx src/components/issue-view/StartAgentCta.test.tsx",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports IssueView.test.tsx, IssueDrawer.test.tsx and StartAgentCta.test.tsx green",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md WI-10 IssueView part: in components/issue-view/IssueView.tsx delete the `density === \"console\"` StartAgentCta block and its import, rename the destructured issueId to issueId: _issueId so it is not spread onto the div, and replace the PAN-2975 doc-comment paragraph with the PAN-5244 sentence. The Conversation tab start surface (conversation-start-surfaces, wired by compose-drawer) is the replacement."
+        },
+        "items": [
+          {
+            "id": "remove-console-start-block.ac1",
+            "title": "Given the change, when `git grep -n \"StartAgentCta\" src/dashboard/frontend/src/components/issue-view/IssueView.tsx` runs, then it returns nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-console-start-block.ac2",
+            "title": "Given IssueView.tsx, when its parameter list is read, then issueId is destructured as issueId: _issueId so rootProps no longer carries it, and `npm run lint` passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-console-start-block.ac3",
+            "title": "Given IssueView.test.tsx and the IssueDrawer.test.tsx marker table (StartAgentCta on the no-agent Conversation tab), when they run unedited, then they pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the conversation-first drawer in ISSUE-VIEW.md, skills.mdx and the changelog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ISSUE-VIEW.md",
+            "features/skills.mdx",
+            "changelog.d/pan-5244.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-6",
+            "FR-8",
+            "FR-9",
+            "FR-12",
+            "FR-14",
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md WI-12 sections 1-3: docs/ISSUE-VIEW.md (shared-components bullets for IssuePipelineStrip, IssueChecksChip, IssueStateBadge/IssueCostChip; StartAgentCta bullet; new \"### Drawer layout (PAN-5244)\" subsection between \"Header title\" and \"Cockpit layout\" with the D-6 table, D-9, D-10, tab list, Conversation header, Skills tab, Details columns, page-only status rail and the section map; the Cockpit layout and Session bullet edits; the marker-test sentence in the add-a-section list), features/skills.mdx line 279 (Skills tab wording), and the new changelog.d/pan-5244.md entry. Code comments are owned by their code items."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given docs/ISSUE-VIEW.md, when grepped for \"### Drawer layout (PAN-5244)\", then it contains that heading between \"Header title\" and \"Cockpit layout\" and the section lists the eight tab ids with labels in FR-1 order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given features/skills.mdx, when grepped for \"Issue view → Skills for this issue\", then that bullet names the issue drawer's Skills tab and no longer says \"in the issue's Overview\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given changelog.d/pan-5244.md, when `npm run lint:docs` runs, then it passes and the file contains an \"#### Improved\" entry linking issue #5244",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-test-subset",
+        "title": "List the new frontend tests for CI and run the regression sweep",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/backlog/__tests__/PickupGateControls.test.tsx src/components/issue-detail/IssueDetailSections.test.tsx src/components/issue-detail/IssueDrawerDetails.test.tsx src/components/issue-view/IssueChecksChip.test.tsx src/components/issue-view/IssueHeaderFacts.test.tsx src/components/issue-view/IssuePipelineStrip.test.tsx src/components/skills/useIssueSkillOverrideCount.test.tsx src/components/drawer/IssueDrawer.test.tsx src/components/issue-detail/IssueDetail.test.tsx src/components/issue-detail/issue-session-tabs.no-loss.test.tsx src/components/drawer/DrawerAgentSession.test.tsx",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/drawer/IssueDrawer.tracker-fallback.test.tsx src/components/drawer/useDrawerData.absent-issue.test.tsx src/__tests__/fr7-conversation-pending-input.test.tsx src/components/Stage/cockpit/IssueMissionControl.header-title.test.tsx src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx src/lib/__tests__/conformance-gates.test.ts src/lib/__tests__/issue-actions-surface-parity.test.tsx src/components/Stage/cockpit/IssueMissionControl.test.tsx src/components/issue-view/StartAgentCta.test.tsx src/components/skills/SkillOverridesPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "vitest reports the seven new and four existing drawer test files green",
+            "vitest reports the ten regression-sweep files green or each failure recorded as pre-existing on main"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md \"Repo rules that apply\" CI test list and Regression sweep: add the seven new test files to scripts/frontend-test-subset.txt in sorted position. Implementation checkpoint: use the baseline the work agent recorded before its first edit (continue.json D14: IssueDrawer.test.tsx, IssueDetail.test.tsx, issue-session-tabs.no-loss.test.tsx and DrawerAgentSession.test.tsx run on the unmodified branch); each file green at baseline and green now is added to the list; a file red at baseline for reasons this change does not touch stays out and its failures go in the PR description. Never run the whole subset (npm run test:frontend-subset) on the host. Then run every file of the regression sweep list and of `git grep -lE \"DrawerActionBar|IssueDetailShell|IssuePhaseRail|PickupGateControls|SkillOverridesSections|DrawerAgentSession|drawer-tab-|drawer-action-bar\" -- 'src/dashboard/frontend/src/**/*.test.ts*'`; fix only breakage this change caused."
+        },
+        "items": [
+          {
+            "id": "ci-test-subset.ac1",
+            "title": "Given scripts/frontend-test-subset.txt, when read, then it contains the seven new test paths (PickupGateControls, IssueDetailSections, IssueDrawerDetails, IssueChecksChip, IssueHeaderFacts, IssuePipelineStrip, useIssueSkillOverrideCount) in sorted position",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-test-subset.ac2",
+            "title": "Given the seven new test files and the four existing drawer test files (IssueDrawer, IssueDetail, issue-session-tabs.no-loss, DrawerAgentSession), when vitest runs them by path, then every file passes; each existing file is listed only if the continue.json baseline recorded it green on main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-test-subset.ac3",
+            "title": "Given the regression sweep file list, when each file runs, then it passes or its failure is recorded in the PR description as pre-existing on main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-test-subset.ac4",
+            "title": "Given the full change, when `npm run typecheck` and `npm run lint` run, then both complete without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "visual-evidence",
+        "title": "Capture drawer screenshots and run the three layout checks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T06:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/IssuePipelineStrip.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "git log -1 --format=%B | grep -q \"Item: visual-evidence\""
+          ],
+          "expected_outputs": [
+            "the last commit body contains the Item: visual-evidence trailer and the three check results"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute exactly as written in .pan/drafts/pan-5244.md WI-13: with an isolated Playwright browser (own profile; never another agent's session) at 1440x900, take the eight screenshots into gitignored .tmp/pan-5244/ and run the three mechanical checks (strip on one line, chrome height <= 120px, no horizontal overflow). If check 1 fails in the in-review shot, apply the PipelineStripView fallback (button px-[6px], connector w-[6px]) in IssuePipelineStrip.tsx and re-run. Commit: the fallback edit if applied; otherwise `git commit --allow-empty` whose body records the three check results and carries the Item: visual-evidence trailer (pan task done needs a pushed commit with that trailer). Attach the screenshots and results to the PR."
+        },
+        "items": [
+          {
+            "id": "visual-evidence.ac1",
+            "title": "Given the planned state in light and dark, when check 1 runs in the page, then Math.max(tops) - Math.min(tops) of the strip buttons is <= 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "visual-evidence.ac2",
+            "title": "Given shot 1, when check 2 runs, then the distance from the drawer top to drawer-tab-panel-conversation is <= 120px",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "visual-evidence.ac3",
+            "title": "Given every shot, when check 3 runs, then the issue-drawer element has scrollWidth <= clientWidth",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "visual-evidence.ac4",
+            "title": "Given the PR, when it is opened, then it contains the eight screenshots and the three check results, and a pushed commit carries the line \"Item: visual-evidence\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "sections-leaf-move",
+        "to": "sections-icons-inline",
+        "type": "blocks"
+      },
+      {
+        "from": "sections-leaf-move",
+        "to": "tabs-order-labels",
+        "type": "blocks"
+      },
+      {
+        "from": "drawer-escape-guard",
+        "to": "tabs-order-labels",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-header-layout",
+        "to": "conversation-start-surfaces",
+        "type": "blocks"
+      },
+      {
+        "from": "sections-icons-inline",
+        "to": "details-body",
+        "type": "blocks"
+      },
+      {
+        "from": "pipeline-strip",
+        "to": "details-body",
+        "type": "blocks"
+      },
+      {
+        "from": "tabs-order-labels",
+        "to": "compose-drawer",
+        "type": "blocks"
+      },
+      {
+        "from": "drawer-escape-guard",
+        "to": "compose-drawer",
+        "type": "blocks"
+      },
+      {
+        "from": "pipeline-strip",
+        "to": "compose-drawer",
+        "type": "blocks"
+      },
+      {
+        "from": "pickup-strip-variant",
+        "to": "compose-drawer",
+        "type": "blocks"
+      },
+      {
+        "from": "checks-chip",
+        "to": "compose-drawer",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-start-surfaces",
+        "to": "compose-drawer",
+        "type": "blocks"
+      },
+      {
+        "from": "skills-count-hook",
+        "to": "compose-drawer",
+        "type": "blocks"
+      },
+      {
+        "from": "skills-tab-panel",
+        "to": "compose-drawer",
+        "type": "blocks"
+      },
+      {
+        "from": "details-body",
+        "to": "compose-drawer",
+        "type": "blocks"
+      },
+      {
+        "from": "compose-drawer",
+        "to": "drawer-test-migration",
+        "type": "blocks"
+      },
+      {
+        "from": "drawer-test-migration",
+        "to": "drawer-header-row",
+        "type": "blocks"
+      },
+      {
+        "from": "header-facts",
+        "to": "drawer-header-row",
+        "type": "blocks"
+      },
+      {
+        "from": "drawer-test-migration",
+        "to": "remove-console-start-block",
+        "type": "blocks"
+      },
+      {
+        "from": "store-url-default",
+        "to": "ci-test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "drawer-header-row",
+        "to": "ci-test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "remove-console-start-block",
+        "to": "ci-test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "docs",
+        "to": "ci-test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-test-subset",
+        "to": "visual-evidence",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
