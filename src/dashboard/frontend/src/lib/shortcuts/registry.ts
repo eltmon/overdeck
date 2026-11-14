@@ -38,7 +38,7 @@ export interface ShortcutDef {
   group: ShortcutGroup
   run(event: KeyboardEvent): void
   /** Extra condition evaluated at dispatch; false lets the event pass untouched. */
-  when?: () => boolean
+  when?: (event: KeyboardEvent) => boolean
   /** Hidden from the ? sheet (e.g. one of nine 'focus tab N' entries after the first). */
   hidden?: boolean
 }
@@ -103,7 +103,8 @@ function clearPendingChord(): void {
   pendingChord = null
 }
 
-function focusElementOf(event: KeyboardEvent): Element | null {
+/** The focus element of a key event: its target when an Element, else document.activeElement. */
+export function focusElementOf(event: KeyboardEvent): Element | null {
   return event.target instanceof Element ? event.target : document.activeElement
 }
 
@@ -119,10 +120,10 @@ export function isNotEditingFocus(el: Element | null): boolean {
   return !editable || editable.getAttribute('contenteditable') === 'false'
 }
 
-function whenAllows(def: ShortcutDef): boolean {
+function whenAllows(def: ShortcutDef, event: KeyboardEvent): boolean {
   if (!def.when) return true
   try {
-    return def.when() !== false
+    return def.when(event) !== false
   } catch {
     return false
   }
@@ -144,12 +145,12 @@ function dispatch(event: KeyboardEvent, candidates: (def: ShortcutDef) => boolea
     if (!spec) continue
     const steps = specSteps(spec)
     if (steps.length === 1) {
-      if (matchesSpec(event, steps[0]) && whenAllows(def)) {
+      if (matchesSpec(event, steps[0]) && whenAllows(def, event)) {
         runDef(def, event)
         return true
       }
     } else if (steps.length === 2 && allowChords && def.scope === 'not-editing') {
-      if (matchesSpec(event, steps[0]) && whenAllows(def)) {
+      if (matchesSpec(event, steps[0]) && whenAllows(def, event)) {
         event.preventDefault()
         clearPendingChord()
         const first = steps[0]
@@ -175,7 +176,7 @@ function completeChord(event: KeyboardEvent, focusNotEditing: boolean): boolean 
     if (!spec) continue
     const steps = specSteps(spec)
     if (steps.length !== 2 || steps[0] !== first) continue
-    if (matchesSpec(event, steps[1]) && whenAllows(def)) {
+    if (matchesSpec(event, steps[1]) && whenAllows(def, event)) {
       runDef(def, event)
       return true
     }
