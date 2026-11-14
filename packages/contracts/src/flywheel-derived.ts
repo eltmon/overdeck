@@ -72,9 +72,23 @@ export const FlywheelNeedsYouItem = Schema.Struct({
 })
 export type FlywheelNeedsYouItem = typeof FlywheelNeedsYouItem.Type
 
-/** Two items are the same item when their keys match. */
+const NEEDS_YOU_TARGET_RE = /^(.*?)\s*<(https?:\/\/[^\s<>]+)>\s*$/i
+
+/**
+ * An item's trailing `<https://…>` is its target (PAN-5239). Anything else in
+ * angle brackets is plain text. The label is the item without its target.
+ */
+export function parseNeedsYouTarget(text: string): { label: string; target?: string } {
+  const trimmed = text.trim()
+  const match = NEEDS_YOU_TARGET_RE.exec(trimmed)
+  const label = match?.[1]?.trim() ?? ""
+  if (!match || !label) return { label: trimmed }
+  return { label, target: match[2]! }
+}
+
+/** Two items are the same item when their keys match; the target is not part of it. */
 export function needsYouItemKey(text: string): string {
-  return text.trim().toLowerCase()
+  return parseNeedsYouTarget(text).label.toLowerCase()
 }
 
 /** Split a needs-you line on `;`: trimmed, empty pieces dropped, one per key. */
