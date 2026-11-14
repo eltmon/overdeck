@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5282",
   "created": "2026-11-14T19:03:45.838Z",
-  "updated": "2026-11-14T20:45:13.769Z",
+  "updated": "2026-11-14T20:45:15.091Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -221,6 +221,11 @@
     "docs-cliproxy-skill.ac2": {
       "status": "completed",
       "doneAt": "2026-11-14T20:45:13.769Z"
+    },
+    "changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5282",
+      "claimedAt": "2026-11-14T20:45:15.091Z"
     }
   }
 }
