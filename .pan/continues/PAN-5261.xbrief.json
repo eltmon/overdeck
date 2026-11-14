@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5261",
   "created": "2026-11-14T08:29:10.265Z",
-  "updated": "2026-11-14T09:00:27.778Z",
+  "updated": "2026-11-14T09:00:35.191Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -144,6 +144,11 @@
     "issue-state-cache.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T09:00:27.777Z"
+    },
+    "issue-state-cache-wiring": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5261",
+      "claimedAt": "2026-11-14T09:00:35.191Z"
     }
   }
 }
