@@ -58,6 +58,10 @@ import {
 /** PAN-4558: scrolling within this distance of the top loads the next older page. */
 const LOAD_OLDER_THRESHOLD_PX = 400;
 
+/** PAN-5239: a bookmark jump's row flash; a target-message jump's is longer (D8). */
+const BOOKMARK_FLASH_MS = 1600;
+const TARGET_FLASH_MS = 3000;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const MessagesTimeline = memo(function MessagesTimeline({
@@ -123,7 +127,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   const bookmarksCtx = useConversationBookmarks();
   const jumpRequest = bookmarksEnabled ? bookmarksCtx?.jumpRequest ?? null : null;
   const handledJumpNonceRef = useRef<number | null>(null);
-  const [flashRowId, setFlashRowId] = useState<string | null>(null);
+  const [flash, setFlash] = useState<{ rowId: string; durationMs: number } | null>(null);
+  const flashRowId = flash?.rowId ?? null;
 
   const timelineEntries = useMemo(() => deriveTimelineEntries(messages, workLog), [messages, workLog]);
   // PAN-4558 FR-14: a boundary older than the oldest loaded row would render
@@ -446,6 +451,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     if (handledTargetKeyRef.current === targetMessageKey) return;
     handledTargetKeyRef.current = targetMessageKey;
     scrollToRow(targetMessageRow.index, targetMessageRow.row.id);
+    setFlash({ rowId: targetMessageRow.row.id, durationMs: TARGET_FLASH_MS });
     onTargetMessageHandled?.();
   }, [targetMessageRow, targetMessageKey, scrollToRow, onTargetMessageHandled]);
 
@@ -459,7 +465,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       handledJumpNonceRef.current = nonce;
       const row = rows[index]!;
       scrollToRow(index, row.id);
-      setFlashRowId(row.id);
+      setFlash({ rowId: row.id, durationMs: BOOKMARK_FLASH_MS });
       bookmarksCtx?.resolveJump(nonce, true);
       return;
     }
@@ -480,10 +486,10 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   }, [jumpRequest, rows, scrollToRow, bookmarksCtx, history?.hasOlder, onLoadOlderUntil]);
 
   useEffect(() => {
-    if (!flashRowId) return;
-    const timer = setTimeout(() => setFlashRowId(null), 1600);
+    if (!flash) return;
+    const timer = setTimeout(() => setFlash(null), flash.durationMs);
     return () => clearTimeout(timer);
-  }, [flashRowId]);
+  }, [flash]);
 
   useEffect(() => {
     if (!searchOpen) return;
@@ -587,6 +593,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                     key={row.id}
                     data-index={virtualItem.index}
                     data-search-row-id={row.id}
+                    data-flash={flashRowId === row.id ? 'true' : undefined}
                     ref={rowVirtualizer.measureElement}
                     style={{
                       display: 'flow-root',
@@ -635,6 +642,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
             <div
               key={row.id}
               data-search-row-id={row.id}
+              data-flash={flashRowId === row.id ? 'true' : undefined}
               style={{
                 outline: currentMatch?.row.id === row.id || targetMessageRow?.row.id === row.id || flashRowId === row.id ? '2px solid var(--color-primary)' : undefined,
                 outlineOffset: '-2px',
