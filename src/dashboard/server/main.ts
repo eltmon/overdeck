@@ -82,6 +82,7 @@ import { startConversationSweeps, stopConversationSweeps } from './services/conv
 import { startVaultService, stopVaultService } from './services/vault-service.js';
 import { startVaultBrowseService } from './services/vault-browse-service.js';
 import { startGitHubQuotaSampler } from '../../lib/github-quota/sampler.js';
+import { startPrWebhookFreshness } from './services/pr-webhook-freshness.js';
 import { startGitHubQuotaPublisher } from './services/github-quota.js';
 import { registerGitHubRateLimitedTelemetry, startGitHubQuotaTelemetry } from '../../lib/telemetry/github-quota-telemetry.js';
 import { ensureOperatorHash } from '../../lib/telemetry/operator-hash.js';
@@ -599,6 +600,7 @@ if (!isPeerDashboard || process.env.OVERDECK_VAULT_IN_PEER === '1') {
 // PAN-4264: sample GitHub /rate_limit into the quota ledger (boot +2 min, then every 5 min)
 // and publish the quota snapshot to the read model every 30 s when it changes.
 const stopGitHubQuotaSampler = isPeerDashboard ? () => undefined : startGitHubQuotaSampler();
+const stopPrWebhookFreshness = startPrWebhookFreshness({ isPeerDashboard });
 const stopGitHubQuotaPublisher = isPeerDashboard ? () => undefined : startGitHubQuotaPublisher();
 // PAN-4264: hourly bucketed github_quota_sample, and a throttled github_rate_limited per refusal.
 const stopGitHubQuotaTelemetry = isPeerDashboard ? () => undefined : startGitHubQuotaTelemetry();
@@ -799,6 +801,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   await stopVaultService().catch((err) => console.warn('[vault] shutdown failed:', err));
   stopConversationSweeps();
   stopGitHubQuotaSampler();
+  stopPrWebhookFreshness();
   stopGitHubQuotaPublisher();
   stopGitHubQuotaTelemetry();
   stopGitHubRateLimitedTelemetry();

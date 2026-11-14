@@ -1,0 +1,203 @@
+{
+  "version": "1",
+  "issueId": "PAN-5237",
+  "created": "2026-11-14T04:16:13.968Z",
+  "updated": "2026-11-14T05:14:21.406Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "receipt-cancel-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5237",
+      "claimedAt": "2026-11-14T04:16:13.968Z",
+      "doneAt": "2026-11-14T04:22:19.661Z"
+    },
+    "receipt-cancel-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:22:19.661Z"
+    },
+    "receipt-cancel-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:22:19.661Z"
+    },
+    "receipt-cancel-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:22:19.661Z"
+    },
+    "receipt-cancel-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:22:19.661Z"
+    },
+    "receipt-cancel-gate.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:22:19.661Z"
+    },
+    "handler-delivery-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5237",
+      "claimedAt": "2026-11-14T04:22:52.395Z",
+      "doneAt": "2026-11-14T04:26:42.865Z"
+    },
+    "handler-delivery-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:26:42.865Z"
+    },
+    "handler-delivery-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:26:42.865Z"
+    },
+    "handler-delivery-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:26:42.865Z"
+    },
+    "handler-delivery-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:26:42.865Z"
+    },
+    "cancel-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5237",
+      "claimedAt": "2026-11-14T04:26:44.873Z",
+      "doneAt": "2026-11-14T04:37:04.983Z"
+    },
+    "client-cancel-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5237",
+      "claimedAt": "2026-11-14T04:36:29.167Z",
+      "doneAt": "2026-11-14T04:42:55.852Z"
+    },
+    "cancel-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:37:04.983Z"
+    },
+    "cancel-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:37:04.983Z"
+    },
+    "cancel-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:37:04.983Z"
+    },
+    "cancel-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:37:04.983Z"
+    },
+    "client-cancel-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:42:55.852Z"
+    },
+    "client-cancel-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:42:55.852Z"
+    },
+    "client-cancel-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:42:55.852Z"
+    },
+    "client-cancel-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:42:55.852Z"
+    },
+    "client-cancel-store.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:42:55.852Z"
+    },
+    "queued-send-cancel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5237",
+      "claimedAt": "2026-11-14T04:42:58.270Z",
+      "doneAt": "2026-11-14T04:49:51.784Z"
+    },
+    "queued-send-cancel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:49:51.784Z"
+    },
+    "queued-send-cancel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:49:51.784Z"
+    },
+    "queued-send-cancel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:49:51.784Z"
+    },
+    "bubble-cancel-controls": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5237",
+      "claimedAt": "2026-11-14T04:49:55.739Z",
+      "doneAt": "2026-11-14T04:57:47.294Z"
+    },
+    "outbox-cancel-controls": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5237",
+      "claimedAt": "2026-11-14T04:57:08.365Z",
+      "doneAt": "2026-11-14T05:00:10.633Z"
+    },
+    "bubble-cancel-controls.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:57:47.294Z"
+    },
+    "bubble-cancel-controls.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:57:47.294Z"
+    },
+    "bubble-cancel-controls.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:57:47.294Z"
+    },
+    "bubble-cancel-controls.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:57:47.294Z"
+    },
+    "outbox-cancel-controls.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:00:10.633Z"
+    },
+    "outbox-cancel-controls.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:00:10.633Z"
+    },
+    "composer-restore-target": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5237",
+      "claimedAt": "2026-11-14T05:00:12.078Z",
+      "doneAt": "2026-11-14T05:11:42.829Z"
+    },
+    "composer-restore-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:11:42.829Z"
+    },
+    "composer-restore-target.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:11:42.829Z"
+    },
+    "composer-restore-target.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:11:42.829Z"
+    },
+    "composer-restore-target.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:11:42.829Z"
+    },
+    "docs-and-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5237",
+      "claimedAt": "2026-11-14T05:13:18.612Z",
+      "doneAt": "2026-11-14T05:14:21.401Z"
+    },
+    "docs-and-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:14:21.401Z"
+    },
+    "docs-and-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:14:21.401Z"
+    },
+    "docs-and-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:14:21.401Z"
+    }
+  }
+}

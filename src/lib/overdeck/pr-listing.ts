@@ -2,13 +2,17 @@
  * The GitHub PR listing (PAN-5042): a cached open read (every field) and a
  * cached closed read (no `statusCheckRollup`/`reviewRequests`/`mergeable`)
  * per repo, combined for the full listing, plus the stale-while-revalidate
- * read board reads use.
+ * read board reads use. PAN-5224: both caches' settled TTLs come from the PR
+ * freshness policy (`pr-freshness.js`) — 30 s/5 min while webhooks are not
+ * healthy, 5 min/15 min while they are — and a webhook can drop a settled or
+ * in-flight entry via `invalidateRepoPullRequests`.
  */
 
 import { createSettledTtlPromiseCache } from '../concurrency.js';
 import { GitHubQuotaPausedError, GitHubRateLimitedError } from '../github-quota/pause-gate.js';
 import { runGh } from '../github-quota/run-gh.js';
-import { prListingTtlMs, PR_CACHE_IDLE_TTL_MS, shouldListPullRequests } from './pr-cache-policy.js';
+import { prListingTtlMs, shouldListPullRequests } from './pr-cache-policy.js';
+import { prListingActiveTtlMs, prListingIdleTtlMs } from './pr-freshness.js';
 
 /** How long a repo's PR listing is served before the forge is read again. */
 export const PR_CACHE_TTL_MS = 30_000;
@@ -59,25 +63,27 @@ type ClosedListing = SettledListing & { readonly generation: number };
 /**
  * The open-PR read, cached briefly — the batch door's forge read and every
  * caller that only needs open PRs (PAN-5042). PAN-4291: a listing with no
- * open PR is cached for `PR_CACHE_IDLE_TTL_MS` instead, since nothing in it
- * can change without a new PR opening.
+ * open PR is cached for `prListingIdleTtlMs()` instead, since nothing in it
+ * can change without a new PR opening. PAN-5224: while webhooks are healthy
+ * a settled listing is cached for `prListingActiveTtlMs()` (5 min) instead of
+ * the flat 30 s; a failed (null) read always keeps the 30 s retry.
  */
 const cachedOpenPullRequests = createSettledTtlPromiseCache<string, SettledListing | null>(
   PR_CACHE_TTL_MS,
   undefined,
-  (listing) => prListingTtlMs(listing?.rows ?? null, PR_CACHE_TTL_MS),
+  (listing) => prListingTtlMs(listing?.rows ?? null, listing ? prListingActiveTtlMs() : PR_CACHE_TTL_MS),
 );
 
 /**
- * The closed-PR read, cached for `PR_CACHE_IDLE_TTL_MS` once it settles —
+ * The closed-PR read, cached for `prListingIdleTtlMs()` once it settles —
  * closed/merged PRs in this window don't change — but for only
  * `PR_CACHE_TTL_MS` on a failed read, so a transient failure retries at the
- * normal cadence instead of for five minutes.
+ * normal cadence instead of for the (possibly health-extended) idle TTL.
  */
 const cachedClosedPullRequests = createSettledTtlPromiseCache<string, ClosedListing | null>(
   PR_CACHE_TTL_MS,
   undefined,
-  (listing) => (listing ? PR_CACHE_IDLE_TTL_MS : PR_CACHE_TTL_MS),
+  (listing) => (listing ? prListingIdleTtlMs() : PR_CACHE_TTL_MS),
 );
 
 /** The last combined listing each repo answered successfully, and when (PAN-3925). */
@@ -238,10 +244,18 @@ export async function listRepoPullRequests(projectPath: string): Promise<readonl
   return (await readRepoPullRequests(projectPath)) ?? [];
 }
 
-/** Drop the cached PR listings for one repo so the next read goes to the forge (PAN-4457). */
+/**
+ * Drop the cached PR listings for one repo so the next read goes to the
+ * forge (PAN-4457), even while a read is already in flight (PAN-5224: a
+ * webhook that lands mid-read must not be served that read's now-stale
+ * answer). Also bumps `closedGeneration` so a closed read already in flight
+ * is re-read, the same staleness guard `readRepoPullRequests` already applies
+ * to a closed read racing the open side's shrink.
+ */
 export function invalidateRepoPullRequests(projectPath: string): void {
-  cachedOpenPullRequests.invalidate(projectPath);
-  cachedClosedPullRequests.invalidate(projectPath);
+  cachedOpenPullRequests.invalidate(projectPath, { includeInFlight: true });
+  cachedClosedPullRequests.invalidate(projectPath, { includeInFlight: true });
+  closedGeneration.set(projectPath, (closedGeneration.get(projectPath) ?? 0) + 1);
 }
 
 /**

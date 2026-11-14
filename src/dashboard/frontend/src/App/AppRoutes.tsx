@@ -38,7 +38,7 @@ import { BackendConnectionBoundary } from './BackendConnectionBoundary';
 export interface PendingConversationTarget {
   conversationName: string;
   messageId: string;
-  messageIndex: number;
+  messageIndex?: number;
   nonce: number;
   label: string;
   /** Bare subagent id when the target lives in a subagent transcript (PAN-3982). */
@@ -77,6 +77,8 @@ interface AppRoutesProps {
   onBacklogIssueAction: (issueId: string, mode: 'browser' | 'modal' | 'panel') => void;
   /** PAN-1234: suppress j/k/Enter shortcuts in Pipeline/Board while search/command palette is open. */
   keyboardShortcutsDisabled?: boolean;
+  /** PAN-5239: opens a conversation's own Command Deck pane at a given message. */
+  onOpenConversationMessage: (conversationName: string, messageId: string) => void;
 }
 
 export function AppRoutes({
@@ -107,6 +109,7 @@ export function AppRoutes({
   onSelectAgent,
   onBacklogIssueAction,
   keyboardShortcutsDisabled = false,
+  onOpenConversationMessage,
 }: AppRoutesProps) {
   return (
     <BackendConnectionBoundary>
@@ -250,7 +253,7 @@ export function AppRoutes({
       )}
       {activeTab === 'flywheel' && (
         <div className="w-full h-full overflow-hidden">
-          <FlywheelPage onOpenSettings={onOpenSettings} onNavigateIssue={onOpenIssue} />
+          <FlywheelPage onOpenSettings={onOpenSettings} onNavigateIssue={onOpenIssue} onOpenConversationMessage={onOpenConversationMessage} />
         </div>
       )}
       {activeTab === 'orders' && (

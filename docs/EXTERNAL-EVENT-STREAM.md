@@ -130,6 +130,10 @@ Canonical schemas live in `packages/contracts/src/events.ts`. The catalog above 
 - The server buffers outbound frames in-memory per subscriber. If a consumer cannot keep up, the connection is closed with a `slow-consumer` error frame — the consumer should reconnect with `Last-Event-ID` and either increase its processing rate or tighten its filters.
 - No rate limiting is applied to well-behaved consumers. A consumer that rapidly reconnects in a loop will be subject to the dashboard server's existing connection limits.
 
+## Webhooks drive PR freshness (PAN-5224)
+
+The GitHub App webhooks that reach `POST /api/webhooks/github` (`pull_request`, `pull_request_review`, `check_suite`, `check_run` created / failing completed, `status`) invalidate that repo's PR listing and membership PR snapshot through a 6 s per-repo coalescer and refresh the named issues' derived state. Polling is the fallback: 5 minutes (open PRs) / 15 minutes (no open PRs, closed PRs) while the Webhook relay health row is `running`, and 30 seconds / 5 minutes otherwise; a listing with an `UNKNOWN` mergeable row stays at 30 seconds regardless of webhook health. Repos without the GitHub App installed get no webhooks, so their PR state can lag up to the fallback TTL: up to 15 minutes for a repo with no open PR, 5 minutes once it has one (PRs opened through `pan done` are an exception — the review door invalidates the listing directly). Pipeline membership re-gathers on `pull_request` open/close/reopen, closed-out, the review door, `merge.completed` and tracker state/label changes, with a 30-minute fallback for GitHub-tracked projects (5 minutes for other trackers).
+
 ## Example Consumers
 
 ### Bash / curl

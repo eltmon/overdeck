@@ -63,6 +63,13 @@ describe('tick marker (PAN-3964 FR-2)', () => {
     expect(parseTickMarker('print flywheel-tick: … phase=stopping, then end.')).toBeNull();
   });
 
+  it('a backtick-wrapped marker with a target in needs-you keeps the target text (PAN-5239)', () => {
+    const parsed = parseTickMarker(
+      '`flywheel-tick: tick=8 pick=none phase=idle in-flight=none needs-you=upload AAB <https://play.google.com/console/x>`',
+    );
+    expect(parsed?.needsYou).toBe('upload AAB <https://play.google.com/console/x>');
+  });
+
   it('findLastTick reads assistant messages only, newest first', () => {
     const messages = [
       { role: 'assistant', text: 'flywheel-tick: tick=1 pick=PAN-1 phase=launch in-flight=PAN-1 needs-you=none', createdAt: '2026-09-23T10:00:00Z' },
@@ -154,5 +161,15 @@ describe('resolveNeedsYouItems (PAN-5198)', () => {
     const messages = [tickMessage(1, 'a')];
     const [item] = resolveNeedsYouItems(messages);
     expect(item).not.toHaveProperty('firstRaisedMessageId');
+  });
+
+  it('adding a target on a later tick does not reset firstRaisedTick (PAN-5239 FR-3)', () => {
+    const messages = [
+      tickMessage(1, 'upload AAB', 'm1'),
+      tickMessage(2, 'upload AAB <https://a.test>', 'm2'),
+    ];
+    const items = resolveNeedsYouItems(messages);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.firstRaisedTick).toBe(1);
   });
 });

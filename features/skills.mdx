@@ -237,7 +237,7 @@ Every skill has an on/off state that you can set at three levels: a **global def
 
 **conversation > issue > project > global > default (on)**
 
-A skill with no value at any level is on. The global level is two-state: a skill is either on (no stored value) or off. Project and issue levels are three-state: **Inherit**, **On**, or **Off**, so a project can turn on a skill that is off globally, and an issue can turn off a skill its project turned on.
+A skill with no value at any level is on. The global level is two-state: a skill is either on (no stored value) or off. Project and issue levels are three-state: a skill inherits the level above, or is set on, or is set off, so a project can turn on a skill that is off globally, and an issue can turn off a skill its project turned on.
 
 Conversation values are set only when the conversation is created, in the **New conversation with options…** dialog (see [Conversations](/features/conversations)). They are stored on the conversation row and applied at every launch, resume, restart and fork of that conversation. A conversation value for a pack skill (`pack/skill`) beats every level and every pack toggle, so a conversation can turn on one opt-in pack skill for itself. Core skills ignore conversation values too.
 
@@ -275,8 +275,8 @@ At the global level, `pan skills set <skill> on` clears the override, because on
 ### From the dashboard
 
 - **Skills page** (sidebar → Skills): every skill with a global on/off switch. Each row notes when projects or issues override it, and the **Overridden below** filter lists those skills.
-- **Project settings → Skills**: Inherit / On / Off for every skill in that project. The Inherit button shows the value it inherits, for example `Inherit (off via global)`.
-- **Issue view → Skills for this issue**: the same controls for one issue, in the issue drawer's **Skills** tab. It opens filtered to skills overridden here or off at launch; select **All** to see the rest. The tab is hidden for an issue that no registered project owns.
+- **Project settings → Skills**: one switch per skill, showing whether it launches in this project, with the source beside it (`on · global`, `off · this project`). Turning a switch back to the inherited value clears the override. The pin button stores the current value so a later global change does not change it here (`on · pinned here`); the reset button returns the skill to what it inherits. Skills you changed are listed first, with **Reset all**.
+- **Issue view → Skills for this issue**: the same controls for one issue, in the issue drawer's **Skills** tab. It opens on every skill, with the skills this issue changed listed first; **Changed here** and **Off** narrow the list. The tab is hidden for an issue that no registered project owns.
 
 ### When changes apply
 

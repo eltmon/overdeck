@@ -42,6 +42,7 @@ import { conversationMachineState, isLiveMachineState, MachineReadOnlyNotice } f
 import { VaultContinuityNotice } from './VaultContinuityNotice';
 import { HandoffNotice } from './HandoffNotice';
 import { HeldKickoffConflictError, HeldKickoffNotice, kickoffUnchanged, startHeldKickoff, useHeldKickoff, useSeedHeldKickoff } from './heldKickoff';
+import { useComposerRestoreTarget } from './useComposerRestoreTarget';
 import { openImageLightbox, useImageLightboxStore } from './ImageLightbox';
 import { ComposerAttachmentStrip } from './ComposerAttachmentStrip';
 import { CitationChips } from './citations/CitationChips';
@@ -173,6 +174,7 @@ function ComposerFooterInput({
   const currentConversationNameRef = useRef(conversation.name);
   currentConversationNameRef.current = conversation.name;
   useSeedHeldKickoff(editorRef.current, conversation.name, heldKickoff.held, heldKickoff.text);
+  useComposerRestoreTarget(editorRef, conversation.name);
 
   const piConversation = isPiConversation(conversation);
   const { effort, chip: effortChip, pending: effortPending, liveChangeEnabled, title: effortTitle, onChange: handleEffortChange } =

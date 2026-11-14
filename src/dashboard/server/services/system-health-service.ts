@@ -872,3 +872,20 @@ export async function getAcceptedSystemHealthSnapshot(): Promise<SharedSystemHea
 export async function getSystemHealthSnapshot(): Promise<SystemHealthSnapshot> {
   return (await getSystemHealthEvidenceSnapshot()).compatibility;
 }
+
+/** PAN-5224: max age of the accepted sample that may vouch for the relay (4 × the 15 s poll). */
+export const WEBHOOK_RELAY_SAMPLE_MAX_AGE_MS = 60_000;
+
+/**
+ * PAN-5224: whether a fresh accepted sample shows the webhook relay running.
+ * In-memory. A `measuring` (no sample yet) or `stale` (last collection
+ * failed) assessment, or one older than 60 s (collection hung), reads false.
+ */
+export function isWebhookRelayRunningInLastSample(nowMs = Date.now()): boolean {
+  const assessment = getSystemHealthSampler().getSnapshot();
+  if (assessment.freshness.status !== 'fresh') return false;
+  const observedAt = Date.parse(assessment.freshness.observedAt);
+  if (!Number.isFinite(observedAt) || nowMs - observedAt > WEBHOOK_RELAY_SAMPLE_MAX_AGE_MS) return false;
+  return (assessment.metrics.accepted.services ?? [])
+    .some((service) => service.id === 'smee-relay' && service.status === 'running');
+}

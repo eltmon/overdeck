@@ -7,7 +7,13 @@ import {
   type MembershipUnavailableReason,
 } from '@overdeck/contracts';
 import { Effect } from 'effect';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({ runGh: vi.fn() }));
+
+vi.mock('../../../src/lib/github-quota/run-gh.js', () => ({
+  runGh: mocks.runGh,
+}));
 
 import {
   gatherIssueBranchContainment,
@@ -16,6 +22,8 @@ import {
   PIPELINE_PROJECT_CONCURRENCY,
   listIssueStatesBatched,
   listMergedPullRequestHeadsBatched,
+  listOpenPullRequestsSnapshot,
+  invalidateOpenPullRequestsSnapshot,
   isTransientForgeFailure,
   PipelineMembershipUnavailableError,
   projectRepositories,
@@ -31,6 +39,7 @@ import { currentGitHubCaller } from '../../../src/lib/github-quota/caller-contex
 import { JiraTracker } from '../../../src/lib/tracker/jira.js';
 import { tryResolveProjectTrackerType } from '../../../src/lib/project-tracker-type.js';
 import { GitHubQuotaPausedError } from '../../../src/lib/github-quota/pause-gate.js';
+import { setWebhookHealthProvider } from '../../../src/lib/overdeck/pr-freshness.js';
 
 const project: ProjectConfig = {
   name: 'overdeck',
@@ -98,6 +107,54 @@ describe('pipeline membership unavailability contract', () => {
       reason: 'repo_unavailable',
       message: 'msg',
     });
+  });
+});
+
+describe('listOpenPullRequestsSnapshot (PAN-5224)', () => {
+  let repoSeq = 0;
+  let owner = '';
+  let repo = '';
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mocks.runGh.mockReset();
+    mocks.runGh.mockResolvedValue({ stdout: JSON.stringify([]) });
+    setWebhookHealthProvider(() => false);
+    owner = `owner-${++repoSeq}`;
+    repo = `repo-${repoSeq}`;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    setWebhookHealthProvider(() => false);
+  });
+
+  it('healthy webhooks: two reads 4 minutes apart hit runGh once (ac1)', async () => {
+    setWebhookHealthProvider(() => true);
+
+    await listOpenPullRequestsSnapshot(owner, repo);
+    await vi.advanceTimersByTimeAsync(4 * 60_000);
+    await listOpenPullRequestsSnapshot(owner, repo);
+
+    expect(mocks.runGh).toHaveBeenCalledTimes(1);
+  });
+
+  it('a settled snapshot is re-read after invalidateOpenPullRequestsSnapshot, case-insensitively (ac2)', async () => {
+    setWebhookHealthProvider(() => true);
+
+    await listOpenPullRequestsSnapshot(owner, repo);
+    invalidateOpenPullRequestsSnapshot(owner.toUpperCase(), repo.toUpperCase());
+    await listOpenPullRequestsSnapshot(owner, repo);
+
+    expect(mocks.runGh).toHaveBeenCalledTimes(2);
+  });
+
+  it('unhealthy webhooks (default): a read 31 s later hits runGh again (ac3)', async () => {
+    await listOpenPullRequestsSnapshot(owner, repo);
+    await vi.advanceTimersByTimeAsync(31_000);
+    await listOpenPullRequestsSnapshot(owner, repo);
+
+    expect(mocks.runGh).toHaveBeenCalledTimes(2);
   });
 });
 

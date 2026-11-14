@@ -245,3 +245,64 @@ describe('PAN-4476 shared prompt author', () => {
     expect(screen.getByText('Sent · waiting for transcript')).toBeTruthy();
   });
 });
+
+describe('Sending… bubble Cancel (PAN-5237)', () => {
+  function pending(overrides: Partial<ChatMessage> = {}): ChatMessage {
+    return {
+      id: 'optimistic-c1', role: 'user', text: 'hello', createdAt: '2026-11-13T12:00:00.000Z',
+      clientMessageId: 'c1', deliveryState: 'pending', sendPhase: 'queued', ...overrides,
+    };
+  }
+  const cancelButton = () => screen.queryByRole('button', { name: 'Cancel this message' });
+
+  it('a queued bubble renders Cancel and its click calls cancelSend with the bubble id', async () => {
+    const { useComposerStore } = await import('../../../lib/composerStore');
+    const cancelSend = vi.spyOn(useComposerStore.getState(), 'cancelSend').mockResolvedValue();
+    render(<UserMessageRow message={pending()} />);
+    expect(screen.getByText(/Sending…/)).toBeInTheDocument();
+    fireEvent.click(cancelButton()!);
+    expect(cancelSend).toHaveBeenCalledWith('optimistic-c1');
+    cancelSend.mockRestore();
+  });
+
+  it('an in-flight agent-route bubble renders Sending… and no Cancel', () => {
+    render(<UserMessageRow message={pending({ sendPhase: 'in-flight', sendRoute: 'agent' })} />);
+    expect(screen.getByText(/Sending…/)).toBeInTheDocument();
+    expect(cancelButton()).toBeNull();
+  });
+
+  it('an in-flight conversation-route bubble renders Cancel', () => {
+    render(<UserMessageRow message={pending({ sendPhase: 'in-flight', sendRoute: 'conversation' })} />);
+    expect(cancelButton()).not.toBeNull();
+  });
+
+  it("cancelState too-late renders \"Already delivered, can't cancel\" with no Cancel", () => {
+    render(<UserMessageRow message={pending({ sendPhase: 'in-flight', cancelState: 'too-late' })} />);
+    expect(screen.getByText(/Already delivered, can't cancel/)).toBeInTheDocument();
+    expect(cancelButton()).toBeNull();
+  });
+
+  it("cancelState unconfirmed renders \"Couldn't confirm the cancel\" with Cancel", () => {
+    render(<UserMessageRow message={pending({ sendPhase: 'in-flight', cancelState: 'unconfirmed' })} />);
+    expect(screen.getByText(/Couldn't confirm the cancel/)).toBeInTheDocument();
+    expect(cancelButton()).not.toBeNull();
+  });
+
+  it('cancelState cancelling renders Cancelling… with no Cancel', () => {
+    render(<UserMessageRow message={pending({ sendPhase: 'in-flight', cancelState: 'cancelling' })} />);
+    expect(screen.getByText(/Cancelling…/)).toBeInTheDocument();
+    expect(cancelButton()).toBeNull();
+  });
+
+  it('a bubble without sendPhase renders no Cancel', () => {
+    render(<UserMessageRow message={pending({ sendPhase: undefined })} />);
+    expect(cancelButton()).toBeNull();
+  });
+
+  it('a held bubble renders Cancel and no Discard', () => {
+    render(<UserMessageRow message={pending({ deliveryState: 'held', heldAt: 1 })} />);
+    expect(screen.getByText(/Waiting: the agent needs a permission answer first/)).toBeInTheDocument();
+    expect(cancelButton()).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull();
+  });
+});

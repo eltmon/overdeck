@@ -29,8 +29,9 @@ export function useStableComposerProps({ conversation, data, serverMessages, add
 
   const onSend = useCallback((text: string, clientMessageId?: string) => {
     const messages = latestServerMessages.current;
+    // PAN-5237: the composer path runs through runCancellableSend, so its bubble offers Cancel.
     addOptimistic(conversation.name, text, messages.length, {
-      clientMessageId, echoBaselineIds: messages.map((message) => message.id),
+      clientMessageId, echoBaselineIds: messages.map((message) => message.id), sendPhase: 'queued',
     });
   }, [addOptimistic, conversation.name]);
 

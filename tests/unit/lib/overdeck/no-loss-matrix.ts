@@ -229,6 +229,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/conversations/:name/upload-image',               kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.stageAttachment' },
   { surface: 'POST /api/conversations/:name/delete-image',               kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.removeAttachment' },
   { surface: 'POST /api/conversations/:name/message',                    kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.deliver' },
+  { surface: 'POST /api/conversations/:name/message/cancel',             kind: 'http', disposition: 'WRITE',       door: 'cancelConversationMessage (services/conversation-message-receipts, PAN-5237)' },
   { surface: 'POST /api/conversations/:id/codex-approval',               kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.approve' },
   { surface: 'POST /api/conversations/:id/pane-choice',                  kind: 'http', disposition: 'RELOCATE',    door: 'handleConversationPaneChoiceAnswer (lib/overdeck/conversation-pane-choice)' },
   { surface: 'POST /api/conversations/:id/permission',                   kind: 'http', disposition: 'RELOCATE',    door: 'handleConversationPermissionAnswer — terminal permission prompt keystroke drive (PAN-4278)' },

@@ -41,6 +41,16 @@ colleague.
 
 A new conversation's effort is chosen with an effort picker next to the model picker, both on the Home composer and the Command Deck sidebar. The **New conversation with options…** dialog (below) has its own effort field, which defaults to the effort the conversation would get anyway and shows where that default comes from, for example `Default: high (default)` or `Default: medium (project)`.
 
+### Cancelling a message that is still sending
+
+Messages you send go out one at a time, in order. While a message reads **Sending…** it has a **Cancel** link:
+
+- A message still waiting its turn is never sent. If the composer is empty, the text goes back into it so you can edit it. If you have already typed something new, the text goes to the failed-message list below the conversation, marked **Cancelled**, with **Resend**, **Copy** and **Discard**.
+- A message already on its way is stopped if the agent has not received it yet, and its text comes back the same way. If the agent already has it, the message says "Already delivered, can't cancel". If the dashboard cannot tell, it says "Couldn't confirm the cancel" and you can try again.
+- A message waiting on a permission prompt, or one waiting for the server to reconnect, also has **Cancel**.
+
+Messages sent to an agent's own session (not a conversation) can be cancelled only before they start sending.
+
 ### Changing effort while a conversation runs
 
 Pick a level in the composer's effort picker while the session runs. For Claude

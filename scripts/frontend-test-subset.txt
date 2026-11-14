@@ -127,6 +127,7 @@ src/components/__tests__/GitHubQuotaPill.test.tsx
 src/components/__tests__/GitHubRateLimitBanner.test.tsx
 src/components/__tests__/HarnessUpdateCard.test.tsx
 src/components/__tests__/McpSignInCard.test.tsx
+src/components/__tests__/NewBuildBanner.test.tsx
 src/components/__tests__/PanOpenInPicker.remote.test.tsx
 src/components/__tests__/Sidebar.ownerGroups.test.tsx
 src/components/__tests__/Sidebar.workspacePullRequest.test.tsx
@@ -165,6 +166,7 @@ src/components/chat/__tests__/heldKickoff.test.tsx
 src/components/chat/__tests__/queuedPromptSend.test.ts
 src/components/chat/__tests__/resetClippedScroll.test.ts
 src/components/chat/__tests__/scheduledMessages.test.ts
+src/components/chat/__tests__/useComposerRestoreTarget.test.tsx
 src/components/chat/__tests__/useFloatingPickerPosition.test.tsx
 src/components/chat/__tests__/useOlderHistory.test.ts
 src/components/chat/citations/__tests__/CitationChips.test.tsx
@@ -334,6 +336,9 @@ src/components/sidebar/__tests__/MachinesNavItem.test.tsx
 src/components/sidebar/__tests__/projectOwners.test.ts
 src/components/simple/SimpleQuestionCard.test.tsx
 src/components/skills/useIssueSkillOverrideCount.test.tsx
+src/components/skills/SkillControls.test.tsx
+src/components/skills/SkillOverridesPanel.test.tsx
+src/components/skills/SkillPacksSection.test.tsx
 src/components/terminal/TerminalDrawer.pending.test.tsx
 src/components/terminal/terminalControlFrames.test.ts
 src/components/workspace/new/__tests__/smartField.test.ts
@@ -342,8 +347,10 @@ src/hooks/__tests__/useColorTheme.test.ts
 src/hooks/__tests__/useTheme.test.ts
 src/lib/__tests__/appearance.test.ts
 src/lib/__tests__/bootRequests.test.ts
+src/lib/__tests__/buildDrift.test.ts
 src/lib/__tests__/citationFormat.test.ts
 src/lib/__tests__/colorThemeEditor.test.ts
+src/lib/__tests__/composerCancel.test.ts
 src/lib/__tests__/composerCitations.test.ts
 src/lib/__tests__/composerDraft.test.ts
 src/lib/__tests__/composerSendQueue.test.ts
@@ -385,5 +392,6 @@ src/pages/__tests__/FlywheelPage.test.tsx
 src/pages/__tests__/NewProjectPage.no-loss.test.tsx
 src/pages/__tests__/NewWorkspacePage.test.tsx
 src/test-utils/renderCounter.test.tsx
+src/vite-build-commit.test.ts
 src/components/chat/messagesTimeline/__tests__/toolBodyLoader.test.tsx
 src/components/chat/__tests__/MessagesTimeline.test.tsx

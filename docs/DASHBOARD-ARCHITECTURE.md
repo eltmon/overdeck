@@ -708,7 +708,26 @@ door that does not exist; a real record read door would be a separate change.
   failed POST never blocks the ones behind it, and a queued prompt behind a `held` bubble
   is held too. A queued bubble's `createdAt` restarts when its POST starts, so queue time
   never counts toward `TURN_STALL_MS`. `/pan` commands, held-kickoff starts and
-  limit-reset schedules still block the composer until their round trip finishes. Before pasting, the
+  limit-reset schedules still block the composer until their round trip finishes.
+  **Cancel (PAN-5237).** A composer prompt or outbox retry bubble carries `sendPhase`
+  (`queued`, then `in-flight` once its POST starts) and shows **Cancel** while it reads
+  "Sending…". Cancel on a queued or `held` bubble works locally: the send is skipped when its
+  queue turn comes and is never POSTed. Cancel on an in-flight bubble calls
+  `POST /api/conversations/:name/message/cancel` with its `clientMessageId`; the server answers
+  `{ outcome }`. `cancelled` means nothing reached the agent: the receipt's delivery gate
+  refuses the handler's next `commit()` and the message POST answers 409 `code: 'cancelled'`.
+  `delivered` means the handler already passed its commit point (the bubble reads "Already
+  delivered, can't cancel"). `unknown` means the server has no receipt for that id yet: it writes
+  a tombstone that refuses a late POST, but the bubble reads "Couldn't confirm the cancel" and
+  offers Cancel again. The client never aborts a cancelled POST: the server has no
+  per-conversation lock, so an aborted request would let the next queued message start while
+  the cancelled handler may still be sending ensure-main keys to the same pane. The next POST
+  starts only after the cancelled one answers. An in-flight send to `/api/agents/:id/message`
+  has no receipts, so it can be cancelled only while queued or held. A cancelled message's text
+  goes back into the mounted composer when it is empty (blank text, no pending attachments or
+  citations; `useComposerRestoreTarget`); otherwise it stays in the outbox as **Cancelled**,
+  whose **Resend** sends it with a fresh `clientMessageId` as a normal message. An offline-held
+  outbox entry has **Cancel** too, which stops the reconnect send the same way. Before pasting, the
   composer route checks Claude Code's agent selector and switches input back to the main
   agent (PAN-4268); if that cannot be confirmed the route answers 409
   `input-target-not-main`, the toast shows the reason, and the message moves to the
@@ -1041,7 +1060,7 @@ agent selector to main (PAN-4268), because that switch's `Down`/`Enter` would an
 With a prompt up it pastes nothing and answers 409 `permission-pending`. A registry-only entry
 never holds a message: the hook is best-effort, so a lost clearing post must not block every
 send. The composer keeps the message as a `held` bubble ("Waiting: the agent needs a permission
-answer first", with Discard) and resends it once a feed read newer than the hold shows no
+answer first", with Cancel, which keeps the text) and resends it once a feed read newer than the hold shows no
 on-screen (`answerable`) `pendingPermission` for that conversation, with a fresh `clientMessageId`
 and no `retry` flag —
 the receipts cache holds the 409 under the old id. A second `permission-pending` holds it again.
@@ -1224,6 +1243,60 @@ reconnecting status, and region-scoped boundaries (`LoadingBoundary`,
 `ProjectMembershipBoundary`, the Flywheel unreachable chip). Browser coverage
 is `src/dashboard/frontend/tests/pan-4279-degraded-mode.spec.ts`, which runs on
 an isolated dashboard.
+
+## New-build banner (PAN-5236)
+
+A dashboard tab keeps running the frontend bundle it loaded until something
+tells it otherwise — a deploy does not push new code into an open tab. This
+banner is that something: it tells a tab its own bundle is older than what the
+server is now running, and offers a one-click way to catch up.
+
+`lib/buildDrift.ts` compares two commits:
+
+- **Bundle commit** — `vite build` compiles the current `git rev-parse HEAD`
+  into the frontend as `__OVERDECK_FRONTEND_BUILD_COMMIT__`
+  (`vite.config.ts`'s `resolveFrontendBuildCommit`). It is `null` under
+  `vite serve`, because `pan dev` hot-rebuilds only the server, so a dev tab
+  would otherwise always look stale.
+- **Server commit** — `GET /api/health`'s `buildCommit`, the same field
+  `StaleBuildChip` reads. `buildDrift.ts` fetches it itself, once per
+  `useConnectionState` stream rising edge (`streamLive` going `false` →
+  `true`, on first bootstrap and every reconnect) — never polled. A failed or
+  timed-out fetch (3 s, `fetchServerBuildCommit`) keeps the previous value and
+  tries again on the next rising edge.
+
+**Drift rule:** both commits are non-null, non-empty strings and they differ
+(`isBuildDrift`). Either side `null` — dev server, native phone bundle, or a
+server running from source — never shows the banner.
+
+On drift, `components/NewBuildBanner.tsx` renders "A newer Overdeck is
+running. Reload to update.", plus "Unsent drafts are kept." whenever any
+`conv-draft:*` localStorage key holds text (`hasSavedDraft()`). Reload calls
+`window.location.reload()`; because drafts are already flushed to localStorage
+on `pagehide`, nothing new needs saving. Before reloading it writes the
+current server commit to `sessionStorage` under
+`overdeck.build-drift.reloaded-for` (`markReloadedFor`). After the reload,
+`reloadAlreadyTriedFor(serverCommit)` suppresses the banner for that exact
+server commit: a server-only rebuild (no new frontend bundle) would otherwise
+show the same mismatch forever. A genuinely newer server commit after that
+clears the suppression and shows the banner again. Nothing reloads
+automatically — there is no timer and no retry loop.
+
+The banner is mounted on three surfaces: the main app shell (`AppChrome.tsx`,
+directly after `DegradedModeBanner`), the web `/m` phone browser shell
+(`MobileApp.tsx`, with `safeAreaTop`, in both the list and full-screen views),
+and the standalone conversation pop-out (`StandaloneRoutes.tsx`). The native
+phone app (`apps/mobile`) never shows it — its bundle cannot be reloaded to
+update, so there is nothing a reload would fix.
+
+This is a different problem from `StaleBuildChip` ("build stale ×N" in the
+command deck), which compares the *server's* build with `origin/main` to flag
+that the running server itself is behind — not whether a given tab's own
+bundle matches that server. A tab can show the new-build banner while the
+server is perfectly up to date with `origin/main`, and vice versa. Browser
+coverage is
+`src/dashboard/frontend/tests/pan-5236-new-build-banner.spec.ts`, which runs
+on an isolated dashboard.
 
 ## Agents page: Live and History (PAN-3920, PAN-4197)
 

@@ -3,6 +3,8 @@
  * (PAN-5198). A PR links only when its repository is known: `owner/repo#n`
  * names it, or an in-flight row carries that PR number. A bare `#n` from
  * another repository stays text, because a guessed repo opens the wrong PR.
+ * A qualified ref may carry a leading `PR ` (PAN-5239 FR-4); the link text
+ * then includes it.
  */
 import type { FlywheelInFlightRow } from '@overdeck/contracts';
 
@@ -12,7 +14,7 @@ export type NeedsYouSegment =
   | { kind: 'pr'; text: string; url: string };
 
 // Order matters: a qualified ref must win over its bare `#n` tail.
-const REF_RE = /\b([A-Za-z0-9][\w.-]*\/[\w.-]+)#(\d+)\b|\bPR #(\d+)\b|(?<![\w/#])#(\d+)\b|\b([A-Z]{2,}-\d+)\b/g;
+const REF_RE = /(?:\bPR )?\b([A-Za-z0-9][\w.-]*\/[\w.-]+)#(\d+)\b|\bPR #(\d+)\b|(?<![\w/#])#(\d+)\b|\b([A-Z]{2,}-\d+)\b/g;
 
 export function needsYouSegments(text: string, inFlight: readonly FlywheelInFlightRow[]): NeedsYouSegment[] {
   const segments: NeedsYouSegment[] = [];

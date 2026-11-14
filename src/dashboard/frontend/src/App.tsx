@@ -549,6 +549,14 @@ export default function App() {
     }
   }, [setActiveTab, setConversationRoute]);
 
+  // PAN-5239: a Flywheel needs-you jump opens the conversation's own Command Deck
+  // pane at the message; CommandDeck's /conv deep-link effect consumes the target.
+  const handleOpenConversationMessage = useCallback((conversationName: string, messageId: string) => {
+    setPendingConversationTarget({ conversationName, messageId, nonce: Date.now(), label: 'Flywheel' });
+    setActiveTab('command-deck');
+    setConversationRoute(conversationName, 'conversation');
+  }, [setActiveTab, setConversationRoute]);
+
   const setSessionFeedSidebarOpen = useCallback((open: boolean) => {
     setIsSessionFeedSidebarOpen(open);
     window.localStorage.setItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY, String(open));
@@ -883,6 +891,7 @@ export default function App() {
             onSelectAgent={setSelectedAgent}
             onBacklogIssueAction={handleBacklogIssueAction}
             keyboardShortcutsDisabled={isSearchOpen || isPaletteOpen}
+            onOpenConversationMessage={handleOpenConversationMessage}
           />
         </main>
         {/* PAN-1591: in the Command Deck the merged Awareness rail already covers

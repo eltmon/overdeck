@@ -204,6 +204,19 @@ describe('resource-discovery snapshot ownership', () => {
     expect(mocks.getPipelineMembershipForProjects).not.toHaveBeenCalled();
   });
 
+  it('a refreshMembership predicate is evaluated per project (PAN-5224 ac4)', async () => {
+    const overdeckProject = { name: 'overdeck', path: '/tmp/overdeck', issue_prefix: 'PAN', github_repo: 'eltmon/overdeck' };
+    const mynProject = { name: 'mind-your-now', path: '/tmp/myn', issue_prefix: 'MIN', gitlab_repo: 'eltmon/mind-your-now' };
+
+    await refreshResourceAllocatedProjects(
+      [overdeckProject, mynProject],
+      { refreshMembership: (project) => project.path === overdeckProject.path },
+    );
+
+    expect(mocks.getPipelineMembershipForProjects).toHaveBeenCalledTimes(1);
+    expect(mocks.getPipelineMembershipForProjects).toHaveBeenCalledWith([overdeckProject]);
+  });
+
   it('publishes refreshed projects independently into one combined snapshot', async () => {
     const overdeckProject = { name: 'overdeck', path: '/tmp/overdeck', issue_prefix: 'PAN', github_repo: 'eltmon/overdeck' };
     const mynProject = { name: 'mind-your-now', path: '/tmp/myn', issue_prefix: 'MIN', gitlab_repo: 'eltmon/mind-your-now' };

@@ -53,4 +53,22 @@ describe('openConversationTab', () => {
     expect(agentPanes).toHaveLength(1);
     expect(agentPanes[0]!.viewMode).toBe('terminal');
   });
+
+  it('a message target switches an existing terminal-view pane to Conversation (PAN-5239 review)', () => {
+    openConversationTab(WS, 'conv-1', 'Agent', undefined, 'terminal');
+    const firstPane = panes().find((p) => p.paneType === 'agent');
+    expect(firstPane?.viewMode).toBe('terminal');
+
+    openConversationTab(WS, 'conv-1', 'Agent', { messageId: 'm1', nonce: 1 });
+    const agentPanes = panes().filter((p) => p.paneType === 'agent');
+    expect(agentPanes).toHaveLength(1);
+    expect(agentPanes[0]!.viewMode).toBe('conversation');
+    expect(agentPanes[0]!.targetMessageId).toBe('m1');
+  });
+
+  it('an explicit terminal view mode wins over a message target', () => {
+    openConversationTab(WS, 'conv-1', 'Agent', { messageId: 'm1', nonce: 1 }, 'terminal');
+    const agentPane = panes().find((p) => p.paneType === 'agent');
+    expect(agentPane?.viewMode).toBe('terminal');
+  });
 });

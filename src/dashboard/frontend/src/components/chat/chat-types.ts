@@ -51,6 +51,12 @@ export interface ChatMessage {
   /** When deliveryState is 'held': epoch ms the server refused the paste because a
    * permission prompt was up (PAN-4278). Release waits for a newer feed read. */
   heldAt?: number;
+  /** PAN-5237: 'queued' until the POST starts (markSendStarted), then 'in-flight'. */
+  sendPhase?: 'queued' | 'in-flight';
+  /** PAN-5237: which endpoint the in-flight POST uses; 'agent' sends are not server-cancellable. */
+  sendRoute?: 'conversation' | 'agent';
+  /** PAN-5237: a cancel in progress, refused after delivery, or not confirmed. */
+  cancelState?: 'cancelling' | 'too-late' | 'unconfirmed';
   /** Set when deliveryState is 'subagent': the message routed into this running
    * subagent instead of the main conversation (PAN-4247). */
   deliveredToSubagent?: { agentId: string; description: string };

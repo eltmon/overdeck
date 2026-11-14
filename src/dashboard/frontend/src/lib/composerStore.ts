@@ -24,7 +24,13 @@
  * live ephemeral state.
  */
 import type { ComposerCommandResult } from '@overdeck/contracts';
-import { MessageSendError, sendConversationMessage, sendFailureDetails, type SendFailureDetails } from './composerSend';
+import {
+  MessageSendError,
+  requestConversationMessageCancel,
+  sendConversationMessage,
+  sendFailureDetails,
+  type SendFailureDetails,
+} from './composerSend';
 import { reconcileComposerEchoes, type SendIdentity } from './composerEchoes';
 import { enqueueConversationSend, resetConversationSendQueues } from './composerSendQueue';
 import { create } from 'zustand';
@@ -107,6 +113,81 @@ function isEmptySlice(s: ComposerSlice): boolean {
 
 export { isComposerCommandResult, MessageSendError, sendConversationMessage, sendFailureDetails } from './composerSend';
 export type { ComposerCommandConfirmation, SendFailureDetails } from './composerSend';
+
+// ─── Cancel (PAN-5237) ──────────────────────────────────────────────────────────
+
+/** clientMessageIds cancelled before (or while) their POST ran; consumed by the send that owns them. */
+const cancelledSendIds = new Set<string>();
+
+/** A mounted composer that can take a cancelled message's text back. */
+export interface ComposerRestoreTarget {
+  isEmpty(): boolean;
+  setText(text: string): void;
+}
+
+const restoreTargets = new Map<string, ComposerRestoreTarget>();
+
+/** Register the conversation's mounted composer; the returned function unregisters it. */
+export function registerComposerRestoreTarget(conversationName: string, target: ComposerRestoreTarget): () => void {
+  restoreTargets.set(conversationName, target);
+  return () => {
+    if (restoreTargets.get(conversationName) === target) restoreTargets.delete(conversationName);
+  };
+}
+
+/** True once, when the send with this id was cancelled. */
+export function consumeCancelledSend(clientMessageId: string): boolean {
+  return cancelledSendIds.delete(clientMessageId);
+}
+
+/** The outbox entry for a cancelled message (D8): Resend mints a fresh clientMessageId. */
+function cancelledEntry(
+  base: Pick<FailedMessage, 'text' | 'createdAt' | 'clientMessageId' | 'echoBaselineIds'> & { id?: string },
+): FailedMessage {
+  return {
+    id: base.id ?? `failed-${crypto.randomUUID()}`,
+    text: base.text,
+    createdAt: base.createdAt,
+    kind: 'prompt',
+    code: 'cancelled',
+    retryable: true,
+    deliveryUnknown: false,
+    ...(base.clientMessageId ? { clientMessageId: base.clientMessageId } : {}),
+    ...(base.echoBaselineIds ? { echoBaselineIds: base.echoBaselineIds } : {}),
+  };
+}
+
+/**
+ * Run one cancellable POST. A send cancelled while queued never starts; a send
+ * whose cancel was confirmed (or that the server answered 409 code 'cancelled')
+ * settles as cancelled instead of failing. Any other error is rethrown.
+ * `restartClock: false` keeps the bubble's createdAt: a `retry: true` resend
+ * must still match an echo of the original send.
+ */
+export async function runCancellableSend<T>(
+  conversationName: string,
+  clientMessageId: string,
+  route: 'conversation' | 'agent',
+  send: () => Promise<T>,
+  restartClock = true,
+): Promise<{ cancelled: true } | { cancelled: false; result: T }> {
+  const store = useComposerStore.getState();
+  if (consumeCancelledSend(clientMessageId)) {
+    store.settleCancelled(conversationName, clientMessageId);
+    return { cancelled: true };
+  }
+  store.markSendStarted(conversationName, clientMessageId, route, restartClock);
+  try {
+    return { cancelled: false, result: await send() };
+  } catch (err) {
+    // consumeCancelledSend also clears an id a server-confirmed cancel added.
+    if (consumeCancelledSend(clientMessageId) || (err instanceof MessageSendError && err.code === 'cancelled')) {
+      useComposerStore.getState().settleCancelled(conversationName, clientMessageId);
+      return { cancelled: true };
+    }
+    throw err;
+  }
+}
 
 // ─── Attachment API + upload pump (module-level, survives component unmount) ────
 
@@ -242,7 +323,12 @@ interface ComposerStore {
    * PAN-5184: reset a bubble's send clock when its POST actually starts, so time
    * spent waiting in the send queue never counts toward TURN_STALL_MS.
    */
-  markSendStarted(conversationName: string, clientMessageId: string): void;
+  markSendStarted(
+    conversationName: string,
+    clientMessageId: string,
+    route?: 'conversation' | 'agent',
+    restartClock?: boolean,
+  ): void;
   /** An accepted bubble stayed unmatched too long while not streaming: move it
    * to the outbox as a 'Not found in transcript' entry (PAN-4247). */
   markNotFoundInTranscript(conversationName: string, id: string): void;
@@ -264,8 +350,19 @@ interface ComposerStore {
    * second permission-pending re-holds; any other failure goes to the outbox.
    */
   releaseHeld(conversationName: string): Promise<void>;
-  /** Drop a held bubble without sending it (found by id in any conversation). */
-  discardHeld(id: string): void;
+  /**
+   * PAN-5237: a send was cancelled. Remove its bubble and give the text back to
+   * the empty mounted composer, else keep it in the outbox as Cancelled. Idempotent.
+   */
+  settleCancelled(conversationName: string, clientMessageId: string): void;
+  /**
+   * PAN-5237: Cancel on a Sending… or held bubble (found by id in any
+   * conversation). Queued and held sends cancel locally; an in-flight send asks
+   * the server and never aborts its POST.
+   */
+  cancelSend(messageId: string): Promise<void>;
+  /** PAN-5237: Cancel on an offline-held outbox entry, so the reconnect flush skips it. */
+  cancelHeldOffline(failedId: string): void;
 
   /** A send POST failed: preserve it in the retry outbox with its original lane. */
   failSend(conversationName: string, text: string, kind?: FailedMessage['kind'], details?: SendFailureDetails): void;
@@ -339,12 +436,14 @@ async function releaseHeldMessages(conversationName: string): Promise<void> {
         byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
           ...s,
           optimistic: s.optimistic.map((m) => m.id === message.id
-            ? { ...m, clientMessageId, deliveryState: 'pending' as const, heldAt: undefined, createdAt: new Date().toISOString() }
+            ? { ...m, clientMessageId, deliveryState: 'pending' as const, heldAt: undefined, cancelState: undefined, createdAt: new Date().toISOString() }
             : m),
         })),
       }));
       try {
-        await sendConversationMessage(conversationName, message.text, undefined, undefined, undefined, { clientMessageId });
+        const sent = await runCancellableSend(conversationName, clientMessageId, 'conversation', () =>
+          sendConversationMessage(conversationName, message.text, undefined, undefined, undefined, { clientMessageId }));
+        if (sent.cancelled) return 'next';
         getState().acknowledgeOptimistic(conversationName, message.text, clientMessageId);
         return 'next';
       } catch (err) {
@@ -510,14 +609,16 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     })),
   })),
 
-  markSendStarted: (conversationName, clientMessageId) => set((state) => ({
+  markSendStarted: (conversationName, clientMessageId, route, restartClock = true) => set((state) => ({
     byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
       ...s,
       optimistic: s.optimistic.map((message) => message.clientMessageId === clientMessageId
         ? {
           ...message,
-          createdAt: new Date().toISOString(),
+          ...(restartClock ? { createdAt: new Date().toISOString() } : {}),
           deliveryState: message.deliveryState === 'unknown' ? 'pending' as const : message.deliveryState,
+          // PAN-5237: only a bubble that opted into Cancel (sendPhase set) becomes cancellable.
+          ...(message.sendPhase ? { sendPhase: 'in-flight' as const, sendRoute: route ?? 'conversation' } : {}),
         } : message),
     })),
   })),
@@ -546,7 +647,7 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
       ...s,
       optimistic: s.optimistic.map((message) => message.clientMessageId === clientMessageId
-        ? { ...message, deliveryState: 'held' as const, heldAt: Date.now() } : message),
+        ? { ...message, deliveryState: 'held' as const, heldAt: Date.now(), cancelState: undefined } : message),
     })),
   })),
 
@@ -577,17 +678,100 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     }
   },
 
-  discardHeld: (id) => set((state) => {
-    const conversationName = Object.keys(state.byConversation).find((name) =>
-      state.byConversation[name]!.optimistic.some((message) => message.id === id && message.deliveryState === 'held'));
-    if (!conversationName) return state;
-    return {
+  settleCancelled: (conversationName, clientMessageId) => {
+    const bubble = get().byConversation[conversationName]?.optimistic
+      .find((message) => message.clientMessageId === clientMessageId);
+    if (!bubble) return;
+    set((state) => ({
       byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
         ...s,
-        optimistic: s.optimistic.filter((message) => message.id !== id),
+        optimistic: s.optimistic.filter((message) => message.id !== bubble.id),
       })),
+    }));
+    const target = restoreTargets.get(conversationName);
+    if (target?.isEmpty()) {
+      target.setText(bubble.text);
+      return;
+    }
+    set((state) => ({
+      byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
+        ...s,
+        failed: [...s.failed, cancelledEntry({
+          text: bubble.text,
+          createdAt: bubble.createdAt ?? new Date().toISOString(),
+          clientMessageId,
+          echoBaselineIds: bubble.echoBaselineIds,
+        })],
+      })),
+    }));
+  },
+
+  cancelSend: async (messageId) => {
+    const find = () => {
+      const byConversation = get().byConversation;
+      for (const name of Object.keys(byConversation)) {
+        const message = byConversation[name]!.optimistic.find((candidate) => candidate.id === messageId);
+        if (message) return { name, message };
+      }
+      return null;
     };
-  }),
+    const found = find();
+    if (!found) return;
+    const { name, message } = found;
+    const id = message.clientMessageId;
+    const held = message.deliveryState === 'held';
+    if (message.acknowledged || !id || (!held && !message.sendPhase)) return;
+    if (held || message.sendPhase !== 'in-flight') {
+      // Never POSTed (queued), or the server refused to paste (held): cancel locally.
+      cancelledSendIds.add(id);
+      get().settleCancelled(name, id);
+      return;
+    }
+    if (message.sendRoute === 'agent' || message.cancelState === 'cancelling') return;
+    const setCancelState = (cancelState: ChatMessage['cancelState']) => set((state) => ({
+      byConversation: mutateSlice(state.byConversation, name, (s) => ({
+        ...s,
+        optimistic: s.optimistic.map((candidate) => candidate.id === messageId ? { ...candidate, cancelState } : candidate),
+      })),
+    }));
+    setCancelState('cancelling');
+    let outcome: 'cancelled' | 'delivered' | 'unknown';
+    try {
+      outcome = await requestConversationMessageCancel(name, id);
+    } catch {
+      outcome = 'unknown';
+    }
+    // The POST may have settled meanwhile (409 cancelled, success, failure): nothing left to do.
+    const current = find()?.message;
+    if (!current || current.clientMessageId !== id) return;
+    if (outcome === 'cancelled') {
+      // D3: the POST stays open; runCancellableSend consumes this id when it answers.
+      cancelledSendIds.add(id);
+      get().settleCancelled(name, id);
+    } else {
+      setCancelState(outcome === 'delivered' ? 'too-late' : 'unconfirmed');
+    }
+  },
+
+  cancelHeldOffline: (failedId) => {
+    const byConversation = get().byConversation;
+    const name = Object.keys(byConversation).find((candidate) =>
+      byConversation[candidate]!.failed.some((failed) => failed.id === failedId && failed.heldOffline));
+    if (!name) return;
+    const entry = byConversation[name]!.failed.find((failed) => failed.id === failedId)!;
+    const target = restoreTargets.get(name);
+    if (target?.isEmpty()) {
+      target.setText(entry.text);
+      get().removeFailed(name, failedId);
+      return;
+    }
+    set((state) => ({
+      byConversation: mutateSlice(state.byConversation, name, (s) => ({
+        ...s,
+        failed: s.failed.map((failed) => failed.id === failedId ? cancelledEntry(entry) : failed),
+      })),
+    }));
+  },
 
   failSend: (conversationName, text, kind = 'prompt', details) =>
     set((state) => ({
@@ -699,14 +883,25 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
       // Preserve the ordinary prompt path byte-for-byte: move the text onto a
       // recoverable optimistic surface before clearing the outbox and POSTing.
       addOptimistic(conversationName, text, serverBaseCount, isFreshIdentity || neverSent
-        ? { clientMessageId, echoBaselineIds: failed.echoBaselineIds ?? serverMessageIds }
-        : { clientMessageId, echoBaselineIds: failed.echoBaselineIds ?? serverMessageIds, createdAt: failed.createdAt });
+        ? { clientMessageId, echoBaselineIds: failed.echoBaselineIds ?? serverMessageIds, sendPhase: 'queued' }
+        : { clientMessageId, echoBaselineIds: failed.echoBaselineIds ?? serverMessageIds, createdAt: failed.createdAt, sendPhase: 'queued' });
     }
     removeFailed(conversationName, failedId);
     try {
+      const send = () => sendConversationMessage(conversationName, text, agentId, failed.deliverAs, undefined,
+        isFreshIdentity || neverSent ? { clientMessageId } : { clientMessageId, retry: true });
       // PAN-5184: a retry waits behind in-flight composer sends of this conversation.
-      const result = await enqueueConversationSend(conversationName, () => sendConversationMessage(conversationName, text, agentId, failed.deliverAs, undefined,
-        isFreshIdentity || neverSent ? { clientMessageId } : { clientMessageId, retry: true }));
+      // PAN-5237: a prompt retry is cancellable like a composer send.
+      let result: ComposerCommandResult | null;
+      if (kind === 'prompt') {
+        const sent = await enqueueConversationSend(conversationName, () =>
+          runCancellableSend(conversationName, clientMessageId, agentId ? 'agent' : 'conversation', send,
+            isFreshIdentity || neverSent));
+        if (sent.cancelled) return null;
+        result = sent.result;
+      } else {
+        result = await enqueueConversationSend(conversationName, send);
+      }
       if (kind === 'prompt') get().acknowledgeOptimistic(conversationName, text, clientMessageId);
       if (kind === 'command' && result && result.kind !== 'ui') {
         addCommandResult(conversationName, text, result);
@@ -767,6 +962,8 @@ export function resetComposerStore(): void {
   activeUploads = 0;
   removedAttachmentIds.clear();
   releasingConversations.clear();
+  cancelledSendIds.clear();
+  restoreTargets.clear();
   resetConversationSendQueues();
   useComposerStore.setState({ byConversation: {} });
 }

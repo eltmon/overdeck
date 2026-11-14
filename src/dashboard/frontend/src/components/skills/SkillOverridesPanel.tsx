@@ -3,15 +3,17 @@
  *
  * - global (Skills page): a two-state switch per skill. Off stores an
  *   override; on clears it, because on is the default.
- * - project / issue: Inherit | On | Off. Inherit shows the value it inherits.
+ * - project / issue: one switch showing the effective state, the source
+ *   beside it, and Pin (store the inherited value) or Reset (clear the
+ *   stored value). Skills changed at this level are listed first (PAN-5245).
  *
  * The operator-approved UI decisions on the issue shape the details: core
  * skills collapse to one summary row below global, project-only skills are
- * tagged, the issue view opens filtered to what matters, the global page
- * names the projects and issues that override a skill, and a failed save
- * shows an inline error with Retry on its own row.
+ * tagged, every level opens on All, the global page names the projects and
+ * issues that override a skill, and a failed save shows an inline error
+ * with Retry on its own row.
  *
- * Skill packs (PAN-4334) render above the skill list in SkillPacksSection
+ * Skill packs (PAN-4334) render below the skill list in SkillPacksSection
  * when the response carries `packs`.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -19,7 +21,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Lock, Search, X } from 'lucide-react';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { cn } from '../../lib/utils';
-import { GroupHeader, LevelChoice, RowError, SkillSwitch } from './SkillControls';
+import { GroupHeader, LevelSwitch, RowError, SkillSwitch } from './SkillControls';
 import { SkillPacksSection, type PackState } from './SkillPacksSection';
 
 export type SkillOverrideLevel = 'global' | 'project' | 'issue';
@@ -72,12 +74,12 @@ interface SaveResult {
 export const SKILL_OVERRIDES_QUERY_KEY = ['skill-overrides'] as const;
 const ENDPOINT = '/api/skills/overrides';
 
-type Filter = 'all' | 'off' | 'core' | 'below' | 'here' | 'relevant';
+type Filter = 'all' | 'off' | 'core' | 'below' | 'here';
 
 const FILTERS: Record<SkillOverrideLevel, Array<[Filter, string]>> = {
   global: [['all', 'All'], ['off', 'Off'], ['core', 'Core'], ['below', 'Overridden below']],
-  project: [['all', 'All'], ['here', 'Overridden here'], ['off', 'Off at launch']],
-  issue: [['relevant', 'Overridden here or off'], ['all', 'All']],
+  project: [['all', 'All'], ['here', 'Changed here'], ['off', 'Off at launch']],
+  issue: [['all', 'All'], ['here', 'Changed here'], ['off', 'Off']],
 };
 
 export interface SkillOverridesPanelProps {
@@ -136,6 +138,7 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
   const [rowErrors, setRowErrors] = useState<Record<string, { message: string; enabled: boolean | null }>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const [changed, setChanged] = useState(false);
+  const [resettingAll, setResettingAll] = useState(false);
   const packsRef = useRef<HTMLElement>(null);
 
   const query = useQuery({
@@ -145,7 +148,8 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
     retry: false,
   });
 
-  const save = async (skill: string, value: boolean | null) => {
+  /** Resolves true when the write succeeded. `refresh: false` leaves the reload to the caller. */
+  const save = async (skill: string, value: boolean | null, refresh = true): Promise<boolean> => {
     setSaving(prev => ({ ...prev, [skill]: true }));
     setRowErrors(({ [skill]: _cleared, ...rest }) => rest);
     try {
@@ -159,9 +163,11 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
       if (!res.ok) throw new Error(result.error ?? `HTTP ${res.status}`);
       setNotice(result.committed && result.pushed === false ? `Saved locally; push pending: ${result.reason ?? 'unknown reason'}` : null);
       setChanged(true);
-      await queryClient.invalidateQueries({ queryKey: SKILL_OVERRIDES_QUERY_KEY });
+      if (refresh) await queryClient.invalidateQueries({ queryKey: SKILL_OVERRIDES_QUERY_KEY });
+      return true;
     } catch (error) {
       setRowErrors(prev => ({ ...prev, [skill]: { message: error instanceof Error ? error.message : String(error), enabled: value } }));
+      return false;
     } finally {
       setSaving(({ [skill]: _done, ...rest }) => rest);
     }
@@ -176,7 +182,6 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
     core: skills.filter(skill => skill.core).length,
     below: skills.filter(skill => !skill.core && belowNote(below[skill.name])).length,
     here: skills.filter(skill => !skill.core && levelValue(skill, level) !== null).length,
-    relevant: skills.filter(skill => !skill.core && (levelValue(skill, level) !== null || !skill.enabled)).length,
   }), [skills, below, level]);
 
   // Decision #6: an issue no registered project owns has no skills section.
@@ -196,7 +201,6 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
       case 'core': return skill.core;
       case 'below': return !skill.core && belowNote(below[skill.name]) !== null;
       case 'here': return !skill.core && levelValue(skill, level) !== null;
-      case 'relevant': return !skill.core && (levelValue(skill, level) !== null || !skill.enabled);
       default: return true;
     }
   });
@@ -208,6 +212,22 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
   const resetGroups = () => setOpenGroups({});
   const packs = data?.packs;
   const packsOn = packs?.filter(pack => pack.enabled).length ?? 0;
+  // PAN-5245: skills with a stored value at this level, listed first below global.
+  const changedHere = level === 'global' ? [] : skills.filter(skill => !skill.core && levelValue(skill, level) !== null);
+  const showChanged = level !== 'global' && !narrowing;
+  const resetAll = async () => {
+    // A snapshot: the list reloads under the loop.
+    const names = changedHere.map(skill => skill.name);
+    setResettingAll(true);
+    try {
+      for (const name of names) {
+        if (!(await save(name, null, false))) break;
+      }
+    } finally {
+      await queryClient.invalidateQueries({ queryKey: SKILL_OVERRIDES_QUERY_KEY });
+      setResettingAll(false);
+    }
+  };
 
   return (
     <div className="space-y-4" data-testid={`skill-overrides-${level}`}>
@@ -217,6 +237,12 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
             <span className="dot-metadata"><span className="text-foreground">{counts.all - counts.off}</span> on</span>
             <span aria-hidden>·</span>
             <span className="dot-metadata"><span className={cn(counts.off > 0 && 'text-foreground')}>{counts.off}</span> off</span>
+            {level !== 'global' && (
+              <>
+                <span aria-hidden>·</span>
+                <span className="dot-metadata"><span className={cn(counts.here > 0 && 'text-foreground')}>{counts.here}</span> changed here</span>
+              </>
+            )}
             <span aria-hidden>·</span>
             <span className="dot-metadata">{counts.core} core</span>
             {packs && packs.length > 0 && (
@@ -248,7 +274,10 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
       )}
       {notice && <p className="text-sm text-muted-foreground" role="status">{notice}</p>}
       {changed && liveAgents.length > 0 && (
-        <p className="text-sm text-muted-foreground" data-testid="skills-changed-since-launch">
+        <p
+          className="rounded-md border px-3 py-2 text-sm badge-bg-warning badge-border-warning text-warning-foreground"
+          data-testid="skills-changed-since-launch"
+        >
           Skills changed since launch; applies next launch ({liveAgents.join(', ')} running).
         </p>
       )}
@@ -293,6 +322,55 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
             </div>
           </div>
 
+          {showChanged && (
+            <section
+              data-skill-group="changed"
+              aria-label={`Changed for this ${level}`}
+              className="overflow-hidden rounded-lg border border-border bg-card"
+            >
+              <div className="list-group-bar px-3 py-2">
+                <div className="flex min-h-7 items-center gap-3">
+                  <h3 className="text-[13px] font-medium text-foreground">Changed for this {level}</h3>
+                  <span className="ml-auto flex shrink-0 items-center gap-3">
+                    <span className="font-mono-ui text-xs tabular-nums text-muted-foreground" data-testid="skills-changed-count">{changedHere.length}</span>
+                    {changedHere.length > 0 && (
+                      <button
+                        type="button"
+                        disabled={resettingAll || Object.keys(saving).length > 0}
+                        onClick={() => void resetAll()}
+                        title={`Return ${changedHere.length === 1 ? 'this skill' : `these ${changedHere.length} skills`} to what this ${level} inherits`}
+                        className="rounded px-1.5 py-0.5 text-xs text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Reset all
+                      </button>
+                    )}
+                  </span>
+                </div>
+              </div>
+              {changedHere.length === 0 ? (
+                <p className="border-t border-border px-3 py-3 text-sm text-muted-foreground">
+                  {level === 'issue'
+                    ? "Nothing is changed. This issue's agents launch with the project's skills."
+                    : "Nothing is changed. This project's agents launch with the global skills."}
+                </p>
+              ) : (
+                <div className="divide-y divide-border border-t border-border">
+                  {changedHere.map(skill => (
+                    <SkillRow
+                      key={skill.name}
+                      skill={skill}
+                      level={level}
+                      below={null}
+                      saving={saving[skill.name] === true || resettingAll}
+                      error={rowErrors[skill.name]}
+                      onSave={value => void save(skill.name, value)}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
           <div className="overflow-hidden rounded-lg border border-border bg-card">
             {groups.length === 0 && (
               <div className="px-3 py-6 text-center text-sm text-muted-foreground">
@@ -326,7 +404,7 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
                           skill={skill}
                           level={level}
                           below={level === 'global' ? belowNote(below[skill.name]) : null}
-                          saving={saving[skill.name] === true}
+                          saving={saving[skill.name] === true || resettingAll}
                           error={rowErrors[skill.name]}
                           onSave={value => void save(skill.name, value)}
                         />
@@ -385,9 +463,7 @@ function SkillRow({ skill, level, below, saving, error, onSave }: SkillRowProps)
     <div
       className={cn(
         'list-row grid items-start gap-x-4 gap-y-1 px-3 py-2',
-        level === 'global'
-          ? 'grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(11rem,15rem)_minmax(0,1fr)_auto]'
-          : 'grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(11rem,15rem)_minmax(0,1fr)_auto_4.5rem]',
+        'grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(11rem,15rem)_minmax(0,1fr)_auto]',
       )}
       data-skill={skill.name}
     >
@@ -412,22 +488,9 @@ function SkillRow({ skill, level, below, saving, error, onSave }: SkillRowProps)
             onToggle={() => onSave(skill.global === false ? null : false)}
           />
         ) : (
-          <LevelChoice
-            label={`${skill.name} at ${level} level`}
-            current={current}
-            inheritLabel={`Inherit (${inherit.on ? 'on' : 'off'} via ${inherit.from})`}
-            saving={saving}
-            onSet={onSave}
-          />
+          <LevelSwitch skill={skill.name} level={level} current={current} inherited={inherit} saving={saving} onSet={onSave} />
         )}
       </div>
-
-      {level !== 'global' && (
-        <div className="hidden text-right font-mono-ui text-xs leading-5 md:block">
-          <span className={skill.enabled ? 'text-foreground' : 'text-muted-foreground'}>{skill.enabled ? 'on' : 'off'}</span>
-          <span className="block text-muted-foreground">{skill.source}</span>
-        </div>
-      )}
     </div>
   );
 }

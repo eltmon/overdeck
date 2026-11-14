@@ -38,7 +38,7 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
     expect(rows[0]).toHaveTextContent('waive PAN-5095 test removal');
     expect(rows[1]).toHaveTextContent('PR #7 merge');
     expect(rows[2]).toHaveTextContent('upload AAB');
-    expect(screen.getAllByTestId('flywheel-needs-you-jump')).toHaveLength(3);
+    expect(screen.queryAllByTestId('flywheel-needs-you-jump')).toHaveLength(0);
     for (const row of rows) {
       expect(row).not.toHaveAttribute('role');
       expect(row).not.toHaveAttribute('tabindex');
@@ -80,19 +80,40 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
     expect(onNeedsYouClick).toHaveBeenCalledWith('m2');
   });
 
-  it('jumps to the tick\'s messageId without needsYouItems (PAN-5198)', () => {
+  it('renders no jump button when the item has no first-raised id (PAN-5239)', () => {
     const onNeedsYouClick = vi.fn();
     const status = flywheelStatus({
       lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'PR #7 merge', at: '2026-09-23T09:59:50.000Z', messageId: 'm9' },
     });
     render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
+    expect(screen.queryByTestId('flywheel-needs-you-jump')).toBeNull();
+  });
+
+  it('renders exactly one jump button, on the row with a first-raised id (PAN-5239)', () => {
+    const onNeedsYouClick = vi.fn();
+    const status = flywheelStatus({
+      lastTick: {
+        tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'PR #7 merge; upload AAB', at: '2026-09-23T09:59:50.000Z', messageId: 'm9',
+        needsYouItems: [
+          { text: 'PR #7 merge', firstRaisedTick: 2, firstRaisedAt: '2026-09-23T09:30:00.000Z', firstRaisedMessageId: 'm2' },
+          { text: 'upload AAB', firstRaisedTick: 3, firstRaisedAt: '2026-09-23T09:40:00.000Z' },
+        ],
+      },
+    });
+    render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
+    const rows = screen.getAllByTestId('flywheel-needs-you-item');
+    expect(rows[0]!.querySelector('[data-testid="flywheel-needs-you-jump"]')).not.toBeNull();
+    expect(rows[1]!.querySelector('[data-testid="flywheel-needs-you-jump"]')).toBeNull();
     fireEvent.click(screen.getByTestId('flywheel-needs-you-jump'));
-    expect(onNeedsYouClick).toHaveBeenCalledWith('m9');
+    expect(onNeedsYouClick).toHaveBeenCalledWith('m2');
   });
 
   it('the jump button renders and does not throw without onNeedsYouClick (PAN-5217)', () => {
     const status = flywheelStatus({
-      lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the PAN-3920 scope', at: '2026-09-23T09:59:50.000Z' },
+      lastTick: {
+        tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the PAN-3920 scope', at: '2026-09-23T09:59:50.000Z',
+        needsYouItems: [{ text: 'decide the PAN-3920 scope', firstRaisedTick: 2, firstRaisedAt: '2026-09-23T09:30:00.000Z', firstRaisedMessageId: 'm2' }],
+      },
     });
     render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} />);
     expect(screen.getByTestId('flywheel-needs-you-jump')).toBeInTheDocument();
@@ -110,6 +131,70 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
     for (const button of screen.getAllByRole('button')) {
       expect(button.querySelector('button, a, [role="button"], [role="link"]')).toBeNull();
     }
+  });
+
+  describe('Needs-you targets and link styling (PAN-5239)', () => {
+    it('renders one link for an item with a target, and plain text for an item without one (ac1)', () => {
+      const status = flywheelStatus({
+        lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'upload AAB <https://play.google.com/console/x>; store fields', at: '2026-09-23T09:59:50.000Z' },
+      });
+      render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} />);
+      const rows = screen.getAllByTestId('flywheel-needs-you-item');
+      const link = screen.getByTestId('flywheel-needs-you-link');
+      expect(rows[0]).toContainElement(link);
+      expect(link).toHaveAttribute('href', 'https://play.google.com/console/x');
+      expect(link).toHaveTextContent('upload AAB');
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(rows[1]).toHaveTextContent('store fields');
+      expect(rows[1]!.querySelector('a')).toBeNull();
+    });
+
+    it('renders no anchor for a non-http(s) scheme in angle brackets (ac2)', () => {
+      const status = flywheelStatus({
+        lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'run it <javascript:alert(1)>', at: '2026-09-23T09:59:50.000Z' },
+      });
+      render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} />);
+      const row = screen.getByTestId('flywheel-needs-you-item');
+      expect(row).toHaveTextContent('run it <javascript:alert(1)>');
+      expect(screen.queryByTestId('flywheel-needs-you-link')).toBeNull();
+    });
+
+    it('links a qualified PR ref with its "PR " prefix in the link text (ac3)', () => {
+      const status = flywheelStatus({
+        lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'PR eltmon/overdeck-landing#7 merge', at: '2026-09-23T09:59:50.000Z' },
+      });
+      render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} />);
+      const link = screen.getByTestId('flywheel-needs-you-pr');
+      expect(link).toHaveAttribute('href', 'https://github.com/eltmon/overdeck-landing/pull/7');
+      expect(link).toHaveTextContent('PR eltmon/overdeck-landing#7');
+    });
+
+    it('gives issue, PR and item-target links the same link styling (ac4)', () => {
+      const status = flywheelStatus({
+        lastTick: {
+          tick: 4, pick: null, phase: 'park', inFlight: [],
+          needsYou: 'waive PAN-5095 test removal; eltmon/overdeck-landing#7 merge; upload AAB <https://a.test>',
+          at: '2026-09-23T09:59:50.000Z',
+        },
+      });
+      render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} />);
+      for (const testId of ['flywheel-needs-you-issue', 'flywheel-needs-you-pr', 'flywheel-needs-you-link']) {
+        const el = screen.getByTestId(testId);
+        expect(el.className).toContain('underline');
+        expect(el.className).toContain('cursor-pointer');
+        expect(el.className).toContain('focus-visible:ring-2');
+      }
+    });
+
+    it('does not segment a targeted item: one link, no issue button, nothing nested inside it (ac5)', () => {
+      const status = flywheelStatus({
+        lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'waive PAN-5095 <https://a.test>', at: '2026-09-23T09:59:50.000Z' },
+      });
+      render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} />);
+      expect(screen.getAllByTestId('flywheel-needs-you-link')).toHaveLength(1);
+      expect(screen.queryByTestId('flywheel-needs-you-issue')).toBeNull();
+      expect(screen.getByTestId('flywheel-needs-you-link').querySelector('a, button')).toBeNull();
+    });
   });
 
   it('renders in-flight rows with state, attention, PR, and last journal; issue ids navigate', () => {

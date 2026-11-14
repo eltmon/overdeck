@@ -222,6 +222,12 @@ export function getLastGoodMembershipSnapshot(projectPath: string): PipelineMemb
   return snapshot?.refreshedAt ? snapshot.value : null;
 }
 
+/** PAN-5224: how old the project's last successful membership snapshot is, or `null` when none exists. */
+export function membershipSnapshotAgeMs(projectPath: string, now = Date.now()): number | null {
+  const refreshedAt = membershipSnapshots.get(projectPath)?.refreshedAt;
+  return refreshedAt ? now - refreshedAt : null;
+}
+
 export function summarizePipelineMembership(membership: PipelineMembership): IssuePipelineMembership {
   return {
     available: true,
