@@ -7,6 +7,7 @@ import {
   getPipelineMembershipResultsForProjects,
   getPipelineMembershipSnapshotsForProjects,
   getPipelineMembershipSnapshotsForResourceDiscovery,
+  membershipSnapshotAgeMs,
   readPipelineMembershipSnapshotsForProjects,
   PIPELINE_MEMBERSHIP_TTL_MS,
   PIPELINE_MEMBERSHIP_SNAPSHOT_TTL_MS,
@@ -327,6 +328,20 @@ describe('pipeline membership service', () => {
     getMembership.mockRejectedValueOnce(new Error('Linear 503'));
     await refreshMembershipSnapshotsForProjects([project], getMembership);
     expect(getLastGoodMembershipSnapshot(project.path)).toEqual(memberships);
+  });
+
+  it('PAN-5224 (review A6): membershipSnapshotAgeMs is null when cold, else now minus the last successful refresh', async () => {
+    expect(membershipSnapshotAgeMs('/never-gathered')).toBeNull();
+
+    const project = { name: 'age-check', path: '/age-check', github_repo: 'owner/age-check', issue_prefix: 'PAN' };
+    const getMembership = Object.assign(vi.fn().mockResolvedValue([]), { invalidate: vi.fn() });
+
+    let now = 1_000_000;
+    await refreshMembershipSnapshotsForProjects([project], getMembership, () => now);
+
+    expect(membershipSnapshotAgeMs(project.path, now)).toBe(0);
+    now += 90_000;
+    expect(membershipSnapshotAgeMs(project.path, now)).toBe(90_000);
   });
 
   it.each([

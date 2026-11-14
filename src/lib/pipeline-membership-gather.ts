@@ -16,6 +16,7 @@ import { Effect } from 'effect';
 import type { ForgeType } from './forge.js';
 import { createAppFallbackIssueListers } from './pipeline-membership-app-fallback.js';
 import { createSettledTtlPromiseCache, withConcurrencyLimit } from './concurrency.js';
+import { prListingActiveTtlMs } from './overdeck/pr-freshness.js';
 import { listOpenGitLabMergeRequests, listGitLabMergedMergeRequestHeads, type GitLabMergeRequestRow } from './gitlab-merge-requests.js';
 import { runGitHubGraphql } from './github-graphql-run.js';
 import { withGitHubCaller } from './github-quota/caller-context.js';
@@ -68,7 +69,17 @@ interface GitHubPullRequestRow {
 }
 
 const OPEN_PR_CACHE_TTL_MS = 30_000;
-const cachedOpenPullRequests = createSettledTtlPromiseCache<string, PullRequestRow[]>(OPEN_PR_CACHE_TTL_MS);
+// PAN-5224: 5 minutes while webhooks are healthy; a webhook invalidates it.
+const cachedOpenPullRequests = createSettledTtlPromiseCache<string, PullRequestRow[]>(
+  OPEN_PR_CACHE_TTL_MS,
+  undefined,
+  () => prListingActiveTtlMs(),
+);
+
+/** Drop one repo's open-PR snapshot, even mid-read (PAN-5224 webhook path). */
+export function invalidateOpenPullRequestsSnapshot(owner: string, repo: string): void {
+  cachedOpenPullRequests.invalidate(`${owner}/${repo}`.toLowerCase(), { includeInFlight: true });
+}
 
 /** Share one short-lived repository PR snapshot across dashboard consumers. */
 export function listOpenPullRequestsSnapshot(owner: string, repo: string): Promise<PullRequestRow[]> {

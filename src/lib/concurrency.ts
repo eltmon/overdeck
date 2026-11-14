@@ -44,8 +44,14 @@ interface SettledTtlEntry<T> {
 
 export interface SettledTtlPromiseCache<K, V> {
   (key: K, load: () => Promise<V>): Promise<V>;
-  /** Drop one key's settled value (or every key when omitted) so the next read reloads. In-flight loads are untouched. */
-  invalidate(key?: K): void;
+  /**
+   * Drop one key's settled value (or every key when omitted) so the next read reloads.
+   * In-flight loads are untouched unless `includeInFlight` is set, in which case the
+   * entry is dropped even while its load is pending — the next `get` starts a fresh
+   * load, while the in-flight promise still resolves to its own value for callers
+   * already awaiting it.
+   */
+  invalidate(key?: K, options?: { includeInFlight?: boolean }): void;
 }
 
 /**
@@ -76,14 +82,14 @@ export function createSettledTtlPromiseCache<K, V>(
     );
     return entry.promise;
   };
-  get.invalidate = (key?: K): void => {
+  get.invalidate = (key?: K, options: { includeInFlight?: boolean } = {}): void => {
     if (key === undefined) {
       for (const [k, entry] of entries) {
-        if (entry.settledAt !== null) entries.delete(k);
+        if (options.includeInFlight || entry.settledAt !== null) entries.delete(k);
       }
       return;
     }
-    if (entries.get(key)?.settledAt !== null) entries.delete(key);
+    if (options.includeInFlight || entries.get(key)?.settledAt !== null) entries.delete(key);
   };
   return get;
 }
