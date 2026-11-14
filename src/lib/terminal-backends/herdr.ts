@@ -604,18 +604,12 @@ export class HerdrBackend implements TerminalBackend {
         keys: ['enter'],
       });
 
-      // Detection is what makes the pane addressable: only a detected agent can
-      // be renamed, and every caller addresses the pane by the Overdeck agent
-      // id. A timeout therefore has to be a LAUNCH FAILURE — returning the
-      // intended name for a pane that never took it hands the caller a
-      // reference no prompt, wait or close can reach.
+      // Detection makes the pane addressable (only a detected agent can be renamed), so a
+      // timeout is a LAUNCH FAILURE: the intended name on a pane that never took it is unreachable.
       if (!await this.waitForAgentDetection(pane.pane_id)) {
-        // Diagnose BEFORE closing: the pane is the only witness. Herdr's
-        // detector keys on the pane's FOREGROUND PROCESS, so the process line
-        // is what names the cause outright — a wrapper (`node
-        // pty-supervisor.js claude …`, PAN-3917 W12) hides the harness behind
-        // its own pty and can never be detected, while a launcher that died
-        // early leaves its error in the pane text.
+        // Diagnose BEFORE closing: the pane is the only witness. Herdr detects by FOREGROUND
+        // PROCESS, so a wrapper (`node pty-supervisor.js claude …`, PAN-3917 W12) can never be
+        // detected, while a launcher that died early leaves its error in the pane text.
         const diagnosis = await this.diagnoseDetectionFailure(pane.pane_id);
         await this.api.call('pane.close', { pane_id: pane.pane_id }).catch(() => {});
         throw new Error(
@@ -623,11 +617,16 @@ export class HerdrBackend implements TerminalBackend {
           + `the pane could not be bound to ${agentName} and was closed.${diagnosis}`,
         );
       }
-      // Bind the Overdeck agent id as the live agent name so `agent.prompt`
-      // and `agent.wait` address it the way every caller already names it.
-      await this.api.call('agent.rename', { target: pane.pane_id, name: agentName });
-
-      await this.stampPaneIdentity(pane.pane_id, agentName, spec.tokens);
+      // Bind the Overdeck agent id as the live agent name so `agent.prompt` and `agent.wait`
+      // address it the way every caller names it. A failed bind closes THIS pane only: the
+      // name may belong to another live agent (`agent_name_taken`, PAN-5243).
+      try {
+        await this.api.call('agent.rename', { target: pane.pane_id, name: agentName });
+        await this.stampPaneIdentity(pane.pane_id, agentName, spec.tokens);
+      } catch (error) {
+        await this.api.call('pane.close', { pane_id: pane.pane_id }).catch(() => {});
+        throw error;
+      }
 
       return {
         backend: BACKEND,

@@ -767,6 +767,33 @@ Spawn guards are backend-aware too: "is this agent already running" is `agentPan
 tmux session or a live Herdr agent of that name, and the tmux-only session options
 (`destroy-unattached`, `remain-on-exit`) are applied only when the pane really is a tmux session.
 
+### One start per agent at a time (PAN-5243)
+
+`agentPaneExists` cannot see a launch that is still in progress: a Herdr pane takes its agent name
+(`agent.rename`) and its `agentId` token only at the end of `startAgent`, after the harness is
+detected. Two starts inside that window both passed the guard, and the loser's failure cleanup then
+stopped the agent by name and closed the winner's pane. Three rules close this:
+
+- **A shared start claim.** `spawnAgent` takes `<agent dir>/start.claim` (`src/lib/agents/start-claim.ts`)
+  before it checks for a pane or writes anything into the agent dir. The file is created with
+  O_EXCL and records the claiming pid, the time and a per-attempt token. Every start takes it: a CLI
+  `pan start`, and the dashboard route's `pan start --local` child. A second start that finds a live
+  claim throws `AgentAlreadyRunningError` at once, without waiting. A claim whose pid is dead, or that
+  is older than 30 minutes, is reclaimed. The claim is released once the pane is named, because from
+  then on `agentPaneExists` sees the pane. The dashboard's in-memory `claimAgentStart` set still
+  answers its own concurrent requests with `AGENT_START_IN_FLIGHT`.
+- **Cleanup owns only its own pane.** A failed launch stops the agent by name only when this attempt's
+  pane already holds the name. When `HerdrBackend.startAgent` fails to rename or stamp its new pane,
+  it closes that pane itself, as it already did after a detection timeout. A name collision
+  (`agent_name_taken` on Herdr, `duplicate session` on tmux) reaches `spawnAgent` as
+  `AgentNameTakenError`, which becomes `AgentAlreadyRunningError`. Nothing is stopped and no spawn
+  failure is recorded.
+- **"Already running" is a success for `pan start`.** `pan start` reports the live pane, how to message
+  it and how to attach, and exits 0. The dashboard's planning auto-handoff and the Flywheel therefore
+  read a lost race as "agent is live", never as `spawn-failed`.
+
+Resume, restart and crash recovery do not take the claim yet; they keep their own pane checks.
+
 ### Submit verification on Claude Code panes (PAN-4492)
 
 For a Herdr-detected agent whose `agent` is `claude` (and any steer), `prompt` does not call

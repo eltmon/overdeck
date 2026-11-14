@@ -35,6 +35,21 @@ export class TerminalBackendError extends Data.TaggedError('TerminalBackendError
 }> {}
 
 /**
+ * A launch could not take its agent name because another live pane already
+ * holds it: Herdr's `agent_name_taken` or tmux's duplicate session (PAN-5243).
+ * The pane that holds the name belongs to someone else, so a caller must not
+ * stop or close anything by that name.
+ */
+export class AgentNameTakenError extends Error {
+  readonly agentName: string;
+  constructor(agentName: string, detail: string) {
+    super(`agent name ${agentName} is already taken by a live pane: ${detail}`);
+    this.name = 'AgentNameTakenError';
+    this.agentName = agentName;
+  }
+}
+
+/**
  * The selected backend cannot serve at all (PAN-3956 FR-3): Herdr is the
  * policy but its binary or this home's session socket is missing. A launch
  * throws this instead of silently falling back to tmux.

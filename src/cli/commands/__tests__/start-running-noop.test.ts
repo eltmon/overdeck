@@ -329,6 +329,38 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     expect(oraMocks.spinner.fail).toHaveBeenCalledWith(expect.stringContaining('use pan resume or pan reset-session'));
   });
 
+  // PAN-5243: a start that loses the race to another start (live pane or a held
+  // start claim) reports the winner and exits 0 — never spawn-failed, so the
+  // dashboard's planning auto-handoff and the Flywheel read "agent is live".
+  it('exits 0 and names the live pane when spawnAgent reports the agent already running', async () => {
+    agentMocks.getAgentState.mockReturnValue({ id: 'agent-pan-x', issueId: 'PAN-X', paneId: 'w1Y5:p3', backend: 'herdr' });
+    const { AgentAlreadyRunningError } = await import('../../../lib/agents/start-claim.js');
+    const { reportLostStartRace } = await import('../start.js');
+    const spinner = { info: vi.fn() };
+
+    const lost = await reportLostStartRace(
+      new AgentAlreadyRunningError('agent-pan-x', 'starting', 'pid 42 claimed the start at 2026-11-14T04:12:26.561Z'),
+      'PAN-X', 'agent-pan-x', spinner,
+    );
+
+    expect(lost).toBe(true);
+    expect(process.exitCode).toBe(0);
+    expect(spinner.info).toHaveBeenCalledWith(expect.stringContaining('already running'));
+    const written = allConsoleOutput(consoleLogSpy);
+    expect(written).toContain('w1Y5:p3');
+    expect(written).toMatch(/pan tell PAN-X/);
+    expect(agentMocks.stopAgent).not.toHaveBeenCalled();
+  });
+
+  it('leaves every other spawn failure to the normal exit-1 path', async () => {
+    const { reportLostStartRace } = await import('../start.js');
+    const spinner = { info: vi.fn() };
+
+    await expect(reportLostStartRace(new Error('herdr detected no agent'), 'PAN-X', 'agent-pan-x', spinner)).resolves.toBe(false);
+    expect(spinner.info).not.toHaveBeenCalled();
+    expect(process.exitCode).toBeUndefined();
+  });
+
   // PAN-3150: an inert-but-alive agent had no recovery door — the already-running
   // no-op swallowed --fresh, and --fresh itself refused a live session by telling
   // the caller to run `pan kill` first, which the flywheel role is forbidden.

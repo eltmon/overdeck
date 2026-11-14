@@ -265,6 +265,7 @@ afterEach(() => {
   vi.doUnmock('../provider-health.js');
   vi.doUnmock('../overdeck/control-settings.js');
   vi.doUnmock('../projects.js');
+  vi.doUnmock('../terminal-backends/launch.js');
   closeOverdeckDatabase();
   delete process.env.OVERDECK_HOME;
   delete process.env.OVERDECK_AGENT_STARTED_BY;
@@ -1221,5 +1222,128 @@ describe('Prime Agent work launch (PAN-3668 WI-12)', () => {
       prompt: 'Implement the next item.',
     })).rejects.toThrow('no credential for Prime provider "openai"');
     expect(createSessionMock).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * PAN-5243: a duplicate start must never stop or kill a live or starting
+ * agent. These drive the real spawnAgent against an in-memory Herdr: panes
+ * keyed by live agent name, and a `stopAgent` that closes by name the way the
+ * real one does — so a loser that stopped by name would visibly kill the winner.
+ */
+describe('spawnAgent duplicate start (PAN-5243)', () => {
+  let panes: Map<string, string>;
+  let launches: number;
+  let launchGate: Promise<void> | null;
+  let onLaunch: (() => void) | null;
+  let launchFailure: (() => Error) | null;
+
+  function mockHerdrLaunch(): void {
+    panes = new Map();
+    launches = 0;
+    launchGate = null;
+    onLaunch = null;
+    launchFailure = null;
+    stopAgentMock = vi.fn((agentId: string) => Effect.sync(() => { panes.delete(agentId); }));
+    vi.doMock('../terminal-backends/launch.js', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('../terminal-backends/launch.js')>();
+      const { AgentNameTakenError } = await import('../terminal-backends/types.js');
+      return {
+        ...actual,
+        resolveLaunchBackend: vi.fn(async () => ({ name: 'herdr' })),
+        agentPaneExists: vi.fn(async (agentId: string) => panes.has(agentId)),
+        closeBackendPane: vi.fn(async (pane: { agentName: string; paneId: string } | null) => {
+          if (pane && panes.get(pane.agentName) === pane.paneId) panes.delete(pane.agentName);
+        }),
+        launchAgentPane: vi.fn(async (request: { agentId: string }) => {
+          launches += 1;
+          const paneId = `w1Y5:p${launches + 3}`;
+          onLaunch?.();
+          if (launchGate) await launchGate;
+          if (launchFailure) throw launchFailure();
+          if (panes.has(request.agentId)) throw new AgentNameTakenError(request.agentId, 'agent_name_taken');
+          panes.set(request.agentId, paneId);
+          return { backend: 'herdr', workspaceId: 'w1Y5', paneId, terminalId: `term_${paneId}`, agentName: request.agentId };
+        }),
+      };
+    });
+  }
+
+  const startOptions = () => ({ issueId: 'PAN-1405', workspace, role: 'work' as const, model: 'claude-sonnet-4-6' });
+
+  beforeEach(() => mockHerdrLaunch());
+
+  it('leaves a live Herdr pane running and its state intact', async () => {
+    const { spawnAgent, saveAgentStateSync, getAgentState } = await import('../agents.js');
+    const { AgentAlreadyRunningError } = await import('../agents/start-claim.js');
+    panes.set('agent-pan-1405', 'w1Y5:p3');
+    saveAgentStateSync(baseState({ status: 'running', paneId: 'w1Y5:p3', sessionId: 'winner-session' }));
+
+    const error = await spawnAgent(startOptions()).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(AgentAlreadyRunningError);
+    expect((error as Error).message).toContain('already running');
+    expect(panes.get('agent-pan-1405')).toBe('w1Y5:p3');
+    expect(launches).toBe(0);
+    expect(stopAgentMock).not.toHaveBeenCalled();
+    expect(getAgentState('agent-pan-1405')).toMatchObject({ status: 'running', paneId: 'w1Y5:p3', sessionId: 'winner-session' });
+  });
+
+  it('ends a start racing the post-planning auto-start with exactly one agent', async () => {
+    const { spawnAgent, getAgentState } = await import('../agents.js');
+    const { AgentAlreadyRunningError, startClaimPath } = await import('../agents/start-claim.js');
+    let openGate!: () => void;
+    launchGate = new Promise<void>((resolve) => { openGate = resolve; });
+    const firstLaunching = new Promise<void>((resolve) => { onLaunch = resolve; });
+
+    const autoStart = spawnAgent(startOptions());
+    await firstLaunching; // the auto-start is mid-launch: pane opened, name not yet bound
+    const recoveryStart = await spawnAgent(startOptions()).catch((caught: unknown) => caught);
+    openGate();
+    const winner = await autoStart;
+
+    expect(recoveryStart).toBeInstanceOf(AgentAlreadyRunningError);
+    expect((recoveryStart as InstanceType<typeof AgentAlreadyRunningError>).phase).toBe('starting');
+    expect(launches).toBe(1);
+    expect([...panes.entries()]).toEqual([['agent-pan-1405', 'w1Y5:p4']]);
+    expect(stopAgentMock).not.toHaveBeenCalled();
+    expect(winner).toMatchObject({ status: 'running', paneId: 'w1Y5:p4' });
+    expect(getAgentState('agent-pan-1405')).toMatchObject({ status: 'running', paneId: 'w1Y5:p4', sessionId: winner.sessionId });
+    expect(existsSync(startClaimPath('agent-pan-1405'))).toBe(false);
+  });
+
+  it('reports a name taken by an unclaimed launch as already running without stopping it', async () => {
+    const { spawnAgent, getAgentState } = await import('../agents.js');
+    const { AgentAlreadyRunningError } = await import('../agents/start-claim.js');
+    onLaunch = () => panes.set('agent-pan-1405', 'w1Y5:p3'); // another launcher binds the name first
+
+    const error = await spawnAgent(startOptions()).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(AgentAlreadyRunningError);
+    expect(panes.get('agent-pan-1405')).toBe('w1Y5:p3');
+    expect(stopAgentMock).not.toHaveBeenCalled();
+    expect(getAgentState('agent-pan-1405')?.lastFailureReason).toBeUndefined();
+  });
+
+  it('still records a real launch failure and does not stop by name when no pane of its own exists', async () => {
+    const { spawnAgent, getAgentState } = await import('../agents.js');
+    launchFailure = () => new Error('herdr detected no agent in pane w1Y5:p4 within 60000ms');
+
+    await expect(spawnAgent(startOptions())).rejects.toThrow('herdr detected no agent');
+
+    expect(stopAgentMock).not.toHaveBeenCalled();
+    expect(getAgentState('agent-pan-1405')).toMatchObject({ status: 'stopped', lastFailureReason: expect.stringContaining('launch failed') });
+  });
+
+  it('reclaims a stale start claim left by a dead pid', async () => {
+    const { spawnSync } = await import('node:child_process');
+    const { spawnAgent } = await import('../agents.js');
+    const { startClaimPath } = await import('../agents/start-claim.js');
+    const deadPid = spawnSync(process.execPath, ['-e', '']).pid;
+    mkdirSync(join(tmpHome, 'agents', 'agent-pan-1405'), { recursive: true });
+    writeFileSync(startClaimPath('agent-pan-1405'), JSON.stringify({ pid: deadPid, claimedAt: new Date().toISOString(), token: 'crashed-start' }));
+
+    await expect(spawnAgent(startOptions())).resolves.toMatchObject({ status: 'running', paneId: 'w1Y5:p4' });
+    expect(existsSync(startClaimPath('agent-pan-1405'))).toBe(false);
   });
 });
