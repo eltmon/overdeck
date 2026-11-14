@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5281",
   "created": "2026-11-14T18:36:54.537Z",
-  "updated": "2026-11-14T19:04:04.764Z",
+  "updated": "2026-11-14T19:36:26.553Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,9 +54,26 @@
       "doneAt": "2026-11-14T19:03:56.223Z"
     },
     "attributed-commits-reader": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5281",
-      "claimedAt": "2026-11-14T19:04:04.764Z"
+      "claimedAt": "2026-11-14T19:04:04.764Z",
+      "doneAt": "2026-11-14T19:36:26.553Z"
+    },
+    "attributed-commits-reader.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:36:26.553Z"
+    },
+    "attributed-commits-reader.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:36:26.553Z"
+    },
+    "attributed-commits-reader.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:36:26.553Z"
+    },
+    "attributed-commits-reader.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:36:26.553Z"
     }
   }
 }
