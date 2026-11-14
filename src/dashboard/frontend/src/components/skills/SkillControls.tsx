@@ -127,7 +127,7 @@ export function LevelSwitch({ skill, level, current, inherited, saving, onSet }:
     <>
       <span
         data-skill-source
-        className={cn('hidden w-[9rem] shrink-0 truncate text-right font-mono-ui text-xs md:block', state.here ? 'text-foreground' : 'text-muted-foreground')}
+        className={cn('hidden w-[10rem] shrink-0 truncate text-right font-mono-ui text-xs md:block', state.here ? 'text-foreground' : 'text-muted-foreground')}
       >
         {state.source}
       </span>
