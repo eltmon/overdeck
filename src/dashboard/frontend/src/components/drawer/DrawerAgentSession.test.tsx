@@ -395,6 +395,23 @@ describe('DrawerAgentSession conversation-header layout', () => {
     expect(screen.queryByRole('button', { name: 'Start agent' })).toBeNull();
   });
 
+  it('the conversation header carries the AgentsLane and SessionPanel markers', () => {
+    render(
+      <DrawerAgentSession
+        view="conversation"
+        layout="conversation-header"
+        agents={[agent({ id: 'agent-pan-1', role: 'work' })]}
+        agentId="agent-pan-1"
+        onSelectAgent={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('drawer-agent-header')).toHaveAttribute('data-section', 'AgentsLane');
+    const panel = document.querySelector('[data-section="SessionPanel"]');
+    expect(panel).toHaveClass('contents');
+    expect(panel).toContainElement(screen.getByTestId('conversation-panel'));
+  });
+
   it('renders belowHeader between the meta row and the transcript', () => {
     render(
       <DrawerAgentSession

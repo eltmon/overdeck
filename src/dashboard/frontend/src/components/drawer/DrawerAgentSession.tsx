@@ -15,9 +15,11 @@
  *
  * Layouts: `toolbar` (default, the dock and page/rail density) shows the view
  * toggle, a `<select>` picker, the branch chip and the Tools button in one
- * row. `conversation-header` (PAN-5244, drawer density) shows a header row
- * (agent name with a menu of every agent, view toggle, Tools) and a meta row
- * (status, branch chip, model · harness, cost, agent id, start time).
+ * row. `conversation-header` (PAN-5244) is the per-agent conversation
+ * surface of both shells (the drawer and the Stage issue tab, PAN-5246): a
+ * header row (agent name with a menu of every agent, view toggle, Tools) and
+ * a meta row (status, branch chip, model · harness, cost, agent id, start
+ * time) above the transcript.
  */
 
 import { Fragment, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -322,7 +324,7 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, onCha
     );
     return (
       <div data-testid={testId} className="flex min-h-0 flex-1 flex-col">
-        <div data-testid="drawer-agent-header" className="relative flex shrink-0 items-center gap-[8px] px-[20px] pt-[9px]">
+        <div data-section="AgentsLane" data-testid="drawer-agent-header" className="relative flex shrink-0 items-center gap-[8px] px-[20px] pt-[9px]">
           {orderedAgents.length > 1 ? (
             <button
               ref={pickerRef}
@@ -380,8 +382,10 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, onCha
           </div>
         ) : null}
         {belowHeader}
-        <div className="min-h-0 flex-1 overflow-hidden">
-          {sessionBody}
+        <div data-section="SessionPanel" className="contents">
+          <div className="min-h-0 flex-1 overflow-hidden">
+            {sessionBody}
+          </div>
         </div>
       </div>
     );
