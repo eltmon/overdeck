@@ -9,6 +9,7 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { listSessionNames } from '../tmux.js';
 import { readSwarmSlotAssignments } from './deacon-swarm-record.js';
 import { isAlive, isConfirmedDead } from '../agents/liveness.js';
+import type { RuntimeName } from '../runtimes/types.js';
 
 export type IssueFeedbackTarget =
   | { agentId: string }
@@ -62,18 +63,26 @@ async function findLiveUnregisteredSlot(issueId: string): Promise<{ agentId: str
 }
 
 async function findLiveIssueConversation(issueId: string): Promise<string | null> {
-  let sessions: string[];
+  let candidates: Array<{ session: string; harness: RuntimeName }>;
   try {
     // Lazy: overdeck/conversations.js stays out of the cloister import graph
     // (the same reason messaging.ts imports it lazily).
     const { listIssueConversations } = await import('../overdeck/conversations.js');
-    sessions = listIssueConversations(issueId).map(c => c.tmuxSession || `conv-${c.name}`);
+    candidates = listIssueConversations(issueId).map(c => ({
+      session: c.tmuxSession || `conv-${c.name}`,
+      harness: c.harness ?? 'claude-code',
+    }));
   } catch (err) {
     console.warn(`[feedback-target] Could not list conversations for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   }
-  for (const session of new Set(sessions)) {
-    if ((await isAlive(session)).alive) return session;
+  const probed = new Set<string>();
+  for (const { session, harness } of candidates) {
+    if (probed.has(session)) continue;
+    probed.add(session);
+    // A conversation has no agent state, so the probe takes its harness from
+    // the conversation row (as messageAgent does, PAN-3879).
+    if ((await isAlive(session, { readHarness: () => harness })).alive) return session;
   }
   return null;
 }
@@ -118,19 +127,25 @@ export async function resolveIssueFeedbackTarget(
   if (fallback) return { agentId: fallback.agentId };
 
   const registeredAgents = readFeedbackAgentStates();
+  let hasWorkAgentState = false;
   if (registeredAgents) {
     for (const agent of registeredAgents) {
       if (agent.issueId.toUpperCase() !== normalizedIssue) continue;
       if (!isWorkFeedbackTarget(agent.role)) continue;
+      hasWorkAgentState = true;
       if (await isLiveSession(agent.id)) return { agentId: agent.id };
     }
   }
 
   // PAN-5271: a handoff conversation that owns an adopted PR has no work-agent
-  // state; its issue link is the conversation row. Only a confirmed-live one is
-  // a target, and it never joins the resurrection candidates below.
-  const conversation = await findLiveIssueConversation(normalizedIssue);
-  if (conversation) return { agentId: conversation };
+  // state; its issue link is the conversation row. The tier applies only when
+  // the issue has no work-agent state at all, so a stopped work agent is still
+  // resurrected below rather than bypassed. Only a confirmed-live conversation
+  // is a target, and it never joins the resurrection candidates.
+  if (registeredAgents && !hasWorkAgentState) {
+    const conversation = await findLiveIssueConversation(normalizedIssue);
+    if (conversation) return { agentId: conversation };
+  }
 
   // PAN-2209 + PAN-2461 — resurrection-first delivery (operator directive 2026-07-11):
   // feedback with no live target is NOT an operator problem until resurrection has been

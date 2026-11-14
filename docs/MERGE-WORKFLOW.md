@@ -225,9 +225,9 @@ bypasses it.
    the PR branch into one through
    [`src/lib/cloister/pr-adoption-review.ts`](../src/lib/cloister/pr-adoption-review.ts)
    and then starts the pipeline. Verification skips the plan checklist for an
-   adopted PR with no xBRIEF (PAN-4786); every other check still runs. Review,
-   verification and CodeRabbit feedback for an adopted PR go to the live
-   handoff conversation linked to the issue when no work agent is live
+   adopted PR with no xBRIEF (PAN-4786); every other check still runs. All
+   pipeline feedback for an adopted PR goes to the live handoff conversation
+   linked to the issue when the issue has no work-agent state
    (`resolveIssueFeedbackTarget`, PAN-5271). When
    adoption is refused (the branch is
    checked out in another worktree, the head moved, or the local branch

@@ -908,10 +908,12 @@ reads it (`lint:no-coderabbit-merge-gate`). When it does post a review, the
   like conflict repair. A delivery is journaled as `feedback.delivered` with
   kind `coderabbit`, and the same review is never delivered twice, also when
   GitHub sends its event twice at once.
-- An adopted PR has no work agent, so when no work agent or slot is live the
-  target is a live conversation whose row carries the issue (the `pan handoff`
-  conversation that pushed the PR; PAN-5271). A conversation is never resumed
-  or started to receive feedback. With no reachable target, or a delivery that
+- An adopted PR has no work agent. When the issue has no work-agent state at
+  all and no slot is live, the target is a live conversation whose row carries
+  the issue (the `pan handoff` conversation that pushed the PR; PAN-5271). This
+  applies to every feedback the resolver routes, not only CodeRabbit. An issue
+  with a stopped work agent still resurrects it, and a conversation is never
+  resumed or started to receive feedback. With no reachable target, or a delivery that
   is not accepted, the relay raises Needs-you with the feedback file and
   journals `feedback.undelivered`.
 - Both entries carry what a follow-up needs: `repo`, `prNumber`, `reviewId`,

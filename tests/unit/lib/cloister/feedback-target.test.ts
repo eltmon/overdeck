@@ -52,7 +52,7 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
 // default verdict mirrors the legacy mockSessionExists fixture so existing
 // cases keep their meaning; zombie cases override mockIsAlive directly.
 vi.mock('../../../../src/lib/agents/liveness.js', () => ({
-  isAlive: (agentId: string) => Promise.resolve(mockIsAlive(agentId)),
+  isAlive: (agentId: string, deps?: unknown) => Promise.resolve(mockIsAlive(agentId, deps)),
   // Mirrors the real isConfirmedDead: only a confirmed absence is death.
   isConfirmedDead: (verdict: { alive: boolean; reason?: string }) =>
     !verdict.alive && verdict.reason !== 'runtime-indeterminate',
@@ -229,6 +229,35 @@ describe('resolveIssueFeedbackTarget', () => {
         agentId: 'agent-pan-2214',
       });
       expect(mockListIssueConversations).not.toHaveBeenCalled();
+    });
+
+    it('resurrects a stopped work agent instead of diverting feedback to a live conversation', async () => {
+      const revive = vi.fn().mockResolvedValue(true);
+      mockListOverdeckAgentStatesSync.mockReturnValue([
+        { id: 'agent-pan-2214', issueId: 'PAN-2214', role: 'work' },
+      ]);
+      mockListIssueConversations.mockReturnValue([conversation]);
+      mockSessionExists.mockImplementation((agentId: string) => agentId === 'conv-20261114-6462');
+
+      await expect(resolveIssueFeedbackTarget('PAN-2214', {
+        revivePipelinePausedAgent: revive,
+      })).resolves.toEqual({ agentId: 'agent-pan-2214' });
+
+      expect(revive).toHaveBeenCalledWith('agent-pan-2214', 'PAN-2214');
+      expect(mockListIssueConversations).not.toHaveBeenCalled();
+    });
+
+    it('probes a conversation with the harness from its row', async () => {
+      mockListIssueConversations.mockReturnValue([{ ...conversation, harness: 'codex' }]);
+      mockIsAlive.mockImplementation((agentId: string, deps?: { readHarness?: (id: string) => string }) => (
+        agentId === 'conv-20261114-6462' && deps?.readHarness?.(agentId) === 'codex'
+          ? { alive: true, paneAlive: true }
+          : { alive: false, reason: 'runtime-missing' }
+      ));
+
+      await expect(resolveIssueFeedbackTarget('PAN-2214', {
+        revivePipelinePausedAgent: async () => false,
+      })).resolves.toEqual({ agentId: 'conv-20261114-6462' });
     });
 
     it('does not resurrect a stopped conversation', async () => {
