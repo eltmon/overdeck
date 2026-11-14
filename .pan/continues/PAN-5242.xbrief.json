@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5242",
   "created": "2026-11-14T05:32:10.178Z",
-  "updated": "2026-11-14T07:03:03.487Z",
+  "updated": "2026-11-14T07:23:58.013Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,9 +102,22 @@
       "doneAt": "2026-11-14T07:02:49.275Z"
     },
     "pair-relay-classification": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5242",
-      "claimedAt": "2026-11-14T07:03:03.487Z"
+      "claimedAt": "2026-11-14T07:03:03.487Z",
+      "doneAt": "2026-11-14T07:23:58.013Z"
+    },
+    "pair-relay-classification.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:23:58.013Z"
+    },
+    "pair-relay-classification.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:23:58.013Z"
+    },
+    "pair-relay-classification.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:23:58.013Z"
     }
   }
 }
