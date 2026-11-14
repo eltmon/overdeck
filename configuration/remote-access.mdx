@@ -418,7 +418,9 @@ Tailscale. A machine that is not signed in opens no connection and nothing else 
   month). While a relay route is in use the Anywhere card shows **Using relay** and this
   month's traffic; at 50 GB the relay stops until the next month, the card shows "Relay
   allowance used; install Tailscale or add 50 GB" and an **Add 50 GB** button that opens
-  overdeck.ai.
+  overdeck.ai. On a machine signed in with the relay plan, `pan doctor` shows a `TURN relay`
+  row: `ok` when this machine can gather a TURN relay candidate right now, `warn` with the
+  reason otherwise.
 - **Self-hosting the directory:** run `services/connect` yourself and point
   `anywhere.directory_url` in `~/.overdeck/config.yaml` at it:
 

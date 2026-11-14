@@ -494,7 +494,19 @@ lines are always on, because they are bounded by real events:
 - `rtc closing session <session> for <from>: a new offer replaced it`. Many of these for one peer in a
   few minutes mean that peer kept building new connections instead of restarting ICE on the one it
   had (before PAN-5046 the phone did this after every network change).
-- `rtc session <session> <peer> connected|failed|closed`: a peer connection changed state.
+- `rtc session <session> offer to <peer> (<direct|relay>): gathered <tally>` (dialer) and
+  `rtc session <session> answer to <peer> (<direct|relay>): received <tally>, gathered <tally>`
+  (responder, also logged on an ICE restart), right after each side's local description is set.
+  `<tally>` is `CandidateTally.format()`: `<total> (host <n>, srflx <n>, relay <n>)`, counting
+  distinct candidates by kind, deduplicated by text (PAN-5242 WI-2).
+- `rtc session <session> <peer> connected|failed|closed (<direct|relay>; gathered <tally>, received
+  <tally>)`: a peer connection changed state, with that connection's running tallies.
+- A relay dial whose offer gathered a TURN URL but zero `relay`-kind candidates fails at once (no
+  offer is even sent) with `ChannelOpenError('unreachable', "relay connection: gathered no TURN
+  relay candidate from <turnUrl>; the TURN server could not be reached from this host or refused
+  the allocation", { cause: 'no-relay-candidate' })` (PAN-5242 WI-3). A relay list with no TURN URL
+  does not fail fast; `isNoRelayCandidate(error)` recognizes the cause everywhere this error can
+  surface (pairing, verify, the relay-check route).
 - `directory online (plan <plan>, <n> machines)`, `directory socket closed (<code>)`,
   `directory refused: <message>` (for example close 4011, "Another Overdeck process registered
   this machine with the directory"), `directory upgrade refused (<status>)`,
@@ -564,6 +576,25 @@ and sends `relay-usage` deltas every 60 s and on close. Each report broadcasts t
 that reaches the cap broadcasts `relay-status { stopped: true }`; every machine closes its relay channels and the
 status card shows the cap message with **Add 50 GB**. Over-run is bounded by one report
 interval plus the credential TTL. Counts are self-reported by the account's own machines.
+
+`POST /api/anywhere/relay-check` (PAN-5242 WI-7, WI-8) answers whether this machine can gather a
+TURN relay candidate right now, without opening a real bot or phone connection:
+`probeRelayCandidate` (`src/lib/anywhere/channel/relay-probe.ts`) builds one relay-policy peer
+connection, one data channel and one offer, races the gather against a 12 s deadline, and always
+closes the peer. The route needs an `admin`-scoped credential (no `route-scopes.ts` row) and
+single-flights concurrent callers through one in-flight promise. Its five states:
+
+| State | Meaning |
+| --- | --- |
+| `skipped` | this machine is not online in the overdeck.ai directory |
+| `refused` | the directory answered the `ice-servers` request with an `error` frame (`relay_not_allowed`, `relay_cap_reached`, `turn_unavailable`) |
+| `unanswered` | the directory did not answer within 10 s, or the socket was not connected |
+| `ok` | one or more relay candidates gathered; carries the count, the `turnUrl` and `elapsedMs` |
+| `failed` | a TURN list with no TURN URL, zero relay candidates, or a gather timeout; carries a detail and the `turnUrl` (`null` when the list had none) |
+
+`pan doctor`'s `TURN relay` row (`src/cli/commands/doctor-anywhere-relay.ts`, WI-9) calls this
+route with a 25 s deadline and maps each state to an `ok` or `warn` row, naming the TURN
+`host:port` to allow outbound TLS to when a `turnUrl` is present.
 
 ## Webhook inbox (D-20)
 
