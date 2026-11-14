@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, type DragEvent } from 'react';
+import { useShortcut, type ShortcutDef } from '../lib/shortcuts/registry';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   Home, LayoutGrid, Bot, Server,
@@ -416,16 +417,11 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
     });
   }, []);
 
-  // Keyboard shortcut: [ to toggle collapse
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === '[' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
-        toggleCollapsed();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [toggleCollapsed]);
+  // Keyboard shortcut: [ to toggle collapse (shortcut registry, PAN-5287)
+  useShortcut(useMemo(() => ({
+    id: 'sidebar.collapse', keys: { mac: '[', other: '[' }, scope: 'not-editing', label: 'Collapse sidebar',
+    group: 'General', run: () => toggleCollapsed(),
+  } satisfies ShortcutDef), [toggleCollapsed]));
 
   const renderNavItem = ({ id, label, icon: Icon, title }: NavItem) => {
     const live = id === 'flywheel' && flywheelRunning;
