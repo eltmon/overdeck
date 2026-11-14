@@ -362,7 +362,7 @@ export async function assemblePolyrepoUatGeneration(
     }
 
     for (const older of deps.store.listChain(input.projectRoot, ['ready'])) {
-      if (older.name !== name) deps.store.update(older.name, { status: 'superseded' });
+      if (older.name !== name) deps.store.update(older.name, { status: 'superseded', statusReason: `replaced by ${name}` });
     }
 
     log(`[uat-polyrepo] ${name}: ready — ${members.length} member(s) across ${publishedRepos.length} repo(s), ${resolutions.length} resolution(s), ${heldOut.length} held out`);

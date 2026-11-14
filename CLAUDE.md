@@ -55,7 +55,7 @@
 | The foreman protocol for parallel-wave issues | [docs/FOREMAN.md](docs/FOREMAN.md) |
 | Verification gate, verdict feedback routing, review convergence, resource governor | [docs/PIPELINE-GATES.md](docs/PIPELINE-GATES.md) |
 | Workspaces & projects domain, quick actions, memory homes | [docs/WORKSPACES-AND-PROJECTS.md](docs/WORKSPACES-AND-PROJECTS.md) |
-| Merge workflow, post-merge handoff, Docker cleanup, close-out | [docs/MERGE-WORKFLOW.md](docs/MERGE-WORKFLOW.md) |
+| Merge workflow, merge train (route rule, batches, board), post-merge handoff, Docker cleanup, close-out | [docs/MERGE-WORKFLOW.md](docs/MERGE-WORKFLOW.md), [docs/MERGE-TRAIN.md](docs/MERGE-TRAIN.md) |
 | xBRIEF plans, four artifacts, status lifecycle | [docs/XBRIEF.md](docs/XBRIEF.md) |
 | Effect bridging, façade ratchet, diagnostics ratchet | [docs/EFFECT-BRIDGING.md](docs/EFFECT-BRIDGING.md), [docs/EFFECT-DIAGNOSTICS.md](docs/EFFECT-DIAGNOSTICS.md) |
 | Issue views, God View | [docs/ISSUE-VIEW.md](docs/ISSUE-VIEW.md), [docs/GOD-VIEW.md](docs/GOD-VIEW.md) |

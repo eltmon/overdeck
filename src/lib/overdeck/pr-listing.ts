@@ -50,12 +50,14 @@ export interface GhPrRow {
   closedAt?: string | null;
   author?: { login?: string } | null;
   headRefOid?: string | null;
+  /** Closed listing only (PAN-4753): the merge commit the recent-merges strip names. */
+  mergeCommit?: { oid?: string | null } | null;
 }
 
 const GH_PR_FIELDS = 'number,url,title,state,mergedAt,mergeable,headRefName,headRefOid,baseRefName,isDraft,reviewDecision,reviewRequests,statusCheckRollup,updatedAt,closedAt,author';
 
 /** The closed-PR read drops the three fields only an open PR's status needs. */
-const GH_CLOSED_PR_FIELDS = 'number,url,title,state,mergedAt,headRefName,headRefOid,baseRefName,isDraft,reviewDecision,updatedAt,closedAt,author';
+const GH_CLOSED_PR_FIELDS = 'number,url,title,state,mergedAt,mergeCommit,headRefName,headRefOid,baseRefName,isDraft,reviewDecision,updatedAt,closedAt,author';
 
 interface SettledListing {
   readonly rows: readonly GhPrRow[];

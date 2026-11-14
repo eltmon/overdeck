@@ -162,6 +162,12 @@ export interface UatGeneration {
   stackStartedAt: string | null;
   /** ISO timestamp once branch/worktree/stack artifacts have been cleaned. */
   cleanedAt?: string | null;
+  /**
+   * PAN-4753: one sentence saying why the generation became `superseded` or
+   * `invalidated`, written in the same update as the status. Null otherwise,
+   * and for rows from before the column existed.
+   */
+  statusReason?: string | null;
   createdAt: string;
   /** Last lifecycle change; cleanup does not move it, so a failed row keeps its failure time. */
   updatedAt: string;

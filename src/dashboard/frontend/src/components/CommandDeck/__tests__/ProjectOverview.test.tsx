@@ -112,8 +112,8 @@ describe('ProjectOverview', () => {
       if (method === 'GET' && url === '/api/projects/overdeck/merge-train') {
         return Response.json({ value: null, effective: true });
       }
-      if (method === 'GET' && (url === '/api/merge-train/queues' || url === '/api/merge-train/generations')) {
-        return Response.json([]);
+      if (method === 'GET' && url.startsWith('/api/merge-train/board')) {
+        return Response.json({ masterEnabled: true, projects: [] });
       }
       if (method === 'GET' && url === '/api/projects/overdeck/swarm-policy') {
         return Response.json({});
@@ -440,7 +440,7 @@ describe('ProjectOverview new-workspace affordance (PAN-3330 FR-6c)', () => {
       if (url === '/api/costs/summary?project=PAN') return Response.json({ totalCost: 0 });
       if (url === '/api/projects/overdeck/auto-merge-default') return Response.json({ autoMerge: false });
       if (url === '/api/projects/overdeck/merge-train') return Response.json({ value: null, effective: true });
-      if (url === '/api/merge-train/queues' || url === '/api/merge-train/generations') return Response.json([]);
+      if (url.startsWith('/api/merge-train/board')) return Response.json({ masterEnabled: true, projects: [] });
       if (url === '/api/projects/overdeck/swarm-policy') return Response.json({});
       if (url === '/api/projects/overdeck/version-sync') return Response.json({ config: null, lastOutcome: null });
       return undefined;

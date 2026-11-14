@@ -31,17 +31,37 @@ says batching needs a `uat/**` CI trigger. Batching is tried again a day later.
 
 ## What you see
 
-On the Flywheel page, the **UAT batches** card shows, newest first:
+The merge train shows as one card per project: on the Flywheel page rail (all
+projects, with filter chips) and on each project's Home (that project only).
+Each card has:
 
-- A **ready batch** — a `uat/<codename>` branch bundling every ready feature,
-  with the conflicts between them already resolved. It offers **Open UAT
-  frontend** (a live dashboard serving that exact branch), a per-feature **What
-  to UAT** checklist, and **Merge batch (N) to main**.
-- A batch **assembling** in the background when a new feature becomes ready — the
-  current batch stays fully testable until the new one is ready and supersedes it.
-- **Held-out** features, with the reason, when a conflict couldn't be resolved
-  automatically. Nothing blocks the batch; the held-out feature is retried in a
-  later generation.
+- **A mode chip and a Train switch.** **Auto-merge** projects merge ready work
+  on their own; **Holds for UAT** projects wait for you to test and merge a
+  batch. The switch turns the train off for that project. When the train is
+  off, a banner says no batches assemble and each ready PR merges on its own
+  after the cooldown.
+- **The current batch**, when there is one. It names its members and any
+  held-out features with the reason, offers **Open UAT** (a live stack serving
+  that exact branch), a per-feature **What to UAT** checklist, and **Merge
+  batch (N) to main**.
+- **Older batches**, one line each: "Older batch `uat/…` · superseded" or
+  "· voided". **show** opens the full card and the reason it ended, for
+  example "PAN-1 was merged on its own, outside the batch". Nothing is hidden.
+- **Strike PRs** at the front of the train, with a pill for each: checks
+  running, flagged by review (with the reviewer's summary), waits for UAT,
+  merging, or approved, and a **Merge** button where a merge can start.
+- **The queue**: "Waiting to merge (N)" in an auto project, "Not in a batch
+  yet (N)" in a hold project. Each row has a status pill: cooling down with a
+  countdown and **Cancel**, merging with the step it is on, blocked (with the
+  first reason), last merge failed (with **Retry**), waiting for batch, or
+  ready (with **Merge**). In an auto project with the train on, a line says
+  when the next batch assembles. Expand a row for its branch, PR link, how
+  long it has been ready, its merge policy, every blocker, the reviewer's UAT
+  notes, and a nine-step merge tracker.
+- **Recent merges**: "Last merged: PAN-… · 22m ago · show 5". The list says how
+  each one landed: auto-merge, a batch, an Overdeck merge button, or outside
+  the train. A PR merged outside the train is noted, never refused; when it
+  beat its own scheduled auto-merge, the line says by how many minutes.
 
 ## How it works
 
@@ -69,30 +89,36 @@ PR branch itself and its CI run a duplicate, so that feature merges on its own
 global require-UAT setting when the project sets no default) keeps a batch when
 it is the only one ready, because that batch is the stack you test on.
 
-**Each ready feature has one merge path (PAN-4970).** With auto-merge on, a
-feature joins a batch only when auto-merge will not merge it on its own:
-features held for UAT, Deft human-merge features, features whose auto-merge
-was cancelled by the operator or failed at the current PR head, and — with
-auto-merge off entirely, the `OVERDECK_DISABLE_AUTO_MERGE` kill switch set,
-or the project on GitLab or spanning several repos — every ready feature.
-Everything else merges one at a time through auto-merge instead, and no
-batch assembles for it.
+**Each ready feature has one merge path.** Overdeck decides it with one rule,
+first match wins:
 
-**When no tested batch exists, merge from the row.** While a batch is still
-assembling, while a lone feature merges directly, or after an assembly failed,
-each ready feature on the Flywheel's UAT batches card has its own **Merge**
-button. It merges that feature to main through the merge gate, and the issue
-closes out through the normal post-merge flow. When a batch exists, **Merge
-batch (N) to main** is the main action, and "Merge one feature to main…"
-stays below the rows as an escape hatch. Using the escape hatch restales the live
-batches, and a fresh one reassembles automatically.
+1. A feature held for UAT (its `hold-for-uat` label, else the project's
+   default, else the global setting) waits for a batch you test and merge.
+   A hold always wins, even over priority. In a project that holds for UAT,
+   that is every feature, so nothing reaches `main` until you merge a batch.
+2. With the merge train off, every other feature merges on its own, five
+   minutes after it is ready.
+3. A high-priority PR (a strike, or `critical`, `blocks-main`, `P0`, `urgent`,
+   or `substrate-improvement` plus `bug`) merges on its own.
+4. A feature dropped from a batch because the batch's CI failed merges on its
+   own.
+5. Everything else, with the train on, waits for the next batch.
 
-**A failed assembly is named, not hidden.** If the last attempt to build a batch
-failed, the card names that batch and its time, and offers **Retry batch
-assembly**. After three failed attempts in a row, the train stops retrying
-on its own. Failures more than six hours old no longer count toward that limit,
-so the train recovers once the cause is fixed. **Retry batch assembly** tries
-again at once.
+A feature set to **Auto** in a project that holds for UAT still waits for the
+batch. Only its own **Merge** button, or **Merge alone…** on the batch, merges
+it by itself, because a lone merge voids the batch you are testing.
+
+**Merge from the row when you need to.** A **Ready** or **Waiting for batch**
+row has its own **Merge** button, which merges that one feature through the
+merge gate after you confirm. On a batch, **Merge alone…** on a member does the
+same for a feature already in the batch; it voids that batch, and the
+confirmation says so. **Rebuild** assembles a fresh batch at once, including
+after a failed assembly.
+
+**A failed assembly is named, not hidden.** After three failed attempts in a
+row, the train stops retrying on its own. Failures more than six hours old no
+longer count toward that limit, so the train recovers once the cause is fixed.
+**Rebuild** tries again at once.
 
 ## Projects that span several repos
 
@@ -131,10 +157,13 @@ invalidating a batch always tears its stack down.
 
 Every action names its exact effect and confirms before anything happens —
 "Merge batch (3) to main" lists the three issues and states that it lands the
-tree you tested. There is no opaque "Ship batch" button: a batch builds itself,
+tree you tested. **Merge alone…** on a batch member merges that one feature
+now, which voids the batch; the confirmation names the batch, and its other
+members wait for the next one. Merging a strike before its bot review asks
+first too. There is no opaque "Ship batch" button: a batch builds itself,
 and nothing reaches `main` until you say so.
 
-<Card title="Engineering reference" icon="book" href="https://github.com/eltmon/overdeck/blob/main/docs/UAT-BATCH-TRAINS.md">
-The full model, modules, reconciler, API, and promotion semantics live in
-`docs/UAT-BATCH-TRAINS.md`.
+<Card title="Engineering reference" icon="book" href="https://github.com/eltmon/overdeck/blob/main/docs/MERGE-TRAIN.md">
+The route rule, batch statuses and reasons, the board read model, and the
+routes live in `docs/MERGE-TRAIN.md`.
 </Card>

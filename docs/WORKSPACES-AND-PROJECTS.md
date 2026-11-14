@@ -693,6 +693,10 @@ what the operator made:
   origin, and issues stay reachable through Projects, the Issues scope and
   the pipeline views.
 
+The project's Home also shows that project's merge train card (PAN-4753),
+after the settings disclosure, at the DOM id `merge-train`; the disclosure's
+**Merge train ↓** link scrolls to it. See [MERGE-TRAIN.md](MERGE-TRAIN.md).
+
 ## Workspace-addressed memory recall (PAN-3286)
 
 `pan memory status` and `pan memory summary` resolve a workspace three ways, in

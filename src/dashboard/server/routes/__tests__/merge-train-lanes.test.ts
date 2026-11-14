@@ -4,9 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-const { mockPostStrikeMergePayload } = vi.hoisted(() => ({ mockPostStrikeMergePayload: vi.fn() }));
+const { mockPostStrikeMergePayload, mockGetMergeTrainBoard, mockGetProjectSync } = vi.hoisted(() => ({
+  mockPostStrikeMergePayload: vi.fn(),
+  mockGetMergeTrainBoard: vi.fn(),
+  mockGetProjectSync: vi.fn(),
+}));
 
 vi.mock('../../services/strike-merge.js', () => ({ postStrikeMergePayload: mockPostStrikeMergePayload }));
+vi.mock('../../services/merge-train-board.js', () => ({ getMergeTrainBoard: mockGetMergeTrainBoard }));
+vi.mock('../../../../lib/projects.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/projects.js')>()),
+  getProjectSync: mockGetProjectSync,
+}));
 
 import { mergeTrainLanesRouteLayer } from '../merge-train-lanes.js';
 import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../../../lib/internal-token.js';
@@ -32,6 +41,19 @@ async function postStrikeMerge(issueId: string, headers: Record<string, string>)
 }
 
 const AUTHED = { [INTERNAL_TOKEN_HEADER]: 'test-token' };
+
+async function getBoard(query = '') {
+  const request = HttpServerRequest.fromWeb(new Request(`http://localhost/api/merge-train/board${query}`, { headers: AUTHED }));
+  const response = await Effect.runPromise(
+    Effect.scoped(
+      Effect.flatMap(HttpRouter.toHttpEffect(mergeTrainLanesRouteLayer), (app) =>
+        Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)),
+    ),
+  );
+  const responseBody = response.body as { body?: Uint8Array } | null;
+  const text = responseBody?.body ? new TextDecoder().decode(responseBody.body) : '{}';
+  return { status: response.status, body: JSON.parse(text) as Record<string, unknown> };
+}
 
 function resetAuth() {
   _resetInternalTokenCacheForTests();
@@ -90,5 +112,32 @@ describe('POST /api/merge-train/strikes/:issueId/merge', () => {
     mockPostStrikeMergePayload.mockResolvedValue({ status: 404, body: { success: false, error: 'No strike workspace for PAN-9' } });
     const res = await postStrikeMerge('PAN-9', AUTHED);
     expect(res.status).toBe(404);
+  });
+});
+
+/** PAN-4753 WI-7: the merge-train board read. */
+describe('GET /api/merge-train/board', () => {
+  const board = { masterEnabled: true, projects: [{ projectKey: 'overdeck', cars: [], strikes: [], batches: [], recent: [] }] };
+
+  it('returns the board for every project', async () => {
+    mockGetMergeTrainBoard.mockResolvedValue(board);
+    const res = await getBoard();
+    expect(res).toEqual({ status: 200, body: board });
+    expect(mockGetMergeTrainBoard).toHaveBeenCalledWith({ projectKey: undefined });
+  });
+
+  it('filters to one known project', async () => {
+    mockGetProjectSync.mockReturnValue({ name: 'overdeck', path: '/repo' });
+    mockGetMergeTrainBoard.mockResolvedValue(board);
+    const res = await getBoard('?project=overdeck');
+    expect(res.status).toBe(200);
+    expect(mockGetMergeTrainBoard).toHaveBeenCalledWith({ projectKey: 'overdeck' });
+  });
+
+  it('returns 404 for an unknown project', async () => {
+    mockGetProjectSync.mockReturnValue(null);
+    const res = await getBoard('?project=nope');
+    expect(res).toEqual({ status: 404, body: { error: 'Unknown project: nope' } });
+    expect(mockGetMergeTrainBoard).not.toHaveBeenCalled();
   });
 });

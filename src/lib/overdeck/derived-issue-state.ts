@@ -387,6 +387,10 @@ export interface GlabMrRow {
   approvals_required?: number;
   approved?: boolean;
   sha?: string;
+  /** PAN-4753: read by the merge-train board (titles, recent merges). */
+  title?: string;
+  merged_at?: string | null;
+  merge_commit_sha?: string | null;
 }
 
 const cachedRepoMergeRequests = createSettledTtlPromiseCache<string, readonly GlabMrRow[]>(PR_CACHE_TTL_MS);

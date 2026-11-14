@@ -11,7 +11,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { FlywheelOrderBookSummary } from '@overdeck/contracts';
 
-import { mergeTrainTotals, useMergeTrainData } from '../merge-train/MergeTrainView';
+import { trainTotals, useMergeTrainBoard } from '../merge-train/train/useMergeTrainBoard';
 import { fetchFlywheelStats } from './FlywheelStatsPanel';
 
 const HEADLINE_WINDOW_DAYS = 30;
@@ -36,7 +36,7 @@ export function FlywheelHeadlineStrip({ orderBook }: { orderBook: FlywheelOrderB
     queryFn: () => fetchFlywheelStats(HEADLINE_WINDOW_DAYS),
     refetchInterval: 60_000,
   });
-  const { sections } = useMergeTrainData(true);
+  const { data: board } = useMergeTrainBoard({ active: true });
   const stats = statsQuery.data;
   // The strip never guesses: a failed — or malformed — stats read means no
   // number, not a zero, and never a crash that takes the Status tab with it.
@@ -66,10 +66,10 @@ export function FlywheelHeadlineStrip({ orderBook }: { orderBook: FlywheelOrderB
         />
       )}
       <Tile
-        label="Awaiting UAT"
-        value={String(mergeTrainTotals(sections).features)}
+        label="Waiting to merge"
+        value={board && Array.isArray(board.projects) ? String(trainTotals(board).waiting) : '—'}
         testId="flywheel-headline-uat"
-        title="Features queued on the merge train, across every project it knows."
+        title="Features waiting on the merge train (not yet in a live batch), across every project."
       />
     </section>
   );

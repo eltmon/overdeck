@@ -6,9 +6,11 @@
  * API's rebuild action):
  *
  *   1. No-op unless the merge train is enabled and a flywheel run is active.
- *   2. Invalidate live generations that went stale — main advanced past their
- *      baseSha, a member left the ready set, or a member branch gained
- *      commits. Invalidation tears down the generation's live stack.
+ *   2. Invalidate live generations that went stale — a member left the ready
+ *      set (merged on its own, or no longer ready), a member branch gained
+ *      commits, or the per-PR train now owns a member. The one-sentence
+ *      reason is stored as the row's `status_reason` (PAN-4753), and
+ *      invalidation tears down the generation's live stack.
  *      (Older SUBSET generations are NOT stale: a smaller batch off current
  *      main remains perfectly testable and promotable.)
  *   3. If no live generation matches the current desired set, assemble the
@@ -128,6 +130,14 @@ export interface UatReconcilerDeps {
    */
   mergesPerPr?(feature: ReadyFeature): boolean | Promise<boolean>;
   /**
+   * PAN-4753: issue ids (upper-case) whose PR already merged, so a member
+   * that left the ready set because it merged on its own gets a reason that
+   * says so. Read at most once per tick, only while a live generation
+   * exists. Omitted, or a rejected read, = every departure reads as "no
+   * longer ready to merge".
+   */
+  mergedIssueIds?(): Promise<ReadonlySet<string>>;
+  /**
    * PAN-4753 D4: the batch window. Given the batch-owned ready set (merge
    * order) and the live generations (newest first), answers the features to
    * assemble now (`features`; the single-feature rule does not apply), a
@@ -235,6 +245,7 @@ function isStale(
   desiredIds: ReadonlySet<string>,
   headShas: ReadonlyMap<string, string>,
   perPrIds: ReadonlySet<string>,
+  mergedIds: ReadonlySet<string> = new Set(),
 ): string | null {
   for (const member of gen.members) {
     const id = member.issueId.toUpperCase();
@@ -245,7 +256,9 @@ function isStale(
       return `${member.issueId} merges through the per-PR auto-merge train`;
     }
     if (!desiredIds.has(id)) {
-      return `${member.issueId} left the ready queue`;
+      return mergedIds.has(id)
+        ? `${member.issueId} was merged on its own, outside the batch`
+        : `${member.issueId} is no longer ready to merge`;
     }
     const current = headShas.get(member.branch);
     if (current !== member.headSha) {
@@ -338,16 +351,21 @@ export async function reconcileUatGenerations(
 
     // Promoted is terminal: stamp positive merge evidence before stale checks,
     // and never include promoted rows in the live list passed to isStale.
-    for (const gen of deps.store.listChain(projectRoot, ['ready', 'superseded'])) {
+    const liveChain = deps.store.listChain(projectRoot, ['ready', 'superseded']);
+    // PAN-4753: one merged-ids read per tick, only when a member can depart.
+    const mergedIds = liveChain.length > 0 && deps.mergedIssueIds
+      ? await deps.mergedIssueIds().catch(() => new Set<string>())
+      : new Set<string>();
+    for (const gen of liveChain) {
       if (await deps.isGenerationContainedInMain?.(gen).catch(() => false)) {
         log(`[uat-reconciler] stamping ${gen.name} promoted — branch is contained in main`);
         deps.store.update(gen.name, { status: 'promoted' });
         continue;
       }
-      const staleReason = isStale(gen, desiredIds, headShas, perPrIds);
+      const staleReason = isStale(gen, desiredIds, headShas, perPrIds, mergedIds);
       if (!staleReason) continue;
       log(`[uat-reconciler] invalidating ${gen.name}: ${staleReason}`);
-      deps.store.update(gen.name, { status: 'invalidated' });
+      deps.store.update(gen.name, { status: 'invalidated', statusReason: staleReason });
       invalidated.push(gen.name);
       await deps.teardownStack(gen).catch((err) => {
         log(`[uat-reconciler] stack teardown for ${gen.name} failed: ${err instanceof Error ? err.message : String(err)}`);

@@ -1,7 +1,7 @@
 /**
  * Merge-train board payload types (PAN-4753 WI-10), copied from the server's
  * `src/dashboard/server/services/merge-train-board-types.ts`. Change both
- * together. `UatGenerationPayload` moved here from `MergeTrainView.tsx` and
+ * together. `UatGenerationPayload` moved here from the retired merge-train view and
  * gained `statusReason` (WI-3).
  */
 

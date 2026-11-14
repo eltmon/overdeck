@@ -688,7 +688,7 @@ async function finishPromote(
   const invalidated: string[] = [];
   for (const other of deps.store.listChain(projectRoot, ['ready', 'superseded'])) {
     if (other.name === gen.name) continue;
-    deps.store.update(other.name, { status: 'invalidated' });
+    deps.store.update(other.name, { status: 'invalidated', statusReason: `${gen.name} was merged to main` });
     invalidated.push(other.name);
     await deps.teardownStack(other).catch(() => {});
   }

@@ -252,6 +252,20 @@ describe('overdeck schema top-ups', () => {
     ).toContain('effort');
   });
 
+  it('adds uat_generations.status_reason on a fresh and on a pre-existing database (PAN-4753)', () => {
+    const columns = (db: SqliteDatabase) => db
+      .prepare('PRAGMA table_info(`uat_generations`)')
+      .all<{ name: string }>()
+      .map((column) => column.name);
+    const dbPath = makeDbPath();
+    const fresh = getOverdeckDatabase(dbPath);
+    expect(columns(fresh)).toContain('status_reason');
+    fresh.exec('ALTER TABLE `uat_generations` DROP COLUMN `status_reason`');
+    closeOverdeckDatabase();
+
+    expect(columns(getOverdeckDatabase(dbPath))).toContain('status_reason');
+  });
+
   it('logs a missing-table top-up failure while startup and later top-ups continue', () => {
     const dbPath = makeDbPath();
     const initial = getOverdeckDatabase(dbPath);

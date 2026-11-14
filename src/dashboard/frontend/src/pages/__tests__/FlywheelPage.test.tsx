@@ -6,15 +6,14 @@ vi.mock('../../components/flywheel/FlywheelConversationPane', () => ({
   FlywheelConversationPane: () => <div data-testid="flywheel-conversation-pane" />,
 }));
 vi.mock('../../components/flywheel/FlywheelOrderBookCard', () => ({ FlywheelOrderBookCard: () => null }));
-vi.mock('../../components/flywheel/PendingAutoMergesCard', () => ({ PendingAutoMergesCard: () => null }));
 // Both have their own tests and their own network; here only their presence
 // in the page matters, and an unmocked one leaks fetches past the test body.
 vi.mock('../../components/flywheel/FlywheelHeadlineStrip', () => ({
   FlywheelHeadlineStrip: () => <section aria-label="Flywheel headline" />,
 }));
-// The card's own test covers its counts; here only its presence in the rail matters.
-vi.mock('../../components/flywheel/FlywheelUatBatchesCard', () => ({
-  FlywheelUatBatchesCard: () => <section aria-label="UAT batches" />,
+// PAN-4753 WI-11: the component's own tests cover the cards; here only its placement matters.
+vi.mock('../../components/merge-train/train/MergeTrain', () => ({
+  MergeTrain: ({ placement }: { placement: string }) => <div data-testid="merge-train-component" data-placement={placement} />,
 }));
 
 import { FlywheelPage } from '../FlywheelPage';
@@ -23,6 +22,18 @@ import { consumePendingReveal, requestRevealNeedsYou } from '../../lib/flywheelR
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 
 const config = { auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: true, batch_size: 3, batch_wait_minutes: 30 };
+
+const BOARD = {
+  masterEnabled: true,
+  projects: [{
+    projectKey: 'overdeck', projectName: 'overdeck', repo: 'eltmon/overdeck', forge: 'github', polyrepo: null,
+    enabled: true, override: null, mode: 'auto', cooldownMinutes: 5, window: null, strikes: [], recent: [], batches: [],
+    cars: [
+      { issueId: 'PAN-1', state: 'cooldown', liveBatch: null },
+      { issueId: 'PAN-2', state: 'held', liveBatch: null },
+    ],
+  }],
+};
 
 // The Stats tab and the headline strip share the ['flywheel','stats',30] query.
 const STATS = {
@@ -44,6 +55,7 @@ function setup(status: FlywheelDerivedStatus | 'unreachable', opts: { pendingInp
       return Response.json({ ...config, ...(JSON.parse(String(init.body)) as object) });
     }
     if (url === '/api/merge-train/config') return Response.json(config);
+    if (url.startsWith('/api/merge-train/board')) return Response.json(BOARD);
     if (url === '/api/flywheel/state') return Response.json({ exists: false, path: '.pan/flywheel/state.md', content: null, lastModified: null });
     if (url === '/api/flywheel/report') return Response.json({ exists: false, path: '.pan/flywheel/report.md', content: null, lastModified: null });
     if (url.startsWith('/api/flywheel/stats')) return Response.json(STATS);
@@ -61,11 +73,12 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
   afterEach(() => vi.useRealTimers());
   afterEach(() => { vi.unstubAllGlobals(); consumePendingReveal(); });
 
-  it('mounts the UAT batches card in the left rail even when idle (PAN-4199 ac3)', async () => {
+  it('mounts the merge train in the left rail even when idle (PAN-4199 ac3, PAN-4753 WI-11)', async () => {
     setup(flywheelStatus({ run: 'idle', conversation: null, lastTick: null, freshness: null }));
     renderWithQuery(<FlywheelPage />);
     await screen.findByTestId('flywheel-run-chip');
-    expect(screen.getByRole('region', { name: 'UAT batches' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Merge train' })).toBeInTheDocument();
+    expect(screen.getByTestId('merge-train-component')).toBeInTheDocument();
   });
 
   it.each([
@@ -116,12 +129,21 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     await waitFor(() => expect(mergeTrain).toBeEnabled());
     expect(mergeTrain).toHaveAttribute('aria-checked', 'true');
     expect(mergeTrain).toHaveAttribute('data-testid', 'flywheel-merge-train-switch');
-    expect(screen.queryByTestId('flywheel-merge-train-chip')).toBeNull();
     fireEvent.click(mergeTrain);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/merge-train/config', expect.objectContaining({
       method: 'POST', body: JSON.stringify({ merge_train_enabled: false }),
     })));
     await waitFor(() => expect(screen.getByRole('switch', { name: 'Merge train' })).toHaveAttribute('aria-checked', 'false'));
+  });
+
+  it('the rail shows the all-projects merge train with its summary, not the old cards (PAN-4753 WI-11)', async () => {
+    setup(flywheelStatus());
+    renderWithQuery(<FlywheelPage />);
+    const rail = await screen.findByRole('region', { name: 'Flywheel control rail' });
+    expect(await screen.findByTestId('merge-train-component')).toHaveAttribute('data-placement', 'all-projects');
+    await waitFor(() => expect(screen.getByTestId('flywheel-merge-train-summary')).toHaveTextContent('2 waiting · 0 batches ready to test'));
+    expect(rail).not.toHaveTextContent('UAT batches');
+    expect(screen.queryByRole('region', { name: 'Pending auto-merges' })).toBeNull();
   });
 
   it('the header counts the loop\'s own in-flight ids when a tick named them (PAN-4199 ac3)', async () => {

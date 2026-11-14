@@ -113,6 +113,8 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   // #3983: the PR head an auto-merge was scheduled for, so a cancel or a
   // failure holds only for that head and a new push re-arms the scheduler.
   runSchemaTopUp(db, 'ALTER TABLE `pending_auto_merges` ADD COLUMN `head_sha` text');
+  // PAN-4753: why a batch became superseded or invalidated, so the train UI can show it.
+  runSchemaTopUp(db, 'ALTER TABLE `uat_generations` ADD COLUMN `status_reason` text');
   // PAN-4185: bare conversations (no Overdeck-injected context) and the
   // native CLAUDE.md opt-out persist on the row so resume/restart/fork keep them.
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `bare_context` integer NOT NULL DEFAULT 0');

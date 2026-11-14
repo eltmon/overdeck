@@ -10,9 +10,11 @@
  * git + PR), never from a record.
  */
 import { listInFlightIssuesWithPr, type MergeCandidateDeps } from './merge-ready-set.js';
-import { getPrFacts, type PrFacts } from './pr-facts.js';
+import { blockerReasonsFor, type MergeBlockerType } from './merge-blocker-types.js';
+import { getPrFacts } from './pr-facts.js';
 
-export type MergeBlockerType = 'merge_conflict' | 'failing_checks' | 'not_mergeable';
+// PAN-4753 WI-7: the classification moved to merge-blocker-types.ts (six types).
+export { blockerReasonsFor, type MergeBlockerType } from './merge-blocker-types.js';
 
 export interface MergeBlocker {
   issueId: string;
@@ -21,26 +23,6 @@ export interface MergeBlocker {
 }
 
 export type MergeBlockersDeps = MergeCandidateDeps;
-
-/**
- * Classify one PR's forge state into blocker reasons. Pure: the caller supplies
- * the facts. An approved PR with green checks and `mergeable` true has none.
- */
-export function blockerReasonsFor(facts: PrFacts): MergeBlocker['reasons'] {
-  if (!facts.exists || !facts.open || facts.merged) return [];
-  const reasons: MergeBlocker['reasons'] = [];
-  if (facts.mergeable === false) {
-    const conflicting = (facts.mergeableState ?? '').includes('conflict')
-      || facts.mergeableState === 'conflicting';
-    reasons.push(conflicting
-      ? { type: 'merge_conflict', summary: 'the branch conflicts with the base branch' }
-      : { type: 'not_mergeable', summary: `the forge reports the PR is not mergeable${facts.mergeableState ? ` (${facts.mergeableState})` : ''}` });
-  }
-  if (facts.checks === 'red') {
-    reasons.push({ type: 'failing_checks', summary: `CI checks are failing on ${facts.headSha?.slice(0, 8) ?? 'HEAD'}` });
-  }
-  return reasons;
-}
 
 /**
  * Every in-flight issue whose PR is approved but blocked by the forge.
