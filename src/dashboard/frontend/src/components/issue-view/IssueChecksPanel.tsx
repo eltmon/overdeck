@@ -45,6 +45,7 @@ export function IssueChecksPanel({ issueId }: { issueId: string }) {
     <section data-testid="issue-checks-panel" aria-label="Checks">
       <h3 className="mb-[8px] text-[13px] font-semibold text-foreground">
         {checks.isLoading ? 'Loading checks'
+          : checks.isError ? 'Could not load checks'
           : !data?.pr ? 'No pull request yet'
           : summary?.total ? <>{summary.passed} of {summary.total} checks passed on <a href={data.pr.url} target="_blank" rel="noreferrer" className="font-mono-ui text-primary-ink hover:underline">#{data.pr.number}</a></>
           : 'No check runs reported'}

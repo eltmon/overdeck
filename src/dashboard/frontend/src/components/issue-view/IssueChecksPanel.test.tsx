@@ -81,6 +81,19 @@ describe('IssueChecksPanel', () => {
     expect(screen.getByText('lint').closest('a')).toHaveAttribute('href', 'https://github.com/eltmon/overdeck/actions/runs/1');
   });
 
+  it('says checks could not load when the request itself fails', () => {
+    useIssueCheckRunsQueryMock.mockReturnValue({
+      isLoading: false,
+      isError: true,
+      data: undefined,
+    });
+
+    render(<IssueChecksPanel issueId="PAN-1" />);
+
+    expect(screen.getByText('Could not load checks')).toBeInTheDocument();
+    expect(screen.queryByText('No pull request yet')).not.toBeInTheDocument();
+  });
+
   it('shows the query error', () => {
     useIssueCheckRunsQueryMock.mockReturnValue({
       isLoading: false,

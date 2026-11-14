@@ -124,13 +124,26 @@ describe('IssueBannerSlot', () => {
   it('the paused action targets the exact non-primary agent', () => {
     let invoke: (() => void) | undefined;
     function Probe() {
-      const resolveAction = useNeedsYouActions(new Set(['agent-pan-1-review-security']), vi.fn());
+      const resolveAction = useNeedsYouActions(new Map([['agent-pan-1-review-security', 'agent-pan-1-review-security']]), vi.fn());
       invoke = resolveAction({ kind: 'paused', sessionId: 'agent-pan-1-review-security' })?.invoke;
       return null;
     }
     render(<Probe />);
     invoke?.();
     expect(unpauseMutate).toHaveBeenCalledWith({ agentId: 'agent-pan-1-review-security' });
+  });
+
+  it('resolves a Herdr terminalId session id to the real agent id for Open conversation', () => {
+    const onOpenAgentConversation = vi.fn();
+    let invoke: (() => void) | undefined;
+    function Probe() {
+      const resolveAction = useNeedsYouActions(new Map([['term_abc123', 'agent-pan-1-review-security']]), onOpenAgentConversation);
+      invoke = resolveAction({ kind: 'awaiting_input', sessionId: 'term_abc123', prompt: 'Which storage path?' })?.invoke;
+      return null;
+    }
+    render(<Probe />);
+    invoke?.();
+    expect(onOpenAgentConversation).toHaveBeenCalledWith('agent-pan-1-review-security');
   });
 
   it.each([
