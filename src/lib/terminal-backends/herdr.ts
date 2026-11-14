@@ -44,6 +44,7 @@ import {
   HerdrApiClient,
   HerdrApiError,
 } from './herdr-api.js';
+import { herdrPaneReadText } from './herdr-pane-read.js';
 import { controlTerminal, observeTerminal, sizeHerdrTerminal } from './herdr-stream.js';
 import { pasteAndSubmitHerdrPane } from './herdr-submit.js';
 import { adoptIssueWorkspace, listIssueWorkspaces, type HerdrWorkspaceInfo } from './herdr-workspaces.js';
@@ -521,13 +522,13 @@ export async function readHerdrPaneText(
   source: 'recent' | 'visible' = 'recent', // `visible` includes a full-screen TUI's alternate screen
   api: HerdrApiClient = getHerdrApiClient(),
 ): Promise<string> {
-  const result = await api.call<{ text?: string }>('pane.read', {
+  const result = await api.call('pane.read', {
     pane_id: paneId,
     source,
     lines,
     strip_ansi: true,
   });
-  return result.text ?? '';
+  return herdrPaneReadText(result);
 }
 
 /** Detection-wait knobs. Production uses the defaults; tests shorten them. */
@@ -715,13 +716,13 @@ export class HerdrBackend implements TerminalBackend {
     }
 
     try {
-      const read = await this.api.call<{ text?: string }>('pane.read', {
+      const read = await this.api.call('pane.read', {
         pane_id: paneId,
         source: 'recent_unwrapped',
         lines: DETECTION_FAILURE_LINES,
         strip_ansi: true,
       });
-      const text = (read.text ?? '').trimEnd();
+      const text = herdrPaneReadText(read).trimEnd();
       parts.push(
         text
           ? `Last ${DETECTION_FAILURE_LINES} lines of pane output:\n${text}`
