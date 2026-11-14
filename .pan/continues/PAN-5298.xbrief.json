@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5298",
   "created": "2026-11-14T21:08:19.124Z",
-  "updated": "2026-11-14T21:11:57.058Z",
+  "updated": "2026-11-14T21:12:32.802Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "vite-harness-helper.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T21:11:57.058Z"
+    },
+    "issue-tree-isolation": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5298",
+      "claimedAt": "2026-11-14T21:12:32.802Z"
     }
   }
 }
