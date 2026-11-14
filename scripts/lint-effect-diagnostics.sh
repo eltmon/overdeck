@@ -74,7 +74,8 @@ else
   for lane in "${LANES[@]}"; do
     label=${lane%%:*}
     tsconfig=${lane#*:}
-    if output=$("$TSC_BIN" --noEmit -p "$tsconfig" 2>&1); then
+    # PAN-5248: one gate admission per lane (CPU and memory).
+    if output=$(node scripts/tsc-admitted.mjs --noEmit -p "$tsconfig" 2>&1); then
       tsc_status=0
     else
       tsc_status=$?
@@ -83,7 +84,7 @@ else
     if (( tsc_status != 0 )) && ! grep -Eq "$TYPE_DIAGNOSTIC_REGEX" <<< "$output"; then
       echo "✖ Effect diagnostics lane '$label' failed (exit $tsc_status) without TypeScript diagnostics." >&2
       printf '%s\n' "$output" >&2
-      echo "  Reproduce: node_modules/.bin/tsc --noEmit -p $tsconfig" >&2
+      echo "  Reproduce: node scripts/tsc-admitted.mjs --noEmit -p $tsconfig" >&2
       exit 1
     fi
 
@@ -139,7 +140,7 @@ if (( count > baseline_count )); then
   if (( tailless > 0 )); then
     echo "  Note: $tailless finding rows carry no file position and are counted but not attributed." >&2
   fi
-  echo "  Reproduce each lane with: node_modules/.bin/tsc --noEmit -p <tsconfig.effect-diag.json>" >&2
+  echo "  Reproduce each lane with: node scripts/tsc-admitted.mjs --noEmit -p <tsconfig.effect-diag.json>" >&2
   exit 1
 fi
 
