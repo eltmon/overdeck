@@ -3,7 +3,7 @@
  *
  * Proves the density contract: drawer density (PAN-5244) is the pipeline
  * strip + tab strip + a full-width tab body and switches tabs under host
- * control; page density keeps the shell + status rail; rail density is the
+ * control; page density (PAN-5246) is the same composition; rail density is the
  * compact anatomy (shell + active conversation + one action strip, no tab
  * strip). End-to-end strip conversation switching is covered through the
  * drawer in IssueDrawer.test.tsx.
@@ -244,38 +244,53 @@ describe('IssueDetail (C-DETAIL one component)', () => {
     expect(screen.getByTestId('mock-agent-session-conversation')).toHaveAttribute('data-layout', 'toolbar');
   });
 
-  it('page density renders the full composition at route width with the wider status rail', () => {
+  it('page density renders the same composition as drawer density', () => {
     const { container } = renderDetail(
       <IssueDetail issueId="PAN-1" density="page" agents={AGENTS} tab="conversation" onSelectTab={() => {}} />,
     );
     expect(container.querySelector('[data-component="issue-detail"]')).toHaveAttribute('data-density', 'page');
+    expect(screen.getByTestId('mock-pipeline-strip')).toBeInTheDocument();
+    expect(screen.getByTestId('mock-banner-slot')).toBeInTheDocument();
+    expect(screen.queryByTestId('mock-detail-shell')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('mock-activity-rail')).not.toBeInTheDocument();
     expect(screen.getByTestId('drawer-tabs')).toBeInTheDocument();
-    expect(screen.getByTestId('mock-detail-shell')).toBeInTheDocument();
-    expect(screen.getByTestId('mock-activity-rail')).toBeInTheDocument();
-    expect(container.querySelector('.grid-cols-\\[minmax\\(0\\,1fr\\)_360px\\]')).not.toBeNull();
-    expect(screen.getByTestId('mock-agent-session-conversation')).toHaveAttribute('data-agent-id', 'agent-work-1');
-    expect(screen.queryByTestId('mock-pipeline-strip')).not.toBeInTheDocument();
-    expect(screen.getByTestId('mock-agent-session-conversation')).toHaveAttribute('data-layout', 'toolbar');
-    expect(screen.queryByTestId('drawer-tab-skills')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('drawer-tab-discussion')).not.toBeInTheDocument();
+    expect(screen.getByTestId('drawer-tab-skills')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-tab-discussion')).toBeInTheDocument();
+    expect(screen.getByTestId('mock-agent-session-conversation')).toHaveAttribute('data-layout', 'conversation-header');
+    expect(container.querySelector('.grid-cols-\\[minmax\\(0\\,1fr\\)_360px\\]')).toBeNull();
   });
 
-  it('page density keeps its own DrawerPausedBanner wrapper and never the banner slot', () => {
+  it('page density renders the banner slot, not the legacy paused banner', () => {
     renderDetail(
       <IssueDetail issueId="PAN-1" density="page" agents={AGENTS} tab="conversation" onSelectTab={() => {}} />,
     );
-    expect(document.querySelector('[data-section="DrawerPausedBanner"]')).toBeInTheDocument();
-    expect(screen.queryByTestId('mock-banner-slot')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('issue-banner-slot')).not.toBeInTheDocument();
+    expect(screen.getByTestId('mock-banner-slot')).toBeInTheDocument();
+    // The banner slot is mocked, so the only such element would be the deleted legacy wrapper.
+    expect(document.querySelector('[data-section="DrawerPausedBanner"]')).toBeNull();
   });
 
-  it('page density keeps the Overview body with the skills disclosure and the tasks panel', () => {
+  it('page density renders the Details body', () => {
     renderDetail(
       <IssueDetail issueId="PAN-1" density="page" agents={AGENTS} tab="overview" onSelectTab={() => {}} />,
     );
-    expect(screen.getByTestId('mock-issue-skills-section')).toBeInTheDocument();
-    expect(screen.getByTestId('tasks-panel')).toBeInTheDocument();
-    expect(screen.getByTestId('mock-pickup-full')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-tab-panel-overview')).toBeInTheDocument();
+    expect(screen.queryByTestId('mock-issue-skills-section')).not.toBeInTheDocument();
+  });
+
+  it.each(['page', 'drawer'] as const)('exposes the entry and view on the root (%s density)', (density) => {
+    const { container } = renderDetail(
+      <IssueDetail issueId="PAN-1" density={density} agents={AGENTS} tab="checks" onSelectTab={() => {}} />,
+    );
+    const root = container.querySelector('[data-component="issue-detail"]');
+    expect(root).toHaveAttribute('data-tab', 'changes');
+    expect(root).toHaveAttribute('data-view', 'checks');
+  });
+
+  it('the tab strip scrolls instead of wrapping', () => {
+    renderDetail(
+      <IssueDetail issueId="PAN-1" density="page" agents={AGENTS} tab="conversation" onSelectTab={() => {}} />,
+    );
+    expect(screen.getByTestId('drawer-tabs').firstElementChild).toHaveClass('overflow-x-auto');
   });
 
   it('the strip marks the selected agent only on a session tab', () => {
