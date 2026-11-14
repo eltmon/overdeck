@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5283",
   "created": "2026-11-14T19:04:13.506Z",
-  "updated": "2026-11-14T20:35:26.461Z",
+  "updated": "2026-11-14T20:39:30.382Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -328,6 +328,11 @@
     "wi16-compose-status-tab.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T20:35:26.460Z"
+    },
+    "wi17-playwright-screens": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T20:39:30.381Z"
     }
   }
 }
