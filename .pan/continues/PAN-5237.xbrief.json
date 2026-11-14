@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5237",
   "created": "2026-11-14T04:16:13.968Z",
-  "updated": "2026-11-14T05:00:10.634Z",
+  "updated": "2026-11-14T05:00:12.078Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,11 @@
     "outbox-cancel-controls.ac2": {
       "status": "completed",
       "doneAt": "2026-11-14T05:00:10.633Z"
+    },
+    "composer-restore-target": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5237",
+      "claimedAt": "2026-11-14T05:00:12.078Z"
     }
   }
 }
