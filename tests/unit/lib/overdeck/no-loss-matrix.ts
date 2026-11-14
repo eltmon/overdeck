@@ -603,6 +603,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/machines/versions',                 kind: 'http', disposition: 'AGGREGATE',   door: 'versions-self.buildVersionsReport + linkFetch GET /api/versions/self per online link (PAN-4654)' },
   { surface: 'POST /api/machines/update',                  kind: 'http', disposition: 'WRITE',       door: 'fleet-update-service.start + linkFetch POST /api/versions/self/update (PAN-4654)' },
   { surface: 'GET /api/anywhere/status',                  kind: 'http', disposition: 'AGGREGATE',   door: 'environment-identity + trusted origins + access-tokens + vault config (PAN-4445)' },
+  { surface: 'POST /api/anywhere/relay-check',             kind: 'http', disposition: 'READ',        door: 'directory-rtc.iceServers(relay) + anywhere/channel/relay-probe.probeRelayCandidate (PAN-5242)' },
   { surface: 'GET /api/tailscale/status',                 kind: 'http', disposition: 'AGGREGATE',   door: 'lib/tailscale/state.readTailscaleState + installer.resolveInstallPlan (PAN-1254)' },
   { surface: 'GET /api/tailscale/peers',                  kind: 'http', disposition: 'AGGREGATE',   door: 'lib/tailscale/state.readTailscaleState + peers.discoverTailnetPeers (PAN-1254)' },
   { surface: 'POST /api/tailscale/userspace',             kind: 'http', disposition: 'WRITE',       door: 'lib/tailscale/userspace.installUserspaceTailscale / restartUserspaceDaemon (PAN-1254)' },
