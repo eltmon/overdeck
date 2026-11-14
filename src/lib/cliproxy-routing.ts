@@ -165,6 +165,9 @@ export function startCliproxyRoutingController(): () => void {
 
   const firstTick = setTimeout(() => void tick(), ROUTING_FIRST_TICK_MS);
   const interval = setInterval(() => void tick(), ROUTING_INTERVAL_MS);
+  // The controller never keeps a process alive on its own.
+  firstTick.unref?.();
+  interval.unref?.();
   return () => {
     clearTimeout(firstTick);
     clearInterval(interval);

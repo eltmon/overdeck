@@ -12,6 +12,7 @@ import {
   readPidFile,
   CliproxyError,
 } from '../../../lib/cliproxy.js';
+import { startCliproxyRoutingController } from '../../../lib/cliproxy-routing.js';
 
 /** Run one cliproxy lifecycle step in a route, keeping its message in a 500 body. */
 const cliproxyStep = (operation: string, run: () => Promise<void>) =>
@@ -87,13 +88,18 @@ export function startCliproxyWatchdog(): void {
   setInterval(() => void tick(), intervalMs);
 }
 
-/** Host dashboards supervise CLIProxy; read-only peer dashboards do not. */
+/**
+ * Host dashboards supervise CLIProxy and run the reset-first routing
+ * controller (PAN-5278); read-only peer dashboards do neither.
+ */
 export function startCliproxyWatchdogForDashboard(
   isPeerDashboard: boolean,
   startWatchdog: () => void = startCliproxyWatchdog,
+  startRouting: () => void = startCliproxyRoutingController,
 ): boolean {
   if (isPeerDashboard) return false;
   startWatchdog();
+  startRouting();
   return true;
 }
 
