@@ -122,15 +122,135 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
 
   it('no button-role element contains another button or link (PAN-5217, ACT 307n5z)', () => {
     const status = flywheelStatus({
-      lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'waive PAN-5095 test removal; PR #4001 merge', at: '2026-09-23T09:59:50.000Z' },
+      lastTick: {
+        tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'waive PAN-5095 test removal; PR #4001 merge', at: '2026-09-23T09:59:50.000Z',
+        needsYouItems: [
+          { text: 'waive PAN-5095 test removal; PR #4001 merge', firstRaisedTick: 2, firstRaisedAt: '2026-09-23T09:30:00.000Z', firstRaisedMessageId: 'm2' },
+        ],
+      },
     });
     render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} />);
     // The fixture must actually render nested candidates, or the check is vacuous.
     expect(screen.getByTestId('flywheel-needs-you-issue')).toBeInTheDocument();
     expect(screen.getByTestId('flywheel-needs-you-pr')).toBeInTheDocument();
+    expect(screen.getByTestId('flywheel-needs-you-jump')).toBeInTheDocument();
     for (const button of screen.getAllByRole('button')) {
       expect(button.querySelector('button, a, [role="button"], [role="link"]')).toBeNull();
     }
+  });
+
+  describe('whole-row jump (PAN-5275)', () => {
+    function jumpableRowStatus() {
+      return flywheelStatus({
+        lastTick: {
+          tick: 4, pick: null, phase: 'park', inFlight: [], at: '2026-09-23T09:59:50.000Z',
+          needsYou: 'waive PAN-5095 test removal; PR #4001 merge',
+          needsYouItems: [
+            { text: 'waive PAN-5095 test removal; PR #4001 merge', firstRaisedTick: 2, firstRaisedAt: '2026-09-23T09:30:00.000Z', firstRaisedMessageId: 'm2' },
+          ],
+        },
+      });
+    }
+
+    it('clicking the row text or the row itself jumps once per click (ac1)', () => {
+      const onNeedsYouClick = vi.fn();
+      render(<FlywheelStatusPane status={jumpableRowStatus()} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
+      const row = screen.getAllByTestId('flywheel-needs-you-item')[0]!;
+      const textSegment = Array.from(row.querySelectorAll('span')).find(
+        (el) => el.children.length === 0 && el.textContent?.includes('test removal'),
+      )!;
+      fireEvent.click(textSegment);
+      expect(onNeedsYouClick).toHaveBeenCalledTimes(1);
+      expect(onNeedsYouClick).toHaveBeenNthCalledWith(1, 'm2');
+      fireEvent.click(row);
+      expect(onNeedsYouClick).toHaveBeenCalledTimes(2);
+      expect(onNeedsYouClick).toHaveBeenNthCalledWith(2, 'm2');
+    });
+
+    it('clicking the jump button jumps exactly once (ac2)', () => {
+      const onNeedsYouClick = vi.fn();
+      render(<FlywheelStatusPane status={jumpableRowStatus()} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
+      fireEvent.click(screen.getByTestId('flywheel-needs-you-jump'));
+      expect(onNeedsYouClick).toHaveBeenCalledTimes(1);
+      expect(onNeedsYouClick).toHaveBeenCalledWith('m2');
+    });
+
+    it('an inner issue button navigates and does not jump (ac3)', () => {
+      const onNavigateIssue = vi.fn();
+      const onNeedsYouClick = vi.fn();
+      render(
+        <FlywheelStatusPane status={jumpableRowStatus()} unreachable={false} nowMs={NOW} onNavigateIssue={onNavigateIssue} onNeedsYouClick={onNeedsYouClick} />,
+      );
+      fireEvent.click(screen.getByTestId('flywheel-needs-you-issue'));
+      expect(onNavigateIssue).toHaveBeenCalledWith('PAN-5095');
+      expect(onNeedsYouClick).not.toHaveBeenCalled();
+    });
+
+    it('inner PR and target links do not jump (ac3)', () => {
+      const onNeedsYouClick = vi.fn();
+      const prevent = (e: Event) => e.preventDefault();
+      document.addEventListener('click', prevent, { capture: true });
+      const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+      try {
+        const first = render(<FlywheelStatusPane status={jumpableRowStatus()} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
+        fireEvent.click(screen.getByTestId('flywheel-needs-you-pr'));
+        expect(onNeedsYouClick).not.toHaveBeenCalled();
+        first.unmount();
+
+        const targetStatus = flywheelStatus({
+          lastTick: {
+            tick: 4, pick: null, phase: 'park', inFlight: [], at: '2026-09-23T09:59:50.000Z',
+            needsYou: 'upload AAB <https://play.google.com/console/x>',
+            needsYouItems: [
+              { text: 'upload AAB <https://play.google.com/console/x>', firstRaisedTick: 2, firstRaisedAt: '2026-09-23T09:30:00.000Z', firstRaisedMessageId: 'm3' },
+            ],
+          },
+        });
+        render(<FlywheelStatusPane status={targetStatus} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
+        fireEvent.click(screen.getByTestId('flywheel-needs-you-link'));
+        expect(onNeedsYouClick).not.toHaveBeenCalled();
+      } finally {
+        document.removeEventListener('click', prevent, { capture: true });
+        openSpy.mockRestore();
+      }
+    });
+
+    it('a jumpable row is pointer-styled but not a button (ac4)', () => {
+      render(<FlywheelStatusPane status={jumpableRowStatus()} unreachable={false} nowMs={NOW} />);
+      const row = screen.getAllByTestId('flywheel-needs-you-item')[0]!;
+      expect(row.className).toContain('cursor-pointer');
+      expect(row.className).toContain('hover:bg-[color-mix(in_srgb,var(--warning)_14%,transparent)]');
+      expect(row).not.toHaveAttribute('role');
+      expect(row).not.toHaveAttribute('tabindex');
+    });
+
+    it('a row without a first-raised id is plain text (ac5)', () => {
+      const onNeedsYouClick = vi.fn();
+      const status = flywheelStatus({
+        lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'upload AAB', at: '2026-09-23T09:59:50.000Z' },
+      });
+      render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
+      const row = screen.getByTestId('flywheel-needs-you-item');
+      expect(row.className).not.toContain('cursor-pointer');
+      expect(screen.queryByTestId('flywheel-needs-you-jump')).toBeNull();
+      fireEvent.click(row);
+      expect(onNeedsYouClick).not.toHaveBeenCalled();
+    });
+
+    it('ending a text selection inside the row does not jump (ac6)', () => {
+      const onNeedsYouClick = vi.fn();
+      render(<FlywheelStatusPane status={jumpableRowStatus()} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
+      const row = screen.getAllByTestId('flywheel-needs-you-item')[0]!;
+      const getSelectionSpy = vi
+        .spyOn(window, 'getSelection')
+        .mockReturnValue({ isCollapsed: false, anchorNode: row } as unknown as Selection);
+      fireEvent.click(row);
+      expect(onNeedsYouClick).not.toHaveBeenCalled();
+      getSelectionSpy.mockRestore();
+      fireEvent.click(row);
+      expect(onNeedsYouClick).toHaveBeenCalledTimes(1);
+      expect(onNeedsYouClick).toHaveBeenCalledWith('m2');
+    });
   });
 
   describe('Needs-you targets and link styling (PAN-5239)', () => {
