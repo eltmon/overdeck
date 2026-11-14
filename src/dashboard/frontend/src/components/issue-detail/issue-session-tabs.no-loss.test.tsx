@@ -24,7 +24,19 @@ vi.mock('../TasksPanel', () => ({
 }));
 vi.mock('../issue-view/VerificationGates', () => ({ VerificationGates: () => <div /> }));
 vi.mock('../issue-view/ActiveAgentPanel', () => ({ ActiveAgentPanel: () => <div /> }));
-vi.mock('../backlog/PickupGateControls', () => ({ PickupGateControls: () => <div /> }));
+vi.mock('../backlog/PickupGateControls', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../backlog/PickupGateControls')>()),
+  PickupGateControls: () => <div />,
+}));
+vi.mock('../issue-view/IssuePipelineStrip', () => ({ IssuePipelineStrip: () => <div /> }));
+vi.mock('../issue-view/IssueChecksChip', () => ({ IssueChecksChip: () => null }));
+vi.mock('./IssueDrawerDetails', () => ({ IssueDrawerDetails: () => <div data-testid="drawer-tab-panel-overview" /> }));
+vi.mock('../skills/SkillOverridesSections', () => ({
+  IssueSkillsSection: () => <div data-testid="mock-issue-skills-section" />,
+  IssueSkillsTabPanel: (props: { onUnavailable: () => void }) => (
+    <div data-testid="drawer-tab-panel-skills"><button onClick={props.onUnavailable}>report unavailable</button></div>
+  ),
+}));
 vi.mock('../IssueActionMenu', () => ({ IssueActionMenu: () => <div /> }));
 vi.mock('../CommandDeck/UatEnvironmentPanel', () => ({ UatEnvironmentPanel: () => <div /> }));
 vi.mock('../PanOpenInPicker', () => ({ PanOpenInPicker: () => <div /> }));
@@ -55,11 +67,18 @@ const DESTINATION_TEST_IDS: Record<(typeof OLD_ISSUE_DETAIL_TABS)[number], strin
   artifacts: 'drawer-tab-panel-artifacts',
 };
 
+// PAN-5244: tabs added after the PAN-2908 audit, with their destinations.
+const NEW_ISSUE_DETAIL_TABS = ['skills'] as const;
+
+const NEW_DESTINATION_TEST_IDS: Record<(typeof NEW_ISSUE_DETAIL_TABS)[number], string> = {
+  skills: 'drawer-tab-panel-skills',
+};
+
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ exists: false })));
 });
 
-function renderLegacyTab(tab: (typeof OLD_ISSUE_DETAIL_TABS)[number]) {
+function renderLegacyTab(tab: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
@@ -88,15 +107,23 @@ describe('issue session tab no-loss audit', () => {
     }
   });
 
+  it.each(NEW_ISSUE_DETAIL_TABS)('renders a destination for the new %s tab', (newTab) => {
+    renderLegacyTab(newTab);
+
+    expect(screen.getByTestId(NEW_DESTINATION_TEST_IDS[newTab])).toBeInTheDocument();
+    expect(screen.getByTestId(`drawer-tab-${newTab}`)).toHaveAttribute('aria-selected', 'true');
+  });
+
   it('keeps every non-session section as a literal tab entry', () => {
     expect(ISSUE_DETAIL_TABS.map((entry) => entry.id)).toEqual([
-      'overview',
-      'plan',
-      'tasks',
       'session',
-      'activity',
+      'tasks',
+      'plan',
       'files',
+      'activity',
       'artifacts',
+      'skills',
+      'overview',
     ]);
   });
 });

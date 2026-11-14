@@ -20,7 +20,10 @@ The kit currently owns these reusable pieces:
 - `ShipProgress` renders compact and full merge/verification progress.
 - `VerificationGates` renders the current verification cycle and gate results.
 - `TasksPanel`, `TasksRail`, and `TasksTab` retain the canonical PAN-2696 task-status semantics. Collapsed rail rows use the shared `taskTotals` rollup and never poll task detail per issue.
-- `StartAgentCta` selects one start, clear-and-start, or resume mode. Its issue-view form includes model and harness overrides; the kanban chip and Fleet inline forms deliberately do not.
+- `StartAgentCta` selects one start, clear-and-start, or resume mode. Its issue-view form includes model and harness overrides; the kanban chip and Fleet inline forms deliberately do not. In the drawer the issue-view form renders on the Conversation tab: as the no-agent start surface, and as the row under an ended agent's meta row.
+- `IssuePipelineStrip` is the compact six-phase strip of the drawer. Selecting a phase opens that phase's agent conversation. It takes its right-hand controls (the checks chip and the pickup strip) as children.
+- `IssueChecksChip` shows the PR check state and opens the `VerificationGates` card in a popover.
+- `IssueStateBadge` and `IssueCostChip` are the header facts: the derived state badge (the project tree row's `resolveFeatureStateBadge`) and the spend on the issue so far.
 
 `useIssueView`, `IssueViewModel`, the shared derivations, and the public components are exported through `components/issue-view/index.ts`.
 
@@ -52,12 +55,73 @@ The Command Deck issue tree (`src/dashboard/frontend/src/components/CommandDeck/
 
 The drawer, cockpit, and phone sheet headers render through `IssueHeaderTitle`, backed by `useIssueRecord`: the list entry wins when the store already has it; the per-issue read (`GET /api/issues/:id`) covers issues the list lacks — the snapshot still loading, a new issue, a backlog or canceled issue, or an issue aged out of the tracker sync window. While the read is pending the header shows a skeleton bar; on failure it shows the issue id with "title unavailable" or "not found on tracker". It never shows a placeholder string (PAN-5171).
 
+### Drawer layout (PAN-5244)
+
+The issue drawer is conversation first. `IssueDrawer` renders the frame; `IssueDetail` at `density="drawer"` renders everything under the header.
+
+- **Header row** — one 46px row: the issue id, the title (an `h2`, 15px, truncates, full title in its `title`), the derived state badge (`IssueStateBadge`, the same `resolveFeatureStateBadge` the project tree row uses), the cost (`IssueCostChip`), the shared action strip (`IssueActionMenu mode="primary-strip"`, in `DrawerActionBar`), the tracker **Issue** link, and the close button. There is no footer and no block above the header.
+- **Pipeline strip** — `IssuePipelineStrip`, one row under the header. The six phases are compact buttons; a phase is enabled only when an agent with that phase's role exists, and a click opens that agent's conversation. The Review button shows `<done>/<total>` reviewers once review has started. A button's look is its kind; the first match wins:
+
+  | Condition | Kind | Glyph | Title |
+  | --- | --- | --- | --- |
+  | an agent of this phase is paused | `paused` | pause icon | `<Label> agent is paused` |
+  | the phase's agent is live | `live` | pulsing dot | `<Label> is running` |
+  | rail state `attention` | `attention` | alert icon | `<Label> needs a look` |
+  | rail state `done`, or phase `done` with rail state `current` | `done` | check | `<Label> finished <date>`; for `done`/`current`: `Merged. Close-out has not run yet.` |
+  | rail state `current` | `next` | hollow ring | `<Label> is next. No agent is running.` |
+  | rail state `pending` | `pending` | small dot | `Not started` |
+
+- **Checks chip** — `IssueChecksChip` renders when the issue has a PR, in every state, and opens the verification gates in a popover. Before a PR exists it is omitted; Details shows the gates in every state.
+- **Pickup strip** — `PickupGateControls variant="strip"`: Ready, Blocks main and Park switch chips, a sliders button whose popover holds the full controls, and the plan control. `pickupStageFor` maps the derived state to a stage: `open` (backlog, parked, planned, unknown) shows the chips, the sliders button and the plan control (an Objection chip, Release, or Released with Recall); `picked-up` (working, in review, changes requested, ready) shows the chips and the sliders button; `finished` (merged, closed) renders nothing and makes no request. Escape inside a strip popover closes the popover, not the drawer.
+- **Paused banner** — under the strip, above the tabs.
+- **Tabs** — conversation first. Ids are stable, so `?tab=` links keep working:
+
+  | Id | Label |
+  | --- | --- |
+  | `session` | Conversation |
+  | `tasks` | Tasks |
+  | `plan` | Plan map |
+  | `files` | Files |
+  | `activity` | Activity |
+  | `artifacts` | Artifacts |
+  | `skills` | Skills |
+  | `overview` | Details |
+
+  A drawer link without `?tab=` opens on the Conversation tab.
+- **Conversation tab** — `DrawerAgentSession` in its `conversation-header` layout: a header row (the agent's name with a menu of every agent on the issue, workers included; the Conversation/Terminal toggle; Tools) and a meta row (status, branch chip, model and harness, cost, agent id, start time), then the reviewers row while a review agent is selected, then the transcript. With no agent it shows the start surface; with an ended agent selected it shows the start or resume row under the meta row.
+- **Skills tab** — `IssueSkillsTabPanel` is mounted only while the tab is selected, so opening the drawer fetches nothing. The tab badge reads the react-query cache (`useIssueSkillOverrideCount`) and never fetches. The tab hides itself for an issue that no registered project owns.
+- **Details tab** (id `overview`) — `IssueDrawerDetails`, two columns. Left: the pipeline as a table (phase, agent, outcome, Open conversation), the review specialists, and live activity with a link to the Activity tab. Right: pickup controls (full form), verification gates, the workspace with its containers, the UAT environment, the active agent card, and a link to the Skills tab.
+- The right status rail exists only in page density.
+
+Where each of the 16 console sections lives in the drawer:
+
+| # | Section | Home in the drawer | Tab |
+| --- | --- | --- | --- |
+| 1 | `DrawerActionBar` | the header row | any |
+| 2 | `PhaseTimeline` | the wrapper around `IssuePipelineStrip` | any |
+| 3 | `DrawerTabs` | under the strip | any |
+| 4 | `DrawerPickupSection / PickupGateControls` | Details, right column | `overview` |
+| 5 | `DrawerWorkspaceSection` | Details, right column | `overview` |
+| 6 | `UatEnvironmentPanel` | Details, right column | `overview` |
+| 7 | `DrawerActiveAgent` | Details, right column | `overview` |
+| 8 | `DrawerPausedBanner` | under the strip | any |
+| 9 | `DrawerVerificationGates` | Details, right column | `overview` |
+| 10 | `DrawerReviewSpecialists` | Details, Review section | `overview` |
+| 11 | `DrawerTasksList` | the Tasks tab | `tasks` |
+| 12 | `DrawerPlanPanel / XBriefViewer` | the Plan map tab | `plan` |
+| 13 | `DrawerArtifactsPanel` | the Artifacts tab | `artifacts` |
+| 14 | `DrawerActivityRail / DrawerActivityPanel` | the Activity tab, and Details Live activity | `activity`, `overview` |
+| 15 | `DrawerAgentSession` | the Conversation tab | `session` |
+| 16 | `StartAgentCta` | the Conversation tab's no-agent start surface | `session`, no agents |
+
+Markers outside the inventory that also keep a home: `SpecialistStrip` (the reviewers row on the Conversation tab), `SkillOverrides` (the Skills tab panel), `DrawerResourcesFacet` (Details, under Workspace), `ChangedFilesView` (the Files tab) and `Header bar` (the drawer `<header>`).
+
 ### Cockpit layout
 
-The cockpit is organized around the live run. Its header carries one phase sentence plus branch, PR, cost, tracker, and shared issue actions; a prioritized `NeedsYouSlot` appears immediately below it when the operator must answer or intervene. `CockpitPhaseRail` follows with live actor, model, harness, start-time, and duration metadata driven by the shared reactive tick; clicking an occupied phase opens that exact session id. It is cockpit-only: the console/drawer `IssuePhaseRail` and the default filled idle `StatusDot` keep their frozen behavior, while cockpit rows opt into the hollow idle and outcome colors. The persistent tab band has exactly six destinations:
+The cockpit is organized around the live run. Its header carries one phase sentence plus branch, PR, cost, tracker, and shared issue actions; a prioritized `NeedsYouSlot` appears immediately below it when the operator must answer or intervene. `CockpitPhaseRail` follows with live actor, model, harness, start-time, and duration metadata driven by the shared reactive tick; clicking an occupied phase opens that exact session id. It is cockpit-only: `IssuePhaseRail` (page and rail density) and the default filled idle `StatusDot` keep their frozen behavior; the drawer renders `IssuePipelineStrip` instead (see Drawer layout). Cockpit rows opt into the hollow idle and outcome colors. The persistent tab band has exactly six destinations:
 
 - **Overview** — lifecycle summary, review-specialist outcomes, recent events, pickup state, and the full Ship progress/log surface. It has explicit live, merged, and pre-work teaching states.
-- **Session** — Conversation and Terminal are view modes of one agent-session surface. The drawer/page `IssueDetail` tab strip exposes one Session destination, and both that surface and the cockpit embed switch modes with the shared segmented `components/shared/ViewToggle.tsx` control. `ConversationPanel` and `FlywheelConversationPane` use the same selector, while `IssueDetail` owns selected-agent state and the single transcript composer.
+- **Session** — Conversation and Terminal are view modes of one agent-session surface. The drawer/page `IssueDetail` tab strip exposes one Conversation destination (tab id `session`), and both that surface and the cockpit embed switch modes with the shared segmented `components/shared/ViewToggle.tsx` control. `ConversationPanel` and `FlywheelConversationPane` use the same selector, while `IssueDetail` owns selected-agent state and the single transcript composer.
 - **Plan** — Tasks, dependency Map, and PRD segments. The tab owns the task count and the map retains its full-screen xBRIEF promotion; there is no floating Tasks chip or task drawer.
 - **Changes** — Files, Checks, and Artifacts segments, with the existing check-state badge on the parent tab.
 - **Activity** — Feed and Status history segments.
@@ -74,7 +138,7 @@ To add or move an issue-view section without losing an existing surface:
 1. Add the legacy or new section to `inventory.ts`, including its density and owning component. If it is a sub-section of a shared component, add it to that component's section constant and therefore `SECTION_INVENTORY`.
 2. Add the section name to every intended density in `DENSITY_SECTIONS`.
 3. Render the matching `data-section` attribute on the real visible element. Do not satisfy the gate with hidden marker elements.
-4. Add or update the component test, then run `tests/unit/dashboard/frontend/issue-view-no-loss.test.ts` and `IssueView.test.tsx`.
+4. Add or update the component test, then run `tests/unit/dashboard/frontend/issue-view-no-loss.test.ts` and `IssueView.test.tsx`. The drawer's markers are checked per tab by `IssueDrawer.test.tsx` (`renders every console inventory marker on a visible element`); add a new console section to its table.
 
 The no-loss tests are a surface lock. The root test fixes the historical inventory, requires unique names and valid owning files, and fails when an old surface disappears. The frontend render test requires every inventory entry to have a declared density and rejects hidden section markers. A refactor is complete only when each old action, status, route, view, and affordance still has a real home.
 

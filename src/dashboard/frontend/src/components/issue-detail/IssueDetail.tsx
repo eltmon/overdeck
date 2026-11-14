@@ -2,16 +2,18 @@
  * PAN-2908 · C-DETAIL — the ONE issue-detail component.
  *
  * `IssueDetail` owns the issue-detail anatomy every shell shares: the paused
- * banner, the tab strip, the phase rail + specialist strip (as the per-agent
- * conversation switcher via IssueDetailShell), the tab bodies, and the status
- * rail. Shells keep their frames (the drawer's scrim/header, the cockpit's
- * route chrome) and render this as the body.
+ * banner, the tab strip, the per-agent conversation switcher, the tab bodies,
+ * and (page density) the status rail. Shells keep their frames (the drawer's
+ * scrim/header, the cockpit's route chrome) and render this as the body.
  *
  * Densities:
- * - **drawer** — the full composition: tab strip + shell + tab bodies +
- *   320px status rail. This is exactly what IssueDrawer renders.
- * - **page** — the same composition at full route width with a wider
- *   360px status rail (the cockpit-route form). Adoption on
+ * - **drawer** (PAN-5244) — conversation first: the compact pipeline strip
+ *   (phase buttons, checks chip, pickup strip) + paused banner + tab strip +
+ *   a full-width tab body. The Conversation tab uses DrawerAgentSession's
+ *   conversation-header layout; Details (`overview`) is IssueDrawerDetails;
+ *   Skills is IssueSkillsTabPanel. This is exactly what IssueDrawer renders.
+ * - **page** — tab strip + IssueDetailShell (phase rail + specialist strip)
+ *   + tab bodies + a 360px status rail (the cockpit-route form). Adoption on
  *   `/command-deck/:project/:issue` is a product decision tracked in #2962.
  * - **rail** — compact inline expansion: shell + active conversation +
  *   one action strip. (Adoption in the deck tree's FeatureItem is tracked
@@ -21,14 +23,11 @@
  * SessionPanel flow (test-enshrined); both surfaces share this component's
  * shell and the ConversationPanel transcript renderer.
  */
-import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { toast } from 'sonner';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { Agent } from '../../types';
 import type { DerivedIssueState } from '../../types';
 import { cn } from '../../lib/utils';
-import { trackerIssueUrl } from '../../lib/issueLinks';
 import { DrawerAgentSession, pickDefaultDrawerAgent } from '../drawer/DrawerAgentSession';
 import DrawerActivityRail from '../drawer/DrawerActivityRail';
 import DrawerArtifactsPanel from '../drawer/DrawerArtifactsPanel';
@@ -36,25 +35,32 @@ import { DrawerActivityPanel, DrawerPlanPanel } from '../drawer/DrawerSecondaryP
 import { TasksPanel } from '../TasksPanel';
 import { VerificationGates } from '../issue-view/VerificationGates';
 import { ActiveAgentPanel } from '../issue-view/ActiveAgentPanel';
-import { PickupGateControls } from '../backlog/PickupGateControls';
 import { IssueActionMenu } from '../IssueActionMenu';
 import { UatEnvironmentPanel } from '../CommandDeck/UatEnvironmentPanel';
-import { PanOpenInPicker } from '../PanOpenInPicker';
-import type { WorkspaceInfo } from '../../lib/workspace-types';
 import { IssueDetailShell } from './IssueDetailShell';
-import { IssueSkillsSection } from '../skills/SkillOverridesSections';
+import { PausedBanner, PickupSection, ResourcesFacet, WorkspaceSection, openIssueOnTracker } from './IssueDetailSections';
+import { IssueDrawerDetails } from './IssueDrawerDetails';
+import { SpecialistStrip } from './SpecialistStrip';
+import { agentsToReviewerSessions, deriveSpecialistChips } from './deriveSpecialists';
+import { IssueSkillsSection, IssueSkillsTabPanel } from '../skills/SkillOverridesSections';
+import { useIssueSkillOverrideCount } from '../skills/useIssueSkillOverrideCount';
+import { IssuePipelineStrip } from '../issue-view/IssuePipelineStrip';
+import { IssueChecksChip } from '../issue-view/IssueChecksChip';
+import { PickupGateControls, pickupStageFor } from '../backlog/PickupGateControls';
 import { ChangedFilesView } from '../Stage/cockpit/ChangedFilesView';
 
 export type IssueDetailDensity = 'drawer' | 'page' | 'rail';
 
+// PAN-5244: conversation first. Ids are stable (?tab= links); labels and order are not.
 export const ISSUE_DETAIL_TABS = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'plan', label: 'Plan map' },
+  { id: 'session', label: 'Conversation' },
   { id: 'tasks', label: 'Tasks' },
-  { id: 'session', label: 'Session' },
-  { id: 'activity', label: 'Activity' },
+  { id: 'plan', label: 'Plan map' },
   { id: 'files', label: 'Files' },
+  { id: 'activity', label: 'Activity' },
   { id: 'artifacts', label: 'Artifacts' },
+  { id: 'skills', label: 'Skills' },
+  { id: 'overview', label: 'Details' },
 ] as const;
 
 export type IssueDetailTabId =
@@ -63,6 +69,8 @@ export type IssueDetailTabId =
   | 'terminal';
 
 const SESSION_TAB_IDS = new Set<string>(['session', 'conversation', 'terminal']);
+/** PAN-5244: the Skills tab has a body only in drawer density; page and rail hide it. */
+const HIDDEN_SKILLS: ReadonlySet<string> = new Set(['skills']);
 
 export interface IssueDetailProps {
   issueId: string;
@@ -84,98 +92,6 @@ export interface IssueDetailProps {
   className?: string;
 }
 
-function PickupSection({ issueId }: { issueId: string }) {
-  return (
-    <section data-testid="drawer-pickup-section" className="rounded-[var(--radius)] border border-border bg-card p-[14px]">
-      <PickupGateControls
-        issueId={issueId}
-        onOpenIssueBrowser={(id) => {
-          const href = trackerIssueUrl(id);
-          if (href) window.open(href, '_blank', 'noopener,noreferrer');
-        }}
-      />
-    </section>
-  );
-}
-
-function useDrawerWorkspace(issueId: string) {
-  return useQuery<WorkspaceInfo | null>({
-    queryKey: ['drawer-workspace', issueId],
-    queryFn: async () => {
-      const res = await fetch(`/api/workspaces/${issueId}`);
-      if (!res.ok) return null;
-      return res.json() as Promise<WorkspaceInfo>;
-    },
-    retry: false,
-  });
-}
-
-function WorkspaceSection({ issueId }: { issueId: string }) {
-  const { data: workspace } = useDrawerWorkspace(issueId);
-
-  if (!workspace?.exists || !workspace.path) return null;
-
-  return (
-    <section data-testid="drawer-workspace-section" className="rounded-[var(--radius)] border border-border bg-card p-[14px]">
-      <div className="mb-[8px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Workspace</div>
-      <div className="flex items-center justify-between gap-[12px]">
-        <div className="min-w-0 truncate font-mono text-[11px] leading-[18px] text-muted-foreground" title={workspace.path}>
-          {workspace.path}
-        </div>
-        <div className="shrink-0">
-          <PanOpenInPicker openInCwd={workspace.path} />
-        </div>
-      </div>
-      {workspace.git?.branch && (
-        <div data-testid="drawer-workspace-branch" className="mt-[6px] truncate font-mono text-[11px] leading-[16px] text-muted-foreground" title={workspace.git.branch}>
-          ⎇ {workspace.git.branch}
-        </div>
-      )}
-    </section>
-  );
-}
-
-/** PAN-2908 C-DETAIL: the resources status facet for the always-visible right
- *  rail — workspace containers at a glance (names + health dots), same query
- *  as the Overview's Workspace section (shared cache, one fetch). */
-function ResourcesFacet({ issueId }: { issueId: string }) {
-  const { data: workspace } = useDrawerWorkspace(issueId);
-  const containers = Object.entries(workspace?.containers ?? {});
-  if (!workspace?.exists) return null;
-
-  return (
-    <div data-section="DrawerResourcesFacet" className="shrink-0 border-l border-border bg-card/70 px-[14px] py-[10px]">
-      <div className="mb-[6px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Resources</div>
-      {containers.length > 0 ? (
-        <div className="flex flex-wrap gap-x-3 gap-y-1">
-          {containers.map(([name, container]) => (
-            <span
-              key={name}
-              className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
-              title={`${name}: ${container.status ?? (container.running ? 'running' : 'stopped')}${container.uptime ? ` · up ${container.uptime}` : ''}`}
-            >
-              <span
-                data-testid={`drawer-resource-dot-${name}`}
-                className={cn(
-                  'h-[7px] w-[7px] rounded-full',
-                  container.running
-                    ? container.health === 'unhealthy'
-                      ? 'bg-destructive'
-                      : 'bg-success'
-                    : 'bg-muted-foreground/40',
-                )}
-              />
-              <span className="font-mono">{name}</span>
-            </span>
-          ))}
-        </div>
-      ) : (
-        <div className="text-[11px] text-muted-foreground">Workspace on disk — no containers running.</div>
-      )}
-    </div>
-  );
-}
-
 function tabLabel(tab: string) {
   return tab.replace(/-/g, ' ').replace(/\b\w/g, (match) => match.toUpperCase());
 }
@@ -193,68 +109,22 @@ function TabPlaceholder({ tab }: { tab: string }) {
   );
 }
 
-/** PAN-1779: a pause gate must be unmissable — amber banner with the full
- * reason and a one-click Unpause. Amber = a human must act (style guide). */
-function PausedBanner({ agents }: { agents: ReadonlyArray<{ id: string; paused?: boolean; pausedReason?: string }> }) {
-  const paused = agents.filter((agent) => agent.paused === true);
-  if (paused.length === 0) return null;
+/** Tab count chip: a squared mono chip, never a pill. */
+const TAB_COUNT_CHIP_CLASS = 'ml-[6px] rounded-[4px] border border-border px-[4px] font-mono-ui text-[10.5px] leading-[15px] text-muted-foreground';
 
-  const unpause = async (agentId: string) => {
-    try {
-      const res = await fetch(`/api/agents/${agentId}/unpause`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      const data = await res.json().catch(() => ({})) as { error?: string };
-      if (!res.ok) throw new Error(data.error || 'Failed to unpause agent');
-      toast.success(`${agentId} unpaused — deacon resumes it on the next patrol`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to unpause agent');
-    }
-  };
-
-  return (
-    <div data-testid="drawer-paused-banner" className="space-y-[6px] border-b border-border px-[22px] py-[10px]">
-      {paused.map((agent) => (
-        <div
-          key={agent.id}
-          className="flex items-center gap-[10px] rounded-[var(--radius-sm)] border px-[12px] py-[8px] badge-border-warning badge-bg-warning"
-        >
-          <span className="text-[14px] leading-none text-warning-foreground">⏸</span>
-          <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-medium text-warning-foreground">
-              <span className="font-mono">{agent.id}</span> is paused
-            </div>
-            {agent.pausedReason && (
-              <div className="truncate text-[12px] text-warning-foreground/75" title={agent.pausedReason}>
-                {agent.pausedReason}
-              </div>
-            )}
-          </div>
-          <button
-            type="button"
-            data-testid={`drawer-unpause-${agent.id}`}
-            onClick={() => void unpause(agent.id)}
-            className="inline-flex shrink-0 items-center gap-[4px] rounded-[var(--radius-sm)] border px-[10px] py-[5px] text-[12px] font-medium badge-border-warning text-warning-foreground transition-colors hover:bg-warning/20"
-          >
-            ▶ Unpause
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function IssueDetailTabs({ tab, onSelectTab, tasksBadge }: {
+function IssueDetailTabs({ tab, onSelectTab, tasksBadge, skillsBadge, hiddenTabIds }: {
   tab: string;
   onSelectTab: (tab: IssueDetailTabId) => void;
   tasksBadge?: string | undefined;
+  /** Count of skill overrides for this issue; the chip shows only above zero. */
+  skillsBadge?: number | null | undefined;
+  /** Tab ids this density does not show. */
+  hiddenTabIds?: ReadonlySet<string> | undefined;
 }) {
   return (
-    <nav data-component="drawer-tabs" data-testid="drawer-tabs" className="border-b border-border bg-background/95 px-[14px]" role="tablist" aria-label="Issue drawer sections">
+    <nav data-component="drawer-tabs" data-testid="drawer-tabs" className="border-b border-border bg-background px-[12px]" role="tablist" aria-label="Issue drawer sections">
       <div className="flex min-w-0 items-center overflow-x-auto">
-        {ISSUE_DETAIL_TABS.map((entry) => {
+        {ISSUE_DETAIL_TABS.filter((entry) => !hiddenTabIds?.has(entry.id)).map((entry) => {
           const active = entry.id === 'session' ? SESSION_TAB_IDS.has(tab) : tab === entry.id;
           return (
             <button
@@ -264,7 +134,7 @@ function IssueDetailTabs({ tab, onSelectTab, tasksBadge }: {
               aria-selected={active}
               data-testid={`drawer-tab-${entry.id}`}
               className={cn(
-                'relative flex shrink-0 items-center px-[14px] py-[10px] text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground',
+                'relative flex shrink-0 items-center h-[34px] px-[10px] text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground',
                 active && 'text-foreground',
               )}
               onClick={() => onSelectTab(
@@ -275,11 +145,16 @@ function IssueDetailTabs({ tab, onSelectTab, tasksBadge }: {
             >
               {entry.label}
               {entry.id === 'tasks' ? (
-                <span data-testid="drawer-tab-tasks-count" className="ml-[6px] rounded-full bg-primary/15 px-[5px] py-[1px] font-mono text-[10px] leading-none text-primary">
+                <span data-testid="drawer-tab-tasks-count" className={TAB_COUNT_CHIP_CLASS}>
                   {tasksBadge ?? '0/0'}
                 </span>
               ) : null}
-              {active ? <span data-testid="drawer-tab-active-underline" className="absolute bottom-0 left-[14px] right-[14px] h-[2px] bg-primary" /> : null}
+              {entry.id === 'skills' && typeof skillsBadge === 'number' && skillsBadge > 0 ? (
+                <span data-testid="drawer-tab-skills-count" title="Skills changed for this issue" className={TAB_COUNT_CHIP_CLASS}>
+                  {skillsBadge}
+                </span>
+              ) : null}
+              {active ? <span data-testid="drawer-tab-active-underline" className="absolute bottom-0 left-[10px] right-[10px] h-[2px] bg-primary" /> : null}
             </button>
           );
         })}
@@ -310,6 +185,34 @@ export function IssueDetail({ issueId, density, agents, derived, tab, onSelectTa
     onSelectTab('conversation');
   };
 
+  // PAN-5244 Skills tab: a cache-only badge, and a tab that hides itself when
+  // the panel reports the issue has no project.
+  const skillsCount = useIssueSkillOverrideCount(issueId);
+  // Keyed by issue id, so it resets by itself when the drawer switches issues.
+  const [skillsUnavailableFor, setSkillsUnavailableFor] = useState<string | null>(null);
+  const skillsUnavailable = skillsUnavailableFor === issueId;
+  const markSkillsUnavailable = useCallback(() => setSkillsUnavailableFor(issueId), [issueId]);
+  useEffect(() => {
+    // FR-14: a hidden tab cannot stay selected (also covers a ?tab=skills deep link).
+    if (density === 'drawer' && skillsUnavailable && tab === 'skills') onSelectTab('conversation');
+  }, [density, skillsUnavailable, tab, onSelectTab]);
+
+  // Drawer density: the reviewers row under the conversation header, only
+  // while a review agent is selected (D-8).
+  const activeAgent = agents.find((agent) => agent.id === effectiveAgentId) ?? null;
+  const reviewersRow = density === 'drawer' && activeAgent?.role === 'review' ? (
+    <div data-section="SpecialistStrip" className="shrink-0 border-b border-border px-[20px] py-[8px]">
+      <SpecialistStrip
+        specialists={deriveSpecialistChips(agentsToReviewerSessions(agents), derived)}
+        activeId={/-review-([a-z]+)$/i.exec(effectiveAgentId ?? '')?.[1]?.toLowerCase() ?? null}
+        onSelect={(chip) => {
+          const agent = agents.find((candidate) => candidate.id.toLowerCase().endsWith(`-review-${chip.id.toLowerCase()}`));
+          if (agent) openAgentConversation(agent.id);
+        }}
+      />
+    </div>
+  ) : null;
+
   const shell = (
     <IssueDetailShell
       issueId={issueId}
@@ -323,6 +226,7 @@ export function IssueDetail({ issueId, density, agents, derived, tab, onSelectTa
   const sessionPane = (
     view: 'conversation' | 'terminal',
     onChangeView?: (view: 'conversation' | 'terminal') => void,
+    drawerLayout = false,
   ) => (
     // The wrapper must be a constrained flex column (min-h-0 + flex-1): as a
     // plain block div its min-height:auto content floor blew out the grid
@@ -335,9 +239,30 @@ export function IssueDetail({ issueId, density, agents, derived, tab, onSelectTa
       onSelectAgent={setSelectedAgentId}
       onChangeView={onChangeView}
       issueId={issueId}
+      {...(drawerLayout ? { layout: 'conversation-header' as const, belowHeader: reviewersRow } : {})}
     /></div>
   );
   const conversationPane = sessionPane('conversation');
+
+  // The five secondary tab bodies, shared by drawer and page density.
+  const secondaryPanel =
+    tab === 'tasks' ? (
+      <div data-testid="drawer-tab-panel-tasks" data-section="DrawerTasksList">
+        <TasksPanel issueId={issueId} />
+      </div>
+    ) : tab === 'plan' ? (
+      <div data-section="DrawerPlanPanel / XBriefViewer"><DrawerPlanPanel issueId={issueId} /></div>
+    ) : tab === 'activity' ? (
+      <div data-section="DrawerActivityRail / DrawerActivityPanel"><DrawerActivityPanel /></div>
+    ) : tab === 'artifacts' ? (
+      <div data-section="DrawerArtifactsPanel"><DrawerArtifactsPanel issueId={issueId} /></div>
+    ) : tab === 'files' ? (
+      // C-DETAIL binding tab set: Files is the changed-files tree + diff
+      // (same component as the cockpit's Code tab), not a placeholder.
+      <div data-testid="drawer-tab-panel-files" data-section="ChangedFilesView">
+        <ChangedFilesView issueId={issueId} />
+      </div>
+    ) : null;
 
   if (density === 'rail') {
     // Compact inline expansion: rail + active conversation + one action strip.
@@ -352,11 +277,58 @@ export function IssueDetail({ issueId, density, agents, derived, tab, onSelectTa
     );
   }
 
+  if (density === 'drawer') {
+    const sessionTab = SESSION_TAB_IDS.has(tab);
+    return (
+      <div data-component="issue-detail" data-density="drawer" className={cn('flex min-h-0 flex-1 flex-col', className)}>
+        <div data-section="PhaseTimeline" className="shrink-0 pb-[8px] pl-[14px] pr-[16px]">
+          <IssuePipelineStrip
+            issueId={issueId}
+            agents={agents}
+            activeAgentId={sessionTab ? effectiveAgentId : null}
+            onOpenAgentConversation={openAgentConversation}
+          >
+            <IssueChecksChip issueId={issueId} checks={derived?.pr?.checks} />
+            <PickupGateControls issueId={issueId} variant="strip" stage={pickupStageFor(derived?.state)} onOpenIssueBrowser={openIssueOnTracker} />
+          </IssuePipelineStrip>
+        </div>
+        <div data-section="DrawerPausedBanner"><PausedBanner agents={agents} /></div>
+        {showTabs && (
+          <div data-section="DrawerTabs">
+            <IssueDetailTabs
+              tab={tab}
+              onSelectTab={onSelectTab}
+              tasksBadge={tasksBadge}
+              skillsBadge={skillsCount}
+              hiddenTabIds={skillsUnavailable ? HIDDEN_SKILLS : undefined}
+            />
+          </div>
+        )}
+        <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col', !sessionTab && 'overflow-auto px-[22px] py-[18px]')}>
+          {sessionTab ? sessionPane(tab === 'terminal' ? 'terminal' : 'conversation', onSelectTab, true)
+            : secondaryPanel ? secondaryPanel
+            : tab === 'skills' && !skillsUnavailable ? <IssueSkillsTabPanel issueId={issueId} onUnavailable={markSkillsUnavailable} />
+            : tab === 'overview' ? (
+              <IssueDrawerDetails
+                issueId={issueId}
+                agents={agents}
+                effectiveAgentId={effectiveAgentId}
+                onOpenAgentConversation={openAgentConversation}
+                onOpenTab={onSelectTab}
+                skillsAvailable={!skillsUnavailable}
+                skillsCount={skillsCount}
+              />
+            ) : <TabPlaceholder tab={tab} />}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div data-component="issue-detail" data-density={density} className={cn('flex min-h-0 flex-1 flex-col', className)}>
       <div data-section="DrawerPausedBanner"><PausedBanner agents={agents} /></div>
       {showTabs && (
-        <div data-section="DrawerTabs"><IssueDetailTabs tab={tab} onSelectTab={onSelectTab} tasksBadge={tasksBadge} /></div>
+        <div data-section="DrawerTabs"><IssueDetailTabs tab={tab} onSelectTab={onSelectTab} tasksBadge={tasksBadge} hiddenTabIds={HIDDEN_SKILLS} /></div>
       )}
       {/* PAN-2908 C-DETAIL: the ONE issue-detail anatomy (rail + strip as the
           per-agent conversation switcher), shared with the cockpit. */}
@@ -381,22 +353,8 @@ export function IssueDetail({ issueId, density, agents, derived, tab, onSelectTa
               <IssueSkillsSection issueId={issueId} />
               <div data-section="DrawerTasksList"><TasksPanel issueId={issueId} /></div>
             </div>
-          ) : tab === 'tasks' ? (
-            <div data-testid="drawer-tab-panel-tasks" data-section="DrawerTasksList">
-              <TasksPanel issueId={issueId} />
-            </div>
-          ) : tab === 'plan' ? (
-            <div data-section="DrawerPlanPanel / XBriefViewer"><DrawerPlanPanel issueId={issueId} /></div>
-          ) : tab === 'activity' ? (
-            <div data-section="DrawerActivityRail / DrawerActivityPanel"><DrawerActivityPanel /></div>
-          ) : tab === 'artifacts' ? (
-            <div data-section="DrawerArtifactsPanel"><DrawerArtifactsPanel issueId={issueId} /></div>
-          ) : tab === 'files' ? (
-            // C-DETAIL binding tab set: Files is the changed-files tree + diff
-            // (same component as the cockpit's Code tab), not a placeholder.
-            <div data-testid="drawer-tab-panel-files" data-section="ChangedFilesView">
-              <ChangedFilesView issueId={issueId} />
-            </div>
+          ) : secondaryPanel ? (
+            secondaryPanel
           ) : SESSION_TAB_IDS.has(tab) ? (
             sessionPane(tab === 'terminal' ? 'terminal' : 'conversation', onSelectTab)
           ) : (

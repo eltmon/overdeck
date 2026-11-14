@@ -175,9 +175,11 @@ function readDrawerFromUrl(): DrawerState {
 
   const params = new URLSearchParams(window.location.search)
   const agentId = params.get('agent')
+  const issueId = params.get('issue')
   return {
-    issueId: params.get('issue'),
-    tab: params.get('tab') || 'overview',
+    issueId,
+    // PAN-5244: a link without ?tab= opens conversation-first, like openIssue().
+    tab: params.get('tab') || (issueId ? 'conversation' : 'overview'),
     ...(agentId ? { agentId } : {}),
   }
 }
