@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5287",
   "created": "2026-11-14T19:49:14.970Z",
-  "updated": "2026-11-14T20:17:45.406Z",
+  "updated": "2026-11-14T20:18:10.639Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,9 +74,10 @@
       "doneAt": "2026-11-14T20:17:43.958Z"
     },
     "needs-you": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5287",
-      "claimedAt": "2026-11-14T20:17:45.405Z"
+      "claimedAt": "2026-11-14T20:17:45.405Z",
+      "doneAt": "2026-11-14T20:18:10.638Z"
     },
     "registry-core": {
       "status": "in_progress",
@@ -146,6 +147,26 @@
     "agents-working.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T20:17:43.958Z"
+    },
+    "needs-you.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:18:10.638Z"
+    },
+    "needs-you.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:18:10.638Z"
+    },
+    "needs-you.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:18:10.638Z"
+    },
+    "needs-you.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:18:10.638Z"
+    },
+    "needs-you.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:18:10.638Z"
     }
   }
 }
