@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5225",
   "created": "2026-11-14T03:19:12.068Z",
-  "updated": "2026-11-14T04:02:06.702Z",
+  "updated": "2026-11-14T04:02:11.169Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,11 @@
     "post-merge-forge-landing.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T04:02:06.701Z"
+    },
+    "docs-close-out-and-shim": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5225",
+      "claimedAt": "2026-11-14T04:02:11.169Z"
     }
   }
 }
