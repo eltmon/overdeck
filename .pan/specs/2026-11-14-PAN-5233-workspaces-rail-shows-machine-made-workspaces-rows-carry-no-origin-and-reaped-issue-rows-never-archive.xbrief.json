@@ -1,0 +1,860 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T03:38:47Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5233: Workspaces rail shows machine-made workspaces: rows carry no origin, and reaped issue rows never archive",
+    "updated": "2026-11-14T03:45:17.051Z"
+  },
+  "plan": {
+    "id": "pan-5233",
+    "title": "Workspaces rail shows machine-made workspaces: rows carry no origin, and reaped issue rows never archive",
+    "status": "proposed",
+    "uid": "4b4e2850-283c-46f2-961d-116bc14126b6",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-14T03:38:47Z",
+    "updated": "2026-11-14T03:45:17.051Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5233",
+        "label": "PAN-5233",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5233/.pan/drafts/pan-5233.md",
+        "label": "PRD draft (.pan/drafts/pan-5233.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "workspaces",
+      "sidebar",
+      "command-palette",
+      "schema",
+      "session-vault",
+      "cli"
+    ],
+    "metadata": {
+      "sizeJustification": "The projected surface is about 31 files across more than 6 path subsystems, but most are one-line call-site changes plus their tests and four doc files. Every slice depends on the same new column and write-door rule (origin-write-door), and the issue's three acceptance criteria (no machine-made rows on the rail, reaped rows archive, no dead rows after a rebuild run) only hold together: shipping the rail filter without the stamping creators would hide operator workspaces created by conversations, and stamping without the filter changes nothing visible. The reaper fix already shipped separately (e5cc8544749), which is the one piece that could stand alone.",
+      "canonicalFilename": "2026-11-14-PAN-5233-workspaces-rail-shows-machine-made-workspaces-rows-carry-no-origin-and-reaped-issue-rows-never-archive.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The sidebar WORKSPACES rail and the Cmd-K workspaces scope treat every non-issue row as operator-made (isUserFacingWorkspace: kind !== 'issue' || isFavorite). Session Vault 'Continue here' and agents running `pan workspace new` write scratch rows indistinguishable from the operator's, so vault-<id8> and smoke-test workspaces fill the rail. A collapsed 'Pipeline worktrees 658' group duplicates the Projects section, and 645 of those issue rows point at deleted directories because the reaper never archived rows (fixed on main in e5cc8544749) and rebuild-workspaces' fallback asks a stale issues cache.",
+      "Proposal": "Store a new workspaces.origin column (operator | pipeline | vault | agent), added and backfilled at schema top-up and stamped at the write door: issue rows are always pipeline, main rows always operator, scratch rows take the caller's origin through a new performWorkspaceCreate(intent, { origin }) argument. Session Vault stamps vault; `pan workspace new` stamps agent inside a managed session unless --origin operator; the dashboard create route derives origin from the request credential. The identity mirror carries origin so rebuild restores it. The rail and Cmd-K list origin === 'operator' or favorited rows and drop the pipeline count rows. `pan admin db rebuild-workspaces` archives issue rows whose directory is gone (skipping rows younger than 10 minutes) and terminal-issues.ts is deleted. Docs, the pan-workspace skill and a changelog entry describe the new behavior.",
+      "NonGoals": "- No change to the reaper (reap-issue-residue.ts); its row archival already shipped in e5cc8544749.\n- No dead-row archival at dashboard boot; it runs only from `pan admin db rebuild-workspaces`.\n- No UI to list, reveal or re-label non-operator workspaces; `pan workspace list --kind scratch` still lists them and favoriting still surfaces one.\n- No CHECK constraint on workspaces.origin (SQLite cannot add one by ALTER); the writer's type is the guard.\n- No change to GET /api/workspace-registry filtering; the API keeps returning every kind and origin.\n- No change to the rail's Archived group or to includeArchived behavior.\n- No origin field in WorkspaceCreateInput, ResolvedWorkspaceIntent, the /resolve response or toDryRunPayload.\n- The request body of POST /api/workspace-registry must never set origin.\n- No special handling for issue rows whose worktree migrated to a remote VM; they archive like any dead row and archive is reversible.\n- No edit to the top of changelog.mdx and no raise of scripts/file-size-allowlist.txt."
+    },
+    "autoDecisions": [
+      {
+        "summary": "The writer forces kind='main' rows to origin 'operator' as well as issue rows to 'pipeline' (D-1).",
+        "rationale": "FR-6 then holds for project creation, `pan workspace main` and the route's bootstrapMain without touching those callers, and a project's primary checkout is registered by the operator."
+      },
+      {
+        "summary": "Origin reaches the writer as a second argument to performWorkspaceCreate, not as a field of the resolved intent (D-2).",
+        "rationale": "Origin is caller identity, not a resolution of the input; this keeps the nine-field dry-run payload that create-intent.test.ts pins and the /resolve response unchanged."
+      },
+      {
+        "summary": "The create route maps credentials as in D-3: browser session, device, phone, operator-minted token and operator-acting machine are operator; per-agent token, agent-relaying machine, internal-token and connector are agent.",
+        "rationale": "The PRD's two-case rule mislabeled per-agent MCP tokens (PAN-4927) and agent-relaying machine links as operator; the full union is decided so the work agent makes no judgment call."
+      },
+      {
+        "summary": "rowToWorkspace maps a NULL origin to 'pipeline' for issue rows and 'operator' otherwise (D-4).",
+        "rationale": "A blanket 'operator' fallback would put an issue row written by an older build onto the rail until the next backfill."
+      },
+      {
+        "summary": "The identity mirror writes origin only when the source carries it, and all four rewrite sites pass it (D-6).",
+        "rationale": "writeWorkspaceIdentity builds its merged object field by field, so an unconditional origin key set to undefined would erase the stored value on archive or relocate."
+      },
+      {
+        "summary": "archiveDeadIssueWorkspaces skips issue rows created less than 10 minutes ago, with an injectable now (D-7).",
+        "rationale": "workspace-manager/create.ts writes the issue row before `git worktree add`, so a rebuild run during a workspace creation would otherwise archive a live row; an injected clock keeps tests timer-free."
+      },
+      {
+        "summary": "The schema backfill UPDATE is wrapped in try/catch that logs and continues (NFR-3).",
+        "rationale": "It runs on every database open; if the ALTER failed silently inside runSchemaTopUp, an unguarded UPDATE would throw on every open."
+      },
+      {
+        "summary": "The vault name match is exact: vault-<8 lowercase hex> optionally followed by -2 through -9.",
+        "rationale": "That is exactly what createScratchWorkspace generates from a randomUUID; the original GLOB's trailing * was looser than FR-7's regex."
+      },
+      {
+        "summary": "The rail's Archived group is left unchanged (D-9).",
+        "rationale": "The rail fetches /api/workspace-registry without includeArchived, so archived pipeline and vault rows never reach it."
+      },
+      {
+        "summary": "Inside a managed session `pan workspace new` defaults to origin agent, and conversations acting for the operator pass --origin operator, documented in the CLI help, configuration/workspaces.mdx and the pan-workspace skill (D-8).",
+        "rationale": "The PRD names this rule; documenting it where conversations learn the command keeps operator-requested workspaces visible."
+      }
+    ],
+    "items": [
+      {
+        "id": "origin-schema",
+        "title": "Add and backfill the workspaces.origin column at schema top-up",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T03:38:47Z",
+        "metadata": {
+          "issueLabel": "pan-5233",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/overdeck/infra.ts",
+            "drizzle/overdeck/0000_overdeck_init.sql",
+            "tests/unit/lib/overdeck/workspace-tables.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/workspace-tables.test.ts",
+            "npm run typecheck",
+            "npm run lint:workspace-doors"
+          ],
+          "expected_outputs": [
+            "workspace-tables.test.ts passes including the new origin column and backfill cases",
+            "typecheck completes without errors",
+            "workspace-doors guard prints its passed line"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-7",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 1. In src/lib/overdeck/infra.ts ensureWorkspaceTablesSync: add `origin` text to the CREATE TABLE IF NOT EXISTS workspaces statement after `kind`; after the run_command ALTER top-up add `runSchemaTopUp(db, 'ALTER TABLE `workspaces` ADD COLUMN `origin` text')` and the guarded (try/catch, console.error, never throws) backfill UPDATE with the exact CASE from the PRD (issue->pipeline, main->operator, scratch named vault-<8 hex> or vault-<8 hex>-[2-9] -> vault, else operator; WHERE origin IS NULL). Add a tab-indented `origin` text line after `kind` in the workspaces CREATE TABLE of drizzle/overdeck/0000_overdeck_init.sql. Extend tests/unit/lib/overdeck/workspace-tables.test.ts with the column-present case and the backfill case described in the PRD (seed NULL-origin rows via odb.raw(), closeOverdeckDatabase() then odb.raw() to re-run the top-up)."
+        },
+        "items": [
+          {
+            "id": "origin-schema.ac1",
+            "title": "Given an overdeck.db opened through getOverdeckDatabase, when PRAGMA table_info(workspaces) runs, then it returns a column named origin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "origin-schema.ac2",
+            "title": "Given NULL-origin rows feature-pan-1 (issue), main (main), vault-0978a29e, vault-0978a29e-2, qwen-smoke and vault-notahex1 (scratch), when the top-up re-runs on reopen, then SELECT origin returns pipeline, operator, vault, vault, operator, operator for them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "origin-schema.ac3",
+            "title": "Given the backfill has run, when SELECT count(*) FROM workspaces WHERE origin IS NULL executes, then it returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "origin-schema.ac4",
+            "title": "Given the backfill UPDATE throws, when the database opens, then ensureWorkspaceTablesSync logs a [schema] error and returns without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "origin-write-door",
+        "title": "Add WorkspaceOrigin to the row type, the read door and createWorkspace",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T03:38:47Z",
+        "metadata": {
+          "issueLabel": "pan-5233",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "origin-identity-mirror",
+            "perform-create-origin",
+            "vault-continue-origin",
+            "cli-new-origin",
+            "route-credential-origin",
+            "rail-origin-filter",
+            "dead-issue-rows"
+          ],
+          "files_scope": [
+            "src/lib/workspaces/types.ts",
+            "src/lib/workspaces/resolver.ts",
+            "src/lib/workspaces/writer.ts",
+            "tests/unit/lib/workspaces/writer.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspaces/writer.test.ts",
+            "npx vitest run tests/unit/lib/workspaces/resolver.test.ts",
+            "npm run typecheck",
+            "npm run lint:workspace-doors"
+          ],
+          "expected_outputs": [
+            "writer.test.ts and resolver.test.ts pass",
+            "typecheck completes without errors",
+            "workspace-doors guard prints its passed line"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 2 (decisions D-1, D-4). src/lib/workspaces/types.ts: export type WorkspaceOrigin = 'operator' | 'pipeline' | 'vault' | 'agent'; add `origin: WorkspaceOrigin` to WorkspaceRow after kind. src/lib/workspaces/resolver.ts: add origin to WORKSPACE_COLUMNS after kind; rowToWorkspace maps NULL to kind==='issue' ? 'pipeline' : 'operator'. src/lib/workspaces/writer.ts: add `origin?: WorkspaceOrigin` to CreateWorkspaceOptions, export pure resolveWorkspaceOrigin(kind, requested) (issue->pipeline, main->operator, else requested ?? 'operator'), and write the resolved origin in createWorkspace's INSERT (column after kind, value after opts.kind). Do not change the identity-mirror payloads here (item origin-identity-mirror does). Extend tests/unit/lib/workspaces/writer.test.ts with the PRD's three cases."
+        },
+        "items": [
+          {
+            "id": "origin-write-door.ac1",
+            "title": "Given createWorkspace({ kind: 'issue', origin: 'operator', ... }), when the row is read with getWorkspaceById, then origin returns 'pipeline'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "origin-write-door.ac2",
+            "title": "Given createWorkspace({ kind: 'main', origin: 'agent', ... }), when the row is read, then origin returns 'operator'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "origin-write-door.ac3",
+            "title": "Given createWorkspace for a scratch row with no origin, when it is read, then origin defaults to 'operator'; with origin 'vault' it persists 'vault'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "origin-write-door.ac4",
+            "title": "Given a workspaces row whose origin column is NULL, when rowToWorkspace maps it, then an issue row returns 'pipeline' and a scratch row returns 'operator'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "origin-identity-mirror",
+        "title": "Carry origin through the workspace identity mirror and rebuild",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T03:38:47Z",
+        "metadata": {
+          "issueLabel": "pan-5233",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/memory/identity-record.ts",
+            "src/lib/workspaces/writer.ts",
+            "src/lib/workspaces/rebuild.ts",
+            "tests/lib/memory/identity-record.test.ts",
+            "tests/unit/lib/workspaces/writer.test.ts",
+            "tests/unit/lib/workspaces/rebuild.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/lib/memory/identity-record.test.ts",
+            "npx vitest run tests/unit/lib/workspaces/writer.test.ts",
+            "npx vitest run tests/unit/lib/workspaces/rebuild.test.ts",
+            "npx vitest run tests/unit/lib/workspaces/memory-migration.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "identity-record, writer, rebuild and memory-migration tests pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 3 (FR-11, D-6). src/lib/memory/identity-record.ts: add optional `origin?: WorkspaceOrigin` to WorkspaceIdentitySource and add `...(row.origin ? { origin: row.origin } : {})` to the merged object in writeWorkspaceIdentity. src/lib/workspaces/writer.ts: pass origin in the writeWorkspaceIdentity payloads of createWorkspace (resolved origin), archiveWorkspace and relocateWorkspace (workspace.origin). src/lib/workspaces/rebuild.ts: rebuildMainAndScratchWorkspaces passes `origin: typeof record.origin === 'string' ? record.origin as WorkspaceOrigin : undefined` to createWorkspace; migrateMemoryHomesToWorkspaces passes origin: workspace.origin to writeWorkspaceIdentity. Tests in tests/lib/memory/identity-record.test.ts, tests/unit/lib/workspaces/writer.test.ts and tests/unit/lib/workspaces/rebuild.test.ts per the PRD."
+        },
+        "items": [
+          {
+            "id": "origin-identity-mirror.ac1",
+            "title": "Given an identity record written with origin 'vault', when writeWorkspaceIdentity rewrites it from a source without origin, then readWorkspaceIdentity still returns origin 'vault'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "origin-identity-mirror.ac2",
+            "title": "Given a scratch row created with origin 'agent', when archiveWorkspace runs, then the metadata.json at resolveWorkspaceIdentityPath returns origin 'agent'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "origin-identity-mirror.ac3",
+            "title": "Given a scratch identity record with origin 'vault' and no DB row, when rebuildMainAndScratchWorkspaces runs, then the recreated row persists origin 'vault'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "origin-identity-mirror.ac4",
+            "title": "Given a scratch identity record without origin and no DB row, when rebuildMainAndScratchWorkspaces runs, then the recreated row defaults to origin 'operator'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "perform-create-origin",
+        "title": "Let performWorkspaceCreate forward an origin to the writer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T03:38:47Z",
+        "metadata": {
+          "issueLabel": "pan-5233",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/workspaces/create.ts",
+            "tests/unit/lib/workspaces/create.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspaces/create.test.ts",
+            "npx vitest run tests/unit/lib/workspaces/create-intent.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "create.test.ts passes with the new origin cases",
+            "create-intent.test.ts passes unchanged",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 4 (D-2). src/lib/workspaces/create.ts: add exported interface PerformWorkspaceCreateOptions { origin?: WorkspaceOrigin } and change the signature to performWorkspaceCreate(intent, options: PerformWorkspaceCreateOptions = {}); pass origin: options.origin into its createWorkspace({ ... }) call. Do NOT add origin to WorkspaceCreateInput, ResolvedWorkspaceIntent, resolveWorkspaceCreateIntent or toDryRunPayload. Extend tests/unit/lib/workspaces/create.test.ts with the two PRD cases."
+        },
+        "items": [
+          {
+            "id": "perform-create-origin.ac1",
+            "title": "Given performWorkspaceCreate(intent, { origin: 'vault' }), when it writes the row, then the mocked createWorkspace receives an argument containing origin 'vault'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "perform-create-origin.ac2",
+            "title": "Given performWorkspaceCreate(intent) with no options, when it writes the row, then createWorkspace receives origin undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "perform-create-origin.ac3",
+            "title": "Given resolveWorkspaceCreateIntent and toDryRunPayload, when create-intent.test.ts runs unchanged, then the dry-run payload returns the same nine keys in the same order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-continue-origin",
+        "title": "Stamp Session Vault continue workspaces with origin vault",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T03:38:47Z",
+        "metadata": {
+          "issueLabel": "pan-5233",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "trivial",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/services/vault-continue.ts",
+            "tests/unit/dashboard/server/services/vault-continue.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/vault-continue.test.ts",
+            "npx vitest run tests/unit/dashboard/server/services/vault-continue-codex-placement.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vault-continue tests pass including the origin assertion",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-3"
+          ],
+          "acJustification": "One-line change; two criteria cover the call and the unchanged retry behavior."
+        },
+        "narrative": {
+          "Action": "PRD work item 5 (FR-3). In src/dashboard/server/services/vault-continue.ts createScratchWorkspace, change `await deps.performWorkspaceCreate(intent);` to `await deps.performWorkspaceCreate(intent, { origin: 'vault' });`. In tests/unit/dashboard/server/services/vault-continue.test.ts, in the case 'a dirty target with a project gets a scratch workspace, retrying on path-exists', assert the deps performWorkspaceCreate mock was called with (expect.anything(), { origin: 'vault' })."
+        },
+        "items": [
+          {
+            "id": "vault-continue-origin.ac1",
+            "title": "Given a dirty target with a project, when Continue here creates the vault-<id8> scratch workspace, then performWorkspaceCreate receives { origin: 'vault' } as its second argument",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-continue-origin.ac2",
+            "title": "Given the first vault-<id8> path exists, when createScratchWorkspace retries with vault-<id8>-2, then the retried create also passes { origin: 'vault' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-new-origin",
+        "title": "Stamp pan workspace new with agent or operator and add --origin",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T03:38:47Z",
+        "metadata": {
+          "issueLabel": "pan-5233",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/workspace-scratch.ts",
+            "src/cli/commands/workspace.ts",
+            "tests/unit/cli/workspace-new-origin.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/workspace-new-origin.test.ts",
+            "npx vitest run tests/unit/cli/workspace-scratch-isolated.test.ts",
+            "npx vitest run tests/unit/cli/workspace-new-target-path.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "workspace-new-origin.test.ts passes",
+            "existing workspace-new CLI tests pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 6 (FR-4, D-8). src/cli/commands/workspace-scratch.ts: add origin?: string to WorkspaceNewOptions; export pure resolveNewWorkspaceOrigin(explicit, env = process.env) exactly as in the PRD (explicit operator/agent wins; any other explicit value throws `Invalid --origin '<v>'. Expected operator or agent.`; else OVERDECK_AGENT_ID or OVERDECK_CONVERSATION non-empty -> agent, otherwise operator). In workspaceNewCommand resolve it before resolveWorkspaceCreateIntent and call performWorkspaceCreate(intent, { origin }) (scratch path only; workspaceMainCommand unchanged). src/cli/commands/workspace.ts: add the --origin <origin> option with the PRD's help text to the `new <name>` command. New test tests/unit/cli/workspace-new-origin.test.ts with the five PRD cases."
+        },
+        "items": [
+          {
+            "id": "cli-new-origin.ac1",
+            "title": "Given an env with neither OVERDECK_AGENT_ID nor OVERDECK_CONVERSATION, when resolveNewWorkspaceOrigin(undefined, env) runs, then it returns 'operator'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-new-origin.ac2",
+            "title": "Given OVERDECK_AGENT_ID or OVERDECK_CONVERSATION set, when resolveNewWorkspaceOrigin(undefined, env) runs, then it returns 'agent'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-new-origin.ac3",
+            "title": "Given OVERDECK_AGENT_ID set and explicit 'operator', when resolveNewWorkspaceOrigin runs, then it returns 'operator'; given explicit 'pipeline' it throws an error containing Invalid --origin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-new-origin.ac4",
+            "title": "Given the built CLI, when `pan workspace new --help` runs, then its output lists the --origin <origin> option",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-credential-origin",
+        "title": "Derive the registry create route's origin from the request credential",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T03:38:47Z",
+        "metadata": {
+          "issueLabel": "pan-5233",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/workspace-registry.ts",
+            "tests/unit/dashboard/workspace-registry-create.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/workspace-registry-create.test.ts",
+            "npx vitest run tests/unit/dashboard/workspace-registry-integration.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "workspace-registry-create.test.ts passes including every credential mapping",
+            "workspace-registry-integration.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 7 (FR-5, D-3). In src/dashboard/server/routes/workspace-registry.ts import resolveRequestCredential and type DashboardCredential from ./dashboard-auth.js, add exported pure workspaceOriginForCredential(credential: DashboardCredential | null): 'operator' | 'agent' implementing the D-3 table exactly (root-session, device, phone, token without agentId, machine with actor === 'operator', null -> operator; token with agentId, machine with an { agentId } actor, internal-token, connector -> agent). In postWorkspaceRegistryCreateRoute call performWorkspaceCreate(intent, { origin: workspaceOriginForCredential(resolveRequestCredential(request)) }). toCreateInput must not read body.origin. Tests in tests/unit/dashboard/workspace-registry-create.test.ts: add resolveRequestCredential to routeMocks and to the dashboard-auth vi.mock factory, unit-test every table row, and the two route cases from the PRD."
+        },
+        "items": [
+          {
+            "id": "route-credential-origin.ac1",
+            "title": "Given each DashboardCredential variant in the D-3 table, when workspaceOriginForCredential runs, then it returns the origin the table names for that variant",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-credential-origin.ac2",
+            "title": "Given a connector credential and a body carrying origin 'operator', when POST /api/workspace-registry creates a workspace, then performWorkspaceCreate receives { origin: 'agent' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-credential-origin.ac3",
+            "title": "Given a root-session credential, when POST /api/workspace-registry creates a workspace, then performWorkspaceCreate receives { origin: 'operator' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rail-origin-filter",
+        "title": "List only operator-made or favorited workspaces in the rail and Cmd-K, removing the pipeline count rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T03:38:47Z",
+        "metadata": {
+          "issueLabel": "pan-5233",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Sidebar.tsx",
+            "src/dashboard/frontend/src/components/CommandPalette.tsx",
+            "src/dashboard/frontend/src/components/workspace-rail-filter.test.tsx"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/workspace-rail-filter.test.tsx",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "workspace-rail-filter.test.tsx passes",
+            "typecheck completes without errors",
+            "file-size guard passes (Sidebar.tsx and CommandPalette.tsx shrink)"
+          ],
+          "traces": [
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 8 (FR-8, FR-9). Sidebar.tsx: add origin to WorkspaceRegistryRow; isUserFacingWorkspace returns workspace.origin === 'operator' || workspace.isFavorite with the PRD doc comment; delete WORKSPACES_PIPELINE_EXPANDED_KEY, workspacesPipelineExpanded, toggleWorkspacesPipelineExpanded, pipelineWorkspaces and the sidebar-workspaces-pipeline-toggle block; leave the Archived block alone (D-9). CommandPalette.tsx: drop the WORKSPACES_PIPELINE_EXPANDED_KEY import, pipelineWorkspacesExpanded state and its re-read, hiddenPipelineWorkspaces and the workspace-pipeline-expand action; visibleWorkspaceRows = sortWorkspaces(workspaceRows.filter(isUserFacingWorkspace)); fix dependency arrays; keep runTargetWorkspace over all non-archived rows; remove imports only this change leaves unused. Rewrite src/dashboard/frontend/src/components/workspace-rail-filter.test.tsx per the PRD."
+        },
+        "items": [
+          {
+            "id": "rail-origin-filter.ac1",
+            "title": "Given registry rows with origins operator, vault, agent, pipeline and a favorited agent row, when isUserFacingWorkspace runs, then it returns true only for the operator row and the favorited row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rail-origin-filter.ac2",
+            "title": "Given a registry of a non-favorited operator main row, an operator scratch, vault scratch, agent scratch, pipeline issue and favorited agent scratch, when the Sidebar renders, then the WORKSPACES rail lists exactly the operator scratch and favorited rows and no element with text matching /Pipeline worktree/ or testid sidebar-workspaces-pipeline-toggle renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rail-origin-filter.ac3",
+            "title": "Given that same registry, when the Cmd-K workspaces scope opens, then it lists the operator scratch row, the favorited row and the main row under its project name, and no action label matches /pipeline worktree/i",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rail-origin-filter.ac4",
+            "title": "Given the change, when git grep -n 'WORKSPACES_PIPELINE_EXPANDED_KEY\\|sidebar-workspaces-pipeline-toggle\\|workspace-pipeline-expand' src/dashboard/frontend/src runs, then it returns no match outside tests asserting absence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rail-origin-filter.ac5",
+            "title": "Given a running dashboard in an isolated Playwright browser, when the sidebar renders, then the WORKSPACES section shows no 'Pipeline worktrees' row and no vault-* row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dead-issue-rows",
+        "title": "Archive dead issue rows in rebuild-workspaces and delete terminal-issues.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T03:38:47Z",
+        "metadata": {
+          "issueLabel": "pan-5233",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/workspaces/rebuild.ts",
+            "src/cli/commands/db.ts",
+            "src/lib/overdeck/terminal-issues.ts",
+            "tests/unit/lib/workspaces/rebuild-archive-terminal.test.ts",
+            "tests/unit/lib/workspaces/rebuild-archive-dead.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspaces/rebuild-archive-dead.test.ts",
+            "npx vitest run tests/unit/lib/workspaces/rebuild.test.ts",
+            "npx vitest run src/cli/commands/__tests__/workspace-rebuild.test.ts",
+            "npm run typecheck",
+            "git grep -n terminal-issues -- src tests"
+          ],
+          "expected_outputs": [
+            "rebuild-archive-dead.test.ts and rebuild.test.ts pass",
+            "typecheck completes without errors",
+            "git grep for terminal-issues prints nothing"
+          ],
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 9 (FR-10, D-7). src/lib/workspaces/rebuild.ts: replace ArchiveTerminalIssueWorkspacesOptions/Result and archiveTerminalIssueWorkspaces with ArchiveDeadIssueWorkspacesOptions { dryRun?, verbose?, now? }, ArchiveDeadIssueWorkspacesResult, const DEAD_ROW_MIN_AGE_MS = 10 * 60 * 1000 and archiveDeadIssueWorkspaces exactly as in the PRD (skip rows younger than 10 minutes or whose path exists; archive via archiveWorkspace; dry run writes nothing); move the existing pathExists helper above it; update the module header paragraph. src/cli/commands/db.ts rebuildWorkspacesCommand: drop the resolveTerminalIssueIds import, call archiveDeadIssueWorkspaces({ dryRun, verbose }), and use the PRD's two spinner texts ('... issue workspaces whose directory is gone'). Delete src/lib/overdeck/terminal-issues.ts and tests/unit/lib/workspaces/rebuild-archive-terminal.test.ts; add tests/unit/lib/workspaces/rebuild-archive-dead.test.ts with the five PRD cases, passing now explicitly (no fake timers)."
+        },
+        "items": [
+          {
+            "id": "dead-issue-rows.ac1",
+            "title": "Given a non-archived issue row older than 10 minutes whose path is missing, when archiveDeadIssueWorkspaces runs, then getWorkspaceById returns isArchived true and the id appears in archivedIds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dead-issue-rows.ac2",
+            "title": "Given an issue row whose path exists, or one created less than 10 minutes before options.now, when archiveDeadIssueWorkspaces runs, then the row stays unarchived and is counted in skipped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dead-issue-rows.ac3",
+            "title": "Given dryRun true and one dead row, when archiveDeadIssueWorkspaces runs, then it returns archived 1 and the row's isArchived stays false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dead-issue-rows.ac4",
+            "title": "Given the built CLI, when `pan admin db rebuild-workspaces --dry-run` runs, then it prints 'would archive N of M issue workspaces whose directory is gone'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dead-issue-rows.ac5",
+            "title": "Given the change, when git grep -n terminal-issues -- src tests runs, then it returns no match and src/lib/overdeck/terminal-issues.ts no longer exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-origin",
+        "title": "Document workspace origin, the operator-only rail and dead-row archival",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T03:38:47Z",
+        "metadata": {
+          "issueLabel": "pan-5233",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "configuration/workspaces.mdx",
+            "sync-sources/skills/pan-workspace/SKILL.md",
+            "changelog.d/pan-5233.md"
+          ],
+          "verify_commands": [
+            "npm run lint:docs",
+            "npm run lint:skills",
+            "git grep -n 'pipeline worktrees' -- configuration/workspaces.mdx docs/WORKSPACES-AND-PROJECTS.md"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "lint:skills passes",
+            "the git grep prints nothing"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-8",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 10. docs/WORKSPACES-AND-PROJECTS.md: add a WorkspaceRow.origin paragraph to the kind section (four values, D-1 writer rule, who stamps vault and agent, short D-3 credential mapping); replace Rebuild step 5 with archiveDeadIssueWorkspaces() (dead = directory gone, rows younger than 10 minutes skipped) and note reapIssueResidue archives the row when the reaper removes the worktree; rename 'User-facing surfaces vs. pipeline worktrees (PAN-3286)' to 'User-facing surfaces (PAN-5233)' describing origin === 'operator' || isFavorite, the kept main-row rule, and the removed count row and WORKSPACES_PIPELINE_EXPANDED_KEY. configuration/workspaces.mdx: rewrite the Sidebar and Cmd-K bullets (no pipeline count row) and add the `pan workspace new my-notes --origin operator` example with the one-sentence agent default note. sync-sources/skills/pan-workspace/SKILL.md: add [--origin operator|agent] to the synopsis and the one-line instruction. Add changelog.d/pan-5233.md with the PRD's #### Fixed entry."
+        },
+        "items": [
+          {
+            "id": "docs-origin.ac1",
+            "title": "Given docs/WORKSPACES-AND-PROJECTS.md, when a reader opens the kind section, then it defines WorkspaceRow.origin with the values operator, pipeline, vault and agent and names who stamps each",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-origin.ac2",
+            "title": "Given docs/WORKSPACES-AND-PROJECTS.md, when a reader opens the Rebuild section, then step 5 names archiveDeadIssueWorkspaces() and states that rows younger than 10 minutes are skipped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-origin.ac3",
+            "title": "Given configuration/workspaces.mdx and the pan-workspace SKILL.md, when a reader looks up pan workspace new, then both show the --origin operator|agent flag and say a managed session defaults to agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-origin.ac4",
+            "title": "Given changelog.d/pan-5233.md, when npm run lint:docs runs, then it accepts the file's single #### Fixed heading and bullet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "origin-schema",
+        "to": "origin-write-door",
+        "type": "blocks"
+      },
+      {
+        "from": "origin-write-door",
+        "to": "origin-identity-mirror",
+        "type": "blocks"
+      },
+      {
+        "from": "origin-write-door",
+        "to": "perform-create-origin",
+        "type": "blocks"
+      },
+      {
+        "from": "origin-write-door",
+        "to": "rail-origin-filter",
+        "type": "blocks"
+      },
+      {
+        "from": "perform-create-origin",
+        "to": "vault-continue-origin",
+        "type": "blocks"
+      },
+      {
+        "from": "perform-create-origin",
+        "to": "cli-new-origin",
+        "type": "blocks"
+      },
+      {
+        "from": "perform-create-origin",
+        "to": "route-credential-origin",
+        "type": "blocks"
+      },
+      {
+        "from": "origin-identity-mirror",
+        "to": "dead-issue-rows",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
