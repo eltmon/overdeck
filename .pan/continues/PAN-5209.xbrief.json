@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5209",
   "created": "2026-11-14T01:28:12.101Z",
-  "updated": "2026-11-14T02:05:37.985Z",
+  "updated": "2026-11-14T02:05:44.384Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,11 @@
     "dod-forge-merge-verdict.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T02:05:37.985Z"
+    },
+    "dod-rows-forge-merge-wiring": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5209",
+      "claimedAt": "2026-11-14T02:05:44.384Z"
     }
   }
 }
