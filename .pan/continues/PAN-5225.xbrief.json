@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5225",
   "created": "2026-11-14T03:19:12.068Z",
-  "updated": "2026-11-14T04:04:02.965Z",
+  "updated": "2026-11-14T04:04:15.453Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,11 @@
     "docs-close-out-and-shim.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T04:04:02.965Z"
+    },
+    "live-dod-probe": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5225",
+      "claimedAt": "2026-11-14T04:04:15.453Z"
     }
   }
 }
