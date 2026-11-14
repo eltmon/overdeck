@@ -30,7 +30,7 @@ describe('FlywheelLaneBoard (PAN-5283 FR-7)', () => {
     const status = boardStatus({ inFlight: [{ issueId: 'PAN-1', title: 'Old', state: 'in-review', liveAgents: 0, inTick: false, lastJournal: null }] });
     render(<FlywheelLaneBoard status={status} nowMs={NOW} />);
     expect(within(screen.getByTestId('flywheel-lane-review')).getByTestId('flywheel-card-PAN-1')).toBeInTheDocument();
-    expect(screen.getByTestId('flywheel-card-agent-PAN-1')).toHaveTextContent('no agent');
+    expect(screen.getByTestId('flywheel-agentline-PAN-1')).toHaveTextContent('no agent');
   });
 
   it('card shows the blocker text and never the raw journal type', () => {
@@ -48,21 +48,21 @@ describe('FlywheelLaneBoard (PAN-5283 FR-7)', () => {
     const card = screen.getByTestId('flywheel-card-PAN-5275');
     expect(screen.getByTestId('flywheel-blocker-PAN-5275')).toHaveTextContent('typecheck queued: 11.5 GB free, needs 2.2 GB, gates keep 12.0 GB (20 min)');
     expect(card).not.toHaveTextContent('no agent');
-    expect(screen.getByTestId('flywheel-card-agent-PAN-5275')).toHaveTextContent('work · claude-sonnet-5 · waiting');
+    expect(screen.getByTestId('flywheel-agentline-PAN-5275')).toHaveTextContent('work · claude-sonnet-5 · waiting');
   });
 
   it('a handoff agent shows role handoff and the conversation name', () => {
     render(<FlywheelLaneBoard status={boardStatus()} nowMs={NOW} />);
-    expect(screen.getByTestId('flywheel-card-agent-PAN-5276')).toHaveTextContent('handoff 20261114-d9c5 · claude-opus-5-5 · working');
-    expect(screen.getByTestId('flywheel-card-owner-PAN-5276')).toHaveTextContent('conv 20261114-d9c5');
-    expect(screen.getByTestId('flywheel-card-owner-PAN-5276')).toHaveAttribute('title', 'Handoff for PAN-5276');
+    expect(screen.getByTestId('flywheel-agentline-PAN-5276')).toHaveTextContent('handoff 20261114-d9c5 · claude-opus-5-5 · working');
+    expect(screen.getByTestId('flywheel-owner-PAN-5276')).toHaveTextContent('conv 20261114-d9c5');
+    expect(screen.getByTestId('flywheel-owner-PAN-5276')).toHaveAttribute('title', 'Handoff for PAN-5276');
   });
 
   it('shows time in stage, cost and the full title with a two-line clamp', () => {
     render(<FlywheelLaneBoard status={boardStatus()} nowMs={NOW} />);
-    expect(screen.getByTestId('flywheel-card-since-PAN-5276')).toHaveTextContent('42m in stage');
-    expect(screen.getByTestId('flywheel-card-cost-PAN-5095')).toHaveTextContent('$7.84');
-    expect(screen.queryByTestId('flywheel-card-cost-PAN-5281')).toBeNull();
+    expect(screen.getByTestId('flywheel-since-PAN-5276')).toHaveTextContent('42m in stage');
+    expect(screen.getByTestId('flywheel-cost-PAN-5095')).toHaveTextContent('$7.84');
+    expect(screen.queryByTestId('flywheel-cost-PAN-5281')).toBeNull();
     const title = screen.getByTestId('flywheel-title-PAN-5276');
     expect(title).toHaveClass('line-clamp-2');
     expect(title).toHaveAttribute('title', 'Add the shipped-today timeline to the Flywheel page');

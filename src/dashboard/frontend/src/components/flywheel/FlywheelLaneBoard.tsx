@@ -68,7 +68,7 @@ function AgentLine({ row }: { row: FlywheelInFlightRow }) {
   const agent = row.agent;
   if (agent) {
     return (
-      <span className="block truncate text-muted-foreground" data-testid={`flywheel-card-agent-${row.issueId}`}>
+      <span className="block truncate text-muted-foreground" data-testid={`flywheel-agentline-${row.issueId}`}>
         {agent.role}
         {agent.conversationName && <> <span className="font-mono">{agent.conversationName}</span></>}
         {agent.model && <> · <span className="font-mono">{agent.model}</span></>}
@@ -79,9 +79,9 @@ function AgentLine({ row }: { row: FlywheelInFlightRow }) {
   }
   // A server without board fields still reports the live pane count.
   if (row.agent === undefined && row.liveAgents > 0) {
-    return <span className="block text-muted-foreground" data-testid={`flywheel-card-agent-${row.issueId}`}>{row.liveAgents} live agent{row.liveAgents === 1 ? '' : 's'}</span>;
+    return <span className="block text-muted-foreground" data-testid={`flywheel-agentline-${row.issueId}`}>{row.liveAgents} live agent{row.liveAgents === 1 ? '' : 's'}</span>;
   }
-  return <span className="block text-muted-foreground" data-testid={`flywheel-card-agent-${row.issueId}`}>no agent</span>;
+  return <span className="block text-muted-foreground" data-testid={`flywheel-agentline-${row.issueId}`}>no agent</span>;
 }
 
 export function FlywheelIssueCard({ row, nowMs, onNavigateIssue }: {
@@ -105,23 +105,25 @@ export function FlywheelIssueCard({ row, nowMs, onNavigateIssue }: {
       <span className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
         <span className="font-mono text-foreground">{row.issueId}</span>
         <span className="flex flex-wrap items-baseline gap-x-1.5">
-          {inStage && <span data-testid={`flywheel-card-since-${row.issueId}`}>{inStage} in stage</span>}
-          {typeof row.cost === 'number' && <span data-testid={`flywheel-card-cost-${row.issueId}`}>· ${row.cost.toFixed(2)}</span>}
+          {inStage && <span data-testid={`flywheel-since-${row.issueId}`}>{inStage} in stage</span>}
+          {typeof row.cost === 'number' && <span data-testid={`flywheel-cost-${row.issueId}`}>· ${row.cost.toFixed(2)}</span>}
           {row.pr && <span className="font-mono">· PR #{row.pr.number}</span>}
           {owner && (
-            <span title={owner.title} data-testid={`flywheel-card-owner-${row.issueId}`} className="border border-border px-1 text-[10px]">
+            <span title={owner.title} data-testid={`flywheel-owner-${row.issueId}`} className="border border-border px-1 text-[10px]">
               {owner.text}
             </span>
           )}
         </span>
       </span>
-      <span
-        className="my-0.5 line-clamp-2 block text-[13px] font-medium text-foreground"
-        title={row.title ?? undefined}
-        data-testid={`flywheel-title-${row.issueId}`}
-      >
-        {row.title ?? row.issueId}
-      </span>
+      {row.title && (
+        <span
+          className="my-0.5 line-clamp-2 block text-[13px] font-medium text-foreground"
+          title={row.title}
+          data-testid={`flywheel-title-${row.issueId}`}
+        >
+          {row.title}
+        </span>
+      )}
       {(row.trackerUnknown || row.strike) && (
         <span className="mb-0.5 flex flex-wrap gap-1">
           {row.trackerUnknown && <StatusBadge tone="neutral" testId={`flywheel-tracker-unknown-${row.issueId}`}>tracker unknown</StatusBadge>}
