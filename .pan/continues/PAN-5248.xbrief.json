@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5248",
   "created": "2026-11-14T05:37:27.839Z",
-  "updated": "2026-11-14T06:39:54.962Z",
+  "updated": "2026-11-14T06:39:57.362Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -234,6 +234,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5248",
       "claimedAt": "2026-11-14T06:39:54.962Z"
+    },
+    "docs-admission": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T06:39:57.362Z"
     }
   }
 }
