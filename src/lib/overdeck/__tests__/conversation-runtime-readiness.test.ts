@@ -3,7 +3,10 @@
  * terminal backend, so a conversation on a Herdr pane (no tmux session) still
  * becomes ready.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const readAgentPaneText = vi.hoisted(() => vi.fn(async (_agentId: string, _lines: number, _backend?: unknown, _source?: string) => ''));
 const capturePane = vi.hoisted(() => vi.fn(async () => ''));
@@ -36,7 +39,7 @@ vi.mock('../../agents.js', async (importOriginal) => {
   return { ...actual, waitForReadySignal: vi.fn(actual.waitForReadySignal) };
 });
 
-const { waitForConversationRuntimeReady, waitForPiTuiReady } = await import('../conversation-runtime.js');
+const { piFamilyNotReadyMessage, waitForConversationRuntimeReady, waitForPiTuiReady } = await import('../conversation-runtime.js');
 const { waitForPromptReady, waitForHostReady, waitForCodexAppServerReady } = await import('../../agents/runtime-command.js');
 const { waitForClaudeReady } = await import('../claude-readiness.js');
 const { waitForReadySignal } = await import('../../agents.js');
@@ -84,6 +87,52 @@ describe('conversation readiness on the host backend (PAN-3921)', () => {
     await expect(waitForPromptReady('conv-x', 'kimi-code', 5)).resolves.toBe(true);
     expect(readAgentPaneText).toHaveBeenCalledWith('conv-x', 80, undefined, 'visible');
     expect(capturePane).not.toHaveBeenCalled();
+  });
+});
+
+describe('pi conversation readiness (PAN-5223)', () => {
+  // The exact pane text of a dashboard-created pi 0.85 conversation: changelog
+  // banner, extension-package warning, update notice, then the footer.
+  const startupPane = readFileSync(join(import.meta.dirname, 'fixtures', 'pi-0.85-startup-pane.txt'), 'utf8');
+  let home: string;
+  let originalHome: string | undefined;
+  beforeEach(() => {
+    home = mkdtempSync(join(tmpdir(), 'pan-5223-ready-'));
+    originalHome = process.env.OVERDECK_HOME;
+    process.env.OVERDECK_HOME = home;
+  });
+  afterEach(() => {
+    if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalHome;
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it('resolves as soon as the extension writes ready.json, with no pane text at all', async () => {
+    // Herdr's pane reader returns '' today; the ready file must carry pi on its own.
+    readAgentPaneText.mockResolvedValue('');
+    mkdirSync(join(home, 'agents', 'conv-pi'), { recursive: true });
+    writeFileSync(join(home, 'agents', 'conv-pi', 'ready.json'), '{"sessionId":"s"}');
+    const started = Date.now();
+    await expect(waitForPiTuiReady('conv-pi', 5_000, 'pi')).resolves.toBe(true);
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(readAgentPaneText).not.toHaveBeenCalled();
+  });
+
+  it('reads the pi startup pane (banners, warnings, footer) as ready through the text fallback', async () => {
+    readAgentPaneText.mockResolvedValue(startupPane);
+    await expect(waitForPiTuiReady('conv-pi', 5_000, 'pi')).resolves.toBe(true);
+  });
+
+  it('does not treat ready.json as ready for omp, whose TUI wait also covers MCP startup', async () => {
+    readAgentPaneText.mockResolvedValue('');
+    mkdirSync(join(home, 'agents', 'conv-omp'), { recursive: true });
+    writeFileSync(join(home, 'agents', 'conv-omp', 'ready.json'), '{"sessionId":"s"}');
+    await expect(waitForPiTuiReady('conv-omp', 600, 'ohmypi')).resolves.toBe(false);
+  });
+
+  it('names the real harness when a pi-family launch never becomes ready', () => {
+    expect(piFamilyNotReadyMessage('conv-pi', 'pi')).toMatch(/^Pi \(pi\) did not become interactive in conv-pi .*ready\.json/);
+    expect(piFamilyNotReadyMessage('conv-omp', 'ohmypi')).toMatch(/^Oh My Pi \(ohmypi\) did not become interactive/);
   });
 });
 

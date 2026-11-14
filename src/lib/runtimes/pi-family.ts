@@ -46,6 +46,13 @@ export interface PiFamilyProfile {
    * custom `nous` provider that pi-models.ts provisions.
    */
   readonly providerOverrides: Readonly<Record<string, string>>
+  /**
+   * The extension's ready.json (written at session_start) means the TUI takes
+   * input, so conversation readiness can wait on it (PAN-5223). pi: true,
+   * verified (ready.json 1.5 s after launch, prompt accepted). omp: false; its
+   * TUI wait also holds for MCP servers to finish connecting.
+   */
+  readonly readyFileMeansInteractive: boolean
 }
 
 const PROFILES: Record<PiFamilyHarness, PiFamilyProfile> = {
@@ -59,6 +66,7 @@ const PROFILES: Record<PiFamilyHarness, PiFamilyProfile> = {
     resolveExtensionPath: () => resolvePiExtensionPath(),
     checksOmpCodexAuth: false,
     providerOverrides: { mimo: 'xiaomi-token-plan-sgp', nous: 'nous' },
+    readyFileMeansInteractive: true,
   },
   ohmypi: {
     harness: 'ohmypi',
@@ -70,6 +78,7 @@ const PROFILES: Record<PiFamilyHarness, PiFamilyProfile> = {
     resolveExtensionPath: () => resolveOhmypiExtensionPath(),
     checksOmpCodexAuth: true,
     providerOverrides: {},
+    readyFileMeansInteractive: false,
   },
 }
 

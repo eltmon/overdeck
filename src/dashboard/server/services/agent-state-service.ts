@@ -77,8 +77,11 @@ export function observeSessionIndexEvent(
   log: (...values: unknown[]) => void = (...values) => console.error(...values),
 ): void {
   if (ev.type !== 'agent.model_set') return;
-  const payload = ev.payload as { agentId?: string; claudeSessionId?: string; model?: string; transcriptPath?: string };
+  const payload = ev.payload as { agentId?: string; claudeSessionId?: string; model?: string; transcriptPath?: string; sessionIndexed?: boolean };
   if (!payload.agentId || !payload.claudeSessionId) return;
+  // The pi/omp extensions append their own complete session-start row (harness,
+  // model, transcript path); a second one here had harness "unknown" (PAN-5223).
+  if (payload.sessionIndexed) return;
   try {
     append(payload.agentId, payload.claudeSessionId, 'session-start', { model: payload.model, path: payload.transcriptPath });
   } catch (error) {

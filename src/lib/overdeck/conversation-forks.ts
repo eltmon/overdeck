@@ -268,7 +268,7 @@ export async function injectForkSummary(conv: Conversation, summary: string, cal
   const method = resolveConversationDeliveryMethod(conv);
   const behavior = getHarnessBehavior(conv.harness);
   if (behavior.transcriptKind === 'ohmypi-jsonl') {
-    await waitForPiTuiReady(conv.tmuxSession, 60000);
+    await waitForPiTuiReady(conv.tmuxSession, 60000, conv.harness ?? undefined);
     assertForkDelivered(conv, caller, await deliverAgentMessage(conv.tmuxSession, summary, caller, method));
     return 'submitted';
   }

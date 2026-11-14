@@ -249,10 +249,26 @@ function isPiTuiInputReady(snapshot: string): boolean {
     // under it reads `0.0%/131k (auto)` once the TUI accepts input.
     || /(?:^|\s)\d+(?:\.\d+)?%\/\d+(?:\.\d+)?[kKmM]?\b/.test(snapshot);
 }
-export async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 60_000): Promise<boolean> {
+/**
+ * Wait until a pi-family (pi or omp) conversation accepts input.
+ *
+ * For pi the deterministic signal is the Overdeck extension's `ready.json`,
+ * written at `session_start` (PAN-5223; `readyFileMeansInteractive` in the
+ * pi-family profile). spawnConversationSession deletes any previous one
+ * before the launch, so only this launch's file counts. The TUI text match is
+ * kept as an either-or fallback, and is the only signal for omp. On Herdr it currently sees
+ * no text: Overdeck's `pane.read` reader returns '' (it reads `result.text`,
+ * herdr 0.9.1 answers `{ read: { text } }`), tracked separately.
+ */
+export async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 60_000, harness?: RuntimeName): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
+  const readyPath = harness && getPiFamilyProfile(harness).readyFileMeansInteractive ? piFifoPaths(tmuxSession).readyPath : null;
   let stableV17FooterPolls = 0;
   while (Date.now() < deadline) {
+    if (readyPath && await fileExists(readyPath)) {
+      console.log(`[conversations] Pi-family extension ready.json present for ${tmuxSession}`);
+      return true;
+    }
     const snapshot = await readConversationPane(tmuxSession, 40);
     const mcpConnecting = /Connecting to MCP servers/i.test(snapshot) && !/MCP finished/i.test(snapshot);
     // omp v17 paints its footer before MCP startup and redraws again afterward.
@@ -265,6 +281,15 @@ export async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 60_000)
   }
   console.warn(`[conversations] Timed out waiting for Pi TUI to render in ${tmuxSession}`);
   return false;
+}
+/** The readiness failure for a pi-family conversation, naming the real harness (PAN-5223). */
+export function piFamilyNotReadyMessage(tmuxSession: string, harness: RuntimeName): string {
+  return `${getHarnessBehavior(harness).displayName} (${harness}) did not become interactive in ${tmuxSession} within the startup window: `
+    + 'the Overdeck extension wrote no ready.json and the TUI never showed its input prompt. '
+    + 'Check the pane for a startup error, and that the extension bundle exists (pan doctor).';
+}
+async function fileExists(path: string): Promise<boolean> {
+  return stat(path).then(() => true, () => false);
 }
 export function shouldReportUnresolvedLiveSession(
   conv: Pick<Conversation, 'status' | 'harness'> | null | undefined,
@@ -338,7 +363,7 @@ export async function waitForConversationRuntimeReady(tmuxSession: string, harne
       await waitForHostReady(tmuxSession, 'prime-agent', 60, { sessionExists: tmuxSessionExists });
       return;
     case 'ohmypi-ready-file':
-      if (!await waitForPiTuiReady(tmuxSession)) throw new Error(`Pi (ohmypi) did not become interactive in ${tmuxSession} within the startup window — MCP server connections are likely still in progress. Retry once MCP servers finish connecting, or check ~/.claude/mcp.json for a slow/hanging server.`);
+      if (!await waitForPiTuiReady(tmuxSession, undefined, harness)) throw new Error(piFamilyNotReadyMessage(tmuxSession, harness));
       return;
     case 'kimi-session-signal':
       // PAN-1837: the native kimi binary never prints Claude Code's ready markers, so wait on its own prompt.
@@ -678,6 +703,8 @@ export async function spawnConversationSession(
       const piSessionDir = piSessionsRoot(paths.agentDir);
       await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
       await mkdir(piSessionDir, { recursive: true, mode: 0o700 });
+      // PAN-5223: readiness waits on this launch's ready.json; a previous launch's file would pass it early.
+      await rm(paths.readyPath, { force: true });
       const storedPiSessionId = resume
         ? readLatestIndexedSessionId(tmuxSession) ?? undefined
         : undefined;
