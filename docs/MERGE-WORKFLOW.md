@@ -73,6 +73,9 @@ the UAT reconciler waits until `merge_train.batch_size` (default 3) features
 are ready, or the oldest has waited `merge_train.batch_wait_minutes` (default
 30), and then assembles a batch of at most `batch_size` features. A lone
 feature at the timeout makes a one-member batch, so nothing waits forever.
+Assembly merges each member with `git merge --no-ff`, so the batch head is
+always a new commit and its `uat/**` push always triggers CI, even when a
+feature already contains the base (PAN-5269).
 "Ready since" is the newest check-run completion on the PR head (a new push
 resets it). A batch, once assembled, keeps its members; features that become
 ready later wait for the next batch. Both keys are in **Settings → Merge
@@ -117,7 +120,10 @@ member moves to the held-out list with a `no combined CI run …` (or
 per-PR path. A missing run also marks the project as having no batch CI for
 24 hours: its PRs merge one at a time, as with the train off, and the
 activity feed shows one notice saying batching needs a `uat/**` CI trigger.
-After 24 hours the next window batch tries again.
+After 24 hours the next window batch tries again. The exception is a batch
+head that is a member's own commit (an assembly that fast-forwarded): its
+members get a `batch head is a member commit …` reason and merge one at a
+time, but the project keeps batching and no notice is sent.
 
 **The roll leaves waiting features alone.** With the train on, the
 merge-train roll after a merge skips features that wait for the batch window

@@ -32,8 +32,15 @@ export const COMBINED_CI_DROP_PREFIX = 'combined CI failed';
 export const NO_BATCH_CI_PREFIX = 'no combined CI run';
 /** Prefix of the heldOut reason written when a batch's CI run was cancelled and nothing replaced it. */
 export const CANCELLED_BATCH_CI_PREFIX = 'combined CI run cancelled';
+/**
+ * Prefix of the heldOut reason written when no `CI` run appeared because the
+ * batch head is a member's own commit (assembly fast-forwarded, PAN-5269).
+ * This says nothing about the project's CI, so it does not mark the project
+ * as having no batch CI.
+ */
+export const FAST_FORWARD_BATCH_HEAD_PREFIX = 'batch head is a member commit';
 /** Every heldOut reason that sends a member back to the per-PR path. */
-const DROP_PREFIXES = [COMBINED_CI_DROP_PREFIX, NO_BATCH_CI_PREFIX, CANCELLED_BATCH_CI_PREFIX];
+const DROP_PREFIXES = [COMBINED_CI_DROP_PREFIX, NO_BATCH_CI_PREFIX, CANCELLED_BATCH_CI_PREFIX, FAST_FORWARD_BATCH_HEAD_PREFIX];
 /** How long a "no batch CI" mark keeps the project's PRs per-PR before batching is tried again. */
 export const BATCH_CI_RETRY_MS = 24 * 60 * 60 * 1000;
 
@@ -76,7 +83,8 @@ export const BATCH_ROUTE_REASON = 'the merge train batches this PR; it merges wi
 
 /**
  * D4: whether the issue was dropped from a batch: its combined CI failed, no
- * CI run ever appeared, or the run was cancelled. The auto-promote tick
+ * CI run ever appeared (including for a fast-forwarded batch head), or the run
+ * was cancelled. The auto-promote tick
  * records the drop as a heldOut entry on the generation it invalidates, so
  * this reads stored generation rows and nothing else. A dropped member stays
  * on the per-PR path until it merges.
