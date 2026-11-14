@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5287",
   "created": "2026-11-14T19:49:14.970Z",
-  "updated": "2026-11-14T20:47:34.552Z",
+  "updated": "2026-11-14T20:47:54.152Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,9 +202,10 @@
       "doneAt": "2026-11-14T20:47:34.551Z"
     },
     "panebar-chip": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5287",
-      "claimedAt": "2026-11-14T20:46:08.808Z"
+      "claimedAt": "2026-11-14T20:46:08.808Z",
+      "doneAt": "2026-11-14T20:47:54.152Z"
     },
     "sidebar-shortcut": {
       "status": "in_progress",
@@ -278,6 +279,14 @@
     "stage-shortcuts.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T20:47:34.551Z"
+    },
+    "panebar-chip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:47:54.152Z"
+    },
+    "panebar-chip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:47:54.152Z"
     }
   }
 }
