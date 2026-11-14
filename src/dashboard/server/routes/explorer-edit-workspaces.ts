@@ -7,7 +7,9 @@
  *
  *   POST /api/explorer/edit-workspaces/:workspaceId/pr
  *     Body EditWorkspaceCreatePrInput. `direct` commits, pushes the edit
- *     branch and opens (or pushes to) its PR; 201 EditWorkspaceCreatePrResult.
+ *     branch and opens (or pushes to) its PR; `pipeline` creates a GitHub
+ *     issue, pushes feature/<issue>, opens its PR and hands it to PR adoption;
+ *     201 EditWorkspaceCreatePrResult.
  *
  *   POST /api/explorer/edit-workspaces/:workspaceId/merge
  *     Body {}. Squash-merges the PR pinned to its head, then removes the edit
@@ -36,9 +38,11 @@ import {
   mergeEditWorkspace,
   type EditWorkspacePrDeps,
 } from '../services/explorer/edit-workspace-pr.js';
+import { sendThroughPipeline, type EditWorkspacePipelineDeps } from '../services/explorer/edit-workspace-pipeline.js';
 import { explorerErrorResponse } from '../services/explorer/http-errors.js';
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { httpHandler } from './http-handler.js';
+import { ensurePRExists } from './workspaces/ensure-pr.js';
 
 export function editWorkspaceErrorResponse(error: unknown): HttpServerResponse.HttpServerResponse {
   if (error instanceof EditWorkspaceError) {
@@ -99,7 +103,7 @@ export async function handleEditWorkspaceCreatePr(
   request: HttpServerRequest.HttpServerRequest,
   workspaceId: string,
   readBody: () => Promise<unknown>,
-  deps: EditWorkspacePrDeps = {},
+  deps: Partial<EditWorkspacePipelineDeps> = {},
 ): Promise<HttpServerResponse.HttpServerResponse> {
   const guardError = rejectUnsafeDashboardMutationRequest(request);
   if (guardError) return guardError;
@@ -107,7 +111,12 @@ export async function handleEditWorkspaceCreatePr(
   if (typeof input === 'string') return invalidInput(input);
   try {
     if (input.mode === 'pipeline') {
-      return jsonResponse({ error: 'Send through pipeline is not available yet.', code: 'NOT_IMPLEMENTED' }, { status: 501 });
+      const result = await sendThroughPipeline(
+        workspaceId,
+        { title: input.title, body: input.body },
+        { ...deps, ensurePr: deps.ensurePr ?? ensurePRExists },
+      );
+      return jsonResponse(result, { status: 201 });
     }
     return jsonResponse(await createDirectPr(workspaceId, input, deps), { status: 201 });
   } catch (error) {
