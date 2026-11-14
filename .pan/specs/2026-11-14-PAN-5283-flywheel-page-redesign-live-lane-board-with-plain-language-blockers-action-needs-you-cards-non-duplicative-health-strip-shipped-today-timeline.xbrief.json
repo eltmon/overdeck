@@ -4,17 +4,17 @@
     "created": "2026-11-14T18:59:15Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5283: Flywheel page redesign: live lane board with plain-language blockers, action Needs-you cards, non-duplicative health strip, shipped-today timeline",
-    "updated": "2026-11-14T18:59:56.476Z"
+    "updated": "2026-11-14T19:01:11.303Z"
   },
   "plan": {
     "id": "pan-5283",
     "title": "Flywheel page redesign: live lane board with plain-language blockers, action Needs-you cards, non-duplicative health strip, shipped-today timeline",
-    "status": "proposed",
+    "status": "running",
     "uid": "72521a66-e00f-4844-9ced-1a198994ee8a",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T18:59:15Z",
-    "updated": "2026-11-14T18:59:56.476Z",
+    "updated": "2026-11-14T19:01:11.303Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5283",
@@ -1455,5 +1455,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
