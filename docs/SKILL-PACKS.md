@@ -38,7 +38,7 @@ every config key, see
 | `resolve.ts` | `CORE_SKILLS`, `resolvePackSkill`, `resolvePackToggle`, `resolveSkillStates` |
 | `store.ts` | `setSkillOverride`, `setIssuePipeline`, `listSkillStates`, `loadSkillOverrideLayers`, `issueSkillOverridesPath` |
 | `issue-file.ts` | Reads of the issue file (`skills:`, `packs:`, `pipeline:`): `readIssueOverrides`, `readIssuePipelineField`; split from `store.ts` so `deft/issue-pipeline.ts` avoids the store's write-side imports |
-| `catalog.ts` | `listSkillCatalog`, `listPackCatalog`, `readInstalledClaudePluginNames` |
+| `catalog.ts` | `listSkillCatalog`, `listPackCatalog`, `readInstalledClaudePluginNames`; reads run concurrently through a 32-slot fs limiter, and `listPackCatalog` reuses a manifest while its extract dir keeps the same inode, mtime and ctime (PAN-5238) |
 | `launch.ts` | `resolveLaunchPackSelection`, `applyClaudePacks`, `applyCodexPacks`, `applyDeftForLaunch`, `claudeSkillSettingsJson` |
 | `launch-pack-mcp.ts` | `resolveLaunchPackMcpServers`: one launch's pack MCP servers, after consent and the collision rules against reserved names (PAN-5165) |
 | `launcher-lines.ts` | `launcherSkillOverrideLines`, `deftEnvReadLine`, `skillPackLinkPath`, `claudeSkillOverrideLaunch`, `codexSkillOverrideLines` (leaf module) |
@@ -303,6 +303,7 @@ instead.
   by `npm run lint:agent-dir-removal` (`scripts/guard-agent-dir-removal.sh`).
 - `adapters.ts`, `sources.ts`, `mount.ts`, and `deft.ts` never import
   `src/lib/skill-overrides/` (see each file's header comment).
+- Catalog and manifest reads never await one file at a time: each fs call queues on libuv's 4-thread pool, and the ~3,900-call serial chain took 66 s under synthetic pool saturation, matching a reported 37–77 s load (PAN-5238). Wrap leaf fs calls in the module's `limitFs`, never a function that itself calls it.
 - `launcher-lines.ts` is a leaf module (imports nothing from
   `src/lib/skill-overrides/store.ts`), so `src/lib/launcher-generator.ts`
   never reaches the override store through it.
