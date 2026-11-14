@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5287",
   "created": "2026-11-14T19:49:14.970Z",
-  "updated": "2026-11-14T20:48:54.157Z",
+  "updated": "2026-11-14T20:49:28.017Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -226,9 +226,10 @@
       "doneAt": "2026-11-14T20:48:54.157Z"
     },
     "explorer-shortcuts": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5287",
-      "claimedAt": "2026-11-14T20:46:17.588Z"
+      "claimedAt": "2026-11-14T20:46:17.588Z",
+      "doneAt": "2026-11-14T20:49:28.017Z"
     },
     "workflow-fixture": {
       "status": "in_progress",
@@ -314,6 +315,18 @@
     "new-conversation-shortcut.ac2": {
       "status": "completed",
       "doneAt": "2026-11-14T20:48:54.157Z"
+    },
+    "explorer-shortcuts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:28.017Z"
+    },
+    "explorer-shortcuts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:28.017Z"
+    },
+    "explorer-shortcuts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:28.017Z"
     }
   }
 }
