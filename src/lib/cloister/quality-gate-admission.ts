@@ -506,42 +506,91 @@ export async function readQualityGateAdmissionOwnerPids(rootDir?: string): Promi
   }
 }
 
-/** One queued waiter as status readers see it (PAN-5285). */
-export interface QualityGateAdmissionWaiter {
-  gateName: string
+/** One running or queued gate, as the read-only queue snapshot reports it (PAN-5283 WI-2). */
+export interface QualityGateQueueEntry {
   issueId?: string
   workspacePath: string
-  pid: number
-  createdAt: number
-  footprintKey?: string
+  gateName: string
   footprintBytes?: number
+  createdAt: number
+  /** Set on owners only. */
+  acquiredAt?: number
+  /** PAN-5285: set on waiters only; the reason the waiter last reported and when it began. */
   wait?: { since: number; reason: QualityGateWaitReason }
 }
 
+export interface QualityGateQueueSnapshot {
+  slots: number
+  owners: QualityGateQueueEntry[]
+  waiters: QualityGateQueueEntry[]
+}
+
+function queueEntry(ticket: AdmissionTicket | AdmissionOwner): QualityGateQueueEntry {
+  const entry: QualityGateQueueEntry = {
+    workspacePath: ticket.workspacePath,
+    gateName: ticket.gateName,
+    createdAt: ticket.createdAt,
+  }
+  if (ticket.issueId) entry.issueId = ticket.issueId
+  if (typeof ticket.footprintBytes === 'number') entry.footprintBytes = ticket.footprintBytes
+  if ('acquiredAt' in ticket && Number.isFinite(ticket.acquiredAt)) entry.acquiredAt = ticket.acquiredAt
+  if (ticket.wait && Number.isFinite(ticket.wait.since)) entry.wait = ticket.wait
+  return entry
+}
+
+function isTicketShape(value: unknown): value is AdmissionTicket {
+  const ticket = value as Partial<AdmissionTicket> | null
+  return !!ticket
+    && typeof ticket.workspacePath === 'string'
+    && typeof ticket.gateName === 'string'
+    && typeof ticket.pid === 'number'
+    && Number.isFinite(ticket.createdAt)
+}
+
 /**
- * PAN-5285: the live waiters, oldest first, with the wait reason each one last
- * wrote. Read-only (it never sweeps dead or torn tickets) and never throws.
+ * Read-only snapshot of the gate queue: live owners and live waiters, oldest
+ * waiter first. Unlike the acquire loop it never unlinks or writes a file, so
+ * the Flywheel page can read it on every poll. Never throws.
  */
-export async function readQualityGateAdmissionQueue(
-  rootDir?: string,
-  isProcessAlive: (pid: number) => boolean = processIsAlive,
-): Promise<QualityGateAdmissionWaiter[]> {
+export async function readQualityGateQueue(deps: {
+  rootDir?: string
+  isProcessAlive?: (pid: number) => boolean
+  slots?: number
+  now?: () => number
+  staleMs?: number
+} = {}): Promise<QualityGateQueueSnapshot> {
+  const slots = deps.slots ?? await resolveQualityGateSlots()
+  const empty: QualityGateQueueSnapshot = { slots, owners: [], waiters: [] }
+  const isProcessAlive = deps.isProcessAlive ?? processIsAlive
+  const now = deps.now ?? Date.now
+  const staleMs = deps.staleMs ?? QUALITY_GATE_ADMISSION_STALE_MS
+  const root = admissionRoot(deps.rootDir)
   try {
-    const root = admissionRoot(rootDir)
+    const owners: QualityGateQueueEntry[] = []
+    for (const { path } of await listSlotOwnerFiles(root)) {
+      const owner = await readJson<AdmissionOwner>(path)
+      if (!isTicketShape(owner) || !Number.isFinite(owner.acquiredAt)) continue
+      if (ownerIsStale(owner, now(), staleMs, isProcessAlive)) continue
+      owners.push(queueEntry(owner))
+    }
     const waiters: AdmissionTicket[] = []
     for (const entry of await readdir(root)) {
       if (!entry.startsWith('waiter-') || !entry.endsWith('.json')) continue
       const ticket = await readJson<AdmissionTicket>(join(root, entry))
-      if (ticket && Number.isFinite(ticket.createdAt) && isProcessAlive(ticket.pid)) waiters.push(ticket)
+      if (!isTicketShape(ticket) || !isProcessAlive(ticket.pid)) continue
+      waiters.push(ticket)
     }
-    return waiters
-      .sort((left, right) => left.createdAt - right.createdAt || left.ticketId.localeCompare(right.ticketId))
-      .map(({ gateName, issueId, workspacePath, pid, createdAt, footprintKey, footprintBytes, wait }) => ({
-        gateName, issueId, workspacePath, pid, createdAt, footprintKey, footprintBytes, wait,
-      }))
+    waiters.sort((left, right) => left.createdAt - right.createdAt
+      || String(left.ticketId).localeCompare(String(right.ticketId)))
+    return { slots, owners, waiters: waiters.map(queueEntry) }
   } catch {
-    return []
+    return empty
   }
+}
+
+/** The gate's own MemAvailable read; null when unreadable or zero. */
+export async function readQualityGateMemory(): Promise<QualityGateMemorySample | null> {
+  return readMemory(sampleProcMemory)
 }
 
 function queueBlocker(ticket: AdmissionTicket): QualityGateQueueBlocker {

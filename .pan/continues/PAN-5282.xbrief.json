@@ -1,0 +1,261 @@
+{
+  "version": "1",
+  "issueId": "PAN-5282",
+  "created": "2026-11-14T19:03:45.838Z",
+  "updated": "2026-11-14T20:49:32.944Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "pin-bump": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5282",
+      "claimedAt": "2026-11-14T19:03:45.838Z",
+      "doneAt": "2026-11-14T19:05:15.224Z"
+    },
+    "pin-bump.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:05:15.224Z"
+    },
+    "pin-bump.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:05:15.224Z"
+    },
+    "pin-bump.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:05:15.224Z"
+    },
+    "config-builder-base": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5282",
+      "claimedAt": "2026-11-14T19:13:40.578Z",
+      "doneAt": "2026-11-14T19:14:03.868Z"
+    },
+    "config-builder-base.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:14:03.868Z"
+    },
+    "config-builder-base.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:14:03.868Z"
+    },
+    "config-builder-base.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:14:03.868Z"
+    },
+    "key-file-helpers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5282",
+      "claimedAt": "2026-11-14T19:14:05.647Z",
+      "doneAt": "2026-11-14T19:14:28.248Z"
+    },
+    "key-file-helpers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:14:28.248Z"
+    },
+    "key-file-helpers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:14:28.248Z"
+    },
+    "key-file-helpers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:14:28.248Z"
+    },
+    "key-file-helpers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:14:28.248Z"
+    },
+    "legacy-merge": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5282",
+      "claimedAt": "2026-11-14T19:14:49.627Z",
+      "doneAt": "2026-11-14T19:16:22.266Z"
+    },
+    "legacy-merge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:16:22.266Z"
+    },
+    "legacy-merge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:16:22.266Z"
+    },
+    "legacy-merge.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:16:22.266Z"
+    },
+    "legacy-merge.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:16:22.266Z"
+    },
+    "claude-exclusion": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5282",
+      "claimedAt": "2026-11-14T19:16:24.258Z",
+      "doneAt": "2026-11-14T19:17:50.081Z"
+    },
+    "claude-exclusion.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:17:50.081Z"
+    },
+    "claude-exclusion.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:17:50.081Z"
+    },
+    "claude-exclusion.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:17:50.081Z"
+    },
+    "config-needs-write": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5282",
+      "claimedAt": "2026-11-14T19:17:51.967Z",
+      "doneAt": "2026-11-14T19:19:17.055Z"
+    },
+    "config-needs-write.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:19:17.055Z"
+    },
+    "config-needs-write.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:19:17.055Z"
+    },
+    "config-needs-write.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:19:17.055Z"
+    },
+    "config-writer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5282",
+      "claimedAt": "2026-11-14T19:19:18.806Z",
+      "doneAt": "2026-11-14T19:21:05.847Z"
+    },
+    "config-writer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:21:05.847Z"
+    },
+    "config-writer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:21:05.847Z"
+    },
+    "config-writer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:21:05.847Z"
+    },
+    "config-writer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:21:05.847Z"
+    },
+    "lifecycle-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5282",
+      "claimedAt": "2026-11-14T19:21:07.482Z",
+      "doneAt": "2026-11-14T20:49:32.943Z"
+    },
+    "live-probe": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:44:00.958Z"
+    },
+    "live-probe.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:44:00.958Z"
+    },
+    "live-probe.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:44:00.958Z"
+    },
+    "live-probe.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:44:00.958Z"
+    },
+    "live-probe.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:44:00.958Z"
+    },
+    "docs-configuration": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5282",
+      "claimedAt": "2026-11-14T20:44:10.453Z",
+      "doneAt": "2026-11-14T20:44:30.712Z"
+    },
+    "docs-configuration.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:44:30.712Z"
+    },
+    "docs-configuration.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:44:30.712Z"
+    },
+    "docs-configuration.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:44:30.712Z"
+    },
+    "docs-configuration.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:44:30.712Z"
+    },
+    "docs-harnesses": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5282",
+      "claimedAt": "2026-11-14T20:44:31.988Z",
+      "doneAt": "2026-11-14T20:44:52.465Z"
+    },
+    "docs-harnesses.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:44:52.465Z"
+    },
+    "docs-harnesses.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:44:52.465Z"
+    },
+    "docs-cliproxy-skill": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5282",
+      "claimedAt": "2026-11-14T20:44:54.077Z",
+      "doneAt": "2026-11-14T20:45:13.769Z"
+    },
+    "docs-cliproxy-skill.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:45:13.769Z"
+    },
+    "docs-cliproxy-skill.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:45:13.769Z"
+    },
+    "changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5282",
+      "claimedAt": "2026-11-14T20:45:15.091Z",
+      "doneAt": "2026-11-14T20:45:34.964Z"
+    },
+    "changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:45:34.964Z"
+    },
+    "changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:45:34.964Z"
+    },
+    "lifecycle-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:32.943Z"
+    },
+    "lifecycle-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:32.943Z"
+    },
+    "lifecycle-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:32.943Z"
+    },
+    "lifecycle-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:32.943Z"
+    },
+    "lifecycle-wiring.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:32.943Z"
+    }
+  }
+}

@@ -567,9 +567,9 @@ already queued, without killing them:
   past the bypass bound: needs X GiB, …`.
 - **Status readers.** Each waiter writes its current reason and the time it
   began into its `waiter-*.json` ticket (`wait: { since, reason }`).
-  `readQualityGateAdmissionQueue()` in `quality-gate-admission.ts` returns the
-  live waiters, oldest first, with that field, for status surfaces such as the
-  Flywheel page (PAN-5283). To relieve a stall, free memory or lower
+  The read-only snapshot `readQualityGateQueue()` in
+  `quality-gate-admission.ts`, which the Flywheel page reads (PAN-5283),
+  carries it on each waiter entry as `wait`. To relieve a stall, free memory or lower
   `resources.governor_soft_reserve_gb`; queued gates pick up the new value on
   their next poll.
 

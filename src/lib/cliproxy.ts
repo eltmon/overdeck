@@ -9,10 +9,23 @@
  * GPT models (via ANTHROPIC_BASE_URL) without needing an OpenAI API key.
  *
  * Responsibilities:
- *   - Download + install the cliproxy binary from GitHub releases
+ *   - Download + install the pinned cliproxy binary from GitHub releases
  *   - Maintain `~/.overdeck/cliproxy/config.yaml` + auth-dir
  *   - Bridge `~/.codex/auth.json` into cliproxy's codex credential format
  *   - Start / stop / supervise the process via a pidfile
+ *
+ * Config (PAN-5282): `config.yaml` uses the CLIProxy v8 layout
+ * (`config-version: 8`), built as an object by `cliproxy-config.ts` and written
+ * by `cliproxy-config-files.ts`. The operator's `config.extra.yaml` is parsed as
+ * YAML, its legacy v7 keys are converted to v8 paths, and it is deep-merged over
+ * the generated config (extra wins). The generated config turns on session
+ * affinity (1h TTL) and the localhost-only management API, whose plaintext key
+ * lives in `~/.overdeck/cliproxy/management-key` (mode 0600, read by
+ * `readManagementKey()`). Every Codex-aliased model name is excluded from Claude
+ * accounts (`oauth.excluded-models.claude`). CLIProxy hot-reloads `config.yaml`,
+ * and an older v7 proxy cannot read the v8 layout, so the v8 config is written
+ * only once the installed binary is the pin: `startCliproxy` installs first,
+ * then stops a stale running proxy, then writes and spawns.
  */
 
 import {
@@ -30,6 +43,8 @@ import { promisify } from 'util';
 import net from 'net';
 import { Data } from 'effect';
 import { OVERDECK_HOME, BIN_DIR } from './paths.js';
+import { planCliproxyStart } from './cliproxy-config.js';
+import { readManagementKeyFile, writeCliproxyConfig } from './cliproxy-config-files.js';
 
 const execAsync = promisify(exec);
 
@@ -66,7 +81,15 @@ export const CLIPROXY_BASE_URL = `http://${CLIPROXY_HOST}:${CLIPROXY_PORT}`;
 // claude --print tool round trip succeeded). CLIProxy refreshes its model
 // catalog every 3h from router-for-me/models models.json, which added Terra
 // on 2026-10-26 after the PAN-4633 probe, so no pin bump was needed.
-const CLIPROXY_RELEASE_VERSION = 'v7.3.16';
+// v8.0.71 (PAN-5282): v8 config layout (config-version: 8). Probed 2026-11-14 on
+// a throwaway instance: --version banner unchanged, /v0/management unchanged,
+// oauth.excluded-models.claude hides Codex-aliased names from a Claude account,
+// and startup rewrites only management.secret-key (plaintext -> bcrypt hash).
+// Re-probed 2026-11-14 with Overdeck's generated config (port 18317, fake
+// auth files): auth-files 200 with both files, "1 Gemini API keys" at startup,
+// Claude list free of the nine Codex aliases (8 of them reappear when
+// oauth.excluded-models.claude is removed), second write skipped (wrote: false).
+const CLIPROXY_RELEASE_VERSION = 'v8.0.71';
 
 function getCliproxyDir(): string {
   return join(OVERDECK_HOME, 'cliproxy');
@@ -86,6 +109,19 @@ function getCliproxyConfigPath(): string {
 
 export function getCliproxyAuthDir(): string {
   return join(getCliproxyDir(), 'auth');
+}
+
+function getCliproxyManagementKeyPath(): string {
+  return join(getCliproxyDir(), 'management-key');
+}
+
+/**
+ * The plaintext CLIProxy management API key (`management.secret-key`), or null
+ * before the first config write creates it. For management API clients
+ * (PAN-5278); the API listens on localhost only.
+ */
+export async function readManagementKey(): Promise<string | null> {
+  return readManagementKeyFile(getCliproxyManagementKeyPath());
 }
 
 function getCliproxyPidPath(): string {
@@ -248,17 +284,6 @@ function parseBridgedGeminiApiKey(raw: string): string | null {
   }
 }
 
-function readBridgedGeminiApiKey(): string | null {
-  const target = getCliproxyGeminiCredPath();
-  if (!existsSync(target)) return null;
-
-  try {
-    return parseBridgedGeminiApiKey(readFileSync(target, 'utf8'));
-  } catch {
-    return null;
-  }
-}
-
 async function readBridgedGeminiApiKeyAsync(): Promise<string | null> {
   try {
     return parseBridgedGeminiApiKey(await readFile(getCliproxyGeminiCredPath(), 'utf8'));
@@ -267,17 +292,15 @@ async function readBridgedGeminiApiKeyAsync(): Promise<string | null> {
   }
 }
 
-function serializeYamlString(value: string): string {
-  return JSON.stringify(value);
-}
-
 /**
  * Persist a Google Generative Language API key for CLIProxyAPI's Gemini backend.
  *
- * CLIProxyAPI v6.10.x accepts Gemini API keys through the `gemini-api-key`
- * config section. We also keep a small credential marker in auth-dir so future
- * config rewrites can preserve the bridged key without re-reading Overdeck
- * settings. This path is used by getProviderEnvForModel(), which is reachable
+ * The key lands in the v8 config's `api-keys.gemini` provider group (the v6
+ * `gemini-api-key` section is legacy). We also keep a small credential marker
+ * in auth-dir so future config rewrites can preserve the bridged key without
+ * re-reading Overdeck settings. The v8 config is written directly only when
+ * the installed binary is the pin; otherwise `startCliproxy()` upgrades the
+ * binary (stopping a stale proxy first) and then writes it. This path is used by getProviderEnvForModel(), which is reachable
  * from dashboard HTTP routes, so all credential/config persistence is async.
  */
 export async function bridgeGeminiAuthToCliproxy(apiKey: string): Promise<boolean> {
@@ -309,7 +332,8 @@ export async function bridgeGeminiAuthToCliproxy(apiKey: string): Promise<boolea
     if (existing !== serialized) {
       await writeFile(target, serialized, { mode: 0o600 });
     }
-    await ensureConfigFileAsync(normalized);
+    if (await isCliproxyUpToDateTask()) await ensureConfigFileAsync(normalized);
+    else await startCliproxy(); // installs the pin, then writes the config with the bridged key
   } catch {
     return false;
   }
@@ -322,77 +346,24 @@ function getCliproxyConfigExtraPath(): string {
 }
 
 /**
- * Operator-owned config additions (e.g. oauth-model-alias remap rules).
- * config.yaml is regenerated on every start, so durable customization lives
- * in config.extra.yaml and is appended verbatim to the generated config.
+ * Ensure `config.yaml` holds the generated v8 config (see the module header).
+ * `geminiApiKey` undefined means "use the key bridged into auth-dir".
  */
-function readConfigExtra(): string {
-  const extraPath = getCliproxyConfigExtraPath();
-  if (!existsSync(extraPath)) return '';
-  try {
-    const extra = readFileSync(extraPath, 'utf8').trim();
-    return extra ? `${extra}\n` : '';
-  } catch {
-    return '';
-  }
-}
-
-function buildCliproxyConfig(geminiApiKey: string | null): string {
-  const authDir = getCliproxyAuthDir();
-
-  // Config is rewritten every time so upgrades can evolve the format safely.
-  const lines = [
-    `host: "${CLIPROXY_HOST}"`,
-    `port: ${CLIPROXY_PORT}`,
-    `auth-dir: "${authDir}"`,
-    `api-keys:`,
-    `  - "${CLIPROXY_AUTH_TOKEN}"`,
-  ];
-
-  if (geminiApiKey) {
-    lines.push(
-      `gemini-api-key:`,
-      `  - api-key: ${serializeYamlString(geminiApiKey)}`,
-    );
-  }
-
-  lines.push(`debug: false`, '');
-  const extra = readConfigExtra();
-  return extra ? `${lines.join('\n')}${extra}` : lines.join('\n');
-}
-
-function ensureConfigFile(geminiApiKey: string | null = readBridgedGeminiApiKey()): void {
-  ensureDirs();
-  const configPath = getCliproxyConfigPath();
-  const config = buildCliproxyConfig(geminiApiKey);
-
-  if (existsSync(configPath)) {
-    try {
-      if (readFileSync(configPath, 'utf8') === config) return;
-    } catch {
-      // overwrite
-    }
-  }
-  writeFileSync(configPath, config);
-}
-
 async function ensureConfigFileAsync(geminiApiKey?: string | null): Promise<void> {
   await ensureDirsAsync();
-  const configPath = getCliproxyConfigPath();
   const effectiveGeminiApiKey = geminiApiKey === undefined
     ? await readBridgedGeminiApiKeyAsync()
     : geminiApiKey;
-  const config = buildCliproxyConfig(effectiveGeminiApiKey);
-
-  let existing: string | null = null;
-  try {
-    existing = await readFile(configPath, 'utf8');
-  } catch {
-    existing = null;
-  }
-
-  if (existing === config) return;
-  await writeFile(configPath, config);
+  await writeCliproxyConfig({
+    configPath: getCliproxyConfigPath(),
+    extraPath: getCliproxyConfigExtraPath(),
+    keyPath: getCliproxyManagementKeyPath(),
+    host: CLIPROXY_HOST,
+    port: CLIPROXY_PORT,
+    clientToken: CLIPROXY_AUTH_TOKEN,
+    authDir: getCliproxyAuthDir(),
+    geminiApiKey: effectiveGeminiApiKey,
+  });
 }
 
 export function detectPlatformAsset(
@@ -455,7 +426,7 @@ export function execFailureStdout(err: unknown): string {
  * machines on whatever shipped first (PAN-1584 — stuck on 6.9.45, which breaks
  * gpt-5.5 work agents via a Codex "System messages are not allowed" rejection).
  * An unreadable version is treated as out-of-date so we re-pull rather than
- * trust a mystery binary. CLIProxyAPI (v7.2.113 through v7.3.16) deliberately does not define
+ * trust a mystery binary. CLIProxyAPI (v7.2.113 through v8.0.71) deliberately does not define
  * `--version`: it prints this banner then exits 2, which avoids starting a server.
  */
 async function isCliproxyUpToDateTask(): Promise<boolean> {
@@ -621,24 +592,38 @@ export async function stopCliproxy(): Promise<void> {
 }
 
 /**
- * Start cliproxy in the background. Idempotent: returns immediately if an
- * instance is already running. Ensures config, auth dir and the Codex bridge are
- * up to date before spawning, and installs or upgrades the binary (non-blocking
- * download) when it is missing or not the pinned version. Safe for the event loop.
+ * Start cliproxy in the background. A running proxy on the pinned binary only
+ * gets its config refreshed (CLIProxy hot-reloads it). A running stale proxy
+ * is upgraded (PAN-5282): download the pin first, then stop the old proxy,
+ * write the v8 config and spawn — so a v7 proxy never hot-reloads a v8 config,
+ * and a failed download leaves the old proxy running with its config untouched.
+ * A stopped proxy is installed or upgraded (PAN-1584) before the config write
+ * and spawn. Safe for the event loop.
  */
 export async function startCliproxy(): Promise<void> {
-  ensureDirs();
-  ensureConfigFile();
+  await ensureDirsAsync();
   // Best-effort bridge; if the user hasn't logged into Codex yet, cliproxy
   // will still start but subscription auth won't be available until they do.
   try { await bridgeCodexAuthToCliproxy(); } catch { /* non-fatal */ }
 
-  if (await isCliproxyRunning()) return;
-
-  // Upgrade in place on version mismatch, not just when missing (PAN-1584).
-  if (!await isCliproxyUpToDateTask()) {
+  const plan = planCliproxyStart({
+    running: await isCliproxyRunning(),
+    binaryCurrent: await isCliproxyUpToDateTask(),
+  });
+  if (plan === 'write-config-only') {
+    await ensureConfigFileAsync();
+    return;
+  }
+  if (plan === 'upgrade-running') {
+    console.log(`[cliproxy] upgrading the running CLIProxy to ${CLIPROXY_RELEASE_VERSION}`);
+    // Download first: on failure the old proxy keeps running and config.yaml is untouched.
+    await installCliproxy();
+    await stopCliproxy();
+    await new Promise((r) => setTimeout(r, 500)); // let the port release, as restartCliproxy does
+  } else if (plan === 'install-write-spawn') {
     await installCliproxy();
   }
+  await ensureConfigFileAsync();
 
   const bin = getCliproxyBinary();
   const config = getCliproxyConfigPath();

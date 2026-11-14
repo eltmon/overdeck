@@ -78,11 +78,7 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     const chip = await screen.findByTestId('flywheel-run-chip');
     expect(chip).toHaveTextContent(label);
     expect(chip).toHaveAttribute('data-tone', tone);
-    expect(screen.getByTestId('flywheel-inflight-count')).toHaveTextContent(
-      status.inFlightSource === 'tick'
-        ? `${status.inFlight.filter((row) => row.inTick).length} in flight (loop)`
-        : `${status.inFlight.length} feature workspaces`,
-    );
+    expect(screen.getByTestId('flywheel-inflight-count')).toHaveTextContent(`${status.inFlight.length} in flight · 0 shipped today`);
   });
 
   it('shows the retry copy, never idle, when the status read fails', async () => {
@@ -124,7 +120,7 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     await waitFor(() => expect(screen.getByRole('switch', { name: 'Merge train' })).toHaveAttribute('aria-checked', 'false'));
   });
 
-  it('the header counts the loop\'s own in-flight ids when a tick named them (PAN-4199 ac3)', async () => {
+  it('the header counts every in-flight card, tick-named or not (PAN-4199 ac3, PAN-5283 D17)', async () => {
     const base = flywheelStatus();
     setup(flywheelStatus({
       inFlightSource: 'tick',
@@ -135,17 +131,31 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
       ],
     }));
     renderWithQuery(<FlywheelPage />);
-    expect(await screen.findByTestId('flywheel-inflight-count')).toHaveTextContent('2 in flight (loop)');
+    expect(await screen.findByTestId('flywheel-inflight-count')).toHaveTextContent('3 in flight · 0 shipped today');
   });
 
-  it('the header counts feature workspaces when no tick named them (PAN-4199 ac4)', async () => {
+  it('the header counts census rows the same way when no tick named them (PAN-4199 ac4, PAN-5283 D17)', async () => {
     const base = flywheelStatus();
     setup(flywheelStatus({
       inFlightSource: 'census',
       inFlight: ['PAN-1', 'PAN-2', 'PAN-3'].map((issueId) => ({ ...base.inFlight[0]!, issueId, inTick: false })),
     }));
     renderWithQuery(<FlywheelPage />);
-    expect(await screen.findByTestId('flywheel-inflight-count')).toHaveTextContent('3 feature workspaces');
+    expect(await screen.findByTestId('flywheel-inflight-count')).toHaveTextContent('3 in flight · 0 shipped today');
+  });
+
+  it('header count equals the number of in-flight cards', async () => {
+    const base = flywheelStatus();
+    const merge = (sha: string) => ({
+      sha: sha.repeat(40), at: '2026-09-23T09:00:00.000Z', subject: 'feat: x (#1)', prNumber: 1, prUrl: null, issueId: null, title: null, deployed: true,
+    });
+    setup(flywheelStatus({
+      inFlight: ['PAN-1', 'PAN-2', 'PAN-3', 'PAN-4', 'PAN-5', 'PAN-6', 'PAN-7'].map((issueId, i) => ({ ...base.inFlight[1]!, issueId, inTick: i < 5 })),
+      shipped: { merges: [merge('a'), merge('b')], events: [] },
+    }));
+    renderWithQuery(<FlywheelPage />);
+    expect(await screen.findByTestId('flywheel-inflight-count')).toHaveTextContent('7 in flight · 2 shipped today');
+    expect(document.querySelectorAll('[data-testid^="flywheel-card-PAN-"]')).toHaveLength(7);
   });
 
   it('shows how long the run has been up, and only while it runs (PAN-4199 ac2, ac3)', async () => {

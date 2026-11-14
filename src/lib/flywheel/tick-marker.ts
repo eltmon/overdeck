@@ -111,7 +111,7 @@ export function findLastTick(
  * has ended. A run that reaches the oldest tick in `messages` ends there.
  */
 export function resolveNeedsYouItems(messages: readonly TickMarkerMessage[]): FlywheelNeedsYouItem[] {
-  type Seen = { tick: number; at: string; messageId?: string };
+  type Seen = { tick: number; at: string; messageId?: string; text: string };
   let items: Array<{ text: string; key: string; first: Seen }> | null = null;
   const open = new Set<string>();
   for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -119,7 +119,7 @@ export function resolveNeedsYouItems(messages: readonly TickMarkerMessage[]): Fl
     if (!message || message.role !== 'assistant' || !message.text.includes(TICK_MARKER_PREFIX)) continue;
     const parsed = parseTickMarker(message.text);
     if (!parsed) continue;
-    const here: Seen = { tick: parsed.tick, at: message.createdAt, ...(message.id ? { messageId: message.id } : {}) };
+    const here: Seen = { tick: parsed.tick, at: message.createdAt, text: message.text, ...(message.id ? { messageId: message.id } : {}) };
     if (items === null) {
       items = splitNeedsYouItems(parsed.needsYou).map((text) => ({ text, key: needsYouItemKey(text), first: here }));
       for (const item of items) open.add(item.key);
@@ -133,10 +133,34 @@ export function resolveNeedsYouItems(messages: readonly TickMarkerMessage[]): Fl
     }
     if (open.size === 0) break;
   }
-  return (items ?? []).map(({ text, first }) => ({
-    text,
-    firstRaisedTick: first.tick,
-    firstRaisedAt: first.at,
-    ...(first.messageId ? { firstRaisedMessageId: first.messageId } : {}),
-  }));
+  return (items ?? []).map(({ text, first }) => {
+    const context = needsYouContext(first.text);
+    return {
+      text,
+      firstRaisedTick: first.tick,
+      firstRaisedAt: first.at,
+      ...(first.messageId ? { firstRaisedMessageId: first.messageId } : {}),
+      ...(context ? { context } : {}),
+    };
+  });
+}
+
+/** Longest "why" excerpt a Needs-you card shows (PAN-5283 D18). */
+export const NEEDS_YOU_CONTEXT_MAX = 280;
+
+/**
+ * The prose of the message that raised a needs-you item (PAN-5283 D18):
+ * every line holding a tick marker removed, whitespace collapsed, and the
+ * last {@link NEEDS_YOU_CONTEXT_MAX} characters kept behind a leading `…`.
+ * Null when nothing but the tick line was written.
+ */
+export function needsYouContext(messageText: string): string | null {
+  const prose = messageText
+    .split('\n')
+    .filter((line) => !line.includes(TICK_MARKER_PREFIX))
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!prose) return null;
+  return prose.length > NEEDS_YOU_CONTEXT_MAX ? `…${prose.slice(-NEEDS_YOU_CONTEXT_MAX)}` : prose;
 }

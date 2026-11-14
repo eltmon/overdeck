@@ -35,6 +35,7 @@ import {
   FlywheelPausedExists,
 } from '../../../lib/flywheel/errors.js';
 import { readFlywheelReportFile, readFlywheelStateFile } from '../../../lib/flywheel/files.js';
+import { deriveFlywheelHealth, type FlywheelHealthResult } from '../../../lib/flywheel/health.js';
 import { computeSubstrateStats } from '../../../lib/flywheel/substrate-stats.js';
 import type { TrackerIssueFacts } from '../../../lib/overdeck/derived-issue-state.js';
 import { jsonResponse } from '../http-helpers.js';
@@ -115,8 +116,47 @@ export function serverFlywheelStatusDeps(): DeriveFlywheelStatusDeps {
   };
 }
 
-export function getFlywheelStatusPayload(deps: DeriveFlywheelStatusDeps = serverFlywheelStatusDeps()): Promise<RouteResult> {
-  return guarded(() => deriveFlywheelStatus({ deps }));
+/** The health strip and shipped-today read the route merges into the status (PAN-5283 D7). */
+export type FlywheelHealthReader = (projectRoot: string) => Promise<FlywheelHealthResult>;
+
+/** Server health read: titles come from the shared issue cache, never a tracker call. */
+export function readServerFlywheelHealth(projectRoot: string): Promise<FlywheelHealthResult> {
+  return deriveFlywheelHealth({
+    projectRoot,
+    deps: {
+      trackerTitle: (issueId) => {
+        try {
+          return getSharedIssueService().getTrackerIssue(issueId.toUpperCase())?.title ?? null;
+        } catch {
+          return null;
+        }
+      },
+    },
+  });
+}
+
+const loggedHealthFailures = new Set<string>();
+
+export function getFlywheelStatusPayload(
+  deps: DeriveFlywheelStatusDeps = serverFlywheelStatusDeps(),
+  readHealth: FlywheelHealthReader = readServerFlywheelHealth,
+): Promise<RouteResult> {
+  return guarded(async () => {
+    const status = await deriveFlywheelStatus({ deps });
+    if (typeof status?.projectRoot !== 'string') return status;
+    try {
+      const { health, shipped } = await readHealth(status.projectRoot);
+      return { ...status, health, shipped };
+    } catch (error) {
+      // The status stands without the strip; say why once, not every 5 s poll.
+      const message = error instanceof Error ? error.message : String(error);
+      if (!loggedHealthFailures.has(message)) {
+        loggedHealthFailures.add(message);
+        console.warn('[flywheel] health strip unavailable:', message);
+      }
+      return status;
+    }
+  });
 }
 
 export function getFlywheelStatePayload(): Promise<RouteResult> {
