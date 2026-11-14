@@ -13,6 +13,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ISSUE_ACTIONS,
+  deriveIssueActionPhase,
+  getEnabledActions,
   getMenuActions,
   type IssueActionKey,
   type IssueActionState,
@@ -173,6 +175,39 @@ describe('getMenuActions per derived state', () => {
       const contextual = getMenuActions(state).filter((action) => action.placement !== 'menu');
       expect(contextual.map((action) => action.key), name).toEqual([]);
     }
+  });
+});
+
+// PAN-5279: an open epic lands in slices; one merged slice is not the epic shipping.
+describe('an open epic with a merged slice', () => {
+  const epic = baseState({
+    derived: {
+      issueId: 'PAN-1',
+      state: 'planned',
+      mergedSlice: { number: 5254, url: 'https://example.test/pr/5254' },
+    },
+    hasPlan: true,
+    hasTasks: true,
+    workspace,
+    issueCanonicalState: 'in_progress',
+    // The membership bucket alone must not turn Close out on.
+    isMerged: true,
+  });
+
+  it('Close out is not offered for an open epic with a merged slice', () => {
+    expect(getMenuActions(epic).map((action) => action.key)).not.toContain('closeOut');
+    expect(getEnabledActions(epic).map((action) => action.key)).not.toContain('closeOut');
+    expect(deriveIssueActionPhase(epic)).not.toBe('MERGED');
+  });
+
+  it('leaves the next slice startable', () => {
+    expect(getMenuActions(epic).map((action) => action.key)).toContain('startAgent');
+  });
+
+  it('still offers Close out for a merged non-epic issue', () => {
+    const merged = baseState({ derived: { issueId: 'PAN-1', state: 'merged', pr: pr('approved', 'green', true) }, workspace, hasPr: true });
+    expect(getMenuActions(merged).map((action) => action.key)).toContain('closeOut');
+    expect(deriveIssueActionPhase(merged)).toBe('MERGED');
   });
 });
 

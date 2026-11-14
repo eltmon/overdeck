@@ -33,6 +33,10 @@ The kit currently owns these reusable pieces:
 
 A closed-out issue derives as `closed`, because the tracker outranks the PR in the derived-state precedence. `isShipped` therefore treats `merged`, or `closed` with a PR, as shipped. The forge attaches only an open or merged PR. A shipped issue renders the Ship step and ship status as merged, shows "Merged and closed out", and raises no `stopped` needs-you item for its finished work agent. A `closed` issue without a PR was cancelled, so it stays unshipped. `pan show` derives the CV outcome for the issue the same way: a shipped issue's `in_progress` entry counts as a success. Nothing is written back to `cv.json` (PAN-3420).
 
+An epic lands in slices. For an open issue labeled `epic`, `deriveState` never returns `merged` because a PR merged: the state falls through to `working` (live pane only), `parked`, `planned` or `backlog`, and the merged PR is reported as `mergedSlice: { number, url }` instead of `pr`, so the header badge, the Ship and Done steps, the checks chip, the Details narrative and Close out all stay off. The squash-merged branch still looks ahead of main, so the branch count does not mean `working` for a merged-slice epic. Pipeline membership resolves such an epic to `planned_backlog`, never `post_merge_limbo`. The Details narrative reads "Slice merged (#N) — X of Y tasks done", and the activity feed reads "Slice #N merged to main — more slices to land" (PAN-5279).
+
+The Stage tab's title row (`IssueTitleRow` with `wrap`) wraps the title to at most 3 lines (`line-clamp-3 break-words`). The drawer's fixed-height row keeps `truncate`. Both keep the full title in the heading's `title` attribute.
+
 ## Density model
 
 `densitySections.ts` owns `DENSITY_SECTIONS`, the declarative membership map for `rail`, `cockpit`, and `console`. Density changes layout and section visibility; it does not create three component trees or three versions of status logic. A shell wraps its existing routing and interaction glue around `<IssueView density="…">`.

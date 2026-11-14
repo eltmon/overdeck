@@ -96,6 +96,16 @@ export const DerivedPrOutsidePipeline = Schema.Struct({
 })
 export type DerivedPrOutsidePipeline = typeof DerivedPrOutsidePipeline.Type
 
+/**
+ * PAN-5279: a merged PR on an open epic's feature branch. An epic lands in
+ * slices, so a merged slice is progress, never the epic shipping.
+ */
+export const DerivedMergedSlice = Schema.Struct({
+  number: Schema.Number,
+  url: Schema.String,
+})
+export type DerivedMergedSlice = typeof DerivedMergedSlice.Type
+
 /** Everything the dashboard needs to render an issue's pipeline position. */
 export const DerivedIssueState = Schema.Struct({
   issueId: Schema.String,
@@ -113,6 +123,12 @@ export const DerivedIssueState = Schema.Struct({
   workStart: Schema.optional(DerivedWorkStart),
   /** An outside PR the pipeline never picked up (PAN-4605). */
   prOutsidePipeline: Schema.optional(DerivedPrOutsidePipeline),
+  /**
+   * PAN-5279: the issue is an open epic and this merged PR is one of its
+   * slices. Present instead of `pr`, so no reader takes slice 1's review,
+   * checks or merge for the epic's own.
+   */
+  mergedSlice: Schema.optional(DerivedMergedSlice),
 })
 export type DerivedIssueState = typeof DerivedIssueState.Type
 

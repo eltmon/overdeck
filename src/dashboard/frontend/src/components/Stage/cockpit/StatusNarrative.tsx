@@ -40,6 +40,12 @@ export function deriveNarrative(args: {
   if (issue?.state === 'merged') {
     headline = 'Shipped — this change is on main'
     next = 'Wrapping up: closing the issue out.'
+  } else if (issue?.mergedSlice && !workRunning && issue.state !== 'working') {
+    // PAN-5279: an open epic between slices. One slice is on main; the epic is not.
+    headline = progress
+      ? `Slice merged (#${issue.mergedSlice.number}) — ${progress}`
+      : `Slice merged (#${issue.mergedSlice.number}) — more slices to land`
+    next = 'This epic ships in slices; the next slice starts when it’s picked up.'
   } else if (issue?.state === 'ready') {
     headline = 'Ready to ship — everything passed'
     next = 'Waiting on you: press Merge when you want it on main.'

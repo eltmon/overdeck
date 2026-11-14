@@ -109,6 +109,30 @@ describe('resolvePipelineMembership (PAN-1980)', () => {
     expect(r.lenses.L2_unmergedBranch).toBe(false);
   });
 
+  // PAN-5279: an epic lands in slices; a merged slice never asks for close-out.
+  it('open epic with a merged PR is not post_merge_limbo', () => {
+    const r = resolvePipelineMembership(sig({ issueOpen: true, hasMergedPr: true, isEpic: true }));
+    expect(r.bucket).not.toBe('post_merge_limbo');
+    expect(r.bucket).toBe('planned_backlog');
+    expect(r.inPipeline).toBe(true);
+    const squashed = resolvePipelineMembership(sig({
+      issueOpen: true, isEpic: true, hasConventionBranch: true, branchUnmerged: true, hasMergedPr: true,
+    }));
+    expect(squashed.bucket).toBe('planned_backlog');
+  });
+
+  it('open epic whose branch work landed without a PR is not post_merge_limbo either', () => {
+    const r = resolvePipelineMembership(sig({
+      issueOpen: true, isEpic: true, hasConventionBranch: true, branchUnmerged: false, hasMergedBranchWork: true,
+    }));
+    expect(r.bucket).toBe('planned_backlog');
+  });
+
+  it('an open epic with an open slice PR is in flight, and a closed epic is terminal', () => {
+    expect(resolvePipelineMembership(sig({ isEpic: true, hasOpenPr: true, hasMergedPr: true })).bucket).toBe('in_flight');
+    expect(resolvePipelineMembership(sig({ issueOpen: false, isEpic: true, hasMergedPr: true })).bucket).toBe('clean_terminal');
+  });
+
   it('post_merge_limbo: open issue whose branch WORK is contained in main (non-PR path, positive evidence), no merged PR', () => {
     const r = resolvePipelineMembership(sig({
       issueOpen: true, hasConventionBranch: true, branchUnmerged: false, hasMergedBranchWork: true,

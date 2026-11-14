@@ -26,6 +26,14 @@ export const READY_LABEL = 'ready';
 export const PARKED_LABEL = 'parked';
 /** An epic is a container of child issues — never directly workable/pickable. */
 export const EPIC_LABEL = 'epic';
+
+/**
+ * PAN-5279: the issue's tracker labels mark it an epic. An epic lands in
+ * slices, so a merged PR on it is a slice, never the epic shipping.
+ */
+export function hasEpicLabel(labels: readonly string[] | undefined): boolean {
+  return (labels ?? []).some((label) => label.toLowerCase() === EPIC_LABEL);
+}
 export const VETOED_LABEL = 'vetoed';
 export const BLOCKS_MAIN_LABEL = 'blocks-main';
 /** PAN-2059: operator's explicit "go" after reviewing the plan. Required for auto-pickup. */

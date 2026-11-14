@@ -102,6 +102,8 @@ export function HappenedFeed({ issueId }: { issueId: string }) {
   if (issue?.pr?.checks === 'green') lines.push({ at: '', atMs: Number.MAX_SAFE_INTEGER - 1, text: 'All checks passed ✓', tone: 'ok' })
   if (issue?.pr?.checks === 'red') lines.push({ at: '', atMs: Number.MAX_SAFE_INTEGER - 1, text: 'Checks are failing on the PR', tone: 'bad' })
   if (issue?.state === 'merged') lines.push({ at: '', atMs: Number.MAX_SAFE_INTEGER, text: 'Shipped — the change is on main ✓', tone: 'ok' })
+  // PAN-5279: an open epic's merged PR is one slice, never the epic shipping.
+  if (issue?.mergedSlice) lines.push({ at: '', atMs: Number.MAX_SAFE_INTEGER, text: `Slice #${issue.mergedSlice.number} merged to main — more slices to land`, tone: 'info' })
 
   const recent = lines
     .filter((line) => Number.isFinite(line.atMs))
