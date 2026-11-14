@@ -8,13 +8,15 @@ resolution. Nothing here is a stored pipeline status — merge readiness is
 computed live from the PR, its checks, and the forge's own mergeability
 verdict, every time it's asked.
 
-> **Scope.** This describes the **per-issue** merge — one feature, one click. While
-> a Flywheel run with the merge train enabled is active, the primary path is
-> **promoting a UAT batch** (merging several tested features at once). The
+> **Scope.** This describes the **per-issue** merge — one feature, one click.
+> With the merge train on, normal-priority work merges in **batches** instead
+> (see "Merge train on or off" below), and a project that holds for UAT
+> merges by **promoting a UAT batch** (several tested features at once). The
 > per-issue flow below remains the escape hatch (the "Merge one feature to
-> main…" control) and the path for everything outside an active batch-train
-> run. Unless the project holds merges for UAT, a batch assembles only when
-> **two or more** features are ready (PAN-3965): a one-member batch is
+> main…" control) and the path for high-priority work and for every PR while
+> the train is off. Outside the batch window (a hold project, GitLab,
+> polyrepo), a batch assembles only when **two or more** features are ready
+> (PAN-3965): a one-member batch is
 > byte-identical to the PR branch and its CI run a duplicate, so a single
 > ready feature merges directly through this flow (Merge button /
 > `gh pr merge`). The Merge train page says so: "1 feature ready — merges
@@ -27,12 +29,68 @@ verdict, every time it's asked.
 >
 > **Each ready feature has one merge path (PAN-4970).** When the per-PR
 > auto-merge train is active for the project (GitHub forge, single repo,
-> `OVERDECK_DISABLE_AUTO_MERGE` unset) and the feature is not held for UAT,
-> or it already has a `pending`/`merging` auto-merge row (and is not held),
-> the train merges it and no batch includes it. Held features, Deft
+> `OVERDECK_DISABLE_AUTO_MERGE` unset) and the feature's merge route is
+> per-PR (see below), or it already has a `pending`/`merging` auto-merge row
+> (and is not held), the per-PR path merges it and no batch includes it. Held
+> features, normal-priority features while the merge train is on, Deft
 > human-merge features, a cancelled auto-merge, an auto-merge that failed at
 > the current PR head, GitLab and polyrepo projects, and every feature while
 > the kill switch is set stay on the batch path.
+
+### Merge train on or off (PAN-4753)
+
+The **Merge train** switch on the Flywheel page header (next to Auto-pickup
+and Require UAT) writes `merge_train.enabled` through
+`POST /api/merge-train/config`. It is the master switch: a project's
+`merge_train: disabled` in `projects.yaml` turns the train off for that
+project only, and `enabled` cannot turn it on while the switch is off.
+
+- **Off:** every ready feature merges on its own as soon as it is green,
+  through the per-PR auto-merge path and its 5-minute cooldown. No project
+  batches, and the merge-train roll does not run. Off no longer stops
+  automatic merging; `OVERDECK_DISABLE_AUTO_MERGE=1` is the switch that stops
+  every automatic merge, per-PR and batch.
+- **On:** normal-priority ready features wait for a batch. The merge route
+  rule is `mergeRouteFor` (`src/lib/cloister/merge-route.ts`); first match
+  wins:
+  1. **Held for UAT** (its `hold-for-uat` label, else the project's
+     `auto_merge_default: hold`, else global Require UAT): batch, and the
+     operator tests and promotes it. Priority never bypasses a hold.
+  2. **High priority:** merges at once, on its own, through the per-PR path,
+     keeping the 5-minute cancel window. High priority is a strike branch
+     (`strike/<id>`), or an issue labeled `critical`, `blocks-main`, `P0` or
+     `urgent`, or labeled both `substrate-improvement` and `bug`. A
+     `substrate-improvement` issue that is not a `bug` batches. Strike PRs
+     never batch and stay operator-merged until strike auto-merge lands
+     (PAN-4753 WI-1/5/6).
+  3. **Dropped from a batch** (below): per-PR.
+  4. **Everything else:** batch.
+
+**The batch window.** In an auto GitHub monorepo project with the train on,
+the UAT reconciler waits until `merge_train.batch_size` (default 3) features
+are ready, or the oldest has waited `merge_train.batch_wait_minutes` (default
+30), and then assembles a batch of at most `batch_size` features. A lone
+feature at the timeout makes a one-member batch, so nothing waits forever.
+"Ready since" is the newest check-run completion on the PR head (a new push
+resets it). A batch, once assembled, keeps its members; features that become
+ready later wait for the next batch. Both keys are in **Settings → Merge
+Train**.
+
+**Combined CI and the merge.** CI runs on every push to a `uat/**` branch, so
+each batch gets its own run. Each 60-second tick, the auto-promote tick
+(`src/dashboard/server/services/batch-auto-promote.ts`) reads the newest
+`ready` batch's head check runs, ignoring CodeRabbit and the
+`Non-blocking flake lane`. When they are green it promotes the batch through
+the same door as the operator's **Merge batch** click, which re-checks every
+member's PR and refuses a moved base. A batch with any member held for UAT
+is never promoted automatically.
+
+**A failing member never blocks the rest.** When the batch CI fails, the tick
+drops the member merged last onto the branch (highest merge order), marks the
+batch `invalidated`, and records the drop on the batch's held-out list with
+the reason `combined CI failed on <batch> (<checks>); <ID> merges on its
+own`. That member then takes the per-PR path, and the next reconcile
+assembles the rest.
 
 ### Merging from the Flywheel UAT card (PAN-4598)
 
@@ -312,7 +370,7 @@ repository read-only to bypass a real stranded branch.
 
 ## After another feature merges
 
-With the merge train enabled, a merge rebases the project's approved sibling
+With the merge train on, a merge rebases the project's approved sibling
 branches onto the new main and re-reviews them (see "The merge-train roll"
 below). A rebase that conflicts is left to the conflict-repair patrol. When
 another merge (or a direct push to `main`) makes an approved PR conflict, the
@@ -624,12 +682,16 @@ disk line and "Clean up now" are the backstop for when the reaper cannot run —
 for example while `deacon.globally_paused` is set (PAN-4210) or during a
 GitHub quota pause, either of which lets closed workspaces accumulate.
 
-When the merge-train flag (`flywheel.merge_train_enabled`, default off) is
-ON, a merge-train reconcile pass rebases/re-verifies ready sibling branches
-(PAN-1691); with the flag off, reconcile an affected workspace explicitly
-with `pan sync-main <id>` before it proceeds through review or merge. The
-UAT reconciler (`src/lib/cloister/uat-reconciler.ts`) assembles a batch only
-for 2+ ready features; with exactly one it returns `single-feature` and
+When the merge-train flag (`merge_train.enabled`, falling back to the legacy
+`flywheel.merge_train_enabled`; off when neither is set; the **Merge train**
+switch on the Flywheel header) is on, a merge-train reconcile pass
+rebases/re-verifies ready sibling branches (PAN-1691) and normal-priority
+features batch (PAN-4753, "Merge train on or off" above); with the flag off,
+every ready PR merges on its own and an affected workspace is reconciled
+explicitly with `pan sync-main <id>` before it proceeds through review or
+merge. Outside the batch window, the UAT reconciler
+(`src/lib/cloister/uat-reconciler.ts`) assembles a batch only for 2+ ready
+features; with exactly one it returns `single-feature` and
 builds nothing, even on a forced rebuild — unless that feature is held for
 UAT (`issueHoldsForUat` in `cloister/auto-merge-eligibility.ts`: the issue's
 label, then the project default, then the global flag — the same tiers

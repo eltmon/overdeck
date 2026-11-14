@@ -90,16 +90,15 @@ Typed errors: `FlywheelAlreadyRunning`, `FlywheelPausedExists`, and `FlywheelOrp
 | --- | --- | --- |
 | `auto_pickup_backlog` (default off) | Off: the loop picks up only operator-released items. On: every ready, planned item can be picked up. | The **Auto-pickup** switch in the Flywheel header |
 | `require_uat_before_merge` (default on) | A PR may not merge until UAT passes. | The **Require UAT** switch in the Flywheel header |
-| `merge_train_enabled` | After a merge, rebase and re-verify the other ready branches. | The Merge train section on **Awaiting Merge**. The Flywheel header only shows it and links there. |
+| `merge_train_enabled` | Master switch (PAN-4753). On: normal-priority PRs batch, merging at `merge_train.batch_size` PRs or after `merge_train.batch_wait_minutes` once the batch CI is green; high-priority PRs (strikes, `critical`, `blocks-main`, `substrate-improvement` + `bug`) merge on their own; a merge rebases the other ready branches. Off: every ready PR merges on its own. See [MERGE-WORKFLOW.md](MERGE-WORKFLOW.md#merge-train-on-or-off-pan-4753). | The **Merge train** switch in the Flywheel header (also on **Awaiting Merge**). Batch size and wait: **Settings → Merge Train**. |
 
-All three use `GET/POST /api/merge-train/config`. The skill's Orient step reads them from `pan flywheel status --json` (`.policies`) instead of assuming the defaults.
+All three use `GET/POST /api/merge-train/config`, which also carries `batch_size` and `batch_wait_minutes` (PAN-4753). The skill's Orient step reads them from `pan flywheel status --json` (`.policies`) instead of assuming the defaults.
 
 ## Non-goals
 
 - Stats criteria c3–c7 (pass rate, MTTR, intervention rate, time consistency, flake). Their inputs were the run telemetry that PAN-3917 deleted.
 - A run record, a run id, a `flywheel_runs` table, a telemetry service, or `POST /api/flywheel/status`.
 - Boot reconciliation, the Recover button, the orphan-test-agent surface, the VerifyingOnMain badge, and the reset/restart-from-plan buttons.
-- Moving `merge_train_enabled` off the Merge train section.
 - Changing the loop's phases or the `pan start` launch path.
 - Launching `roles/flywheel.md` as a role prompt. The skill is the prompt, and the role file is only the source of the text it quotes.
 
