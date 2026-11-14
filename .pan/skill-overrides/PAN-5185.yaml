@@ -1,4 +1,5 @@
 # Overdeck per-issue skill overrides (PAN-3942). true = on, false = off; absent = inherit.
 issue: PAN-5185
 skills:
+  d3-viz: false
   elevenlabs: true
