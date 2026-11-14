@@ -4,17 +4,17 @@
     "created": "2026-11-14T01:32:40.547Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5191: File explorer F: edit workspaces, Create PR, one-click merge, discard, pipeline PR",
-    "updated": "2026-11-14T01:33:51.001Z"
+    "updated": "2026-11-14T01:35:12.478Z"
   },
   "plan": {
     "id": "pan-5191",
     "title": "File explorer F: edit workspaces, Create PR, one-click merge, discard, pipeline PR",
-    "status": "proposed",
+    "status": "running",
     "uid": "c0faec16-5396-4432-b94a-af30074a8652",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T01:32:40.547Z",
-    "updated": "2026-11-14T01:33:51.001Z",
+    "updated": "2026-11-14T01:35:12.478Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5191",
@@ -1412,5 +1412,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
