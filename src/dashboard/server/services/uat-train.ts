@@ -45,7 +45,7 @@ import {
   buildSelectBatch,
   combineLaneResults,
   laneStore,
-  splitReadySetByHold,
+  splitReadySetByLane,
   WINDOW_LANE_LABEL_SUFFIX,
   type BatchLane,
 } from './merge-train-batching.js';
@@ -242,14 +242,13 @@ async function runUatTrainReconcileForProject(
   // window lane (unheld features) and the UAT lane (held ones) run in turn.
   let readyOnce: Promise<ReadyFeature[] | null> | undefined;
   const readySet = () => (readyOnce ??= getReadySetForProject(projectPath));
+  let splitOnce: Promise<Record<BatchLane, ReadyFeature[]> | null> | undefined;
+  const split = () => (splitOnce ??= readySet().then((all) => all && splitReadySetByLane(all, projectPath, projectConfig)));
   const laneDeps = (lane?: BatchLane) => {
     const store = lane ? laneStore(buildUatGenerationStore(), lane) : buildUatGenerationStore();
     return {
       isEnabled: () => true,  // Already checked above
-      getReadySet: async () => {
-        const all = await readySet();
-        return all && lane ? splitReadySetByHold(all, projectConfig)[lane] : all;
-      },
+      getReadySet: async () => (lane ? (await split())?.[lane] ?? null : readySet()),
       getMainHeadSha: () => gitDeps.fetchMain(),
       getBranchHeadSha: (branch: string) => gitDeps.branchHeadSha(branch),
       isGenerationContainedInMain: (generation: UatGeneration) => gitDeps.isBranchContainedInMain?.(generation.name) ?? Promise.resolve(false),

@@ -20,7 +20,8 @@
  *     workflow run, and the non-blocking flake lane cannot fail the run;
  *   - all green: promote through the same door an operator's click uses
  *     (`postUatGenerationPromotePayload`), which re-runs the merge gate for
- *     every member against fresh PR reads and refuses a moved base;
+ *     every member against fresh PR reads and refuses the merge when `main`
+ *     moved under a member's files;
  *   - any failed: drop one member so it never blocks the rest. The drop rule
  *     is deterministic: the member with the highest `mergeOrder`, the last
  *     one merged onto the branch. The generation is marked `invalidated` (not
@@ -45,8 +46,12 @@ import type { UatGeneration } from '../../../lib/overdeck/merge-sync.js';
 import type { CommitCheckRuns } from '../../../lib/overdeck/pull-requests.js';
 import type { PromoteResult, UatPromoteDeps } from '../../../lib/cloister/uat-promote.js';
 import { isAdvisoryCheckName } from '../../../lib/advisory-checks.js';
-import { COMBINED_CI_DROP_PREFIX } from '../../../lib/cloister/merge-route.js';
-import { batchWindowAppliesToProject, issueHeldForUat, isWindowBatch } from './merge-train-batching.js';
+import {
+  CANCELLED_BATCH_CI_PREFIX,
+  COMBINED_CI_DROP_PREFIX,
+  NO_BATCH_CI_PREFIX,
+} from '../../../lib/cloister/merge-route.js';
+import { batchWindowAppliesToProject, isWindowBatch, needsHumanMerge } from './merge-train-batching.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -55,7 +60,18 @@ function isNonGatingCheck(name: string): boolean {
   return isAdvisoryCheckName(name) || /^non-blocking/i.test(name.trim());
 }
 
-export type BatchCiVerdict = 'green' | 'pending' | 'failed';
+/**
+ * The batch head's CI state: `none` (no `CI` run for this commit yet),
+ * `running` (queued or in progress), `green`, `failed`, or `cancelled`.
+ */
+export type BatchCiVerdict = 'none' | 'running' | 'green' | 'failed' | 'cancelled';
+
+/**
+ * How long a ready window batch may wait for a `CI` run to appear (or for a
+ * cancelled run to be replaced) before it is dissolved and its members merge
+ * one at a time. A batch never waits forever.
+ */
+export const BATCH_CI_APPEAR_TIMEOUT_MS = 10 * 60 * 1000;
 
 /** One GitHub Actions workflow run for a commit (`GET /repos/:o/:r/actions/runs?head_sha=`). */
 export interface WorkflowRunSummary {
@@ -72,20 +88,20 @@ export const BATCH_CI_WORKFLOW = 'CI';
 const FAILED_CONCLUSIONS = new Set(['failure', 'timed_out', 'startup_failure']);
 
 /**
- * The batch head's CI verdict from its `CI` workflow runs. Pure. The newest
- * run (then the newest attempt) decides: completed + success is green; a
- * failed conclusion is failed; anything else (none yet, queued, in progress,
- * cancelled) is pending.
+ * The batch head's CI state from its `CI` workflow runs. Pure. The newest run
+ * (then the newest attempt) decides: completed + success is green; a failed
+ * conclusion is failed; cancelled (or skipped, neutral, stale) is cancelled;
+ * anything not completed is running; no `CI` run at all is none.
  */
 export function batchCiVerdict(runs: readonly WorkflowRunSummary[]): BatchCiVerdict {
   const ci = runs.filter((run) => run.name === BATCH_CI_WORKFLOW);
-  if (ci.length === 0) return 'pending';
+  if (ci.length === 0) return 'none';
   const newest = [...ci].sort((a, b) =>
     (b.created_at ?? '').localeCompare(a.created_at ?? '') || (b.run_attempt ?? 0) - (a.run_attempt ?? 0))[0]!;
-  if (newest.status !== 'completed') return 'pending';
+  if (newest.status !== 'completed') return 'running';
   if (newest.conclusion === 'success') return 'green';
   if (FAILED_CONCLUSIONS.has(newest.conclusion ?? '')) return 'failed';
-  return 'pending';
+  return 'cancelled';
 }
 
 /** The failed check names worth naming in a drop reason (advisory and non-blocking checks left out). */
@@ -104,6 +120,13 @@ export interface BatchAutoPromoteDeps {
   forgeOf?: (projectPath: string) => 'github' | 'gitlab';
   isRequireUatBeforeMerge?: () => boolean;
   getIssueLabels?: (issueId: string) => readonly string[];
+  /** Why only a human may merge this member, or null; `needsHumanMerge` by default. */
+  humanMerge?: (issueId: string, projectPath: string, config: ProjectConfig) => Promise<string | null>;
+  /** The project has no batch CI; `projectLacksBatchCi` by default. */
+  lacksBatchCi?: (projectRoot: string) => boolean;
+  /** One activity-feed notice; `emitActivityEntry` by default. */
+  notify?: (entry: { message: string; level: 'warn' }) => void;
+  now?: () => number;
   /** Live `ready` generations for the project (both lanes), newest first. */
   listReady?: (projectRoot: string) => UatGeneration[];
   /** The batch branch's head SHA on origin, or null when it is not there. */
@@ -121,7 +144,18 @@ export interface BatchAutoPromoteDeps {
 
 export type BatchAutoPromoteOutcome =
   | { projectKey: string; generation: string; action: 'promoted' | 'promote-refused' | 'waiting-ci' | 'held'; detail?: string }
-  | { projectKey: string; generation: string; action: 'dropped'; issueId: string; detail: string };
+  | { projectKey: string; generation: string; action: 'dropped'; issueId: string; detail: string }
+  /** The batch got no usable CI run in time; every member merges one at a time. */
+  | { projectKey: string; generation: string; action: 'dissolved'; detail: string };
+
+/** Projects already told this process that batching needs a `uat/**` CI trigger. */
+const noBatchCiNoticeSent = new Set<string>();
+
+/** Test seam. */
+export function _resetBatchAutoPromoteForTests(): void {
+  noBatchCiNoticeSent.clear();
+  lastLogged.clear();
+}
 
 async function defaultBranchHead(projectPath: string, branch: string): Promise<string | null> {
   const { stdout } = await execFileAsync('git', ['ls-remote', 'origin', `refs/heads/${branch}`], {
@@ -197,6 +231,13 @@ async function runTick(
   const branchHead = deps.branchHead ?? defaultBranchHead;
   const workflowRuns = deps.workflowRuns ?? defaultWorkflowRuns;
   const checkRuns = deps.checkRuns ?? defaultCheckRuns;
+  const humanMerge = deps.humanMerge ?? ((issueId: string, projectPath: string, config: ProjectConfig) =>
+    needsHumanMerge(issueId, projectPath, config, deps.getIssueLabels ? { getIssueLabels: deps.getIssueLabels } : {}));
+  const now = deps.now ?? Date.now;
+  const notify = deps.notify ?? (await (async () => {
+    const { emitActivityEntry } = await import('../../../lib/activity-logger.js');
+    return (entry: { message: string; level: 'warn' }) => emitActivityEntry({ source: 'dashboard', link: '/flywheel', ...entry });
+  })());
   const say = (gen: string, line: string) => {
     if (lastLogged.get(gen) === line) return;
     lastLogged.set(gen, line);
@@ -208,22 +249,66 @@ async function runTick(
     const projectPath = resolve(config.path);
     try {
       if (!isTrainOn(config)) continue;
-      if (!batchWindowAppliesToProject(projectPath, config, { forgeOf, ...(deps.isRequireUatBeforeMerge ? { isRequireUatBeforeMerge: deps.isRequireUatBeforeMerge } : {}) })) continue;
+      if (!batchWindowAppliesToProject(projectPath, config, {
+        forgeOf,
+        ...(deps.isRequireUatBeforeMerge ? { isRequireUatBeforeMerge: deps.isRequireUatBeforeMerge } : {}),
+        ...(deps.lacksBatchCi ? { lacksBatchCi: deps.lacksBatchCi } : {}),
+      })) continue;
       const gen = listReady(projectPath).find((g) => isWindowBatch(g.name));
       if (!gen) continue;
 
-      const held = gen.members.find((m) => issueHeldForUat(m.issueId, config, deps));
-      if (held) {
-        say(gen.name, `${gen.name} waits for the operator: ${held.issueId} is held for UAT`);
-        outcomes.push({ projectKey: key, generation: gen.name, action: 'held', detail: held.issueId });
+      // A member that only a human may merge stops the automatic merge (the
+      // lane split keeps them out; this covers a change since assembly).
+      let human: { issueId: string; reason: string } | null = null;
+      for (const member of gen.members) {
+        const reason = await humanMerge(member.issueId, projectPath, config);
+        if (reason) { human = { issueId: member.issueId, reason }; break; }
+      }
+      if (human) {
+        say(gen.name, `${gen.name} waits for the operator: ${human.issueId} — ${human.reason}`);
+        outcomes.push({ projectKey: key, generation: gen.name, action: 'held', detail: human.issueId });
         continue;
       }
 
       const sha = await branchHead(projectPath, gen.name);
-      const verdict = sha ? batchCiVerdict(await workflowRuns(projectPath, sha)) : 'pending';
-      if (verdict === 'pending') {
-        say(gen.name, `${gen.name} waits for its combined CI${sha ? ` at ${sha.slice(0, 10)}` : ' (branch not on origin yet)'}`);
-        outcomes.push({ projectKey: key, generation: gen.name, action: 'waiting-ci' });
+      const verdict: BatchCiVerdict = sha ? batchCiVerdict(await workflowRuns(projectPath, sha)) : 'none';
+      if (verdict === 'none' || verdict === 'running' || verdict === 'cancelled') {
+        const readyAt = Date.parse(gen.updatedAt || gen.createdAt || '');
+        const waited = Number.isFinite(readyAt) ? now() - readyAt : Number.POSITIVE_INFINITY;
+        if (verdict === 'running' || waited < BATCH_CI_APPEAR_TIMEOUT_MS) {
+          say(gen.name, `${gen.name} waits for its combined CI${sha ? ` at ${sha.slice(0, 10)}` : ' (branch not on origin yet)'} (${verdict})`);
+          outcomes.push({ projectKey: key, generation: gen.name, action: 'waiting-ci' });
+          continue;
+        }
+        // Never wait forever: no CI run appeared (or the run was cancelled and
+        // nothing replaced it) within the bound. Dissolve the batch; every
+        // member merges one at a time, as with the train off.
+        const minutes = Math.round(BATCH_CI_APPEAR_TIMEOUT_MS / 60_000);
+        const prefix = verdict === 'none' ? NO_BATCH_CI_PREFIX : CANCELLED_BATCH_CI_PREFIX;
+        const why = verdict === 'none'
+          ? `${prefix} for ${gen.name} within ${minutes} min (batching needs a workflow named ${BATCH_CI_WORKFLOW} that runs on uat/** pushes)`
+          : `${prefix} on ${gen.name} and not replaced within ${minutes} min`;
+        markDropped(gen, {
+          members: [],
+          heldOut: [
+            ...gen.heldOut,
+            ...gen.members.map((m) => ({ issueId: m.issueId, branch: m.branch, headSha: m.headSha, reason: `${why}; ${m.issueId} merges on its own` })),
+          ],
+        });
+        lastLogged.delete(gen.name);
+        log(`[batch-auto-promote] ${why}; dissolved, ${gen.members.length} member(s) merge one at a time`);
+        await teardownStack(gen).catch((err) => {
+          log(`[batch-auto-promote] stack teardown for ${gen.name} failed: ${err instanceof Error ? err.message : String(err)}`);
+        });
+        if (verdict === 'none' && !noBatchCiNoticeSent.has(key)) {
+          noBatchCiNoticeSent.add(key);
+          notify({
+            level: 'warn',
+            message: `Merge train batching is paused for ${key}: its CI never ran on batch branch ${gen.name}. `
+              + `Add 'uat/**' to the push branches of a workflow named ${BATCH_CI_WORKFLOW}. Until then its PRs merge one at a time (batching is retried after a day).`,
+          });
+        }
+        outcomes.push({ projectKey: key, generation: gen.name, action: 'dissolved', detail: why });
         continue;
       }
 

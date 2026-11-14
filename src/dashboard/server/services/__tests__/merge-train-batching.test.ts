@@ -11,16 +11,28 @@ import type { ReadyFeature } from '../../../../lib/cloister/uat-generation-engin
 vi.mock('../issue-service-singleton.js', () => ({ getSharedIssueService: () => ({ getTrackerIssue: () => null }) }));
 
 const {
-  buildSelectBatch, _resetBatchWindowClockForTests, isWindowBatch, laneStore, splitReadySetByHold, combineLaneResults,
+  buildSelectBatch, _resetBatchWindowClockForTests, isWindowBatch, laneStore, splitReadySetByLane, combineLaneResults, needsHumanMerge,
 } = await import('../merge-train-batching.js');
 const { reconcileUatGenerations } = await import('../../../../lib/cloister/uat-reconciler.js');
 const { chooseBatch } = await import('../../../../lib/cloister/batch-window.js');
 type GenerationStorePort = import('../../../../lib/cloister/uat-generation-engine.js').GenerationStorePort;
-const { runBatchAutoPromoteTick, batchCiVerdict, failedGatingChecks, memberToDrop } = await import('../batch-auto-promote.js');
+const {
+  runBatchAutoPromoteTick, batchCiVerdict, failedGatingChecks, memberToDrop, _resetBatchAutoPromoteForTests, BATCH_CI_APPEAR_TIMEOUT_MS,
+} = await import('../batch-auto-promote.js');
+const { projectLacksBatchCi, NO_BATCH_CI_PREFIX } = await import('../../../../lib/cloister/merge-route.js');
+type PendingAutoMerge = import('../../../../lib/overdeck/merge-sync.js').PendingAutoMerge;
 type WorkflowRunSummary = import('../batch-auto-promote.js').WorkflowRunSummary;
 const { droppedFromBatch, mergeRouteFor } = await import('../../../../lib/cloister/merge-route.js');
 
 const MIN = 60_000;
+
+/** The consent check with no Deft hold and no auto-merge row unless a test says so. */
+function consent(labels: (id: string) => string[] = () => [], over: Parameters<typeof needsHumanMerge>[3] = {}) {
+  return (issueId: string) => needsHumanMerge(issueId, '/repos/overdeck', PROJECT, {
+    getIssueLabels: labels, isRequireUatBeforeMerge: () => false,
+    deftHold: async () => null, latestAutoMerge: () => null, listOpenPrs: async () => [], ...over,
+  });
+}
 const PROJECT: ProjectConfig = { name: 'Overdeck', path: '/repos/overdeck', auto_merge_default: 'auto' };
 const feature = (n: number): ReadyFeature => ({ issueId: `PAN-${n}`, title: `t${n}`, branch: `feature/pan-${n}` });
 
@@ -54,6 +66,7 @@ describe('buildSelectBatch (window wiring)', () => {
     getIssueLabels: () => [] as string[],
     batchSize: () => 3,
     batchWaitMinutes: () => 30,
+    lacksBatchCi: () => false,
   };
 
   it('waits, then batches the oldest ready features once M elapses (ready-since from the rollup)', async () => {
@@ -98,10 +111,10 @@ describe('batchCiVerdict (positive evidence from the CI workflow run)', () => {
   });
 
   it('is pending with no CI run yet, a run in progress, or a cancelled run', () => {
-    expect(batchCiVerdict([])).toBe('pending');
-    expect(batchCiVerdict([run({ name: 'Windows smoke' })])).toBe('pending');
-    expect(batchCiVerdict([run({ status: 'in_progress', conclusion: null })])).toBe('pending');
-    expect(batchCiVerdict([run({ conclusion: 'cancelled' })])).toBe('pending');
+    expect(batchCiVerdict([])).toBe('none');
+    expect(batchCiVerdict([run({ name: 'Windows smoke' })])).toBe('none');
+    expect(batchCiVerdict([run({ status: 'in_progress', conclusion: null })])).toBe('running');
+    expect(batchCiVerdict([run({ conclusion: 'cancelled' })])).toBe('cancelled');
   });
 
   it('is failed for a failed or timed-out run', () => {
@@ -117,7 +130,7 @@ describe('batchCiVerdict (positive evidence from the CI workflow run)', () => {
     expect(batchCiVerdict([
       run({ conclusion: 'failure', run_attempt: 1 }),
       run({ status: 'queued', conclusion: null, run_attempt: 2 }),
-    ])).toBe('pending');
+    ])).toBe('running');
   });
 
   it('names failed gating checks, leaving out CodeRabbit and the non-blocking flake lane', () => {
@@ -146,6 +159,8 @@ describe('runBatchAutoPromoteTick', () => {
       forgeOf: () => 'github',
       isRequireUatBeforeMerge: () => false,
       getIssueLabels: (id) => opts.labels?.[id] ?? [],
+      humanMerge: (id) => consent((i) => opts.labels?.[i] ?? [])(id),
+      lacksBatchCi: () => false,
       listReady: () => (opts.gen === null ? [] : [opts.gen ?? generation([1, 2, 3])]),
       branchHead: async () => 'headsha',
       workflowRuns: async () => opts.ci ?? [{ name: 'CI', status: 'completed', conclusion: 'success' }],
@@ -234,6 +249,8 @@ describe('runBatchAutoPromoteTick', () => {
       forgeOf: () => 'github' as const,
       isRequireUatBeforeMerge: () => false,
       getIssueLabels: () => [] as string[],
+      humanMerge: consent(),
+      lacksBatchCi: () => false,
       listReady: () => [generation([1, 2, 3])],
       branchHead: async () => 'headsha',
       workflowRuns: async () => [{ name: 'CI', status: 'completed', conclusion: 'success' }],
@@ -264,8 +281,12 @@ describe('two lanes: a held feature never delays the rest (operator, 2026-11-14)
     expect(isWindowBatch('uat/pan-train-otter-1114')).toBe(true);
     expect(isWindowBatch('uat/pan-train-otter-1114-2')).toBe(true);
     expect(isWindowBatch('uat/pan-otter-1114')).toBe(false);
-    const held = { getIssueLabels: (id: string) => (id === 'PAN-4' ? ['hold-for-uat'] : []), isRequireUatBeforeMerge: () => false };
-    expect(splitReadySetByHold([1, 2, 3, 4].map(feature), PROJECT, held)).toEqual({
+  });
+
+  it('splits held features into the UAT lane', async () => {
+    const held = { getIssueLabels: (id: string) => (id === 'PAN-4' ? ['hold-for-uat'] : []), isRequireUatBeforeMerge: () => false,
+      deftHold: async () => null, latestAutoMerge: () => null };
+    expect(await splitReadySetByLane([1, 2, 3, 4].map(feature), '/repos/overdeck', PROJECT, held)).toEqual({
       window: [feature(1), feature(2), feature(3)], uat: [feature(4)],
     });
   });
@@ -297,7 +318,9 @@ describe('two lanes: a held feature never delays the rest (operator, 2026-11-14)
       };
       const labels = (id: string) => (id === 'PAN-4' ? ['hold-for-uat'] : []);
       const ready = [1, 2, 3, 4].map(feature);
-      const lanes = splitReadySetByHold(ready, PROJECT, { getIssueLabels: labels, isRequireUatBeforeMerge: () => false });
+      const lanes = await splitReadySetByLane(ready, root, PROJECT, {
+        getIssueLabels: labels, isRequireUatBeforeMerge: () => false, deftHold: async () => null, latestAutoMerge: () => null,
+      });
       const laneDeps = (lane: 'window' | 'uat') => {
         const own = laneStore(store, lane);
         return {
@@ -356,6 +379,8 @@ describe('two lanes: a held feature never delays the rest (operator, 2026-11-14)
         forgeOf: () => 'github',
         isRequireUatBeforeMerge: () => false,
         getIssueLabels: labels,
+        humanMerge: consent(labels),
+        lacksBatchCi: () => false,
         listReady: (projectRoot) => store.listChain(projectRoot, ['ready']),
         branchHead: async () => 'headsha',
         workflowRuns: async () => [{ name: 'CI', status: 'completed', conclusion: 'success' }],
@@ -368,5 +393,154 @@ describe('two lanes: a held feature never delays the rest (operator, 2026-11-14)
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('only-a-human-merges features never enter an auto-promoted window batch (review of #5254)', () => {
+  const row = (status: PendingAutoMerge['status'], headSha = 'h1'): PendingAutoMerge => ({
+    id: 1, issueId: 'PAN-1', prUrl: 'https://github.com/eltmon/overdeck/pull/1', projectKey: 'overdeck', forge: 'github',
+    status, scheduledMergeAt: '2026-11-14T12:00:00Z', scheduledAt: '2026-11-14T11:55:00Z', headSha,
+  });
+  const listOpenPrs = async () => [{ headRefName: 'feature/pan-1', headRefOid: 'h1', url: 'https://github.com/eltmon/overdeck/pull/1' }];
+
+  it('reads each reason a human must merge', async () => {
+    expect(await consent()('PAN-1')).toBeNull();
+    expect(await consent(() => ['hold-for-uat'])('PAN-1')).toBe('held for UAT');
+    expect(await consent(() => [], { latestAutoMerge: () => row('cancelled') })('PAN-1')).toBe('auto-merge cancelled by the operator');
+    expect(await consent(() => [], { deftHold: async () => 'PAN-1 runs on Deft and requires a human merge' })('PAN-1'))
+      .toBe('PAN-1 runs on Deft and requires a human merge');
+    expect(await consent(() => [], { latestAutoMerge: () => row('failed'), listOpenPrs })('PAN-1')).toBe('auto-merge failed at this PR head');
+    // A failed row at an older head re-arms: the train may merge the new head.
+    expect(await consent(() => [], { latestAutoMerge: () => row('failed', 'old'), listOpenPrs })('PAN-1')).toBeNull();
+    // A read that fails never picks the automatic path.
+    expect(await consent(() => [], { deftHold: async () => { throw new Error('policy unreadable'); } })('PAN-1'))
+      .toMatch(/^merge consent could not be read/);
+  });
+
+  it('a feature whose auto-merge the operator cancelled goes to the UAT lane, and its batch is never auto-promoted', async () => {
+    const deps = { getIssueLabels: () => [], isRequireUatBeforeMerge: () => false, deftHold: async () => null,
+      latestAutoMerge: (id: string) => (id === 'PAN-2' ? { ...row('cancelled'), issueId: 'PAN-2' } : null) };
+    expect(await splitReadySetByLane([1, 2, 3].map(feature), '/repos/overdeck', PROJECT, deps))
+      .toEqual({ window: [feature(1), feature(3)], uat: [feature(2)] });
+
+    const promote = vi.fn();
+    const outcomes = await runBatchAutoPromoteTick(vi.fn(), {
+      env: {}, listProjects: () => [{ key: 'overdeck', config: PROJECT }], isTrainOn: () => true, forgeOf: () => 'github',
+      isRequireUatBeforeMerge: () => false, lacksBatchCi: () => false,
+      humanMerge: consent(() => [], deps),
+      listReady: () => [generation([1, 2, 3])],
+      branchHead: async () => 'headsha',
+      workflowRuns: async () => [{ name: 'CI', status: 'completed', conclusion: 'success' }],
+      promote, log: () => {},
+    });
+    expect(outcomes).toEqual([{ projectKey: 'overdeck', generation: 'uat/pan-train-otter-1114', action: 'held', detail: 'PAN-2' }]);
+    expect(promote).not.toHaveBeenCalled();
+  });
+
+  it('a Deft requireHumanMerge feature goes to the UAT lane, and its batch is never auto-promoted', async () => {
+    const deftHold = async (id: string) => (id === 'PAN-3' ? 'PAN-3 runs on Deft and requires a human merge' : null);
+    const deps = { getIssueLabels: () => [], isRequireUatBeforeMerge: () => false, deftHold, latestAutoMerge: () => null };
+    expect(await splitReadySetByLane([1, 2, 3].map(feature), '/repos/overdeck', PROJECT, deps))
+      .toEqual({ window: [feature(1), feature(2)], uat: [feature(3)] });
+
+    const promote = vi.fn();
+    const outcomes = await runBatchAutoPromoteTick(vi.fn(), {
+      env: {}, listProjects: () => [{ key: 'overdeck', config: PROJECT }], isTrainOn: () => true, forgeOf: () => 'github',
+      isRequireUatBeforeMerge: () => false, lacksBatchCi: () => false,
+      humanMerge: consent(() => [], { deftHold }),
+      listReady: () => [generation([1, 2, 3])],
+      branchHead: async () => 'headsha',
+      workflowRuns: async () => [{ name: 'CI', status: 'completed', conclusion: 'success' }],
+      promote, log: () => {},
+    });
+    expect(outcomes).toEqual([{ projectKey: 'overdeck', generation: 'uat/pan-train-otter-1114', action: 'held', detail: 'PAN-3' }]);
+    expect(promote).not.toHaveBeenCalled();
+  });
+});
+
+describe('a batch never waits forever for CI (review of #5254)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-14T12:00:00Z'));
+    _resetBatchAutoPromoteForTests();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  function dissolveWorld(ci: WorkflowRunSummary[]) {
+    const readyAt = new Date().toISOString();
+    const gen = generation([1, 2], { updatedAt: readyAt, createdAt: readyAt });
+    const markDropped = vi.fn();
+    const notify = vi.fn();
+    const promote = vi.fn();
+    const deps = {
+      env: {}, listProjects: () => [{ key: 'myn-cli', config: PROJECT }], isTrainOn: () => true, forgeOf: () => 'github' as const,
+      isRequireUatBeforeMerge: () => false, lacksBatchCi: () => false, humanMerge: consent(),
+      listReady: () => [gen], branchHead: async () => 'headsha', workflowRuns: async () => ci,
+      promote, markDropped, notify, teardownStack: vi.fn(async () => {}), now: () => Date.now(), log: () => {},
+    };
+    return { gen, deps, markDropped, notify, promote };
+  }
+
+  it('dissolves a window batch whose CI never ran within 10 minutes; members merge one at a time; one notice per project', async () => {
+    const { deps, markDropped, notify, promote } = dissolveWorld([]);
+    vi.advanceTimersByTime(BATCH_CI_APPEAR_TIMEOUT_MS - MIN);
+    await expect(runBatchAutoPromoteTick(vi.fn(), deps)).resolves.toEqual([
+      { projectKey: 'myn-cli', generation: 'uat/pan-train-otter-1114', action: 'waiting-ci' },
+    ]);
+    expect(markDropped).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(MIN);
+    const [outcome] = await runBatchAutoPromoteTick(vi.fn(), deps);
+    expect(outcome).toMatchObject({ action: 'dissolved' });
+    expect(promote).not.toHaveBeenCalled();
+    const { members, heldOut } = markDropped.mock.calls[0]![1] as Pick<UatGeneration, 'members' | 'heldOut'>;
+    expect(members).toEqual([]);
+    expect(heldOut.map((h) => h.issueId)).toEqual(['PAN-1', 'PAN-2']);
+    expect(heldOut.every((h) => h.reason.startsWith(NO_BATCH_CI_PREFIX))).toBe(true);
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify.mock.calls[0]![0].message).toContain("Add 'uat/**' to the push branches of a workflow named CI");
+
+    // The dissolve record sends both members per-PR and stops batching the project.
+    const invalidated = [{ ...generation([]), status: 'invalidated' as const, heldOut, updatedAt: new Date().toISOString() }];
+    for (const id of ['PAN-1', 'PAN-2']) {
+      expect(droppedFromBatch(id, '/repos/overdeck', { listInvalidated: () => invalidated })).toBe(true);
+    }
+    expect(projectLacksBatchCi('/repos/overdeck', { listInvalidated: () => invalidated, now: () => Date.now() })).toBe(true);
+    // Batching is retried after a day.
+    vi.advanceTimersByTime(24 * 60 * MIN);
+    expect(projectLacksBatchCi('/repos/overdeck', { listInvalidated: () => invalidated, now: () => Date.now() })).toBe(false);
+
+    // A second dissolve in the same project sends no second notice.
+    const again = dissolveWorld([]);
+    vi.advanceTimersByTime(BATCH_CI_APPEAR_TIMEOUT_MS);
+    await runBatchAutoPromoteTick(vi.fn(), { ...again.deps, notify });
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps waiting while a CI run is in progress, however long it takes', async () => {
+    const { deps, markDropped } = dissolveWorld([{ name: 'CI', status: 'in_progress', conclusion: null }]);
+    vi.advanceTimersByTime(3 * BATCH_CI_APPEAR_TIMEOUT_MS);
+    await expect(runBatchAutoPromoteTick(vi.fn(), deps)).resolves.toEqual([
+      { projectKey: 'myn-cli', generation: 'uat/pan-train-otter-1114', action: 'waiting-ci' },
+    ]);
+    expect(markDropped).not.toHaveBeenCalled();
+  });
+
+  it('dissolves a batch whose CI run was cancelled and not replaced, without the no-CI notice', async () => {
+    const { deps, markDropped, notify } = dissolveWorld([{ name: 'CI', status: 'completed', conclusion: 'cancelled' }]);
+    vi.advanceTimersByTime(BATCH_CI_APPEAR_TIMEOUT_MS);
+    const [outcome] = await runBatchAutoPromoteTick(vi.fn(), deps);
+    expect(outcome).toMatchObject({ action: 'dissolved' });
+    const { heldOut } = markDropped.mock.calls[0]![1] as Pick<UatGeneration, 'heldOut'>;
+    expect(heldOut.every((h) => h.reason.startsWith('combined CI run cancelled'))).toBe(true);
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('turns the window off for a project marked as lacking batch CI', async () => {
+    const select = buildSelectBatch('/repos/overdeck', PROJECT, {
+      forgeOf: () => 'github', isRequireUatBeforeMerge: () => false, lacksBatchCi: () => true,
+      listOpenPrs: async () => [], batchSize: () => 3, batchWaitMinutes: () => 30,
+    });
+    expect(await select([feature(1), feature(2), feature(3)], [])).toBeNull();
   });
 });

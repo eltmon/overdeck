@@ -72,8 +72,9 @@ export function MergeTrainBatchingSection() {
       </h2>
       <p className="text-xs text-muted-foreground mb-4">
         While the merge train is on (the switch on the Flywheel page), normal-priority PRs wait and merge together as one
-        batch once the batch&apos;s CI is green. Strikes and issues labeled critical, blocks-main, or both
+        batch once the batch&apos;s CI is green. Strikes and issues labeled critical, blocks-main, P0, urgent, or both
         substrate-improvement and bug still merge on their own. With the train off, every ready PR merges on its own.
+        Batching needs a CI workflow that runs on uat/** pushes; without one, PRs merge one at a time.
       </p>
       {error ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-xs text-destructive">

@@ -24,6 +24,18 @@ export const HIGH_PRIORITY_LABELS: readonly string[] = ['critical', 'blocks-main
 
 /** Prefix of the heldOut reason the auto-promote tick writes when it drops a member. */
 export const COMBINED_CI_DROP_PREFIX = 'combined CI failed';
+/**
+ * Prefix of the heldOut reason written when a window batch is dissolved
+ * because no `CI` run appeared for its head: the project's CI does not run on
+ * `uat/**` pushes. It also marks the project as having no batch CI.
+ */
+export const NO_BATCH_CI_PREFIX = 'no combined CI run';
+/** Prefix of the heldOut reason written when a batch's CI run was cancelled and nothing replaced it. */
+export const CANCELLED_BATCH_CI_PREFIX = 'combined CI run cancelled';
+/** Every heldOut reason that sends a member back to the per-PR path. */
+const DROP_PREFIXES = [COMBINED_CI_DROP_PREFIX, NO_BATCH_CI_PREFIX, CANCELLED_BATCH_CI_PREFIX];
+/** How long a "no batch CI" mark keeps the project's PRs per-PR before batching is tried again. */
+export const BATCH_CI_RETRY_MS = 24 * 60 * 60 * 1000;
 
 /** How many of a project's newest invalidated generations count for {@link droppedFromBatch}. */
 const DROP_LOOKBACK = 20;
@@ -63,11 +75,11 @@ export function mergeRouteFor(input: MergeRouteInput): MergeRoute {
 export const BATCH_ROUTE_REASON = 'the merge train batches this PR; it merges with the next batch';
 
 /**
- * D4: whether the issue was dropped from a batch because the batch's
- * combined CI failed. The auto-promote tick records the drop as a heldOut
- * entry on the generation it invalidates, so this reads stored generation
- * rows and nothing else. A dropped member stays on the per-PR path until it
- * merges.
+ * D4: whether the issue was dropped from a batch: its combined CI failed, no
+ * CI run ever appeared, or the run was cancelled. The auto-promote tick
+ * records the drop as a heldOut entry on the generation it invalidates, so
+ * this reads stored generation rows and nothing else. A dropped member stays
+ * on the per-PR path until it merges.
  */
 export function droppedFromBatch(
   issueId: string,
@@ -80,21 +92,48 @@ export function droppedFromBatch(
     ?? ((root: string) => listUatGenerations({ projectRoot: root, statuses: ['invalidated'], limit: DROP_LOOKBACK }));
   try {
     return list(projectRoot).some((gen) => gen.heldOut.some((held) =>
-      held.issueId.toUpperCase() === id && held.reason.startsWith(COMBINED_CI_DROP_PREFIX)));
+      held.issueId.toUpperCase() === id && DROP_PREFIXES.some((prefix) => held.reason.startsWith(prefix))));
   } catch {
     return false;
   }
 }
 
 /**
- * The effective merge-train flag for the issue's project (the global master
- * switch, then the project's opt-out). An issue no project claims reads as
- * train off, which routes it per-PR; the merge gate still decides.
+ * Whether the project has no batch CI: within the last
+ * {@link BATCH_CI_RETRY_MS}, a window batch was dissolved because no `CI` run
+ * appeared for its head. While true, the train does not batch this project's
+ * PRs; they merge one at a time, as with the train off. Read from stored
+ * generation rows only.
+ */
+export function projectLacksBatchCi(
+  projectRoot: string | undefined,
+  deps: { listInvalidated?: (projectRoot: string) => ReturnType<typeof listUatGenerations>; now?: () => number } = {},
+): boolean {
+  if (!projectRoot) return false;
+  const now = (deps.now ?? Date.now)();
+  const list = deps.listInvalidated
+    ?? ((root: string) => listUatGenerations({ projectRoot: root, statuses: ['invalidated'], limit: DROP_LOOKBACK }));
+  try {
+    return list(projectRoot).some((gen) =>
+      now - Date.parse(gen.updatedAt || gen.createdAt || '') < BATCH_CI_RETRY_MS
+      && gen.heldOut.some((held) => held.reason.startsWith(NO_BATCH_CI_PREFIX)));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether the merge train batches the issue's project: the effective flag
+ * (the global master switch, then the project's opt-out) is on, and the
+ * project has batch CI ({@link projectLacksBatchCi}). An issue no project
+ * claims reads as train off, which routes it per-PR; the merge gate still
+ * decides.
  */
 export function issueTrainOn(issueId: string): boolean {
   const resolved = resolveProjectFromIssueSync(issueId);
   if (!resolved) return false;
-  return isMergeTrainEnabledForProject(getProjectSync(resolved.projectKey) ?? undefined);
+  if (!isMergeTrainEnabledForProject(getProjectSync(resolved.projectKey) ?? undefined)) return false;
+  return !projectLacksBatchCi(resolved.projectPath ? resolve(resolved.projectPath) : undefined);
 }
 
 /** {@link droppedFromBatch} for the issue's own project. */

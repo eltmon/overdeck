@@ -160,7 +160,10 @@ feature has exactly one of these two merge paths — a feature auto-merge will
 merge never also joins a batch.
 
 - **Merge train off:** every ready PR is auto-merged on its own. Nothing batches.
-- **Merge train on:** normal-priority PRs batch. A batch merges when
+- **Merge train on:** normal-priority PRs batch (this needs a workflow named
+  `CI` that runs on `uat/**` pushes; without one, a batch waits at most 10
+  minutes for CI, then dissolves and its PRs merge one at a time, and batching
+  pauses for a day with one activity-feed notice). A batch merges when
   `batch_size` PRs are ready (default 3) or the oldest has waited
   `batch_wait_minutes` (default 30), once the batch's own CI run is green. If
   that run fails, one PR is dropped from the batch and merges on its own; the
@@ -172,9 +175,9 @@ merge never also joins a batch.
 A ready feature is also batched when it is held for UAT (its label, else the
 project default, else the global setting), its Deft policy requires a human
 merge, its auto-merge was cancelled by the operator, or its last auto-merge
-failed at the PR head it still has. Held features get their own batch, which
-waits for you to test and promote it; they never hold back the other PRs'
-batch. A GitLab project, a project spanning several repos, and any host
+failed at the PR head it still has. These features get their own batch, which
+waits for you to test and promote it; they never join an automatic batch and
+never hold back the other PRs' batch. A GitLab project, a project spanning several repos, and any host
 with `OVERDECK_DISABLE_AUTO_MERGE=1` set batch every ready feature —
 auto-merge never schedules there, and only you promote their batches.
 Leave `require_uat_before_merge` at its default (`true`, auto-merge OFF) when you

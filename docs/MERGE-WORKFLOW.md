@@ -79,9 +79,13 @@ ready later wait for the next batch. Both keys are in **Settings → Merge
 Train**.
 
 **Two lanes.** In a project where the window applies, the reconciler splits
-the ready set. Unheld features go to the **window lane**: its batches are
-named `uat/<prefix>-train-<codename>-<MMDD>` and merge on the window. Features
-held by their own `hold-for-uat` label go to the **UAT lane**: its batches
+the ready set. Features the train may merge with no click go to the
+**window lane**: its batches are named `uat/<prefix>-train-<codename>-<MMDD>`
+and merge on the window. Features only a human may merge go to the **UAT
+lane**: held for UAT by their own `hold-for-uat` label, a Deft
+`requireHumanMerge` hold, an auto-merge the operator cancelled, or an
+auto-merge that failed at the PR's current head (`needsHumanMerge` in
+`src/dashboard/server/services/merge-train-batching.ts`). UAT-lane batches
 keep the plain `uat/<prefix>-<codename>-<MMDD>` names and today's semantics,
 so the operator tests and promotes them. Each lane sees only its own
 generations, so assembling, superseding or trimming one never touches the
@@ -95,12 +99,25 @@ reads the `CI` workflow run for the newest `ready` window-lane batch's head
 commit. It
 needs positive evidence: the newest run is completed with conclusion
 `success` (CodeRabbit is not part of that run, and the non-blocking flake lane
-cannot fail it). No run yet, a run in progress, or a cancelled run means wait.
-Then it promotes the batch through the same door as the operator's
-**Merge batch** click, which re-checks every member's PR and refuses a moved
-base. One tick runs at a time. A UAT-lane batch is never promoted
-automatically, and neither is a window batch whose member became held after
-it was assembled.
+cannot fail it). A run in progress means wait. Then it promotes the batch
+through the same door as the operator's **Merge batch** click, which re-checks every member's PR and refuses
+the merge when `main` moved under a member's files (if `main` moved without
+touching them, it merges, so the merged tree can differ slightly from the one
+CI tested). One tick runs at a time. A UAT-lane batch is never
+promoted automatically, and neither is a window batch with a member that only
+a human may merge (it became held, its auto-merge was cancelled, or Deft
+requires a human merge since it was assembled).
+
+**Batching needs batch CI, and never waits forever.** The window needs a
+GitHub Actions workflow named `CI` that runs on pushes to `uat/**` branches.
+If no `CI` run appears for a ready window batch within 10 minutes (or its run
+was cancelled and nothing replaced it), the tick dissolves the batch: each
+member moves to the held-out list with a `no combined CI run …` (or
+`combined CI run cancelled …`) reason and merges one at a time through the
+per-PR path. A missing run also marks the project as having no batch CI for
+24 hours: its PRs merge one at a time, as with the train off, and the
+activity feed shows one notice saying batching needs a `uat/**` CI trigger.
+After 24 hours the next window batch tries again.
 
 **The roll leaves waiting features alone.** With the train on, the
 merge-train roll after a merge skips features that wait for the batch window

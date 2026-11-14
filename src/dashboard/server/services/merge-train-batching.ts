@@ -14,11 +14,18 @@
  * polyrepo projects get.
  *
  * Two lanes (operator, 2026-11-14): in a project where the window applies, a
- * feature held for UAT by its own `hold-for-uat` label never delays the rest.
- * The ready set is split. Unheld features go to the **window lane**, whose
- * batches are named `uat/<prefix>-train-…` and merge on the window once their
- * combined CI is green. Held features go to the **UAT lane**, whose batches
- * keep today's names and today's semantics (the operator tests and promotes).
+ * feature only a human may merge never delays the rest. The ready set is
+ * split by {@link needsHumanMerge}. Features that may merge with no click go
+ * to the **window lane**, whose batches are named `uat/<prefix>-train-…` and
+ * merge on the window once their combined CI is green. The others (held for
+ * UAT, a Deft human-merge hold, an auto-merge the operator cancelled, or one
+ * that failed at the current head) go to the **UAT lane**, whose batches keep
+ * today's names and today's semantics (the operator tests and promotes).
+ *
+ * The window needs batch CI: a workflow named `CI` that runs on `uat/**`
+ * pushes. A project whose window batch got no CI run is marked
+ * (`projectLacksBatchCi`, set by the auto-promote tick) and gets no window
+ * for a day; its PRs merge one at a time instead.
  * Each lane sees only its own generations ({@link laneStore}), so assembling
  * one never supersedes, invalidates or trims the other.
  *
@@ -27,7 +34,9 @@
  * whose rollup reports no completion falls back to the first tick this
  * process saw it ready, keyed on its head so a new push restarts the clock.
  */
+import { resolve } from 'node:path';
 import type { ProjectConfig } from '../../../lib/projects.js';
+import type { PendingAutoMerge } from '../../../lib/overdeck/merge-sync.js';
 import type { GenerationStorePort, ReadyFeature } from '../../../lib/cloister/uat-generation-engine.js';
 import type { ReconcileResult } from '../../../lib/cloister/uat-reconciler.js';
 import type { UatGeneration } from '../../../lib/overdeck/merge-sync.js';
@@ -40,6 +49,8 @@ import {
   getMergeTrainBatchWaitMinutes,
   isFlywheelRequireUatBeforeMerge,
 } from '../../../lib/overdeck/control-settings.js';
+import { latestAutoMergeAllowsSchedule } from '../../../lib/cloister/auto-merge-rearm.js';
+import { projectLacksBatchCi } from '../../../lib/cloister/merge-route.js';
 import { cachedIssueLabels } from './auto-merge-door-policy.js';
 
 export type SelectBatch = (
@@ -54,7 +65,17 @@ export interface BatchWindowDeps {
   listOpenPrs?: (projectPath: string) => Promise<readonly GhPrRow[] | null>;
   batchSize?: () => number;
   batchWaitMinutes?: () => number;
+  /** The project has no batch CI; `projectLacksBatchCi` by default. */
+  lacksBatchCi?: (projectRoot: string) => boolean;
   now?: () => number;
+}
+
+/** What {@link needsHumanMerge} reads besides the labels. */
+export interface HumanMergeDeps extends Pick<BatchWindowDeps, 'getIssueLabels' | 'isRequireUatBeforeMerge' | 'listOpenPrs'> {
+  /** PAN-4820: the Deft human-merge hold; `deftAutoMergeHold` by default. */
+  deftHold?: (issueId: string) => Promise<string | null>;
+  /** The issue's newest `pending_auto_merges` row; `getLatestAutoMerge` by default. */
+  latestAutoMerge?: (issueId: string) => PendingAutoMerge | null;
 }
 
 export type BatchLane = 'window' | 'uat';
@@ -76,14 +97,55 @@ export function laneStore(store: GenerationStorePort, lane: BatchLane): Generati
   };
 }
 
-/** Split a ready set into the window lane (unheld) and the UAT lane (held by label, project or global). */
-export function splitReadySetByHold(
-  features: readonly ReadyFeature[],
+/**
+ * Why only a human may merge this feature, or null when the train may merge
+ * it with no click. The one predicate for both the lane split and the
+ * auto-promote tick, matching the `mergePathOwner` reasons that mean "a human
+ * merges this": held for UAT (label, project, global); a Deft human-merge
+ * hold; an auto-merge the operator cancelled (only the operator re-arms it);
+ * a failed or blocked auto-merge the scheduler cannot re-arm at the PR's
+ * current head. A read that fails answers "a human merges this", never the
+ * automatic path.
+ */
+export async function needsHumanMerge(
+  issueId: string,
+  projectPath: string,
   config: ProjectConfig | undefined,
-  deps: Pick<BatchWindowDeps, 'getIssueLabels' | 'isRequireUatBeforeMerge'> = {},
-): Record<BatchLane, ReadyFeature[]> {
+  deps: HumanMergeDeps = {},
+): Promise<string | null> {
+  const id = issueId.toUpperCase();
+  try {
+    if (issueHeldForUat(id, config, deps)) return 'held for UAT';
+    const deftHold = deps.deftHold ?? (await import('../../../lib/deft/policy.js')).deftAutoMergeHold;
+    const hold = await deftHold(id);
+    if (hold) return hold;
+    const latestAutoMerge = deps.latestAutoMerge
+      ?? (await import('../../../lib/overdeck/merge-sync.js')).getLatestAutoMerge;
+    const latest = latestAutoMerge(id);
+    if (latest?.status === 'cancelled') return 'auto-merge cancelled by the operator';
+    if (latest?.status === 'failed' || latest?.status === 'blocked') {
+      const rows = (await (deps.listOpenPrs ?? defaultListOpenPrs)(projectPath)) ?? [];
+      const row = rows.find((r) => r.headRefName === `feature/${id.toLowerCase()}`);
+      const pr = { url: row?.url ?? null, headSha: row?.headRefOid ?? null };
+      if (!latestAutoMergeAllowsSchedule(latest, pr)) return `auto-merge ${latest.status} at this PR head`;
+    }
+    return null;
+  } catch (err) {
+    return `merge consent could not be read (${err instanceof Error ? err.message : String(err)})`;
+  }
+}
+
+/** Split a ready set: features that may merge with no click (window lane) and the rest (UAT lane). */
+export async function splitReadySetByLane(
+  features: readonly ReadyFeature[],
+  projectPath: string,
+  config: ProjectConfig | undefined,
+  deps: HumanMergeDeps = {},
+): Promise<Record<BatchLane, ReadyFeature[]>> {
   const split: Record<BatchLane, ReadyFeature[]> = { window: [], uat: [] };
-  for (const feature of features) split[issueHeldForUat(feature.issueId, config, deps) ? 'uat' : 'window'].push(feature);
+  for (const feature of features) {
+    split[(await needsHumanMerge(feature.issueId, projectPath, config, deps)) ? 'uat' : 'window'].push(feature);
+  }
   return split;
 }
 
@@ -107,17 +169,23 @@ export function _resetBatchWindowClockForTests(): void {
 
 /**
  * Whether the batch window and auto-promote apply to this project: GitHub,
- * monorepo, and not a hold project. The train flag itself is the caller's
- * check (the reconciler and the promote tick both read it first).
+ * monorepo, not a hold project, and not marked as having no batch CI
+ * (`projectLacksBatchCi`). The train flag itself is the caller's check (the
+ * reconciler and the promote tick both read it first).
  */
 export function batchWindowAppliesToProject(
   projectPath: string,
   config: ProjectConfig | undefined,
-  deps: { forgeOf: (projectPath: string) => 'github' | 'gitlab'; isRequireUatBeforeMerge?: () => boolean },
+  deps: {
+    forgeOf: (projectPath: string) => 'github' | 'gitlab';
+    isRequireUatBeforeMerge?: () => boolean;
+    lacksBatchCi?: (projectRoot: string) => boolean;
+  },
 ): boolean {
   if (!config || config.workspace?.type === 'polyrepo') return false;
   if (deps.forgeOf(projectPath) !== 'github') return false;
-  return !projectHoldsForUat(config, (deps.isRequireUatBeforeMerge ?? isFlywheelRequireUatBeforeMerge)());
+  if (projectHoldsForUat(config, (deps.isRequireUatBeforeMerge ?? isFlywheelRequireUatBeforeMerge)())) return false;
+  return !(deps.lacksBatchCi ?? ((root: string) => projectLacksBatchCi(root)))(resolve(projectPath));
 }
 
 /** True when the issue is held for UAT by its label, its project, or the global flag. */

@@ -38,7 +38,7 @@ const SPLIT_DEFAULT_LEFT = 560;
 
 const AUTO_PICKUP_TITLE = 'Off: the loop picks up only backlog items the operator released. On: every ready, planned backlog item is pickable.';
 const REQUIRE_UAT_TITLE = 'On: a PR may not merge until UAT has passed. Off: eligible merges may be scheduled through the auto-merge cooldown.';
-const MERGE_TRAIN_TITLE = 'On: normal-priority PRs batch and merge together once the batch CI is green; strikes, critical, blocks-main and substrate bug fixes still merge on their own. Off: every ready PR merges on its own. Batch size and wait are in Settings.';
+const MERGE_TRAIN_TITLE = 'On: normal-priority PRs batch and merge together once the batch CI is green; strikes, critical, blocks-main, P0, urgent and substrate bug fixes still merge on their own. Off: every ready PR merges on its own. Batch size and wait are in Settings.';
 
 function readStoredSplit(): number {
   try {
