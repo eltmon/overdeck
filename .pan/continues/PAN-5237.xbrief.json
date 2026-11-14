@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5237",
   "created": "2026-11-14T04:16:13.968Z",
-  "updated": "2026-11-14T05:11:42.829Z",
+  "updated": "2026-11-14T05:13:18.612Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -180,6 +180,11 @@
     "composer-restore-target.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T05:11:42.829Z"
+    },
+    "docs-and-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5237",
+      "claimedAt": "2026-11-14T05:13:18.612Z"
     }
   }
 }
