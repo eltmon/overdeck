@@ -24,6 +24,7 @@
  */
 import { randomBytes } from 'node:crypto';
 import type { Duplex } from 'node:stream';
+import { ChannelOpenError } from '@overdeck/anywhere-channel';
 import type { SignalData } from '@overdeck/contracts';
 import { RTCPeerConnection, type RTCDataChannel } from 'werift';
 
@@ -55,11 +56,25 @@ export interface RtcTransportLogs {
 /** The step of handling a signal frame that failed, for the `failed at <step>` line. */
 type SignalStep = 'ice-servers' | 'peer-connection' | 'remote-description' | 'answer';
 
+export type RtcRoute = 'direct' | 'relay';
+
+export function routeOf(relay: boolean): RtcRoute {
+  return relay ? 'relay' : 'direct';
+}
+
 export class RtcDialAbortedError extends Error {
-  constructor() {
-    super('direct connection aborted');
+  constructor(readonly route: RtcRoute = 'direct') {
+    super(`${route} connection aborted`);
     this.name = 'AbortError';
   }
+}
+
+/** Prefixes `<route> connection: ` once, keeping a `ChannelOpenError`'s code and detail. */
+function withRoute(route: RtcRoute, error: unknown): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.startsWith(`${route} connection`)) return error as Error;
+  if (error instanceof ChannelOpenError) return new ChannelOpenError(error.code, `${route} connection: ${message}`, error.detail);
+  return new Error(`${route} connection: ${message}`, { cause: error });
 }
 
 interface PeerEntry {
@@ -111,7 +126,7 @@ export class RtcTransport {
   }
 
   async dial(peerEnvironmentId: string, opts: { relay: boolean; purpose: RtcPurpose; signal: AbortSignal }): Promise<Duplex> {
-    if (opts.signal.aborted) throw new RtcDialAbortedError();
+    if (opts.signal.aborted) throw new RtcDialAbortedError(routeOf(opts.relay));
     const key = entryKey(peerEnvironmentId, opts.relay, opts.purpose);
     let entry = this.byKey.get(key);
     if (entry && (entry.closed || ['failed', 'closed', 'disconnected'].includes(entry.pc.connectionState))) {
@@ -134,7 +149,7 @@ export class RtcTransport {
         return this.awaitOpen(first.entry, first.channel, opts.signal, true);
       }
     }
-    if (opts.signal.aborted) throw new RtcDialAbortedError();
+    if (opts.signal.aborted) throw new RtcDialAbortedError(routeOf(opts.relay));
     return this.awaitOpen(entry, entry.pc.createDataChannel(RTC_DATA_CHANNEL_LABEL, { ordered: true }), opts.signal, false);
   }
 
@@ -146,20 +161,24 @@ export class RtcTransport {
 
   /** Initiator: a new peer connection, its first data channel and the offer. */
   private async create(key: string, peer: string, relay: boolean, purpose: RtcPurpose): Promise<{ entry: PeerEntry; channel: RTCDataChannel }> {
-    const iceServers = await this.peerIceServers(relay);
-    const pc = new RTCPeerConnection({ iceServers, iceTransportPolicy: relay ? 'relay' : 'all' });
-    const entry = this.register(pc, key, peer, randomBytes(16).toString('hex'), purpose, relay);
-    // The first channel must exist before the offer so the SDP carries the SCTP section.
-    const channel = pc.createDataChannel(RTC_DATA_CHANNEL_LABEL, { ordered: true });
     try {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
+      const iceServers = await this.peerIceServers(relay);
+      const pc = new RTCPeerConnection({ iceServers, iceTransportPolicy: relay ? 'relay' : 'all' });
+      const entry = this.register(pc, key, peer, randomBytes(16).toString('hex'), purpose, relay);
+      // The first channel must exist before the offer so the SDP carries the SCTP section.
+      const channel = pc.createDataChannel(RTC_DATA_CHANNEL_LABEL, { ordered: true });
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+      } catch (error) {
+        this.closeEntry(entry);
+        throw error;
+      }
+      this.sendLocalDescription(entry, 'offer');
+      return { entry, channel };
     } catch (error) {
-      this.closeEntry(entry);
-      throw error;
+      throw withRoute(routeOf(relay), error);
     }
-    this.sendLocalDescription(entry, 'offer');
-    return { entry, channel };
   }
 
   /** Fails the connection behind one signalling session (the directory said the peer is offline). */
@@ -353,6 +372,7 @@ export class RtcTransport {
 
   /** `ownsEntry`: this dial created the connection, so a failure before any channel opened closes it. */
   private awaitOpen(entry: PeerEntry, channel: RTCDataChannel, signal: AbortSignal, ownsEntry: boolean): Promise<Duplex> {
+    const route = routeOf(entry.relay);
     return new Promise<Duplex>((resolve, reject) => {
       let settled = false;
       const subscriptions: Array<{ unSubscribe: () => void }> = [];
@@ -374,7 +394,7 @@ export class RtcTransport {
         entry.everOpen = true;
         resolve(new RtcDuplex(channel, entry.peer));
       };
-      const onAbort = (): void => finish(new RtcDialAbortedError());
+      const onAbort = (): void => finish(new RtcDialAbortedError(route));
       if (signal.aborted) {
         onAbort();
         return;
@@ -383,10 +403,10 @@ export class RtcTransport {
       subscriptions.push(
         channel.stateChanged.subscribe((state) => {
           if (state === 'open') finish(null);
-          else if (state === 'closed') finish(new Error('data channel closed before it opened'));
+          else if (state === 'closed') finish(new Error(`${route} data channel closed before it opened`));
         }),
         entry.pc.connectionStateChange.subscribe((state) => {
-          if (state === 'failed' || state === 'closed') finish(new Error(`direct connection ${state}`));
+          if (state === 'failed' || state === 'closed') finish(new Error(`${route} connection ${state}`));
         }),
       );
       if (channel.readyState === 'open') finish(null);

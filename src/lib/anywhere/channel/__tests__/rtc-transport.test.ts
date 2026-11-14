@@ -5,6 +5,7 @@
 import { randomBytes } from 'node:crypto';
 import type { Duplex } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ChannelOpenError } from '@overdeck/anywhere-channel';
 import type { SignalData } from '@overdeck/contracts';
 import { RTCPeerConnection } from 'werift';
 
@@ -171,6 +172,19 @@ describe('RtcTransport (PAN-2356 WI-10)', () => {
     expect(a.peerConnectionCount()).toBe(0);
   }, 20_000);
 
+  it('names the route in an aborted dial', async () => {
+    const { a } = pair();
+    const direct = new AbortController();
+    const directDial = a.dial(B, { relay: false, purpose: 'link', signal: direct.signal });
+    direct.abort();
+    await expect(directDial).rejects.toMatchObject({ message: 'direct connection aborted' });
+
+    const relay = new AbortController();
+    const relayDial = a.dial(B, { relay: true, purpose: 'link', signal: relay.signal });
+    relay.abort();
+    await expect(relayDial).rejects.toMatchObject({ message: 'relay connection aborted' });
+  }, 20_000);
+
   it('ends the far side when one side destroys its stream', async () => {
     const { a, nextIncoming } = pair();
     const raw = await a.dial(B, { relay: false, purpose: 'link', signal: new AbortController().signal });
@@ -179,6 +193,36 @@ describe('RtcTransport (PAN-2356 WI-10)', () => {
     raw.destroy();
     await closed;
     expect(accepted.raw.destroyed).toBe(true);
+  }, 20_000);
+
+  it('names the relay route when a relay connection closes before it opens', async () => {
+    const h = hub();
+    const a = new RtcTransport(h.port(A), () => undefined);
+    transports.push(a);
+    const dial = a.dial(B, { relay: true, purpose: 'link', signal: new AbortController().signal }).catch((error: unknown) => error);
+    await vi.waitFor(() => expect(h.sent.some((frame) => frame.from === A && frame.data.sdp?.type === 'offer')).toBe(true));
+    const offer = h.sent.find((frame) => frame.from === A && frame.data.sdp?.type === 'offer')!;
+    a.abortSession(offer.session);
+    const error = await dial;
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/^relay /);
+    expect((error as Error).message.startsWith('direct')).toBe(false);
+  }, 20_000);
+
+  it('names the route when the ICE server request fails', async () => {
+    const h = hub();
+    const failingPort = { ...h.port(A), iceServers: async () => { throw new Error('the directory did not answer the ICE server request'); } };
+    const a = new RtcTransport(failingPort, () => undefined);
+    transports.push(a);
+    const dial = a.dial(B, { relay: true, purpose: 'link', signal: new AbortController().signal });
+    await expect(dial).rejects.toMatchObject({ message: 'relay connection: the directory did not answer the ICE server request' });
+
+    const channelOpenPort = { ...h.port(A), iceServers: async () => { throw new ChannelOpenError('unreachable', 'x', { cause: 'c' }); } };
+    const a2 = new RtcTransport(channelOpenPort, () => undefined);
+    transports.push(a2);
+    const dial2 = a2.dial(B, { relay: true, purpose: 'link', signal: new AbortController().signal });
+    await expect(dial2).rejects.toBeInstanceOf(ChannelOpenError);
+    await expect(dial2).rejects.toMatchObject({ code: 'unreachable', message: 'relay connection: x', detail: { cause: 'c' } });
   }, 20_000);
 });
 
