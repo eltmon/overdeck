@@ -114,7 +114,8 @@ function decodeAuthFile(row: unknown): ListedAccount | null {
   const provider = stringOrNull(row.provider) ?? stringOrNull(row.type);
   if (!name || !authIndex || !provider) return null;
 
-  // CLIProxy 7.x rows carried an `id_token` object; 8.0.71 rows do not.
+  // Both 7.x and 8.0.71 rows carry `id_token` { chatgpt_account_id, plan_type }
+  // when the account's token has those claims; either may be missing.
   const idToken = isRecord(row.id_token) ? row.id_token : {};
   const plan = stringOrNull(idToken.plan_type) ?? stringOrNull(idToken.chatgpt_plan_type);
   return {

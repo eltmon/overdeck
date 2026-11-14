@@ -12,7 +12,8 @@ describe('startCliproxyWatchdogForDashboard', () => {
   it('starts the watchdog once in the host dashboard', () => {
     const startWatchdog = vi.fn();
 
-    expect(startCliproxyWatchdogForDashboard(false, startWatchdog)).toBe(true);
+    // A mock routing controller keeps this test off the real CLIProxy.
+    expect(startCliproxyWatchdogForDashboard(false, startWatchdog, vi.fn())).toBe(true);
     expect(startWatchdog).toHaveBeenCalledOnce();
   });
 
