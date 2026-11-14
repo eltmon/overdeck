@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5218",
   "created": "2026-11-14T02:30:48.079Z",
-  "updated": "2026-11-14T02:34:21.760Z",
+  "updated": "2026-11-14T02:39:24.163Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,22 @@
     "relay-records.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T02:34:21.759Z"
+    },
+    "settlement-facts-fetch": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:39:24.163Z"
+    },
+    "settlement-facts-fetch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:39:24.163Z"
+    },
+    "settlement-facts-fetch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:39:24.163Z"
+    },
+    "settlement-facts-fetch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:39:24.163Z"
     }
   }
 }
