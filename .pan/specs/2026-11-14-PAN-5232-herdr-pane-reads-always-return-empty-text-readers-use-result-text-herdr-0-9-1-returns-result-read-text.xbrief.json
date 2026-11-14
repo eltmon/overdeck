@@ -4,17 +4,17 @@
     "created": "2026-11-14T03:23:13Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5232: Herdr pane reads always return empty text: readers use result.text, herdr 0.9.1 returns result.read.text",
-    "updated": "2026-11-14T03:41:00.885Z"
+    "updated": "2026-11-14T03:49:54.036Z"
   },
   "plan": {
     "id": "pan-5232",
     "title": "Herdr pane reads always return empty text: readers use result.text, herdr 0.9.1 returns result.read.text",
-    "status": "proposed",
+    "status": "running",
     "uid": "efa8330e-9f6b-4e9b-9f95-67f348b8d37a",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-14T03:23:13Z",
-    "updated": "2026-11-14T03:41:00.885Z",
+    "updated": "2026-11-14T03:49:54.036Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5232",
@@ -617,5 +617,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
