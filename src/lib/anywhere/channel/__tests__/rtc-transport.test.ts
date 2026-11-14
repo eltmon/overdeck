@@ -7,9 +7,9 @@ import type { Duplex } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ChannelOpenError } from '@overdeck/anywhere-channel';
 import type { SignalData } from '@overdeck/contracts';
-import { RTCPeerConnection } from 'werift';
+import { Candidate, RTCPeerConnection } from 'werift';
 
-import { RtcDialAbortedError, type RtcPurpose, type RtcSignalingPort, RtcTransport } from '../rtc-transport.js';
+import { CandidateTally, candidateKind, RtcDialAbortedError, type RtcPurpose, type RtcSignalingPort, RtcTransport } from '../rtc-transport.js';
 
 const A = '00000000-0000-4000-8000-00000000000a';
 const B = '00000000-0000-4000-8000-00000000000b';
@@ -291,6 +291,48 @@ describe('RtcTransport diagnostics (PAN-5018 FR-6)', () => {
       expect(line).not.toContain('a=');
       expect(line).not.toContain('candidate:');
     }
+  }, 20_000);
+});
+
+describe('RtcTransport candidate tallies (PAN-5242 WI-2)', () => {
+  it('tallies candidates by kind and ignores duplicates', () => {
+    const tally = new CandidateTally();
+    const host = 'candidate:1 1 udp 1 127.0.0.1 9 typ host';
+    tally.add(host);
+    tally.add(host);
+    tally.addSdp(['v=0', 'a=candidate:2 1 udp 1 203.0.113.9 9 typ relay', ''].join('\r\n'));
+    tally.add('candidate:2 1 udp 1 203.0.113.9 9 typ relay');
+    expect(tally.format()).toBe('2 (host 1, srflx 0, relay 1)');
+  });
+
+  it('reads the kind of a relay candidate werift serializes itself', () => {
+    const candidate = new Candidate('f', 1, 'udp', 16777215, '203.0.113.9', 5000, 'relay', '198.51.100.2', 6000, undefined, 0, 'u');
+    expect(candidateKind(candidate.toSdp())).toBe('relay');
+    expect(candidateKind('candidate:' + candidate.toSdp())).toBe('relay');
+  });
+
+  it('logs gathered and received tallies on both sides of a direct dial', async () => {
+    const h = hub();
+    const aLogs = { log: vi.fn(), debug: vi.fn() };
+    const bLogs = { log: vi.fn(), debug: vi.fn() };
+    const incoming: Duplex[] = [];
+    const a = new RtcTransport(h.port(A), () => undefined, aLogs);
+    const b = new RtcTransport(h.port(B), (raw) => incoming.push(raw), bLogs);
+    transports.push(a, b);
+    await a.dial(B, { relay: false, purpose: 'link', signal: new AbortController().signal });
+    await vi.waitFor(() => expect(incoming).toHaveLength(1));
+    const aLines = aLogs.log.mock.calls.map(([line]) => line as string);
+    const bLines = bLogs.log.mock.calls.map(([line]) => line as string);
+    expect(aLines).toContainEqual(
+      expect.stringMatching(/^rtc session [0-9a-f]{8} offer to 00000000 \(direct\): gathered [1-9]\d* \(host [1-9]\d*, srflx \d+, relay 0\)$/),
+    );
+    expect(bLines).toContainEqual(
+      expect.stringMatching(
+        /^rtc session [0-9a-f]{8} answer to 00000000 \(direct\): received [1-9]\d* \(host [1-9]\d*, srflx \d+, relay 0\), gathered [1-9]\d* /,
+      ),
+    );
+    expect(bLines).toContainEqual(expect.stringMatching(/^rtc session [0-9a-f]{8} answered$/));
+    expect([...aLines, ...bLines]).toContainEqual(expect.stringMatching(/ connected \(direct; gathered \d+ \(host /));
   }, 20_000);
 });
 

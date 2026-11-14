@@ -77,6 +77,41 @@ function withRoute(route: RtcRoute, error: unknown): Error {
   return new Error(`${route} connection: ${message}`, { cause: error });
 }
 
+export type CandidateKind = 'host' | 'srflx' | 'prflx' | 'relay' | 'other';
+
+/** The `typ` of one candidate string; never logs or returns the text. */
+export function candidateKind(candidate: string): CandidateKind {
+  const kind = / typ (host|srflx|prflx|relay)(?:\s|$)/.exec(candidate)?.[1];
+  return (kind as CandidateKind | undefined) ?? 'other';
+}
+
+/** Distinct candidates by kind (deduplicated by text without a leading `a=`). */
+export class CandidateTally {
+  private readonly seen = new Set<string>();
+  readonly counts: Record<CandidateKind, number> = { host: 0, srflx: 0, prflx: 0, relay: 0, other: 0 };
+
+  add(candidate: string | undefined | null): void {
+    const key = (candidate ?? '').trim().replace(/^a=/, '');
+    if (!key || this.seen.has(key)) return;
+    this.seen.add(key);
+    this.counts[candidateKind(key)] += 1;
+  }
+
+  addSdp(sdp: string): void {
+    for (const line of sdp.split(/\r?\n/)) if (line.startsWith('a=candidate:')) this.add(line);
+  }
+
+  get total(): number {
+    return this.seen.size;
+  }
+
+  /** `3 (host 2, srflx 0, relay 1)`. */
+  format(): string {
+    const { host, srflx, relay } = this.counts;
+    return `${this.total} (host ${host}, srflx ${srflx}, relay ${relay})`;
+  }
+}
+
 interface PeerEntry {
   readonly key: string;
   readonly peer: string;
@@ -93,6 +128,8 @@ interface PeerEntry {
   closed: boolean;
   /** A data channel on this connection has opened at least once. */
   everOpen: boolean;
+  readonly gathered: CandidateTally;
+  readonly received: CandidateTally;
 }
 
 function entryKey(peer: string, relay: boolean, purpose: RtcPurpose): string {
@@ -174,6 +211,7 @@ export class RtcTransport {
         this.closeEntry(entry);
         throw error;
       }
+      this.log(`rtc session ${shortId(entry.session)} offer to ${shortId(peer)} (${routeOf(relay)}): gathered ${entry.gathered.format()}`);
       this.sendLocalDescription(entry, 'offer');
       return { entry, channel };
     } catch (error) {
@@ -209,12 +247,15 @@ export class RtcTransport {
       localSent: false,
       closed: false,
       everOpen: false,
+      gathered: new CandidateTally(),
+      received: new CandidateTally(),
     };
     this.byKey.set(key, entry);
     this.bySession.set(session, entry);
     pc.onIceCandidate.subscribe((candidate) => {
       if (!candidate || entry.closed) return;
       const json = candidate.toJSON();
+      entry.gathered.add(json.candidate);
       const out: NonNullable<SignalData['candidate']> = {
         candidate: json.candidate,
         sdpMid: json.sdpMid ?? null,
@@ -224,7 +265,11 @@ export class RtcTransport {
       else entry.pendingLocal.push(out);
     });
     pc.connectionStateChange.subscribe((state) => {
-      if (state === 'connected' || state === 'failed' || state === 'closed') this.log(`rtc session ${shortId(session)} ${shortId(peer)} ${state}`);
+      if (state === 'connected' || state === 'failed' || state === 'closed') {
+        this.log(
+          `rtc session ${shortId(session)} ${shortId(peer)} ${state} (${routeOf(relay)}; gathered ${entry.gathered.format()}, received ${entry.received.format()})`,
+        );
+      }
       if (state === 'failed' || state === 'closed') this.closeEntry(entry);
     });
     // Either side may open data channels on a connected peer connection (dial reuses whichever
@@ -258,6 +303,7 @@ export class RtcTransport {
 
   private async addRemoteCandidate(entry: PeerEntry, candidate: SignalData['candidate']): Promise<void> {
     if (!candidate) return;
+    entry.received.add(candidate.candidate);
     if (!entry.remoteSet) {
       entry.pendingRemote.push(candidate);
       return;
@@ -274,6 +320,7 @@ export class RtcTransport {
   }
 
   private async setRemote(entry: PeerEntry, type: 'offer' | 'answer', sdp: string): Promise<void> {
+    entry.received.addSdp(sdp);
     await entry.pc.setRemoteDescription({ type, sdp });
     entry.remoteSet = true;
     for (const candidate of entry.pendingRemote.splice(0)) await this.addRemoteCandidate(entry, candidate);
@@ -314,6 +361,9 @@ export class RtcTransport {
           progress.step = 'answer';
           const answer = await known.pc.createAnswer();
           await known.pc.setLocalDescription(answer);
+          this.log(
+            `rtc session ${shortId(session)} answer to ${shortId(from)} (${routeOf(relay)}): received ${known.received.format()}, gathered ${known.gathered.format()}`,
+          );
           this.sendLocalDescription(known, 'answer');
           this.log(`rtc session ${shortId(session)} answered`);
         }
@@ -367,6 +417,9 @@ export class RtcTransport {
     progress.step = 'answer';
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
+    this.log(
+      `rtc session ${shortId(session)} answer to ${shortId(from)} (${routeOf(relay)}): received ${entry.received.format()}, gathered ${entry.gathered.format()}`,
+    );
     this.sendLocalDescription(entry, 'answer');
   }
 
