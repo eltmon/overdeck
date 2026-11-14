@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5298",
   "created": "2026-11-14T21:08:19.124Z",
-  "updated": "2026-11-14T22:01:43.252Z",
+  "updated": "2026-11-14T22:01:50.432Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,11 @@
     "docs-e2e-harness.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T22:01:43.251Z"
+    },
+    "repeat-evidence": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5298",
+      "claimedAt": "2026-11-14T22:01:50.432Z"
     }
   }
 }
