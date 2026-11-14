@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5261",
   "created": "2026-11-14T08:29:10.265Z",
-  "updated": "2026-11-14T09:00:35.191Z",
+  "updated": "2026-11-14T09:03:52.897Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,9 +146,26 @@
       "doneAt": "2026-11-14T09:00:27.777Z"
     },
     "issue-state-cache-wiring": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5261",
-      "claimedAt": "2026-11-14T09:00:35.191Z"
+      "claimedAt": "2026-11-14T09:00:35.191Z",
+      "doneAt": "2026-11-14T09:03:52.897Z"
+    },
+    "issue-state-cache-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T09:03:52.897Z"
+    },
+    "issue-state-cache-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T09:03:52.897Z"
+    },
+    "issue-state-cache-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T09:03:52.897Z"
+    },
+    "issue-state-cache-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T09:03:52.897Z"
     }
   }
 }
