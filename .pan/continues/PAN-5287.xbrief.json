@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5287",
   "created": "2026-11-14T19:49:14.970Z",
-  "updated": "2026-11-14T20:46:19.724Z",
+  "updated": "2026-11-14T20:46:52.593Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -190,9 +190,10 @@
       "doneAt": "2026-11-14T20:18:34.365Z"
     },
     "app-migration": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5287",
-      "claimedAt": "2026-11-14T20:46:02.048Z"
+      "claimedAt": "2026-11-14T20:46:02.048Z",
+      "doneAt": "2026-11-14T20:46:52.593Z"
     },
     "stage-shortcuts": {
       "status": "in_progress",
@@ -228,6 +229,18 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5287",
       "claimedAt": "2026-11-14T20:46:19.724Z"
+    },
+    "app-migration.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:46:52.593Z"
+    },
+    "app-migration.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:46:52.593Z"
+    },
+    "app-migration.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:46:52.593Z"
     }
   }
 }
