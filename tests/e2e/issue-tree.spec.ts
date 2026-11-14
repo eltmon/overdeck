@@ -11,13 +11,14 @@
  *
  * Drives the real Stage issue route against route mocks; no live server.
  */
-import { existsSync, realpathSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { lstat, mkdir, readFile, symlink, unlink } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
+import { createViteCacheDir, pdfjsAssetsAlias, removeViteCacheDir } from './fixtures/vite-harness.js';
 
 type ViteDevServer = {
   listen: () => Promise<void> | void;
@@ -27,6 +28,7 @@ type ViteDevServer = {
 
 const require = createRequire(import.meta.url);
 let vite: ViteDevServer;
+let viteCacheDir: string | undefined;
 let browser: Browser;
 let baseUrl: string;
 let linkedFrontendNodeModules = false;
@@ -225,6 +227,7 @@ async function openCockpit(): Promise<{ context: BrowserContext; page: Page; pag
 
 beforeAll(async () => {
   await ensureFrontendNodeModules();
+  viteCacheDir = await createViteCacheDir(projectRoot, 'issue-tree');
   const vitePath = resolvePackage('vite');
   const reactPath = resolvePackage('@vitejs/plugin-react');
   const { createServer } = await import(vitePath) as { createServer: (options: Record<string, unknown>) => Promise<ViteDevServer> };
@@ -232,13 +235,10 @@ beforeAll(async () => {
   vite = await createServer({
     root: frontendRoot,
     configFile: false,
-    // The real vite.config.ts alias that pdfDocument.ts's import.meta.glob
-    // calls rely on. Without it Vite's dependency scan fails on CI ("Invalid
-    // glob: pdfjs-dist-assets/…"), skips pre-bundling, and serves every
-    // dependency unbundled, which pushes the first page load past 30s.
-    resolve: {
-      alias: [{ find: 'pdfjs-dist-assets', replacement: dirname(realpathSync(resolvePackage('pdfjs-dist/package.json'))) }],
-    },
+    // A private optimizer cache (PAN-5298) and vite.config.ts's pdfjs alias
+    // (PAN-5246): see tests/e2e/fixtures/vite-harness.ts.
+    cacheDir: viteCacheDir,
+    resolve: { alias: [pdfjsAssetsAlias(resolvePackage)] },
     plugins: [react(), {
       name: 'issue-tree-mock-ws-transport',
       enforce: 'pre',
@@ -301,6 +301,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await browser?.close();
   await vite?.close();
+  await removeViteCacheDir(viteCacheDir);
   await Promise.all(linkedFrontendPackages.map((packagePath) => unlink(packagePath)));
   if (linkedFrontendNodeModules) await unlink(join(frontendRoot, 'node_modules'));
 });
@@ -308,50 +309,53 @@ afterAll(async () => {
 describe('the issue tree is the issue workspace', () => {
   it('renders a Herdr-spawned reviewer as the Review row with its model tag', async () => {
     const { context, page, pageErrors } = await openCockpit();
+    try {
+      // Open Details by clicking its tab: nothing verifies that the Command
+      // Deck's routing keeps a ?tab= query string until the frame mounts.
+      const detailsTab = page.locator('[data-testid="drawer-tab-overview"]');
+      await expect.poll(() => detailsTab.count(), renderPoll).toBe(1);
+      await detailsTab.click();
+      const table = page.locator('[data-testid="drawer-details-pipeline"]');
+      await expect.poll(() => table.count(), renderPoll).toBe(1);
 
-    // Open Details by clicking its tab: nothing verifies that the Command
-    // Deck's routing keeps a ?tab= query string until the frame mounts.
-    const detailsTab = page.locator('[data-testid="drawer-tab-overview"]');
-    await expect.poll(() => detailsTab.count(), renderPoll).toBe(1);
-    await detailsTab.click();
-    const table = page.locator('[data-testid="drawer-details-pipeline"]');
-    await expect.poll(() => table.count(), renderPoll).toBe(1);
+      // The reviewer pane is the issue's Review row, tagged with the model the
+      // backend reported for it — not a loose conversation somewhere else.
+      const review = table.locator('tr[data-phase="review"]');
+      await expect.poll(() => review.innerText(), renderPoll).toMatch(/opus-5/);
+      expect(await review.innerText()).toMatch(/Running now/);
 
-    // The reviewer pane is the issue's Review row, tagged with the model the
-    // backend reported for it — not a loose conversation somewhere else.
-    const review = table.locator('tr[data-phase="review"]');
-    await expect.poll(() => review.innerText(), renderPoll).toMatch(/opus-5/);
-    expect(await review.innerText()).toMatch(/Running now/);
+      // Its work pane sits alongside it, tagged with its own model.
+      expect(await table.locator('tr[data-phase="work"]').innerText()).toMatch(/sonnet-5/);
 
-    // Its work pane sits alongside it, tagged with its own model.
-    expect(await table.locator('tr[data-phase="work"]').innerText()).toMatch(/sonnet-5/);
-
-    expect(pageErrors).toEqual([]);
-    await context.close();
+      expect(pageErrors).toEqual([]);
+    } finally {
+      await context.close();
+    }
   }, 60_000);
 
   it('takes its rows from the pane inventory alone', async () => {
     const { context, page } = await openCockpit();
+    try {
+      const detailsTab = page.locator('[data-testid="drawer-tab-overview"]');
+      await expect.poll(() => detailsTab.count(), renderPoll).toBe(1);
+      await detailsTab.click();
+      const table = page.locator('[data-testid="drawer-details-pipeline"]');
+      await expect.poll(() => table.count(), renderPoll).toBe(1);
+      await expect.poll(() => table.locator('tr[data-phase="review"]').innerText(), renderPoll).toMatch(/opus-5/);
 
-    const detailsTab = page.locator('[data-testid="drawer-tab-overview"]');
-    await expect.poll(() => detailsTab.count(), renderPoll).toBe(1);
-    await detailsTab.click();
-    const table = page.locator('[data-testid="drawer-details-pipeline"]');
-    await expect.poll(() => table.count(), renderPoll).toBe(1);
-    await expect.poll(() => table.locator('tr[data-phase="review"]').innerText(), renderPoll).toMatch(/opus-5/);
+      // Exactly one Review row: the pane, with no session-tree ghost beside it
+      // (/api/session-trees answers empty in this fixture).
+      expect(await table.locator('tr[data-phase="review"]').count()).toBe(1);
 
-    // Exactly one Review row: the pane, with no session-tree ghost beside it
-    // (/api/session-trees answers empty in this fixture).
-    expect(await table.locator('tr[data-phase="review"]').count()).toBe(1);
+      // Both panes report `working`, so the strip shows both phases live.
+      const strip = page.locator('[data-testid="drawer-pipeline-strip"]');
+      expect(await strip.locator('[data-phase="work"]').getAttribute('data-kind')).toBe('live');
+      expect(await strip.locator('[data-phase="review"]').getAttribute('data-kind')).toBe('live');
 
-    // Both panes report `working`, so the strip shows both phases live.
-    const strip = page.locator('[data-testid="drawer-pipeline-strip"]');
-    expect(await strip.locator('[data-phase="work"]').getAttribute('data-kind')).toBe('live');
-    expect(await strip.locator('[data-phase="review"]').getAttribute('data-kind')).toBe('live');
-
-    // The pane id is backend bookkeeping; it never surfaces.
-    expect(await page.getByText('pane-review-9101', { exact: false }).count()).toBe(0);
-
-    await context.close();
+      // The pane id is backend bookkeeping; it never surfaces.
+      expect(await page.getByText('pane-review-9101', { exact: false }).count()).toBe(0);
+    } finally {
+      await context.close();
+    }
   }, 60_000);
 });
