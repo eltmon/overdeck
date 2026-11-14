@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5248",
   "created": "2026-11-14T05:37:27.839Z",
-  "updated": "2026-11-14T06:19:33.519Z",
+  "updated": "2026-11-14T06:19:55.722Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -178,6 +178,11 @@
     "verification-gate-footprint.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T06:19:33.519Z"
+    },
+    "tsc-admitted-wrapper": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T06:19:55.721Z"
     }
   }
 }
