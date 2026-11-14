@@ -164,7 +164,9 @@ export const ExplorerGitStageInput = Schema.Struct({
 })
 export type ExplorerGitStageInput = typeof ExplorerGitStageInput.Type
 
-export const ExplorerGitStageResult = Schema.Struct({})
+export const ExplorerGitStageResult = Schema.Struct({
+  trashIds: Schema.Array(Schema.String),
+})
 export type ExplorerGitStageResult = typeof ExplorerGitStageResult.Type
 
 // ─── Search ───────────────────────────────────────────────────────────────────

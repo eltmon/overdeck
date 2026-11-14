@@ -80,6 +80,13 @@ describe('explorerRpcHandlers read methods', () => {
     expect(failureOf(exit).code).toBe('EDIT_WORKSPACE_REQUIRED');
   });
 
+  it('pan.explorerGitStage returns trashIds', async () => {
+    const result = await Effect.runPromise(
+      explorerRpcHandlers[WS_METHODS.explorerGitStage]({ rootId: 'issue:x', paths: ['a.txt'], action: 'stage' }),
+    );
+    expect(result).toEqual({ trashIds: [] });
+  });
+
   it('pan.explorerReadFile and the search methods reach their services', async () => {
     const read = await Effect.runPromise(explorerRpcHandlers[WS_METHODS.explorerReadFile]({ rootId: 'issue:x', path: 'a.txt' }));
     expect(read).toMatchObject({ kind: 'text', text: 'a\n' });
