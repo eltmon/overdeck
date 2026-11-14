@@ -157,6 +157,13 @@ describe('IssueDetail (C-DETAIL one component)', () => {
     expect(screen.getByTestId('mock-agent-session-conversation')).toBeInTheDocument();
   });
 
+  it('focusAgentId opens the terminal of a non-default agent (blocked-agent deep link)', () => {
+    renderDetail(
+      <IssueDetail issueId="PAN-1" density="drawer" agents={AGENTS} tab="terminal" focusAgentId="agent-review-1" onSelectTab={vi.fn()} />,
+    );
+    expect(screen.getByTestId('mock-agent-session-terminal')).toHaveAttribute('data-agent-id', 'agent-review-1');
+  });
+
   it('preserves a selected specialist across both selector switch directions', () => {
     renderDetail(<ControlledSessionDetail />);
 

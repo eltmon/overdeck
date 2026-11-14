@@ -40,6 +40,8 @@ export type DrawerState = {
   tab: string
   // PAN-4717: fallback tracker URL for issues absent from the dashboard snapshot.
   trackerUrl?: string
+  // Agent to select in the Conversation/Terminal panes (`?agent=` deep link).
+  agentId?: string
 }
 
 export interface DashboardState extends ReadModelState {
@@ -158,9 +160,12 @@ function replaceDrawerUrl(drawer: DrawerState) {
   if (drawer.issueId) {
     url.searchParams.set('issue', drawer.issueId)
     url.searchParams.set('tab', drawer.tab)
+    if (drawer.agentId) url.searchParams.set('agent', drawer.agentId)
+    else url.searchParams.delete('agent')
   } else {
     url.searchParams.delete('issue')
     url.searchParams.delete('tab')
+    url.searchParams.delete('agent')
   }
   window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
 }
@@ -169,9 +174,11 @@ function readDrawerFromUrl(): DrawerState {
   if (typeof window === 'undefined') return { issueId: null, tab: 'overview' }
 
   const params = new URLSearchParams(window.location.search)
+  const agentId = params.get('agent')
   return {
     issueId: params.get('issue'),
     tab: params.get('tab') || 'overview',
+    ...(agentId ? { agentId } : {}),
   }
 }
 
@@ -222,11 +229,11 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
   openIssueFromRoute: (issueId, parentPath, routePath) => {
     directIssueRoute = { parentPath, routePath }
     // PAN-2908 C-DETAIL: the drawer opens conversation-first — but an explicit
-    // ?tab= in the URL is a deep-link and always wins.
-    const urlTab = typeof window !== 'undefined'
-      ? new URLSearchParams(window.location.search).get('tab')
-      : null
-    set({ drawer: { issueId, tab: urlTab || 'conversation' } })
+    // ?tab= in the URL is a deep-link and always wins; ?agent= selects the agent.
+    const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+    const urlTab = params?.get('tab')
+    const agentId = params?.get('agent')
+    set({ drawer: { issueId, tab: urlTab || 'conversation', ...(agentId ? { agentId } : {}) } })
   },
 
   closeIssue: () => {
@@ -250,9 +257,10 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
 
   setDrawerTab: (tab) =>
     set((state) => {
-      const drawer = state.drawer.trackerUrl
+      const drawer: DrawerState = state.drawer.trackerUrl
         ? { issueId: state.drawer.issueId, tab, trackerUrl: state.drawer.trackerUrl }
         : { issueId: state.drawer.issueId, tab }
+      if (state.drawer.agentId) drawer.agentId = state.drawer.agentId
       replaceDrawerUrl(drawer)
       return { drawer }
     }),

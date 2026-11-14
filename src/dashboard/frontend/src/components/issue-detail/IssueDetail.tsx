@@ -21,7 +21,7 @@
  * SessionPanel flow (test-enshrined); both surfaces share this component's
  * shell and the ConversationPanel transcript renderer.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -72,6 +72,8 @@ export interface IssueDetailProps {
   /** Controlled tab (the drawer's store owns it). */
   tab: string;
   onSelectTab: (tab: IssueDetailTabId) => void;
+  /** Agent to select in the Conversation/Terminal panes (the drawer's `?agent=` deep link). */
+  focusAgentId?: string | undefined;
   /** "3/13" badge on the Tasks tab. */
   tasksBadge?: string | undefined;
   /** Conversation pane height in px (rail density). Default 420. */
@@ -286,11 +288,14 @@ function IssueDetailTabs({ tab, onSelectTab, tasksBadge }: {
   );
 }
 
-export function IssueDetail({ issueId, density, agents, derived, tab, onSelectTab, tasksBadge, conversationHeight = 420, showTabs = true, className }: IssueDetailProps) {
+export function IssueDetail({ issueId, density, agents, derived, tab, onSelectTab, focusAgentId, tasksBadge, conversationHeight = 420, showTabs = true, className }: IssueDetailProps) {
   // Selected agent for the Conversation/Terminal panes. Owned here so the
   // choice survives a Conversation ⇄ Terminal switch; falls back to the
   // default pick whenever the selection is cleared or no longer matches.
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(focusAgentId ?? null);
+  useEffect(() => {
+    if (focusAgentId) setSelectedAgentId(focusAgentId);
+  }, [focusAgentId]);
   const effectiveAgentId = useMemo(() => {
     if (selectedAgentId && agents.some((agent) => agent.id === selectedAgentId)) {
       return selectedAgentId;

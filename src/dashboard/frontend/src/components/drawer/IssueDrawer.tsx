@@ -137,6 +137,7 @@ export function IssueDrawer() {
           agents={agents}
           derived={derived}
           tab={drawer.tab}
+          focusAgentId={drawer.agentId}
           onSelectTab={(tab: IssueDetailTabId) => setDrawerTab(tab)}
           tasksBadge={taskBadge(tasks)}
         />

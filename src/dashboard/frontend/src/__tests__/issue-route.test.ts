@@ -43,6 +43,12 @@ describe('direct issue route drawer lifecycle', () => {
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1234', tab: 'files' });
   });
 
+  it('carries an ?agent= deep-link into the drawer state', () => {
+    window.history.replaceState(null, '', '/issues/PAN-1234?tab=terminal&agent=agent-pan-1234-review');
+    useDashboardStore.getState().openIssueFromRoute('PAN-1234', '/board', window.location.pathname);
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1234', tab: 'terminal', agentId: 'agent-pan-1234-review' });
+  });
+
   it('falls back to conversation-first when no ?tab= is present', () => {
     useDashboardStore.getState().openIssueFromRoute('PAN-1234', '/board', window.location.pathname);
     expect(useDashboardStore.getState().drawer.tab).toBe('conversation');
