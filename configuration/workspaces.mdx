@@ -17,18 +17,19 @@ checkout, exactly one per project), `issue` (one per tracked issue), or
 
 Workspaces are reachable from three places in the dashboard:
 
-- **Sidebar → Workspaces** — favorites first, then most-recently-accessed. The
-  workspaces you created are listed directly; worktrees Overdeck created for
-  issues collapse into a **N pipeline worktrees** count row, as do archived
-  workspaces. A project's `main` workspace is listed here only when you
+- **Sidebar → Workspaces** — favorites first, then most-recently-accessed.
+  Lists the workspaces you created plus anything you favorited; worktrees
+  Overdeck created for issues, Session Vault scratch workspaces, and
+  agent-made workspaces stay off the list unless favorited — there is no
+  count row to reveal them. Archived workspaces still collapse into their own
+  count row. A project's `main` workspace is listed here only when you
   favorite it. A flat/grouped-by-project toggle persists across sessions.
 - **A project's Home → Main checkout** (next to Terminal and Web) — opens that
   project's `main` workspace, creating it the first time.
-- **Cmd-K / Ctrl-K** — the command palette's "Workspaces" section lists the same
-  set plus every `main` workspace, shown under its project's name. It is
-  filterable by name or project, with the same **N pipeline worktrees** row to
-  reveal the rest; selecting a workspace activates it and opens its view.
-  Expanding in either place expands both.
+- **Cmd-K / Ctrl-K** — the command palette's "Workspaces" section lists the
+  same set plus every `main` workspace, shown under its project's name. It is
+  filterable by name or project; selecting a workspace activates it and opens
+  its view.
 - **`/workspace/:id`** — a dedicated view with a terminal (issue-kind
   workspaces, when an agent is running), workspace-filtered conversations,
   and the workspace's memory surface (status headline, phase, and observation
@@ -163,6 +164,11 @@ pan workspace new vendor-lens --target-path ~/code/some-vendored-repo
 
 # --dry-run prints the resolved intent as JSON and creates nothing
 pan workspace new my-scratch-notes --dry-run
+
+# --origin operator keeps the workspace in the sidebar even when created
+# from inside an Overdeck agent or conversation; the default there is
+# `agent`, which keeps it out of the sidebar.
+pan workspace new my-notes --origin operator
 
 # Re-point an existing workspace at a new directory
 pan workspace relocate vendor-lens --path ~/code/moved-vendored-repo

@@ -65,6 +65,20 @@ Representative exports:
   at any existing directory (`pan workspace new`; see "Targeting a directory"
   below).
 
+`WorkspaceRow.origin` (PAN-5233) is `'operator' | 'pipeline' | 'vault' | 'agent'`
+— who caused the row to exist, not what it is. `createWorkspace()`'s D-1 rule
+resolves it from `kind` first: `kind === 'issue'` is always `'pipeline'`,
+`kind === 'main'` is always `'operator'`, whatever the caller passes. A
+`scratch` row takes the caller's value, defaulting to `'operator'`. The only
+non-default stampers are Session Vault "Continue here" (`'vault'`),
+`pan workspace new` inside a managed agent or conversation (`'agent'`, unless
+`--origin operator` overrides it), and `POST /api/workspace-registry`, which
+derives `'operator'` or `'agent'` from the request credential rather than
+trusting the body: `root-session`/`device`/`phone`/a plain `token`/a `machine`
+acting for the operator resolve to `'operator'`; an agent-scoped `token`, a
+`machine` relaying an agent, `internal-token`, and `connector` resolve to
+`'agent'`.
+
 ## Targeting a directory (PAN-3286)
 
 A workspace is a long-lived lens that *targets* a repo directory — several
@@ -396,14 +410,21 @@ rebuild follows. In order:
    (`memory/{projectId}/{issueId}/`, from before PAN-1990) onto their
    workspace UUID and re-points `memory_fts.workspace_id` by issue id.
 
-5. `archiveTerminalIssueWorkspaces()` (PAN-3286) — **archives, never deletes**
-   every non-archived `kind='issue'` row whose issue reached a terminal stage.
-   Terminality comes from `isTerminalIssueStage(getIssueStage(...))`, the
-   same shared helper `pan admin db gc-agents` uses, so this pass makes no
-   tracker call of its own. The rows stay because they own their memory homes;
-   they remain readable through `listWorkspaces({ includeArchived: true })` and
-   `unarchiveWorkspace()` reverses it. Rows whose issue has no recorded stage
-   are skipped rather than assumed finished.
+5. `archiveDeadIssueWorkspaces()` (PAN-5233) — **archives, never deletes**
+   every non-archived `kind='issue'` row whose worktree directory no longer
+   exists. Rows created less than 10 minutes before the scan are skipped —
+   `workspace-manager/create.ts` writes the row *before* `git worktree add`
+   runs, so a young row mid-creation is not yet "dead". The rows stay because
+   they own their memory homes; they remain readable through
+   `listWorkspaces({ includeArchived: true })` and `unarchiveWorkspace()`
+   reverses it (and `backfillIssueWorkspaces()` enrolls a fresh row if the
+   directory comes back).
+
+`reapIssueResidue()` (`src/lib/cloister/reap-issue-residue.ts`) already
+archives an issue's row the moment the closed-issue reaper removes its
+worktree, so step 5 here is a repeatable hygiene pass for whatever that
+reaper missed — a manual directory deletion, a crash, an install predating
+the fix — not the primary archival path.
 
 `--dry-run` previews step 3 (the memory-home scan) and step 5 (the archival
 pass, which writes nothing under it) — steps 1, 2, and 4 are idempotent upserts
@@ -643,34 +664,34 @@ Planning builds no stack. A planning session creates its workspace without
 The stack is built when the work agent starts: the work-start hold is described
 in [PIPELINE-GATES.md](PIPELINE-GATES.md) ("Disk-low hold").
 
-## User-facing surfaces vs. pipeline worktrees (PAN-3286)
+## User-facing surfaces (PAN-5233)
 
 `backfillIssueWorkspaces()` enrolls *every* `feature-*` worktree as a
-`kind='issue'` row, so a mature checkout has dozens of rows the operator never
-created. The rows are correct and stay — they own the memory homes — but the
-user-facing surfaces default to what the operator made:
+`kind='issue'` row, and Session Vault / `pan workspace new` inside a managed
+session write rows the operator never asked for either. The rows are correct
+and stay — they own the memory homes — but the user-facing surfaces default to
+what the operator made:
 
 - The sidebar WORKSPACES rail and the Cmd-K `workspaces` scope list
-  `kind !== 'issue' || isFavorite`, sharing one exported predicate
-  (`isUserFacingWorkspace` in `Sidebar.tsx`) so the two cannot drift.
+  `origin === 'operator' || isFavorite`, sharing one exported predicate
+  (`isUserFacingWorkspace` in `Sidebar.tsx`) so the two cannot drift. A
+  pipeline issue worktree, a Session Vault scratch row, and an agent-made
+  scratch row are all `origin !== 'operator'` and stay out unless favorited.
 - The rail additionally drops a non-favorited `main` row (`isRailWorkspace`):
   the Projects list already represents each primary checkout, and every main
   row is named `main`, so listing them repeated each project as an
-  indistinguishable row. Main rows are not pipeline worktrees, so they are not
-  counted in the collapsed row either. They stay in Cmd-K, labelled with the
-  row's `projectName` (a list-DTO field the route fills from the `projects`
-  table, falling back to the project key), and open from the **Main checkout**
+  indistinguishable row. They stay in Cmd-K, labelled with the row's
+  `projectName` (a list-DTO field the route fills from the `projects` table,
+  falling back to the project key), and open from the **Main checkout**
   button on the project's Home.
-- Hidden rows collapse into an expandable "N pipeline worktrees" count row in
-  **both** surfaces — the rail's row uses the same pattern as the Archived row,
-  and Cmd-K carries an equivalent entry whose keywords include the hidden
-  workspaces' own names, so typing a hidden workspace surfaces the row that
-  reveals it. Expansion state is shared: both read and write
-  `WORKSPACES_PIPELINE_EXPANDED_KEY`
-  (`overdeck.ui.sidebarWorkspacesPipelineExpanded`), so expanding in one expands
-  the other.
-- This is **presentation only** — the API still returns every kind, and issues
-  stay reachable through the Issues scope and the pipeline views.
+- There is no pipeline-worktree count row any more — a non-operator row
+  stays out of both surfaces entirely rather than collapsing behind an
+  expandable count (the PAN-3286 `WORKSPACES_PIPELINE_EXPANDED_KEY` toggle is
+  gone). Favoriting a row is the only way to pin a non-operator workspace to
+  the rail or Cmd-K.
+- This is **presentation only** — the API still returns every kind and
+  origin, and issues stay reachable through Projects, the Issues scope and
+  the pipeline views.
 
 ## Workspace-addressed memory recall (PAN-3286)
 
