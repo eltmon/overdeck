@@ -78,8 +78,9 @@ function storeAgent(overrides: Partial<Agent>): Agent {
 
 describe('formatEventTime', () => {
   it('shows a time for the same local calendar day as now', () => {
-    const now = new Date('2026-11-13T23:00:00.000Z');
-    const at = '2026-11-13T19:43:00.000Z';
+    // Built from local calendar components, not UTC instants, so this holds in every timezone (CodeRabbit).
+    const now = new Date(2026, 10, 13, 23, 0, 0);
+    const at = new Date(2026, 10, 13, 19, 43, 0).toISOString();
     expect(formatEventTime(at, now)).toBe(new Date(at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }));
   });
 
