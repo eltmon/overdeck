@@ -45,6 +45,22 @@ describe('workspaces resolver', () => {
     expect(getWorkspaceByName(projectId, 'missing')).toBeNull();
   });
 
+  it('rowToWorkspace maps a NULL origin column to pipeline for issue rows and operator for scratch rows (PAN-5233 D-4)', () => {
+    const projectId = seedProject();
+    const now = Date.now();
+    odb.raw().prepare(`
+      INSERT INTO workspaces (id, project_id, kind, name, path, created_at, last_accessed_at)
+      VALUES ('ws-issue-null-origin', ?, 'issue', 'feature-pan-9', '/repo/workspaces/feature-pan-9', ?, ?)
+    `).run(projectId, now, now);
+    odb.raw().prepare(`
+      INSERT INTO workspaces (id, project_id, kind, name, path, created_at, last_accessed_at)
+      VALUES ('ws-scratch-null-origin', ?, 'scratch', 'notes', '/repo/overdeck-notes', ?, ?)
+    `).run(projectId, now, now);
+
+    expect(getWorkspaceById('ws-issue-null-origin')?.origin).toBe('pipeline');
+    expect(getWorkspaceById('ws-scratch-null-origin')?.origin).toBe('operator');
+  });
+
   describe('resolveWorkspaceRef (D-3: --workspace <id|name>, review fix cycle 2)', () => {
     it('resolves by id', async () => {
       const projectId = seedProject();
