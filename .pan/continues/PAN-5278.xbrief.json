@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5278",
   "created": "2026-11-14T18:11:34.102Z",
-  "updated": "2026-11-14T23:22:18.249Z",
+  "updated": "2026-11-14T23:22:19.571Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,11 @@
     "rank-priorities.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T23:22:18.249Z"
+    },
+    "routing-controller": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5278",
+      "claimedAt": "2026-11-14T23:22:19.571Z"
     }
   },
   "agentModel": "claude-opus-5-5"
