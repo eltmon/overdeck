@@ -37,6 +37,33 @@
         "value": "cubic-bezier(.34, 1.56, .64, 1)",
         "createdAt": "2026-08-27T02:02:43.886Z",
         "reason": "User confirmed the Broadsheet --ease-spring token is intentional (PAN-3706 design system)"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          ".tmp/conversation-changes-files-mockup.html"
+        ],
+        "createdAt": "2026-11-14T17:58:54.623Z",
+        "reason": "Claude: flagged elements are compact inline badges, keycaps and counters in a data-dense developer UI, matching the Overdeck style guide's badge pattern; throwaway mockup in gitignored .tmp"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          ".tmp/overdeck-workflow-mockup-v2.html"
+        ],
+        "createdAt": "2026-11-14T18:40:59.115Z",
+        "reason": "Claude: compact inline tags, keycaps and counters in a data-dense developer UI, matching the style guide's badge pattern; throwaway mockup"
+      },
+      {
+        "rule": "undersized-ui-text",
+        "value": "*",
+        "files": [
+          ".tmp/overdeck-workflow-mockup-v2.html"
+        ],
+        "createdAt": "2026-11-14T18:41:20.614Z",
+        "reason": "Claude: remaining sub-11px text is the letter glyph inside file-type icon badges (an icon, not text) and the mockup-notes tag chrome (not product UI); the one real 10.5px label was raised to 11px"
       }
     ]
   }

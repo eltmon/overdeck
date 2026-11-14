@@ -20,6 +20,7 @@ import { useDashboardStore, selectIssues } from '../lib/store';
 import { getPipelineIssuePhase } from '../lib/pipeline-state';
 import { fetchExperimentalFeaturesEnabled, isExperimentalTab } from '../lib/experimentalFeatures';
 import { useFlywheelRunning } from '../lib/flywheelApi';
+import { useOverdeckBusy } from '../hooks/useOverdeckBusy';
 import type { Issue } from '../types';
 import type { Tab } from './Header';
 import { OtherMachineProjects, ProjectMachineCount } from './sidebar/OtherMachineProjects';
@@ -318,6 +319,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
   }, [visibleWorkspaces, projectNameByKey]);
 
   const flywheelRunning = useFlywheelRunning();
+  const overdeckBusy = useOverdeckBusy();
   const issues = useDashboardStore(selectIssues) as Issue[];
   const derivedByIssueId = useDashboardStore((state) => state.derivedIssueStateByIssueId);
 
@@ -525,7 +527,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
           {!collapsed && (
             <div className="flex items-center gap-2 min-w-0">
             <button onClick={() => onTabChange('home')} className="flex items-center gap-2 hover:opacity-80 transition-opacity min-w-0" title="Go to Home">
-              <OverdeckMark className="w-5 h-5 text-primary shrink-0" />
+              <OverdeckMark className="w-5 h-5 text-primary shrink-0" orbiting={overdeckBusy} />
               {/* PAN-698: Space Grotesk is used for the sidebar wordmark, drawer title, and Command Deck tree head */}
               <span className="text-base font-semibold text-foreground font-display truncate">
                 Overdeck
@@ -542,7 +544,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
               className="flex items-center justify-center w-full hover:opacity-80 transition-opacity"
               title="Go to Home"
             >
-              <OverdeckMark className="w-5 h-5 text-primary" />
+              <OverdeckMark className="w-5 h-5 text-primary" orbiting={overdeckBusy} />
             </button>
           )}
           {!collapsed && (

@@ -1,0 +1,1100 @@
+<!doctype html>
+<html lang="en" data-theme="broadsheet">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overdeck workflow mockup v2</title>
+<style>
+@font-face { font-family: 'Geist Variable'; font-weight: 100 900; src: url('../../src/dashboard/frontend/public/fonts/Geist-Variable.woff2') format('woff2'); }
+@font-face { font-family: 'Geist Mono Variable'; font-weight: 100 900; src: url('../../src/dashboard/frontend/public/fonts/GeistMono-Variable.woff2') format('woff2'); }
+:root {
+  --background: hsl(0 0% 96.5%); --foreground: hsl(35 10% 14%);
+  --card: hsl(30 8% 94.5%); --popover: hsl(30 8% 97%);
+  --muted: hsl(30 8% 94.5%); --muted-foreground: hsl(35 5% 42%);
+  --border: hsl(30 4% 88.5%);
+  --body-foreground: hsl(35 8% 28%); --faint-foreground: hsl(35 3% 62%);
+  --primary: oklch(0.488 0.217 264); --primary-ink: oklch(0.42 0.19 264);
+  --accent: color-mix(in srgb, black 4.5%, transparent);
+  --destructive: #dc2626; --success: #10b981; --signal-cost: #0891b2;
+  --state-live: #2563eb; --state-needs-you: #d97706; --state-done: #059669; --state-stuck: #dc2626;
+  --radius: 6px;
+  --surface: hsl(0 0% 99%);
+  --add-bg: color-mix(in srgb, #10b981 12%, transparent); --add-fg: #047857;
+  --del-bg: color-mix(in srgb, #ef4444 11%, transparent); --del-fg: #b91c1c;
+  --mine: var(--primary);
+  --shadow-floating: 0 12px 32px -8px rgb(0 0 0 / 0.18), 0 2px 6px rgb(0 0 0 / 0.08);
+  --font-body: 'Geist Variable', system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+  --dock-w: 340px;
+}
+html.dark {
+  --background: hsl(0 0% 12.5%); --foreground: hsl(30 8% 94%);
+  --card: hsl(0 0% 17%); --popover: hsl(0 0% 18.5%);
+  --muted: hsl(0 0% 15%); --muted-foreground: hsl(30 2% 66%);
+  --border: hsl(0 0% 22.7%);
+  --body-foreground: hsl(30 2% 88%); --faint-foreground: hsl(30 1% 48%);
+  --primary: oklch(0.588 0.217 264); --primary-ink: oklch(0.7 0.19 264);
+  --accent: color-mix(in srgb, white 7%, transparent);
+  --destructive: #f87171; --signal-cost: #22d3ee;
+  --state-live: #3b82f6; --state-needs-you: #f59e0b; --state-done: #10b981; --state-stuck: #ef4444;
+  --surface: hsl(0 0% 14.5%);
+  --add-bg: color-mix(in srgb, #10b981 16%, transparent); --add-fg: #6ee7b7;
+  --del-bg: color-mix(in srgb, #ef4444 16%, transparent); --del-fg: #fca5a5;
+  --shadow-floating: 0 16px 40px -8px rgb(0 0 0 / 0.6), 0 2px 8px rgb(0 0 0 / 0.4);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { font-family: var(--font-body); font-size: 13px; line-height: 1.6; color: var(--foreground); background: var(--background); -webkit-font-smoothing: antialiased; overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+input, textarea { font: inherit; color: inherit; }
+.mono { font-family: var(--font-mono); }
+.muted { color: var(--muted-foreground); }
+.faint { color: var(--faint-foreground); }
+svg.i { width: 15px; height: 15px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+svg.i.sm { width: 13px; height: 13px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
+.kbd { font-family: var(--font-mono); font-size: 11px; padding: 0 5px; border-radius: 4px; background: var(--accent); color: var(--muted-foreground); border: 1px solid var(--border); line-height: 18px; white-space: nowrap; }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); font-size: 12.5px; white-space: nowrap; }
+.btn:hover { background: var(--accent); }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: white; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.ghost { border-color: transparent; background: transparent; }
+.btn.ghost:hover { background: var(--accent); }
+.btn.icon { width: 28px; padding: 0; justify-content: center; }
+.btn.on { background: var(--card); border-color: color-mix(in srgb, var(--foreground) 30%, var(--border)); }
+.btn[disabled] { opacity: .5; cursor: not-allowed; }
+.btn.danger { color: var(--destructive); }
+.num { font-family: var(--font-mono); font-size: 11.5px; white-space: nowrap; }
+.num b { color: var(--add-fg); font-weight: 500; }
+.num i { color: var(--del-fg); font-style: normal; }
+.tag { font-family: var(--font-mono); font-size: 11px; padding: 0 6px; border-radius: 4px; border: 1px solid var(--border); color: var(--muted-foreground); white-space: nowrap; line-height: 18px; }
+.tag.local { border-color: color-mix(in srgb, var(--state-needs-you) 40%, var(--border)); color: var(--state-needs-you); }
+.tag.live { border-color: color-mix(in srgb, var(--state-live) 35%, var(--border)); color: var(--state-live); }
+.tag.done { border-color: color-mix(in srgb, var(--state-done) 35%, var(--border)); color: var(--state-done); }
+.st { font-family: var(--font-mono); font-size: 11px; font-weight: 600; width: 12px; text-align: center; flex: none; }
+.st.M { color: var(--state-needs-you); } .st.A { color: var(--success); } .st.D { color: var(--destructive); }
+.eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.ext { font-family: var(--font-mono); font-size: 8.5px; font-weight: 600; border-radius: 3px; padding: 0 2px; line-height: 12px; }
+.ext.ts { background: #3178c6; color: white; } .ext.py { background: #3572a5; color: #ffd43b; } .ext.md { background: var(--muted-foreground); color: var(--background); } .ext.js { background: #f1e05a; color: #222; } .ext.lua { background: #000080; color: white; } .ext.json { background: #6b7280; color: white; }
+.ficon { width: 16px; height: 16px; flex: none; display: grid; place-items: center; }
+
+/* ── frame ───────────────────────────────────────── */
+.app { display: grid; grid-template-columns: 264px minmax(0, 1fr) 0; grid-template-rows: 44px minmax(0, 1fr); height: 100vh; }
+.app.dock-open { grid-template-columns: 264px minmax(0, 1fr) var(--dock-w); }
+.top { grid-column: 1 / -1; display: grid; grid-template-columns: 264px 1fr auto; align-items: center; border-bottom: 1px solid var(--border); }
+.brand { display: flex; align-items: center; gap: 8px; padding-left: 16px; font-weight: 600; font-size: 14.5px; letter-spacing: -0.01em; }
+.brand .ver { font-family: var(--font-mono); font-size: 11px; color: var(--faint-foreground); font-weight: 400; }
+.top-mid { display: flex; align-items: center; gap: 14px; padding-left: 14px; min-width: 0; }
+.crumbs { display: flex; align-items: center; gap: 6px; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; min-width: 0; }
+.crumbs b { color: var(--foreground); font-weight: 500; }
+.search { margin-left: auto; width: 440px; display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--muted-foreground); cursor: text; }
+.search .kbd { margin-left: auto; }
+.top-right { display: flex; align-items: center; gap: 6px; padding: 0 10px 0 16px; position: relative; }
+.pill { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); font-size: 12.5px; white-space: nowrap; }
+.pill:hover { background: var(--accent); }
+.pill.needs { border-color: color-mix(in srgb, var(--state-needs-you) 45%, var(--border)); background: color-mix(in srgb, var(--state-needs-you) 9%, var(--surface)); }
+.menu { position: absolute; z-index: 40; min-width: 260px; padding: 4px; background: var(--popover); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-floating); display: none; }
+.menu.on { display: block; }
+.menu .item { display: flex; align-items: center; gap: 9px; width: 100%; padding: 6px 9px; border-radius: 5px; text-align: left; }
+.menu .item:hover { background: var(--accent); }
+.menu .item .kbd, .menu .item .r { margin-left: auto; }
+.menu .sep { height: 1px; background: var(--border); margin: 4px 2px; }
+.menu .hd { padding: 6px 9px 4px; }
+.menu .sub { font-size: 11.5px; color: var(--muted-foreground); }
+
+/* left column */
+.left { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+.proj-switch { margin: 10px 10px 4px; display: flex; align-items: center; gap: 9px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); text-align: left; position: relative; }
+.proj-switch:hover { background: var(--accent); }
+.proj-switch .nm { font-weight: 600; font-size: 13.5px; }
+.proj-switch .path { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); }
+.proj-switch .chev2 { margin-left: auto; color: var(--muted-foreground); }
+.pmark { width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; font-weight: 600; font-size: 12px; color: white; flex: none; }
+.nav { padding: 4px 8px; }
+.nav a { display: flex; align-items: center; gap: 9px; height: 28px; padding: 0 9px; border-radius: var(--radius); color: var(--body-foreground); cursor: pointer; }
+.nav a:hover { background: var(--accent); }
+.nav a .r { margin-left: auto; font-size: 11.5px; color: var(--muted-foreground); }
+.newconv { margin: 6px 10px 6px; display: flex; }
+.newconv .btn.primary { flex: 1; justify-content: center; border-radius: var(--radius) 0 0 var(--radius); height: 32px; }
+.newconv .btn.split { border-radius: 0 var(--radius) var(--radius) 0; height: 32px; width: 30px; padding: 0; justify-content: center; background: var(--primary); border-color: var(--primary); color: white; border-left: 1px solid color-mix(in srgb, white 30%, transparent); }
+.sect { display: flex; align-items: center; gap: 8px; padding: 12px 18px 4px; }
+.sect .seg2 { margin-left: auto; display: flex; gap: 2px; }
+.seg2 button { font-size: 11.5px; padding: 1px 7px; border-radius: 4px; color: var(--muted-foreground); }
+.seg2 button.on { background: var(--card); color: var(--foreground); box-shadow: 0 0 0 1px var(--border); }
+.list { overflow: auto; flex: 1; padding: 0 6px 10px; }
+.row { padding: 6px 10px 7px; border-radius: var(--radius); cursor: pointer; }
+.row:hover { background: var(--accent); }
+.row.on { background: var(--card); box-shadow: inset 2px 0 0 var(--primary); }
+.row .t { display: flex; align-items: center; gap: 7px; font-weight: 500; white-space: nowrap; overflow: hidden; }
+.row .t span.x { overflow: hidden; text-overflow: ellipsis; }
+.row .m { display: flex; gap: 6px; align-items: center; padding-left: 14px; font-size: 11.5px; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; }
+.row .m .mono { font-size: 11px; }
+.sub-row { padding: 3px 10px 3px 24px; font-size: 12px; color: var(--muted-foreground); cursor: pointer; border-radius: var(--radius); display: flex; gap: 6px; align-items: center; }
+.sub-row:hover { background: var(--accent); color: var(--foreground); }
+.left-foot { border-top: 1px solid var(--border); display: flex; align-items: center; gap: 4px; padding: 6px 8px; }
+
+/* stage */
+.stage { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.tabs { display: flex; align-items: stretch; height: 38px; border-bottom: 1px solid var(--border); padding-left: 4px; }
+.tab { display: flex; align-items: center; gap: 7px; padding: 0 10px; min-width: 120px; max-width: 230px; color: var(--muted-foreground); border-bottom: 2px solid transparent; white-space: nowrap; cursor: pointer; position: relative; }
+.tab .l { overflow: hidden; text-overflow: ellipsis; flex: 1; }
+.tab.on { color: var(--foreground); border-bottom-color: var(--foreground); }
+.tab:hover { color: var(--foreground); background: var(--accent); }
+.tab .x { opacity: 0; border-radius: 4px; }
+.tab:hover .x, .tab.on .x { opacity: .6; }
+.tab.home { min-width: 0; }
+.tab-tools { display: flex; align-items: center; gap: 2px; padding: 0 6px; position: relative; }
+.tabs .spacer { flex: 1; }
+.stage-body { flex: 1; min-height: 0; display: flex; }
+.view { display: none; flex: 1; min-width: 0; min-height: 0; }
+.view.on { display: flex; }
+
+/* conversation + editor split */
+.group { display: grid; grid-template-columns: minmax(0, 1fr); flex: 1; min-width: 0; min-height: 0; }
+.group.split { grid-template-columns: minmax(380px, 1fr) 5px minmax(380px, 1fr); }
+.gres { cursor: col-resize; position: relative; display: none; }
+.group.split .gres { display: block; }
+.gres::after { content: ''; position: absolute; left: 2px; top: 0; bottom: 0; width: 1px; background: var(--border); }
+.chat { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.ch { padding: 10px 18px 9px; border-bottom: 1px solid var(--border); }
+.ch-row { display: flex; align-items: center; gap: 8px; }
+.ch-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ch-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; position: relative; }
+.seg { display: inline-flex; padding: 2px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.seg button { padding: 1px 10px; border-radius: 4px; font-size: 12px; color: var(--muted-foreground); }
+.seg button.on { background: var(--card); color: var(--foreground); box-shadow: 0 0 0 1px var(--border); }
+.meta { display: flex; align-items: center; margin-top: 3px; font-size: 12px; color: var(--muted-foreground); flex-wrap: wrap; row-gap: 2px; }
+.meta > * + *::before { content: '·'; margin: 0 8px; color: var(--faint-foreground); }
+.meta a { color: inherit; cursor: pointer; border-bottom: 1px dotted var(--faint-foreground); }
+.meta a:hover { color: var(--foreground); }
+.meta .mono { font-size: 11.5px; }
+.transcript { flex: 1; overflow: auto; padding: 18px 0 20px; }
+.msg, .work, .user-msg, .turn-card { width: min(720px, calc(100% - 40px)); margin-left: auto; margin-right: auto; }
+.msg { color: var(--body-foreground); font-size: 13.5px; line-height: 1.65; }
+.msg p { margin: 0 0 12px; } .msg strong { color: var(--foreground); font-weight: 600; } .msg ul { margin: 0 0 12px; padding-left: 20px; } .msg li { margin-bottom: 6px; }
+.user-msg { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+.user-msg div { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; max-width: 80%; }
+.work { margin-bottom: 12px; }
+.work-line { display: flex; align-items: center; gap: 8px; color: var(--muted-foreground); font-size: 12px; cursor: pointer; }
+.work-items { display: none; margin: 4px 0 4px 21px; border-left: 1px solid var(--border); padding-left: 10px; font-size: 12px; color: var(--muted-foreground); }
+.work-items div { padding: 2px 0; display: flex; gap: 8px; align-items: center; }
+.work.open .work-items { display: block; }
+.work.open .chev { transform: rotate(90deg); }
+.chev { transition: transform 120ms; }
+code.path { font-family: var(--font-mono); font-size: 12px; padding: 1px 5px; border-radius: 4px; background: var(--accent); color: var(--foreground); cursor: pointer; }
+code.path:hover { color: var(--primary-ink); text-decoration: underline; text-underline-offset: 3px; }
+.turn-card { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; margin-bottom: 8px; }
+.tc-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 12px; }
+.frow { display: flex; align-items: center; gap: 8px; padding: 4px 12px; cursor: pointer; font-size: 12.5px; }
+.frow:hover { background: var(--accent); }
+.frow .p { font-family: var(--font-mono); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.frow .p .dir { color: var(--muted-foreground); }
+.frow .ra { display: none; }
+.frow:hover .ra { display: flex; }
+.frow:hover .num { display: none; }
+.ra button { width: 24px; height: 22px; border-radius: 4px; display: grid; place-items: center; color: var(--muted-foreground); }
+.ra button:hover { background: var(--card); color: var(--foreground); }
+.composer { margin: 0 18px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 9px 10px 7px 12px; }
+.composer textarea { width: 100%; border: 0; outline: 0; resize: none; background: transparent; height: 38px; }
+.crow { display: flex; align-items: center; gap: 4px; }
+.crow .right { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+.cbtn { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 8px; border-radius: 6px; font-size: 12px; color: var(--body-foreground); }
+.cbtn:hover { background: var(--accent); }
+.cbtn .faint { font-size: 11.5px; }
+.send { width: 30px; height: 30px; border-radius: 8px; background: var(--primary); color: white; display: grid; place-items: center; }
+.ctx { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); }
+
+/* editor */
+.editor { display: none; flex-direction: column; min-width: 0; min-height: 0; border-left: 0; background: var(--surface); }
+.group.split .editor { display: flex; }
+.etabs { display: flex; height: 36px; border-bottom: 1px solid var(--border); align-items: stretch; }
+.etab { display: flex; align-items: center; gap: 6px; padding: 0 10px; color: var(--muted-foreground); border-right: 1px solid var(--border); cursor: pointer; font-size: 12.5px; }
+.etab.on { color: var(--foreground); background: var(--background); box-shadow: inset 0 -2px 0 var(--foreground); }
+.etab.preview .l { font-style: italic; }
+.etab .dirty { width: 7px; height: 7px; border-radius: 50%; background: var(--foreground); }
+.etabs .r { margin-left: auto; display: flex; align-items: center; gap: 2px; padding: 0 6px; }
+.ebar { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.bc { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted-foreground); display: flex; gap: 4px; align-items: center; white-space: nowrap; overflow: hidden; }
+.bc b { color: var(--foreground); font-weight: 500; }
+.bc span.s { color: var(--faint-foreground); }
+.ebar .r { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.code { flex: 1; overflow: auto; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; padding: 6px 0 30px; background: var(--background); }
+.cl { display: grid; grid-template-columns: 54px 4px 1fr; white-space: pre; }
+.cl .n { color: var(--faint-foreground); text-align: right; padding-right: 10px; user-select: none; font-size: 11.5px; }
+.cl .g { }
+.cl.chg .g { background: var(--mine); }
+.cl.chg .n { color: var(--muted-foreground); }
+.cl .c { padding-left: 12px; }
+.cl.typed { background: color-mix(in srgb, var(--state-needs-you) 10%, transparent); }
+.kw { color: #7c3aed; } .str { color: #0f766e; } .cm { color: var(--faint-foreground); font-style: italic; } .fn { color: #2563eb; }
+html.dark .kw { color: #c4b5fd; } html.dark .str { color: #5eead4; } html.dark .fn { color: #93c5fd; }
+.estatus { display: flex; align-items: center; gap: 12px; height: 26px; padding: 0 12px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--muted-foreground); background: var(--surface); }
+.estatus .r { margin-left: auto; display: flex; gap: 12px; }
+
+.ewbar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--primary) 6%, var(--surface)); font-size: 12.5px; }
+.ewbar .grow { flex: 1; min-width: 0; }
+.ewbar .grow b { font-weight: 600; }
+.ewbar.merged { background: color-mix(in srgb, var(--state-done) 8%, var(--surface)); }
+
+/* diff */
+.diff { font-family: var(--font-mono); font-size: 12px; line-height: 1.55; }
+.hunk { padding: 3px 10px; background: color-mix(in srgb, var(--state-live) 7%, transparent); color: var(--muted-foreground); font-size: 11.5px; border-block: 1px solid var(--border); }
+.dl { display: grid; grid-template-columns: 42px 42px 16px 1fr; white-space: pre-wrap; word-break: break-word; }
+.dl .n { color: var(--faint-foreground); text-align: right; padding-right: 8px; user-select: none; font-size: 11px; }
+.dl .sgn { color: var(--faint-foreground); user-select: none; }
+.dl.add { background: var(--add-bg); } .dl.add .sgn { color: var(--add-fg); }
+.dl.del { background: var(--del-bg); } .dl.del .sgn { color: var(--del-fg); }
+.dl.mine { box-shadow: inset 3px 0 0 var(--mine); }
+.dl.others { opacity: .5; }
+.fold { padding: 4px 10px 4px 100px; font-size: 11px; color: var(--muted-foreground); background: var(--muted); border-block: 1px solid var(--border); }
+
+/* dock */
+.dock { display: none; flex-direction: column; min-width: 0; min-height: 0; border-left: 1px solid var(--border); background: var(--surface); position: relative; }
+.app.dock-open .dock { display: flex; }
+.dres { position: absolute; left: -3px; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 5; }
+.dres:hover { background: color-mix(in srgb, var(--primary) 40%, transparent); }
+.dtabs { display: flex; align-items: center; height: 38px; border-bottom: 1px solid var(--border); padding: 0 4px; }
+.dtab { display: flex; align-items: center; gap: 6px; height: 38px; padding: 0 9px; color: var(--muted-foreground); border-bottom: 2px solid transparent; font-size: 12.5px; }
+.dtab.on { color: var(--foreground); border-bottom-color: var(--foreground); }
+.dtab .n { font-family: var(--font-mono); font-size: 11px; padding: 0 5px; border-radius: 4px; background: var(--accent); }
+.dtabs .r { margin-left: auto; display: flex; }
+.dscope { display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted-foreground); }
+.dscope b { color: var(--foreground); font-weight: 500; }
+.dbody { flex: 1; min-height: 0; overflow: auto; }
+.chips { display: flex; gap: 5px; padding: 8px 12px; flex-wrap: wrap; }
+.chips button { height: 24px; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 11.5px; color: var(--muted-foreground); background: var(--background); }
+.chips button.on { color: var(--foreground); border-color: color-mix(in srgb, var(--foreground) 40%, var(--border)); background: var(--card); }
+.grp { border-top: 1px solid var(--border); }
+.ghead { display: flex; align-items: center; gap: 7px; padding: 7px 12px; cursor: pointer; font-size: 12.5px; }
+.ghead:hover { background: var(--accent); }
+.ghead .sha { font-family: var(--font-mono); font-size: 11.5px; color: var(--primary-ink); }
+.ghead .msgt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.grp.closed .gfiles { display: none; }
+.grp.closed .chev { transform: rotate(-90deg); }
+.gfiles .frow { padding-left: 32px; }
+.note { margin: 2px 12px 8px 32px; padding: 7px 9px; border-radius: 6px; font-size: 11.5px; color: var(--body-foreground); background: color-mix(in srgb, var(--state-needs-you) 8%, transparent); border: 1px solid color-mix(in srgb, var(--state-needs-you) 28%, transparent); line-height: 1.5; }
+.attr { padding: 10px 12px 14px; font-size: 11.5px; color: var(--muted-foreground); border-top: 1px solid var(--border); line-height: 1.5; }
+.dhead { position: sticky; top: 0; z-index: 2; background: var(--surface); border-bottom: 1px solid var(--border); padding: 6px 8px; display: flex; align-items: center; gap: 4px; }
+.dhead .p { font-family: var(--font-mono); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.dhead2 { display: flex; gap: 6px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 11.5px; color: var(--muted-foreground); }
+.dhead2 .r { margin-left: auto; display: flex; gap: 4px; }
+.tree-tools { display: flex; align-items: center; gap: 4px; padding: 6px 8px 6px 12px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 2; }
+.tree-tools .root { font-weight: 600; display: flex; gap: 6px; align-items: center; }
+.tree-tools .root .mono { font-weight: 400; font-size: 11px; color: var(--muted-foreground); }
+.tree-tools .r { margin-left: auto; display: flex; gap: 0; position: relative; }
+.tree { padding: 4px 0 24px; }
+.node { display: flex; align-items: center; gap: 5px; height: 24px; padding-right: 10px; cursor: pointer; white-space: nowrap; position: relative; }
+.node:hover { background: var(--accent); }
+.node.sel { background: color-mix(in srgb, var(--primary) 14%, transparent); }
+.node.sel::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--primary); }
+.node .nm { overflow: hidden; text-overflow: ellipsis; }
+.node .gl { font-family: var(--font-mono); font-size: 11px; font-weight: 600; margin-left: 2px; }
+.node .gl.M { color: var(--state-needs-you); } .node .gl.A { color: var(--success); }
+.node .mine { width: 6px; height: 6px; border-radius: 50%; background: var(--mine); margin-left: auto; flex: none; }
+.node.ign .nm { color: var(--faint-foreground); font-style: italic; }
+.guide { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border); }
+.searchbox { margin: 8px 12px; display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 9px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--background); }
+.searchbox input { border: 0; outline: 0; background: transparent; flex: 1; }
+.sres { padding: 0 0 12px; }
+.sfile { display: flex; align-items: center; gap: 6px; padding: 5px 12px; font-size: 12.5px; }
+.sline { display: flex; gap: 8px; padding: 2px 12px 2px 34px; font-family: var(--font-mono); font-size: 11.5px; cursor: pointer; white-space: nowrap; overflow: hidden; }
+.sline:hover { background: var(--accent); }
+.sline .ln { color: var(--faint-foreground); width: 34px; text-align: right; flex: none; }
+mark { background: color-mix(in srgb, var(--state-needs-you) 30%, transparent); color: inherit; border-radius: 2px; padding: 0 1px; }
+
+/* home */
+.home { flex: 1; overflow: auto; }
+.home-in { max-width: 1120px; margin: 0 auto; padding: 26px 36px 60px; }
+.h-title { display: flex; align-items: flex-end; gap: 14px; }
+.h-title h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+.h-title .r { margin-left: auto; display: flex; gap: 6px; }
+.dotline { margin-top: 6px; display: flex; align-items: center; gap: 0; font-family: var(--font-mono); font-size: 11.5px; color: var(--muted-foreground); }
+.dotline > * + *::before { content: '·'; margin: 0 8px; color: var(--faint-foreground); }
+.actions { display: flex; gap: 8px; margin: 18px 0 22px; flex-wrap: wrap; }
+.act { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); font-size: 13px; }
+.act:hover { background: var(--accent); }
+.act .kbd { margin-left: 4px; }
+.act.primary { background: var(--primary); color: white; border-color: var(--primary); }
+.act.primary .kbd { background: color-mix(in srgb, white 18%, transparent); border-color: transparent; color: white; }
+.facts { display: grid; grid-template-columns: repeat(5, 1fr); border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.fact { padding: 12px 16px; border-right: 1px solid var(--border); text-align: left; }
+.fact:last-child { border-right: 0; }
+.fact:hover { background: var(--accent); }
+.fact .k { font-size: 12px; color: var(--muted-foreground); display: flex; gap: 6px; align-items: center; }
+.fact .v { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin-top: 2px; }
+.fact .s { font-size: 11.5px; color: var(--muted-foreground); }
+.panel { margin-top: 22px; }
+.panel-h { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.panel-h h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.panel-h .r { margin-left: auto; }
+.card { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.needs-card { border-color: color-mix(in srgb, var(--state-needs-you) 40%, var(--border)); }
+.lrow { display: grid; grid-template-columns: 92px minmax(0, 1fr) 150px 170px 80px; align-items: center; gap: 12px; padding: 9px 14px; border-top: 1px solid var(--border); cursor: pointer; }
+.lrow:first-child { border-top: 0; }
+.lrow:hover { background: var(--accent); }
+.lrow .id { font-family: var(--font-mono); font-size: 12px; color: var(--muted-foreground); }
+.lrow .ti { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lrow .who { font-size: 12px; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lrow .when { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted-foreground); text-align: right; }
+.lane { padding: 7px 14px; font-size: 12px; color: var(--muted-foreground); background: var(--muted); border-top: 1px solid var(--border); display: flex; gap: 8px; }
+.lane:first-child { border-top: 0; }
+.crow2 { display: grid; grid-template-columns: 80px minmax(0, 1fr) 210px 60px; gap: 12px; align-items: center; padding: 7px 14px; border-top: 1px solid var(--border); cursor: pointer; }
+.crow2:first-child { border-top: 0; }
+.crow2:hover { background: var(--accent); }
+.crow2 .sha { font-family: var(--font-mono); font-size: 11.5px; color: var(--primary-ink); }
+.who-chip { display: inline-flex; gap: 5px; align-items: center; font-size: 12px; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; }
+.oneline { display: flex; gap: 10px; align-items: center; padding: 10px 14px; font-size: 12.5px; }
+
+/* modal */
+.scrim { position: fixed; inset: 0; background: rgb(0 0 0 / .32); display: none; z-index: 60; }
+.scrim.on { display: grid; place-items: start center; }
+.modal { margin-top: 80px; width: 640px; background: var(--popover); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-floating); overflow: hidden; }
+.modal .mh { padding: 16px 20px 6px; }
+.modal .mh h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.modal .mb { padding: 8px 20px 4px; }
+.modal label.f { display: block; font-size: 12px; color: var(--muted-foreground); margin: 10px 0 4px; }
+.modal input.t { width: 100%; height: 34px; border: 1px solid var(--border); border-radius: 6px; padding: 0 10px; background: var(--surface); outline: 0; }
+.modal input.t:focus { border-color: var(--primary); }
+.choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+.opt { display: block; text-align: left; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--surface); }
+.opt.on { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+.opt .ot { font-weight: 600; display: flex; gap: 8px; align-items: center; }
+.opt .od { font-size: 12px; color: var(--muted-foreground); margin-top: 3px; line-height: 1.45; }
+.radio { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--faint-foreground); flex: none; }
+.opt.on .radio { border: 4px solid var(--primary); }
+.mfiles { border: 1px solid var(--border); border-radius: 8px; margin-top: 4px; overflow: hidden; }
+.modal .mf { display: flex; align-items: center; gap: 8px; padding: 12px 20px 16px; margin-top: 8px; }
+.modal .mf .l { font-size: 12px; color: var(--muted-foreground); display: flex; gap: 6px; align-items: center; }
+.modal .mf .r { margin-left: auto; display: flex; gap: 8px; }
+
+/* quick open */
+.qo { position: fixed; inset: 0; background: rgb(0 0 0 / .22); display: none; z-index: 70; }
+.qo.on { display: block; }
+.qo-box { position: absolute; top: 84px; left: 50%; transform: translateX(-50%); width: 640px; background: var(--popover); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-floating); overflow: hidden; }
+.qo-box input { width: 100%; height: 46px; border: 0; border-bottom: 1px solid var(--border); outline: 0; padding: 0 14px; background: transparent; font-size: 14px; }
+.qo-sec { padding: 6px 14px 2px; }
+.qr { display: flex; align-items: center; gap: 9px; padding: 6px 14px; cursor: pointer; }
+.qr.on, .qr:hover { background: var(--accent); }
+.qr .d { color: var(--muted-foreground); font-family: var(--font-mono); font-size: 11.5px; margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
+.qo-foot { padding: 6px 14px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--muted-foreground); display: flex; gap: 14px; }
+
+.toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--popover); border: 1px solid var(--border); box-shadow: var(--shadow-floating); padding: 9px 14px; border-radius: 8px; z-index: 80; font-size: 12.5px; display: none; align-items: center; gap: 8px; }
+
+/* mockup notes */
+.notes { position: fixed; left: 10px; bottom: 50px; z-index: 90; width: 340px; max-height: 72vh; overflow: auto; background: #1d1b2e; color: #e8e6f5; border-radius: 10px; box-shadow: 0 10px 30px rgb(0 0 0 / .35); font-size: 12px; }
+.notes .nh { display: flex; align-items: center; gap: 8px; padding: 9px 12px; font-weight: 600; cursor: pointer; }
+.notes .nh .r { margin-left: auto; }
+.notes .nh .r button { color: #c9c5ee; border: 1px solid #3d3960; border-radius: 5px; padding: 1px 7px; font-size: 11px; }
+.notes .screens { display: flex; gap: 4px; padding: 0 12px 10px; }
+.notes .screens button { flex: 1; color: #c9c5ee; border: 1px solid #3d3960; border-radius: 6px; padding: 4px 6px; font-size: 11.5px; }
+.notes .screens button.on { background: #3d3960; color: white; }
+.notes.min .nb { display: none; }
+.notes ol { margin: 0; padding: 0 12px 12px 30px; }
+.notes li { margin-bottom: 7px; line-height: 1.45; }
+.notes li:hover { color: white; }
+.notes .ttag { display: inline-block; font-family: var(--font-mono); font-size: 10px; padding: 0 4px; border-radius: 3px; background: #3d3960; margin-right: 4px; }
+.notes .try { padding: 0 12px 10px; color: #b6b1dd; }
+.flash { outline: 2px solid #8b7cf6 !important; outline-offset: 2px; }
+</style>
+</head>
+<body>
+<div class="app dock-open" id="app">
+  <!-- ── top bar ── -->
+  <header class="top">
+    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" style="color:var(--primary)"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/><circle cx="18" cy="6" r="2.1" fill="currentColor"/></svg>Overdeck <span class="ver">v0.86</span></div>
+    <div class="top-mid">
+      <div class="crumbs" id="crumbs"></div>
+      <div class="search" id="searchBtn" data-note="g2"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Go to file, conversation, issue or command</span><span class="kbd">Ctrl K</span></div>
+    </div>
+    <div class="top-right" data-note="g3">
+      <button class="pill" id="agentsPill"><span class="dot" style="background:var(--state-live)"></span>3 agents working<svg class="i sm" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+      <button class="pill needs" id="needsPill"><span class="dot" style="background:var(--state-needs-you)"></span>Needs you · 2</button>
+      <button class="btn icon ghost" id="healthBtn" title="System healthy: 23 GB free, GitHub quota 4,721 of 5,000 left"><span class="dot" style="background:var(--state-done);width:9px;height:9px"></span></button>
+      <button class="btn icon ghost" id="themeBtn" title="Light or dark"><svg class="i" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></button>
+      <div class="menu" id="agentsMenu" style="right:220px;top:36px;width:340px">
+        <div class="hd eyebrow">Working now</div>
+        <button class="item"><span class="dot" style="background:var(--state-live)"></span><span><b style="font-weight:500">Fort 3D pop-in fixes</b><div class="sub">DFAI · conversation · Claude Fable 5.2</div></span><span class="r faint">6m</span></button>
+        <button class="item"><span class="dot" style="background:var(--state-live)"></span><span><b style="font-weight:500">PAN-5281 Commit attribution</b><div class="sub">overdeck · planning · Claude Opus 5.5</div></span><span class="r faint">12m</span></button>
+        <button class="item"><span class="dot" style="background:var(--state-live)"></span><span><b style="font-weight:500">PAN-5278 CLIProxy account routing</b><div class="sub">overdeck · building · GPT-6.1</div></span><span class="r faint">41m</span></button>
+        <div class="sep"></div>
+        <button class="item">Open the Agents page</button>
+        <button class="item danger" style="color:var(--destructive)">Stop all agents…</button>
+      </div>
+      <div class="menu" id="needsMenu" style="right:70px;top:36px;width:380px">
+        <div class="hd eyebrow">Needs you · all projects</div>
+        <button class="item" data-go="home"><span class="dot" style="background:var(--state-needs-you)"></span><span><b style="font-weight:500">PAN-5095 test removal needs a waiver</b><div class="sub">overdeck · verification failed 82 h ago</div></span></button>
+        <button class="item" data-go="conv"><span class="dot" style="background:var(--state-needs-you)"></span><span><b style="font-weight:500">Fort 3D: 1 file not committed</b><div class="sub">DFAI · docs/operations.md · the agent asked you to decide</div></span></button>
+        <div class="sep"></div>
+        <button class="item">Open Activity (system events)</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── left column ── -->
+  <nav class="left">
+    <button class="proj-switch" id="projSwitch" data-note="g1">
+      <span class="pmark" id="pmark" style="background:#7c5c3b">DF</span>
+      <span><div class="nm" id="pname">DFAI</div><div class="path" id="ppath">~/Projects/dfai · main</div></span>
+      <svg class="i sm chev2" viewBox="0 0 24 24"><path d="m7 15 5 5 5-5M7 9l5-5 5 5"/></svg>
+    </button>
+    <div class="menu" id="projMenu" style="left:10px;top:104px;width:244px">
+      <div class="hd eyebrow">Projects</div>
+      <button class="item" data-proj="overdeck"><span class="pmark" style="background:#4f46e5;width:20px;height:20px;font-size:10px">OD</span>overdeck<span class="r faint">3 working</span></button>
+      <button class="item" data-proj="dfai"><span class="pmark" style="background:#7c5c3b;width:20px;height:20px;font-size:10px">DF</span>DFAI<span class="r faint">1 working</span></button>
+      <button class="item"><span class="pmark" style="background:#0f766e;width:20px;height:20px;font-size:10px">MY</span>mind-your-now<span class="r faint">4 in review</span></button>
+      <button class="item"><span class="pmark" style="background:#9333ea;width:20px;height:20px;font-size:10px">LX</span>lexerra<span class="r faint">1 working</span></button>
+      <button class="item"><span class="pmark" style="background:#64748b;width:20px;height:20px;font-size:10px">OR</span>orca<span class="r faint">idle</span></button>
+      <div class="sep"></div>
+      <button class="item">All 19 projects…<span class="kbd">Ctrl K</span></button>
+      <button class="item">Add a project</button>
+    </div>
+    <div class="nav">
+      <a data-go="home"><svg class="i" viewBox="0 0 24 24"><path d="M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></svg>Project home</a>
+      <a><svg class="i" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Flywheel<span class="r">running</span></a>
+      <a><svg class="i" viewBox="0 0 24 24"><path d="M2 4h7a3 3 0 0 1 3 3v14a2 2 0 0 0-2-2H2Z"/><path d="M22 4h-7a3 3 0 0 0-3 3v14a2 2 0 0 1 2-2h8Z"/></svg>Order books</a>
+    </div>
+    <div class="newconv"><button class="btn primary"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New conversation<span class="kbd" style="background:color-mix(in srgb, white 18%, transparent);border-color:transparent;color:white;margin-left:6px">Ctrl N</span></button><button class="btn split" title="Choose agent"><svg class="i sm" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button></div>
+    <div class="sect"><span class="eyebrow">Conversations</span><div class="seg2"><button class="on">Active</button><button>All 31</button></div></div>
+    <div class="list" id="leftList"></div>
+    <div class="left-foot">
+      <button class="btn ghost" style="height:26px"><svg class="i sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>Settings</button>
+      <button class="btn ghost" style="height:26px">Machines</button>
+      <button class="btn ghost" style="height:26px;margin-left:auto" title="Keyboard shortcuts">?</button>
+    </div>
+  </nav>
+
+  <!-- ── stage ── -->
+  <main class="stage">
+    <div class="tabs" id="tabs" data-note="c6"></div>
+    <div class="stage-body">
+      <!-- conversation view -->
+      <section class="view" id="v-conv">
+        <div class="group" id="group">
+          <div class="chat">
+            <div class="ch">
+              <div class="ch-row">
+                <div class="ch-title">Fort 3D pop-in fixes and camera smoothing</div>
+                <div class="ch-actions">
+                  <div class="seg"><button class="on">Chat</button><button>Terminal</button></div>
+                  <button class="btn" id="hdrChanges" data-note="c1"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12M6 9l6-6 6 6M5 21h14"/></svg>Changes<span class="num"><b>+86</b> <i>−1</i></span></button>
+                  <button class="btn" id="hdrFiles" data-note="c1"><svg class="i" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>Files</button>
+                  <button class="btn icon" id="moreBtn" title="More"><svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+                  <div class="menu" id="moreMenu" style="right:0;top:34px">
+                    <button class="item">About this conversation</button>
+                    <button class="item">Bookmarks</button>
+                    <button class="item">Show tool calls<span class="r faint">on</span></button>
+                    <button class="item">Subagents<span class="r faint">4</span></button>
+                    <button class="item">Open folder in Cursor</button>
+                    <button class="item">Copy conversation id<span class="r mono faint" style="font-size:11px">20261111-8078</span></button>
+                    <div class="sep"></div>
+                    <button class="item">Archive</button>
+                    <button class="item" style="color:var(--destructive)">Stop the agent…</button>
+                  </div>
+                </div>
+              </div>
+              <div class="meta" data-note="c2">
+                <span style="display:inline-flex;align-items:center;gap:6px;color:var(--body-foreground)"><span class="dot" style="background:var(--state-live)"></span>Working</span>
+                <a class="mono" data-act="files">~/Projects/dfai</a>
+                <span class="mono">main</span>
+                <a data-act="changes">2 commits pushed</a>
+                <a data-act="uncommitted" style="color:var(--state-needs-you)">1 file not committed</a>
+                <span style="color:var(--signal-cost)">$43.06</span>
+              </div>
+            </div>
+            <div class="transcript">
+              <div class="user-msg"><div>Eltmon is just walking in place during the check-in. Fix it.</div></div>
+              <div class="work" id="work1" data-note="c4">
+                <div class="work-line"><svg class="i sm chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>Worked 11 min: read 9 files, ran 14 commands, edited 3 files, made 2 commits</div>
+                <div class="work-items">
+                  <div>Edited <code class="path" data-f="units">units.ts</code> <code class="path" data-f="test">playback.test.mjs</code> <code class="path" data-f="checkin">checkin3d.py</code></div>
+                  <div>Committed <span class="mono" style="color:var(--primary-ink)">3397787f</span> and <span class="mono" style="color:var(--primary-ink)">6f8552a0</span>, pushed to origin/main</div>
+                  <div>Ran the playback tests: 61 passed</div>
+                </div>
+              </div>
+              <div class="msg">
+                <p>Eltmon was walking in place because the game's ten-minute quicksave started at 12:20:18, the same second the 3D view went on air. The game and the 3D feed stopped for 78 of the shot's 96 seconds; the playback ran out of buffered data after about 4 seconds and froze, but his walk animation kept playing.</p>
+                <ul>
+                  <li><strong>Check-in timing:</strong> <code class="path" data-f="checkin">tools/checkin3d.py</code> now waits out a quicksave that is running or due during its shot.</li>
+                  <li><strong>Viewer:</strong> in <code class="path" data-f="units">fort3d/web/src/units.ts</code> a creature stands when the playback stops. A new test in <code class="path" data-f="test">playback.test.mjs</code> failed before the change and passes now.</li>
+                </ul>
+                <p>The fixes are committed and pushed. The note in <code class="path" data-f="ops">docs/operations.md</code> is written but not committed, because that file holds other conversations' edits.</p>
+              </div>
+              <div class="turn-card" data-note="c3">
+                <div class="tc-head">
+                  <svg class="i" viewBox="0 0 24 24" style="color:var(--muted-foreground)"><path d="M12 3v12M6 9l6-6 6 6M5 21h14"/></svg>
+                  <b style="font-weight:500">5 files changed</b><span class="num"><b>+86</b> <i>−1</i></span>
+                  <span class="tag">2 commits pushed</span><span class="tag local">1 not committed</span>
+                  <span style="margin-left:auto;display:flex;gap:4px"><button class="btn ghost" data-act="files-mine">Show in files</button><button class="btn" data-act="changes-turn">Review</button></span>
+                </div>
+                <div id="turnFiles"></div>
+              </div>
+            </div>
+            <div class="composer" data-note="c5">
+              <textarea placeholder="Message the agent. Type @ to mention a file."></textarea>
+              <div class="crow">
+                <button class="cbtn" title="Attach"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+                <button class="cbtn">Claude Fable 5.2<svg class="i sm" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+                <button class="cbtn">Thinking: high<svg class="i sm" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+                <button class="cbtn" title="How your message reaches a busy agent">Send: when idle<svg class="i sm" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+                <div class="right">
+                  <span class="ctx" title="Context used">27% context</span>
+                  <button class="cbtn" title="Dictate"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+                  <button class="send" title="Send (Enter)"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="gres"></div>
+          <div class="editor" id="editor"></div>
+        </div>
+      </section>
+
+      <!-- project home view -->
+      <section class="view" id="v-home"><div class="home"><div class="home-in" id="homeIn"></div></div></section>
+
+      <!-- edit view (overdeck README) -->
+      <section class="view" id="v-edit"><div class="group split" style="grid-template-columns:minmax(0,1fr)"><div class="editor" id="editor2" style="display:flex"></div></div></section>
+    </div>
+  </main>
+
+  <!-- ── dock ── -->
+  <aside class="dock" id="dock" data-note="g4">
+    <div class="dres" id="dres"></div>
+    <div class="dtabs">
+      <button class="dtab" data-dtab="files"><svg class="i sm" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>Files</button>
+      <button class="dtab" data-dtab="changes"><svg class="i sm" viewBox="0 0 24 24"><path d="M12 3v12M6 9l6-6 6 6M5 21h14"/></svg>Changes <span class="n" id="chgN">5</span></button>
+      <button class="dtab" data-dtab="search"><svg class="i sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search</button>
+      <div class="r"><button class="btn icon ghost" id="dockClose" title="Hide panel (Ctrl Shift E)"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+    </div>
+    <div class="dscope" id="dscope"></div>
+    <div class="dbody" id="dbody"></div>
+  </aside>
+</div>
+
+<!-- create PR modal -->
+<div class="scrim" id="prScrim"><div class="modal" role="dialog" aria-label="Create pull request">
+  <div class="mh"><h2>Create a pull request</h2><div class="muted" style="font-size:12.5px">From edit workspace <span class="mono">edit-1114-1248</span>, branch <span class="mono">scratch/edit-1114-1248</span>, into <span class="mono">main</span>.</div></div>
+  <div class="mb">
+    <label class="f">Title</label>
+    <input class="t" id="prTitle" value="docs: clarify the quick start in README.md and CONTRIBUTING.md">
+    <label class="f">What will be committed · 2 files <span class="num" style="margin-left:6px"><b>+6</b> <i>−2</i></span></label>
+    <div class="mfiles" id="prFiles"></div>
+    <label class="f">How should it land?</label>
+    <div class="choice">
+      <button class="opt on" data-how="direct"><div class="ot"><span class="radio"></span>Open a pull request</div><div class="od">You review and merge it yourself. When GitHub reports no conflicts, a Merge button appears right here.</div></button>
+      <button class="opt" data-how="pipeline"><div class="ot"><span class="radio"></span>Send through the pipeline</div><div class="od">Creates an issue and a PR; review and test agents check it, then it merges like any other issue.</div></button>
+    </div>
+  </div>
+  <div class="mf"><label class="l"><input type="checkbox"> Open as a draft</label><div class="r"><button class="btn" id="prCancel">Cancel</button><button class="btn primary" id="prGo">Open pull request</button></div></div>
+</div></div>
+
+<!-- quick open -->
+<div class="qo" id="qo"><div class="qo-box">
+  <input id="qoIn" placeholder="Go to a file, conversation, issue or command">
+  <div id="qoList"></div>
+  <div class="qo-foot"><span><span class="kbd">Enter</span> open beside the chat</span><span><span class="kbd">Shift Enter</span> reveal in files</span><span style="margin-left:auto">Files changed here rank first</span></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<div class="notes min" id="notes">
+  <div class="nh" id="notesHd">Mockup v2 · what changed and why<span class="r"><button id="notesTog">show notes</button></span></div>
+  <div class="screens"><button data-screen="conv">1 · Conversation</button><button data-screen="home">2 · Project home</button><button data-screen="edit">3 · Edit and PR</button></div>
+  <div class="nb">
+    <div class="try" id="notesTry"></div>
+    <ol id="notesList"></ol>
+  </div>
+</div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const ICON = {
+  chev: '<svg class="i sm chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>',
+  chevR: '<svg class="i sm chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>',
+  folder: '<svg class="i sm" viewBox="0 0 24 24" style="color:var(--muted-foreground)"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>',
+  diff: '<svg class="i sm" viewBox="0 0 24 24"><path d="M12 3v12M6 9l6-6 6 6M5 21h14"/></svg>',
+  reveal: '<svg class="i sm" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="m10 13 2 2 4-4"/></svg>',
+  code: '<svg class="i sm" viewBox="0 0 24 24"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></svg>',
+  commit: '<svg class="i sm" viewBox="0 0 24 24" style="color:var(--muted-foreground)"><circle cx="12" cy="12" r="3"/><path d="M3 12h6M15 12h6"/></svg>',
+  pencil: '<svg class="i sm" viewBox="0 0 24 24" style="color:var(--state-needs-you)"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+  back: '<svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>',
+  up: '<svg class="i sm" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg>',
+  down: '<svg class="i sm" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>',
+  x: '<svg class="i sm" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  chat: '<svg class="i sm" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></svg>',
+  home: '<svg class="i sm" viewBox="0 0 24 24"><path d="M3 10 12 3l9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z"/></svg>',
+  term: '<svg class="i sm" viewBox="0 0 24 24"><path d="m4 17 6-6-6-6M12 19h8"/></svg>',
+  more: '<svg class="i sm" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>',
+  plus: '<svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  split: '<svg class="i sm" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg>',
+  eye: '<svg class="i sm" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>',
+};
+const extOf = (n) => ({ ts: 'ts', py: 'py', md: 'md', mjs: 'js', js: 'js', lua: 'lua', json: 'json' })[n.split('.').pop()];
+const ficon = (n) => extOf(n) ? `<span class="ficon"><span class="ext ${extOf(n)}">${extOf(n).toUpperCase()}</span></span>` : `<span class="ficon"><svg class="i sm" viewBox="0 0 24 24" style="color:var(--muted-foreground)"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6"/></svg></span>`;
+const pathHtml = (p) => { const i = p.lastIndexOf('/'); return i < 0 ? p : `<span class="dir">${p.slice(0, i + 1)}</span>${p.slice(i + 1)}`; };
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/* ── data ── */
+const PROJ = {
+  dfai: { name: 'DFAI', mark: 'DF', color: '#7c5c3b', path: '~/Projects/dfai' },
+  overdeck: { name: 'overdeck', mark: 'OD', color: '#4f46e5', path: '~/Projects/overdeck' },
+};
+const FILES = {
+  ops:     { path: 'docs/operations.md', st: 'M', add: 9, del: 0, g: 'unc' },
+  fortmd:  { path: 'docs/fort3d.md', st: 'M', add: 1, del: 0, g: '6f8552a0' },
+  units:   { path: 'fort3d/web/src/units.ts', st: 'M', add: 5, del: 1, g: '3397787f' },
+  test:    { path: 'fort3d/web/test/playback.test.mjs', st: 'M', add: 25, del: 0, g: '3397787f' },
+  checkin: { path: 'tools/checkin3d.py', st: 'M', add: 48, del: 0, g: '3397787f' },
+  readme:  { path: 'README.md', st: 'M', add: 4, del: 1, g: 'ew' },
+  contrib: { path: 'CONTRIBUTING.md', st: 'M', add: 2, del: 1, g: 'ew' },
+};
+const ORDER = ['ops', 'fortmd', 'units', 'test', 'checkin'];
+const GROUPS = [
+  { id: 'unc', files: ['ops'] },
+  { id: '6f8552a0', title: 'docs/fort3d.md: quicksaves and the check-ins', time: '12:31', files: ['fortmd'] },
+  { id: '3397787f', title: "fort3d: the walk cycle by the drawn speed; checkin3d waits out the runner's quicksave", time: '12:27', files: ['units', 'test', 'checkin'] },
+];
+const DIFFS = {
+  units: [['h', '@@ -1946,7 +1946,11 @@ export class Unit {'], [' ', 1946, 1946, '    if (this.planned !== Unit.version) this.plan();'], [' ', 1948, 1948, '    const rate = fol.clock.rate;'], ['-', 1949, null, '    const walking = !petted && fol.speed >= HOLD_V;'], ['+', null, 1949, "    // walking by its drawn speed: the track's speed times the clock's rate. With the clock"], ['+', null, 1950, '    // braked to a stop the track keeps its mid-walk speed, so the creature walked on the spot'], ['+', null, 1951, '    // (on air 2026-11-14 12:20: the dwarf walked in place for 50 s of a 78 s feed stop)'], ['+', null, 1953, '    const walking = !petted && fol.speed * rate >= HOLD_V;'], [' ', 1950, 1954, '    this.moving = walking;'], [' ', 1951, 1955, '    this.pace = this.pace > 0 ? this.pace + (fol.speed * rate - this.pace) * Math.min(1, dt * 2) : fol.speed * rate;']],
+  checkin: [['h', '@@ -228,6 +228,53 @@ def blocked(allow_crisis: bool = False)'], [' ', 228, 228, '    return None'], ['+', null, 231, 'SAVE_EVERY = 600  # tools/live.py: the runner quicksaves this long after its last save'], ['+', null, 234, 'def save_wait(window: float) -> None:'], ['+', null, 235, '    """Wait out the runner\'s quicksave if it would fall inside the next `window` seconds."""'], ['+', null, 240, '    saving, now = LIVE / "saving", time.time()'], ['f', '41 more added lines']],
+  test: [['h', "@@ -405,6 +405,31 @@ test('FR-12: a creature takes on its sample's job…"], ['+', null, 408, "test('the feed stops in mid-walk (a quicksave): the creature stands', () => {"], ['+', null, 409, '  const { pb, units } = unitPlayback();'], ['+', null, 412, '  const feed = (t) => (t <= 10000 ? [row(12, 10 + (t / 1000) * 2, 10)] : null);'], ['f', '20 more added lines'], ['+', null, 429, '  assert.equal(units.get(12).moving, false);']],
+  fortmd: [['h', '@@ -2675,6 +2675,7 @@'], ['+', null, 2678, "- **Quicksaves and the check-ins** (2026-11-14). The runner's quicksave stops DF, and the feed, for about 78 s, every 600 s plus a second: it drifts round the clock…"]],
+  ops: [['h', '@@ -8147,3 +8147,633 @@ not committed · 630 lines added by 3 conversations'], ['o', null, 8150, '## Fort22 goblin siege, 2026-11-13 01:56–02:01 EST'], ['f', '612 lines from Fort #23 Overseer and Fort #20 Manager, hidden'], ['+', null, 8753, '## 3D check-in froze on the quicksave, 2026-11-14 12:20'], ['+', null, 8754, 'The 12:20:18 quicksave began as the check-in cut to 3D; DF and the feed stopped for 78 s of 96.'], ['+', null, 8756, 'Fixed in 3397787f: walking follows the drawn speed; checkin3d.py save_wait waits out the save.'], ['+', null, 8757, 'Deployed 12:29. Next check: the 12:50 tour should log save_wait and air a live fort.']],
+  readme: [['h', '@@ -12,7 +12,10 @@ ## Quick start'], [' ', 12, 12, '```bash'], ['-', 13, null, 'npm install -g overdeck'], ['+', null, 13, 'npm install -g @overdeck/core'], ['+', null, 14, 'pan install        # installs Herdr and the agent integrations'], ['+', null, 15, 'pan up             # starts the dashboard on http://localhost:3011'], [' ', 14, 16, '```']],
+  contrib: [['h', '@@ -40,4 +40,5 @@'], ['-', 41, null, 'Run `npm test` before you push.'], ['+', null, 41, 'Run `npm run typecheck` and the test files you touched; CI runs the full suite.']],
+};
+const CODE = {
+  units: { start: 1940, chg: [1949, 1950, 1951, 1953], lines: [
+    '  tickFollow(now: number, dt: number, ev?: string) {', '    const fol = this.fol;', '    if (!fol) return;', '    const petted = this.petted(now);', '    if (fol.clock.held) this.hold(now);', '', '    if (this.planned !== Unit.version) this.plan();', "    if (ev === 'reloc') this.folReloc();", '    const rate = fol.clock.rate;',
+    "    // walking by its drawn speed: the track's speed times the clock's rate. With the clock", '    // braked to a stop the track keeps its mid-walk speed, so the creature walked on the spot', '    // (on air 2026-11-14 12:20: the dwarf walked in place for 50 s of a 78 s feed stop)', '', '    const walking = !petted && fol.speed * rate >= HOLD_V;', '    this.moving = walking;', '    this.pace = this.pace > 0 ? this.pace + (fol.speed * rate - this.pace) * Math.min(1, dt * 2) : fol.speed * rate;', '    let onRun = false, runYaw = NaN, hopU = -1, hopSlope = 0;', '    if (walking && this.track.length > 1) {', '      const seg = this.track.at(now);', '      onRun = seg.run;', '    }', '  }'] },
+  checkin: { start: 226, chg: [231, 234, 235, 236, 237, 238, 239, 240, 241], lines: ['', '', '    return None', '', '', 'SAVE_EVERY = 600  # tools/live.py SAVE_EVERY: the runner quicksaves this long after its last save', '', '', 'def save_wait(window: float) -> None:', '    """Wait out the runner\'s quicksave if it would fall inside the next `window` seconds.', '', '    A quicksave stops DF, and with it the 3D feed, for about 78 s."""', '    saving, now = LIVE / "saving", time.time()', '', '    def quiet_end() -> float:', '        try:', '            return float(saving.read_text().strip() or 0)', '        except (OSError, ValueError):', '            return 0.0'] },
+  readme: { start: 1, chg: [], lines: ['# Overdeck', '', 'A control room for AI coding agents: run many agents in parallel, each in its own', 'worktree, and review what they did before it lands.', '', '## What it does', '', '- Starts Claude Code, Codex, Pi and other agents on issues or in free conversations.', '- Plans, builds, reviews and merges through one pipeline.', '- Shows every agent, every change and every cost in one dashboard.', '', '## Quick start', '', '```bash', 'npm install -g overdeck', '```', '', 'Then open the dashboard and add a project.', '', '## Documentation', '', 'See https://overdeck.ai/docs.'] },
+};
+const TREE_DFAI = [
+  { n: '.overdeck', d: 1 }, { n: 'blueprints', d: 1 },
+  { n: 'docs', d: 1, open: 1, kids: [{ n: 'fort22-plan.md', st: 'M' }, { n: 'fort23-plan.md', st: 'M' }, { n: 'fort3d.md', key: 'fortmd' }, { n: 'operations.md', key: 'ops' }, { n: 'stream-handbook.md' }] },
+  { n: 'extension', d: 1 },
+  { n: 'fort3d', d: 1, open: 1, kids: [{ n: 'web', d: 1, open: 1, kids: [{ n: 'dist', d: 1, ign: 1 }, { n: 'src', d: 1, open: 1, kids: [{ n: 'arrive.ts' }, { n: 'backdrop.ts' }, { n: 'camstatus.ts' }, { n: 'units.ts', key: 'units' }, { n: 'zoom.ts' }] }, { n: 'test', d: 1, open: 1, kids: [{ n: 'backdrop.test.mjs' }, { n: 'playback.test.mjs', key: 'test' }] }] }] },
+  { n: 'lua', d: 1 }, { n: 'overlay', d: 1 }, { n: 'runs', d: 1, ign: 1 },
+  { n: 'tools', d: 1, open: 1, kids: [{ n: 'checkin.py' }, { n: 'checkin3d.py', key: 'checkin' }, { n: 'live.py' }] },
+  { n: 'video', d: 1 }, { n: 'README.md' },
+];
+const TREE_OD = [
+  { n: '.github', d: 1 }, { n: 'apps', d: 1 }, { n: 'changelog.d', d: 1 }, { n: 'configuration', d: 1 }, { n: 'docs', d: 1 }, { n: 'packages', d: 1 }, { n: 'scripts', d: 1 },
+  { n: 'src', d: 1, kids: [] }, { n: 'tests', d: 1 },
+  { n: 'CLAUDE.md' }, { n: 'CONTRIBUTING.md', key: 'contrib' }, { n: 'package.json' }, { n: 'README.md', key: 'readme' },
+];
+
+const S = { screen: 'conv', proj: 'dfai', dock: 'changes', scope: 'conversation', diff: null, sel: null, filter: 'all', showIgnored: false, split: false, etabs: [], etab: null, emode: 'code', ew: 'none', pr: null, how: 'direct' };
+
+/* ── left list ── */
+function renderLeft() {
+  const p = PROJ[S.proj];
+  $('#pname').textContent = p.name; $('#ppath').textContent = p.path; $('#pmark').textContent = p.mark; $('#pmark').style.background = p.color;
+  const L = $('#leftList');
+  if (S.proj === 'dfai') {
+    L.innerHTML = `
+      <div class="row on" data-go="conv"><div class="t"><span class="dot" style="background:var(--state-live)"></span><span class="x">Fort 3D pop-in fixes and camera smoothing</span></div><div class="m">Working · <span class="num"><b>+86</b> <i>−1</i></span> · 1 not committed</div></div>
+      <div class="row"><div class="t"><span class="dot" style="background:var(--state-done)"></span><span class="x">Fort #23 Overseer</span></div><div class="m">Idle 20 m · Codex · <span class="num"><b>+612</b> <i>−3</i></span></div></div>
+      <div class="row"><div class="t"><span class="dot" style="background:var(--state-done)"></span><span class="x">Fort #20 Manager (Terra)</span></div><div class="m">Idle 1 h · branch manager/terra-fort20</div></div>
+      <div class="row"><div class="t"><span class="dot" style="background:var(--faint-foreground)"></span><span class="x">Dwarf Fortress stream mood checker</span></div><div class="m">Yesterday · <span class="num"><b>+31</b> <i>−4</i></span></div></div>
+      <div class="row"><div class="t"><span class="dot" style="background:var(--faint-foreground)"></span><span class="x">Twitch extension review status</span></div><div class="m">Yesterday · no file changes</div></div>
+      <div class="sect" style="padding-left:10px"><span class="eyebrow">Issues</span><span class="faint" style="margin-left:auto;font-size:11.5px">none open</span></div>`;
+  } else {
+    L.innerHTML = `
+      <div class="row ${S.screen === 'edit' ? 'on' : ''}" data-go="edit"><div class="t"><span class="dot" style="background:var(--state-needs-you)"></span><span class="x">Edit workspace edit-1114-1248</span></div><div class="m">Your hand edits · 2 files · <span class="num"><b>+6</b> <i>−2</i></span></div></div>
+      <div class="row"><div class="t"><span class="dot" style="background:var(--state-live)"></span><span class="x">Overdeck UI redesign</span></div><div class="m">Working · <span class="num"><b>+1,212</b> <i>−4</i></span></div></div>
+      <div class="row"><div class="t"><span class="dot" style="background:var(--state-live)"></span><span class="x">Flywheel</span></div><div class="m">Running · tick 834 · 13 earlier sessions</div></div>
+      <div class="row"><div class="t"><span class="dot" style="background:var(--faint-foreground)"></span><span class="x">Animate logo when busy</span></div><div class="m">2 h ago · <span class="num"><b>+88</b> <i>−12</i></span></div></div>
+      <div class="sect" style="padding-left:10px"><span class="eyebrow">Issues</span><span class="faint" style="margin-left:auto;font-size:11.5px">4 in pipeline</span></div>
+      <div class="row"><div class="t"><span class="dot" style="background:var(--state-live)"></span><span class="mono faint" style="font-size:11.5px">PAN-5281</span><span class="x">Commit attribution trailers</span></div><div class="m">Planning · Claude Opus 5.5</div></div>
+      <div class="row"><div class="t"><span class="dot" style="background:var(--state-live)"></span><span class="mono faint" style="font-size:11.5px">PAN-5278</span><span class="x">CLIProxy account routing</span></div><div class="m">Building · GPT-6.1</div></div>
+      <div class="row"><div class="t"><span class="dot" style="background:var(--state-live)"></span><span class="mono faint" style="font-size:11.5px">PAN-5275</span><span class="x">Needs-you rows clickable</span></div><div class="m">Building · Claude Sonnet 5.5</div></div>
+      <div class="row" data-go="home"><div class="t"><span class="dot" style="background:var(--state-needs-you)"></span><span class="mono faint" style="font-size:11.5px">PAN-5095</span><span class="x">pan tell reaches idle Codex</span></div><div class="m">Needs you: waive a test removal</div></div>`;
+  }
+}
+
+/* ── tabs ── */
+function renderTabs() {
+  let t;
+  if (S.proj === 'dfai') t = [{ k: 'home', icon: ICON.home, l: 'Home', go: 'home' }, { k: 'o', icon: ICON.chat, l: 'Fort #23 Overseer' }, { k: 'conv', icon: '<span class="dot" style="background:var(--state-live)"></span>', l: 'Fort 3D pop-in fixes and camera smoothing', go: 'conv' }];
+  else t = [{ k: 'home', icon: ICON.home, l: 'Home', go: 'home' }, { k: 'u', icon: '<span class="dot" style="background:var(--state-live)"></span>', l: 'Overdeck UI redesign' }, { k: 'edit', icon: ficon('README.md'), l: 'README.md', go: 'edit' }];
+  if (S.proj === 'overdeck' && S.ew === 'none' && S.screen !== 'edit') t = t.filter(x => x.k !== 'edit');
+  $('#tabs').innerHTML = t.map(x => `<div class="tab ${x.k === 'home' ? 'home' : ''} ${S.screen === x.go ? 'on' : ''}" ${x.go ? `data-go="${x.go}"` : ''}>${x.icon}<span class="l">${x.l}</span>${x.k !== 'home' ? `<span class="x">${ICON.x}</span>` : ''}</div>`).join('') +
+    `<div class="tab-tools"><button class="btn icon ghost" id="addBtn" title="New tab">${ICON.plus}</button>
+      <div class="menu" id="addMenu" style="top:34px;left:0">
+        <button class="item">${ICON.chat}New conversation<span class="kbd">Ctrl N</span></button>
+        <button class="item" data-act="files">${ICON.folder}Files<span class="kbd">Ctrl Shift E</span></button>
+        <button class="item" data-act="changes-all">${ICON.diff}Changes in ${PROJ[S.proj].name}<span class="kbd">Ctrl Shift G</span></button>
+        <button class="item" data-act="quick"><svg class="i sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Go to file…<span class="kbd">Ctrl P</span></button>
+        <div class="sep"></div>
+        <button class="item">${ICON.term}Terminal<span class="kbd">Ctrl \`</span></button>
+        <button class="item"><svg class="i sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/></svg>Web page</button>
+      </div></div><div class="spacer"></div>
+      <div class="tab-tools"><button class="btn ghost" style="height:26px;color:var(--muted-foreground)" title="All open tabs">7 tabs ${ICON.down}</button></div>`;
+}
+
+/* ── changes dock ── */
+function frow(k, extra = '') {
+  const f = FILES[k];
+  return `<div class="frow" data-diff="${k}">${ficon(f.path)}<span class="p">${pathHtml(f.path)}</span>${extra}<span class="num"><b>+${f.add}</b> <i>−${f.del}</i></span>
+    <span class="ra"><button title="Open diff" data-diff="${k}">${ICON.diff}</button><button title="Open the file beside the chat" data-open="${k}">${ICON.code}</button><button title="Reveal in files" data-reveal="${k}">${ICON.reveal}</button></span></div>`;
+}
+function renderChanges() {
+  if (S.diff) return renderDiff(S.diff);
+  const B = $('#dbody');
+  if (S.screen === 'edit') {
+    const head = S.ew === 'editing' ? `${ICON.pencil}<span class="msgt" style="color:var(--state-needs-you)">Not committed yet</span>`
+      : S.ew === 'merged' ? `${ICON.commit}<span class="sha">a91c03e</span><span class="msgt">docs: clarify the quick start…</span><span class="tag done">merged</span>`
+      : S.ew === 'pipeline' ? `${ICON.commit}<span class="sha">5d02e7a</span><span class="msgt">PAN-5291 · PR #5292</span><span class="tag live">in review</span>`
+      : `${ICON.commit}<span class="sha">5d02e7a</span><span class="msgt">PR #5290 · docs: clarify the quick start…</span><span class="tag">pushed</span>`;
+    if (S.ew === 'none') { B.innerHTML = '<div class="attr" style="border:0">No edits yet. Typing in a file of the main checkout starts an edit workspace.</div>'; return; }
+    B.innerHTML = `<div class="chips"><button class="on">This edit workspace</button><button>All of main today</button></div>
+      <div class="grp"><div class="ghead">${ICON.chev}${head}<span class="num"><b>+6</b> <i>−2</i></span></div>
+      <div class="gfiles">${frow('readme')}${frow('contrib')}</div></div>
+      <div class="attr">Edits you make in Overdeck's editor never touch the main checkout. They live on <span class="mono">scratch/edit-1114-1248</span> until you open a PR or discard them.</div>`;
+    return;
+  }
+  const scopes = [['conversation', 'This conversation'], ['turn', 'Last turn'], ['unc', 'Not committed'], ['main', 'All of main today']];
+  let h = `<div class="chips">${scopes.map(([k, l]) => `<button class="${S.scope === k ? 'on' : ''}" data-scope="${k}">${l}</button>`).join('')}</div>`;
+  if (S.scope === 'main') {
+    h += [['6f8552a0', 'docs/fort3d.md: quicksaves and the check-ins', 1], ['3397787f', 'fort3d: the walk cycle by the drawn speed…', 1], ['ac5a11db', 'Record boulders belong in stone storage', 'Fort #23 Overseer'], ['2f640256', 'Document material initialization required by suspendmanager', 'Fort #20 Manager'], ['c44331f5', 'Memory: clearing the building material before…', 'Fort #20 Manager'], ['50f9777b', 'Apply buildingplan rule to every supported building', 'Fort #20 Manager']]
+      .map(([s, t, w]) => `<div class="grp closed"><div class="ghead">${ICON.commit}<span class="sha">${s}</span><span class="msgt">${t}</span>${w === 1 ? '<span class="tag live">this chat</span>' : `<span class="faint" style="font-size:11.5px;white-space:nowrap">${w}</span>`}</div></div>`).join('');
+    B.innerHTML = h; return;
+  }
+  const groups = S.scope === 'unc' ? GROUPS.filter(g => g.id === 'unc') : GROUPS;
+  for (const g of groups) {
+    const unc = g.id === 'unc';
+    h += `<div class="grp"><div class="ghead">${ICON.chev}${unc ? ICON.pencil : ICON.commit}${unc ? '<span class="msgt" style="color:var(--state-needs-you)">Not committed yet</span>' : `<span class="sha">${g.id}</span><span class="msgt">${g.title}</span><span class="tag">pushed</span>`}</div>
+      <div class="gfiles">${g.files.map(k => frow(k)).join('')}${unc ? `<div class="note"><b>Shared file.</b> 612 other uncommitted lines come from Fort #23 Overseer and Fort #20 Manager. Only this conversation's 9 lines are counted and would be committed.<div style="display:flex;gap:6px;margin-top:6px"><button class="btn" style="height:24px">Ask the agent to commit them</button></div></div>` : ''}</div></div>`;
+  }
+  h += `<div class="attr">Commits carry <span class="mono">Overdeck-Conversation: 20261111-8078</span>; uncommitted lines come from the agent's own edit records. Other conversations' work on <span class="mono">main</span> is left out.</div>`;
+  B.innerHTML = h;
+}
+function renderDiff(k) {
+  const f = FILES[k], list = S.screen === 'edit' ? ['readme', 'contrib'] : ORDER, i = list.indexOf(k);
+  const g = f.g === 'unc' || f.g === 'ew' ? '<span class="tag local">not committed</span>' : `<span class="tag">${f.g} · pushed</span>`;
+  let h = `<div class="dhead"><button class="btn icon ghost" data-act="diffback" title="Back to the list">${ICON.back}</button>${ficon(f.path)}<span class="p">${pathHtml(f.path)}</span><span class="faint mono" style="font-size:11px">${i + 1}/${list.length}</span><button class="btn icon ghost" data-step="-1" title="Previous file (K)">${ICON.up}</button><button class="btn icon ghost" data-step="1" title="Next file (J)">${ICON.down}</button></div>
+    <div class="dhead2"><span class="num"><b>+${f.add}</b> <i>−${f.del}</i></span>${g}<span class="r"><button class="btn ghost" style="height:24px" data-open="${k}">${ICON.split} Open beside chat</button><button class="btn ghost" style="height:24px" data-reveal="${k}">${ICON.reveal}</button></span></div><div class="diff">`;
+  for (const l of DIFFS[k]) {
+    if (l[0] === 'h') h += `<div class="hunk">${esc(l[1])}</div>`;
+    else if (l[0] === 'f') h += `<div class="fold">⋯ ${esc(l[1])}</div>`;
+    else { const c = l[0] === '+' ? 'add mine' : l[0] === '-' ? 'del mine' : l[0] === 'o' ? 'add others' : ''; h += `<div class="dl ${c}"><span class="n">${l[1] ?? ''}</span><span class="n">${l[2] ?? ''}</span><span class="sgn">${l[0] === 'o' ? '+' : l[0] === ' ' ? ' ' : l[0]}</span><span>${esc(l[3])}</span></div>`; }
+  }
+  $('#dbody').innerHTML = h + '</div>';
+}
+
+/* ── files dock ── */
+function renderFiles() {
+  const tree = S.proj === 'dfai' ? TREE_DFAI : TREE_OD;
+  const rootName = S.proj === 'dfai' ? 'DFAI' : (S.screen === 'edit' ? 'overdeck' : 'overdeck');
+  const branch = S.screen === 'edit' ? 'edit-1114-1248' : 'main';
+  let h = `<div class="tree-tools"><span class="root">${ICON.folder}${rootName}<span class="mono">${branch}</span></span><span class="r">
+      <button class="btn icon ghost" title="New file">${ICON.plus}</button>
+      <button class="btn icon ghost" title="Collapse all"><svg class="i sm" viewBox="0 0 24 24"><path d="m7 20 5-5 5 5M7 4l5 5 5-5"/></svg></button>
+      <button class="btn icon ghost" id="treeOpts" title="View options">${ICON.more}</button>
+      <div class="menu" id="treeMenu" style="right:0;top:30px;width:230px">
+        <button class="item" data-filter="all">Show all files${S.filter === 'all' ? '<span class="r">✓</span>' : ''}</button>
+        <button class="item" data-filter="changed">Only changed files${S.filter === 'changed' ? '<span class="r">✓</span>' : ''}</button>
+        ${S.proj === 'dfai' ? `<button class="item" data-filter="mine">Only what this conversation changed${S.filter === 'mine' ? '<span class="r">✓</span>' : ''}</button>` : ''}
+        <div class="sep"></div>
+        <button class="item" data-act="ignored">Show git-ignored files${S.showIgnored ? '<span class="r">✓</span>' : ''}</button>
+        <button class="item">Show dotfiles<span class="r">✓</span></button>
+      </div></span></div>`;
+  if (S.filter !== 'all') h += `<div class="dscope" style="border-bottom:1px solid var(--border)">Showing ${S.filter === 'mine' ? 'files this conversation changed' : 'changed files'} <button class="btn ghost" style="height:22px;margin-left:auto" data-filter="all">Show all</button></div>`;
+  h += '<div class="tree">';
+  const walk = (nodes, depth) => {
+    for (const n of nodes) {
+      if (n.ign && !S.showIgnored) continue;
+      const mine = S.proj === 'dfai' && !!n.key;
+      const st = n.key ? FILES[n.key].st : n.st;
+      if (!n.d) { if (S.filter === 'changed' && !st) continue; if (S.filter === 'mine' && !mine) continue; }
+      else if (S.filter !== 'all' && !has(n)) continue;
+      const guides = Array.from({ length: depth }, (_, i) => `<span class="guide" style="left:${19 + i * 16}px"></span>`).join('');
+      const pad = 10 + depth * 16;
+      if (n.d) {
+        const open = n.open || S.filter !== 'all';
+        h += `<div class="node ${n.ign ? 'ign' : ''}" style="padding-left:${pad}px">${guides}${open ? ICON.chev : ICON.chevR}${ICON.folder}<span class="nm">${n.n}</span>${hasMine(n) ? '<span class="mine" title="Contains files this conversation changed"></span>' : ''}</div>`;
+        if (open && n.kids) walk(n.kids, depth + 1);
+      } else {
+        h += `<div class="node ${S.sel && S.sel === n.key ? 'sel' : ''}" style="padding-left:${pad + 18}px" ${n.key ? `data-open="${n.key}" data-key="${n.key}"` : `data-plain="${n.n}"`}>${guides}${ficon(n.n)}<span class="nm">${n.n}</span>${st ? `<span class="gl ${st}">${st}</span>` : ''}${mine ? '<span class="mine" title="Changed by this conversation"></span>' : ''}</div>`;
+      }
+    }
+  };
+  const has = (n) => (n.kids || []).some(k => k.d ? has(k) : (S.filter === 'mine' ? !!k.key : !!(k.key || k.st)));
+  const hasMine = (n) => S.proj === 'dfai' && (n.kids || []).some(k => k.key || hasMine(k));
+  walk(tree, 0);
+  $('#dbody').innerHTML = h + '</div>';
+  const sel = $('#dbody .node.sel'); if (sel) sel.scrollIntoView({ block: 'center' });
+}
+function renderSearch() {
+  $('#dbody').innerHTML = `<div class="searchbox"><svg class="i sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="sq" value="save_wait"><span class="kbd">Aa</span><span class="kbd">.*</span></div>
+    <div class="dscope" style="border-top:1px solid var(--border)">4 matches in 3 files</div>
+    <div class="sres">
+      <div class="sfile">${ficon('checkin3d.py')}<b style="font-weight:500">checkin3d.py</b><span class="faint mono" style="font-size:11px">tools</span><span class="mine" style="width:6px;height:6px;border-radius:50%;background:var(--mine);margin-left:auto"></span></div>
+      <div class="sline" data-open="checkin"><span class="ln">234</span><span>def <mark>save_wait</mark>(window: float) -> None:</span></div>
+      <div class="sline" data-open="checkin"><span class="ln">412</span><span>        <mark>save_wait</mark>(SHOT_SECONDS)</span></div>
+      <div class="sfile">${ficon('fort3d.md')}<b style="font-weight:500">fort3d.md</b><span class="faint mono" style="font-size:11px">docs</span></div>
+      <div class="sline" data-open="fortmd"><span class="ln">2678</span><span>…and \`tools/checkin3d.py\` \`<mark>save_wait</mark>\` waits out a quicksave…</span></div>
+      <div class="sfile">${ficon('operations.md')}<b style="font-weight:500">operations.md</b><span class="faint mono" style="font-size:11px">docs</span></div>
+      <div class="sline" data-open="ops"><span class="ln">8756</span><span>…checkin3d.py <mark>save_wait</mark> waits out the save.</span></div>
+    </div>`;
+}
+function renderDock() {
+  $$('.dtab').forEach(t => t.classList.toggle('on', t.dataset.dtab === S.dock));
+  $('#chgN').textContent = S.screen === 'edit' ? '2' : S.proj === 'dfai' ? '5' : '0';
+  const sc = $('#dscope');
+  if (S.screen === 'conv') sc.innerHTML = `${ICON.chat}<span>For <b>Fort 3D pop-in fixes</b> · DFAI · main</span>`;
+  else if (S.screen === 'edit') sc.innerHTML = `${ICON.pencil}<span>Edit workspace <b>edit-1114-1248</b> · overdeck</span>`;
+  else sc.innerHTML = `${ICON.home}<span>Project <b>${PROJ[S.proj].name}</b> · main checkout</span>`;
+  if (S.dock === 'files') renderFiles(); else if (S.dock === 'changes') renderChanges(); else renderSearch();
+}
+
+/* ── editor ── */
+function hl(line, lang) {
+  if (lang === 'md') {
+    if (/^#{1,6} /.test(line)) return `<b style="font-weight:600;color:var(--foreground)">${esc(line)}</b>`;
+    if (/^```/.test(line)) return `<span class="cm">${esc(line)}</span>`;
+    return esc(line);
+  }
+  if (/^\s*(\/\/|#)/.test(line)) return `<span class="cm">${esc(line)}</span>`;
+  return line.split(/('[^']*'|"[^"]*"|`[^`]*`)/).map((part, i) => i % 2
+    ? `<span class="str">${esc(part)}</span>`
+    : esc(part).replace(/\b(const|let|if|return|def|try|except|import|from|export|class|this|function|await|async|else|for|of|float|None|True|False)\b/g, '<span class="kw">$1</span>')).join('');
+}
+function renderEditor(target = '#editor') {
+  const E = $(target);
+  const k = S.etab;
+  if (!k) { E.innerHTML = ''; return; }
+  const f = FILES[k];
+  const tabs = S.etabs.map(t => `<div class="etab ${t === k ? 'on' : ''} ${t === S.preview ? 'preview' : ''}" data-etab="${t}">${ficon(FILES[t].path)}<span class="l">${FILES[t].path.split('/').pop()}</span>${t === 'readme' && S.ew !== 'none' && S.ew !== 'merged' ? '<span class="dirty" title="Changed in this edit workspace"></span>' : ''}<span class="x" data-eclose="${t}">${ICON.x}</span></div>`).join('');
+  const parts = f.path.split('/');
+  const bc = `<span>${S.proj === 'dfai' ? 'DFAI' : 'overdeck'}</span>` + parts.map((p, i) => `<span class="s">›</span>${i === parts.length - 1 ? `<b>${p}</b>` : `<span>${p}</span>`}`).join('');
+  let ew = '';
+  if (target === '#editor2') {
+    if (S.ew === 'none') ew = `<div class="ewbar"><svg class="i" viewBox="0 0 24 24" style="color:var(--muted-foreground)"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span class="grow">This is the <b>main checkout</b>. Start typing and Overdeck moves your edits to a new edit workspace, so main never changes until a PR merges.</span><button class="btn" data-act="startedit">Start editing</button></div>`;
+    else if (S.ew === 'editing') ew = `<div class="ewbar"><span class="dot" style="background:var(--state-needs-you)"></span><span class="grow">Editing in <b>edit-1114-1248</b> on <span class="mono">scratch/edit-1114-1248</span> · 2 files changed <span class="num"><b>+6</b> <i>−2</i></span> · saved 1 s ago</span><button class="btn ghost" data-act="discard">Discard…</button><button class="btn primary" data-act="createpr">Create PR</button></div>`;
+    else if (S.ew === 'pr-checking') ew = `<div class="ewbar"><span class="dot" style="background:var(--state-live)"></span><span class="grow">PR <b class="mono">#5290</b> is open · checks running (3 of 9 done) · GitHub has not computed mergeability yet</span><button class="btn ghost">View on GitHub</button><button class="btn" disabled title="Waiting for GitHub to report the merge state">Merge</button></div>`;
+    else if (S.ew === 'pr-ready') ew = `<div class="ewbar"><span class="dot" style="background:var(--state-done)"></span><span class="grow">PR <b class="mono">#5290</b> · <b>no conflicts</b>, all 9 checks passed. Merging squashes it into main at the commit you reviewed.</span><button class="btn ghost">View on GitHub</button><button class="btn primary" data-act="merge">Merge</button></div>`;
+    else if (S.ew === 'pipeline') ew = `<div class="ewbar"><span class="dot" style="background:var(--state-live)"></span><span class="grow">Sent through the pipeline as <b class="mono">PAN-5291</b> · PR <b class="mono">#5292</b> · review agents are checking it. The edit workspace was handed over to the pipeline.</span><button class="btn">Open PAN-5291</button></div>`;
+    else if (S.ew === 'merged') ew = `<div class="ewbar merged"><span class="dot" style="background:var(--state-done)"></span><span class="grow"><b>Merged into main</b> as <span class="mono">a91c03e</span>. The edit workspace and its branch were removed; this tab now shows main.</span><button class="btn ghost" data-act="closeedit">Close tab</button></div>`;
+  }
+  const ro = target === '#editor' ? '<span class="tag" title="Overdeck never writes the main checkout; typing here opens an edit workspace">main checkout · read-only</span>' : '';
+  let body = '';
+  if (S.emode === 'diff') {
+    body = '<div class="code" style="padding:0">' + `<div class="diff">${DIFFS[k].map(l => l[0] === 'h' ? `<div class="hunk">${esc(l[1])}</div>` : l[0] === 'f' ? `<div class="fold">⋯ ${esc(l[1])}</div>` : `<div class="dl ${l[0] === '+' ? 'add mine' : l[0] === '-' ? 'del mine' : l[0] === 'o' ? 'add others' : ''}"><span class="n">${l[1] ?? ''}</span><span class="n">${l[2] ?? ''}</span><span class="sgn">${l[0] === 'o' ? '+' : l[0] === ' ' ? ' ' : l[0]}</span><span>${esc(l[3])}</span></div>`).join('')}</div></div>`;
+  } else {
+    const c = CODE[k] || { start: 1, chg: [], lines: DIFFS[k].filter(l => l[0] === '+' || l[0] === ' ' || l[0] === 'o').map(l => l[3]) };
+    let lines = c.lines;
+    if (k === 'readme' && S.ew !== 'none' && S.ew !== 'merged') lines = [...lines.slice(0, 14), 'npm install -g @overdeck/core', 'pan install        # installs Herdr and the agent integrations', 'pan up             # starts the dashboard on http://localhost:3011', ...lines.slice(15)];
+    body = '<div class="code">' + lines.map((ln, i) => { const no = c.start + i; const typed = k === 'readme' && S.ew !== 'none' && S.ew !== 'merged' && no >= 15 && no <= 17; return `<div class="cl ${c.chg.includes(no) || typed ? 'chg' : ''}"><span class="n">${no}</span><span class="g"></span><span class="c">${hl(ln, extOf(f.path)) || ' '}</span></div>`; }).join('') + '</div>';
+  }
+  E.innerHTML = `<div class="etabs">${tabs}<div class="r">${target === '#editor' ? `<button class="btn icon ghost" data-act="closesplit" title="Close the editor">${ICON.x}</button>` : ''}</div></div>
+    ${ew}
+    <div class="ebar"><div class="bc">${bc}</div><div class="r">${ro}<div class="seg"><button class="${S.emode === 'code' ? 'on' : ''}" data-emode="code">File</button><button class="${S.emode === 'diff' ? 'on' : ''}" data-emode="diff">Changes</button></div><button class="btn icon ghost" data-reveal="${k}" title="Reveal in files">${ICON.reveal}</button></div></div>
+    ${body}
+    <div class="estatus"><span>${extOf(f.path) === 'ts' ? 'TypeScript' : extOf(f.path) === 'py' ? 'Python' : extOf(f.path) === 'md' ? 'Markdown' : 'JavaScript'}</span><span>UTF-8</span><span>LF</span><span class="r"><span>${target === '#editor2' && S.ew === 'editing' ? 'Autosaved to edit-1114-1248' : f.g === 'unc' ? 'Not committed' : k === 'readme' ? 'Line 15, col 31' : 'Line ' + ((CODE[k] || {}).chg || [1])[0] + ', col 5'}</span></span></div>`;
+}
+function openBeside(k) {
+  if (S.screen === 'edit') { S.etab = k; if (!S.etabs.includes(k)) S.etabs.push(k); render(); return; }
+  if (!S.etabs.includes(k)) S.etabs.push(k);
+  S.etab = k; S.split = true; S.sel = k; S.emode = 'code'; render();
+}
+
+/* ── home ── */
+function renderHome() {
+  const p = PROJ[S.proj];
+  const dfai = S.proj === 'dfai';
+  $('#homeIn').innerHTML = `
+    <div class="h-title"><h1>${p.name}</h1><span class="faint" style="padding-bottom:3px">${dfai ? 'Dwarf Fortress AI stream' : 'The Overdeck dashboard and CLI'}</span>
+      <span class="r"><button class="btn ghost" title="Project settings: merge policy, swarm, UAT">${ICON.more} Settings</button></span></div>
+    <div class="dotline"><span>${dfai ? '~/Projects/dfai' : '~/Projects/overdeck'}</span><span>main</span><span>${dfai ? 'no releases' : 'v0.85.0 released 2 h ago'}</span><span style="color:var(--state-done)">CI passing</span></div>
+    <div class="actions" data-note="h1">
+      <button class="act primary">${ICON.chat}New conversation<span class="kbd">Ctrl N</span></button>
+      <button class="act" data-act="files">${ICON.folder}Files<span class="kbd">Ctrl Shift E</span></button>
+      <button class="act" data-act="changes-all">${ICON.diff}Changes on main</button>
+      <button class="act">${ICON.term}Terminal<span class="kbd">Ctrl \`</span></button>
+      <button class="act"><svg class="i sm" viewBox="0 0 24 24"><path d="M14 3h7v7M10 14 21 3M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/></svg>Open in Cursor</button>
+      ${dfai ? '' : '<button class="act">Start an issue…</button>'}
+    </div>
+    <div class="facts" data-note="h2">
+      <button class="fact"><div class="k"><span class="dot" style="background:var(--state-live)"></span>Agents working</div><div class="v">${dfai ? 1 : 3}</div><div class="s">${dfai ? '1 conversation' : '1 planning · 2 building'}</div></button>
+      <button class="fact"><div class="k"><span class="dot" style="background:var(--state-needs-you)"></span>Needs you</div><div class="v">${dfai ? 1 : 1}</div><div class="s">${dfai ? '1 file not committed' : '1 waiver'}</div></button>
+      <button class="fact"><div class="k">In review</div><div class="v">${dfai ? 0 : 1}</div><div class="s">${dfai ? '—' : 'PR #5127'}</div></button>
+      <button class="fact"><div class="k">Merged this week</div><div class="v">${dfai ? 0 : 23}</div><div class="s">${dfai ? 'commits go to main' : '7 since yesterday'}</div></button>
+      <button class="fact"><div class="k">Spend this week</div><div class="v" style="color:var(--signal-cost)">$${dfai ? '412' : '1,080'}</div><div class="s">$${dfai ? '43' : '214'} today</div></button>
+    </div>
+    ${dfai ? '' : `
+    <div class="panel" data-note="h3"><div class="panel-h"><span class="dot" style="background:var(--state-needs-you)"></span><h3>Needs you</h3></div>
+      <div class="card needs-card"><div class="lrow"><span class="id">PAN-5095</span><span class="ti">pan tell never reaches an idle Codex app-server conversation</span><span class="tag local">verification failed</span><span class="who">Approve a test removal?</span><span style="text-align:right"><button class="btn">Decide</button></span></div></div></div>
+    <div class="panel" data-note="h4"><div class="panel-h"><h3>Pipeline</h3><span class="faint">4 issues</span><span class="r"><button class="btn ghost">Open the board</button></span></div>
+      <div class="card">
+        <div class="lane">Building · 3</div>
+        <div class="lrow"><span class="id">PAN-5281</span><span class="ti">Commit attribution: stamp every agent and conversation commit with a trailer</span><span><span class="tag live">planning</span></span><span class="who">Claude Opus 5.5</span><span class="when">12 m</span></div>
+        <div class="lrow"><span class="id">PAN-5278</span><span class="ti">CLIProxy: route new sessions to the account that resets soonest</span><span><span class="tag live">building</span></span><span class="who">GPT-6.1 · 4 of 7 items</span><span class="when">41 m</span></div>
+        <div class="lrow"><span class="id">PAN-5275</span><span class="ti">Flywheel Needs-you: make the whole row clickable, not just the 12px icon</span><span><span class="tag live">building</span></span><span class="who">Claude Sonnet 5.5 · 2 of 3</span><span class="when">1 h</span></div>
+        <div class="lane">In review · 1</div>
+        <div class="lrow"><span class="id">PAN-5095</span><span class="ti">pan tell never reaches an idle Codex app-server conversation</span><span><span class="tag local">needs you</span></span><span class="who">PR #5127 · checks green</span><span class="when">82 h</span></div>
+        <div class="lane">Ready to merge · 0</div>
+      </div></div>`}
+    <div class="panel" data-note="h5"><div class="panel-h"><h3>Recent changes on main</h3><span class="faint">who changed what, today</span><span class="r"><button class="btn ghost" data-act="changes-all">All changes</button></span></div>
+      <div class="card">${(dfai ? [['6f8552a0', 'docs/fort3d.md: quicksaves and the check-ins', 'Fort 3D pop-in fixes', '12:31'], ['3397787f', 'fort3d: the walk cycle by the drawn speed…', 'Fort 3D pop-in fixes', '12:27'], ['ac5a11db', 'Record boulders belong in stone storage', 'Fort #23 Overseer', '11:58'], ['2f640256', 'Document material initialization required by suspendmanager', 'Fort #20 Manager', '11:40']]
+        : [['d0c9b93e', 'chore: release 0.85.0', 'Release', '11:30'], ['b5476473', 'PAN-5191: edit workspaces, Create PR, one-click merge', 'PAN-5191 agent', '03:29'], ['edeb775d', 'feat(dashboard): orbit the sidebar logo while busy', 'Animate logo when busy', '13:02'], ['a48f3b9b', 'docs: add commit attribution trailer PRD (PAN-5281)', 'Overdeck UI redesign', '13:10']])
+        .map(([s, t, w, at]) => `<div class="crow2" ${dfai && w.startsWith('Fort 3D') ? 'data-go="conv"' : ''}><span class="sha">${s}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t}</span><span class="who-chip">${ICON.chat}${w}</span><span class="mono faint" style="font-size:11.5px;text-align:right">${at}</span></div>`).join('')}</div></div>`;
+}
+
+/* ── screens / render ── */
+const NOTES = {
+  conv: { try: 'Click Changes or Files in the header, a path in the reply, a row in the card, "Open beside chat", "Reveal", Ctrl P, Ctrl Shift F. Switch projects at top-left.', items: [
+    ['g1', 'new', 'One left column. The project switcher replaces the 19-project list and the separate Command Deck column; the column lists this project\'s conversations and issues, one line of meta each, saying in words what they changed.'],
+    ['g4', 'new', 'Files, Changes and Search live in one docked panel on the right (Ctrl Shift E / Ctrl Shift G / Ctrl Shift F, from anywhere). It follows the active tab: here it scopes to this conversation.'],
+    ['c1', 'new', 'Changes and Files in the conversation header.'],
+    ['c3', 'changed', 'The turn card is the single "what changed" summary in chat. Every path in the reply is a link.'],
+    ['', 'new', 'Opening a file splits the stage: chat on the left, the file on the right, the tree still visible. Nothing replaces the chat. Lines this conversation changed have a blue gutter bar; "Changes" flips the editor to a diff.'],
+    ['c2', 'changed', 'Status line in words, each part clickable: folder opens Files, "2 commits pushed" opens Changes, "1 file not committed" filters to it.'],
+    ['c5', 'changed', 'Composer: one control style, labelled. "Send: when idle" replaces the raw "Auto" dropdown; "Thinking: high" replaces "High · set".'],
+    ['c6', 'changed', 'Tabs clamp to 120–230 px with kind icons, no shortcut chips, and an "all tabs" list at the end.'],
+    ['g3', 'changed', 'Top bar: one agents menu (Stop all lives inside it), one Needs-you count that matches every other count, and a single health dot with a tooltip. Awareness event cards move to an Activity page.'],
+    ['g2', 'changed', 'Ctrl K finds files too; Ctrl P ranks exact file names first and highlights the match.'],
+  ] },
+  home: { try: 'Click Files or Changes on main, a commit row, or the Needs-you card. Switch to overdeck at top-left for the busier project.', items: [
+    ['h1', 'changed', 'The actions people use most sit directly under the title: New conversation, Files, Changes, Terminal, Open in Cursor. Today they are three screens down.'],
+    ['h2', 'changed', 'Five labelled facts that agree with the top bar: agents working (counted from the live sessions, not 0), needs you, in review, merged, spend with a currency and a period.'],
+    ['h3', 'new', 'Needs-you items for this project sit first, with a plain-language ask and one button.'],
+    ['h4', 'changed', 'Pipeline as full-width rows: id, full title, stage, agent and progress, age. No unexplained Q/OS/P52 badges; CI collapses to one word in the header line when green.'],
+    ['h5', 'new', 'Recent changes on main, each commit labelled with the conversation or agent that made it, from the new commit trailers. Click to open that conversation.'],
+    ['', 'removed', 'The TODAY/YESTERDAY conversation list (it repeated the left column) and the settings row (now behind Settings).'],
+  ] },
+  edit: { try: 'Click "Start editing", then Create PR. Try both landing options. After "Open pull request", wait two seconds for the checks, then Merge.', items: [
+    ['', 'changed', 'The edit-workspace state lives in the editor itself, not only in the Files tab: a bar that says where your edits go, what changed, and the next action.'],
+    ['', 'new', 'Before the first keystroke the main checkout says plainly that it is read-only and what typing will do. The cursor stays where it was when the workspace is created.'],
+    ['', 'changed', 'Create PR shows exactly which files and lines will be committed, and asks one question, "How should it land?", with two described choices and one primary button whose label follows the choice.'],
+    ['', 'new', 'The PR state follows in the same bar: checks running → no conflicts, Merge enabled → merged, workspace removed, tab switched to main with a note. Nothing goes stale silently.'],
+    ['', 'changed', 'The tree root shows the human name and the edit workspace, never a UUID or the repo folder name.'],
+  ] },
+};
+function renderNotes() {
+  $$('.notes .screens button').forEach(b => b.classList.toggle('on', b.dataset.screen === S.screen));
+  const n = NOTES[S.screen];
+  $('#notesTry').textContent = 'Try: ' + n.try;
+  $('#notesList').innerHTML = n.items.map(([f, t, txt]) => `<li data-for="${f}"><span class="ttag">${t}</span>${txt}</li>`).join('');
+  $$('#notesList li').forEach(li => { li.onmouseenter = () => li.dataset.for && $$(`[data-note="${li.dataset.for}"]`).forEach(e => e.classList.add('flash')); li.onmouseleave = () => $$('.flash').forEach(e => e.classList.remove('flash')); });
+}
+function render() {
+  $$('.view').forEach(v => v.classList.toggle('on', v.id === 'v-' + S.screen));
+  $('#group').classList.toggle('split', S.split);
+  $('#crumbs').innerHTML = `<b>${PROJ[S.proj].name}</b><span class="faint">/</span><span>${S.screen === 'conv' ? 'Fort 3D pop-in fixes and camera smoothing' : S.screen === 'edit' ? 'README.md' : 'Home'}</span>`;
+  renderLeft(); renderTabs(); renderDock(); renderNotes();
+  if (S.screen === 'conv') { $('#turnFiles').innerHTML = ORDER.map(k => frow(k)).join(''); renderEditor('#editor'); }
+  if (S.screen === 'home') renderHome();
+  if (S.screen === 'edit') renderEditor('#editor2');
+}
+function go(screen) {
+  S.screen = screen; S.diff = null;
+  if (screen === 'edit') { S.proj = 'overdeck'; S.etabs = ['readme']; S.etab = 'readme'; S.emode = 'code'; S.dock = S.ew === 'none' ? 'files' : 'changes'; S.sel = 'readme'; S.filter = 'all'; }
+  if (screen === 'conv') { S.proj = 'dfai'; }
+  $('#app').classList.add('dock-open');
+  render();
+}
+function toast(m, ms = 2600) { const t = $('#toast'); t.innerHTML = m; t.style.display = 'flex'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', ms); }
+function openDock(tab, o = {}) { $('#app').classList.add('dock-open'); S.dock = tab; S.diff = o.diff ?? null; if (o.scope) S.scope = o.scope; if (o.sel !== undefined) S.sel = o.sel; if (o.filter) S.filter = o.filter; render(); }
+function closeMenus(except) { $$('.menu.on').forEach(m => m !== except && m.classList.remove('on')); }
+function toggleMenu(id) { const m = $(id); const on = !m.classList.contains('on'); closeMenus(); m.classList.toggle('on', on); }
+
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-go],[data-act],[data-diff],[data-open],[data-reveal],[data-scope],[data-filter],[data-dtab],[data-step],[data-etab],[data-eclose],[data-emode],[data-screen],[data-proj],[data-how],.ghead,.work-line,code.path,#agentsPill,#needsPill,#projSwitch,#moreBtn,#addBtn,#treeOpts,#searchBtn,#themeBtn,#dockClose,#notesHd,.node[data-plain]');
+  if (!t) { if (!e.target.closest('.menu')) closeMenus(); return; }
+  const d = t.dataset;
+  if (t.id === 'agentsPill') return toggleMenu('#agentsMenu');
+  if (t.id === 'needsPill') return toggleMenu('#needsMenu');
+  if (t.id === 'projSwitch') return toggleMenu('#projMenu');
+  if (t.id === 'moreBtn') return toggleMenu('#moreMenu');
+  if (t.id === 'addBtn') return toggleMenu('#addMenu');
+  if (t.id === 'treeOpts') { e.stopPropagation(); return toggleMenu('#treeMenu'); }
+  if (t.id === 'searchBtn') return showQuick();
+  if (t.id === 'themeBtn') return document.documentElement.classList.toggle('dark');
+  if (t.id === 'dockClose') { $('#app').classList.remove('dock-open'); return; }
+  if (t.id === 'notesHd') { $('#notes').classList.toggle('min'); $('#notesTog').textContent = $('#notes').classList.contains('min') ? 'show notes' : 'hide notes'; return; }
+  closeMenus();
+  if (d.screen) return go(d.screen);
+  if (d.proj) { S.proj = d.proj; S.screen = 'home'; S.dock = 'files'; S.diff = null; S.sel = null; return render(); }
+  if (d.go) return go(d.go);
+  if (d.how) { S.how = d.how; $$('.opt').forEach(o => o.classList.toggle('on', o.dataset.how === d.how)); $('#prGo').textContent = d.how === 'direct' ? 'Open pull request' : 'Send through pipeline'; return; }
+  if (d.reveal) { e.stopPropagation(); return openDock('files', { sel: d.reveal, filter: 'all' }); }
+  if (d.open) { e.stopPropagation(); return openBeside(d.open); }
+  if (d.diff) return openDock('changes', { diff: d.diff, sel: d.diff });
+  if (t.matches('code.path')) return openDock('changes', { diff: t.dataset.f, sel: t.dataset.f });
+  if (t.matches('.node[data-plain]')) return toast(`Opens <b>${t.dataset.plain}</b> beside the chat (preview tab until you edit it)`);
+  if (d.scope) { S.scope = d.scope; S.diff = null; return render(); }
+  if (d.filter) { S.filter = d.filter; return render(); }
+  if (d.dtab) { S.dock = d.dtab; S.diff = null; return render(); }
+  if (d.step) { const list = S.screen === 'edit' ? ['readme', 'contrib'] : ORDER; const i = (list.indexOf(S.diff) + Number(d.step) + list.length) % list.length; S.diff = list[i]; S.sel = list[i]; return render(); }
+  if (d.eclose) { e.stopPropagation(); S.etabs = S.etabs.filter(x => x !== d.eclose); S.etab = S.etabs.at(-1) ?? null; if (!S.etab) S.split = false; return render(); }
+  if (d.etab) { S.etab = d.etab; S.sel = d.etab; return render(); }
+  if (d.emode) { S.emode = d.emode; return render(); }
+  if (t.classList.contains('ghead')) return t.parentElement.classList.toggle('closed');
+  if (t.classList.contains('work-line')) return t.parentElement.classList.toggle('open');
+  switch (d.act) {
+    case 'files': return openDock('files', { filter: 'all' });
+    case 'files-mine': return openDock('files', { filter: 'mine' });
+    case 'changes': return openDock('changes', { scope: 'conversation' });
+    case 'changes-turn': return openDock('changes', { scope: 'turn' });
+    case 'changes-all': return openDock('changes', { scope: 'main' });
+    case 'uncommitted': return openDock('changes', { scope: 'unc' });
+    case 'diffback': S.diff = null; return render();
+    case 'closesplit': S.split = false; S.etabs = []; S.etab = null; return render();
+    case 'ignored': S.showIgnored = !S.showIgnored; return render();
+    case 'quick': return showQuick();
+    case 'startedit': S.ew = 'editing'; S.dock = 'changes'; S.etabs = ['readme', 'contrib']; S.etab = 'readme'; render(); return toast('Created edit workspace <b>edit-1114-1248</b> from main. Your cursor stayed put; main is unchanged.');
+    case 'createpr': $('#prFiles').innerHTML = frow('readme') + frow('contrib'); $('#prScrim').classList.add('on'); return;
+    case 'discard': return toast('Discard asks first, lists both files, and closes their tabs afterwards.');
+    case 'merge': S.ew = 'merged'; S.etabs = ['readme']; S.etab = 'readme'; render(); return toast('Merged PR #5290 into main. Edit workspace and branch removed.');
+    case 'closeedit': S.ew = 'none'; return go('home');
+  }
+});
+$('#prCancel').onclick = () => $('#prScrim').classList.remove('on');
+$('#prGo').onclick = () => {
+  $('#prScrim').classList.remove('on');
+  if (S.how === 'pipeline') { S.ew = 'pipeline'; render(); return toast('Created PAN-5291 and PR #5292. Review agents are on it.'); }
+  S.ew = 'pr-checking'; render(); toast('Committed 2 files, pushed, opened PR #5290.');
+  setTimeout(() => { if (S.ew === 'pr-checking') { S.ew = 'pr-ready'; render(); } }, 2000);
+};
+$('#dock').addEventListener('click', (e) => { const t = e.target.closest('[data-dtab]'); if (t) { S.dock = t.dataset.dtab; S.diff = null; render(); } });
+
+/* quick open */
+const QF = ['fort3d/web/src/units.ts', 'fort3d/web/src/unitsort.ts', 'fort3d/web/test/units-path.test.mjs', 'tools/checkin3d.py', 'fort3d/web/test/playback.test.mjs', 'docs/operations.md', 'docs/fort3d.md', 'tools/live.py', 'fort3d/web/src/camstatus.ts', 'docs/stream-handbook.md'];
+const keyOfPath = (p) => Object.keys(FILES).find(k => FILES[k].path === p);
+function score(p, q) {
+  if (!q) return keyOfPath(p) ? 2 : 1;
+  const base = p.split('/').pop().toLowerCase(), ql = q.toLowerCase();
+  if (base === ql) return 100; if (base.startsWith(ql)) return 80 + (keyOfPath(p) ? 5 : 0); if (base.includes(ql)) return 60; if (p.toLowerCase().includes(ql)) return 30; return 0;
+}
+function markQ(s, q) { if (!q) return esc(s); const i = s.toLowerCase().indexOf(q.toLowerCase()); return i < 0 ? esc(s) : esc(s.slice(0, i)) + '<mark>' + esc(s.slice(i, i + q.length)) + '</mark>' + esc(s.slice(i + q.length)); }
+function drawQuick(q) {
+  const rows = QF.map(p => [p, score(p, q)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 7);
+  let h = `<div class="qo-sec eyebrow">Files</div>` + rows.map(([p], i) => { const n = p.split('/').pop(); const k = keyOfPath(p); return `<div class="qr ${i === 0 ? 'on' : ''}" data-qp="${p}">${ficon(n)}<span>${markQ(n, q)}</span>${k ? '<span class="tag live">changed here</span>' : ''}<span class="d">${esc(p.slice(0, p.length - n.length))}</span></div>`; }).join('');
+  if (!q || 'fort'.includes(q.toLowerCase().slice(0, 4))) h += `<div class="qo-sec eyebrow">Conversations</div><div class="qr">${ICON.chat}<span>Fort 3D pop-in fixes and camera smoothing</span><span class="d">DFAI · working</span></div>`;
+  h += `<div class="qo-sec eyebrow">Commands</div><div class="qr">${ICON.diff}<span>Show changes in this conversation</span><span class="d">Ctrl Shift G</span></div>`;
+  $('#qoList').innerHTML = h;
+}
+function showQuick() { $('#qo').classList.add('on'); $('#qoIn').value = 'units'; drawQuick('units'); setTimeout(() => { $('#qoIn').focus(); $('#qoIn').select(); }, 10); }
+$('#qoIn').oninput = (e) => drawQuick(e.target.value);
+$('#qo').onclick = (e) => { if (e.target.id === 'qo') $('#qo').classList.remove('on'); const r = e.target.closest('.qr[data-qp]'); if (r) { $('#qo').classList.remove('on'); const k = keyOfPath(r.dataset.qp); if (S.screen !== 'conv') go('conv'); if (k) openBeside(k); else toast(`Opens <b>${r.dataset.qp}</b> beside the chat`); } };
+document.addEventListener('keydown', (e) => {
+  const ctrl = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+  if (ctrl && !e.shiftKey && (k === 'p' || k === 'k')) { e.preventDefault(); return showQuick(); }
+  if (ctrl && e.shiftKey && k === 'e') { e.preventDefault(); return openDock('files'); }
+  if (ctrl && e.shiftKey && k === 'f') { e.preventDefault(); return openDock('search'); }
+  if (ctrl && e.shiftKey && k === 'g') { e.preventDefault(); return openDock('changes', { scope: 'conversation' }); }
+  if (e.key === 'Escape') { $('#qo').classList.remove('on'); $('#prScrim').classList.remove('on'); closeMenus(); }
+  if (e.key === 'Enter' && $('#qo').classList.contains('on')) { const r = $('#qoList .qr[data-qp]'); if (r) r.click(); }
+  if (S.diff && !e.target.closest('input,textarea') && (k === 'j' || k === 'k') && !ctrl) { const list = S.screen === 'edit' ? ['readme', 'contrib'] : ORDER; const i = (list.indexOf(S.diff) + (k === 'j' ? 1 : -1) + list.length) % list.length; S.diff = list[i]; S.sel = list[i]; render(); }
+});
+/* dock resize */
+(() => { const r = $('#dres'); r.onmousedown = (e) => { const x0 = e.clientX, w0 = $('#dock').getBoundingClientRect().width; document.onmousemove = (m) => document.documentElement.style.setProperty('--dock-w', Math.max(260, Math.min(720, w0 + (x0 - m.clientX))) + 'px'); document.onmouseup = () => document.onmousemove = null; }; })();
+
+render();
+</script>
+</body>
+</html>

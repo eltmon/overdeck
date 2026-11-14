@@ -739,3 +739,9 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 
 - PAN-5269 (substrate fix, merged 62955b549aa): a one-member batch whose feature already contained main fast-forwarded onto the feature head (`git merge --no-edit`), GitHub ran no `push` CI for the uat branch, and the 10-minute dissolve marked the project "no batch CI" for 24 h with a wrong "add uat/**" notice. Fix: batches always merge `--no-ff`; a fast-forward-head dissolve does not mark the project. Learning: the train's readiness clock is the PR's newest check completion, so a late push resets the 30-minute wait.
 - PAN-5271 (filed, handoff running): review and CodeRabbit feedback skip a live handoff conversation because `feedback-target.ts` accepts only `role === 'work'`. Until it lands, relay handoff-PR feedback with `pan tell`.
+
+## 2026-11-14 operator sequence: CLIProxy v8 (from conv 20261114-6808)
+
+1. PAN-5282 (CLIProxy v8.0.71, v8-layout config) started by the Flywheel. Drive to merge, deploy once main CI is green, then confirm `~/.overdeck/bin/cliproxy` reports 8.0.71 and the management `auth-files` endpoint on 127.0.0.1:8317 returns 200.
+2. Only after PAN-5282 merges: `pan unpause PAN-5278`, the agent runs `pan sync-main` and reads the revised .pan/drafts/pan-5278.md (item 1 retired: discard pre-pause cliproxy.ts config edits; keep bridge, pool, controller, route, panel). Drive PAN-5278 to merge.
+3. When PAN-5282 is deployed and live CLIProxy is v8: `pan tell 20261114-6808` so it can sign the operator's Claude Max account in. Never do that login from the Flywheel.
