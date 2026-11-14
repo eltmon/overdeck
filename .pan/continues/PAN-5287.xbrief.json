@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5287",
   "created": "2026-11-14T19:49:14.970Z",
-  "updated": "2026-11-14T20:50:21.462Z",
+  "updated": "2026-11-14T20:50:23.973Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -353,6 +353,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5287",
       "claimedAt": "2026-11-14T20:50:21.462Z"
+    },
+    "docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:50:23.973Z"
     }
   }
 }
