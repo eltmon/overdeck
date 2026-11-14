@@ -1,0 +1,805 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T23:59:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5288: Workflow redesign A: per-conversation and per-project changes API (attributed commits, uncommitted edits, spend incl. conversations)",
+    "updated": "2026-11-14T23:56:37.913Z"
+  },
+  "plan": {
+    "id": "pan-5288",
+    "title": "Workflow redesign A: per-conversation and per-project changes API (attributed commits, uncommitted edits, spend incl. conversations)",
+    "status": "proposed",
+    "uid": "2938be01-94c5-4637-aef5-5e0d29be1ad4",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-14T23:59:00Z",
+    "updated": "2026-11-14T23:56:37.913Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5288",
+        "label": "PAN-5288",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5288/.pan/drafts/pan-5288.md",
+        "label": "PRD draft (.pan/drafts/pan-5288.md)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-5284.md",
+        "label": "Parent PRD PAN-5284 (child A)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard-server",
+      "api",
+      "git",
+      "conversations",
+      "costs",
+      "workflow-redesign"
+    ],
+    "metadata": {
+      "sizeJustification": "One server API slice (child A of the PAN-5284 epic, already decomposed into nine children). The 27 files are mostly small: four focused lib modules split out deliberately to stay under the file-size ceiling, their one-test-file-per-module tests, the mandatory no-loss/route-scope/test-count rows for two new routes, and three doc files. Six subsystems, within the limit.",
+      "canonicalFilename": "2026-11-14-PAN-5288-workflow-redesign-a-per-conversation-and-per-project-changes-api-attributed-commits-uncommitted-edits-spend-incl-conversations.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Nothing on the server can say what one conversation changed or who made recent commits in a project. The workflow redesign's dock, conversation header, turn card, left column and project Home (children B, D1, D2, F, G) all need that. Project spend on Home also ignores conversation costs and uses the UTC day as 'today'.",
+      "Proposal": "Add GET /api/conversations/:name/changes (commits exact from Overdeck-Conversation trailers joined on the session name, plus a git-commit tool-output fallback; uncommitted edits with per-line attribution where edit records carry text) and GET /api/projects/:projectKey/changes (default-branch commits with conversation/agent attribution, including squash-merge bodies). Stamp changeTotals on conversation list rows from a totals map filled in the background. Make /api/costs/summary?project= include the project's conversation cost events and use the server's local day for 'today'. Contracts already exist from child S; no frontend change.",
+      "NonGoals": "- Any frontend change (children B, D1, D2, F, G consume the API)\n- Editing packages/contracts/src/conversation-changes.ts\n- Per-line attribution for non-Claude harnesses or shell-only edits\n- Edits in repositories other than the conversation's cwd repository\n- Parsing a cold transcript to name other conversations\n- Anywhere/linked-machine proxying of the changes routes\n- Cross-time-zone agreement of 'today' between linked machines\n- A third diff renderer or new per-file diff endpoints\n- Raising any scripts/file-size-allowlist.txt row\n- Harness-name or transcript-kind string comparisons in new code"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split the parent's single conversation-changes module into four modules (commits, uncommitted, project changes, assembly).",
+        "rationale": "Each part gets its own tests and stays far below the 1000-line ceiling; items can run in parallel instead of serializing on one file."
+      },
+      {
+        "summary": "Trailer-commit `since` is 10 minutes before the earliest of conv.createdAt and the transcript's first record.",
+        "rationale": "Conversation rows can be created after the transcript starts (the shared fixture does exactly this); `since: conv.createdAt` would drop real commits."
+      },
+      {
+        "summary": "Line vs file attribution is decided from whether the work log has edit records with text, not from the harness name.",
+        "rationale": "lint-harness-branches fails new harness literals; the data rule gives exactly parent D-5's split (only Claude Code records edit text)."
+      },
+      {
+        "summary": "Tool-output commits must be reachable from HEAD, not merely resolvable.",
+        "rationale": "An amended commit's old object still resolves until gc; reachability is what drops it and keeps the pushed computation valid."
+      },
+      {
+        "summary": "Unattributed commits in scope 'main' carry attribution 'trailer' with by.kind 'unattributed'; a cwd outside any repo returns 200 with repoRoot = cwd and empty lists.",
+        "rationale": "Keeps the contract S shipped unchanged; both cases are documented in the PRD."
+      },
+      {
+        "summary": "The server computes rootId from issueId and cwd only; workspaceId conversations get null and the client resolves them.",
+        "rationale": "The authoritative rules live in the frontend helper child A may not edit; the subset the server can answer is exact."
+      },
+      {
+        "summary": "Project commit attribution also scans the message body for Overdeck-* lines after the final-paragraph trailers.",
+        "rationale": "GitHub squash merges move sub-commit trailers into the body; the final paragraph only holds Co-authored-by lines (checked on main)."
+      },
+      {
+        "summary": "The project route is /api/projects/:projectKey/changes, not :key.",
+        "rationale": "Every sibling project route names the parameter projectKey; the URL is identical."
+      },
+      {
+        "summary": "The local-day 'today' is defined once in request-digest.ts and used by both the costs summary and fleet usage windows.",
+        "rationale": "Fleet usage subtracts per window; two definitions of 'today' would make the summary and /api/fleet/usage disagree on the same machine."
+      },
+      {
+        "summary": "Spend membership keeps ?project=<PREFIX> and includes archived conversations.",
+        "rationale": "The only caller sends an issue prefix; archiving a conversation must not hide this week's spend."
+      },
+      {
+        "summary": "Changelog file is changelog.d/pan-5288.md, not 5288.md as the child stub said.",
+        "rationale": "changelog.d/README.md requires the lowercase issue id."
+      }
+    ],
+    "items": [
+      {
+        "id": "diffs-parse-worklog",
+        "title": "Widen ConversationDiffParseResult with workLog and resolve the turn route's repo root from a subdirectory cwd",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T23:59:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5288",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-diffs.ts",
+            "tests/unit/lib/overdeck/conversation-diffs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-diffs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-diffs.test.ts: all tests pass, including the new subdirectory-cwd turn test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.2 / WI-1. Add `workLog: ReadonlyArray<WorkLogEntry>` to `ConversationDiffParseResult` (search `export interface ConversationDiffParseResult`). Add `export` to `function lookupConversation` and `async function repoRootForDir`. In `getConversationDiffTurn` replace `existsSync(join(cwd, '.git')) ? cwd : null` with `await repoRootForDir(cwd)`; drop the `join` import if now unused. Existing test fakes that omit `workLog` stay as they are (typecheck skips test files; conversation-diffs.ts never reads workLog). Add test 'getConversationDiffTurn returns the patch when the conversation cwd is a subdirectory of the repository'."
+        },
+        "items": [
+          {
+            "id": "diffs-parse-worklog.ac1",
+            "title": "Given a conversation whose cwd is `<repo>/sub` and a working-tree edit to `README.md` after the conversation start, when `getConversationDiffTurn` runs, then `body.diff` contains `README.md`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diffs-parse-worklog.ac2",
+            "title": "`ConversationDiffParseResult` contains a required `workLog` field and `lookupConversation` and `repoRootForDir` are exported from `src/lib/overdeck/conversation-diffs.ts`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diffs-parse-worklog.ac3",
+            "title": "`npx vitest run tests/unit/lib/overdeck/conversation-diffs.test.ts` exits 0 with the existing tests unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "change-commits",
+        "title": "Conversation commits: trailer join on the session name, tool-output fallback, pushed state and turn mapping",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T23:59:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5288",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/git/attributed-commits.ts",
+            "src/lib/overdeck/conversation-change-commits.ts",
+            "tests/unit/lib/overdeck/conversation-change-commits.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-change-commits.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-harness-branches.sh",
+            "bash scripts/lint-source-introspection.sh"
+          ],
+          "expected_outputs": [
+            "conversation-change-commits.test.ts passes",
+            "typecheck completes without errors",
+            "both lint scripts exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ],
+          "parallelSafeReason": "Owns two files no other item touches (attributed-commits.ts export and the new commits module) plus its own new test file; it only reads the conversation-diffs type from diffs-parse-worklog."
+        },
+        "narrative": {
+          "Action": "PRD §6.1, §6.5, decisions A-D6, A-D7, A-D8 / WI-2. Export `listCommitFilesAt(repoPath, sha)` from `src/lib/git/attributed-commits.ts` wrapping the private `listCommitFiles`. New module exports `turnIdAt`, `toolOutputCommitCandidates`, `listLocalShas` (returns `{ shas, hasUpstream }`) and `listConversationCommits({ repoRoot, sessionName, since, parsed })` returning `{ commits: ChangeCommit[], toolOutputOnly: Set<string> }`. Trailer query uses `sessionName` (= `conv.tmuxSession`, D-16). Tool-output candidates: command = string `toolInput.command` else `entry.command`; must match `/\\bgit\\b[\\s\\S]*\\bcommit\\b/`; result regex per A-D7 (all matches); keep a candidate only if `rev-parse --verify --quiet <sha>^{commit}` resolves AND `merge-base --is-ancestor <full> HEAD` exits 0. Union by full sha, `attribution` 'trailer' wins, newest first. `pushed` = not in `rev-list @{u}..HEAD`; no upstream ⇒ all false. Only async `execFile` with argument arrays. Tests use real temp repos and hand-built parse results (no readFile calls)."
+        },
+        "items": [
+          {
+            "id": "change-commits.ac1",
+            "title": "Given commits with trailers `Overdeck-Conversation: conv-n1` and `Overdeck-Conversation: n1`, when `listConversationCommits` runs with sessionName `conv-n1`, then it returns only the first commit with `attribution: 'trailer'`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "change-commits.ac2",
+            "title": "Given a Bash entry (`toolInput.command`) and a Codex-shaped entry (`command`, no `toolInput`) whose results contain `[main <sha>] <subject>`, then both commits are returned with `attribution: 'tool-output'`; after `git commit --amend` the old sha is not returned.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "change-commits.ac3",
+            "title": "Given a repo with an upstream and one unpushed commit, then the pushed commit returns `pushed: true` and the unpushed one `pushed: false`; given a repo without an upstream, every commit returns `pushed: false`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "change-commits.ac4",
+            "title": "`turnIdAt` returns the last assistant id of the turn containing the time, prefers the last candidate in `editTurnIds` when given, and returns `undefined` for a time before any assistant message.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "change-uncommitted",
+        "title": "Uncommitted files of a conversation with data-driven line attribution and cache-only naming of other conversations",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T23:59:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5288",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-change-uncommitted.ts",
+            "src/lib/overdeck/conversation-reads.ts",
+            "tests/unit/lib/overdeck/conversation-change-uncommitted.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-change-uncommitted.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh",
+            "bash scripts/lint-harness-branches.sh",
+            "bash scripts/lint-source-introspection.sh"
+          ],
+          "expected_outputs": [
+            "conversation-change-uncommitted.test.ts passes",
+            "typecheck completes without errors",
+            "lint-file-size reports conversation-reads.ts at or under 1000 lines",
+            "harness-branch and source-introspection lints exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "changes-assembly"
+          ],
+          "parallelSafeReason": "Owns its new module and test file; its only shared file, conversation-reads.ts, is touched by no other item."
+        },
+        "narrative": {
+          "Action": "PRD §6.3, §6.6, decisions A-D4, A-D5, A-D19 and parent D-5 / WI-3. Add `peekCachedMessages(sessionFile)` to `conversation-reads.ts` exactly as §6.3 (≤ 8 lines; returns `messagesCache.get(`${sessionFile}:false`)?.result ?? null`). New module exports `editedFiles`, `writtenLinesOf`, `listUncommittedFiles({ repoRoot, cwd, parsed, others })`. Status from `git -c core.quotePath=false status --porcelain=v2 -z --untracked-files=all` (record types 1/2/u/?), intersected with edited paths (Claude `fileEditsByAssistantId` ∪ entries whose lower-cased `toolTitle ?? label` ∈ {edit, write, multiedit, notebookedit} with string `file_path`/`path`), compared through realpath. Line attribution only for files with an edit record carrying text (`new_string`/`content`/`edits[].new_string`/`new_source`): written lines = lines(new) − lines(old), trimmed, non-empty; plus-lines from one `git diff HEAD -U0` (untracked: file content ≤ 2 MiB); `otherLines` = plus-lines not written; `otherConversations` from `others()` whose written lines match an unmatched plus-line. Never compare a harness name to a literal."
+        },
+        "items": [
+          {
+            "id": "change-uncommitted.ac1",
+            "title": "Given a shared tracked file where this conversation's Edit wrote 4 lines and 2 other lines are in the working-tree diff, when `listUncommittedFiles` runs, then the file returns `attribution: 'lines'` and `otherLines: 2`, and `otherConversations` contains only the conversation whose edit text matches those 2 lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "change-uncommitted.ac2",
+            "title": "Given a Pi-shaped entry (`toolTitle: 'edit'`, relative `toolInput.path`), then the file returns `attribution: 'file'` with no `otherLines`; given a file changed only by a Bash command, then it is not returned.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "change-uncommitted.ac3",
+            "title": "Given an untracked file created by a Write entry, then it returns `status: 'A'` with additions equal to its line count; a committed-clean edited file is not returned.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "change-uncommitted.ac4",
+            "title": "`peekCachedMessages(file)` returns `null` before `getCachedMessages(file, false)` ran and returns that parse afterwards, without parsing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "project-changes",
+        "title": "Project changes: default-branch log with conversation and agent attribution, including squash-merge bodies",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T23:59:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5288",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/project-changes.ts",
+            "tests/unit/lib/overdeck/project-changes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/project-changes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "project-changes.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.7, decisions A-D11, A-D13, A-D14 / WI-4. Exports `attributeCommit`, `byForAttribution`, `listBranchCommits(repoPath, ref, sinceIso, maxCount)`, `parseSince(value, now)`, `getProjectChanges(projectKey, { sinceIso })`. Log format and record separator exactly as §6.7. Precedence: final-paragraph conversation, final-paragraph agent, body-line conversation, body-line agent, unattributed. Conversation value maps through `getConversationByTmuxSession`; agent title = first `/[a-z][a-z0-9]*-\\d+/i` match upper-cased. Ref: `origin/<default>` if it resolves, else `<default>`, else empty commits; unknown project ⇒ 404. `since`: `Nd`/`Nh` (≤ 90 days), ISO, default 7d, else invalid. Max 500 commits."
+        },
+        "items": [
+          {
+            "id": "project-changes.ac1",
+            "title": "Given a commit whose body (not final paragraph) contains `Overdeck-Conversation: conv-x` and whose final paragraph has only `Co-authored-by:`, when `attributeCommit` runs, then it returns `{ source: 'conversation', value: 'conv-x' }`; a final-paragraph conversation trailer wins over an agent trailer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-changes.ac2",
+            "title": "`byForAttribution` returns `{ kind: 'conversation', id: <name>, title: <title> }` for a registered `conv-<name>` and `{ kind: 'agent', id: 'agent-pan-12', title: 'PAN-12' }` for that agent id.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-changes.ac3",
+            "title": "`parseSince` accepts `7d`, `12h`, an ISO date and null (7 days) and rejects `91d` and `abc`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-changes.ac4",
+            "title": "Given a registered project with `origin/main`, `getProjectChanges` returns first-parent commits with `by`; without a remote it falls back to local `main`; for an unknown key it returns status 404.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changes-assembly",
+        "title": "getConversationChanges: scopes, totals, A-D9 empty response, server rootId, 30 s cache and the totals map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T23:59:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5288",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-changes.ts",
+            "tests/unit/lib/overdeck/conversation-changes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-changes.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "conversation-changes.test.ts passes, including the seeded-fixture AC-A test",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "changes-routes",
+            "list-change-totals"
+          ],
+          "parallelSafeReason": "Owns the new conversation-changes.ts and its test file; list-change-totals, the only other item touching them, runs after it through a blocking edge."
+        },
+        "narrative": {
+          "Action": "PRD §6.4, §6.8, decisions A-D2, A-D3, A-D9, A-D10, A-D15 / WI-5. Export `ConversationChangesDependencies` (§6.4), `getConversationChanges(name, { scope, turnId }, deps)`, `rootIdForConversationRow`, `getChangeTotals`, `resetConversationChangesCachesForTests`. Do not import conversation-reads.ts. 404 unknown name; 400 `{ error: 'Invalid scope' }`; cwd outside a repo ⇒ 200 with `repoRoot: conv.cwd`, `branch: null`, empty lists, zero totals. `since` = 10 min before min(conv.createdAt, earliest message/workLog createdAt). Full result cached per name (max 64) while transcript size+mtime and HEAD are unchanged and < 30 s old; `turn`/`uncommitted` filter it; `main` cached under `<name>\\0main` and built with `listBranchCommits(repoRoot, 'HEAD', localDayStartIso(now), 200)`. Every full computation writes the totals map. The AC-A test seeds `scripts/dev/seed-workflow-fixture.ts` with the setup of `tests/unit/scripts/seed-workflow-fixture.test.ts` and warms fixture-2's parse first. Every TTL comparison reads `deps.now()`; tests advance an injected `now()`. The AC-A test injects `resolveSessionFile` returning `join(claudeProjectDir(repoPath, claudeProjectsRoot(home)), `${conv.claudeSessionId}.jsonl`)` and uses the real `getCachedMessages`/`peekCachedMessages`. Import `localDayStartIso` from `src/lib/costs/request-digest.ts` (added by item spend-conversations, which blocks this item)."
+        },
+        "items": [
+          {
+            "id": "changes-assembly.ac1",
+            "title": "Given the seeded workflow fixture, when `getConversationChanges('fixture-1', { scope: 'conversation' })` runs, then it returns the pre-trailer commit with `pushed: true, attribution: 'tool-output'`, the trailer commit with `pushed: false, attribution: 'trailer'`, and `docs/shared.md` with `attribution: 'lines'`, `otherLines: 2` and `otherConversations` naming `fixture-2`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-assembly.ac2",
+            "title": "Scope `turn` returns only that turn's commits and files (a `conv-turn-` prefix is accepted; no turnId defaults to the last turn with changes), scope `uncommitted` returns no commits, and scope `main` marks this conversation's commits `by.isThisConversation: true`; each response's `totals` match its returned lists.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-assembly.ac3",
+            "title": "An unknown name returns status 404, `scope=bogus` returns status 400, and a cwd outside any repository returns status 200 with empty `commits` and `uncommitted`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-assembly.ac4",
+            "title": "Given unchanged transcript and HEAD, a second call within 30 s returns the identical object (`toBe`); after a new commit, or after the injected `now()` advances 31 s, it recomputes, and `getChangeTotals('fixture-1')` returns the totals after the first call.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-assembly.ac5",
+            "title": "`rootIdForConversationRow` returns `issue:<ID>` for an issueId, `null` for a workspaceId, `issue:<SLUG>` for a feature-workspace cwd, `project:<key>` for a primary-checkout subdirectory, and `null` outside every project.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changes-routes",
+        "title": "HTTP routes for conversation and project changes, route scope row and no-loss entries",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T23:59:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5288",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/conversation-diffs.ts",
+            "src/dashboard/server/routes/project-changes.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts",
+            "tests/unit/dashboard/server/routes/changes-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/changes-routes.test.ts tests/unit/dashboard/server/routes/conversations-no-loss.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.9, decision A-D12 / WI-6. Add `GET /api/conversations/:name/changes` to `routes/conversation-diffs.ts` (origin check like its siblings; `scope` default `conversation`, `turnId`; deps built from conversation-reads.ts and conversations.ts per §6.4) and to `conversationDiffRoutes`. New `routes/project-changes.ts` exports `projectChangesRouteLayer` with `GET /api/projects/:projectKey/changes` (parseSince ⇒ 400 `Invalid since`), mounted in `server.ts` next to `projectsMergeTrainRouteLayer`. `route-scopes.ts`: `{ method: 'GET', path: '/api/conversations/:name/changes', scope: 'read:conversations' }` after the diffs rows; no row for the project route. no-loss-matrix rows exactly as §6.9. `conversations-no-loss.test.ts`: add the route to EXPECTED_CONVERSATION_ROUTES, `toBe(43)`, title 'keeps all 43 …'. Route tests use `HttpRouter.toHttpEffect(...)` as `conversation-diffs.test.ts` does."
+        },
+        "items": [
+          {
+            "id": "changes-routes.ac1",
+            "title": "`GET /api/conversations/<fixture-1>/changes?scope=uncommitted` returns status 200 with `scope: 'uncommitted'`, and `scope=bogus` returns status 400.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-routes.ac2",
+            "title": "`GET /api/projects/<key>/changes?since=7d` returns status 200 with `projectKey`, `since=abc` returns status 400, and an unknown key returns status 404.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-routes.ac3",
+            "title": "`requiredScopeFor('GET', '/api/conversations/x/changes')` returns `read:conversations` and `requiredScopeFor('GET', '/api/projects/x/changes')` returns `admin`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-routes.ac4",
+            "title": "`conversations-no-loss.test.ts` passes with 43 live routes and `no-loss-matrix.test.ts` passes with rows for both new surfaces.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "list-change-totals",
+        "title": "Stamp changeTotals on GET /api/conversations rows from the totals map with bounded background computation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T23:59:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5288",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation-list-merged.ts",
+            "src/lib/overdeck/conversation-changes.ts",
+            "tests/unit/lib/overdeck/conversation-changes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-changes.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "conversation-changes.test.ts passes including the stampChangeTotals block",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.10, decision A-D16 / WI-7. Add `stampChangeTotals(rows, deps)` to `conversation-changes.ts` and call it on the local rows in `getMergedConversationList` (both the offset/linked=0 return and the merge path). Rules: skip `origin === 'vault'`; activity time = `lastActivityAt ?? lastAttachedAt ?? createdAt`; rows active in the last 24 h get `changeTotals` when the totals map has an entry; missing or > 30 s old entries enqueue a background `getConversationChanges(name, { scope: 'conversation' })`: max 2 running, max 20 enqueued per call, deduplicated by name, errors logged and swallowed; never awaited; never mutates input rows (return new objects). Signature `stampChangeTotals(rows, deps, compute?)` (compute defaults to `getConversationChanges(name, { scope: 'conversation' }, deps)`) plus `whenChangeTotalsIdle(): Promise<void>`. Tests pass a compute built from hand-resolved deferred promises and `await whenChangeTotalsIdle()`; never drain timers to wait for background work. Activity comparisons read `deps.now()`."
+        },
+        "items": [
+          {
+            "id": "list-change-totals.ac1",
+            "title": "Given a row active 1 h ago with a totals-map entry, `stampChangeTotals` returns that row with `changeTotals`; a row active 25 h ago returns without `changeTotals`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-change-totals.ac2",
+            "title": "Given a row active now with no entry, the first call returns it without `changeTotals` and calls `compute` once; after a real computation settles and `whenChangeTotalsIdle()` resolves, the next call returns it with `changeTotals`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-change-totals.ac3",
+            "title": "`stampChangeTotals` preserves its input rows (each stays deep-equal to its copy taken before the call), and given 30 active rows without entries it calls `compute` at most 20 times with at most 2 calls unresolved at once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spend-conversations",
+        "title": "Project spend includes the project's conversations, and 'today' is the server's local calendar day",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T23:59:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5288",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/costs/request-digest.ts",
+            "src/dashboard/server/services/project-spend.ts",
+            "src/dashboard/server/routes/costs.ts",
+            "tests/unit/dashboard/server/services/project-spend.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/project-spend.test.ts src/dashboard/server/__tests__/fleet-usage.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "project-spend.test.ts passes, including the America/Denver case, and fleet-usage.test.ts still passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.11, decisions A-D17, A-D18 and parent D-10 / WI-8. In `request-digest.ts` add `localDayStartIso(now)` and make `usageWindowStarts(now).today` return it (week/month unchanged). New `services/project-spend.ts` exports `projectKeysForPrefix`, `conversationSessionsForProject`, `inProjectSpend`. In `routes/costs.ts` summary use `usageWindowStarts(Date.now())` for all windows; when `?project=<PREFIX>` is set, build the session set from `listProjectsAsync()` and `listConversations()` + `listArchivedConversations()` and filter with `inProjectSpend` (issueId prefix OR agentId member; counted once). Add `agentId?: string` to the local Entry type. The TZ test sets `process.env.TZ = 'America/Denver'` in beforeEach and restores it in afterEach (vitest pool is forks, as in src/lib/__tests__/codex-auth.test.ts) and passes an explicit `now`. `src/dashboard/server/__tests__/fleet-usage.test.ts` must still pass."
+        },
+        "items": [
+          {
+            "id": "spend-conversations.ac1",
+            "title": "Given `TZ=America/Denver`, `localDayStartIso(Date.parse('2026-11-15T03:00:00Z'))` returns `2026-11-14T07:00:00.000Z` and `usageWindowStarts(now).today` returns the same value, so an event at `2026-11-14T10:00:00Z` falls in `today`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spend-conversations.ac2",
+            "title": "`projectKeysForPrefix('WFX', …)` returns the keys whose `issue_prefix` is `wfx` or whose `issue_prefixes` contains `WFX`; `conversationSessionsForProject` returns explicit-projectKey members and null-projectKey members by cwd, with a nested project's longer path winning.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spend-conversations.ac3",
+            "title": "`inProjectSpend` returns true for a `WFX-1` event and for an `UNKNOWN` event whose `agentId` is a member session, and false for a session of another project; an event matching both rules is counted once in the summary totals.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the changes API, line attribution rules and conversation spend; add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T23:59:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5288",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "features/conversations.mdx",
+            "changelog.d/pan-5288.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. (1) `docs/DASHBOARD-ARCHITECTURE.md`: new `## Conversation changes (PAN-5288)` directly after the `## Frame seams (PAN-5287)` section, covering every point listed in PRD WI-9 step 1. (2) `features/conversations.mdx`: new `## What a conversation changed` before `## Pull requests on conversations`, plain user language per WI-9 step 2. (3) `changelog.d/pan-5288.md` with `#### New` and `#### Improved` per `changelog.d/README.md`, each bullet linking `[#5288](https://github.com/eltmon/overdeck/issues/5288)`. Write the sections from the merged code, not from memory."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "`docs/DASHBOARD-ARCHITECTURE.md` contains a `## Conversation changes (PAN-5288)` section that names `GET /api/conversations/:name/changes` with its four scopes and `GET /api/projects/:projectKey/changes` with its `since` values, and states that other conversations are named only from cached parses.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "`features/conversations.mdx` contains a `## What a conversation changed` section stating that Claude Code conversations get per-line counts, other harnesses list the file only, shell-only edits are not shown, and project spend includes conversations.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "`changelog.d/pan-5288.md` contains `#### New` and `#### Improved` bullets linking #5288, and `npm run lint:docs` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "diffs-parse-worklog",
+        "to": "change-commits",
+        "type": "blocks"
+      },
+      {
+        "from": "diffs-parse-worklog",
+        "to": "change-uncommitted",
+        "type": "blocks"
+      },
+      {
+        "from": "diffs-parse-worklog",
+        "to": "changes-assembly",
+        "type": "blocks"
+      },
+      {
+        "from": "change-commits",
+        "to": "change-uncommitted",
+        "type": "blocks"
+      },
+      {
+        "from": "change-commits",
+        "to": "changes-assembly",
+        "type": "blocks"
+      },
+      {
+        "from": "change-uncommitted",
+        "to": "changes-assembly",
+        "type": "blocks"
+      },
+      {
+        "from": "project-changes",
+        "to": "changes-assembly",
+        "type": "blocks"
+      },
+      {
+        "from": "project-changes",
+        "to": "changes-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "spend-conversations",
+        "to": "changes-assembly",
+        "type": "blocks"
+      },
+      {
+        "from": "changes-assembly",
+        "to": "changes-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "changes-assembly",
+        "to": "list-change-totals",
+        "type": "blocks"
+      },
+      {
+        "from": "changes-routes",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "list-change-totals",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "spend-conversations",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
