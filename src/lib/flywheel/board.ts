@@ -329,7 +329,10 @@ function conversationForPane(pane: BackendPane, conversations: readonly BoardCon
   return match?.name ?? key.replace(/^conv-/, '');
 }
 
-/** The agent a card shows (D4), or null when nothing drives the issue. */
+/**
+ * The agent a card shows (D4), or null when nothing drives the issue. With no
+ * pane and no handoff conversation, a queued gate shows as role `gate`.
+ */
 export function deriveCardAgent(facts: BoardFacts): FlywheelCardAgent | null {
   const waiting = facts.gateWaiters.length > 0;
   const pane = [...facts.panes]
@@ -347,7 +350,8 @@ export function deriveCardAgent(facts: BoardFacts): FlywheelCardAgent | null {
     };
   }
   const conversation = facts.conversations.find((conv) => conv.status === 'active');
-  if (!conversation) return null;
+  // A queued gate is the work in progress, so it never reads as "no agent" (FR-4).
+  if (!conversation) return waiting ? { role: 'gate', model: null, harness: null, state: 'waiting' } : null;
   return {
     role: 'handoff',
     model: conversation.model,
@@ -379,7 +383,7 @@ function failedVerification(journal: readonly PipelineJournalEntry[]): PipelineJ
 export function deriveBlocker(facts: BoardFacts): FlywheelBlocker | null {
   const stage = deriveStage(facts);
   const agent = deriveCardAgent(facts);
-  const agentLive = agent !== null;
+  const agentLive = agent !== null && agent.role !== 'gate';
   const suffix = agentLive ? ', agent fixing' : ', no agent running';
   const latest = facts.journal[facts.journal.length - 1] ?? null;
 

@@ -21,7 +21,7 @@
 
 import { join } from 'node:path';
 
-import { paneAgentKey } from '@overdeck/contracts';
+import { indexPanesByAgentKey, paneAgentKey } from '@overdeck/contracts';
 import type {
   BackendPane,
   DerivedIssueState,
@@ -36,6 +36,8 @@ import type {
 } from '@overdeck/contracts';
 
 import type { LegacyConversation } from '../overdeck/conversations.js';
+import type { PendingAutoMerge, UatGeneration } from '../overdeck/merge-types.js';
+import type { QualityGateMemorySample, QualityGateQueueEntry, QualityGateQueueSnapshot } from '../cloister/quality-gate-admission.js';
 import type { LoadedPr, TrackerIssueFacts } from '../overdeck/derived-issue-state.js';
 import type { PipelineJournalEntry } from '../cloister/pipeline-journal.js';
 import {
@@ -44,6 +46,20 @@ import {
   FLYWHEEL_FRESHNESS_LIVE_MS,
 } from './constants.js';
 import { findLastTick, resolveNeedsYouItems, type TickMarkerMessage } from './tick-marker.js';
+import {
+  activityFrom,
+  deriveBlocker,
+  deriveCardAgent,
+  deriveOwner,
+  deriveStage,
+  deriveStageSince,
+  mapWaiterToIssue,
+  type BoardAutoMerge,
+  type BoardConversation,
+  type BoardFacts,
+  type BoardGeneration,
+  type GateIssueCandidate,
+} from './board.js';
 
 export interface FlywheelWorkspace {
   issueId: string;
@@ -77,6 +93,24 @@ export interface DeriveFlywheelStatusDeps {
    * its prompt, not that it exited.
    */
   isAgentAlive?: (agentKey: string) => Promise<boolean>;
+  // ── Board facts (PAN-5283 WI-5). Each degrades to "unknown" on failure. ──
+  /** The pipeline journal tail, oldest first (D22). */
+  journalTail?: (workspacePath: string) => readonly PipelineJournalEntry[] | Promise<readonly PipelineJournalEntry[]>;
+  /** The issue's unarchived handoff conversations, newest first. */
+  listIssueConversations?: (issueId: string) => readonly LegacyConversation[] | Promise<readonly LegacyConversation[]>;
+  /** The issue's work agent `startedBy` provenance. */
+  readStartedBy?: (issueId: string) => string | null | Promise<string | null>;
+  /** The issue's cost-event aggregate in USD (D21). */
+  issueCost?: (issueId: string) => number | null | Promise<number | null>;
+  readGateQueue?: () => Promise<QualityGateQueueSnapshot>;
+  readMemory?: () => Promise<QualityGateMemorySample | null>;
+  softReserveBytes?: () => number | Promise<number>;
+  /** The issue's newest auto-merge row in any status. */
+  readAutoMerge?: (issueId: string) => PendingAutoMerge | null | Promise<PendingAutoMerge | null>;
+  /** The project's assembling or ready window-lane train generations, newest first. */
+  listWindowGenerations?: (projectRoot: string) => readonly UatGeneration[] | Promise<readonly UatGeneration[]>;
+  /** When train batching resumes for the project, or null (WI-6). */
+  batchingPausedUntil?: (projectRoot: string) => string | null | Promise<string | null>;
   /** The issue's open `strike/<id>` PR; null when none is open (PAN-4752). */
   readStrikePr?: (projectPath: string, issueId: string) => DerivedPrState | null | Promise<DerivedPrState | null>;
   policies?: () => FlywheelPolicies | Promise<FlywheelPolicies>;
@@ -213,9 +247,85 @@ async function livePanes(
   return panes.filter((_pane, index) => verdicts[index] === true);
 }
 
-async function defaultLastJournal(workspacePath: string): Promise<PipelineJournalEntry | null> {
-  const { lastPipelineEntry } = await import('../cloister/pipeline-journal.js');
-  return lastPipelineEntry(workspacePath);
+async function defaultJournalTail(workspacePath: string): Promise<readonly PipelineJournalEntry[]> {
+  const { readPipelineJournal } = await import('../cloister/pipeline-journal.js');
+  return readPipelineJournal(workspacePath, { limit: JOURNAL_TAIL_LIMIT });
+}
+
+const JOURNAL_TAIL_LIMIT = 50;
+
+async function defaultListIssueConversations(issueId: string): Promise<readonly LegacyConversation[]> {
+  const { listIssueConversations } = await import('../overdeck/conversations.js');
+  return listIssueConversations(issueId);
+}
+
+async function defaultReadStartedBy(issueId: string): Promise<string | null> {
+  const { getAgentState } = await import('../agents/agent-state-read.js');
+  return getAgentState(`agent-${issueId.toLowerCase()}`)?.startedBy ?? null;
+}
+
+async function defaultIssueCost(issueId: string): Promise<number | null> {
+  const { getCostForIssueAggregate } = await import('../overdeck/cost-sync.js');
+  return getCostForIssueAggregate(issueId)?.totalCost ?? null;
+}
+
+async function defaultReadGateQueue(): Promise<QualityGateQueueSnapshot> {
+  const { readQualityGateQueue } = await import('../cloister/quality-gate-admission.js');
+  return readQualityGateQueue();
+}
+
+async function defaultReadMemory(): Promise<QualityGateMemorySample | null> {
+  const { readQualityGateMemory } = await import('../cloister/quality-gate-admission.js');
+  return readQualityGateMemory();
+}
+
+async function defaultSoftReserveBytes(): Promise<number> {
+  const { resolveSoftReserveBytes } = await import('../cloister/quality-gate-memory.js');
+  return resolveSoftReserveBytes();
+}
+
+/**
+ * The newest row decides, the same row the scheduler reads: an old failed row
+ * behind a newer merged or cancelled one must not pin the card in Merge.
+ */
+async function defaultReadAutoMerge(issueId: string): Promise<PendingAutoMerge | null> {
+  const { getLatestAutoMerge } = await import('../overdeck/merge-sync.js');
+  return getLatestAutoMerge(issueId);
+}
+
+/** Same name test as `isWindowBatch` in the server's merge-train batching, which `src/lib` must not import. */
+const WINDOW_BATCH_RE = /^uat\/[a-z0-9]+-train-/i;
+
+async function defaultListWindowGenerations(projectRoot: string): Promise<readonly UatGeneration[]> {
+  const { listUatGenerations } = await import('../overdeck/merge-sync.js');
+  return listUatGenerations({ projectRoot, statuses: ['assembling', 'ready'], limit: 20 })
+    .filter((gen) => WINDOW_BATCH_RE.test(gen.name));
+}
+
+async function defaultBatchingPausedUntil(projectRoot: string): Promise<string | null> {
+  const { projectBatchCiPausedUntil } = await import('../cloister/merge-route.js');
+  return projectBatchCiPausedUntil(projectRoot);
+}
+
+/** A board read that fails, synchronously or not, answers `fallback` (WI-5: never throw the status). */
+async function attempt<T>(read: () => T | Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await read();
+  } catch {
+    return fallback;
+  }
+}
+
+const ACTIONABLE_AUTO_MERGE = new Set(['pending', 'merging', 'blocked', 'failed']);
+
+function boardAutoMerge(row: PendingAutoMerge | null): BoardAutoMerge | null {
+  if (!row || !ACTIONABLE_AUTO_MERGE.has(row.status)) return null;
+  return {
+    status: row.status as BoardAutoMerge['status'],
+    scheduledMergeAt: row.scheduledMergeAt,
+    scheduledAt: row.scheduledAt,
+    ...(row.failureReason ? { failureReason: row.failureReason } : {}),
+  };
 }
 
 /**
@@ -258,6 +368,96 @@ async function defaultRunningBook(panDir: string): Promise<FlywheelOrderBookSumm
   if (!book) return null;
   const progress = computeBookProgress(book);
   return { id: book.id, name: book.name, status: book.status, landed: progress.landed, total: progress.total };
+}
+
+/** One conversation row as board facts; its pane state comes from the inventory. */
+function boardConversation(conv: LegacyConversation, panesByKey: ReadonlyMap<string, BackendPane>): BoardConversation & { totalCost: number } {
+  const pane = panesByKey.get(conv.tmuxSession) ?? panesByKey.get(`conv-${conv.name}`) ?? panesByKey.get(conv.name);
+  return {
+    name: conv.name,
+    title: conv.title,
+    model: conv.model,
+    harness: conv.harness,
+    cwd: conv.cwd,
+    status: conv.status,
+    tmuxSession: conv.tmuxSession,
+    ...(pane ? { paneState: pane.state } : {}),
+    totalCost: Number.isFinite(conv.totalCost) ? conv.totalCost : 0,
+  };
+}
+
+/** Gate tickets by the in-flight issue they belong to (D10), oldest first. */
+function groupGateEntries(
+  entries: readonly QualityGateQueueEntry[],
+  candidates: readonly GateIssueCandidate[],
+): Map<string, QualityGateQueueEntry[]> {
+  const byId = new Map<string, QualityGateQueueEntry[]>();
+  for (const entry of entries) {
+    const id = mapWaiterToIssue(entry, candidates);
+    if (!id) continue;
+    const list = byId.get(id);
+    if (list) list.push(entry); else byId.set(id, [entry]);
+  }
+  for (const list of byId.values()) list.sort((a, b) => a.createdAt - b.createdAt);
+  return byId;
+}
+
+interface BoardShared {
+  gateQueue: QualityGateQueueSnapshot | null;
+  memory: QualityGateMemorySample | null;
+  softReserveBytes: number | null;
+  generationById: Map<string, BoardGeneration>;
+  batchingPausedUntil: string | null;
+}
+
+/** The board reads shared by every row, once per status; each failure reads as unknown. */
+async function readBoardShared(projectRoot: string, any: boolean, deps: DeriveFlywheelStatusDeps): Promise<BoardShared> {
+  if (!any) return { gateQueue: null, memory: null, softReserveBytes: null, generationById: new Map(), batchingPausedUntil: null };
+  const [gateQueue, memory, softReserveBytes, generations, batchingPausedUntil] = await Promise.all([
+    attempt<QualityGateQueueSnapshot | null>(() => (deps.readGateQueue ?? defaultReadGateQueue)(), null),
+    attempt(() => (deps.readMemory ?? defaultReadMemory)(), null),
+    attempt<number | null>(() => (deps.softReserveBytes ?? defaultSoftReserveBytes)(), null),
+    attempt<readonly UatGeneration[]>(() => (deps.listWindowGenerations ?? defaultListWindowGenerations)(projectRoot), []),
+    attempt(() => (deps.batchingPausedUntil ?? defaultBatchingPausedUntil)(projectRoot), null),
+  ]);
+  // Generations arrive newest first, so the newest batch an issue sits in wins.
+  const generationById = new Map<string, BoardGeneration>();
+  for (const gen of generations) {
+    for (const member of gen.members) {
+      const id = member.issueId.toUpperCase();
+      if (!generationById.has(id)) generationById.set(id, { name: gen.name, createdAt: gen.createdAt, memberCount: gen.members.length });
+    }
+  }
+  return { gateQueue, memory, softReserveBytes, generationById, batchingPausedUntil };
+}
+
+/** USD for the card (D21): the cost-event aggregate, else the handoff conversations' total, else unknown. */
+function cardCost(aggregate: number | null, conversations: readonly { totalCost?: number }[]): number | null {
+  if (typeof aggregate === 'number' && aggregate > 0) return aggregate;
+  const total = conversations.reduce((sum, conv) => sum + (conv.totalCost ?? 0), 0);
+  return total > 0 ? total : null;
+}
+
+/** The board fields of one row (FR-1); a derivation that throws leaves them out. */
+function boardFields(
+  facts: BoardFacts,
+  aggregateCost: number | null,
+  conversations: readonly { totalCost?: number }[],
+): Partial<FlywheelInFlightRow> {
+  try {
+    const stage = deriveStage(facts);
+    return {
+      stage,
+      stageSince: deriveStageSince(facts, stage),
+      owner: deriveOwner(facts),
+      agent: deriveCardAgent(facts),
+      blocker: deriveBlocker(facts),
+      cost: cardCost(aggregateCost, conversations),
+      lastActivity: activityFrom(facts.journal[facts.journal.length - 1]),
+    };
+  } catch {
+    return {};
+  }
 }
 
 // ─── the deriver ─────────────────────────────────────────────────────────────
@@ -377,20 +577,51 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
     ? await (deps.loadStates ?? defaultLoadStates)(projectRoot, issueIds, { issues, panes })
     : new Map<string, DerivedIssueState>();
   const livePanesByIssue = new Map<string, BackendPane[]>();
-  const issuePanes = panes.filter((pane) => pane.issue);
+  // Probe only the panes of issues on this board (H3): every poll would
+  // otherwise probe every finished pane in the inventory.
+  const candidateIds = new Set(issueIds.map((id) => id.toUpperCase()));
+  const issuePanes = panes.filter((pane) => pane.issue && candidateIds.has(pane.issue.toUpperCase()));
   for (const pane of await livePanes(issuePanes, deps.isAgentAlive ?? defaultIsAgentAlive)) {
     if (!pane.issue) continue;
     const id = pane.issue.toUpperCase();
     const list = livePanesByIssue.get(id);
     if (list) list.push(pane); else livePanesByIssue.set(id, [pane]);
   }
-  const lastJournal = deps.lastJournal ?? defaultLastJournal;
+  const board = await readBoardShared(projectRoot, candidates.length > 0, deps);
+  const panesByKey = indexPanesByAgentKey(panes);
+  // First pass: each issue's handoff conversations, so a gate ticket in a
+  // `hoff-*` worktree maps to its issue through the conversation's cwd (D10).
+  const conversationsById = new Map<string, (BoardConversation & { totalCost: number })[]>();
+  await Promise.all(candidates.map(async (candidate) => {
+    const id = candidate.issueId.toUpperCase();
+    const rows = await attempt(() => (deps.listIssueConversations ?? defaultListIssueConversations)(id), []);
+    conversationsById.set(id, rows.map((conv) => boardConversation(conv, panesByKey)));
+  }));
+  const gateCandidates: GateIssueCandidate[] = candidates.map((candidate) => {
+    const id = candidate.issueId.toUpperCase();
+    const cwds = (conversationsById.get(id) ?? [])
+      .filter((conv) => conv.status === 'active')
+      .map((conv) => conv.cwd)
+      // The primary checkout is every issue's parent; it names none of them.
+      .filter((cwd) => cwd !== projectRoot);
+    return { issueId: id, paths: [...(candidate.workspacePath ? [candidate.workspacePath] : []), ...cwds] };
+  });
+  const gateWaitersById = groupGateEntries(board.gateQueue?.waiters ?? [], gateCandidates);
+  const gateOwnersById = groupGateEntries(board.gateQueue?.owners ?? [], gateCandidates);
+  const gateMemory = board.memory && board.softReserveBytes !== null
+    ? { memAvailableBytes: board.memory.memAvailableBytes, softReserveBytes: board.softReserveBytes }
+    : null;
+  const journalTail = deps.journalTail
+    ?? (deps.lastJournal
+      ? async (ws: string) => { const entry = await deps.lastJournal!(ws); return entry ? [entry] : []; }
+      : defaultJournalTail);
   const rows: FlywheelInFlightRow[] = await Promise.all(candidates.map(async (candidate) => {
     const id = candidate.issueId.toUpperCase();
     const derived = states.get(id);
     const issue = issues[id] ?? null;
     // A tick-only id has no workspace, so it has no journal of its own.
-    const entry = candidate.workspacePath ? await lastJournal(candidate.workspacePath) : null;
+    const journal = candidate.workspacePath ? await attempt(() => journalTail(candidate.workspacePath!), []) : [];
+    const entry = journal[journal.length - 1] ?? null;
     // A strike row with no feature-branch PR carries its open strike PR as
     // `row.pr`; tracker state wins, so a closed issue stays closed even with
     // an open strike PR (D7, PAN-4752).
@@ -401,17 +632,46 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
       ? strikePr.reviewState === 'changes-requested' ? 'changes-requested' : 'in-review'
       : derived?.state ?? 'backlog';
     const attention = strikePr && derived?.attention === 'work-not-started' ? undefined : derived?.attention;
+    const pr = derived?.pr ?? strikePr ?? undefined;
+    const conversations = conversationsById.get(id) ?? [];
+    const [startedBy, aggregateCost, autoMergeRow] = await Promise.all([
+      attempt(() => (deps.readStartedBy ?? defaultReadStartedBy)(id), null),
+      attempt(() => (deps.issueCost ?? defaultIssueCost)(id), null),
+      attempt(() => (deps.readAutoMerge ?? defaultReadAutoMerge)(id), null),
+    ]);
+    const facts: BoardFacts = {
+      issueId: id,
+      state,
+      ...(attention ? { attention } : {}),
+      ...(pr ? { pr } : {}),
+      ...(derived?.workStart ? { workStart: derived.workStart } : {}),
+      ...(derived?.prOutsidePipeline ? { prOutsidePipeline: derived.prOutsidePipeline } : {}),
+      journal,
+      panes: livePanesByIssue.get(id) ?? [],
+      conversations,
+      gateWaiters: gateWaitersById.get(id) ?? [],
+      gateOwners: gateOwnersById.get(id) ?? [],
+      gateQueue: board.gateQueue,
+      gateMemory,
+      autoMerge: boardAutoMerge(autoMergeRow),
+      generation: board.generationById.get(id) ?? null,
+      batchingPausedUntil: board.batchingPausedUntil,
+      inTick: candidate.inTick,
+      startedBy,
+      nowMs: now,
+    };
     return {
       issueId: candidate.issueId,
       title: issue?.title ?? null,
       state,
       ...(attention ? { attention } : {}),
-      ...(derived?.pr ? { pr: derived.pr } : strikePr ? { pr: strikePr } : {}),
+      ...(pr ? { pr } : {}),
       ...(issue ? {} : { trackerUnknown: true as const }),
       ...(candidate.strike ? { strike: true as const } : {}),
       liveAgents: livePanesByIssue.get(id)?.length ?? 0,
       inTick: candidate.inTick,
       lastJournal: entry ? { at: entry.at, type: entry.type, ...(entry.source ? { source: entry.source } : {}) } : null,
+      ...boardFields(facts, aggregateCost, conversations),
     };
   }));
   // A merged or closed issue's workspace lingers until close-out; it is not in flight.

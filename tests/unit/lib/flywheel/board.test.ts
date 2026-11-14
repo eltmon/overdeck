@@ -241,6 +241,11 @@ describe('deriveCardAgent (D4)', () => {
       .toEqual({ role: 'handoff', model: 'opus', harness: 'claude-code', state: 'waiting', conversationName: '20261114-d9c5' });
     expect(deriveCardAgent(facts({ conversations: [{ ...conv, status: 'ended' }] }))).toBeNull();
   });
+
+  it('a queued gate with no pane or conversation shows a waiting gate, never no agent', () => {
+    expect(deriveCardAgent(facts({ gateWaiters: [waiter(NOW)] })))
+      .toEqual({ role: 'gate', model: null, harness: null, state: 'waiting' });
+  });
 });
 
 describe('deriveBlocker (D11)', () => {
