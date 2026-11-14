@@ -1,0 +1,12 @@
+{
+  "id": "2026-11-14-workflow-redesign-pan-5284",
+  "name": "Workflow redesign (PAN-5284)",
+  "status": "draft",
+  "settings": {
+    "laneAConcurrency": 1,
+    "posture": "open"
+  },
+  "items": [],
+  "createdAt": "2026-11-14T19:17:57.102Z",
+  "updatedAt": "2026-11-14T19:17:57.102Z"
+}

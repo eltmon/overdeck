@@ -28,5 +28,11 @@
     "name": "File explorer (PAN-5183)",
     "status": "ready",
     "updatedAt": "2026-11-13T17:52:15.746Z"
+  },
+  {
+    "id": "2026-11-14-workflow-redesign-pan-5284",
+    "name": "Workflow redesign (PAN-5284)",
+    "status": "draft",
+    "updatedAt": "2026-11-14T19:17:57.102Z"
   }
 ]
