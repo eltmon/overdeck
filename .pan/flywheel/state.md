@@ -734,3 +734,8 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - The class fix is PAN-5137 (one changelog file per PR, folded at release). It needs the operator's `released` label.
 - Gate check before a reload: `pgrep -f 'vitest|tsc --noEmit|madge'` matches the checking shell's own command line, so a wait loop never sees "idle" (a reload went out at 18:57 after the loop timed out). Use the bracket form `pgrep -f '[v]itest|[t]sc --noEmit|[m]adge'`.
 - The resolver now adds an entry into main's existing Upcoming block (under its section heading) and creates a new block only when main has none.
+
+## 2026-11-14 merge train live batches
+
+- PAN-5269 (substrate fix, merged 62955b549aa): a one-member batch whose feature already contained main fast-forwarded onto the feature head (`git merge --no-edit`), GitHub ran no `push` CI for the uat branch, and the 10-minute dissolve marked the project "no batch CI" for 24 h with a wrong "add uat/**" notice. Fix: batches always merge `--no-ff`; a fast-forward-head dissolve does not mark the project. Learning: the train's readiness clock is the PR's newest check completion, so a late push resets the 30-minute wait.
+- PAN-5271 (filed, handoff running): review and CodeRabbit feedback skip a live handoff conversation because `feedback-target.ts` accepts only `role === 'work'`. Until it lands, relay handoff-PR feedback with `pan tell`.
