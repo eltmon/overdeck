@@ -403,6 +403,8 @@ describe('generateLauncherScript', () => {
       PATH="$(IFS=':'; echo "\${_overdeck_kept_path[*]}")"
       unset _overdeck_path_segments _overdeck_kept_path _overdeck_path_segment
       _OVERDECK_REAL_GIT="$(command -v git)"
+      _OVERDECK_GIT_TRAILERS=0
+      case "$("$_OVERDECK_REAL_GIT" commit -h 2>&1)" in *--trailer*) _OVERDECK_GIT_TRAILERS=1 ;; esac
       _OVERDECK_GUARD_ROOT="$(cd '/workspace/project' 2>/dev/null && pwd -P)"
       [ -n "$_OVERDECK_GUARD_ROOT" ] || _OVERDECK_GUARD_ROOT='/workspace/project'
       mkdir -p '<OVERDECK_HOME>/agents/plan-abc/git-guard'
@@ -410,6 +412,7 @@ describe('generateLauncherScript', () => {
       #!/bin/sh
       _OVERDECK_REAL_GIT="$_OVERDECK_REAL_GIT"
       _OVERDECK_GUARD_ROOT="$_OVERDECK_GUARD_ROOT"
+      _OVERDECK_GIT_TRAILERS="$_OVERDECK_GIT_TRAILERS"
       if [ "\\$OVERDECK_PAN_GIT_OP" = "1" ]; then
         exec "\\$_OVERDECK_REAL_GIT" "\\$@"
       fi
@@ -484,6 +487,31 @@ describe('generateLauncherScript', () => {
         fi
       }
       _overdeck_git_command="\\$(_overdeck_git_find_command "\\$@")"
+      _OVERDECK_TRAILER_KEY=Overdeck-Agent
+      _OVERDECK_TRAILER_VALUE='plan-abc'
+      if [ "\\$_overdeck_git_command" = "commit" ] && [ "\\$_OVERDECK_GIT_TRAILERS" = "1" ]; then
+        _ot_n=\\$#
+        _ot_state=opts
+        while [ "\\$_ot_n" -gt 0 ]; do
+          _ot_arg="\\$1"
+          shift
+          _ot_n=\\$((_ot_n - 1))
+          set -- "\\$@" "\\$_ot_arg"
+          case "\\$_ot_state" in
+            value) _ot_state=opts ;;
+            opts)
+              case "\\$_ot_arg" in
+                -C|-c|--git-dir|--work-tree|--namespace|--config-env|--super-prefix|--attr-source) _ot_state=value ;;
+                --) _ot_state=cmd ;;
+                -*) ;;
+                *) set -- "\\$@" --trailer "\\$_OVERDECK_TRAILER_KEY: \\$_OVERDECK_TRAILER_VALUE"; _ot_state=done ;;
+              esac
+              ;;
+            cmd) set -- "\\$@" --trailer "\\$_OVERDECK_TRAILER_KEY: \\$_OVERDECK_TRAILER_VALUE"; _ot_state=done ;;
+          esac
+        done
+        set -- -c "trailer.\\$_OVERDECK_TRAILER_KEY.ifexists=addIfDifferent" "\\$@"
+      fi
       case "\\$_overdeck_git_command" in
         rebase|stash|reset|commit|push|merge|cherry-pick) ;;
         *) exec "\\$_OVERDECK_REAL_GIT" "\\$@" ;;
@@ -738,6 +766,8 @@ describe('generateLauncherScript', () => {
       PATH="$(IFS=':'; echo "\${_overdeck_kept_path[*]}")"
       unset _overdeck_path_segments _overdeck_kept_path _overdeck_path_segment
       _OVERDECK_REAL_GIT="$(command -v git)"
+      _OVERDECK_GIT_TRAILERS=0
+      case "$("$_OVERDECK_REAL_GIT" commit -h 2>&1)" in *--trailer*) _OVERDECK_GIT_TRAILERS=1 ;; esac
       _OVERDECK_GUARD_ROOT="$(cd '/workspace/project' 2>/dev/null && pwd -P)"
       [ -n "$_OVERDECK_GUARD_ROOT" ] || _OVERDECK_GUARD_ROOT='/workspace/project'
       mkdir -p '<OVERDECK_HOME>/agents/spec-123/git-guard'
@@ -745,6 +775,7 @@ describe('generateLauncherScript', () => {
       #!/bin/sh
       _OVERDECK_REAL_GIT="$_OVERDECK_REAL_GIT"
       _OVERDECK_GUARD_ROOT="$_OVERDECK_GUARD_ROOT"
+      _OVERDECK_GIT_TRAILERS="$_OVERDECK_GIT_TRAILERS"
       if [ "\\$OVERDECK_PAN_GIT_OP" = "1" ]; then
         exec "\\$_OVERDECK_REAL_GIT" "\\$@"
       fi
@@ -819,6 +850,31 @@ describe('generateLauncherScript', () => {
         fi
       }
       _overdeck_git_command="\\$(_overdeck_git_find_command "\\$@")"
+      _OVERDECK_TRAILER_KEY=Overdeck-Agent
+      _OVERDECK_TRAILER_VALUE='spec-123'
+      if [ "\\$_overdeck_git_command" = "commit" ] && [ "\\$_OVERDECK_GIT_TRAILERS" = "1" ]; then
+        _ot_n=\\$#
+        _ot_state=opts
+        while [ "\\$_ot_n" -gt 0 ]; do
+          _ot_arg="\\$1"
+          shift
+          _ot_n=\\$((_ot_n - 1))
+          set -- "\\$@" "\\$_ot_arg"
+          case "\\$_ot_state" in
+            value) _ot_state=opts ;;
+            opts)
+              case "\\$_ot_arg" in
+                -C|-c|--git-dir|--work-tree|--namespace|--config-env|--super-prefix|--attr-source) _ot_state=value ;;
+                --) _ot_state=cmd ;;
+                -*) ;;
+                *) set -- "\\$@" --trailer "\\$_OVERDECK_TRAILER_KEY: \\$_OVERDECK_TRAILER_VALUE"; _ot_state=done ;;
+              esac
+              ;;
+            cmd) set -- "\\$@" --trailer "\\$_OVERDECK_TRAILER_KEY: \\$_OVERDECK_TRAILER_VALUE"; _ot_state=done ;;
+          esac
+        done
+        set -- -c "trailer.\\$_OVERDECK_TRAILER_KEY.ifexists=addIfDifferent" "\\$@"
+      fi
       case "\\$_overdeck_git_command" in
         rebase|stash|reset|commit|push|merge|cherry-pick) ;;
         *) exec "\\$_OVERDECK_REAL_GIT" "\\$@" ;;
