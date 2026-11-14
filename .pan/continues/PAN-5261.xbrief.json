@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5261",
   "created": "2026-11-14T08:29:10.265Z",
-  "updated": "2026-11-14T08:42:50.243Z",
+  "updated": "2026-11-14T08:42:56.763Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "open-read-limit-30.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T08:42:50.242Z"
+    },
+    "unknown-pin-issue-branch": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5261",
+      "claimedAt": "2026-11-14T08:42:56.763Z"
     }
   }
 }
