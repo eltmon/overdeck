@@ -200,6 +200,29 @@ describe('spawnReviewRoleForIssue', () => {
     expect(prompt).not.toContain('synthesis.md');
   });
 
+  it('tells a strike reviewer there is no xBRIEF (PAN-4753 WI-5)', async () => {
+    await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1194',
+      workspace: '/tmp/pan-review-strike-contract',
+      branch: 'strike/pan-1194',
+      reviewMode: 'quick',
+      reviewKind: 'strike',
+    }));
+    const prompt = mocks.spawnRun.mock.calls[0][2].prompt;
+    expect(prompt).toContain('This is a strike PR');
+    expect(prompt).toContain('There is no xBRIEF');
+    expect(prompt).toContain('sole reviewer');
+  });
+
+  it('leaves the strike paragraph out of a feature review', async () => {
+    await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1194',
+      workspace: '/tmp/pan-review-quick-contract',
+      branch: 'feature/pan-1194',
+    }));
+    expect(mocks.spawnRun.mock.calls[0][2].prompt).not.toContain('There is no xBRIEF');
+  });
+
   it('keeps convoy wait, failure, and report obligations in the full dispatch', () => {
     const prompt = buildReviewRolePrompt({
       issueId: 'PAN-1194', workspace: '/tmp/full', branch: 'feature/pan-1194',

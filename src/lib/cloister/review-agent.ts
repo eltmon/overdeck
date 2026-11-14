@@ -214,6 +214,8 @@ function buildSelfReviewPrompt(opts: {
   reviewDir: string;
   contextManifestPath?: string;
   tier1Summary?: string;
+  /** PAN-4753 WI-5: a strike PR has no xBRIEF; tell the reviewer not to block on it. */
+  reviewKind?: 'feature' | 'strike';
 }): string {
   const reviewReportPath = selfReviewReportPath(opts.reviewDir);
   const prompt = [
@@ -233,6 +235,7 @@ function buildSelfReviewPrompt(opts: {
     `Review directory: ${opts.reviewDir}`,
     `Review output file: ${reviewReportPath}`,
     '',
+    opts.reviewKind === 'strike' ? `This is a strike PR: a small precision fix that bypassed planning. There is no xBRIEF and no acceptance-criteria list; do not block for missing plan context. Review the diff against the issue body for correctness, security and regressions, then record your verdict with \`pan admin specialists done review ${opts.issueId} --status passed|blocked\` as usual.\n` : '',
     opts.tier1Summary
       ? [
           'Shared review context (risk-ranked changed files + acceptance criteria):',
@@ -275,7 +278,7 @@ function buildSelfReviewPrompt(opts: {
   return prompt;
 }
 async function spawnReviewRoleForIssueBody(
-  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean; reviewMode?: ReviewMode; operatorRequested?: boolean },
+  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean; reviewMode?: ReviewMode; operatorRequested?: boolean; reviewKind?: 'feature' | 'strike' },
 ): Promise<{ success: boolean; message: string; error?: string; gated?: boolean }> {
   const dispatchStartedAtMs = Date.now();
   const reviewSessionName = `agent-${opts.issueId.toLowerCase()}-review`;
@@ -914,7 +917,7 @@ export async function killAllReviewSessions(): Promise<{ killed: string[]; faile
 const reviewDispatchCoalescer = createPromiseCoalescer<{ success: boolean; message: string; error?: string; gated?: boolean }>();
 
 export const spawnReviewRoleForIssue = (
-  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean; reviewMode?: ReviewMode; operatorRequested?: boolean },
+  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean; reviewMode?: ReviewMode; operatorRequested?: boolean; reviewKind?: 'feature' | 'strike' },
 ): Effect.Effect<{ success: boolean; message: string; error?: string; gated?: boolean }> =>
   Effect.promise(() => {
     const key = opts.issueId.toUpperCase();

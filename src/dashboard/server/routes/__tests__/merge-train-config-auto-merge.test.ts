@@ -261,6 +261,75 @@ describe('POST /api/merge-train/auto-merge/schedule', () => {
   });
 });
 
+describe('POST /api/merge-train/auto-merge/schedule with kind strike (PAN-4753 WI-6)', () => {
+  it('gates and judges the strike branch, writes kind strike, and keeps the cooldown (D4)', async () => {
+    const schedule = vi.fn(() => ({ created: true, entry: { id: 1, issueId: 'PAN-3917', status: 'pending', kind: 'strike' } }));
+    const mergeGate = vi.fn(async () => gate({ headBranch: 'strike/pan-3917' }));
+    const isEligible = vi.fn(async () => ({ eligible: true }) as const);
+    const result = await postAutoMergeSchedulePayload({ issueId: 'pan-3917', kind: 'strike' }, {
+      ...baseDeps,
+      // Train on: a normal feature batches; the strike branch is high priority.
+      isTrainOn: () => true,
+      mergeGate,
+      isEligible,
+      schedule: schedule as never,
+    });
+    expect(result.status).toBe(200);
+    expect(mergeGate).toHaveBeenCalledWith('PAN-3917', { preferBranch: 'strike/pan-3917' });
+    expect(isEligible).toHaveBeenCalledWith('PAN-3917', { preferBranch: 'strike/pan-3917' });
+    expect(schedule).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'PAN-3917',
+      kind: 'strike',
+      scheduledAt: '2026-09-18T12:00:00.000Z',
+      scheduledMergeAt: '2026-09-18T12:05:00.000Z',
+    }));
+  });
+
+  it('refuses a strike request whose lookup fell back to the feature PR', async () => {
+    const schedule = vi.fn();
+    const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917', kind: 'strike' }, {
+      ...baseDeps,
+      mergeGate: async () => gate({ headBranch: 'feature/pan-3917' }),
+      schedule: schedule as never,
+    });
+    expect(result).toEqual({ status: 422, body: { error: 'PAN-3917 has no open strike PR: the open PR is on feature/pan-3917' } });
+    expect(schedule).not.toHaveBeenCalled();
+  });
+
+  it('refuses a strike held for UAT like a feature (R4)', async () => {
+    const schedule = vi.fn();
+    const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917', kind: 'strike' }, {
+      ...baseDeps,
+      isRequireUatBeforeMerge: () => true,
+      mergeGate: async () => gate(),
+      schedule: schedule as never,
+    });
+    expect(result).toEqual({ status: 412, body: { error: 'UAT is still required before merge' } });
+    expect(schedule).not.toHaveBeenCalled();
+  });
+
+  it('batches a normal feature with the train on, so only the branch makes a strike per-PR', async () => {
+    const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917' }, {
+      ...baseDeps,
+      isTrainOn: () => true,
+      mergeGate: async () => gate(),
+      schedule: vi.fn() as never,
+    });
+    expect(result.status).toBe(412);
+  });
+
+  it('rejects an unknown kind with 400', async () => {
+    const schedule = vi.fn();
+    const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917', kind: 'hotfix' }, {
+      ...baseDeps,
+      mergeGate: async () => gate(),
+      schedule: schedule as never,
+    });
+    expect(result).toEqual({ status: 400, body: { error: "kind must be 'feature' or 'strike'" } });
+    expect(schedule).not.toHaveBeenCalled();
+  });
+});
+
 describe('DELETE /api/merge-train/auto-merge/:id', () => {
   const entry = { id: 7, issueId: 'PAN-3917', status: 'pending' as const };
 

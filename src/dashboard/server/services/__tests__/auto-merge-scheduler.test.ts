@@ -44,7 +44,7 @@ vi.mock('../derived-issue-state.js', async (importOriginal) => {
 });
 
 const {
-  issueIdFromGateBranch,
+  gateCandidateFromBranch,
   latestAutoMergeAllowsSchedule,
   listScheduleCandidates,
   runAutoMergeSchedulerTick,
@@ -59,9 +59,17 @@ const { isAutoMergeEligible } = await import('../../../../lib/cloister/auto-merg
 
 type ListedPr = GhPrRow;
 
-/** A listing that names only these candidates and rules nothing out. */
+/** A listing that names only these feature candidates and rules nothing out. */
 function only(...candidates: string[]): ScheduleCandidates {
-  return { candidates, dropped: [] };
+  return { candidates: candidates.map(feature), dropped: [] };
+}
+
+function feature(issueId: string) {
+  return { issueId: issueId.toUpperCase(), kind: 'feature' as const, branch: `feature/${issueId.toLowerCase()}` };
+}
+
+function strikeCandidate(issueId: string) {
+  return { issueId: issueId.toUpperCase(), kind: 'strike' as const, branch: `strike/${issueId.toLowerCase()}` };
 }
 
 const PR_URL = 'https://github.com/eltmon/overdeck/pull/42';
@@ -100,7 +108,7 @@ function facts(overrides: Partial<PrFacts> = {}): PrFacts {
 
 interface WorldOptions {
   labels?: string[];
-  getFacts?: (issueId: string) => Promise<PrFacts>;
+  getFacts?: (issueId: string, options?: { preferBranch?: string }) => Promise<PrFacts>;
   globalRequireUat?: boolean;
   projectDefault?: 'auto' | 'hold';
   /** PAN-4753 D4: the project's merge train; off (per-PR merges) by default. */
@@ -147,23 +155,24 @@ function world(options: WorldOptions = {}) {
   // GitHub's reviews are read only when no marker proves it; none approve here
   // unless a test says so.
   const readReviews = vi.fn(options.readReviews ?? (async () => ({ headRefOid: null, reviews: [] })));
-  const mergeGate = (issueId: string) => evaluateIssueMergeGate(
+  const mergeGate = (issueId: string, options?: { preferBranch?: string }) => evaluateIssueMergeGate(
     issueId,
     { getFacts: factsReads, ciTestsRequired: () => false, readReviews },
+    options,
   );
 
   const deps = {
     listProjects: () => [OVERDECK],
     forgeOf: (): 'github' | 'gitlab' => 'github',
     listCandidates,
-    policyRefusal: (issueId: string) => autoMergePolicyRefusal(issueId, policy),
+    policyRefusal: (issueId: string, options?: { branch?: string }) => autoMergePolicyRefusal(issueId, policy, options),
     latestAutoMerge: () => options.latest ?? null,
     mergeGate,
-    schedule: (issueId: string, canSchedule: (latest: PendingAutoMerge) => boolean) => postAutoMergeSchedulePayload({ issueId }, {
+    schedule: (issueId: string, canSchedule: (latest: PendingAutoMerge) => boolean, kind?: 'feature' | 'strike') => postAutoMergeSchedulePayload({ issueId, ...(kind ? { kind } : {}) }, {
       ...policy,
       now: () => new Date('2026-09-24T12:00:00Z'),
       mergeGate,
-      isEligible: (id) => isAutoMergeEligible(id, {
+      isEligible: (id, eligibilityOptions) => isAutoMergeEligible(id, {
         getFacts: factsReads,
         getIssueLabels: async () => labels,
         getProjectDefault: projectDefault,
@@ -172,7 +181,7 @@ function world(options: WorldOptions = {}) {
         readReviews,
         isTrainOn: () => trainOn,
         droppedFromBatch: () => false,
-      }),
+      }, eligibilityOptions),
       resolveProject: () => ({ projectKey: 'overdeck', projectName: 'Overdeck', projectPath: '/repos/overdeck' }),
       schedule: (input) => insert({ ...input, canSchedule }),
       announce: vi.fn(),
@@ -586,7 +595,7 @@ describe('listScheduleCandidates (#3983)', () => {
   it('lists open green feature PRs without reading the forge review decision', async () => {
     const rows: ListedPr[] = [
       listed(),
-      // #4066 review: a strike PR is the operator's to merge (PAN-3973).
+      // PAN-4753 WI-6: a strike PR is a candidate too.
       listed({ number: 43, headRefName: 'strike/pan-43' }),
       // Automatic merges land feature/<id> only: nothing links these.
       listed({ number: 44, headRefName: 'fix/pan-3983-merge-train-schedule' }),
@@ -604,13 +613,13 @@ describe('listScheduleCandidates (#3983)', () => {
     ];
     await expect(listScheduleCandidates('/repos/overdeck', { listPullRequests: async () => rows }))
       .resolves.toEqual({
-        candidates: ['PAN-42', 'PAN-52'],
+        candidates: [feature('PAN-42'), strikeCandidate('PAN-43'), feature('PAN-52')],
         // PAN-5036: open gate-linked PRs the listing rules out, with the head it judged.
         dropped: [
-          { issueId: 'PAN-47', head: 'abc123', reason: 'checks red in the PR listing at abc123' },
-          { issueId: 'PAN-48', head: 'abc123', reason: 'checks pending in the PR listing at abc123' },
-          { issueId: 'PAN-53', head: 'abc123', reason: 'checks red in the PR listing at abc123' },
-          { issueId: 'PAN-49', head: 'abc123', reason: 'PR conflicts with its base in the PR listing at abc123' },
+          { ...feature('PAN-47'), head: 'abc123', reason: 'checks red in the PR listing at abc123' },
+          { ...feature('PAN-48'), head: 'abc123', reason: 'checks pending in the PR listing at abc123' },
+          { ...feature('PAN-53'), head: 'abc123', reason: 'checks red in the PR listing at abc123' },
+          { ...feature('PAN-49'), head: 'abc123', reason: 'PR conflicts with its base in the PR listing at abc123' },
         ],
       });
   });
@@ -621,11 +630,24 @@ describe('listScheduleCandidates (#3983)', () => {
       .resolves.toEqual({ candidates: [], dropped: [] });
   });
 
-  it('links an issue by its feature branch only, never a strike branch', () => {
-    expect(issueIdFromGateBranch('feature/pan-3983')).toBe('PAN-3983');
-    expect(issueIdFromGateBranch('strike/min-1039')).toBeNull();
-    expect(issueIdFromGateBranch('fix/pan-3983-merge-train-schedule')).toBeNull();
-    expect(issueIdFromGateBranch(undefined)).toBeNull();
+  it('links an issue by its feature or strike branch only (PAN-4753)', () => {
+    expect(gateCandidateFromBranch('feature/pan-3983')).toEqual(feature('PAN-3983'));
+    expect(gateCandidateFromBranch('strike/min-1039')).toEqual(strikeCandidate('MIN-1039'));
+    expect(gateCandidateFromBranch('Strike/PAN-7')).toEqual({ issueId: 'PAN-7', kind: 'strike', branch: 'Strike/PAN-7' });
+    expect(gateCandidateFromBranch('fix/pan-3983-merge-train-schedule')).toBeNull();
+    expect(gateCandidateFromBranch('strike/pan-3983-extra')).toBeNull();
+    expect(gateCandidateFromBranch(undefined)).toBeNull();
+  });
+
+  it('keys a strike and a feature PR of the same issue apart', async () => {
+    const rows: ListedPr[] = [
+      listed({ number: 60, headRefName: 'feature/pan-60' }),
+      listed({ number: 61, headRefName: 'strike/pan-60', statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'FAILURE' }] }),
+    ];
+    await expect(listScheduleCandidates('/repos/overdeck', { listPullRequests: async () => rows })).resolves.toEqual({
+      candidates: [feature('PAN-60')],
+      dropped: [{ ...strikeCandidate('PAN-60'), head: 'abc123', reason: 'checks red in the PR listing at abc123' }],
+    });
   });
 
   it('defaults to the open-only listing, never the combined one (PAN-5042)', async () => {
@@ -950,5 +972,58 @@ describe('a failed or stale PR listing is never silent (PAN-5036)', () => {
       reason: 'PR conflicts with its base in the PR listing at 697a05f8',
     }]);
     expect(optedIn.factsReads).not.toHaveBeenCalled();
+  });
+});
+
+describe('strike candidates (PAN-4753 WI-6)', () => {
+  const strikeFacts = () => facts({ headBranch: 'strike/pan-42' });
+
+  it('gates a green strike on its own branch and schedules it as a strike, keeping the cooldown', async () => {
+    // Train on: a normal feature would wait for a batch; a strike is high priority.
+    const { deps, insert, factsReads } = world({ labels: ['auto-merge'], trainOn: true, getFacts: async () => strikeFacts() });
+    deps.listCandidates = vi.fn(async (): Promise<ScheduleCandidates | null> => ({ candidates: [strikeCandidate('pan-42')], dropped: [] }));
+    const outcomes = await scheduleReadyAutoMerges(deps);
+    expect(outcomes).toEqual([{ projectKey: 'overdeck', issueId: 'PAN-42', scheduled: true }]);
+    expect(factsReads.mock.calls.length).toBeGreaterThan(0);
+    for (const call of factsReads.mock.calls) expect(call[1]).toMatchObject({ preferBranch: 'strike/pan-42' });
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(insert.mock.calls[0]![0]).toMatchObject({
+      issueId: 'PAN-42',
+      kind: 'strike',
+      scheduledAt: '2026-09-24T12:00:00.000Z',
+      // D4: high-priority merges keep the 5-minute cancel window.
+      scheduledMergeAt: '2026-09-24T12:05:00.000Z',
+    });
+  });
+
+  it('schedules strikes before features in the same pass', async () => {
+    // Each read answers the PR on the branch it asked for.
+    const { deps, insert } = world({
+      labels: ['auto-merge'],
+      getFacts: async (issueId, options) => facts({ headBranch: options?.preferBranch ?? `feature/${issueId.toLowerCase()}` }),
+    });
+    deps.listCandidates = vi.fn(async (): Promise<ScheduleCandidates | null> => ({
+      candidates: [feature('pan-41'), strikeCandidate('pan-42')],
+      dropped: [],
+    }));
+    await scheduleReadyAutoMerges(deps);
+    expect(insert.mock.calls.map(([input]) => [input.issueId, input.kind])).toEqual([['PAN-42', 'strike'], ['PAN-41', 'feature']]);
+  });
+
+  it('skips a strike held for UAT with the door reason (R4: it waits for the operator)', async () => {
+    const { deps, insert } = world({ globalRequireUat: true, trainOn: true, getFacts: async () => strikeFacts() });
+    deps.listCandidates = vi.fn(async (): Promise<ScheduleCandidates | null> => ({ candidates: [strikeCandidate('pan-42')], dropped: [] }));
+    const outcomes = await scheduleReadyAutoMerges(deps);
+    expect(outcomes).toEqual([{ projectKey: 'overdeck', issueId: 'PAN-42', scheduled: false, reason: 'UAT is still required before merge' }]);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it('never asks the stale-approval re-review for a strike', async () => {
+    const { deps, insert } = world({ labels: ['auto-merge'], getFacts: async () => strikeFacts() });
+    deps.listCandidates = vi.fn(async (): Promise<ScheduleCandidates | null> => ({ candidates: [strikeCandidate('pan-42')], dropped: [] }));
+    deps.mergeGate = vi.fn(async () => ({ ready: false, reason: 'PR is not approved at PR HEAD abc123', facts: { url: PR_URL, headSha: 'abc123' } }));
+    await scheduleReadyAutoMerges(deps);
+    expect(deps.rereview).not.toHaveBeenCalled();
+    expect(insert).not.toHaveBeenCalled();
   });
 });

@@ -35,6 +35,7 @@ import { bumpIssuePrTabCacheGeneration } from '../../../dashboard/server/service
 import { postReviewVerdict } from '../../../lib/cloister/pr-review-verdict.js';
 import { readAncestorAgentIds, reviewedHeadFromRunId, reviewVerdictRefusal, verdictCallerFromEnv } from '../../../lib/cloister/verdict-caller.js';
 import { getIssueWorkspacePath } from '../../../lib/overdeck/issue-projects.js';
+import { resolveReviewTarget } from '../../../lib/cloister/review-target.js';
 import { appendPipelineEntry } from '../../../lib/cloister/pipeline-journal.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 
@@ -155,7 +156,14 @@ export async function doneCommand(
     return exitCli(1);
   }
 
-  const workspacePath = getIssueWorkspacePath(normalizedIssueId);
+  // PAN-4753 WI-5: a review reads the feature workspace, else the strike
+  // workspace (`feature-<id>-strike` on `strike/<id>`).
+  const featureWorkspace = getIssueWorkspacePath(normalizedIssueId);
+  const reviewTarget = role === 'review' && !(featureWorkspace && existsSync(featureWorkspace))
+    ? resolveReviewTarget(normalizedIssueId)
+    : null;
+  const strike = reviewTarget?.kind === 'strike';
+  const workspacePath = strike ? reviewTarget.workspacePath : featureWorkspace;
   if (!workspacePath || !existsSync(workspacePath)) {
     console.error(chalk.red(`No workspace for ${normalizedIssueId}; cannot reach its review artifact.`));
     return exitCli(1);
@@ -215,7 +223,9 @@ export async function doneCommand(
   }
 
   const forge = await forgeForWorkspace(workspacePath);
-  const sourceBranch = `feature/${normalizedIssueId.toLowerCase()}`;
+  const sourceBranch = strike ? reviewTarget.branch : `feature/${normalizedIssueId.toLowerCase()}`;
+  // A strike PR is read on its own branch, so a stray feature PR never stands in for it.
+  const prRead = strike ? { preferBranch: sourceBranch } : {};
   // PAN-4263: a transient forge failure on a review verdict is saved for
   // deacon-lite to replay under the same caller (`deferred-verdict-replay.ts`).
   const deferIfTransient = (reason: string): boolean => {
@@ -292,7 +302,7 @@ export async function doneCommand(
     // verdict only as the issue's review session, and never reverses an
     // approval proven to stand on the exact head, unless the operator asked
     // for this run. Unproven means the verdict goes through.
-    const facts = caller.kind === 'agent' ? await getPrFacts(normalizedIssueId) : undefined;
+    const facts = caller.kind === 'agent' ? await getPrFacts(normalizedIssueId, {}, prRead) : undefined;
     let guardFacts: Pick<PrFacts, 'approved' | 'approvedAtHead' | 'headSha'> | null = facts ?? null;
     let operatorRequested = false;
     if (caller.kind === 'agent' && options.status !== 'passed' && facts?.approved === true) {
@@ -319,11 +329,26 @@ export async function doneCommand(
     });
     if (refusal) return refuseReviewVerdict(refusal, artifact.url);
     const reviewedHead = reviewedHeadFromRunId(runId, normalizedIssueId);
+    const verdictFacts = facts ?? (strike ? await getPrFacts(normalizedIssueId, {}, prRead) : undefined);
+    // A strike approval is what lets the strike auto-merge, so it must land on
+    // the commit this run reviewed. A push since then gets its own review.
+    let pinHead: string | undefined;
+    if (strike) {
+      const live = verdictFacts?.headSha?.toLowerCase();
+      if (!reviewedHead || !live?.startsWith(reviewedHead)) {
+        return refuseReviewVerdict(
+          `the strike PR is at ${live?.slice(0, 12) ?? 'an unknown head'}, not the commit this review read (${reviewedHead ?? 'no run head'}); the new head gets its own review`,
+          artifact.url,
+        );
+      }
+      pinHead = live;
+    }
     const result = await postReviewVerdict({
       issueId: normalizedIssueId,
       verdict: options.status === 'passed' ? 'approve' : 'request-changes',
       body,
-      ...(facts ? { facts } : {}),
+      ...(verdictFacts ? { facts: verdictFacts } : {}),
+      ...(pinHead ? { pinHead } : {}),
       ...(reviewedHead ? { reviewedHead } : {}),
     });
     if (!result.posted) {
@@ -344,6 +369,10 @@ export async function doneCommand(
         subRole: role,
         ...(result.via ? { via: result.via } : {}),
         ...(options.runId ? { runId: options.runId } : {}),
+        // PAN-4753: the strike lane shows `summary` when flagged; a car shows `uatNotes`.
+        ...(reviewedHead ? { headSha: reviewedHead } : {}),
+        ...(options.notes ? { summary: options.notes.slice(0, 500) } : {}),
+        ...(options.uatNotes ? { uatNotes: options.uatNotes.slice(0, 1000) } : {}),
       },
     });
     const tint = options.status === 'passed' ? chalk.green : chalk.yellow;
@@ -369,7 +398,10 @@ export async function doneCommand(
     console.log(tint(`${options.status === 'passed' ? '✓' : '✗'} ${role} ${options.status} — recorded on ${artifact.url}`));
   }
 
-  if (role === 'review' && (options.status === 'blocked' || options.status === 'failed')) {
+  if (strike && options.status !== 'passed') {
+    // PAN-4753 D1: a flagged strike stops; nothing reworks it automatically.
+    console.log(chalk.yellow(`${normalizedIssueId} is a strike: it stops here until the operator acts on the review.`));
+  } else if (role === 'review' && (options.status === 'blocked' || options.status === 'failed')) {
     // Drive the work agent only once the FORGE reports the rejection — a fresh
     // read, not the caller's own claim about what it just posted. GitHub says
     // so with `CHANGES_REQUESTED`; GitLab has no request-changes primitive at

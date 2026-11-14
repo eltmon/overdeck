@@ -16,11 +16,17 @@
  *     The merge-train flag no longer skips a project (PAN-4753 D4): with the
  *     train off every ready PR merges on its own, and with it on the door's
  *     policy check below refuses only the normal-priority PRs that batch;
- *   - it has an open PR on its `feature/<id>` branch with green checks (a
- *     strike PR is the operator's to merge, PAN-3973);
+ *   - it has an open PR on its `feature/<id>` or `strike/<id>` branch with
+ *     green checks. PAN-4753 WI-6: a strike PR is a candidate once its
+ *     expedited review approved its head (`strike-review.ts`); strikes are
+ *     walked before features in each project, scheduled as `kind: 'strike'`,
+ *     and the executor merges due strike rows first (R5). A strike keeps the
+ *     5-minute cancel window, like every high-priority merge (D4);
  *   - the door's policy check passes, which reads no forge: the issue is not
  *     held for UAT, and its merge route is per-PR (train off, high priority,
- *     or dropped from a batch; `merge-route.ts`);
+ *     or dropped from a batch; `merge-route.ts`). A strike branch is high
+ *     priority, so only a UAT hold keeps it from scheduling (R4): it then
+ *     waits for the operator's strike Merge button;
  *   - the one merge gate, `evaluateIssueMergeGate`, says the PR is ready: its
  *     approval is a GitHub review of the exact head commit or a trusted
  *     verdict marker whose `sha=` names it;
@@ -42,9 +48,10 @@
  * is still walked through the free checks above, then skipped with a reason
  * naming its head instead of vanishing from `notScheduled`.
  *
- * PAN-4772: when the gate refuses a PR whose approval is stale (approved at an
- * older head), the pass re-requests review once per head
- * (`stale-approval-rereview.ts`). Every completed pass's skip reasons are kept
+ * PAN-4772: when the gate refuses a feature PR whose approval is stale
+ * (approved at an older head), the pass re-requests review once per head
+ * (`stale-approval-rereview.ts`). A strike's new head gets its expedited
+ * review from the strike review tick instead. Every completed pass's skip reasons are kept
  * (`auto-merge-skip-reasons.ts`) and served as `notScheduled` on
  * `GET /api/merge-train/auto-merge/pending`; a reason is logged only when it
  * changes.
@@ -62,9 +69,15 @@ type GateAnswer = MergeReadiness & { facts: Pick<PrFacts, 'url' | 'headSha'> & S
 /** The re-arm rule, asked again with the latest row inside the insert transaction. */
 type CanSchedule = (latest: PendingAutoMerge) => boolean;
 
-/** An open gate-linked PR the listing ruled out, and why (PAN-5036). */
-export interface DroppedScheduleCandidate {
+/** A PR the merge train can merge automatically (PAN-4753: a feature or a strike). */
+export interface GateCandidate {
   issueId: string;
+  kind: 'feature' | 'strike';
+  branch: string;
+}
+
+/** An open gate-linked PR the listing ruled out, and why (PAN-5036). */
+export interface DroppedScheduleCandidate extends GateCandidate {
   /** The PR head the listing judged, when it carried one. */
   head?: string;
   reason: string;
@@ -72,8 +85,8 @@ export interface DroppedScheduleCandidate {
 
 /** One project's listing, read for scheduling. */
 export interface ScheduleCandidates {
-  /** Issues with an open, green, non-conflicting PR the merge gate can link. */
-  candidates: readonly string[];
+  /** PRs that are open, green and not conflicting, on a branch the merge gate can link. */
+  candidates: readonly GateCandidate[];
   dropped: readonly DroppedScheduleCandidate[];
 }
 
@@ -90,14 +103,15 @@ export interface AutoMergeSchedulerDeps {
    * the listing could not be read; {@link listScheduleCandidates} by default.
    */
   listCandidates?: (projectPath: string) => Promise<ScheduleCandidates | null>;
-  /** The door's forge-free policy check; `autoMergePolicyRefusal` by default. */
-  policyRefusal?: (issueId: string) => DoorResult | null;
+  /** The door's forge-free policy check; `autoMergePolicyRefusal` by default. A strike passes its branch. */
+  policyRefusal?: (issueId: string, options?: { branch?: string }) => DoorResult | null;
   /** PAN-4820: the Deft human-merge hold; `deftAutoMergeHold` by default. */
   deftHold?: (issueId: string) => Promise<string | null>;
   latestAutoMerge?: (issueId: string) => PendingAutoMerge | null;
-  mergeGate?: (issueId: string) => Promise<GateAnswer>;
+  /** A strike is gated on its own branch (`preferBranch: strike/<id>`). */
+  mergeGate?: (issueId: string, options?: { preferBranch?: string }) => Promise<GateAnswer>;
   /** The schedule door; `postAutoMergeSchedulePayload` with a guarded insert by default. */
-  schedule?: (issueId: string, canSchedule: CanSchedule) => Promise<DoorResult>;
+  schedule?: (issueId: string, canSchedule: CanSchedule, kind?: GateCandidate['kind']) => Promise<DoorResult>;
   /**
    * PAN-4772: asked when the gate refuses. Re-requests review once per head
    * for a stale approval and answers a clause for the skip reason, or null.
@@ -136,14 +150,18 @@ function errorMessage(error: unknown): string {
 }
 
 /**
- * The issue a PR branch belongs to, for automatic merging: `feature/<id>`, the
- * branch `triggerMerge` lands and the merge gate is bound to. A strike PR
- * (`strike/<id>`) is merged by the operator since PAN-3973, so it is never a
- * candidate; nor is a PR on any other branch.
+ * The PR a branch belongs to, for automatic merging: `feature/<id>` or, since
+ * PAN-4753, `strike/<id>` — the branches `triggerMerge` lands and the merge
+ * gate is bound to. A PR on any other branch is never a candidate.
  */
-export function issueIdFromGateBranch(branch: string | undefined): string | null {
-  const match = /^feature\/([a-z][a-z0-9]*-\d+)$/i.exec(branch ?? '');
-  return match?.[1] ? match[1].toUpperCase() : null;
+export function gateCandidateFromBranch(branch: string | undefined): GateCandidate | null {
+  const match = /^(feature|strike)\/([a-z][a-z0-9]*-\d+)$/i.exec(branch ?? '');
+  if (!match?.[1] || !match[2]) return null;
+  return { issueId: match[2].toUpperCase(), kind: match[1].toLowerCase() as GateCandidate['kind'], branch: branch! };
+}
+
+function candidateKey(candidate: GateCandidate): string {
+  return `${candidate.issueId.toUpperCase()}:${candidate.kind}`;
 }
 
 /**
@@ -165,12 +183,13 @@ export async function listScheduleCandidates(
   const { readOpenRepoPullRequests, toChecksState } = await import('./derived-issue-state.js');
   const rows = await (deps.listPullRequests ?? readOpenRepoPullRequests)(projectPath);
   if (!rows) return null;
-  const candidates = new Set<string>();
+  const candidates = new Map<string, GateCandidate>();
   const dropped = new Map<string, DroppedScheduleCandidate>();
   for (const row of rows) {
     if ((row.state ?? '').toUpperCase() !== 'OPEN' || row.mergedAt || row.isDraft) continue;
-    const issueId = issueIdFromGateBranch(row.headRefName);
-    if (!issueId) continue;
+    const candidate = gateCandidateFromBranch(row.headRefName);
+    if (!candidate) continue;
+    const key = candidateKey(candidate);
     const head = row.headRefOid ?? undefined;
     const at = head ? ` at ${head.slice(0, 8)}` : '';
     const checks = toChecksState(row.statusCheckRollup);
@@ -178,13 +197,13 @@ export async function listScheduleCandidates(
       : row.mergeable === 'CONFLICTING' ? `PR conflicts with its base in the PR listing${at}`
       : null;
     if (reason) {
-      dropped.set(issueId, { issueId, ...(head ? { head } : {}), reason });
+      dropped.set(key, { ...candidate, ...(head ? { head } : {}), reason });
       continue;
     }
-    candidates.add(issueId);
+    candidates.set(key, candidate);
   }
-  for (const issueId of candidates) dropped.delete(issueId);
-  return { candidates: [...candidates], dropped: [...dropped.values()] };
+  for (const key of candidates.keys()) dropped.delete(key);
+  return { candidates: [...candidates.values()], dropped: [...dropped.values()] };
 }
 
 async function defaultForgeOf(): Promise<(projectPath: string) => 'github' | 'gitlab'> {
@@ -199,9 +218,9 @@ async function defaultForgeOf(): Promise<(projectPath: string) => 'github' | 'gi
 import { latestAutoMergeAllowsSchedule } from '../../../lib/cloister/auto-merge-rearm.js';
 export { latestAutoMergeAllowsSchedule };
 
-async function defaultMergeGate(issueId: string): Promise<GateAnswer> {
+async function defaultMergeGate(issueId: string, options?: { preferBranch?: string }): Promise<GateAnswer> {
   const { evaluateIssueMergeGate } = await import('../../../lib/cloister/merge-gate.js');
-  return evaluateIssueMergeGate(issueId);
+  return options?.preferBranch ? evaluateIssueMergeGate(issueId, {}, options) : evaluateIssueMergeGate(issueId);
 }
 
 async function defaultRereview(issueId: string, facts: GateAnswer['facts']): Promise<string | null> {
@@ -209,17 +228,17 @@ async function defaultRereview(issueId: string, facts: GateAnswer['facts']): Pro
   return rereviewStaleApproval(issueId, facts);
 }
 
-async function defaultPolicyRefusal(): Promise<(issueId: string) => DoorResult | null> {
+async function defaultPolicyRefusal(): Promise<(issueId: string, options?: { branch?: string }) => DoorResult | null> {
   const { autoMergePolicyRefusal } = await import('../routes/merge-train.js');
-  return (issueId) => autoMergePolicyRefusal(issueId);
+  return (issueId, options) => autoMergePolicyRefusal(issueId, {}, options);
 }
 
-async function defaultSchedule(issueId: string, canSchedule: CanSchedule): Promise<DoorResult> {
+async function defaultSchedule(issueId: string, canSchedule: CanSchedule, kind: GateCandidate['kind'] = 'feature'): Promise<DoorResult> {
   const [{ postAutoMergeSchedulePayload }, { scheduleAutoMergeWithResult }] = await Promise.all([
     import('../routes/merge-train.js'),
     import('../../../lib/overdeck/merge-sync.js'),
   ]);
-  return postAutoMergeSchedulePayload({ issueId }, {
+  return postAutoMergeSchedulePayload({ issueId, kind }, {
     schedule: (input) => scheduleAutoMergeWithResult({ ...input, canSchedule }),
   });
 }
@@ -280,17 +299,20 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
       outcomes.push({ projectKey: key, issueId: key, scope: 'project', scheduled: false, reason: PR_LISTING_UNAVAILABLE_REASON });
       continue;
     }
-    const dropped = new Map(listing.dropped.map((entry) => [entry.issueId.toUpperCase(), entry]));
+    // PAN-4753 R5: strikes first; within a kind, listed candidates before ruled-out PRs.
+    const walk: Array<GateCandidate & { reason?: string; head?: string }> = [...listing.candidates, ...listing.dropped]
+      .sort((a, b) => (a.kind === 'strike' ? 0 : 1) - (b.kind === 'strike' ? 0 : 1));
 
-    for (const rawIssueId of [...listing.candidates, ...dropped.keys()]) {
+    for (const candidate of walk) {
       if (!isCurrent()) return outcomes;
-      const issueId = rawIssueId.toUpperCase();
+      const issueId = candidate.issueId.toUpperCase();
+      const strike = candidate.kind === 'strike';
       let head: string | undefined;
       const skip = (reason: string, extra: { alreadyScheduled?: true } = {}) =>
         outcomes.push({ projectKey: key, issueId, scheduled: false, reason, ...(head ? { head } : {}), ...extra });
       try {
         // Free checks first: a held or already-scheduled issue costs no forge read.
-        const refusal = policyRefusal(issueId);
+        const refusal = strike ? policyRefusal(issueId, { branch: candidate.branch }) : policyRefusal(issueId);
         if (refusal) {
           skip(refusalReason(refusal));
           continue;
@@ -310,19 +332,19 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
           continue;
         }
         // PAN-5036: ruled out by the listing; say so with the head it judged.
-        const ruledOut = dropped.get(issueId);
-        if (ruledOut) {
-          head = ruledOut.head;
-          skip(ruledOut.reason);
+        if (candidate.reason) {
+          head = candidate.head;
+          skip(candidate.reason);
           continue;
         }
 
-        const gate = await mergeGate(issueId);
+        // A feature read keeps the 60 s PR-facts cache; a strike is read on its own branch.
+        const gate = strike ? await mergeGate(issueId, { preferBranch: candidate.branch }) : await mergeGate(issueId);
         head = gate.facts.headSha ?? undefined;
         if (!gate.ready) {
           const reason = gate.reason ?? 'merge gate says not ready';
           let stale: string | null = null;
-          if (isCurrent()) {
+          if (isCurrent() && !strike) {
             try {
               stale = await rereview(issueId, gate.facts);
             } catch (error) {
@@ -339,12 +361,13 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
         if (!isCurrent()) return outcomes;
 
         let refusedInInsert: PendingAutoMerge | null = null;
-        const result = await schedule(issueId, (fresh) => {
+        const canSchedule: CanSchedule = (fresh) => {
           // An abandoned pass writes nothing, even mid-door.
           const allowed = isCurrent() && latestAutoMergeAllowsSchedule(fresh, gate.facts);
           if (!allowed) refusedInInsert = fresh;
           return allowed;
-        });
+        };
+        const result = strike ? await schedule(issueId, canSchedule, 'strike') : await schedule(issueId, canSchedule);
         if (result.status !== 200) {
           skip(refusalReason(result));
           continue;
@@ -354,7 +377,7 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
           continue;
         }
         outcomes.push({ projectKey: key, issueId, scheduled: true });
-        log(`[auto-merge-scheduler] scheduled auto-merge for ${issueId}`);
+        log(`[auto-merge-scheduler] scheduled ${strike ? 'strike ' : ''}auto-merge for ${issueId}`);
       } catch (error) {
         log(`[auto-merge-scheduler] ${issueId} failed: ${errorMessage(error)}`);
         skip(errorMessage(error));
