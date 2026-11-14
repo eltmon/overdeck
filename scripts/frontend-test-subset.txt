@@ -332,6 +332,7 @@ src/hooks/__tests__/useColorTheme.test.ts
 src/hooks/__tests__/useTheme.test.ts
 src/lib/__tests__/appearance.test.ts
 src/lib/__tests__/bootRequests.test.ts
+src/lib/__tests__/buildDrift.test.ts
 src/lib/__tests__/citationFormat.test.ts
 src/lib/__tests__/colorThemeEditor.test.ts
 src/lib/__tests__/composerCitations.test.ts
