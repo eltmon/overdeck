@@ -326,6 +326,9 @@ src/components/sidebar/__tests__/AddProjectToMachineDialog.test.tsx
 src/components/sidebar/__tests__/MachinesNavItem.test.tsx
 src/components/sidebar/__tests__/projectOwners.test.ts
 src/components/simple/SimpleQuestionCard.test.tsx
+src/components/skills/SkillControls.test.tsx
+src/components/skills/SkillOverridesPanel.test.tsx
+src/components/skills/SkillPacksSection.test.tsx
 src/components/terminal/TerminalDrawer.pending.test.tsx
 src/components/terminal/terminalControlFrames.test.ts
 src/components/workspace/new/__tests__/smartField.test.ts
