@@ -1,0 +1,579 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T03:06:32Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5225: pan close still compares MYN repos against stale local main after PAN-5209 (fetch fails inside close-out)",
+    "updated": "2026-11-14T03:15:27.106Z"
+  },
+  "plan": {
+    "id": "pan-5225",
+    "title": "pan close still compares MYN repos against stale local main after PAN-5209 (fetch fails inside close-out)",
+    "status": "proposed",
+    "uid": "88613ef3-c416-422f-b9cc-73bf0e3259a1",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-14T03:06:32Z",
+    "updated": "2026-11-14T03:15:27.106Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5225",
+        "label": "PAN-5225",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5225.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "close-out",
+      "dod-gate",
+      "reload",
+      "polyrepo",
+      "myn"
+    ],
+    "narratives": {
+      "Problem": "The reported pan close failures for MIN-1140/MIN-1139 ran the pre-PAN-5209 build: ~/.overdeck/cli-bin/pan (first on PATH) still pointed at generation-b (70816bc8790, built before PAN-5209), because pan reload repoints only the npm-global link, never the cli-bin shim. A read-only probe of the PAN-5209 code shows rows 1, 2 and 4 now pass for MIN-1140, but row 5 (post-merge) always misses for non-GitHub-tracked issues (no canonical state, no PR mergedAt), MIN-1139 rows 1/2 call an openclaw-plugin branch with no net changes 'unlanded', and a failed fetch still falls back to stale local main over an existing origin/main.",
+      "Proposal": "(1) pan reload rewrites the cli-bin shim to the activated generation. (2) resolveTargetComparison prefers the last-fetched origin/<target> over local <target> after a failed fetch, with a note. (3) Rows 1/2 landing evidence treats an empty three-dot diff as no-branch-work. (4) Extract row 5 into dod-post-merge-row.ts (dod-gate.ts is at 992/1000 lines), then (5) let row 5 pass a non-GitHub issue on the same memoized complete forge-merge verdict rows 1/2 read. (6) Docs + changelog. (7) Record a read-only DoD probe for both issues in the PR; the real close runs after merge and reload.",
+      "NonGoals": "- Must not change row 3 (verification) or add a way to close MIN-1139 without an operator decision on its failed frontend-lint artifact\n- Must not run the real pan close for MIN-1139/MIN-1140 from the work agent\n- Must not change rows 1/2's refusal to judge after a failed target fetch (comparison.note stays unverifiable)\n- Must not fix pipeline-membership-gather resolveRepositoryDefaultBranch or close-out.ts isBranchMerged (still prefer local main)\n- Must not extend pan doctor's CLI Generation check to the shim\n- Must not read Linear state for the row 5 canonical state\n- Must not edit scripts/file-size-allowlist.txt or add circular-deps baseline entries\n- Must not mark issue requirement 3 satisfied for MIN-1139 (its row 3 miss needs a fresh green verification run or an operator decision)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Root cause is the stale cli-bin shim (pre-PAN-5209 generation-b), not a fetch failing inside pan close; no investigation spike",
+        "rationale": "generation-b checkout is 70816bc8790 and its dist lacks every PAN-5209 string; the shim was repointed to generation-a 35 s after the issue was filed; the reported texts match the old code exactly; a probe of the new code in an agent shell fetched successfully"
+      },
+      {
+        "summary": "Fix the shim in pan reload activation rather than in pan close",
+        "rationale": "every pan verb runs through the shim; reload is the one place that knows a new generation went live, and it already repoints the npm-global link"
+      },
+      {
+        "summary": "MIN-1139 row 3 (failed frontend-lint verification artifact) stays a genuine miss; issue requirement 3 is met for MIN-1140 and for MIN-1139 rows 1, 2, 4 and 5",
+        "rationale": "weakening a real failed verification verdict would be a policy change outside this bug; the operator decides between --accept-verification and a fresh verification run"
+      },
+      {
+        "summary": "Row 5 reuses the memoized complete forge-merge verdict instead of branch containment",
+        "rationale": "containment compares against stale local main and lists myn-skills/openclaw-plugin as unmerged; a complete forge verdict is the non-GitHub analogue of the PR mergedAt that row 5 already accepts"
+      },
+      {
+        "summary": "Empty three-dot diff (no path exclusions) is the no-branch-work rule for rows 1/2",
+        "rationale": "it compares against the merge-base so it survives the target advancing (two-tree equality would not), and a squash-merged branch without an artifact still shows its work"
+      },
+      {
+        "summary": "Live check is a read-only evaluateDodGate probe recorded in the PR; the real pan close runs after merge and pan reload",
+        "rationale": "the deployed pan will not carry this fix before merge, and a passing close-out irreversibly removes workspaces and closes tracker issues"
+      }
+    ],
+    "items": [
+      {
+        "id": "reload-shim-repoint",
+        "title": "pan reload rewrites the cli-bin shim to the activated generation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T03:06:32Z",
+        "metadata": {
+          "issueLabel": "pan-5225",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/reload.ts",
+            "src/cli/commands/__tests__/reload.test.ts",
+            "src/cli/commands/__tests__/reload-health-timeout.integration.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/reload.test.ts src/cli/commands/__tests__/reload-health-timeout.integration.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "reload.test.ts and reload-health-timeout.integration.test.ts pass, including the new shim tests",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-5225.md). In src/cli/commands/reload.ts split reportCliRepoint (grep: `async function reportCliRepoint(deployRoot: string)`) into reportGlobalCliRepoint (the old switch body, unchanged) and a new reportCliShimRepoint that calls writePanCliShims({ root: deployRoot }) from src/lib/pan-cli-shim.ts; reportCliRepoint returns linkError ?? shimError. Success prints dim `  pan CLI shim → <deployRoot>`; missing-bundle/error prints red and returns `pan CLI shim repoint failed — the shell pan still runs the previous generation (PAN-5225): <reason>`. Leave the four callers unchanged. In src/cli/commands/__tests__/reload.test.ts add a writePanCliShims mock (vi.mock('../../../lib/pan-cli-shim.js')) defaulting to { status: 'written' } in beforeEach — mandatory so no test writes the real ~/.overdeck/cli-bin — and add the tests named in WI-1. Put the success assertion in the green-restart test 'keeps a successful restart green when previous deployment cleanup fails' (reload.test.ts line 591), not the line-696 health-timeout test. Add the same pan-cli-shim.js mock to src/cli/commands/__tests__/reload-health-timeout.integration.test.ts."
+        },
+        "items": [
+          {
+            "id": "reload-shim-repoint.ac1",
+            "title": "Given the green-restart test 'keeps a successful restart green when previous deployment cleanup fails', when reloadCommand runs, then writePanCliShims is called with { root: <activated deployRoot> }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reload-shim-repoint.ac2",
+            "title": "Given writePanCliShims resolves { status: 'error', message: 'EACCES' }, when the reload activates, then process.exitCode is 1 and the recorded failure contains `pan CLI shim repoint failed`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reload-shim-repoint.ac3",
+            "title": "Given a reload that rolls back (the existing test asserting repointGlobalCliToDeployment is not called), then writePanCliShims is also not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reload-shim-repoint.ac4",
+            "title": "When the reload.test.ts suite runs, then it mocks src/lib/pan-cli-shim.js and the real ~/.overdeck/cli-bin/pan keeps its mtime",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "target-fallback-remote-tracking",
+        "title": "Merged check falls back to last-fetched origin/<target> before local <target>",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T03:06:32Z",
+        "metadata": {
+          "issueLabel": "pan-5225",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/lifecycle/verify-merged.ts",
+            "tests/unit/lib/lifecycle/verify-merged-remote-target.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/verify-merged-remote-target.test.ts tests/unit/lib/lifecycle/dod-forge-merge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "verify-merged-remote-target.test.ts passes with the new last-fetched origin/main cases",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/lib/lifecycle/verify-merged.ts resolveTargetComparison catch block: after a failed fetch, return { ref: `origin/<target>`, note: `Checked against the last-fetched origin/<target> because git fetch origin <target> failed: <reason>` } when refs/remotes/origin/<target>^{commit} resolves; else the existing local fallback; else error `Cannot verify merge: git fetch origin <target> failed (<reason>) and neither origin/<target> nor a local <target> branch exists`. Add a refResolves(dir, ref) helper using execAsync `git rev-parse --verify --quiet`. Rewrite/add the four tests listed in WI-2 in tests/unit/lib/lifecycle/verify-merged-remote-target.test.ts."
+        },
+        "items": [
+          {
+            "id": "target-fallback-remote-tracking.ac1",
+            "title": "Given origin is unreachable and origin/main already contains the feature tip while local main is stale, when verifyConventionBranchMerged runs, then it returns success and details include `Checked against the last-fetched origin/main because git fetch origin main failed:`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "target-fallback-remote-tracking.ac2",
+            "title": "Given origin is unreachable and origin/main is behind the branch, then the step fails with `2 unmerged commit(s) on feature/pan-900. Merge before closing out. (Checked against the last-fetched origin/main because git fetch origin main failed: …)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "target-fallback-remote-tracking.ac3",
+            "title": "Given origin is unreachable and refs/remotes/origin/main is deleted, then the error ends with `(Checked against local main because git fetch origin main failed: …)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "target-fallback-remote-tracking.ac4",
+            "title": "Given origin is unreachable with neither origin/main nor local main, then the step fails with `Cannot verify merge: git fetch origin main failed (…) and neither origin/main nor a local main branch exists`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "landing-no-changes",
+        "title": "Rows 1/2 landing evidence treats a branch that adds no changes as no-branch-work",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T03:06:32Z",
+        "metadata": {
+          "issueLabel": "pan-5225",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/lifecycle/dod-forge-merge.ts",
+            "tests/unit/lib/lifecycle/dod-forge-merge.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-forge-merge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "dod-forge-merge.test.ts passes including cases (f), (g), (h)",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In src/lib/lifecycle/dod-forge-merge.ts assessRepoLanding, inside the catch of `git merge-base --is-ancestor ${tip} ${ref}`, call a new addsNoChanges(repoPath, ref, tip) helper running `git diff --quiet ${ref}...${tip}` (THREE dots): exit 0 → return no-branch-work with reason `<repoKey>: <source> adds no changes over <ref>`; err.code === 1 → today's unlanded result; any other failure rethrows to the existing outer catch (unverifiable). Do not change the comparison.note → unverifiable rule. Add tests (f), (g), (h) from WI-3 to tests/unit/lib/lifecycle/dod-forge-merge.test.ts."
+        },
+        "items": [
+          {
+            "id": "landing-no-changes.ac1",
+            "title": "Given a branch off origin/main whose commits add then delete a file and no merged artifact, when assessRepoLanding runs, then it returns state no-branch-work with reason `<repoKey>: feature/pan-900 adds no changes over origin/main`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landing-no-changes.ac2",
+            "title": "Given the same branch after one more commit lands on origin/main, then assessRepoLanding still returns no-branch-work",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landing-no-changes.ac3",
+            "title": "Given an off-main branch that keeps a new file and has no merged artifact, then assessRepoLanding returns unlanded with reason `<repoKey>: feature/pan-900 is not on origin/main and has no merged review artifact`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-post-merge-row",
+        "title": "Extract DoD row 5 into dod-post-merge-row.ts with no behavior change",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T03:06:32Z",
+        "metadata": {
+          "issueLabel": "pan-5225",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "refactor",
+          "requiresInspection": true,
+          "foundationFor": [
+            "post-merge-forge-landing"
+          ],
+          "files_scope": [
+            "src/lib/lifecycle/dod.ts",
+            "src/lib/lifecycle/dod-gate.ts",
+            "src/lib/lifecycle/dod-post-merge-row.ts"
+          ],
+          "verify_commands": [
+            "wc -l src/lib/lifecycle/dod-gate.ts",
+            "npm run lint:circular",
+            "npm run lint:file-size",
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts tests/unit/lib/lifecycle/dod-gate-pr-read.test.ts"
+          ],
+          "expected_outputs": [
+            "dod-gate.ts is at or under 1000 lines",
+            "lint:circular reports no new cycle",
+            "lint:file-size passes",
+            "typecheck completes without errors",
+            "dod-gate.test.ts and dod-gate-pr-read.test.ts pass with unchanged import lines"
+          ],
+          "traces": [
+            "NFR-1",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. (1) In src/lib/lifecycle/dod.ts export dodRowDefinition(id) and dodRowResult(id, status, observed) (bodies of dod-gate's rowDefinition/result). (2) In dod-gate.ts delete rowDefinition/result and import `dodRowDefinition as rowDefinition, dodRowResult as result` from './dod.js'. (3) Move PostMergeRowDeps, readPullRequestMergedAt (with doc comment), defaultPostMergeRowDeps and checkPostMergeRow verbatim into new src/lib/lifecycle/dod-post-merge-row.ts; type the merged param as `PostMergeMergedEvidence = Partial<DodRowResult> & { evidence?: 'branch-containment'; containedStrikeHead?: string }`. The new module must never import dod-gate.js. (4) dod-gate.ts imports checkPostMergeRow for its defaults and re-exports `checkPostMergeRow, readPullRequestMergedAt` so existing test imports keep working. (5) Remove imports only the moved code used."
+        },
+        "items": [
+          {
+            "id": "extract-post-merge-row.ac1",
+            "title": "When `wc -l src/lib/lifecycle/dod-gate.ts` runs, then it prints at most 1000, and `git diff origin/main -- scripts/file-size-allowlist.txt` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-post-merge-row.ac2",
+            "title": "`npm run lint:circular` exits 0 and src/lib/lifecycle/dod-post-merge-row.ts contains no import of './dod-gate.js'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-post-merge-row.ac3",
+            "title": "When tests/unit/lib/lifecycle/dod-gate.test.ts and dod-gate-pr-read.test.ts run with their import lines unchanged (checkPostMergeRow and readPullRequestMergedAt from dod-gate.js), then both suites pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "post-merge-forge-landing",
+        "title": "Row 5 passes a non-GitHub issue on complete merged forge artifacts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T03:06:32Z",
+        "metadata": {
+          "issueLabel": "pan-5225",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/lifecycle/dod-post-merge-row.ts",
+            "src/lib/lifecycle/dod-gate.ts",
+            "tests/unit/lib/lifecycle/dod-gate.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts",
+            "npm run lint:file-size",
+            "npm run lint:circular",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "dod-gate.test.ts passes including the four new post-merge cases",
+            "lint:file-size and lint:circular pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add optional 4th param `landing?: { forgeMerge?: () => Promise<RepoLandingEvidence> }` to checkPostMergeRow in dod-post-merge-row.ts. After the branch-containment block and before the final return: if !lifecycleObserved && landing?.forgeMerge, await readForgeMergeVerdict(landing.forgeMerge); on kind 'complete' return result('post-merge', blockingAgents.length === 0 ? 'pass' : 'miss', `${stateObserved}; ${verdict.text} — merged forge artifacts stand in for the PR mergedAt on a non-GitHub-tracked issue; ${agentsObserved}`). In dod-gate.ts: EvaluateDodGateDeps.postMerge gains `landing?: LandingEvidence`; default becomes `(ctx, merged, landing) => checkPostMergeRow(ctx, merged, undefined, landing)` (never the bare reference); evaluateDodGate calls deps.postMerge(ctx, merged, landing). Add the four tests from WI-5 to tests/unit/lib/lifecycle/dod-gate.test.ts."
+        },
+        "items": [
+          {
+            "id": "post-merge-forge-landing.ac1",
+            "title": "Given a ctx without github, null canonical state, no mergedAt, no live agents and forgeMerge resolving one merged repo, when checkPostMergeRow runs, then it returns pass with observed containing `forge merge complete: fe merged (u) — merged forge artifacts stand in for the PR mergedAt`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "post-merge-forge-landing.ac2",
+            "title": "Given the same ctx with an unlanded repo, then the row returns miss with the unchanged text `canonical state unavailable; PR mergedAt: not merged; no running work/planning agents`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "post-merge-forge-landing.ac3",
+            "title": "Given complete forge evidence and one live work agent, then the row returns miss",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "post-merge-forge-landing.ac4",
+            "title": "Given evaluateDodGate on a non-GitHub ctx with a forgeMerge spy, when the gate runs rows 1, 2 and 5, then the spy is called exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-close-out-and-shim",
+        "title": "Document the comparison fallback, the no-changes rule, row 5 forge landing and the reload shim",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T03:06:32Z",
+        "metadata": {
+          "issueLabel": "pan-5225",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/MERGE-WORKFLOW.md",
+            "docs/BUILD.md",
+            "changelog.d/pan-5225.md",
+            ".overdeck/context/codebase/concerns.md"
+          ],
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'last-fetched' docs/MERGE-WORKFLOW.md",
+            "grep -c 'adds no changes' docs/MERGE-WORKFLOW.md",
+            "grep -c 'pan reload' docs/BUILD.md"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "each grep prints a count of at least 1"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Edit docs/MERGE-WORKFLOW.md row 4, rows 1/2 and row 5 paragraphs as specified; edit docs/BUILD.md line 21 to list pan reload activation among the shim writers; add changelog.d/pan-5225.md with the two Fixed bullets from the PRD; add one sentence about the cli-bin shim writers to the 'Primary checkouts have a stale local main' bullet in .overdeck/context/codebase/concerns.md without touching its last-verified line. The row 4 paragraph also states the fallback assumes the merge target is a protected branch that is never rewound."
+        },
+        "items": [
+          {
+            "id": "docs-close-out-and-shim.ac1",
+            "title": "docs/MERGE-WORKFLOW.md row 4 paragraph states that a failed fetch falls back to the last-fetched origin/<target> before the local branch and quotes the `Checked against the last-fetched origin/<target>` note",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-close-out-and-shim.ac2",
+            "title": "docs/MERGE-WORKFLOW.md contains a rows 1/2 sentence saying an empty three-dot diff (`adds no changes over`) is no branch work, and a row 5 sentence saying complete forge landing evidence stands in for the PR mergedAt on non-GitHub issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-close-out-and-shim.ac3",
+            "title": "docs/BUILD.md contains `pan reload` in its list of the writers of ~/.overdeck/cli-bin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-close-out-and-shim.ac4",
+            "title": "changelog.d/pan-5225.md exists with a `#### Fixed` heading and two bullets linking #5225, and `npm run lint:docs` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-dod-probe",
+        "title": "Record read-only DoD probe output for MIN-1140 and MIN-1139",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T03:06:32Z",
+        "metadata": {
+          "issueLabel": "pan-5225",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "test",
+          "requiresInspection": false,
+          "files_scope": [
+            ".pan/drafts/PAN-5225-live-probe.md"
+          ],
+          "verify_commands": [
+            "test -s .pan/drafts/PAN-5225-live-probe.md",
+            "grep -c 'passed' .pan/drafts/PAN-5225-live-probe.md"
+          ],
+          "expected_outputs": [
+            "the probe file exists and is non-empty",
+            "grep counts two `passed` lines (one per issue)"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Write probe-dod.mts (exact content in the PRD) to your session scratchpad — never /tmp, never the repo — with absolute imports of src/lib/lifecycle/dod-gate.ts and verify-merged.ts. Run `npx tsx <scratchpad>/probe-dod.mts MIN-1140 /home/eltmon/Projects/myn` and the same for MIN-1139 from the workspace root. Commit both outputs verbatim in .pan/drafts/PAN-5225-live-probe.md and paste them into the PR body under `## Live DoD probe`. NEVER run `pan close` for these issues. If a row differs from the PRD's expected values, record the observed text and the live cause instead of changing code. The probe file and PR body must say that MIN-1139 close-out still needs a fresh green verification run or an operator decision on its failed row 3; this change does not satisfy issue requirement 3 for MIN-1139."
+        },
+        "items": [
+          {
+            "id": "live-dod-probe.ac1",
+            "title": "Given the branch code, when the probe runs for MIN-1140 and MIN-1139, then .pan/drafts/PAN-5225-live-probe.md contains both outputs verbatim, one row line per DoD row plus a `passed` line per issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-dod-probe.ac2",
+            "title": "The probe file either shows MIN-1140 `post-merge: pass` and `passed true`, or names each differing row with its observed text and the live cause (e.g. workspace reaped)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-dod-probe.ac3",
+            "title": "The PR body contains a `## Live DoD probe` section with both outputs, and it states that the real `pan close MIN-1140 --force` runs after merge and pan reload and that MIN-1139 still needs a green verification run or an operator decision on row 3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-post-merge-row",
+        "to": "post-merge-forge-landing",
+        "type": "blocks"
+      },
+      {
+        "from": "target-fallback-remote-tracking",
+        "to": "live-dod-probe",
+        "type": "blocks"
+      },
+      {
+        "from": "landing-no-changes",
+        "to": "live-dod-probe",
+        "type": "blocks"
+      },
+      {
+        "from": "post-merge-forge-landing",
+        "to": "live-dod-probe",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Only two code subsystems change (src/cli/commands reload, src/lib/lifecycle close-out DoD); the other six 'subsystems' are their test directories (src/cli/commands/__tests__, tests/unit/lib/lifecycle), the required docs (docs/, changelog.d/, .overdeck/context/codebase/) and the committed probe evidence (.pan/drafts/). All seven items serve one bug report whose live acceptance check (the MIN-1140 close-out) needs every fix at once: the shim fix makes pan run the new code, and the DoD fixes make that code pass. Splitting into siblings would leave the issue's acceptance check unverifiable until all siblings merged.",
+      "canonicalFilename": "2026-11-14-PAN-5225-pan-close-still-compares-myn-repos-against-stale-local-main-after-pan-5209-fetch-fails-inside-close-out.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
