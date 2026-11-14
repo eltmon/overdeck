@@ -35,6 +35,12 @@ import {
 import { getForgeAdapter } from '../forge.js';
 import { resolveProjectReposForIssue } from '../project-repos.js';
 import {
+  memoizeOnce,
+  readForgeMergeVerdict,
+  readRepoLandingEvidence,
+  type RepoLandingEvidence,
+} from './dod-forge-merge.js';
+import {
   gatherIssueBranchContainment,
   type IssueBranchContainment,
 } from '../pipeline-membership-gather.js';
@@ -67,6 +73,8 @@ export interface DodStatusRowDeps {
 export interface LandingEvidence {
   /** The work reached main through `strike/<id>` rather than a PR. */
   strikeLanded: boolean;
+  /** PAN-5209: memoized repo landing evidence for a non-GitHub issue; absent for GitHub-tracked issues. */
+  forgeMerge?: () => Promise<RepoLandingEvidence>;
 }
 
 export interface MergedDodRowResult extends DodRowResult {
@@ -278,6 +286,8 @@ export interface EvaluateDodGateDeps {
     mainVerifyRowStatus?: DodRowResult['status'];
   }) => DodRowResult | Promise<DodRowResult>;
   trackerClosed?: (issueId: string) => Awaitable<boolean>;
+  /** PAN-5209: repo landing evidence for rows 1/2 on a non-GitHub-tracked issue. */
+  forgeMerge?: (issueId: string) => Promise<RepoLandingEvidence>;
   now: () => string;
 }
 
@@ -291,6 +301,7 @@ const defaultEvaluateDodGateDeps: EvaluateDodGateDeps = {
   ship: checkShipRow,
   deploy: checkDeployRow,
   trackerClosed: isTrackerIssueClosed,
+  forgeMerge: readRepoLandingEvidence,
   now: () => new Date().toISOString(),
 };
 
@@ -360,6 +371,16 @@ const STRIKE_BYPASS_NOTE: Record<'review' | 'tests', string> = {
 };
 
 /**
+ * PAN-5209: a non-GitHub-tracked issue with no GitHub PR can still land through
+ * merged forge artifacts (`landing.forgeMerge`) — but that is never a review
+ * decision or a check result, so the skip says plainly what was not read.
+ */
+const FORGE_LANDING_NOT_READ: Record<'review' | 'tests', string> = {
+  review: 'the forge review decision is not read',
+  tests: 'forge check results are not read',
+};
+
+/**
  * A specialist that ran and returned a negative verdict is a different fact from
  * one that was never dispatched, so the strike waiver never covers it — those
  * still block until an operator records an explicit `--accept-<row>` override.
@@ -417,7 +438,17 @@ async function checkVerdict(
   }
 
   if (!pr) {
-    const observed = 'no pull request found on the forge for this issue';
+    let observed = 'no pull request found on the forge for this issue';
+    if (landing?.forgeMerge) {
+      const verdict = await readForgeMergeVerdict(landing.forgeMerge);
+      if (verdict.kind === 'complete') {
+        return result(id, 'skip', `${observed}; ${verdict.text}; skipped — merged forge artifacts are landing evidence; ${FORGE_LANDING_NOT_READ[id]}`);
+      }
+      if (verdict.kind === 'unverifiable') {
+        return result(id, 'miss', `${observed}; ${verdict.text}`);
+      }
+      observed = `${observed}; ${verdict.text}`;
+    }
     if (landing?.strikeLanded) {
       return result(id, 'skip', `${observed}; skipped by the strike path — ${STRIKE_BYPASS_NOTE[id]}`);
     }
@@ -891,7 +922,12 @@ export async function evaluateDodGate(
   };
   // PAN-3917: "this landed as a strike" is derived from branch containment on
   // row 4, not from a stored strikeLandingState.
-  const landing: LandingEvidence = { strikeLanded: Boolean(merged.containedStrikeHead) };
+  const readForgeMerge = deps.forgeMerge ?? readRepoLandingEvidence;
+  const landing: LandingEvidence = {
+    strikeLanded: Boolean(merged.containedStrikeHead),
+    // PAN-5209: a non-GitHub-tracked issue falls back to merged forge artifacts for rows 1/2.
+    ...(ctx.github ? {} : { forgeMerge: memoizeOnce(() => readForgeMerge(ctx.issueId)) }),
+  };
   const [review, tests, verification, postMerge, ship, deploy] = await Promise.all([
     deps.review(ctx.issueId, settlement, landing),
     deps.tests(ctx.issueId, settlement, landing),

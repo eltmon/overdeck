@@ -292,6 +292,66 @@ describe('Definition-of-Done status rows', () => {
     expect(green).toMatchObject({ status: 'skip' });
     expect(unproved).toMatchObject({ status: 'miss' });
   });
+
+  it('both rows skip with the merge-complete note when forge landing evidence is complete (PAN-5209)', async () => {
+    const source = deps(null, null);
+    const landing = {
+      strikeLanded: false,
+      forgeMerge: async () => ({
+        repos: [
+          { repoKey: 'fe', state: 'merged' as const, url: 'https://gitlab.com/x/-/merge_requests/121', reason: '' },
+          { repoKey: 'myn-skills', state: 'no-branch-work' as const, reason: 'myn-skills: feature/pan-900 points at origin/main history' },
+        ],
+      }),
+    };
+
+    const review = await checkReviewRow(issueId, source, undefined, landing);
+    expect(review).toMatchObject({
+      status: 'skip',
+      observed: 'no pull request found on the forge for this issue; forge merge complete: fe merged (https://gitlab.com/x/-/merge_requests/121), myn-skills no branch work; skipped — merged forge artifacts are landing evidence; the forge review decision is not read',
+    });
+
+    const tests = await checkTestsRow(issueId, source, undefined, landing);
+    expect(tests).toMatchObject({
+      status: 'skip',
+      observed: 'no pull request found on the forge for this issue; forge merge complete: fe merged (https://gitlab.com/x/-/merge_requests/121), myn-skills no branch work; skipped — merged forge artifacts are landing evidence; forge check results are not read',
+    });
+  });
+
+  it('both rows miss when forge landing evidence is unverifiable, even on the strike path (PAN-5209)', async () => {
+    const source = deps(null, null);
+    const landing = {
+      strikeLanded: true,
+      forgeMerge: async () => ({
+        repos: [{ repoKey: 'fe', state: 'unverifiable' as const, reason: 'fe: merged-artifact lookup failed: glab mr list failed: 401' }],
+      }),
+    };
+
+    const review = await checkReviewRow(issueId, source, undefined, landing);
+    const tests = await checkTestsRow(issueId, source, undefined, landing);
+
+    expect(review).toMatchObject({ status: 'miss' });
+    expect(tests).toMatchObject({ status: 'miss' });
+    expect(review.observed).toContain('forge merge evidence unavailable:');
+    expect(tests.observed).toContain('forge merge evidence unavailable:');
+  });
+
+  it('both rows miss with the incomplete reason when a repo is unlanded (PAN-5209)', async () => {
+    const source = deps(null, null);
+    const landing = {
+      strikeLanded: false,
+      forgeMerge: async () => ({
+        repos: [{ repoKey: 'fe', state: 'unlanded' as const, reason: 'fe: feature/min-1 is not on origin/main and has no merged review artifact' }],
+      }),
+    };
+
+    const review = await checkReviewRow(issueId, source, undefined, landing);
+    const tests = await checkTestsRow(issueId, source, undefined, landing);
+
+    const expected = 'no pull request found on the forge for this issue; forge merge incomplete: fe: feature/min-1 is not on origin/main and has no merged review artifact';
+    expect(review).toMatchObject({ status: 'miss', observed: expected });
+    expect(tests).toMatchObject({ status: 'miss', observed: expected });
+  });
 });
 
 describe('Definition-of-Done merged row', () => {
@@ -1243,6 +1303,26 @@ describe('assembled Definition-of-Done gate', () => {
     const gate = await evaluateDodGate(ctx, {}, deps());
     expect(gate.passed).toBe(true);
     expect(gate.rows.map(row => row.id)).toEqual(DOD_ROWS.slice(0, 8).map(row => row.id));
+  });
+
+  it('reads repo landing evidence once for a non-GitHub issue, and never for a GitHub issue (PAN-5209)', async () => {
+    const forgeMergeSpy = vi.fn(async () => ({ repos: [] }));
+    const review = async (_issueId: string, _settlement?: unknown, landing?: { forgeMerge?: () => Promise<unknown> }) => {
+      await landing?.forgeMerge?.();
+      return makeRow('review', 'skip');
+    };
+    const tests = async (_issueId: string, _settlement?: unknown, landing?: { forgeMerge?: () => Promise<unknown> }) => {
+      await landing?.forgeMerge?.();
+      return makeRow('tests', 'skip');
+    };
+
+    await evaluateDodGate(ctx, {}, { ...deps(), review, tests, forgeMerge: forgeMergeSpy });
+    expect(forgeMergeSpy).toHaveBeenCalledTimes(1);
+
+    forgeMergeSpy.mockClear();
+    const githubCtx = { ...ctx, github: { owner: 'eltmon', repo: 'overdeck', number: 100 } };
+    await evaluateDodGate(githubCtx, {}, { ...deps(), review, tests, forgeMerge: forgeMergeSpy });
+    expect(forgeMergeSpy).not.toHaveBeenCalled();
   });
 
   it('computes landed and main-verify evidence before passing terminal settlement to verdict rows', async () => {
