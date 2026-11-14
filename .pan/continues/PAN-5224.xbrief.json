@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5224",
   "created": "2026-11-14T03:12:38.408Z",
-  "updated": "2026-11-14T03:47:30.873Z",
+  "updated": "2026-11-14T03:54:06.006Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,9 +108,26 @@
       "doneAt": "2026-11-14T03:47:16.820Z"
     },
     "webhook-coalescer": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5224",
-      "claimedAt": "2026-11-14T03:47:30.873Z"
+      "claimedAt": "2026-11-14T03:47:30.873Z",
+      "doneAt": "2026-11-14T03:54:06.006Z"
+    },
+    "webhook-coalescer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:54:06.006Z"
+    },
+    "webhook-coalescer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:54:06.006Z"
+    },
+    "webhook-coalescer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:54:06.006Z"
+    },
+    "webhook-coalescer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:54:06.006Z"
     }
   }
 }
