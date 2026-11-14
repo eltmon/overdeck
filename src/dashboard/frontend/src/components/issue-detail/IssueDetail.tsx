@@ -259,37 +259,65 @@ export function IssueDetail({ issueId, density, agents, derived, tab, onSelectTa
   const sessionTab = entry === 'session';
   return (
     <div data-component="issue-detail" data-density={density} data-tab={entry ?? undefined} data-view={resolved?.view ?? undefined} className={cn('flex min-h-0 flex-1 flex-col', className)}>
-      <div data-section="PhaseTimeline" className="shrink-0 pb-[8px] pl-[14px] pr-[16px]">
-        <IssuePipelineStrip
-          issueId={issueId}
-          agents={agents}
-          activeAgentId={sessionTab ? effectiveAgentId : null}
-          onOpenAgentConversation={openAgentConversation}
-        >
-          <IssueChecksChip issueId={issueId} checks={derived?.pr?.checks} />
-          <PickupGateControls issueId={issueId} variant="strip" stage={pickupStageFor(derived?.state)} onOpenIssueBrowser={openIssueOnTracker} />
-        </IssuePipelineStrip>
+      <div data-section="Pipeline Band" className="contents">
+        <div data-section="PhaseTimeline" className="shrink-0 pb-[8px] pl-[14px] pr-[16px]">
+          <IssuePipelineStrip
+            issueId={issueId}
+            agents={agents}
+            activeAgentId={sessionTab ? effectiveAgentId : null}
+            onOpenAgentConversation={openAgentConversation}
+          >
+            <IssueChecksChip issueId={issueId} checks={derived?.pr?.checks} />
+            <PickupGateControls issueId={issueId} variant="strip" stage={pickupStageFor(derived?.state)} onOpenIssueBrowser={openIssueOnTracker} />
+          </IssuePipelineStrip>
+        </div>
       </div>
       <IssueBannerSlot issueId={issueId} agents={agents} onOpenAgentConversation={openAgentConversation} />
       {showTabs && (
-        <div data-section="DrawerTabs">
-          <IssueDetailTabs
-            issueId={issueId}
-            tab={tab}
-            onSelectTab={onSelectTab}
-            tasksBadge={tasksBadge}
-            skillsBadge={skillsCount}
-            hiddenTabIds={hiddenTabIds}
-          />
+        <div data-section="Detail Tabs" className="contents">
+          <div data-section="DrawerTabs">
+            <IssueDetailTabs
+              issueId={issueId}
+              tab={tab}
+              onSelectTab={onSelectTab}
+              tasksBadge={tasksBadge}
+              skillsBadge={skillsCount}
+              hiddenTabIds={hiddenTabIds}
+            />
+          </div>
         </div>
       )}
       <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col', !sessionTab && 'overflow-auto px-[22px] py-[18px]')}>
-        {entry === 'session' ? sessionPane(resolved?.view === 'terminal' ? 'terminal' : 'conversation', onSelectTab, true)
-          : entry === 'tasks' ? <IssueTasksBody issueId={issueId} />
-          : entry === 'plan' ? <IssuePlanBody issueId={issueId} value={resolved!.value} onSelect={onSelectTab} />
-          : entry === 'changes' ? <IssueChangesBody issueId={issueId} value={resolved!.value} onSelect={onSelectTab} />
-          : entry === 'activity' ? <IssueActivityBody issueId={issueId} value={resolved!.value} onSelect={onSelectTab} />
-          : entry === 'discussion' ? <IssueDiscussionBody issueId={issueId} />
+        {entry === 'session' ? (
+            <div data-section="Session tab" className="contents">
+              {sessionPane(resolved?.view === 'terminal' ? 'terminal' : 'conversation', onSelectTab, true)}
+            </div>
+          )
+          : entry === 'tasks' ? (
+            <div data-section="TasksRail / TasksTab" className="contents">
+              <IssueTasksBody issueId={issueId} />
+            </div>
+          )
+          : entry === 'plan' ? (
+            <div data-section="Plan / Activity / Discussion tabs" className="contents">
+              <IssuePlanBody issueId={issueId} value={resolved!.value} onSelect={onSelectTab} />
+            </div>
+          )
+          : entry === 'changes' ? (
+            <div data-section="Changes tab" className="contents">
+              <IssueChangesBody issueId={issueId} value={resolved!.value} onSelect={onSelectTab} />
+            </div>
+          )
+          : entry === 'activity' ? (
+            <div data-section="Plan / Activity / Discussion tabs" className="contents">
+              <IssueActivityBody issueId={issueId} value={resolved!.value} onSelect={onSelectTab} />
+            </div>
+          )
+          : entry === 'discussion' ? (
+            <div data-section="Plan / Activity / Discussion tabs" className="contents">
+              <IssueDiscussionBody issueId={issueId} />
+            </div>
+          )
           : entry === 'decisions' ? <DeftDecisionsTab issueId={issueId} />
           : entry === 'skills' && !skillsUnavailable ? <IssueSkillsTabPanel issueId={issueId} onUnavailable={markSkillsUnavailable} />
           : entry === 'overview' ? (

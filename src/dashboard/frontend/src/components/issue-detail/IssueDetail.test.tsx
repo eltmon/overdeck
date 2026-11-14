@@ -279,6 +279,24 @@ describe('IssueDetail (C-DETAIL one component)', () => {
     expect(screen.queryByTestId('mock-issue-skills-section')).not.toBeInTheDocument();
   });
 
+  it.each([
+    ['conversation', 'Session tab'],
+    ['tasks', 'TasksRail / TasksTab'],
+    ['files', 'Changes tab'],
+    ['plan', 'Plan / Activity / Discussion tabs'],
+    ['activity', 'Plan / Activity / Discussion tabs'],
+    ['discussion', 'Plan / Activity / Discussion tabs'],
+  ])('carries the cockpit tab markers (tab=%s)', (tab, marker) => {
+    renderDetail(
+      <IssueDetail issueId="PAN-1" density="page" agents={AGENTS} tab={tab} onSelectTab={() => {}} />,
+    );
+    for (const name of ['Pipeline Band', 'Detail Tabs', marker]) {
+      const el = document.querySelector(`[data-section="${name}"]`);
+      expect(el, name).not.toBeNull();
+      expect(el, name).toHaveClass('contents');
+    }
+  });
+
   it('passes detailsFooter to the Details body', () => {
     renderDetail(
       <IssueDetail issueId="PAN-1" density="page" agents={AGENTS} tab="overview" detailsFooter={<span data-testid="x-footer" />} onSelectTab={() => {}} />,
