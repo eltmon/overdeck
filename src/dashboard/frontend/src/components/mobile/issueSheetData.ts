@@ -1,9 +1,17 @@
-/** Pure data helpers for the issue sheet (PAN-5219 WI-5, WI-6, WI-7). No React. */
-import { PHONE_ISSUE_EVENT_LABELS, type DirectoryEntry, type DirectoryEntryState, type PhoneIssueEvent } from '@overdeck/contracts';
+/** Pure data helpers for the issue sheet (PAN-5219 WI-5 to WI-8). No React. */
+import {
+  PHONE_ISSUE_EVENT_LABELS,
+  type DerivedIssueState,
+  type DerivedPrState,
+  type DirectoryEntry,
+  type DirectoryEntryState,
+  type PhoneIssueEvent,
+  type PrReviewState,
+} from '@overdeck/contracts';
 
 import { classifyDashboardAgent } from '../../lib/agent-classifier';
 import type { Agent } from '../../types';
-import type { IssueCostData } from '../CommandDeck/ZoneCOverviewTabs/queries';
+import type { IssueCheckRunsResponse, IssueCostData } from '../CommandDeck/ZoneCOverviewTabs/queries';
 
 /** D-5: same local calendar day as `now` shows a time; otherwise a date and time. Null for an unparsable `at`. */
 export function formatEventTime(at: string, now: Date): string | null {
@@ -132,4 +140,57 @@ export function stageCostLine(byStage: Record<string, { cost: number; tokens: nu
   const shown = stages.slice(0, 4).map(([stage, { cost }]) => `${stage} ${formatUsd(cost)}`);
   const more = stages.length - shown.length;
   return more > 0 ? `${shown.join(' · ')} · +${more} more` : shown.join(' · ');
+}
+
+/** D-8: true when `value` has a numeric check-runs summary; never throws. */
+export function isCheckRunsResponse(value: unknown): value is IssueCheckRunsResponse {
+  if (typeof value !== 'object' || value === null) return false;
+  const summary = (value as { summary?: unknown }).summary;
+  if (typeof summary !== 'object' || summary === null) return false;
+  const s = summary as Record<string, unknown>;
+  return typeof s.total === 'number' && typeof s.passed === 'number' && typeof s.failed === 'number'
+    && typeof s.running === 'number' && typeof s.pending === 'number';
+}
+
+export const REVIEW_LABELS: Readonly<Record<PrReviewState, string>> = {
+  approved: 'Approved',
+  'changes-requested': 'Changes requested',
+  'review-requested': 'Review requested',
+  commented: 'Commented',
+  none: 'No review yet',
+};
+
+/** D-8: the PR state label, or null when a PR is known only from check-runs. */
+export function prStateLabel(derived: DerivedIssueState | undefined): string | null {
+  if (!derived?.pr) return null;
+  if (derived.pr.merged || derived.state === 'merged') return 'Merged';
+  if (derived.state === 'closed') return 'Closed';
+  return 'Open';
+}
+
+const CHECKS_FALLBACK_LABELS: Record<DerivedPrState['checks'], string> = {
+  green: 'Checks passed',
+  red: 'Checks failed',
+  pending: 'Checks running',
+};
+
+export interface ChecksDisplay {
+  text: string;
+  /** The checks page to link to, only when the counts came from check-runs. */
+  href: string | null;
+}
+
+/** D-8: the checks row, preferring a valid check-runs summary over `derivedPr.checks`. */
+export function checksText(checkRuns: IssueCheckRunsResponse | null, derivedPr: DerivedPrState | undefined): ChecksDisplay {
+  if (checkRuns) {
+    const { summary } = checkRuns;
+    if (summary.total === 0) return { text: 'No checks reported', href: null };
+    const prUrl = derivedPr?.url ?? checkRuns.pr?.url ?? null;
+    return {
+      text: `${summary.passed} passed · ${summary.failed} failed · ${summary.running + summary.pending} running`,
+      href: prUrl ? `${prUrl}/checks` : null,
+    };
+  }
+  if (derivedPr) return { text: CHECKS_FALLBACK_LABELS[derivedPr.checks], href: null };
+  return { text: 'Checks not available', href: null };
 }

@@ -1,17 +1,42 @@
-import type { DirectoryEntry } from '@overdeck/contracts';
+import type { DerivedIssueState, DerivedPrState, DirectoryEntry } from '@overdeck/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { Agent } from '../../../types';
+import type { IssueCheckRunsResponse } from '../../CommandDeck/ZoneCOverviewTabs/queries';
 import {
+  checksText,
   DIRECTORY_STATE_LABELS,
   eventLine,
   formatEventTime,
   headlineCost,
+  isCheckRunsResponse,
   isIssueCostData,
   isLiveDirectoryResponse,
   pickIssueAgent,
+  prStateLabel,
   stageCostLine,
 } from '../issueSheetData';
+
+function derivedPr(overrides: Partial<DerivedPrState>): DerivedPrState {
+  return {
+    url: 'https://example.com/pr/1',
+    number: 1,
+    reviewState: 'none',
+    checks: 'pending',
+    mergeable: true,
+    ...overrides,
+  };
+}
+
+function checkRunsResponse(overrides: Partial<IssueCheckRunsResponse>): IssueCheckRunsResponse {
+  return {
+    issueId: 'PAN-1',
+    pr: null,
+    checkRuns: [],
+    summary: { total: 0, passed: 0, failed: 0, running: 0, skipped: 0, pending: 0, cancelled: 0 },
+    ...overrides,
+  };
+}
 
 function directoryEntry(overrides: Partial<DirectoryEntry>): DirectoryEntry {
   return {
@@ -189,5 +214,77 @@ describe('stageCostLine', () => {
   it('returns null with no byStage or no non-zero stage', () => {
     expect(stageCostLine(undefined)).toBeNull();
     expect(stageCostLine({ work: { cost: 0, tokens: 1 } })).toBeNull();
+  });
+});
+
+describe('isCheckRunsResponse', () => {
+  it('accepts a numeric summary and rejects everything else', () => {
+    expect(isCheckRunsResponse(checkRunsResponse({}))).toBe(true);
+    expect(isCheckRunsResponse({ summary: { total: '5' } })).toBe(false);
+    expect(isCheckRunsResponse(null)).toBe(false);
+  });
+});
+
+describe('prStateLabel', () => {
+  it('returns null with no derived state or no pr', () => {
+    expect(prStateLabel(undefined)).toBeNull();
+    expect(prStateLabel({ issueId: 'PAN-1', state: 'working' } satisfies DerivedIssueState)).toBeNull();
+  });
+
+  it('gives "Merged" when pr.merged is true, regardless of derived.state', () => {
+    const derived: DerivedIssueState = { issueId: 'PAN-1', state: 'ready', pr: derivedPr({ merged: true }) };
+    expect(prStateLabel(derived)).toBe('Merged');
+  });
+
+  it('gives "Merged" when derived.state is merged', () => {
+    const derived: DerivedIssueState = { issueId: 'PAN-1', state: 'merged', pr: derivedPr({}) };
+    expect(prStateLabel(derived)).toBe('Merged');
+  });
+
+  it('gives "Closed" when derived.state is closed', () => {
+    const derived: DerivedIssueState = { issueId: 'PAN-1', state: 'closed', pr: derivedPr({}) };
+    expect(prStateLabel(derived)).toBe('Closed');
+  });
+
+  it('gives "Open" for any other state with a pr', () => {
+    const derived: DerivedIssueState = { issueId: 'PAN-1', state: 'in-review', pr: derivedPr({}) };
+    expect(prStateLabel(derived)).toBe('Open');
+  });
+});
+
+describe('checksText', () => {
+  it('shows counts and links to the checks page when check-runs is valid', () => {
+    const result = checksText(
+      checkRunsResponse({ summary: { total: 5, passed: 4, failed: 1, running: 0, skipped: 0, pending: 0, cancelled: 0 } }),
+      derivedPr({ url: 'https://example.com/pr/9' }),
+    );
+    expect(result).toEqual({ text: '4 passed · 1 failed · 0 running', href: 'https://example.com/pr/9/checks' });
+  });
+
+  it('falls back to the check-runs pr url when derivedPr is absent', () => {
+    const result = checksText(
+      checkRunsResponse({
+        pr: { number: 9, url: 'https://example.com/pr/9', headRefName: 'x', headRefOid: 'a', mergeable: null, statusCheckRollup: [] },
+        summary: { total: 1, passed: 1, failed: 0, running: 0, skipped: 0, pending: 0, cancelled: 0 },
+      }),
+      undefined,
+    );
+    expect(result.href).toBe('https://example.com/pr/9/checks');
+  });
+
+  it('shows "No checks reported" when total is 0', () => {
+    expect(checksText(checkRunsResponse({}), derivedPr({}))).toEqual({ text: 'No checks reported', href: null });
+  });
+
+  it.each([
+    ['green', 'Checks passed'],
+    ['red', 'Checks failed'],
+    ['pending', 'Checks running'],
+  ] as const)('falls back to derivedPr.checks %s -> %s when check-runs is null', (checks, text) => {
+    expect(checksText(null, derivedPr({ checks }))).toEqual({ text, href: null });
+  });
+
+  it('shows "Checks not available" with neither source', () => {
+    expect(checksText(null, undefined)).toEqual({ text: 'Checks not available', href: null });
   });
 });

@@ -1,11 +1,76 @@
-/** Sections of the issue sheet moved out of MobileIssueSheet.tsx to keep it small (PAN-5219 WI-5 to WI-7). */
+/** Sections of the issue sheet moved out of MobileIssueSheet.tsx to keep it small (PAN-5219 WI-5 to WI-8). */
 import { useQuery } from '@tanstack/react-query';
-import type { DirectoryEntry } from '@overdeck/contracts';
+import type { DerivedIssueState, DirectoryEntry } from '@overdeck/contracts';
 
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import type { Agent } from '../../types';
-import type { IssueCostData } from '../CommandDeck/ZoneCOverviewTabs/queries';
-import { formatUsd, headlineCost, isIssueCostData, isLiveDirectoryResponse, pickIssueAgent, stageCostLine } from './issueSheetData';
+import type { IssueCheckRunsResponse, IssueCostData } from '../CommandDeck/ZoneCOverviewTabs/queries';
+import {
+  checksText,
+  formatUsd,
+  headlineCost,
+  isCheckRunsResponse,
+  isIssueCostData,
+  isLiveDirectoryResponse,
+  pickIssueAgent,
+  prStateLabel,
+  REVIEW_LABELS,
+  stageCostLine,
+} from './issueSheetData';
+
+const LINK_CLASS = 'inline-flex min-h-11 min-w-11 items-center underline';
+
+async function fetchCheckRuns(issueId: string): Promise<IssueCheckRunsResponse> {
+  const res = await fetch(`/api/issues/${encodeURIComponent(issueId)}/check-runs`);
+  if (!res.ok) throw new Error(`check-runs read failed: ${res.status}`);
+  const body: unknown = await res.json();
+  if (!isCheckRunsResponse(body)) throw new Error('check-runs read returned a malformed body');
+  return body;
+}
+
+export function PrChecksSection({ issueId, derived }: { issueId: string; derived: DerivedIssueState | undefined }) {
+  const query = useQuery({
+    queryKey: ['mobile-issue-check-runs', issueId],
+    queryFn: () => fetchCheckRuns(issueId),
+    retry: false,
+    refetchInterval: (q) => (q.state.status === 'error' ? false : 60_000),
+  });
+  const checkRuns = query.isSuccess ? query.data : null;
+  const derivedPr = derived?.pr;
+  const prUrl = derivedPr?.url ?? checkRuns?.pr?.url ?? null;
+  const prNumber = derivedPr?.number ?? checkRuns?.pr?.number ?? null;
+  if (prUrl === null || prNumber === null) {
+    return (
+      <div>
+        <dt className="text-xs text-muted-foreground">Pull request</dt>
+        <dd className="break-words text-sm">No pull request</dd>
+      </div>
+    );
+  }
+  const state = prStateLabel(derived);
+  const review = derivedPr ? REVIEW_LABELS[derivedPr.reviewState] : null;
+  const checks = checksText(checkRuns, derivedPr);
+  return (
+    <>
+      <div>
+        <dt className="text-xs text-muted-foreground">Pull request</dt>
+        <dd className="break-words text-sm">
+          <a href={prUrl} target="_blank" rel="noreferrer" className={LINK_CLASS}>
+            #{prNumber}
+          </a>
+          {state && ` · ${state}`}
+          {review && ` · ${review}`}
+        </dd>
+      </div>
+      <div>
+        <dt className="text-xs text-muted-foreground">Checks</dt>
+        <dd className="break-words text-sm">
+          {checks.href ? <a href={checks.href} target="_blank" rel="noreferrer" className={LINK_CLASS}>{checks.text}</a> : checks.text}
+        </dd>
+      </div>
+    </>
+  );
+}
 
 async function fetchIssueCosts(issueId: string): Promise<IssueCostData> {
   const res = await fetch(`/api/issues/${encodeURIComponent(issueId)}/costs`);

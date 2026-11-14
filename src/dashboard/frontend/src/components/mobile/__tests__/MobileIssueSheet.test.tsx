@@ -106,7 +106,10 @@ describe('MobileIssueSheet', () => {
     expect(screen.getByRole('heading', { name: 'Fix the thing' })).toBeInTheDocument();
     expect(screen.getByText('Review')).toBeInTheDocument();
     expect(screen.getByText('in-review')).toBeInTheDocument();
-    expect(screen.getByText('#12 · checks green · approved')).toBeInTheDocument();
+    const prLink = screen.getByRole('link', { name: '#12' });
+    expect(prLink).toHaveAttribute('href', 'https://example.com/pr/12');
+    expect(prLink.closest('dd')).toHaveTextContent('#12 · Open · Approved');
+    expect(await screen.findByText('Checks passed')).toBeInTheDocument();
     expect(await screen.findByText('work · opus · claude-code')).toBeInTheDocument();
     expect(await screen.findByText('Stopped')).toBeInTheDocument();
     expect(screen.getByText('Overdeck')).toBeInTheDocument();
@@ -329,6 +332,69 @@ describe('MobileIssueSheet', () => {
     renderSheet('PAN-15');
 
     expect(await screen.findByText('No spend recorded')).toBeInTheDocument();
+  });
+
+  it('links the checks summary from a valid check-runs response', async () => {
+    stubFetch({
+      '/api/agent-directory': () => Response.json({ generatedAt: '2026-01-01T00:00:00.000Z', windowHours: 0, scope: 'live', entries: [] }),
+      '/check-runs': () => Response.json({
+        issueId: 'PAN-16',
+        pr: null,
+        checkRuns: [],
+        summary: { total: 5, passed: 4, failed: 1, running: 0, skipped: 0, pending: 0, cancelled: 0 },
+      }),
+    });
+    useDashboardStore.setState({
+      issuesRaw: [issue({ identifier: 'PAN-16' })],
+      derivedIssueStateByIssueId: {
+        'PAN-16': {
+          issueId: 'PAN-16',
+          state: 'ready',
+          pr: { url: 'https://example.com/pr/16', number: 16, reviewState: 'approved', checks: 'green', mergeable: true, merged: true },
+        },
+      } satisfies Record<string, DerivedIssueState>,
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderSheet('PAN-16');
+
+    expect(screen.getByRole('link', { name: '#16' })).toBeInTheDocument();
+    expect(screen.getByText('#16').closest('dd')).toHaveTextContent('#16 · Merged · Approved');
+    const checksLink = await screen.findByRole('link', { name: '4 passed · 1 failed · 0 running' });
+    expect(checksLink).toHaveAttribute('href', 'https://example.com/pr/16/checks');
+  });
+
+  it('falls back to derived.pr.checks when check-runs fails', async () => {
+    useDashboardStore.setState({
+      issuesRaw: [issue({ identifier: 'PAN-17' })],
+      derivedIssueStateByIssueId: {
+        'PAN-17': {
+          issueId: 'PAN-17',
+          state: 'ready',
+          pr: { url: 'https://example.com/pr/17', number: 17, reviewState: 'none', checks: 'red', mergeable: true },
+        },
+      } satisfies Record<string, DerivedIssueState>,
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderSheet('PAN-17');
+
+    expect(await screen.findByText('Checks failed')).toBeInTheDocument();
+  });
+
+  it('renders "No pull request" when neither source knows one', () => {
+    useDashboardStore.setState({
+      issuesRaw: [issue({ identifier: 'PAN-18' })],
+      derivedIssueStateByIssueId: {
+        'PAN-18': { issueId: 'PAN-18', state: 'working' },
+      } satisfies Record<string, DerivedIssueState>,
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderSheet('PAN-18');
+
+    expect(screen.getByText('No pull request')).toBeInTheDocument();
+    expect(screen.queryByText(/Checks/)).not.toBeInTheDocument();
   });
 
   it('renders exactly one button (Back), and tapping it calls onBack', () => {

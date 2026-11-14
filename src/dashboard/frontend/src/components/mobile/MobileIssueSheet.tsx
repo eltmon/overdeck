@@ -22,7 +22,7 @@ import { IssueHeaderTitle } from '../issue-view/IssueHeaderTitle';
 import { useIssueRecord } from '../issue-view/useIssueRecord';
 import { PHASE_LABELS } from '../primitives/PhaseHeader';
 import { eventLine } from './issueSheetData';
-import { AgentRow, CostSection, SheetHeader, WhatHappened } from './IssueSheetSections';
+import { AgentRow, CostSection, PrChecksSection, SheetHeader, WhatHappened } from './IssueSheetSections';
 import { issueNeedsOperator, NeedsYouMark } from './MobilePipeline';
 
 export function MobileIssueSheet({
@@ -74,12 +74,7 @@ export function MobileIssueSheet({
             <dd className="break-words text-sm">{issue.project.name}</dd>
           </div>
         )}
-        {derived?.pr && (
-          <div>
-            <dt className="text-xs text-muted-foreground">Pull request</dt>
-            <dd className="break-words text-sm">{`#${derived.pr.number} · checks ${derived.pr.checks} · ${derived.pr.reviewState}`}</dd>
-          </div>
-        )}
+        <PrChecksSection issueId={identifier} derived={derived} />
         <AgentRow issueId={identifier} storeAgents={agents} />
         <CostSection issueId={identifier} />
         {issue && issue.labels.length > 0 && (
