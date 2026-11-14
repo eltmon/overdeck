@@ -750,12 +750,13 @@ describe('readQualityGateQueue (PAN-5283)', () => {
     const rootDir = home()
     writeFileSync(join(rootDir, 'waiter-b.json'), waiterJson('b', process.pid, 200, { issueId: 'PAN-2', footprintBytes: 1024 }))
     writeFileSync(join(rootDir, 'waiter-a.json'), waiterJson('a', process.pid, 100))
+    writeFileSync(join(rootDir, 'waiter-c.json'), waiterJson('c', process.pid, 150))
     writeFileSync(join(rootDir, 'owner.json'), ownerJson(process.pid, 50))
     const snapshot = await readQualityGateQueue({ rootDir, slots: 2, isProcessAlive: (pid) => pid === process.pid, now: () => 60, staleMs: 1_000 })
     expect(snapshot.slots).toBe(2)
     expect(snapshot.owners).toEqual([{ workspacePath: '/tmp/owner', gateName: 'test', createdAt: 50, acquiredAt: 50 }])
-    expect(snapshot.waiters.map((waiter) => waiter.workspacePath)).toEqual(['/ws/a', '/ws/b'])
-    expect(snapshot.waiters[1]).toMatchObject({ issueId: 'PAN-2', footprintBytes: 1024, createdAt: 200 })
+    expect(snapshot.waiters.map((waiter) => waiter.workspacePath)).toEqual(['/ws/a', '/ws/c', '/ws/b'])
+    expect(snapshot.waiters[2]).toMatchObject({ issueId: 'PAN-2', footprintBytes: 1024, createdAt: 200 })
   })
 
   it('readQualityGateQueue skips dead pids without deleting their files', async () => {
