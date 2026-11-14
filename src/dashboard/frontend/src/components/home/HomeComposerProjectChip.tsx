@@ -5,11 +5,13 @@
  * (PAN-4281; it navigated to /projects/new before the dialog existed).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import type { RegisteredProject } from '../CommandDeck/UnknownProjectState';
 import type { UiMode } from '../../lib/simple/uiMode';
 import { SIMPLE_STRINGS } from '../../lib/simple/strings';
 import { useAddProjectDialog } from '../project/new/addProjectDialogStore';
+import { useFloatingPickerPosition } from '../chat/useFloatingPickerPosition';
 
 export interface HomeComposerProjectChipProps {
   mode: UiMode;
@@ -23,6 +25,10 @@ export function HomeComposerProjectChip({ mode, projects, value, onChange, disab
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  // The menu is portaled to <body> with fixed positioning so the Home card's
+  // overflow and the app header cannot clip it; it opens up or down to fit.
+  const { style: menuStyle } = useFloatingPickerPosition(open, triggerRef, menuRef, { preferredHeight: 256 });
 
   const close = useCallback(() => {
     setOpen(false);
@@ -32,7 +38,9 @@ export function HomeComposerProjectChip({ mode, projects, value, onChange, disab
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) close();
+      const target = event.target as Node;
+      if (wrapperRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      close();
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') close();
@@ -71,11 +79,13 @@ export function HomeComposerProjectChip({ mode, projects, value, onChange, disab
         {chipLabel}
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
+          ref={menuRef}
           role="menu"
           aria-label="Choose a project"
-          className="absolute bottom-full z-20 mb-1 max-h-64 min-w-[200px] overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-floating"
+          style={menuStyle}
+          className="z-[9999] min-w-[200px] overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-floating"
         >
           {projects.map((project) => (
             <button
@@ -107,7 +117,8 @@ export function HomeComposerProjectChip({ mode, projects, value, onChange, disab
           >
             {addProjectLabel}
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
