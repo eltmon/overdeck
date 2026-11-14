@@ -34,6 +34,11 @@ function renderSheet(
   );
 }
 
+/** Every test's AgentRow fetches the live directory; default it to empty so unrelated tests don't trip the no-unexpected-fetch guard. */
+function stubEmptyLiveDirectory() {
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ generatedAt: '2026-01-01T00:00:00.000Z', windowHours: 0, scope: 'live', entries: [] })));
+}
+
 describe('MobileIssueSheet', () => {
   beforeEach(() => {
     useDashboardStore.setState({
@@ -41,13 +46,14 @@ describe('MobileIssueSheet', () => {
       derivedIssueStateByIssueId: {},
       agentsById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
+    stubEmptyLiveDirectory();
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('renders the D-4661-10 fields for an in-review issue with a PR, agent, project and labels', () => {
+  it('renders the D-4661-10 fields for an in-review issue with a PR, agent, project and labels', async () => {
     useDashboardStore.setState({
       issuesRaw: [
         issue({
@@ -85,7 +91,8 @@ describe('MobileIssueSheet', () => {
     expect(screen.getByText('Review')).toBeInTheDocument();
     expect(screen.getByText('in-review')).toBeInTheDocument();
     expect(screen.getByText('#12 · checks green · approved')).toBeInTheDocument();
-    expect(screen.getByText('work · opus · running')).toBeInTheDocument();
+    expect(await screen.findByText('work · opus · claude-code')).toBeInTheDocument();
+    expect(await screen.findByText('Stopped')).toBeInTheDocument();
     expect(screen.getByText('Overdeck')).toBeInTheDocument();
     expect(screen.getByText('frontend')).toBeInTheDocument();
   });
@@ -195,6 +202,45 @@ describe('MobileIssueSheet', () => {
     expect(await screen.findByText('not found on tracker')).toBeInTheDocument();
     expect(screen.getByText('Work')).toBeInTheDocument();
     expect(screen.getByText('working')).toBeInTheDocument();
+  });
+
+  it('renders the live directory agent as "Live" over a stopped store agent', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      windowHours: 0,
+      scope: 'live',
+      entries: [{
+        id: 'a1',
+        kind: 'agent',
+        label: 'a1',
+        location: 'local',
+        projectKey: 'pan',
+        issueId: 'PAN-12',
+        issueTitle: null,
+        parentId: null,
+        role: 'work',
+        harness: 'claude-code',
+        model: 'opus',
+        state: 'working',
+        startedAt: '2026-01-01T00:00:00.000Z',
+        lastActivityAt: '2026-01-01T00:00:00.000Z',
+        costUsd: null,
+        source: 'overdeck',
+        transcript: null,
+      }],
+    })));
+    useDashboardStore.setState({
+      issuesRaw: [issue({ identifier: 'PAN-12' })],
+      derivedIssueStateByIssueId: {
+        'PAN-12': { issueId: 'PAN-12', state: 'working' },
+      } satisfies Record<string, DerivedIssueState>,
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderSheet('PAN-12');
+
+    expect(await screen.findByText('work · opus · claude-code')).toBeInTheDocument();
+    expect(screen.getByText(/^Live/)).toBeInTheDocument();
   });
 
   it('renders exactly one button (Back), and tapping it calls onBack', () => {

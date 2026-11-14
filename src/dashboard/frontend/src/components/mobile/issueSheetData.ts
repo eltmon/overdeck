@@ -1,5 +1,8 @@
-/** Pure data helpers for the issue sheet (PAN-5219 WI-5). No React. */
-import { PHONE_ISSUE_EVENT_LABELS, type PhoneIssueEvent } from '@overdeck/contracts';
+/** Pure data helpers for the issue sheet (PAN-5219 WI-5, WI-6). No React. */
+import { PHONE_ISSUE_EVENT_LABELS, type DirectoryEntry, type DirectoryEntryState, type PhoneIssueEvent } from '@overdeck/contracts';
+
+import { classifyDashboardAgent } from '../../lib/agent-classifier';
+import type { Agent } from '../../types';
 
 /** D-5: same local calendar day as `now` shows a time; otherwise a date and time. Null for an unparsable `at`. */
 export function formatEventTime(at: string, now: Date): string | null {
@@ -24,4 +27,82 @@ export function eventLine(
     : PHONE_ISSUE_EVENT_LABELS[event.kind];
   const time = event.at ? formatEventTime(event.at, now) : null;
   return time ? `${label} at ${time}` : label;
+}
+
+/** D-6: true when `value` is a live agent-directory response. */
+export function isLiveDirectoryResponse(value: unknown): value is { entries: DirectoryEntry[] } {
+  return typeof value === 'object' && value !== null && Array.isArray((value as { entries?: unknown }).entries);
+}
+
+export const DIRECTORY_STATE_LABELS: Readonly<Record<DirectoryEntryState, string>> = {
+  working: 'Live',
+  idle: 'Idle',
+  blocked: 'Waiting for you',
+  done: 'Done',
+  stopped: 'Stopped',
+  unknown: 'Status not available',
+};
+
+export interface IssueAgentSummary {
+  summary: string;
+  status: string;
+  lastActivityAt: string | null;
+  more: number;
+}
+
+function latestStoreAgent(issueId: string, storeAgents: readonly Agent[]): Agent | null {
+  const target = issueId.toLowerCase();
+  const matches = storeAgents.filter((a) => a.issueId?.toLowerCase() === target);
+  if (matches.length === 0) return null;
+  return matches.reduce((best, a) => {
+    const bestAt = Date.parse(best.lastActivity ?? best.startedAt);
+    const at = Date.parse(a.lastActivity ?? a.startedAt);
+    return at > bestAt ? a : best;
+  });
+}
+
+function storeAgentSummary(agent: Agent, status: string): IssueAgentSummary {
+  return {
+    summary: [agent.role, agent.model, agent.harness ?? agent.runtime].filter(Boolean).join(' · '),
+    status,
+    lastActivityAt: agent.lastActivity ?? null,
+    more: 0,
+  };
+}
+
+/** D-6: the agent row for `issueId`, or null when no agent is known anywhere. */
+export function pickIssueAgent(
+  issueId: string,
+  directory: readonly DirectoryEntry[] | null,
+  storeAgents: readonly Agent[],
+  nowMs: number,
+): IssueAgentSummary | null {
+  if (directory) {
+    const target = issueId.toLowerCase();
+    const matches = directory.filter((entry) => entry.kind === 'agent' && entry.issueId?.toLowerCase() === target);
+    if (matches.length > 0) {
+      // Latest lastActivityAt first; null sorts last; a stable sort keeps response order on ties.
+      const [best] = [...matches].sort((a, b) => {
+        const at = a.lastActivityAt ? Date.parse(a.lastActivityAt) : -Infinity;
+        const bt = b.lastActivityAt ? Date.parse(b.lastActivityAt) : -Infinity;
+        return bt - at;
+      });
+      return {
+        summary: [best!.role, best!.model, best!.harness].filter(Boolean).join(' · '),
+        status: DIRECTORY_STATE_LABELS[best!.state],
+        lastActivityAt: best!.lastActivityAt,
+        more: matches.length - 1,
+      };
+    }
+    const fallback = latestStoreAgent(issueId, storeAgents);
+    return fallback ? storeAgentSummary(fallback, 'Stopped') : null;
+  }
+
+  const fallback = latestStoreAgent(issueId, storeAgents);
+  if (!fallback) return null;
+  const classification = classifyDashboardAgent(
+    { ...fallback, issueId: fallback.issueId ?? issueId } as Parameters<typeof classifyDashboardAgent>[0],
+    nowMs,
+  );
+  return storeAgentSummary(fallback, classification === 'active' ? 'Live' : 'Stopped');
 }

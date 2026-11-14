@@ -22,12 +22,8 @@ import { IssueHeaderTitle } from '../issue-view/IssueHeaderTitle';
 import { useIssueRecord } from '../issue-view/useIssueRecord';
 import { PHASE_LABELS } from '../primitives/PhaseHeader';
 import { eventLine } from './issueSheetData';
-import { SheetHeader, WhatHappened } from './IssueSheetSections';
+import { AgentRow, SheetHeader, WhatHappened } from './IssueSheetSections';
 import { issueNeedsOperator, NeedsYouMark } from './MobilePipeline';
-
-function agentSummary(agent: Agent): string {
-  return [agent.role, agent.model, agent.status].filter(Boolean).join(' · ');
-}
 
 export function MobileIssueSheet({
   issueId,
@@ -84,12 +80,7 @@ export function MobileIssueSheet({
             <dd className="break-words text-sm">{`#${derived.pr.number} · checks ${derived.pr.checks} · ${derived.pr.reviewState}`}</dd>
           </div>
         )}
-        {agent && (
-          <div>
-            <dt className="text-xs text-muted-foreground">Agent</dt>
-            <dd className="break-words text-sm">{agentSummary(agent)}</dd>
-          </div>
-        )}
+        <AgentRow issueId={identifier} storeAgents={agents} />
         {issue && issue.labels.length > 0 && (
           <div>
             <dt className="text-xs text-muted-foreground">Labels</dt>
