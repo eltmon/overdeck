@@ -769,6 +769,15 @@ export function teardownWorkspace(
 
       // 9. Remove worktree + workspace directory (only if deleting workspace).
       if (shouldDeleteWorkspace) {
+        // PAN-5218: the journal dies with the workspace; file any advisory follow-up still pending first.
+        yield* Effect.promise(async () => {
+          try {
+            const { flushAdvisoryFollowupsBeforeReap } = await import('../cloister/advisory-followup-patrol.js');
+            await flushAdvisoryFollowupsBeforeReap(ctx.issueId, workspacePath);
+          } catch {
+            // Never holds the teardown.
+          }
+        });
         const allPaths = findAllWorkspacePaths(ctx.projectPath, issueLower);
         for (const p of allPaths) {
           results.push(yield* removeWorktree(ctx.projectPath, p));

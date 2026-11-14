@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { __resetAdvisoryFollowupsForTests } from '../../../../src/lib/cloister/advisory-followup.js';
-import { recoverAdvisoryFollowups } from '../../../../src/lib/cloister/advisory-followup-patrol.js';
+import { flushAdvisoryFollowupsBeforeReap, recoverAdvisoryFollowups } from '../../../../src/lib/cloister/advisory-followup-patrol.js';
 import type { PipelineJournalEntry } from '../../../../src/lib/cloister/pipeline-journal.js';
 
 const NOW = Date.parse('2026-11-13T22:00:00.000Z');
@@ -102,5 +102,36 @@ describe('recoverAdvisoryFollowups', () => {
     await expect(result).resolves.toEqual(['PAN-2: 0 follow-up outcome(s)']);
     expect(file).toHaveBeenCalledTimes(2);
     expect(log).toHaveBeenCalledWith('[advisory-followup] patrol failed for PAN-1: boom');
+  });
+});
+
+describe('flushAdvisoryFollowupsBeforeReap', () => {
+  it('files a pending candidate of a merged issue at once, before any patrol age has passed', async () => {
+    const file = vi.fn(async () => []);
+    await flushAdvisoryFollowupsBeforeReap('pan-1', wsA, {
+      readJournal: () => [merged(minutesAgo(1)), delivered(minutesAgo(0))], file, log: vi.fn(),
+    });
+    expect(file).toHaveBeenCalledWith('PAN-1', wsA);
+  });
+
+  it('does nothing for an unmerged issue, a closed candidate, or a missing workspace', async () => {
+    const file = vi.fn(async () => []);
+    const failed: PipelineJournalEntry = {
+      at: minutesAgo(1), type: 'feedback.followup_failed', issueId: 'PAN-1', data: { kind: 'coderabbit', dedupKey: 'coderabbit-feedback:pan-1:900', reason: 'r' },
+    };
+    await flushAdvisoryFollowupsBeforeReap('PAN-1', wsA, { readJournal: () => [delivered(minutesAgo(5))], file });
+    await flushAdvisoryFollowupsBeforeReap('PAN-1', wsA, { readJournal: () => [delivered(minutesAgo(5)), merged(minutesAgo(2)), failed], file });
+    await flushAdvisoryFollowupsBeforeReap('PAN-1', join(root, 'gone'), { readJournal: () => [merged(minutesAgo(2)), delivered(minutesAgo(5))], file });
+    expect(file).not.toHaveBeenCalled();
+  });
+
+  it('never throws when the filer rejects', async () => {
+    const log = vi.fn();
+    await expect(flushAdvisoryFollowupsBeforeReap('PAN-1', wsA, {
+      readJournal: () => [merged(minutesAgo(1)), delivered(minutesAgo(2))],
+      file: vi.fn(async () => { throw new Error('boom'); }),
+      log,
+    })).resolves.toBeUndefined();
+    expect(log).toHaveBeenCalledWith('[advisory-followup] flush before reaping PAN-1 failed: boom');
   });
 });

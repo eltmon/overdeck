@@ -84,3 +84,27 @@ export async function recoverAdvisoryFollowups(now = Date.now(), deps: AdvisoryP
   }
   return actions;
 }
+
+/**
+ * PAN-5218: close-out and the closed-issue reaper delete the workspace that
+ * holds the journal, so a pending follow-up the kick missed would be lost with
+ * it. They call this first: it files any pending candidate of a merged issue,
+ * with no age wait, and never throws. A reaper must not wait on a gate it does
+ * not own, so a failure is logged and the reap goes on.
+ */
+export async function flushAdvisoryFollowupsBeforeReap(
+  issueId: string,
+  workspacePath: string,
+  deps: Pick<AdvisoryPatrolDeps, 'readJournal' | 'file' | 'log'> = {},
+): Promise<void> {
+  const log = deps.log ?? ((line: string) => console.log(line));
+  try {
+    if (!existsSync(workspacePath)) return;
+    const entries = (deps.readJournal ?? readPipelineJournal)(workspacePath);
+    if (!entries.some((entry) => entry.type === 'merge.completed')) return;
+    if (pendingAdvisoryCandidates(entries).length === 0) return;
+    await (deps.file ?? fileAdvisoryFollowups)(issueId.toUpperCase(), workspacePath);
+  } catch (err) {
+    log(`[advisory-followup] flush before reaping ${issueId} failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
