@@ -754,3 +754,7 @@ PRD D-15 rules (strict):
 2. At most 2 of this book's work agents at once (PAN-5281 counts).
 3. After each UI child (5289, 5293, 5291, 5290, 5295, 5294) merges and is reloaded, `pan tell conv-20261113-6031` and wait for its live check before starting the next UI child's work.
 4. `pan start <id> --plan auto`; if finalize refuses "PRD draft too short", `pan plan finalize --no-prd`.
+
+## 2026-11-14 learning: per-PR merges in quick succession can break main semantically
+
+With batching paused (PAN-5269's 24 h mark), PAN-5281, PAN-5287, PAN-5282 and PAN-5283 merged one at a time within about 10 minutes, each green on its own. #5302 added an import of `needsYouRows` from FlywheelStatusPane, and #5304 removed that export, so main's frontend build broke (PAN-5306, fixed by strike). This is exactly what the merge train's combined CI exists to catch; when batching is paused, expect it.
