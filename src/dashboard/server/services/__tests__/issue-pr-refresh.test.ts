@@ -56,6 +56,16 @@ describe('refreshIssuePullRequestStateNow', () => {
     expect(mocks.scheduleDerivedStateRefreshForIssues).toHaveBeenCalledWith([{ identifier: 'PAN-7' }]);
   });
 
+  it('also invalidates the issue\'s routed path for an issue_routing project (review A5)', () => {
+    mocks.resolveProjectFromIssueSync.mockReturnValue({ projectKey: 'overdeck', projectPath: '/repos/routed-worktree' });
+
+    refreshIssuePullRequestStateNow('pan-7');
+
+    expect(mocks.invalidateRepoPullRequests).toHaveBeenCalledWith('/repos/overdeck');
+    expect(mocks.invalidateRepoPullRequests).toHaveBeenCalledWith('/repos/routed-worktree');
+    expect(mocks.invalidateRepoPullRequests).toHaveBeenCalledTimes(2);
+  });
+
   it('still schedules a refresh, without invalidating or enqueuing, when no project resolves', () => {
     mocks.resolveProjectFromIssueSync.mockReturnValue(null);
 
@@ -122,6 +132,16 @@ describe('invalidatePullRequestListingOnApproval (PAN-5036)', () => {
       const invalidateOrder = mocks.invalidateOpenPullRequestsSnapshot.mock.invocationCallOrder[0]!;
       const enqueueOrder = mocks.enqueueProjectResourceRefresh.mock.invocationCallOrder[0]!;
       expect(invalidateOrder).toBeLessThan(enqueueOrder);
+    });
+
+    it('also invalidates the issue\'s routed path for an issue_routing project (review A5)', () => {
+      mocks.resolveProjectFromIssueSync.mockReturnValue({ projectKey: 'overdeck', projectPath: '/repos/routed-worktree' });
+
+      invalidatePullRequestListingOnApproval({ type: 'merge.completed', issueId: 'PAN-7' });
+
+      expect(mocks.invalidateRepoPullRequests).toHaveBeenCalledWith('/repos/overdeck');
+      expect(mocks.invalidateRepoPullRequests).toHaveBeenCalledWith('/repos/routed-worktree');
+      expect(mocks.invalidateRepoPullRequests).toHaveBeenCalledTimes(2);
     });
 
     it('does nothing and never throws when no project resolves (ac4)', () => {

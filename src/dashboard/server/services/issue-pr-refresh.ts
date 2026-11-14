@@ -12,9 +12,23 @@ import { listProjectsSync, resolveProjectFromIssueSync, type ProjectConfig } fro
 import { getSharedIssueService } from './issue-service-singleton.js';
 import { enqueueProjectResourceRefresh } from './project-resource-refresh-queue.js';
 
-function resolveProjectConfig(issueId: string): ProjectConfig | undefined {
+interface ResolvedProjectRefresh {
+  project: ProjectConfig;
+  /** The issue's routed path (`resolveProjectPath`), which may differ from `project.path` for an `issue_routing` project. */
+  routedPath: string;
+}
+
+function resolveProjectConfig(issueId: string): ResolvedProjectRefresh | undefined {
   const resolved = resolveProjectFromIssueSync(issueId);
-  return resolved ? listProjectsSync().find((entry) => entry.key === resolved.projectKey)?.config : undefined;
+  if (!resolved) return undefined;
+  const project = listProjectsSync().find((entry) => entry.key === resolved.projectKey)?.config;
+  return project ? { project, routedPath: resolved.projectPath } : undefined;
+}
+
+/** The derived refresh reads the issue's routed path, so an `issue_routing` project needs both invalidated. */
+function invalidateListing({ project, routedPath }: ResolvedProjectRefresh): void {
+  invalidateRepoPullRequests(project.path);
+  if (routedPath !== project.path) invalidateRepoPullRequests(routedPath);
 }
 
 function invalidateMembershipSnapshot(project: ProjectConfig): void {
@@ -24,11 +38,11 @@ function invalidateMembershipSnapshot(project: ProjectConfig): void {
 
 export function refreshIssuePullRequestStateNow(issueId: string): void {
   try {
-    const project = resolveProjectConfig(issueId);
-    if (project) {
-      invalidateRepoPullRequests(project.path);
-      invalidateMembershipSnapshot(project);
-      enqueueProjectResourceRefresh(project, 'review-door');
+    const resolved = resolveProjectConfig(issueId);
+    if (resolved) {
+      invalidateListing(resolved);
+      invalidateMembershipSnapshot(resolved.project);
+      enqueueProjectResourceRefresh(resolved.project, 'review-door');
     }
     getSharedIssueService().scheduleDerivedStateRefreshForIssues([{ identifier: issueId.toUpperCase() }]);
   } catch (error) {
@@ -59,12 +73,12 @@ export function invalidatePullRequestListingOnApproval(entry: { type: string; is
   }
   if (entry.type !== 'merge.completed') return;
   try {
-    const project = resolveProjectConfig(entry.issueId);
-    if (!project) return;
-    invalidateRepoPullRequests(project.path);
-    invalidateMembershipSnapshot(project);
+    const resolved = resolveProjectConfig(entry.issueId);
+    if (!resolved) return;
+    invalidateListing(resolved);
+    invalidateMembershipSnapshot(resolved.project);
     getSharedIssueService().scheduleDerivedStateRefreshForIssues([{ identifier: entry.issueId.toUpperCase() }]);
-    enqueueProjectResourceRefresh(project, 'merge.completed');
+    enqueueProjectResourceRefresh(resolved.project, 'merge.completed');
   } catch (error) {
     console.warn(`[issue-pr-refresh] ${entry.issueId}: merge.completed refresh failed:`, error);
   }

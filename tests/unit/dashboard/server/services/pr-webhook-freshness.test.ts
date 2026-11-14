@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   isWebhookRelayRunningInLastSample: vi.fn(),
   resolveProjectForRepo: vi.fn(),
   getProjectSync: vi.fn(),
+  resolveProjectFromIssueSync: vi.fn(),
   invalidateRepoPullRequests: vi.fn(),
   invalidateOpenPullRequestsSnapshot: vi.fn(),
   scheduleDerivedStateRefreshForIssues: vi.fn(),
@@ -19,7 +20,7 @@ vi.mock('../../../../../src/lib/ci/project-ci-observation.js', () => ({
 
 vi.mock('../../../../../src/lib/projects.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../../src/lib/projects.js')>();
-  return { ...actual, getProjectSync: mocks.getProjectSync };
+  return { ...actual, getProjectSync: mocks.getProjectSync, resolveProjectFromIssueSync: mocks.resolveProjectFromIssueSync };
 });
 
 vi.mock('../../../../../src/lib/overdeck/pr-listing.js', async (importOriginal) => {
@@ -76,11 +77,13 @@ describe('notePullRequestWebhook coalescer (PAN-5224)', () => {
     resetPrWebhookCoalescerForTests();
     mocks.resolveProjectForRepo.mockReset();
     mocks.getProjectSync.mockReset();
+    mocks.resolveProjectFromIssueSync.mockReset();
     mocks.invalidateRepoPullRequests.mockReset();
     mocks.invalidateOpenPullRequestsSnapshot.mockReset();
     mocks.scheduleDerivedStateRefreshForIssues.mockReset();
     mocks.resolveProjectForRepo.mockReturnValue({ projectKey: 'overdeck', repo: 'eltmon/overdeck', branch: 'main' });
     mocks.getProjectSync.mockReturnValue({ name: 'overdeck', path: '/project' });
+    mocks.resolveProjectFromIssueSync.mockReturnValue({ projectKey: 'overdeck', projectPath: '/project' });
   });
 
   afterEach(() => {
@@ -95,6 +98,15 @@ describe('notePullRequestWebhook coalescer (PAN-5224)', () => {
     expect(mocks.invalidateRepoPullRequests).toHaveBeenCalledWith(expect.stringContaining('project'));
     expect(mocks.invalidateOpenPullRequestsSnapshot).toHaveBeenCalledWith('eltmon', 'overdeck');
     expect(mocks.scheduleDerivedStateRefreshForIssues).toHaveBeenCalledWith([{ identifier: 'PAN-7' }]);
+  });
+
+  it('also invalidates the issue\'s routed path for an issue_routing project (review A5)', () => {
+    mocks.resolveProjectFromIssueSync.mockReturnValue({ projectKey: 'overdeck', projectPath: '/routed-worktree' });
+
+    notePullRequestWebhook('eltmon/overdeck', ['PAN-7'], 'pull_request:synchronize');
+
+    expect(mocks.invalidateRepoPullRequests).toHaveBeenCalledWith('/project');
+    expect(mocks.invalidateRepoPullRequests).toHaveBeenCalledWith('/routed-worktree');
   });
 
   it('20 events within 6s after a fire produce exactly one trailing fire with the union of issue ids (ac2)', async () => {

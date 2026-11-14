@@ -14,7 +14,7 @@ import { resolveProjectForRepo } from '../../../lib/ci/project-ci-observation.js
 import { invalidateOpenPullRequestsSnapshot } from '../../../lib/pipeline-membership-gather.js';
 import { invalidateRepoPullRequests } from '../../../lib/overdeck/pr-listing.js';
 import { setWebhookHealthProvider } from '../../../lib/overdeck/pr-freshness.js';
-import { getProjectSync } from '../../../lib/projects.js';
+import { getProjectSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { getSharedIssueService } from './issue-service-singleton.js';
 import { isWebhookRelayRunningInLastSample } from './system-health-service.js';
 
@@ -58,6 +58,13 @@ function fire(repoFullName: string, issueIds: ReadonlySet<string>, reasons: Read
       if (project?.path) {
         invalidateRepoPullRequests(project.path);
         invalidateRepoPullRequests(resolve(project.path));
+      }
+      // The derived refresh below reads each issue's routed path
+      // (`resolveProjectPath`), which can differ from `project.path` for an
+      // `issue_routing` project.
+      for (const issueId of issueIds) {
+        const routedPath = resolveProjectFromIssueSync(issueId)?.projectPath;
+        if (routedPath && routedPath !== project?.path) invalidateRepoPullRequests(routedPath);
       }
     } catch (err) {
       warnStep(repoFullName, 'invalidate repo PR listing', err);
