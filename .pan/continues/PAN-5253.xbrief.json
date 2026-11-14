@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5253",
   "created": "2026-11-14T08:19:14.576Z",
-  "updated": "2026-11-14T08:50:21.898Z",
+  "updated": "2026-11-14T08:56:57.714Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,9 +126,26 @@
       "doneAt": "2026-11-14T08:50:12.233Z"
     },
     "tab-bodies-wire": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5253",
-      "claimedAt": "2026-11-14T08:50:21.898Z"
+      "claimedAt": "2026-11-14T08:50:21.898Z",
+      "doneAt": "2026-11-14T08:56:57.714Z"
+    },
+    "tab-bodies-wire.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:56:57.714Z"
+    },
+    "tab-bodies-wire.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:56:57.714Z"
+    },
+    "tab-bodies-wire.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:56:57.714Z"
+    },
+    "tab-bodies-wire.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:56:57.714Z"
     }
   }
 }
