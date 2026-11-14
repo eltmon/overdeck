@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5224",
   "created": "2026-11-14T03:12:38.408Z",
-  "updated": "2026-11-14T03:12:38.408Z",
+  "updated": "2026-11-14T03:14:38.844Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,18 @@
   "sessionHistory": [],
   "items": {
     "cache-invalidate-in-flight": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5224",
-      "claimedAt": "2026-11-14T03:12:38.408Z"
+      "claimedAt": "2026-11-14T03:12:38.408Z",
+      "doneAt": "2026-11-14T03:14:38.844Z"
+    },
+    "cache-invalidate-in-flight.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:14:38.844Z"
+    },
+    "cache-invalidate-in-flight.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:14:38.844Z"
     }
   }
 }
