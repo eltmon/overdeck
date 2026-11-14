@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5287",
   "created": "2026-11-14T19:49:14.970Z",
-  "updated": "2026-11-14T20:48:36.702Z",
+  "updated": "2026-11-14T20:48:54.157Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -220,9 +220,10 @@
       "doneAt": "2026-11-14T20:48:36.701Z"
     },
     "new-conversation-shortcut": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5287",
-      "claimedAt": "2026-11-14T20:46:15.418Z"
+      "claimedAt": "2026-11-14T20:46:15.418Z",
+      "doneAt": "2026-11-14T20:48:54.157Z"
     },
     "explorer-shortcuts": {
       "status": "in_progress",
@@ -305,6 +306,14 @@
     "emergency-stop-shortcut.ac2": {
       "status": "completed",
       "doneAt": "2026-11-14T20:48:36.701Z"
+    },
+    "new-conversation-shortcut.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:48:54.157Z"
+    },
+    "new-conversation-shortcut.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:48:54.157Z"
     }
   }
 }
