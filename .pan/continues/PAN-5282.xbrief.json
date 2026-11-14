@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5282",
   "created": "2026-11-14T19:03:45.838Z",
-  "updated": "2026-11-14T20:45:34.964Z",
+  "updated": "2026-11-14T20:49:32.944Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,9 +148,10 @@
       "doneAt": "2026-11-14T19:21:05.847Z"
     },
     "lifecycle-wiring": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5282",
-      "claimedAt": "2026-11-14T19:21:07.482Z"
+      "claimedAt": "2026-11-14T19:21:07.482Z",
+      "doneAt": "2026-11-14T20:49:32.943Z"
     },
     "live-probe": {
       "status": "completed",
@@ -235,6 +236,26 @@
     "changelog.ac2": {
       "status": "completed",
       "doneAt": "2026-11-14T20:45:34.964Z"
+    },
+    "lifecycle-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:32.943Z"
+    },
+    "lifecycle-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:32.943Z"
+    },
+    "lifecycle-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:32.943Z"
+    },
+    "lifecycle-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:32.943Z"
+    },
+    "lifecycle-wiring.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:32.943Z"
     }
   }
 }
