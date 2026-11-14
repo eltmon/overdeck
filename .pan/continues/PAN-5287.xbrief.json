@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5287",
   "created": "2026-11-14T19:49:14.970Z",
-  "updated": "2026-11-14T20:49:28.017Z",
+  "updated": "2026-11-14T20:49:50.750Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -232,9 +232,10 @@
       "doneAt": "2026-11-14T20:49:28.017Z"
     },
     "workflow-fixture": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5287",
-      "claimedAt": "2026-11-14T20:46:19.724Z"
+      "claimedAt": "2026-11-14T20:46:19.724Z",
+      "doneAt": "2026-11-14T20:49:50.749Z"
     },
     "app-migration.ac1": {
       "status": "completed",
@@ -327,6 +328,26 @@
     "explorer-shortcuts.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T20:49:28.017Z"
+    },
+    "workflow-fixture.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:50.749Z"
+    },
+    "workflow-fixture.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:50.749Z"
+    },
+    "workflow-fixture.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:50.749Z"
+    },
+    "workflow-fixture.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:50.749Z"
+    },
+    "workflow-fixture.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:50.749Z"
     }
   }
 }
