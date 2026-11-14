@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5278",
   "created": "2026-11-14T18:11:34.102Z",
-  "updated": "2026-11-14T23:10:01.339Z",
+  "updated": "2026-11-14T23:10:02.503Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -24,6 +24,9 @@
       "status": "cancelled"
     },
     "config-affinity-mgmt.ac2": {
+      "status": "cancelled"
+    },
+    "config-affinity-mgmt.ac3": {
       "status": "cancelled"
     }
   },
