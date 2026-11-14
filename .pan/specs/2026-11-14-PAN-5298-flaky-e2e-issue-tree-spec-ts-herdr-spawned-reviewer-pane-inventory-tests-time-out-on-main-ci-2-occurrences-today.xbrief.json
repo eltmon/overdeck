@@ -4,17 +4,17 @@
     "created": "2026-11-14T20:27:08Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5298: Flaky e2e: issue-tree.spec.ts 'Herdr-spawned reviewer' / 'pane inventory' tests time out on main CI (2 occurrences today)",
-    "updated": "2026-11-14T20:51:15.812Z"
+    "updated": "2026-11-14T21:07:40.226Z"
   },
   "plan": {
     "id": "pan-5298",
     "title": "Flaky e2e: issue-tree.spec.ts 'Herdr-spawned reviewer' / 'pane inventory' tests time out on main CI (2 occurrences today)",
-    "status": "proposed",
+    "status": "running",
     "uid": "d41f2a33-1303-4916-8091-d7cbd4279871",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T20:27:08Z",
-    "updated": "2026-11-14T20:51:15.812Z",
+    "updated": "2026-11-14T21:07:40.226Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5298",
@@ -582,5 +582,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
