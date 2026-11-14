@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5248",
   "created": "2026-11-14T05:37:27.839Z",
-  "updated": "2026-11-14T05:55:53.200Z",
+  "updated": "2026-11-14T05:56:01.278Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -86,6 +86,11 @@
     "admission-memory-rule.ac6": {
       "status": "completed",
       "doneAt": "2026-11-14T05:55:53.198Z"
+    },
+    "admission-settle-and-timeout": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T05:56:01.277Z"
     }
   }
 }
