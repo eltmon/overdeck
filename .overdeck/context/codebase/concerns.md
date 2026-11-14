@@ -537,7 +537,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   own size. One controller per terminal: a second gets `already has an attached
   client` on stderr and exits 0. `pane.split` into a shared tab halves the
   remaining rows per launch. `pane.read` nests its text under `result.read`
-  (PAN-4586), not `result.text`.
+  (PAN-4586), not `result.text`. `HerdrApiClient.call()` returns `result`
+  unchanged, so a reader must take `result.read.text`. As of 2026-11-14 three
+  readers (`readHerdrPaneText` and `diagnoseDetectionFailure` in `herdr.ts`,
+  `read()` in `herdr-submit.ts`) still take `result.text`, so every Herdr pane
+  read is `''`; PAN-5232 tracks the fix.
 - **Two runtime maps, neither replayed at boot before PAN-4522** — the read
   model's `agentRuntimeById` (`read-model.ts`, served in snapshots) booted `{}`,
   and `syncSnapshot` replaced the client's map wholesale, so a restart showed

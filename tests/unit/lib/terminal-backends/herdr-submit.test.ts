@@ -67,7 +67,7 @@ describe('pasteAndSubmitHerdrPane', () => {
     const text = 'send this message';
     const nextScreen = sequentialScreens(emptyComposer, composerWith(text), emptyComposer);
     const { api, log } = fakeApi(({ method }) => {
-      if (method === 'pane.read') return { text: nextScreen() };
+      if (method === 'pane.read') return { type: 'pane_read', read: { text: nextScreen() } };
       if (method === 'agent.get') return { agent: { agent_status: 'idle' } };
       return {};
     });
@@ -84,7 +84,7 @@ describe('pasteAndSubmitHerdrPane', () => {
     const text = 'send this message';
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { api, log } = fakeApi(({ method }) => {
-      if (method === 'pane.read') return { text: composerWith(text) };
+      if (method === 'pane.read') return { type: 'pane_read', read: { text: composerWith(text) } };
       if (method === 'agent.get') return { agent: { agent_status: 'idle' } };
       return {};
     });
@@ -100,28 +100,44 @@ describe('pasteAndSubmitHerdrPane', () => {
     warn.mockRestore();
   });
 
-  it('holds when the agent is blocked at the decision point', async () => {
+  it('never presses a key when the agent is blocked and the paste is visible', async () => {
     const text = 'send this message';
     const { api, log } = fakeApi(({ method }) => {
-      if (method === 'pane.read') return { text: composerWith(text) };
+      if (method === 'pane.read') return { type: 'pane_read', read: { text: composerWith(text) } };
       if (method === 'agent.get') return { agent: { agent_status: 'blocked' } };
       return {};
     });
 
     const outcome = await settle(pasteAndSubmitHerdrPane(api, 'w1:p2', text));
 
-    expect(outcome).toBe('held');
-    expect(log.filter((c) => c.method === 'pane.send_keys')).toEqual([
-      { method: 'pane.send_keys', params: { pane_id: 'w1:p2', keys: ['enter'] } },
-    ]);
+    expect(outcome).toBe('blocked');
+    expect(log.filter((c) => c.method === 'pane.send_keys')).toEqual([]);
   });
 
-  it('holds when a permission menu appears on the same screen as the composer', async () => {
+  it('never presses a key when a permission menu shares the screen with the composer', async () => {
     const text = 'run the deploy script';
     const screen = [RULE, `❯ ${text}`, RULE, PERMISSION_MENU].join('\n');
     const { api, log } = fakeApi(({ method }) => {
-      if (method === 'pane.read') return { text: screen };
+      if (method === 'pane.read') return { type: 'pane_read', read: { text: screen } };
       if (method === 'agent.get') return { agent: { agent_status: 'idle' } };
+      return {};
+    });
+
+    const outcome = await settle(pasteAndSubmitHerdrPane(api, 'w1:p2', text));
+
+    expect(outcome).toBe('blocked');
+    expect(log.filter((c) => c.method === 'pane.send_keys')).toEqual([]);
+  });
+
+  it('holds when the agent becomes blocked after Enter', async () => {
+    const text = 'send this message';
+    let agentGetCalls = 0;
+    const { api, log } = fakeApi(({ method }) => {
+      if (method === 'pane.read') return { type: 'pane_read', read: { text: composerWith(text) } };
+      if (method === 'agent.get') {
+        agentGetCalls += 1;
+        return { agent: { agent_status: agentGetCalls === 1 ? 'idle' : 'blocked' } };
+      }
       return {};
     });
 
@@ -136,7 +152,7 @@ describe('pasteAndSubmitHerdrPane', () => {
   it('resubmits a steer with the chord, never Enter', async () => {
     const text = 'change course';
     const { api, log } = fakeApi(({ method }) => {
-      if (method === 'pane.read') return { text: composerWith(text) };
+      if (method === 'pane.read') return { type: 'pane_read', read: { text: composerWith(text) } };
       if (method === 'agent.get') return { agent: { agent_status: 'idle' } };
       return {};
     });
@@ -152,7 +168,7 @@ describe('pasteAndSubmitHerdrPane', () => {
 
   it('is unconfirmed when the composer can never be located', async () => {
     const { api, log } = fakeApi(({ method }) => {
-      if (method === 'pane.read') return { text: '' };
+      if (method === 'pane.read') return { type: 'pane_read', read: { text: '' } };
       if (method === 'agent.get') return { agent: { agent_status: 'idle' } };
       return {};
     });
@@ -167,7 +183,7 @@ describe('pasteAndSubmitHerdrPane', () => {
 
   it('never presses a key when the paste is never visible and the agent is blocked', async () => {
     const { api, log } = fakeApi(({ method }) => {
-      if (method === 'pane.read') return { text: emptyComposer };
+      if (method === 'pane.read') return { type: 'pane_read', read: { text: emptyComposer } };
       if (method === 'agent.get') return { agent: { agent_status: 'blocked' } };
       return {};
     });
