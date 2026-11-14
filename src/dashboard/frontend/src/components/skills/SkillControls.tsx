@@ -1,28 +1,32 @@
 /**
  * Shared controls for the skill overrides panel and the skill packs section:
- * one switch, one Inherit | On | Off group, and one collapsible group header,
- * so skills and packs read as the same kind of list.
+ * the switch, the project/issue row control (switch + source + Pin or Reset,
+ * PAN-5245), the Inherit | On | Off group packs still use, and the
+ * collapsible group header.
  */
 import type { ReactNode } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Pin, Undo2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export interface SkillSwitchProps {
   checked: boolean;
   label: string;
+  /** Hover hint; the accessible name stays `label`. */
+  title?: string;
   disabled?: boolean;
   /** Core skills: shown on, never changeable. */
   locked?: boolean;
   onToggle: () => void;
 }
 
-export function SkillSwitch({ checked, label, disabled = false, locked = false, onToggle }: SkillSwitchProps) {
+export function SkillSwitch({ checked, label, title, disabled = false, locked = false, onToggle }: SkillSwitchProps) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
       aria-label={label}
+      title={title}
       disabled={disabled || locked}
       onClick={onToggle}
       className={cn(
@@ -73,6 +77,91 @@ export function LevelChoice({ label, current, inheritLabel, saving, onSet }: Lev
         </button>
       ))}
     </div>
+  );
+}
+
+export interface LevelRowState {
+  /** What an agent launches with: the stored value, or the inherited one. */
+  effective: boolean;
+  /** Mono text beside the switch, e.g. "on · global". */
+  source: string;
+  /** This level stores a value. */
+  here: boolean;
+  /** What the switch sends; null clears the stored value. */
+  toggleTo: boolean | null;
+}
+
+/** Turns (stored value, inherited value) into what a project or issue row shows and sends (PAN-5245). */
+export function levelRowState(
+  current: boolean | null,
+  inherited: { on: boolean; from: string },
+  level: 'project' | 'issue',
+): LevelRowState {
+  const effective = current ?? inherited.on;
+  const word = effective ? 'on' : 'off';
+  const source = current === null
+    ? `${word} · ${inherited.from}`
+    : current === inherited.on ? `${word} · pinned here` : `${word} · this ${level}`;
+  const desired = !effective;
+  return { effective, source, here: current !== null, toggleTo: desired === inherited.on ? null : desired };
+}
+
+export interface LevelSwitchProps {
+  /** Skill name, used in every accessible name. */
+  skill: string;
+  level: 'project' | 'issue';
+  current: boolean | null;
+  inherited: { on: boolean; from: string };
+  saving: boolean;
+  onSet: (value: boolean | null) => void;
+}
+
+const ICON_BUTTON = 'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60';
+
+/** Project and issue level: one switch for the effective state, its source, and Pin or Reset. */
+export function LevelSwitch({ skill, level, current, inherited, saving, onSet }: LevelSwitchProps) {
+  const state = levelRowState(current, inherited, level);
+  const word = state.effective ? 'on' : 'off';
+  const above = inherited.from === 'project' ? 'project setting' : 'global default';
+  return (
+    <>
+      <span
+        data-skill-source
+        className={cn('hidden w-[9rem] shrink-0 truncate text-right font-mono-ui text-xs md:block', state.here ? 'text-foreground' : 'text-muted-foreground')}
+      >
+        {state.source}
+      </span>
+      <SkillSwitch
+        checked={state.effective}
+        label={`${skill} for this ${level}`}
+        title={state.effective ? `Turn off for this ${level}` : `Turn on for this ${level}`}
+        disabled={saving}
+        onToggle={() => onSet(state.toggleTo)}
+      />
+      {state.here ? (
+        <button
+          type="button"
+          aria-label={`Reset ${skill} to the ${above}`}
+          title={`Reset to the ${above} (${inherited.on ? 'on' : 'off'})`}
+          disabled={saving}
+          onClick={() => onSet(null)}
+          className={ICON_BUTTON}
+        >
+          <Undo2 aria-hidden className="h-3.5 w-3.5" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          aria-label={`Pin ${skill} ${word} for this ${level}`}
+          title={`Pin ${word} for this ${level}. A later change to the ${above} will not change it here.`}
+          disabled={saving}
+          onClick={() => onSet(inherited.on)}
+          className={ICON_BUTTON}
+        >
+          <Pin aria-hidden className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </>
   );
 }
 
