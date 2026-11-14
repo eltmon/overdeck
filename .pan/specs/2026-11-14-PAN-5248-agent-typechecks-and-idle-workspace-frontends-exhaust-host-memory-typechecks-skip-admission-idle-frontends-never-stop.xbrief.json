@@ -4,17 +4,17 @@
     "created": "2026-11-14T05:20:06Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5248: Agent typechecks and idle workspace frontends exhaust host memory: typechecks skip admission, idle frontends never stop (admission half; container half split to PAN-5250)",
-    "updated": "2026-11-14T05:34:55.443Z"
+    "updated": "2026-11-14T05:37:13.080Z"
   },
   "plan": {
     "id": "pan-5248",
     "title": "Agent typechecks and idle workspace frontends exhaust host memory: typechecks skip admission, idle frontends never stop",
-    "status": "proposed",
+    "status": "running",
     "uid": "26ea10a8-134d-48fe-9b24-44023b29da58",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T05:20:06Z",
-    "updated": "2026-11-14T05:34:55.443Z",
+    "updated": "2026-11-14T05:37:13.080Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5248",
@@ -1045,5 +1045,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
