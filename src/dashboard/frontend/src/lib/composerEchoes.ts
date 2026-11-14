@@ -4,6 +4,8 @@ export interface SendIdentity {
   clientMessageId?: string;
   echoBaselineIds?: string[];
   createdAt?: string;
+  /** PAN-5237: opt the bubble into Cancel; only senders that run through runCancellableSend set it. */
+  sendPhase?: 'queued';
 }
 
 interface EchoState {
