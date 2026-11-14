@@ -66,7 +66,8 @@ export function advisoryCandidates(entries: readonly PipelineJournalEntry[]): Pi
   return [...latest.values()].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 }
 
-function closingOutcome(entries: readonly PipelineJournalEntry[], dedupKey: string): 'already-filed' | 'already-failed' | null {
+/** Which terminal follow-up entry, if any, closes the key. `filed` wins over `failed`. */
+export function closingOutcomeFor(entries: readonly PipelineJournalEntry[], dedupKey: string): 'already-filed' | 'already-failed' | null {
   let failed = false;
   for (const entry of entries) {
     if (entry.data?.dedupKey !== dedupKey) continue;
@@ -78,7 +79,7 @@ function closingOutcome(entries: readonly PipelineJournalEntry[], dedupKey: stri
 
 /** True when the journal holds feedback.followup_filed or feedback.followup_failed for the key. */
 export function isAdvisoryCandidateClosed(entries: readonly PipelineJournalEntry[], dedupKey: string): boolean {
-  return closingOutcome(entries, dedupKey) !== null;
+  return closingOutcomeFor(entries, dedupKey) !== null;
 }
 
 /** The candidate's data when it carries what a follow-up needs; null for an entry written before PAN-5218. */
@@ -109,7 +110,7 @@ export function settleAdvisoryDelivery(
   facts: PullRequestSettlementFacts,
 ): AdvisorySettlement {
   const dedupKey = dedupKeyOf(candidate) ?? '';
-  const closed = closingOutcome(entries, dedupKey);
+  const closed = closingOutcomeFor(entries, dedupKey);
   if (closed) return { outcome: closed, dedupKey };
   const data = advisoryDeliveryData(candidate);
   if (!data) return { outcome: 'legacy', dedupKey };
