@@ -4,17 +4,17 @@
     "created": "2026-11-14T01:40:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5219: Phone: tapping an issue notification opens that issue's sheet, with status, cost, PR, checks and description",
-    "updated": "2026-11-14T01:39:51.368Z"
+    "updated": "2026-11-14T01:41:07.831Z"
   },
   "plan": {
     "id": "pan-5219",
     "title": "Phone: tapping an issue notification opens that issue's sheet, with status, cost, PR, checks and description",
-    "status": "proposed",
+    "status": "running",
     "uid": "e6c3fed1-4cd6-49ca-aa34-c91181ff9bc5",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T01:40:00Z",
-    "updated": "2026-11-14T01:39:51.368Z",
+    "updated": "2026-11-14T01:41:07.831Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5219",
@@ -915,5 +915,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
