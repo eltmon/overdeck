@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5233",
   "created": "2026-11-14T03:57:41.720Z",
-  "updated": "2026-11-14T06:19:34.711Z",
+  "updated": "2026-11-14T06:39:13.970Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,9 +130,22 @@
       "doneAt": "2026-11-14T06:19:21.470Z"
     },
     "route-credential-origin": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5233",
-      "claimedAt": "2026-11-14T06:19:34.710Z"
+      "claimedAt": "2026-11-14T06:19:34.710Z",
+      "doneAt": "2026-11-14T06:39:13.970Z"
+    },
+    "route-credential-origin.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:39:13.970Z"
+    },
+    "route-credential-origin.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:39:13.970Z"
+    },
+    "route-credential-origin.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:39:13.970Z"
     }
   }
 }
