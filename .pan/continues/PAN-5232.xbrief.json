@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5232",
   "created": "2026-11-14T03:50:14.887Z",
-  "updated": "2026-11-14T04:12:06.883Z",
+  "updated": "2026-11-14T04:12:14.477Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,11 @@
     "submit-reader.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T04:12:06.883Z"
+    },
+    "resume-guard": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5232",
+      "claimedAt": "2026-11-14T04:12:14.477Z"
     }
   }
 }
