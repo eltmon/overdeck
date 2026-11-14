@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5239",
   "created": "2026-11-14T04:43:48.158Z",
-  "updated": "2026-11-14T05:23:28.274Z",
+  "updated": "2026-11-14T05:33:09.246Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,9 +126,26 @@
       "doneAt": "2026-11-14T05:23:17.802Z"
     },
     "jump-opens-command-deck": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5239",
-      "claimedAt": "2026-11-14T05:23:28.274Z"
+      "claimedAt": "2026-11-14T05:23:28.274Z",
+      "doneAt": "2026-11-14T05:33:09.245Z"
+    },
+    "jump-opens-command-deck.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:33:09.245Z"
+    },
+    "jump-opens-command-deck.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:33:09.245Z"
+    },
+    "jump-opens-command-deck.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:33:09.245Z"
+    },
+    "jump-opens-command-deck.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:33:09.245Z"
     }
   }
 }
