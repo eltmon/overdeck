@@ -21,7 +21,8 @@ describe("getHarness", () => {
     expect(getHarness({ runtime: "claude-code" })).toBe("claude-code")
     expect(getHarness({ runtime: "ohmypi" })).toBe("ohmypi")
     expect(getHarness({ runtime: "codex" })).toBe("codex")
-    expect(getHarness({ runtime: "pi" })).toBe("ohmypi")
+    // PAN-5212: pi is its own harness again.
+    expect(getHarness({ runtime: "pi" })).toBe("pi")
   })
 
   it("falls back to claude-code for unknown or missing runtime values", () => {

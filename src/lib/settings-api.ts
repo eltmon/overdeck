@@ -39,7 +39,7 @@ import type { RuntimeName } from './runtimes/types.js';
 import { getBuiltInDefaultHarness } from './providers.js';
 import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './background-ai/registry.js';
 import { hasModelCapability, MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
-import { isEffortLevel } from '@overdeck/contracts';
+import { isEffortLevel, KNOWN_HARNESSES } from '@overdeck/contracts';
 import { effortConfigErrors } from './agents/effort-support.js';
 import { synchronizeAnalyticsServices } from './telemetry/service.js';
 import { ensureOperatorHash } from './telemetry/operator-hash.js';
@@ -513,8 +513,8 @@ function validateModelRef(
 
 function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknown>, errors: string[]): void {
   const harness = roleConfig.harness;
-  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse' && harness !== 'prime-agent' && harness !== 'grok') {
-    errors.push(`${fieldPath}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, grok, null, or empty string`);
+  if (harness !== undefined && harness !== null && harness !== '' && !(typeof harness === 'string' && KNOWN_HARNESSES.has(harness))) {
+    errors.push(`${fieldPath}.harness must be claude-code, pi, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, grok, null, or empty string`);
   }
 
   errors.push(...effortConfigErrors(fieldPath, roleConfig.effort, []));
@@ -1236,8 +1236,8 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
           errors.push(`Unknown provider harness entry "${provider}"`);
           continue;
         }
-        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse' && harness !== 'prime-agent' && harness !== 'grok') {
-          errors.push(`models.provider_harnesses.${provider} must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, grok, or empty string`);
+        if (harness !== undefined && harness !== '' && !(typeof harness === 'string' && KNOWN_HARNESSES.has(harness))) {
+          errors.push(`models.provider_harnesses.${provider} must be claude-code, pi, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, grok, or empty string`);
         }
       }
     }

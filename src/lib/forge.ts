@@ -71,6 +71,8 @@ export interface CreateReviewArtifactInput {
 
 export interface CreateReviewArtifactResult extends ReviewArtifactRef {
   created: boolean;
+  /** Merged lookups: the artifact's head commit when the forge reports it. */
+  headSha?: string;
 }
 
 export interface MergeReviewArtifactInput extends ReviewArtifactRef {
@@ -356,6 +358,7 @@ async function findMergedGitLabArtifact(
   return merged ? {
     forge: 'gitlab', created: false, url: merged.web_url,
     id: merged.iid ? String(merged.iid) : input.artifactId,
+    headSha: merged.sha,
   } : null;
 }
 

@@ -50,8 +50,20 @@ describe('ConversationFeedCard', () => {
       />,
     );
 
-    expect(screen.getByLabelText('oh-my-pi logo')).toBeInTheDocument();
+    expect(screen.getByLabelText('Pi logo')).toBeInTheDocument();
     expect(screen.getByText('π')).toBeInTheDocument();
+  });
+
+  it('renders the oh-my-pi harness mark for ohmypi conversation entries (PAN-5212)', () => {
+    render(
+      <ConversationFeedCard
+        entry={entry({ agent: 'ohmypi' })}
+        onSelect={vi.fn()}
+        now={new Date('2026-05-23T01:05:00.000Z')}
+      />,
+    );
+
+    expect(screen.getByLabelText('oh-my-pi logo')).toBeInTheDocument();
   });
 
   it('renders ACP conversations with Kimi labeling and transcript summary text', () => {

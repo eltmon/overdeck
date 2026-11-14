@@ -443,7 +443,7 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
     const { spawn: spawnFlag, model: rawModel, harness, force = false } = body as {
       spawn?: boolean;
       model?: string;
-      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok';
+      harness?: RuntimeName;
       force?: boolean;
     };
     const wantsSpawn = spawnFlag !== false; // default to spawn when omitted (picker path)
@@ -490,7 +490,7 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
     } catch (err) {
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
-    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok' | null = null;
+    let effectiveHarness: RuntimeName | null = null;
     if (wantsSpawn && harness && spawnModel) {
       const policyModel = spawnModel;
       const harnessDecision = yield* Effect.promise(async () =>

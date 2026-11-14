@@ -1,0 +1,336 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-13T20:42:49Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5195: File explorer: discard untracked and newly added files to the Overdeck trash",
+    "updated": "2026-11-14T01:02:41.074Z"
+  },
+  "plan": {
+    "id": "pan-5195",
+    "title": "File explorer: discard untracked and newly added files to the Overdeck trash",
+    "status": "running",
+    "uid": "c4f91c4c-c79c-4187-a726-ac56c76a840b",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-11-13T20:42:49Z",
+    "updated": "2026-11-14T01:02:41.074Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5195",
+        "label": "PAN-5195",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5183",
+        "label": "PAN-5183 (parent)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "explorer",
+      "git",
+      "trash",
+      "dashboard-server"
+    ],
+    "narratives": {
+      "Problem": "The file explorer's Discard changes action (pan.explorerGitStage, action 'discard') refuses any request that names a path not in HEAD, or a folder holding an index entry not in HEAD, with NOT_IMPLEMENTED, because a no-overlay git restore would delete such files. The operator cannot discard untracked or newly added files. PAN-5187 shipped trashPaths but nothing wires discard to it.",
+      "Proposal": "Change gitStage discard to: resolve paths and read HEAD and index (failures throw before any change); unstage requested paths holding index entries not in HEAD with 'git restore --staged'; list what git then reports as untracked (--others --exclude-standard --directory, so an ignored file is never trashed on its own and a new folder is one entry); move those to the Overdeck trash with trashPaths; restore the requested paths that have HEAD content from HEAD. Return { trashIds } in a now-required ExplorerGitStageResult field so PAN-5190's undo can restore them, and make the frontend wrapper return the result. Update docs/DASHBOARD-ARCHITECTURE.md and add changelog.d/pan-5195.md.",
+      "NonGoals": "- No undo or redo UI for discard (PAN-5190 owns undo and reads trashIds)\n- No change to the discard confirm dialog or the context menu's enablement rules\n- Discarding the new path of a staged rename does not restore the rename's original path; the original stays staged as deleted\n- Discarding an untracked symlink whose target is outside the root, or a dangling one, stays refused with PATH_OUTSIDE_ROOT\n- Discard in a repository with no commits fails with EXPLORER_FAILED; no special path for an unborn HEAD\n- No change to trashPaths, restore or pruneTrash in trash.ts\n- Never trash an ignored file on its own or an unchanged committed file; an ignored file inside a wholly new untracked folder goes to the trash with that folder"
+    },
+    "autoDecisions": [
+      {
+        "summary": "A folder with committed and new files: trash only the new entries inside it and restore the committed files from HEAD",
+        "rationale": "The issue's 'What is needed' already describes this split, and refusing would keep the reported bug for every mixed folder."
+      },
+      {
+        "summary": "Return trash ids as a required trashIds field on ExplorerGitStageResult ([] for stage and unstage)",
+        "rationale": "PAN-5190's undo needs the ids; the explorer is unreleased (changelog.d only), so no older server answers {} to a newer client."
+      },
+      {
+        "summary": "The trash set is git's untracked listing after unstaging, never 'not in HEAD'",
+        "rationale": "The context menu sends every selected target; a multi-select holding an ignored .env must not trash it. An ignored file inside a wholly new folder still goes with that folder."
+      },
+      {
+        "summary": "Unstage with 'git restore --staged' by pathspec before listing and trashing",
+        "rationale": "git rm --cached fails on a staged file edited after staging (probed); unstaging first collapses a partly staged new folder into one trash entry and loses no content if a later step fails."
+      },
+      {
+        "summary": "A new folder containing ignored files is trashed whole",
+        "rationale": "git lists it as one collapsed untracked entry; the trash is recoverable and leaving only ignored files behind would not discard the folder."
+      }
+    ],
+    "items": [
+      {
+        "id": "stage-result-trash-ids",
+        "title": "Contract: ExplorerGitStageResult carries trashIds",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T20:42:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5195",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/explorer.ts",
+            "src/dashboard/server/services/explorer/git.ts",
+            "src/dashboard/server/ws-rpc-explorer.ts",
+            "src/dashboard/server/__tests__/ws-rpc-explorer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/ws-rpc-explorer.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ws-rpc-explorer.test.ts passes including the new 'pan.explorerGitStage returns trashIds' case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ],
+          "acJustification": "Two ACs cover the contract field and the handler result; the handler test proves the result is passed through."
+        },
+        "narrative": {
+          "Action": "the PAN-5195 PRD under .pan/drafts/ WI-1. Change ExplorerGitStageResult in packages/contracts/src/explorer.ts to Schema.Struct({ trashIds: Schema.Array(Schema.String) }) (required field, D-5). Change gitStage in src/dashboard/server/services/explorer/git.ts to return Promise<ExplorerGitStageResult>: { trashIds: [] } for empty paths, stage and unstage; keep today's discard logic but return { trashIds: [] } (the next item replaces discard). In src/dashboard/server/ws-rpc-explorer.ts make the explorerGitStage handler return gitStage(...)'s result instead of {}. Add a ws-rpc-explorer.test.ts case staging a.txt on the shared fixture and expecting { trashIds: [] }."
+        },
+        "items": [
+          {
+            "id": "stage-result-trash-ids.ac1",
+            "title": "Given an issue root, when pan.explorerGitStage runs with action 'stage' on a.txt, then the handler returns { trashIds: [] } (asserted in ws-rpc-explorer.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-result-trash-ids.ac2",
+            "title": "ExplorerGitStageResult in packages/contracts/src/explorer.ts declares trashIds as a required Schema.Array(Schema.String) field, and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "discard-to-trash",
+        "title": "gitStage discard unstages, trashes untracked entries, restores the rest",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T20:42:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5195",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/git.ts",
+            "src/dashboard/server/services/explorer/__tests__/git.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/git.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "git.test.ts passes with the ten discard cases from PRD WI-2 step 6",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "NFR-1"
+          ],
+          "acJustification": "Six ACs: each pins one discard rule (mixed folder, collapsed new folder, ignored file, edited staged file, new folder with ignored contents, restore failure after trash) that could otherwise yield a different-but-plausible diff."
+        },
+        "narrative": {
+          "Action": "the PAN-5195 PRD under .pan/drafts/ WI-2 and decisions D-1..D-9. In git.ts replace pathsNotInHead with discardPlan (ls-tree HEAD + ls-files reads; any non-zero, timedOut or truncated read throws EXPLORER_FAILED before changes; returns head = requested paths with HEAD content, unstage = requested paths with an index entry not in HEAD). Add untrackedEntries (ls-files -z --others --exclude-standard --directory --no-empty-directory -- paths, strip one trailing '/'). Discard order: unstage via 'git restore --staged -- <unstage>' (never git rm --cached: it fails on a staged file edited after staging), list untracked, trashPaths(root, untracked) when non-empty, then 'git restore --source=HEAD --staged --worktree -- <head>' when non-empty; a restore failure after a trash throws EXPLORER_FAILED 'git restore failed: <why>; moved to the Overdeck trash: <ids>'. Return { trashIds }. Rewrite the header's last paragraph (D-9). In git.test.ts delete the two 'refuses to discard ...' cases and add a describe block whose beforeEach/afterEach isolate process.env.OVERDECK_HOME in a mkdtemp dir (trash.test.ts pattern), with the ten cases named in PRD WI-2 step 6 (the tenth creates .git/index.lock after setup so the HEAD restore fails after the trash)."
+        },
+        "items": [
+          {
+            "id": "discard-to-trash.ac1",
+            "title": "Given a mixed folder dir with a modified committed dir/a.txt, a staged-new dir/new.txt and an untracked dir/sub/s.txt, when discard runs on ['dir'], then dir/a.txt is restored to its HEAD content, dir/new.txt and dir/sub no longer exist, and trashIds has length 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "discard-to-trash.ac2",
+            "title": "Given a new folder nd with one staged file and one untracked file, when discard runs on ['nd'], then trashIds has exactly one id and nd no longer exists in the worktree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "discard-to-trash.ac3",
+            "title": "Given an ignored x.log selected next to a modified a.txt, when discard runs on ['a.txt','x.log'], then x.log still exists and the result is { trashIds: [] }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "discard-to-trash.ac4",
+            "title": "Given a staged-new file edited after staging, when discard runs on it, then git ls-files prints nothing for it and its content exists under <OVERDECK_HOME>/trash/<id>/files/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "discard-to-trash.ac5",
+            "title": "Given a new untracked folder newdir holding newdir/x and an ignored newdir/z.log, when discard runs on ['newdir'], then trashIds has length 1 and <OVERDECK_HOME>/trash/<id>/files/newdir/z.log exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "discard-to-trash.ac6",
+            "title": "Given a modified committed d.txt, an untracked u.txt and an existing .git/index.lock, when discard runs on ['d.txt','u.txt'], then it rejects with EXPLORER_FAILED whose message contains 'moved to the Overdeck trash: issue-x/', and u.txt exists under <OVERDECK_HOME>/trash/ while d.txt keeps its modified content",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rpc-wrapper-returns-result",
+        "title": "Frontend gitStage wrapper returns the RPC result",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T20:42:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5195",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/explorer-rpc.ts",
+            "src/dashboard/frontend/src/components/explorer/__tests__/explorer-rpc.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/explorer/__tests__/explorer-rpc.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "explorer-rpc.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ],
+          "acJustification": "Two ACs fully cover a one-function wrapper change."
+        },
+        "narrative": {
+          "Action": "the PAN-5195 PRD under .pan/drafts/ WI-3. Change gitStage in explorer-rpc.ts from 'async ... Promise<void> { await ...' to a non-async function returning Promise<ExplorerGitStageResult> (import the type from @overdeck/contracts) with a one-line doc comment. Leave ExplorerContextMenu.tsx unchanged. In explorer-rpc.test.ts change the explorerGitStage mock to return { trashIds: ['issue-PAN-1/20261113T000000000Z-0'] } and assert gitStage resolves to that object."
+        },
+        "items": [
+          {
+            "id": "rpc-wrapper-returns-result.ac1",
+            "title": "Given the transport answers { trashIds: ['issue-PAN-1/20261113T000000000Z-0'] }, when gitStage('issue:PAN-1', ['a.ts','b.ts'], 'discard') runs, then it resolves to that same object (asserted in explorer-rpc.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rpc-wrapper-returns-result.ac2",
+            "title": "gitStage in explorer-rpc.ts is typed to return Promise<ExplorerGitStageResult>, and npm run typecheck exits 0 with ExplorerContextMenu.tsx unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-discard-trash",
+        "title": "Docs and changelog describe discard to the trash",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-13T20:42:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5195",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5195.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "! grep -q 'is tracked in #5195' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "the negated grep exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2"
+          ],
+          "acJustification": "Two ACs cover the two doc files this item touches."
+        },
+        "narrative": {
+          "Action": "the PAN-5195 PRD under .pan/drafts/ WI-4. In docs/DASHBOARD-ARCHITECTURE.md update the pan.explorerGitStage table row (around line 1678) and replace the paragraph starting 'Discard never removes a file that is not in `HEAD`' (around lines 1698-1702, through 'is tracked in #5195.') with prose describing unstage -> trash untracked entries (an ignored file is never trashed on its own; one inside a wholly new folder goes with that folder) -> restore the rest from HEAD, the mixed-folder rule, one entry per new folder, the { trashIds } result, and recovery via pan.explorerRestore or moving trash/<id>/files/<path> back until PAN-5190 adds undo. Keep the following sentence about refusing a root that is not the top level of its checkout. Add changelog.d/pan-5195.md with the exact '#### Fixed' bullet from PRD WI-4 step 3."
+        },
+        "items": [
+          {
+            "id": "docs-discard-trash.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md no longer contains 'is tracked in #5195' and its git-actions paragraph names trashIds, pan.explorerRestore and the rule that an ignored file is never trashed on its own",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-discard-trash.ac2",
+            "title": "changelog.d/pan-5195.md exists with a '#### Fixed' heading and one bullet linking https://github.com/eltmon/overdeck/issues/5195, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "stage-result-trash-ids",
+        "to": "discard-to-trash",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-result-trash-ids",
+        "to": "rpc-wrapper-returns-result",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-13-PAN-5195-file-explorer-discard-untracked-and-newly-added-files-to-the-overdeck-trash.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

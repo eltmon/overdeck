@@ -598,7 +598,7 @@ async function deliverConversationMessage(
   let deliveredMessage = transformForHarness(outboundMessage, harness, effectiveAttachmentPaths);
   if (behavior.injectsPromptTimeMemory) {
     deliveredMessage = await injectPiConversationMemory(
-      { cwd: conv.cwd, issueId: conv.issueId, conversationName: conv.name },
+      { cwd: conv.cwd, issueId: conv.issueId, conversationName: conv.name, harness },
       deliveredMessage,
     );
   }

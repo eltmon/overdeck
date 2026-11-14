@@ -4,6 +4,7 @@ import { lstat, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { EffortLevel, Role } from '@overdeck/contracts';
+import type { RuntimeName } from '../../../../lib/runtimes/types.js';
 import { Effect } from 'effect';
 
 import { buildChildEnvWithoutTmux } from '../../../../lib/child-env.js';
@@ -234,7 +235,7 @@ export function handleContainerOrchestration(input: {
   devScript: string;
   agentSessionName: string;
   role: Role;
-  effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok' | null;
+  effectiveHarness: RuntimeName | null;
   startedBy: string;
   allowHost: boolean;
   /** Explicit operator-chosen model only — forwarded to `pan start` as

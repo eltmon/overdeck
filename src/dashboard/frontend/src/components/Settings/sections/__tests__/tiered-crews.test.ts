@@ -70,7 +70,10 @@ describe('tiered crews mapping', () => {
     const settings = { models: { provider_harnesses: { openai: 'ohmypi' } } } as Pick<SettingsConfig, 'models'>;
     expect(providerDefaultHarness('gpt-5.6-sol', settings)).toBe('ohmypi');
     expect(providerDefaultHarness('claude-sonnet-5', settings)).toBe('claude-code');
-    expect(providerDefaultHarness('kimi-k2.7-code', settings)).toBe('ohmypi');
+    // PAN-5212: the built-in fallback for non-Anthropic, non-OpenAI providers is pi.
+    expect(providerDefaultHarness('kimi-k2.7-code', settings)).toBe('pi');
+    expect(providerDefaultHarness('gemini-3.8-flash', settings)).toBe('pi');
+    expect(providerDefaultHarness('gemini-3.8-flash', { models: { provider_harnesses: { google: 'ohmypi' } } } as Pick<SettingsConfig, 'models'>)).toBe('ohmypi');
     expect(providerDefaultHarness('gpt-5.6-sol', { models: {} } as Pick<SettingsConfig, 'models'>)).toBe('codex');
   });
 

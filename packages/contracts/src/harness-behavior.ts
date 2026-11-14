@@ -7,6 +7,7 @@ import {
   KIMI_CODE_CAPABILITIES,
   MUSE_CAPABILITIES,
   OHMYPI_CAPABILITIES,
+  PI_CAPABILITIES,
   GROK_CAPABILITIES,
   OPENCODE_CAPABILITIES,
   PRIME_AGENT_CAPABILITIES,
@@ -14,7 +15,8 @@ import {
 } from "./harness-capabilities"
 
 export type RuntimeName = Harness
-export type HarnessName = RuntimeName | "pi"
+/** Kept as an alias: `pi` became a RuntimeName in PAN-5212. */
+export type HarnessName = RuntimeName
 
 export type HarnessLaunchCommandKind = "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui" | "muse-tui" | "prime-agent-host"
 export type HarnessDeliveryKind =
@@ -116,7 +118,7 @@ export const CLAUDE_CODE_BEHAVIOR: HarnessBehavior = {
 }
 
 export const OHMYPI_BEHAVIOR: HarnessBehavior = {
-  displayName: "Pi",
+  displayName: "Oh My Pi",
   capabilities: OHMYPI_CAPABILITIES,
   // omp 16.3.11 does not expose a machine-readable native slash-command inventory (checked 2026-07-24).
   nativeCommands: [],
@@ -140,6 +142,27 @@ export const OHMYPI_BEHAVIOR: HarnessBehavior = {
   readyTimeoutSeconds: 120,
   steerKind: "control-channel",
   effortLevels: ["low", "medium", "high", "xhigh"],
+}
+
+/**
+ * Pi Coding Agent (`pi`, PAN-5212). pi is omp's upstream: same `--mode rpc`
+ * JSONL protocol, same ready.json extension handshake, same v3 session JSONL
+ * and `<agentDir>/sessions` layout, so it shares omp's launch, delivery,
+ * readiness and transcript kinds. The launch differences (binary, resume flag,
+ * models.json, extension bundle) live in `src/lib/runtimes/pi-family.ts`.
+ * See .pan/pi-vs-omp.md.
+ */
+export const PI_BEHAVIOR: HarnessBehavior = {
+  ...OHMYPI_BEHAVIOR,
+  displayName: "Pi",
+  capabilities: PI_CAPABILITIES,
+  // pi 0.85.0 exposes get_commands only for extension/skill/prompt commands; none are Overdeck-relevant.
+  nativeCommands: [],
+  executableName: "pi",
+  // pi sets process.title = "pi" (dist/bundle/cli.js).
+  processNames: ["pi"],
+  // effortLevels: inherited low..xhigh. pi 0.85 parses `max`, but the Pi rows
+  // stop at xhigh by decision (PAN-4260, configuration/harnesses.mdx).
 }
 
 export const CODEX_BEHAVIOR: HarnessBehavior = {
@@ -292,6 +315,7 @@ export const PRIME_AGENT_BEHAVIOR: HarnessBehavior = {
 const BEHAVIORS: Record<RuntimeName, HarnessBehavior> = {
   "opencode": OPENCODE_BEHAVIOR,
   "claude-code": CLAUDE_CODE_BEHAVIOR,
+  pi: PI_BEHAVIOR,
   ohmypi: OHMYPI_BEHAVIOR,
   codex: CODEX_BEHAVIOR,
   acp: ACP_BEHAVIOR,
@@ -301,16 +325,8 @@ const BEHAVIORS: Record<RuntimeName, HarnessBehavior> = {
   grok: GROK_BEHAVIOR,
 }
 
-const LEGACY_PI_HARNESS = "pi"
-
-/** True for the legacy stored harness alias `pi` (PAN-1989), which now means ohmypi. */
-export function isLegacyPiHarnessName(raw: unknown): boolean {
-  return raw === LEGACY_PI_HARNESS
-}
-
-/** Map a stored or requested harness string to a RuntimeName; legacy `pi` → `ohmypi`; anything else → null. */
+/** Map a stored or requested harness string to a RuntimeName; anything unknown → null. */
 export function normalizeHarnessName(raw: unknown): RuntimeName | null {
-  if (isLegacyPiHarnessName(raw)) return "ohmypi"
   return typeof raw === "string" && KNOWN_HARNESSES.has(raw) ? (raw as RuntimeName) : null
 }
 

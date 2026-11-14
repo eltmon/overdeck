@@ -29,7 +29,8 @@ const AGENT_LABELS: Record<string, string> = {
 
 /** Feed labels that differ from the harness brand; every other harness uses its brand label. */
 const FEED_LABEL_BY_HARNESS: Partial<Record<Harness, string>> = {
-  ohmypi: 'Pi',
+  pi: 'Pi',
+  ohmypi: 'Oh My Pi',
   acp: 'Kimi',
 };
 
@@ -85,7 +86,8 @@ export function ConversationFeedCard({ entry, onSelect, now = new Date() }: Conv
 }
 
 function harnessForFeedAgent(agent: string): Harness {
-  if (agent === 'ohmypi' || agent === 'pi') return 'ohmypi';
+  if (agent === 'pi') return 'pi';
+  if (agent === 'ohmypi') return 'ohmypi';
   if (agent === 'codex') return 'codex';
   if (agent === 'acp') return 'acp';
   if (agent === 'kimi_code' || agent === 'kimi-code') return 'kimi-code';

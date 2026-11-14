@@ -198,10 +198,10 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     });
     setup(status, { pendingInput: [{ name: 'conv-flywheel', pendingAskUserQuestion: { toolUseId: 'tu-1', askedAt: '2026-09-23T09:59:00.000Z', questions: [] } }] });
     const { client } = renderWithQuery(<FlywheelPage />);
-    const banner = (await screen.findAllByTestId('flywheel-needs-you-item'))[0]!;
+    const jump = (await screen.findAllByTestId('flywheel-needs-you-jump'))[0]!;
     await waitFor(() => expect(client.getQueryData(['conv-ask-user-question'])).toBeDefined());
 
-    fireEvent.click(banner);
+    fireEvent.click(jump);
     expect(useAskUserQuestionUiStore.getState().reopenId).toBe('conv-flywheel');
     expect(useAskUserQuestionUiStore.getState().reopenNonce).toBe(1);
     expect(screen.getByTestId('flywheel-conversation-pane')).toHaveAttribute('data-target-id', '');
@@ -213,16 +213,16 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     });
     setup(status, { pendingInput: [] });
     const { client } = renderWithQuery(<FlywheelPage />);
-    const banner = (await screen.findAllByTestId('flywheel-needs-you-item'))[0]!;
+    const jump = (await screen.findAllByTestId('flywheel-needs-you-jump'))[0]!;
     await waitFor(() => expect(client.getQueryData(['conv-ask-user-question'])).toBeDefined());
 
-    fireEvent.click(banner);
+    fireEvent.click(jump);
     const pane = screen.getByTestId('flywheel-conversation-pane');
     expect(pane).toHaveAttribute('data-target-id', 'msg-9');
     expect(pane).toHaveAttribute('data-target-nonce', '1');
     expect(useAskUserQuestionUiStore.getState().reopenNonce).toBe(0);
 
-    fireEvent.click(banner);
+    fireEvent.click(jump);
     expect(pane).toHaveAttribute('data-target-nonce', '2');
     expect(useAskUserQuestionUiStore.getState().reopenNonce).toBe(0);
 
@@ -230,7 +230,7 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     expect(pane).toHaveAttribute('data-target-id', '');
     expect(pane).toHaveAttribute('data-target-nonce', '2');
 
-    fireEvent.click(banner);
+    fireEvent.click(jump);
     expect(pane).toHaveAttribute('data-target-id', 'msg-9');
     expect(pane).toHaveAttribute('data-target-nonce', '3');
   });
@@ -244,10 +244,10 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     });
     setup(status, { pendingInput: [] });
     const { client } = renderWithQuery(<FlywheelPage />);
-    const row = (await screen.findAllByTestId('flywheel-needs-you-item'))[0]!;
+    const jump = (await screen.findAllByTestId('flywheel-needs-you-jump'))[0]!;
     await waitFor(() => expect(client.getQueryData(['conv-ask-user-question'])).toBeDefined());
 
-    fireEvent.click(row);
+    fireEvent.click(jump);
     expect(screen.getByTestId('flywheel-conversation-pane')).toHaveAttribute('data-target-id', 'msg-2');
   });
 
@@ -260,10 +260,10 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     });
     setup(status, { pendingInput: [{ name: 'conv-flywheel', pendingAskUserQuestion: { toolUseId: 'tu-1', askedAt: '2026-09-23T09:59:00.000Z', questions: [] } }] });
     const { client } = renderWithQuery(<FlywheelPage />);
-    const row = (await screen.findAllByTestId('flywheel-needs-you-item'))[0]!;
+    const jump = (await screen.findAllByTestId('flywheel-needs-you-jump'))[0]!;
     await waitFor(() => expect(client.getQueryData(['conv-ask-user-question'])).toBeDefined());
 
-    fireEvent.click(row);
+    fireEvent.click(jump);
     expect(useAskUserQuestionUiStore.getState().reopenNonce).toBe(1);
     expect(screen.getByTestId('flywheel-conversation-pane')).toHaveAttribute('data-target-id', '');
   });

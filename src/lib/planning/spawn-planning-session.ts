@@ -344,7 +344,7 @@ If the probe pass changes nothing at all, record one decision: "PROBE: no findin
  * Write workspace `.pan/context.md` for Rally Features so story work agents can
  * reference feature-level context (child stories, description, URL).
  */
-async function claudePlanningSystemPromptFiles(workspacePath: string, harness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok'): Promise<string[]> {
+async function claudePlanningSystemPromptFiles(workspacePath: string, harness: RuntimeName): Promise<string[]> {
   return claudeSystemPromptFiles(workspacePath, harness);
 }
 
@@ -562,7 +562,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel, sessionName, roleAgentDefinitionPath('plan'), effectiveHarness, resolvedEffort.effort);
     const behavior = getHarnessBehavior(effectiveHarness);
     const piLauncherFields = behavior.usesRpcFifo
-      ? await getOhmypiLauncherFields(sessionName, planningModel, resolvedEffort.effort)
+      ? await getOhmypiLauncherFields(sessionName, planningModel, resolvedEffort.effort, effectiveHarness)
       : {};
     const codexLauncherFields = behavior.usesCodexHome
       ? getCodexLauncherFields(sessionName, planningModel, workspacePath, 'plan', resolvedEffort.effort, await prepareCodexOverdeckMcp({ agentId: sessionName, agentKind: 'agent', role: 'plan', harness: effectiveHarness, cwd: workspacePath, issueId: issue.identifier }))

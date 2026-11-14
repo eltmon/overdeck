@@ -261,7 +261,7 @@ api_keys:
             openai: { enabled: true, harness: 'bad' as never },
           },
         },
-      })).toThrow('models.providers.openai.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, or grok');
+      })).toThrow('models.providers.openai.harness must be claude-code, pi, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, or grok');
     });
 
     it('accepts prime-agent as a provider default harness (PAN-3668)', () => {

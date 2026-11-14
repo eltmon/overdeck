@@ -38,9 +38,14 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
     expect(rows[0]).toHaveTextContent('waive PAN-5095 test removal');
     expect(rows[1]).toHaveTextContent('PR #7 merge');
     expect(rows[2]).toHaveTextContent('upload AAB');
+    expect(screen.getAllByTestId('flywheel-needs-you-jump')).toHaveLength(3);
+    for (const row of rows) {
+      expect(row).not.toHaveAttribute('role');
+      expect(row).not.toHaveAttribute('tabindex');
+    }
   });
 
-  it('clicking the issue control navigates and does not jump the row (PAN-5198)', () => {
+  it('an issue button navigates to the issue and does not jump (PAN-5217)', () => {
     const onNavigateIssue = vi.fn();
     const onNeedsYouClick = vi.fn();
     const status = flywheelStatus({
@@ -71,11 +76,7 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
       },
     });
     render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
-    const row = screen.getByTestId('flywheel-needs-you-item');
-    fireEvent.click(row);
-    expect(onNeedsYouClick).toHaveBeenCalledWith('m2');
-    onNeedsYouClick.mockClear();
-    fireEvent.keyDown(row, { key: 'Enter' });
+    fireEvent.click(screen.getByTestId('flywheel-needs-you-jump'));
     expect(onNeedsYouClick).toHaveBeenCalledWith('m2');
   });
 
@@ -85,16 +86,30 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
       lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'PR #7 merge', at: '2026-09-23T09:59:50.000Z', messageId: 'm9' },
     });
     render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
-    fireEvent.click(screen.getByTestId('flywheel-needs-you-item'));
+    fireEvent.click(screen.getByTestId('flywheel-needs-you-jump'));
     expect(onNeedsYouClick).toHaveBeenCalledWith('m9');
   });
 
-  it('the needs-you row click does not throw without onNeedsYouClick', () => {
+  it('the jump button renders and does not throw without onNeedsYouClick (PAN-5217)', () => {
     const status = flywheelStatus({
       lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the PAN-3920 scope', at: '2026-09-23T09:59:50.000Z' },
     });
     render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} />);
-    expect(() => fireEvent.click(screen.getByTestId('flywheel-needs-you-item'))).not.toThrow();
+    expect(screen.getByTestId('flywheel-needs-you-jump')).toBeInTheDocument();
+    expect(() => fireEvent.click(screen.getByTestId('flywheel-needs-you-jump'))).not.toThrow();
+  });
+
+  it('no button-role element contains another button or link (PAN-5217, ACT 307n5z)', () => {
+    const status = flywheelStatus({
+      lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'waive PAN-5095 test removal; PR #4001 merge', at: '2026-09-23T09:59:50.000Z' },
+    });
+    render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} />);
+    // The fixture must actually render nested candidates, or the check is vacuous.
+    expect(screen.getByTestId('flywheel-needs-you-issue')).toBeInTheDocument();
+    expect(screen.getByTestId('flywheel-needs-you-pr')).toBeInTheDocument();
+    for (const button of screen.getAllByRole('button')) {
+      expect(button.querySelector('button, a, [role="button"], [role="link"]')).toBeNull();
+    }
   });
 
   it('renders in-flight rows with state, attention, PR, and last journal; issue ids navigate', () => {

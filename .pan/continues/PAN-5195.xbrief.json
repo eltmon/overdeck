@@ -1,0 +1,85 @@
+{
+  "version": "1",
+  "issueId": "PAN-5195",
+  "created": "2026-11-14T01:04:02.519Z",
+  "updated": "2026-11-14T01:59:09.022Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "stage-result-trash-ids": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5195",
+      "claimedAt": "2026-11-14T01:04:02.519Z",
+      "doneAt": "2026-11-14T01:21:25.964Z"
+    },
+    "stage-result-trash-ids.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:21:25.964Z"
+    },
+    "stage-result-trash-ids.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:21:25.964Z"
+    },
+    "discard-to-trash": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5195",
+      "claimedAt": "2026-11-14T01:21:32.666Z",
+      "doneAt": "2026-11-14T01:35:28.445Z"
+    },
+    "discard-to-trash.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:35:28.445Z"
+    },
+    "discard-to-trash.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:35:28.445Z"
+    },
+    "discard-to-trash.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:35:28.445Z"
+    },
+    "discard-to-trash.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:35:28.445Z"
+    },
+    "discard-to-trash.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:35:28.445Z"
+    },
+    "discard-to-trash.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:35:28.445Z"
+    },
+    "rpc-wrapper-returns-result": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5195",
+      "claimedAt": "2026-11-14T01:35:37.807Z",
+      "doneAt": "2026-11-14T01:48:47.775Z"
+    },
+    "rpc-wrapper-returns-result.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:48:47.775Z"
+    },
+    "rpc-wrapper-returns-result.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:48:47.775Z"
+    },
+    "docs-discard-trash": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5195",
+      "claimedAt": "2026-11-14T01:48:55.418Z",
+      "doneAt": "2026-11-14T01:59:09.022Z"
+    },
+    "docs-discard-trash.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:59:09.022Z"
+    },
+    "docs-discard-trash.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:59:09.022Z"
+    }
+  }
+}

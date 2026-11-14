@@ -9,16 +9,24 @@
  * checkpoint-manager runs its own read-only `git rev-parse --verify`, so the
  * Changed filter shares the vs-main diff panel's base (D-A10).
  *
- * Discard never removes a file that is not in HEAD: removing one needs the
- * Overdeck trash (PAN-5187), so such a request fails as a whole with
- * NOT_IMPLEMENTED before any git command changes anything.
+ * Discard unstages index entries that are not in HEAD, moves what git then
+ * lists as untracked to the Overdeck trash (`trashPaths`), and restores the
+ * rest from HEAD; an ignored file is never trashed on its own. Path checks
+ * and the HEAD and index reads run before anything changes. The result
+ * carries the trash ids.
  */
-import type { ExplorerGitCommittedEntry, ExplorerGitStatusEntry, ExplorerGitStatusResult } from '@overdeck/contracts';
+import type {
+  ExplorerGitCommittedEntry,
+  ExplorerGitStageResult,
+  ExplorerGitStatusEntry,
+  ExplorerGitStatusResult,
+} from '@overdeck/contracts';
 import { resolveBaseRef } from '../../../../lib/checkpoint/checkpoint-manager.js';
 import { explorerError } from './errors.js';
 import { runGit, type GitRunResult } from './git-exec.js';
 import { resolveInsideRoot } from './paths.js';
 import type { ExplorerRoot } from './roots.js';
+import { trashPaths } from './trash.js';
 
 const DEFAULT_MAX_STATUS_ENTRIES = 20_000;
 const STATUS_TIMEOUT_MS = 10_000;
@@ -143,31 +151,47 @@ export async function gitStatus(root: ExplorerRoot, opts: { maxEntries?: number 
 }
 
 /**
- * Paths a `git restore --source=HEAD --staged --worktree` of `paths` would
- * delete or cannot restore: requested paths absent from HEAD, and index
- * entries under a requested directory that are absent from HEAD (restore
- * runs in no-overlay mode and removes those from the worktree).
+ * Splits `paths` into those with HEAD content (restorable with
+ * `git restore --source=HEAD`) and those holding at least one index entry
+ * that is not in HEAD (must be unstaged first, or a no-overlay restore
+ * would delete it).
  */
-async function pathsNotInHead(root: ExplorerRoot, paths: readonly string[]): Promise<string[] | null> {
+async function discardPlan(root: ExplorerRoot, paths: readonly string[]): Promise<{ unstage: string[]; head: string[] }> {
   const tree = await runGit(root.absPath, ['ls-tree', '-r', '-z', '--name-only', 'HEAD', '--', ...paths]);
-  if (tree.code !== 0) return null;
+  if (tree.code !== 0 || tree.timedOut || tree.truncated) throw failed('git ls-tree', tree);
   const headFiles = new Set(nulRecords(tree.stdout));
-  const inHead = (p: string) => headFiles.has(p) || [...headFiles].some((f) => f.startsWith(`${p}/`));
-  const missing = paths.filter((p) => !inHead(p));
 
   const index = await runGit(root.absPath, ['ls-files', '-z', '--', ...paths]);
-  if (index.code !== 0) return null;
-  for (const file of new Set(nulRecords(index.stdout))) {
-    if (!headFiles.has(file) && !missing.includes(file)) missing.push(file);
-  }
-  return missing;
+  if (index.code !== 0 || index.timedOut || index.truncated) throw failed('git ls-files', index);
+  const newIndex = nulRecords(index.stdout).filter((f) => !headFiles.has(f));
+
+  const under = (p: string, f: string) => f === p || f.startsWith(`${p}/`);
+  const head = paths.filter((p) => [...headFiles].some((f) => under(p, f)));
+  const unstage = paths.filter((p) => newIndex.some((f) => under(p, f)));
+  return { unstage, head };
+}
+
+/** Entries git lists as untracked under `paths`, after any unstaging has already run. */
+async function untrackedEntries(root: ExplorerRoot, paths: readonly string[]): Promise<string[]> {
+  const run = await runGit(root.absPath, [
+    'ls-files',
+    '-z',
+    '--others',
+    '--exclude-standard',
+    '--directory',
+    '--no-empty-directory',
+    '--',
+    ...paths,
+  ]);
+  if (run.code !== 0 || run.timedOut || run.truncated) throw failed('git ls-files --others', run);
+  return nulRecords(run.stdout).map((r) => r.replace(/\/$/, ''));
 }
 
 export async function gitStage(
   root: ExplorerRoot,
   paths: readonly string[],
   action: 'stage' | 'unstage' | 'discard',
-): Promise<void> {
+): Promise<ExplorerGitStageResult> {
   // A root that is not itself a checkout's top level (e.g. a polyrepo
   // wrapper dir) would let git find an enclosing repository and change its
   // index instead.
@@ -178,21 +202,36 @@ export async function gitStage(
       `Root ${root.id} is not the top level of a git checkout; refusing to change an enclosing repository`,
     );
   }
-  if (paths.length === 0) return;
+  if (paths.length === 0) return { trashIds: [] };
   for (const p of paths) await resolveInsideRoot(root, p, { forWrite: true });
 
-  let run: GitRunResult;
   if (action === 'stage') {
-    run = await runGit(root.absPath, ['add', '--', ...paths]);
-  } else if (action === 'unstage') {
-    run = await runGit(root.absPath, ['restore', '--staged', '--', ...paths]);
-  } else {
-    const missing = await pathsNotInHead(root, paths);
-    if (missing === null || missing.length > 0) {
-      const list = missing === null ? paths.join(', ') : missing.join(', ');
-      throw explorerError('NOT_IMPLEMENTED', `Discarding files that are not in HEAD needs the Overdeck trash (PAN-5187): ${list}`);
-    }
-    run = await runGit(root.absPath, ['restore', '--source=HEAD', '--staged', '--worktree', '--', ...paths]);
+    const run = await runGit(root.absPath, ['add', '--', ...paths]);
+    if (run.code !== 0) throw failed('git stage', run);
+    return { trashIds: [] };
   }
-  if (run.code !== 0) throw failed(`git ${action}`, run);
+  if (action === 'unstage') {
+    const run = await runGit(root.absPath, ['restore', '--staged', '--', ...paths]);
+    if (run.code !== 0) throw failed('git unstage', run);
+    return { trashIds: [] };
+  }
+
+  const { unstage, head } = await discardPlan(root, paths);
+  if (unstage.length > 0) {
+    const run = await runGit(root.absPath, ['restore', '--staged', '--', ...unstage]);
+    if (run.code !== 0) throw failed('git restore --staged', run);
+  }
+  const untracked = await untrackedEntries(root, paths);
+  const trashIds = untracked.length > 0 ? await trashPaths(root, untracked) : [];
+  if (head.length > 0) {
+    const run = await runGit(root.absPath, ['restore', '--source=HEAD', '--staged', '--worktree', '--', ...head]);
+    if (run.code !== 0) {
+      if (trashIds.length > 0) {
+        const why = run.timedOut ? 'timed out' : run.stderr.trim() || `exit ${run.code}`;
+        throw explorerError('EXPLORER_FAILED', `git restore failed: ${why}; moved to the Overdeck trash: ${trashIds.join(', ')}`);
+      }
+      throw failed('git discard', run);
+    }
+  }
+  return { trashIds };
 }

@@ -259,7 +259,7 @@ export function providerDefaultHarness(modelId: ModelId, settings: Pick<Settings
   // Keep this fallback aligned with src/lib/providers.ts getBuiltInDefaultHarness.
   if (provider === 'anthropic') return 'claude-code';
   if (provider === 'openai') return 'codex';
-  return 'ohmypi';
+  return 'pi';
 }
 
 function yamlScalar(value: unknown): string {

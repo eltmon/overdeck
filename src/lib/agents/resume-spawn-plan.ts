@@ -1,4 +1,5 @@
 import type { RuntimeName } from '../runtimes/types.js';
+import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { sessionRotationRefused } from '../session-rotation.js';
 
 export interface ResumeSpawnPlanInput {
@@ -42,7 +43,7 @@ export function decideResumeSpawnPlan(input: ResumeSpawnPlanInput): ResumeSpawnP
     };
   }
 
-  if (input.harness === 'ohmypi' && !input.piProcessWasAlive) {
+  if (getHarnessBehavior(input.harness).usesRpcFifo && !input.piProcessWasAlive) {
     return {
       mode: 'fresh',
       freshReason: 'pi-dead-recovery',

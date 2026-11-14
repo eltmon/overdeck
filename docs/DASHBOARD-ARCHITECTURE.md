@@ -1747,7 +1747,7 @@ t3code).
 | `pan.explorerListDir` | read | PAN-5185 | One directory, unsorted, with git-ignore flags; capped at 10,000 entries |
 | `pan.explorerReadFile` | read | PAN-5185 | A file as text, binary or large-text (over 5 MiB), with a disk signature; `ref: 'HEAD'` reads the committed version |
 | `pan.explorerGitStatus` | read | PAN-5185 | Per-path status from `git status --porcelain=v2`, the branch, and files committed since the default branch |
-| `pan.explorerGitStage` | write (index) | PAN-5185 | Stage, unstage or discard paths |
+| `pan.explorerGitStage` | write (index) | PAN-5185, PAN-5195 | Stage, unstage or discard paths; a discard returns the trash ids of new files it moved to the Overdeck trash |
 | `pan.explorerSearchFiles` | read | PAN-5185 | Fuzzy file-name search over tracked and untracked, non-ignored files (30 s cache) |
 | `pan.explorerSearchContent` | read | PAN-5185 | `git grep`, literal or regex, with UTF-16 columns |
 | `pan.explorerWatch` | stream | PAN-5185 | Batches of change events for a root |
@@ -1767,13 +1767,17 @@ regex git rejects), `INVALID_TARGET` (a move or copy of a folder into itself)
 and `EXPLORER_FAILED` (anything else, with the cause in the
 message). A stub's message names the issue that ships it.
 
-Discard never removes a file that is not in `HEAD`. A request that names such a
-file, or a directory holding an index entry that is not in `HEAD`, fails as a
-whole with `NOT_IMPLEMENTED` before git runs, because `git restore` in its
-default no-overlay mode would delete it. Moving those files to the Overdeck
-trash (PAN-5187's `trashPaths`) instead is tracked in #5195. Git actions also refuse a root that is not the top
-level of its checkout, so git can never fall through to an enclosing
-repository's index.
+Discard first unstages index entries that are not in `HEAD` (a no-overlay
+`git restore` would otherwise delete them), then moves every entry git lists
+as untracked to the Overdeck trash (PAN-5187's `trashPaths`) — an ignored file
+is never trashed on its own, but one inside a wholly new folder goes with that
+folder — and finally restores the remaining paths from `HEAD`. A folder
+holding both committed and new files keeps its committed files and loses only
+its new entries; a new folder becomes one trash entry. The result is
+`{ trashIds }`. Until PAN-5190 adds undo, `pan.explorerRestore` with an id (or
+moving `trash/<id>/files/<path>` back by hand) restores a discarded file. Git
+actions also refuse a root that is not the top level of its checkout, so git
+can never fall through to an enclosing repository's index.
 
 ### Git calls
 

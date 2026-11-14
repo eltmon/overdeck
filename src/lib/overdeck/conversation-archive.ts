@@ -15,6 +15,7 @@ import {
 } from './conversations.js';
 import { ensureDiscoveredSessionsSchema } from './discovered-sessions.js';
 import { getOverdeckDatabase } from './infra.js';
+import { KNOWN_HARNESSES } from '@overdeck/contracts';
 
 // PAN-4645 WI-8: the archived-conversation listing lives here, its only
 // production consumer, so `conversations.ts` stays under the file-size ceiling.
@@ -87,9 +88,6 @@ export function listArchivedConversationsWithEnrichment(options: ArchivedConvers
   if (options.harness === 'claude-code') {
     conditions.push('(c.harness = ? OR c.harness IS NULL)');
     params.push(options.harness);
-  } else if (options.harness === 'ohmypi') {
-    conditions.push('(c.harness = ? OR c.harness = ?)');
-    params.push(options.harness, 'pi');
   } else if (options.harness !== undefined) {
     conditions.push('c.harness = ?');
     params.push(options.harness);
@@ -327,7 +325,7 @@ export function parseArchivedConversationListOptions(params: URLSearchParams): A
   const rawOffset = parseOptionalNumberParam(params, 'offset');
 
   if (workspacePath) options.workspacePath = workspacePath;
-  if (harness === 'claude-code' || harness === 'ohmypi' || harness === 'codex' || harness === 'acp' || harness === 'kimi-code' || harness === 'opencode' || harness === 'muse' || harness === 'prime-agent' || harness === 'grok') options.harness = harness;
+  if (harness && KNOWN_HARNESSES.has(harness)) options.harness = harness as RuntimeName;
   if (primaryModel) options.primaryModel = primaryModel;
   if (since) options.since = parseRelativeTime(since);
   if (params.get('enriched') === 'true') options.enriched = true;

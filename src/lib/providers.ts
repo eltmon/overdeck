@@ -9,6 +9,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { GROK_BUILD_MODELS, type ModelId, type GrokModel } from './settings.js';
 import type { RuntimeName } from './runtimes/types.js';
+import { getPiFamilyProfile } from './runtimes/pi-family.js';
 import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
 import { MODEL_DEPRECATIONS } from './model-capabilities.js';
 
@@ -156,7 +157,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'google',
     displayName: 'Google (Gemini)',
     compatibility: 'direct',
-    defaultHarness: 'ohmypi',
+    defaultHarness: 'pi',
     models: ['gemini-4-argon', 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite'],
     tierModels: { opus: 'gemini-3.1-pro-preview', sonnet: 'gemini-3-flash-preview', haiku: 'gemini-3.1-flash-lite' },
     tested: true,
@@ -167,7 +168,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'minimax',
     displayName: 'MiniMax',
     compatibility: 'direct',
-    defaultHarness: 'ohmypi',
+    defaultHarness: 'pi',
     baseUrl: 'https://api.minimax.io/anthropic',
     authType: 'static',
     models: ['minimax-m2.7', 'minimax-m2.7-highspeed', 'MiniMax-M3', 'MiniMax-M3.1-Flash'],
@@ -181,7 +182,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'zai',
     displayName: 'Z.AI',
     compatibility: 'direct',
-    defaultHarness: 'ohmypi',
+    defaultHarness: 'pi',
     baseUrl: 'https://api.z.ai/api/anthropic',
     authType: 'static',
     models: ['glm-5.3', 'glm-5.3-flash', 'glm-5.3-flashx', 'glm-5.2', 'glm-5.1', 'glm-4.7', 'glm-4.7-flash'],
@@ -195,7 +196,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'mimo',
     displayName: 'Xiaomi MiMo',
     compatibility: 'direct',
-    defaultHarness: 'ohmypi',
+    defaultHarness: 'pi',
     baseUrl: 'https://token-plan-sgp.xiaomimimo.com/anthropic',
     authType: 'static',
     models: ['mimo-v2.6-pro', 'mimo-v2.6-flash', 'mimo-v2.6-pro-ultraspeed'],
@@ -209,7 +210,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'openrouter',
     displayName: 'OpenRouter',
     compatibility: 'direct',
-    defaultHarness: 'ohmypi',
+    defaultHarness: 'pi',
     // Claude Code appends /v1/messages to ANTHROPIC_BASE_URL, so this must NOT
     // end in /v1 — 'https://openrouter.ai/api/v1' produced /api/v1/v1/messages
     // 404s that surfaced as "model may not exist". Pi ignores this var (it
@@ -225,7 +226,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'nous',
     displayName: 'Nous Portal',
     compatibility: 'direct',
-    defaultHarness: 'ohmypi',
+    defaultHarness: 'pi',
     baseUrl: getOpenAICompatibleProxyBaseUrl('nous'),
     authType: 'static',
     models: ['qwen/qwen3.6-plus'],
@@ -239,7 +240,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'dashscope',
     displayName: 'Alibaba DashScope',
     compatibility: 'direct',
-    defaultHarness: 'ohmypi',
+    defaultHarness: 'pi',
     baseUrl: getOpenAICompatibleProxyBaseUrl('dashscope'),
     authType: 'static',
     models: ['qwen3.7-plus', 'qwen3.8-flash', 'qwen3.7-max', 'qwen3.8-max'],
@@ -253,7 +254,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'xai',
     displayName: 'xAI (Grok)',
     compatibility: 'direct',
-    defaultHarness: 'ohmypi',
+    defaultHarness: 'pi',
     baseUrl: 'https://api.x.ai/v1',
     authType: 'static',
     models: ['grok-build-0.1', 'grok-4.7', 'grok-4.3'] as GrokModel[],
@@ -266,7 +267,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'groq',
     displayName: 'Groq',
     compatibility: 'direct',
-    defaultHarness: 'ohmypi',
+    defaultHarness: 'pi',
     authType: 'static',
     models: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'],
     haikuModel: 'openai/gpt-oss-20b',
@@ -279,7 +280,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'cerebras',
     displayName: 'Cerebras',
     compatibility: 'direct',
-    defaultHarness: 'ohmypi',
+    defaultHarness: 'pi',
     authType: 'static',
     models: ['gpt-oss-120b'],
     haikuModel: 'gpt-oss-120b',
@@ -292,7 +293,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'mistral',
     displayName: 'Mistral AI',
     compatibility: 'direct',
-    defaultHarness: 'ohmypi',
+    defaultHarness: 'pi',
     authType: 'static',
     models: ['mistral-large-latest', 'mistral-small-latest', 'codestral-latest', 'mistral-large-4-0'],
     haikuModel: 'mistral-small-latest',
@@ -602,6 +603,8 @@ export function getProviderEnv(
     env.ZAI_API_KEY = apiKey;
   } else if (provider.name === 'mimo') {
     env.MIMO_API_KEY = apiKey;
+    // MiMo keys are token-plan SGP keys; pi's xiaomi-token-plan-sgp provider reads this name (PAN-5212).
+    env.XIAOMI_TOKEN_PLAN_SGP_API_KEY = apiKey;
   } else if (provider.name === 'openrouter') {
     env.OPENROUTER_API_KEY = apiKey;
   } else if (provider.name === 'nous') {
@@ -748,9 +751,20 @@ export function piProviderForModel(modelId: string): string | undefined {
     case 'xai':
       return 'xai';
     case 'dashscope':
-      // Not in omp's bundled catalog — provisioned into the omp user
-      // registry (~/.omp/agent/models.json) by ohmypi-models.ts at spawn.
+      // Not in omp's or pi's bundled catalog — provisioned into the user
+      // registry (models.json) by ohmypi-models.ts / pi-models.ts at spawn.
       return 'dashscope';
+    // PAN-5212: these ids must carry their provider. OpenRouter and Groq ids
+    // contain a vendor segment (`openai/gpt-oss-20b`) that pi and omp bind as
+    // the provider; `gpt-oss-120b` alone is offered by several providers.
+    case 'openrouter':
+      return 'openrouter';
+    case 'groq':
+      return 'groq';
+    case 'cerebras':
+      return 'cerebras';
+    case 'mistral':
+      return 'mistral';
     default:
       return undefined;
   }
@@ -760,10 +774,22 @@ export function piProviderForModel(modelId: string): string | undefined {
  * Provider-qualify a model id for Pi (`kimi-coding/kimi-k2.6`). Returns the
  * bare id unchanged when no Pi provider mapping exists.
  */
-export function qualifyPiModel(modelId: string): string {
-  // Idempotent: conversations pre-qualify (`anthropic/claude-...`) before the
-  // launcher sees the model — never double-prefix an already-qualified id.
-  if (modelId.includes('/')) return modelId;
-  const piProvider = piProviderForModel(modelId);
+export function qualifyPiModel(modelId: string, harness?: string): string {
+  // The input is always an Overdeck model id, never a pi-qualified one. A
+  // slash does not mean qualified: OpenRouter (`vendor/model`), Groq
+  // (`openai/gpt-oss-120b`) and Nous (`qwen/qwen3.6-plus`) ids carry a vendor
+  // segment that pi and omp would read as the provider (verified: bare
+  // `openai/gpt-oss-20b` binds groq on both, PAN-5212), so every id gets its
+  // pi provider in front.
+  const piProvider = piFamilyProviderForModel(modelId, harness);
   return piProvider ? `${piProvider}/${modelId}` : modelId;
+}
+
+/**
+ * The pi-family provider id for an Overdeck model on `harness`: the harness
+ * profile's override first (pi: MiMo token-plan, Nous), else the shared map.
+ */
+export function piFamilyProviderForModel(modelId: string, harness?: string): string | undefined {
+  const override = getPiFamilyProfile(harness).providerOverrides[getProviderForModel(modelId).name];
+  return override ?? piProviderForModel(modelId);
 }

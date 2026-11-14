@@ -1,5 +1,5 @@
 /**
- * @overdeck/pi-extension (PAN-636, PAN-1134)
+ * @overdeck/pi-extension (PAN-636, PAN-1134, PAN-5212)
  *
  * Vendored extension loaded by the Pi Coding Agent (`pi --extension <path>`)
  * to emit Overdeck lifecycle signals via filesystem markers and HTTP POSTs.
@@ -21,7 +21,8 @@ export interface PiExtensionAPI {
   sendUserMessage?(content: string, options?: SendUserMessageOptions): void | Promise<void>
   setThinkingLevel?(level: ThinkingLevel): void | Promise<void>
   getThinkingLevel?(): ThinkingLevel | Promise<ThinkingLevel>
-  setModel?(model: string): void | Promise<void>
+  /** pi 0.85 takes a Model object (resolve it with ctx.modelRegistry.find) and returns false without auth. */
+  setModel?(model: unknown): boolean | void | Promise<boolean | void>
   exec?(command: string, args?: string[], options?: Record<string, unknown>): unknown | Promise<unknown>
 }
 
@@ -105,7 +106,35 @@ export interface SessionStartEvent {
   model?: string
 }
 
+/**
+ * The parts of pi 0.85's ExtensionContext this extension reads (verified in
+ * .pan/pi-vs-omp.md). pi's session_start event carries only `{ reason }`; the
+ * session id, transcript file and model come from the context.
+ */
+export interface PiContextLike {
+  sessionManager?: {
+    getSessionId?(): string | undefined
+    getSessionFile?(): string | undefined
+  }
+  model?: { provider?: string; id?: string } | null
+  modelRegistry?: { find?(provider: string, id: string): unknown }
+}
+
+/** pi 0.85's assistant message as carried by turn_end (`event.message`). */
+export interface PiAssistantMessageLike {
+  role?: string
+  content?: Array<{ type?: string; text?: string }>
+  provider?: string
+  model?: string
+  usage?: (UsageLike & { cost?: { total?: number } }) | null
+}
+
 export interface UsageLike {
+  /** pi 0.85 assistant-message usage field names. */
+  input?: number
+  output?: number
+  cacheRead?: number
+  cacheWrite?: number
   inputTokens?: number
   outputTokens?: number
   cacheReadTokens?: number
@@ -127,6 +156,8 @@ export interface ToolExecutionEndEvent {
 }
 
 export interface TurnEndEvent {
+  /** pi 0.85: the assistant message this turn produced. */
+  message?: PiAssistantMessageLike
   reason?: string
   output?: string
   transcript?: string
@@ -472,10 +503,10 @@ function extractUsage(event: { usage?: UsageLike | null }): { inputTokens: numbe
   const usage = event.usage
   if (!usage) return null
   return {
-    inputTokens: usageNumber(usage.inputTokens ?? usage.input_tokens),
-    outputTokens: usageNumber(usage.outputTokens ?? usage.output_tokens),
-    cacheReadTokens: usageNumber(usage.cacheReadTokens ?? usage.cache_read_tokens),
-    cacheWriteTokens: usageNumber(usage.cacheWriteTokens ?? usage.cache_write_tokens),
+    inputTokens: usageNumber(usage.inputTokens ?? usage.input_tokens ?? usage.input),
+    outputTokens: usageNumber(usage.outputTokens ?? usage.output_tokens ?? usage.output),
+    cacheReadTokens: usageNumber(usage.cacheReadTokens ?? usage.cache_read_tokens ?? usage.cacheRead),
+    cacheWriteTokens: usageNumber(usage.cacheWriteTokens ?? usage.cache_write_tokens ?? usage.cacheWrite),
   }
 }
 
@@ -628,7 +659,7 @@ export async function handleSpecialistTurnEnd(env: HookEnv, event: TurnEndEvent)
   })
 }
 
-export async function handleSessionStart(env: HookEnv, event: SessionStartEvent): Promise<void> {
+export async function handleSessionStart(env: HookEnv, event: SessionStartEvent, transcriptFile?: string): Promise<void> {
   const { paths, now } = envFor(env)
   const ts = now()
   await mkdir(paths.agentDir, { recursive: true })
@@ -642,7 +673,7 @@ export async function handleSessionStart(env: HookEnv, event: SessionStartEvent)
   if (event.sessionId) {
     const state = await readAgentState(env)
     const model = event.model ?? (typeof state['model'] === 'string' ? state['model'] : 'unknown')
-    const transcriptPath = await findPiSessionLogFile(paths.agentDir, event.sessionId)
+    const transcriptPath = transcriptFile ?? await findPiSessionLogFile(paths.agentDir, event.sessionId)
     await appendSessionIndexEntry(paths.sessionsIndexPath, event.sessionId, ts, model, 'session-start', transcriptPath ?? undefined)
   }
   await postEvent(env, { kind: 'model_set', model: 'pi', claudeSessionId: event.sessionId ?? undefined, timestamp: ts })
@@ -667,7 +698,7 @@ export async function handleToolExecutionEnd(env: HookEnv, event: ToolExecutionE
 
 let lastRecordedSessionPath: string | undefined
 
-export async function handleTurnEnd(env: HookEnv, event: TurnEndEvent): Promise<void> {
+export async function handleTurnEnd(env: HookEnv, event: TurnEndEvent, options: { runCompletion?: boolean; postIdle?: boolean } = {}): Promise<void> {
   const { paths, pid, now } = envFor(env)
   const ts = now()
   await mkdir(paths.heartbeatsDir, { recursive: true })
@@ -678,25 +709,92 @@ export async function handleTurnEnd(env: HookEnv, event: TurnEndEvent): Promise<
     last_action: 'turn_end',
     pid,
   })
-  await postEvent(env, { kind: 'activity', activity: 'idle', timestamp: ts })
+  if (options.postIdle !== false) await postEvent(env, { kind: 'activity', activity: 'idle', timestamp: ts })
   await recordCostEvent(env, event, 'turn_end', ts)
 
   if (event.sessionLogPath && event.sessionLogPath !== lastRecordedSessionPath) {
     const sessionId = await sessionIdFor(env)
     if (sessionId) {
       const state = await readAgentState(env)
-      const model = typeof state['model'] === 'string' ? state['model'] : 'unknown'
+      const model = event.model ?? (typeof state['model'] === 'string' ? state['model'] : 'unknown')
       await appendSessionIndexEntry(paths.sessionsIndexPath, sessionId, ts, model, 'turn-end', event.sessionLogPath)
     }
     lastRecordedSessionPath = event.sessionLogPath
   }
 
+  if (options.runCompletion !== false) await handleTurnCompletion(env, event)
+}
+
+/**
+ * pi settled (no retry, compaction or queued follow-up left): report idle and
+ * run the completion checks on the last turn. pi fires turn_end once per LLM
+ * response, tool-call responses included, so idle is not posted there (PAN-5212).
+ */
+export async function handleAgentSettled(env: HookEnv, lastTurn: TurnEndEvent | undefined): Promise<void> {
+  const ts = envFor(env).now()
+  await postEvent(env, { kind: 'activity', activity: 'idle', timestamp: ts })
+  if (lastTurn) await handleTurnCompletion(env, lastTurn)
+}
+
+/**
+ * Role completion checks for a finished reply: work agents (plan checklist,
+ * completion marker, classifier, stuck counter) and specialists. pi fires
+ * turn_end once per LLM response, tool-call responses included, so the pi
+ * wiring runs this on agent_settled with the last turn instead (PAN-5212).
+ */
+export async function handleTurnCompletion(env: HookEnv, event: TurnEndEvent): Promise<void> {
   const role = roleFor(env)
   if (role === 'work') {
     await handleWorkAgentTurnEnd(env, event)
   } else if (normalizeSpecialistCompletionName(role)) {
     await handleSpecialistTurnEnd(env, event)
   }
+}
+
+function piModelLabel(provider: string | undefined, id: string | undefined): string | undefined {
+  if (!id) return undefined
+  return provider ? `${provider}/${id}` : id
+}
+
+/** Fill a pi 0.85 session_start (`{ reason }` only) from the context. */
+export function normalizePiSessionStart(event: SessionStartEvent, ctx: unknown): { event: SessionStartEvent; transcriptFile?: string } {
+  const c = (ctx ?? {}) as PiContextLike
+  const sessionManager = c.sessionManager
+  return {
+    event: {
+      ...event,
+      sessionId: event.sessionId ?? sessionManager?.getSessionId?.(),
+      model: event.model ?? piModelLabel(c.model?.provider, c.model?.id),
+    },
+    transcriptFile: sessionManager?.getSessionFile?.(),
+  }
+}
+
+/** Fill a pi 0.85 turn_end (`{ turnIndex, message, toolResults }`) into the shared TurnEndEvent fields. */
+export function normalizePiTurnEnd(event: TurnEndEvent, ctx: unknown): TurnEndEvent {
+  const message = event.message
+  const assistant = message?.role === 'assistant' ? message : undefined
+  const text = assistant?.content
+    ?.filter((block) => block?.type === 'text' && typeof block.text === 'string')
+    .map((block) => block.text)
+    .join('\n')
+  return {
+    ...event,
+    output: event.output ?? (text || undefined),
+    sessionLogPath: event.sessionLogPath ?? ((ctx ?? {}) as PiContextLike).sessionManager?.getSessionFile?.(),
+    usage: event.usage ?? assistant?.usage ?? undefined,
+    cost: event.cost ?? assistant?.usage?.cost?.total ?? undefined,
+    model: event.model ?? piModelLabel(assistant?.provider, assistant?.model),
+  }
+}
+
+/** pi's setModel takes a Model object: resolve `provider/id` through the context's model registry. */
+function resolvePiModel(ctx: unknown, model: string): unknown {
+  const find = ((ctx ?? {}) as PiContextLike).modelRegistry?.find
+  if (typeof find !== 'function') return model
+  const slash = model.indexOf('/')
+  if (slash <= 0) return null
+  return find.call(((ctx ?? {}) as PiContextLike).modelRegistry, model.slice(0, slash), model.slice(slash + 1)) ?? null
 }
 
 export async function handlePanDone(env: HookEnv, args: string): Promise<void> {
@@ -788,10 +886,14 @@ export async function dispatchControlCommand(
         const ok = await setThinkingLevelIfSupported(pi, command.level)
         return ok ? { id: command.id, ok: true } : { id: command.id, ok: false, error: 'setThinkingLevel unsupported' }
       }
-      case 'set_model':
+      case 'set_model': {
         if (typeof pi.setModel !== 'function') return { id: command.id, ok: false, error: 'setModel unsupported' }
-        await pi.setModel(command.model)
+        const target = resolvePiModel(ctx, command.model)
+        if (target === null) return { id: command.id, ok: false, error: `unknown model ${command.model}` }
+        const result = await pi.setModel(target)
+        if (result === false) return { id: command.id, ok: false, error: `no auth configured for ${command.model}` }
         return { id: command.id, ok: true }
+      }
       case 'compact': {
         const compact = (ctx as ExtensionContext | null | undefined)?.compact
         if (typeof compact !== 'function') return { id: command.id, ok: false, error: 'compact unsupported' }
@@ -904,12 +1006,11 @@ export default function overdeckPiExtension(pi: PiExtensionAPI): void {
 
   pi.on('session_start', async (event, ctx) => {
     try {
-      await handleSessionStart(env, event)
-      // PAN-1566: fold the global engineering-rules layer into the prompt.
-      await handleGlobalContext(ctx)
-      // PAN-1201: fold the assembled workspace context layer into the prompt.
-      await handleWorkspaceContext(ctx)
-      await handleSessionBriefingContext(ctx)
+      const start = normalizePiSessionStart(event, ctx)
+      await handleSessionStart(env, start.event, start.transcriptFile)
+      // The launcher already passes the rendered context layers and session
+      // briefing via --append-system-prompt, so they are not folded in again
+      // here (pi has no ctx.appendSystemPrompt; PAN-5212).
       await handleConversationControlSessionStart(env, pi, ctx)
     } catch {}
   })
@@ -926,9 +1027,21 @@ export default function overdeckPiExtension(pi: PiExtensionAPI): void {
     } catch {}
   })
 
-  pi.on('turn_end', async event => {
+  // pi fires turn_end per LLM response; completion checks wait for
+  // agent_settled (pi will not continue on its own) and use the last turn.
+  let lastTurn: TurnEndEvent | undefined
+  pi.on('turn_end', async (event, ctx) => {
     try {
-      await handleTurnEnd(env, event)
+      lastTurn = normalizePiTurnEnd(event, ctx)
+      await handleTurnEnd(env, lastTurn, { runCompletion: false, postIdle: false })
+    } catch {}
+  })
+
+  pi.on('agent_settled', async () => {
+    const turn = lastTurn
+    lastTurn = undefined
+    try {
+      await handleAgentSettled(env, turn)
     } catch {}
   })
 

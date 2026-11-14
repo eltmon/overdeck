@@ -112,6 +112,26 @@ export function ohmypiExtensionCandidates(): string[] {
 }
 
 /**
+ * Candidate locations for the vendored pi extension bundle (PAN-5212), in the
+ * same order as {@link ohmypiExtensionCandidates}: the `dist/extensions/` copy
+ * first, then the raw `packages/pi-extension` build in a dev checkout.
+ */
+export function piExtensionCandidates(): string[] {
+  return [
+    join(packageRoot, 'dist', 'extensions', 'pi.js'),
+    join(packageRoot, 'packages', 'pi-extension', 'dist', 'index.js'),
+  ];
+}
+
+/** Resolve the pi extension bundle to the first existing candidate, or `null`. */
+export function resolvePiExtensionPath(): string | null {
+  for (const candidate of piExtensionCandidates()) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+/**
  * Resolve the ohmypi (omp) extension bundle to the first existing candidate,
  * or `null` when no build is present. Callers that require the bundle (agent
  * spawn) should throw with a build hint on null.

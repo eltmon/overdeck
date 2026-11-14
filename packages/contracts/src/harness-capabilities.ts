@@ -145,6 +145,19 @@ export const OHMYPI_CAPABILITIES: HarnessCapabilities = {
   overdeckMcp: false,
 }
 
+/**
+ * Pi Coding Agent (PAN-5212). Same launch channel and transcript handling as
+ * omp; pi runs on Node, ships on npm, and has no `ask` tool, so a question is
+ * plain assistant text answered by message (.pan/pi-vs-omp.md).
+ */
+export const PI_CAPABILITIES: HarnessCapabilities = {
+  ...OHMYPI_CAPABILITIES,
+  binaryLabel: "Pi",
+  installHint: "npm install -g @earendil-works/pi-coding-agent",
+  npmPackage: "@earendil-works/pi-coding-agent",
+  askAnswerDelivery: "message",
+}
+
 export const CODEX_CAPABILITIES: HarnessCapabilities = {
   contextChannel: "developer_instructions",
   initialPromptMustLand: false,

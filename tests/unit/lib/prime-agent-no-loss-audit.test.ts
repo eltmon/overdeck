@@ -40,6 +40,7 @@ const ROOT = join(import.meta.dirname, '../../..');
 /** A model each harness may run, for the model-gated resolvers. */
 const MODEL_FOR: Record<RuntimeName, string> = {
   'claude-code': 'claude-sonnet-4-6',
+  pi: 'gemini-3-flash-preview',
   ohmypi: 'gpt-5.4',
   codex: 'gpt-5.5',
   acp: 'k3',
@@ -50,26 +51,22 @@ const MODEL_FOR: Record<RuntimeName, string> = {
   grok: 'grok/grok-4.7',
 };
 
-/** Unforced hand-copied harness lists (PRD "Unforced hand-copied lists" and the host sites). */
+/**
+ * Unforced hand-copied harness lists (PRD "Unforced hand-copied lists" and the host sites).
+ * PAN-5212 replaced the lists in config-yaml merge/roles, settings-api, planning-sessions,
+ * conversation-archive, spawn-planning-session and the agent spawn/restart routes with
+ * KNOWN_HARNESSES / RuntimeName, which every harness reaches by type, so they are not listed.
+ */
 const PRIME_AGENT_LITERAL_FILES = [
   'src/lib/agents/tier-table.ts',
   'src/lib/launcher-generator.ts',
   'src/lib/config-yaml/schema.ts',
-  'src/lib/config-yaml/merge.ts',
-  'src/lib/config-yaml/roles.ts',
-  'src/lib/settings-api.ts',
   'src/lib/conversations/harness-discovery.ts',
   'src/lib/session-history.ts',
   'src/lib/telemetry/pipeline.ts',
   'src/lib/artifacts/lifecycle.ts',
-  'src/lib/overdeck/planning-sessions.ts',
   'src/lib/overdeck/conversations.ts',
-  'src/lib/overdeck/conversation-archive.ts',
   'src/lib/overdeck/conversation-runtime.ts',
-  'src/lib/planning/spawn-planning-session.ts',
-  'src/dashboard/server/routes/agents/spawn-issue.ts',
-  'src/dashboard/server/routes/agents/spawn-helpers.ts',
-  'src/dashboard/server/routes/agents/lifecycle-restart.ts',
   'src/dashboard/server/routes/context.ts',
   'src/dashboard/server/routes/costs.ts',
   'src/dashboard/server/ws-rpc.ts',
@@ -100,20 +97,11 @@ const GROK_LITERAL_FILES = [
   'src/lib/agents/tier-table.ts',
   'src/lib/launcher-generator.ts',
   'src/lib/config-yaml/schema.ts',
-  'src/lib/config-yaml/merge.ts',
-  'src/lib/config-yaml/roles.ts',
-  'src/lib/settings-api.ts',
   'src/lib/conversations/harness-discovery.ts',
   'src/lib/telemetry/pipeline.ts',
   'src/lib/artifacts/lifecycle.ts',
-  'src/lib/overdeck/planning-sessions.ts',
   'src/lib/overdeck/conversations.ts',
-  'src/lib/overdeck/conversation-archive.ts',
   'src/lib/overdeck/conversation-runtime.ts',
-  'src/lib/planning/spawn-planning-session.ts',
-  'src/dashboard/server/routes/agents/spawn-issue.ts',
-  'src/dashboard/server/routes/agents/spawn-helpers.ts',
-  'src/dashboard/server/routes/agents/lifecycle-restart.ts',
   'src/dashboard/server/routes/context.ts',
   'src/lib/conversations/transcript-adapter.ts',
   'src/lib/agents/recovery.ts',
@@ -175,6 +163,16 @@ describe('harness no-loss audit (PAN-3668 WI-22)', () => {
     const helpStrings = source.match(/Coding-agent harness: [^']*/g) ?? [];
     expect(helpStrings.length).toBeGreaterThan(0);
     for (const help of helpStrings) expect(help).toContain('| grok');
+  });
+
+  it('lists pi and ohmypi in every CLI --harness help string (PAN-5212)', () => {
+    const source = readFileSync(join(ROOT, CLI_HELP_FILE), 'utf8');
+    const helpStrings = source.match(/Coding-agent harness: [^']*/g) ?? [];
+    expect(helpStrings.length).toBeGreaterThan(0);
+    for (const help of helpStrings) {
+      expect(help).toContain('| pi |');
+      expect(help).toContain('| ohmypi');
+    }
   });
 
   it('lists prime-agent in every CLI --harness help string', () => {

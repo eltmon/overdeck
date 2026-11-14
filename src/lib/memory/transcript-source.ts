@@ -14,6 +14,8 @@ import { writeThreadId as _writeThreadId } from '../runtimes/codex.js';
 import { codexAgentHome, findRolloutPath } from '../runtimes/storage/codex.js';
 import { compressJsonlBuffer } from './compress.js';
 import { piSessionsRoot } from '../runtimes/storage/pi.js';
+import { getHarnessBehavior } from '../runtimes/behavior.js';
+import type { RuntimeName } from '../runtimes/types.js';
 import { isListedOrRunning, listLiveAgentIds } from '../terminal-backends/inventory.js';
 
 export interface TranscriptEntry {
@@ -119,6 +121,7 @@ export class ClaudeCodeTranscriptSource implements TranscriptSource {
   }
 }
 
+/** Pi-family work agents (pi and ohmypi share one transcript format); keyed 'ohmypi' as the parser key. */
 export class PiTranscriptSource implements TranscriptSource {
   readonly harness = 'ohmypi';
 
@@ -138,7 +141,7 @@ export class PiTranscriptSource implements TranscriptSource {
     const agents = await this.listAgents();
     const entries = await Promise.all(
       agents
-        .filter((agent) => agent.hasLivePane && agent.status === 'running' && agent.role === 'work' && agent.harness === 'ohmypi')
+        .filter((agent) => agent.hasLivePane && agent.status === 'running' && agent.role === 'work' && getHarnessBehavior(agent.harness as RuntimeName | undefined).usesRpcFifo)
         .map((agent) => this.resolveAgentTranscript(agent)),
     );
     return entries.filter((entry): entry is TranscriptEntry => entry !== null);

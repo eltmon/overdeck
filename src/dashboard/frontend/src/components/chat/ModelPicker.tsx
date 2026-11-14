@@ -203,8 +203,15 @@ function formatCost(costPer1M: number | null, provider?: string): string {
   return `$${Math.round(costPer1M)}/1M`;
 }
 
+/** Harnesses the picker button marks with an indicator chip (PAN-5212 added pi). */
+const HARNESS_INDICATOR_LABELS: Partial<Record<Harness, string>> = {
+  pi: 'Pi',
+  ohmypi: 'oh-my-pi',
+  codex: 'Codex',
+};
+
 function isHarness(value: unknown): value is Harness {
-  return value === 'claude-code' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'opencode' || value === 'muse' || value === 'prime-agent' || value === 'grok';
+  return value === 'claude-code' || value === 'pi' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'opencode' || value === 'muse' || value === 'prime-agent' || value === 'grok';
 }
 
 function providerDefaultHarness(provider: string, providerHarnesses: ProviderHarnesses): Harness {
@@ -405,6 +412,7 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
   const effectiveHarness = selectedModel?.harness
     ?? (showHarnessModelPermutations ? harness : selectedProviderHarness ?? harness);
   const selectedWarning = costWarningLevel(selectedModel?.costPer1MTokens);
+  const harnessIndicatorLabel = effectiveHarness ? HARNESS_INDICATOR_LABELS[effectiveHarness] : undefined;
 
   useEffect(() => {
     if (!followProviderDefault || !providerHarnessesLoaded || showHarnessModelPermutations) return;
@@ -463,16 +471,10 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
           />
         )}
         <span className={styles.pickerLabel}>{label}</span>
-        {effectiveHarness === 'ohmypi' && (
-          <span className={styles.harnessIndicator} title="oh-my-pi harness active">
-            <HarnessLogo harness="ohmypi" className={styles.harnessIndicatorIcon} />
-            oh-my-pi
-          </span>
-        )}
-        {effectiveHarness === 'codex' && (
-          <span className={styles.harnessIndicator} title="Codex harness active">
-            <HarnessLogo harness="codex" className={styles.harnessIndicatorIcon} />
-            Codex
+        {effectiveHarness && harnessIndicatorLabel && (
+          <span className={styles.harnessIndicator} title={`${harnessIndicatorLabel} harness active`}>
+            <HarnessLogo harness={effectiveHarness} className={styles.harnessIndicatorIcon} />
+            {harnessIndicatorLabel}
           </span>
         )}
         {selectedWarning && (

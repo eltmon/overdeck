@@ -194,7 +194,7 @@ export function ConversationPanel({
   const [selectedModel, setSelectedModel] = useState<string>(() => conversation.model || getDefaultConversationModel());
   // See ComposerFooter for rationale — never seed an existing conversation's
   // harness from the global localStorage default.
-  const [selectedHarness, setSelectedHarness] = useState<Harness>(() => (conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) ?? 'claude-code');
+  const [selectedHarness, setSelectedHarness] = useState<Harness>(() => conversation.harness ?? 'claude-code');
   const [editingTitle, setEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -224,7 +224,7 @@ export function ConversationPanel({
 
   useEffect(() => {
     if (conversation.harness && conversation.harness !== selectedHarness) {
-      setSelectedHarness(conversation.harness === 'pi' ? 'ohmypi' : conversation.harness);
+      setSelectedHarness(conversation.harness);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.harness]);

@@ -235,6 +235,7 @@ describe('findMergedArtifact', () => {
       created: false,
       url: 'https://gitlab.com/org/repo/-/merge_requests/70',
       id: '70',
+      headSha: currentHead,
     });
   });
 

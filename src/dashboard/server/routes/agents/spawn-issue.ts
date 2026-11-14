@@ -10,7 +10,8 @@
 import { existsSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 
-import type { EffortLevel } from '@overdeck/contracts';
+import { KNOWN_HARNESSES, type EffortLevel } from '@overdeck/contracts';
+import type { RuntimeName } from '../../../../lib/runtimes/types.js';
 import { Cause, Effect, Exit } from 'effect';
 
 import {
@@ -742,9 +743,9 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
     // canUseHarness() so we can fail fast on a model+harness incompatibility
     // before spawning the subprocess.
     const bodyHarness = (body as any).harness;
-    const userPickedHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok' | null =
-      bodyHarness === 'ohmypi' || bodyHarness === 'claude-code' || bodyHarness === 'codex' || bodyHarness === 'acp' || bodyHarness === 'kimi-code' || bodyHarness === 'opencode' || bodyHarness === 'muse' || bodyHarness === 'prime-agent' || bodyHarness === 'grok' ? bodyHarness : null;
-    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok' | null = null;
+    const userPickedHarness: RuntimeName | null =
+      typeof bodyHarness === 'string' && KNOWN_HARNESSES.has(bodyHarness) ? bodyHarness as RuntimeName : null;
+    let effectiveHarness: RuntimeName | null = null;
     if (userPickedHarness !== null) {
       const harnessDecision = yield* Effect.promise(async () =>
         canUseHarness(userPickedHarness, spawnModel, await getProviderAuthMode(spawnModel))

@@ -1,0 +1,175 @@
+{
+  "version": "1",
+  "issueId": "PAN-5209",
+  "created": "2026-11-14T01:28:12.101Z",
+  "updated": "2026-11-14T02:14:46.751Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "extract-verify-merged": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5209",
+      "claimedAt": "2026-11-14T01:28:12.101Z",
+      "doneAt": "2026-11-14T01:31:58.982Z"
+    },
+    "extract-verify-merged.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:31:58.982Z"
+    },
+    "extract-verify-merged.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:31:58.982Z"
+    },
+    "extract-verify-merged.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:31:58.982Z"
+    },
+    "compare-origin-target": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5209",
+      "claimedAt": "2026-11-14T01:40:38.873Z",
+      "doneAt": "2026-11-14T01:49:08.401Z"
+    },
+    "compare-origin-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:49:08.401Z"
+    },
+    "compare-origin-target.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:49:08.401Z"
+    },
+    "compare-origin-target.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:49:08.401Z"
+    },
+    "compare-origin-target.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:49:08.401Z"
+    },
+    "compare-origin-target.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:49:08.401Z"
+    },
+    "verify-merged-fixture-tests": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5209",
+      "claimedAt": "2026-11-14T01:49:21.793Z",
+      "doneAt": "2026-11-14T01:51:59.563Z"
+    },
+    "verify-merged-fixture-tests.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:51:59.563Z"
+    },
+    "verify-merged-fixture-tests.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:51:59.563Z"
+    },
+    "verify-merged-fixture-tests.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:51:59.563Z"
+    },
+    "verify-merged-fixture-tests.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:51:59.563Z"
+    },
+    "verify-merged-fixture-tests.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:51:59.563Z"
+    },
+    "gitlab-mr-head-tolerance": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5209",
+      "claimedAt": "2026-11-14T01:52:05.979Z",
+      "doneAt": "2026-11-14T02:00:03.029Z"
+    },
+    "gitlab-mr-head-tolerance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:00:03.029Z"
+    },
+    "gitlab-mr-head-tolerance.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:00:03.029Z"
+    },
+    "gitlab-mr-head-tolerance.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:00:03.029Z"
+    },
+    "gitlab-mr-head-tolerance.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:00:03.029Z"
+    },
+    "gitlab-mr-head-tolerance.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:00:03.029Z"
+    },
+    "dod-forge-merge-verdict": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5209",
+      "claimedAt": "2026-11-14T02:00:09.673Z",
+      "doneAt": "2026-11-14T02:05:37.985Z"
+    },
+    "dod-forge-merge-verdict.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:05:37.985Z"
+    },
+    "dod-forge-merge-verdict.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:05:37.985Z"
+    },
+    "dod-forge-merge-verdict.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:05:37.985Z"
+    },
+    "dod-forge-merge-verdict.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:05:37.985Z"
+    },
+    "dod-forge-merge-verdict.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:05:37.985Z"
+    },
+    "dod-rows-forge-merge-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5209",
+      "claimedAt": "2026-11-14T02:05:44.384Z",
+      "doneAt": "2026-11-14T02:12:11.139Z"
+    },
+    "dod-rows-forge-merge-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:12:11.139Z"
+    },
+    "dod-rows-forge-merge-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:12:11.139Z"
+    },
+    "dod-rows-forge-merge-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:12:11.139Z"
+    },
+    "dod-rows-forge-merge-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:12:11.139Z"
+    },
+    "docs-close-out-merge-check": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5209",
+      "claimedAt": "2026-11-14T02:12:18.055Z",
+      "doneAt": "2026-11-14T02:14:46.751Z"
+    },
+    "docs-close-out-merge-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:14:46.751Z"
+    },
+    "docs-close-out-merge-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:14:46.751Z"
+    },
+    "docs-close-out-merge-check.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:14:46.751Z"
+    }
+  }
+}

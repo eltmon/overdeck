@@ -64,6 +64,7 @@ export function isWindowsInteropPath(path: string, roots: readonly string[] = wi
 
 const HARNESS_BINARY_BY_RUNTIME: Record<RuntimeName, string> = {
   'claude-code': 'claude',
+  pi: 'pi',
   ohmypi: 'omp',
   codex: 'codex',
   acp: 'kimi',

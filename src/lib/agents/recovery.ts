@@ -418,7 +418,7 @@ export async function restartAgent(
     // a handed-off agent (completed marker) gets a passive restore, not a
     // "pick up where you left off" that re-drives the pipeline.
     const prompt = message || buildResumeContinueMessage(agentState);
-    if (effectiveHarness === 'ohmypi') {
+    if (getHarnessBehavior(effectiveHarness).usesRpcFifo) {
       // ohmypi does not fire the Claude SessionStart hook and does not read tmux
       // input — wait for ready.json and write the continue prompt through the
       // FIFO JSONL protocol.
@@ -604,7 +604,7 @@ export async function recoverAgent(
   state.effortSource = relaunchEffort.source;
   saveAgentStateSync(state);
 
-  if (recoveryHarness === 'ohmypi') {
+  if (getHarnessBehavior(recoveryHarness).usesRpcFifo) {
     // PAN-1055: ohmypi cannot consume the recovery prompt as a positional shell
     // argument the way the Claude direct command path does — ohmypi reads JSONL
     // commands from its FIFO. Build a real ohmypi launcher (extension path,
@@ -616,7 +616,7 @@ export async function recoverAgent(
       workspace: state.workspace,
       role: recoveryRole,
       isPlanning: recoveryRole === 'plan',
-      harness: 'ohmypi',
+      harness: recoveryHarness,
       harnessBinaryPath: harnessLaunch.binaryPath,
       extraEnvExports: [harnessLaunch.pathExport],
       effort: relaunchEffort.effort,
@@ -627,7 +627,7 @@ export async function recoverAgent(
       agentId: normalizedId,
       state,
       role: recoveryRole,
-      harness: 'ohmypi',
+      harness: recoveryHarness,
       model: state.model,
       launcherScript,
       env: {

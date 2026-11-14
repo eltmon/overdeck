@@ -17,7 +17,7 @@ import { ensureInternalToken, INTERNAL_TOKEN_HEADER } from '../../lib/internal-t
 import { describeConflictingWorkAgents } from '../../lib/work-agent-conflicts.js';
 import { resolveModel as resolveRoleModel, loadConfigSync as loadYamlConfig, type RoleEffort } from '../../lib/config-yaml.js';
 import { resolveEffort, InvalidEffortError } from '../../lib/agents/resolve-effort.js';
-import { EFFORT_LEVELS, type EffortSource } from '@overdeck/contracts';
+import { EFFORT_LEVELS, type EffortSource, KNOWN_HARNESSES } from '@overdeck/contracts';
 import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
 import { resolveWorkspaceRepoRoots } from '../../lib/project-repos.js';
 import { resolveProjectFromIssueSync, hasProjects, type ResolvedProject } from '../../lib/projects.js';
@@ -115,17 +115,19 @@ async function confirmHostOverride(options: IssueOptions): Promise<boolean> {
 }
 
 async function resolveExplicitHarnessFlag(
-  harness: string | undefined,
+  rawHarness: string | undefined,
   model: string | undefined,
 ): Promise<RuntimeName | undefined> {
-  if (harness === undefined) {
+  if (rawHarness === undefined) {
     return undefined;
   }
 
-  if (harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse' && harness !== 'prime-agent' && harness !== 'grok') {
-    process.stderr.write(`Invalid --harness value: ${harness}. Expected 'claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', or 'grok'.\n`);
+  if (!KNOWN_HARNESSES.has(rawHarness)) {
+    const harness = rawHarness;
+    process.stderr.write(`Invalid --harness value: ${harness}. Expected 'claude-code', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', or 'grok'.\n`);
     return exitCli(1);
   }
+  const harness = rawHarness as RuntimeName;
 
   if (model) {
     const { canUseHarness } = await import('../../lib/harness-policy.js');
