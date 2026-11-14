@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5219",
   "created": "2026-11-14T01:41:21.515Z",
-  "updated": "2026-11-14T02:01:02.471Z",
+  "updated": "2026-11-14T02:01:09.766Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,11 @@
     "route-scopes-issue-reads.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T02:01:02.470Z"
+    },
+    "sheet-skeleton-and-event": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5219",
+      "claimedAt": "2026-11-14T02:01:09.766Z"
     }
   }
 }
