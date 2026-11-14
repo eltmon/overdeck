@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5282",
   "created": "2026-11-14T19:03:45.838Z",
-  "updated": "2026-11-14T19:14:28.249Z",
+  "updated": "2026-11-14T19:14:49.627Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,11 @@
     "key-file-helpers.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T19:14:28.248Z"
+    },
+    "legacy-merge": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5282",
+      "claimedAt": "2026-11-14T19:14:49.627Z"
     }
   }
 }
