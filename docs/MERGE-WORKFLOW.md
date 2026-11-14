@@ -150,12 +150,18 @@ it on GitHub. Three pieces let it merge without a hand-written approval:
    `runStrikeReviewTick` (`src/dashboard/server/services/strike-review.ts`)
    lists the open strike PRs of every GitHub project and starts one
    quick-mode review (a single reviewer, no convoy) for each PR that is not a
-   draft, has green checks and has no review at its current head. It starts
-   at most two reviews per tick, oldest PR first. "Once per head" is the
-   strike workspace's pipeline journal: a `review.requested` entry with
-   `data.headSha`, unless a later `review.dispatch-failed` names the same
-   head. The reviewer reads the strike workspace, so the workspace HEAD must
-   equal the PR head before a review starts. The merge-train flag does not
+   draft, has green checks, does not conflict with its base and has no review
+   at its current head. It starts at most two reviews per tick, oldest PR
+   first. "Once per head" is the strike workspace's pipeline journal: a
+   `review.requested` entry with `data.headSha`, written once the dispatch
+   succeeds. A request with no verdict after 30 minutes is asked again when
+   no reviewer for that head is alive, and a failed dispatch
+   (`review.dispatch-failed`) waits 10 minutes before the next try. A live
+   reviewer left from an older head never holds a new head's review. The
+   reviewer reads the strike workspace, so the workspace HEAD must equal the
+   PR head before a review starts. An issue that also has a feature workspace
+   is reviewed as a feature, so its strike PR is not auto-reviewed and stays
+   operator-merged. The merge-train flag does not
    gate it (it decides batching only); `OVERDECK_DISABLE_AUTO_MERGE=1` stops
    it. GitLab projects are skipped. `pan review request <id>` and
    `POST /api/review/:issueId/request` start the same review for a
@@ -164,7 +170,9 @@ it on GitHub. Three pieces let it merge without a hand-written approval:
    `pan admin specialists done review <id>` as usual. For an issue with only
    a strike workspace, the command reads `strike/<id>`
    (`resolveReviewTarget`, `src/lib/cloister/review-target.ts`) and journals
-   the reviewed head (`headSha`) and the reviewer's notes (`summary`). An
+   the reviewed head (`headSha`) and the reviewer's notes (`summary`). The
+   verdict is pinned to the reviewed commit; when the PR moved past it, the
+   verdict is refused and the new head gets its own review. An
    APPROVED verdict is a GitHub APPROVE by the App bot, or a trusted
    `sha=` verdict marker when the forge refuses the review, so the merge gate
    sees a head approval. A CHANGES_REQUESTED verdict stops the strike: no

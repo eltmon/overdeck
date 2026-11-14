@@ -304,7 +304,7 @@ function buildStrikePrompt(plan: StrikePlan): string {
     ...openRequestLines(plan, issueReference),
     `8. Print the ${request} URL as your final message, then stop. The ${request} is the completion handoff; do not send a Flywheel message.`,
     '',
-    `The operator reviews and merges the ${request}. Nothing else lands a strike: no background routine picks up the pushed branch. Do NOT switch to \`${base}\`. Do NOT merge into \`${base}\` or merge the ${request} yourself. Do NOT push \`origin ${base}\`. Do NOT call \`pan done\`. Do NOT call \`pan done <id> --strike\`.`,
+    `Overdeck reviews the ${request} once its checks are green (GitHub), and merges it on its own when that review approves and the project does not hold for UAT; otherwise the operator merges it. Only the ${request} lands a strike: no background routine picks up a pushed branch that has none. Do NOT switch to \`${base}\`. Do NOT merge into \`${base}\` or merge the ${request} yourself. Do NOT push \`origin ${base}\`. Do NOT call \`pan done\`. Do NOT call \`pan done <id> --strike\`.`,
     '',
     `If mid-strike you discover the issue is broader than a precision fix, abort, do not push or open a ${request}, and report why so the issue can run through the normal pipeline instead.`,
   ].join('\n');
