@@ -118,8 +118,88 @@ export async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<Ste
 
 interface GitLabMergeLookupCache {
   attempted: boolean;
-  headSha?: string;
-  artifact?: { id?: string; url?: string } | null;
+  artifact?: { id?: string; url?: string; headSha?: string } | null;
+}
+
+/** The PAN-2406 / FR-5 post-merge delta judgment, shared by the GitHub PR and GitLab MR paths. */
+async function judgePostMergeDelta(input: {
+  root: MergeVerificationRoot;
+  branchRef: string;
+  mergedHead: string;
+  tipSha: string;
+  targetRef: string;
+  label: string;
+  kind: 'PR' | 'MR';
+  fallbackLabel: string;
+}): Promise<StepResult> {
+  const { root, branchRef, mergedHead, tipSha, targetRef, label, kind, fallbackLabel } = input;
+  const step = 'close-out:verify-merged';
+
+  // A workspace may merge a newer target branch after its PR/MR head was pushed.
+  // Ignore those merge commits and allow close-out when every post-merge commit
+  // is already on the comparison ref; only branch-unique work is unsafe.
+  let commitsNotOnTarget: string[] | null = null;
+  try {
+    const { stdout: commitsRaw } = await execAsync(
+      `git log --no-merges --format=%H ${mergedHead}..${tipSha}`,
+      { cwd: root.dir, encoding: 'utf-8' },
+    );
+    const commits = commitsRaw.split('\n').map((sha) => sha.trim()).filter(Boolean);
+    const unmerged: string[] = [];
+    for (const commit of commits) {
+      try {
+        await execAsync(
+          `git merge-base --is-ancestor ${commit} ${targetRef}`,
+          { cwd: root.dir, encoding: 'utf-8' },
+        );
+      } catch {
+        unmerged.push(commit);
+      }
+    }
+    if (unmerged.length === 0) {
+      return stepOk(step, [
+        `${label} is squash-merged; all ${commits.length} post-${kind} non-merge commit(s) on ${branchRef} are already on ${targetRef}`,
+      ]);
+    }
+
+    commitsNotOnTarget = unmerged;
+  } catch { /* containment check failure falls through to the state-plane policy */ }
+
+  // PAN-2406 / state-plane policy rule 3: commits after the merged head that
+  // touch ONLY legacy state-plane paths under .pan/ are pipeline exhaust —
+  // e.g. 'chore: record merge status' — and must not block close-out.
+  try {
+    const { stdout: deltaRaw } = await execAsync(
+      `git diff --name-only ${mergedHead}..${tipSha}`,
+      { cwd: root.dir, encoding: 'utf-8' },
+    );
+    let deltaFiles = deltaRaw.split('\n').map((f) => f.trim()).filter(Boolean);
+    let statePlaneOnly = deltaFiles.length > 0 && deltaFiles.every((f) =>
+      f.startsWith('.pan/'));
+    if (!statePlaneOnly) {
+      // Branch may have merged its target INTO itself after the PR/MR merged —
+      // the two-dot delta then contains target-branch files. Judge only changes
+      // UNIQUE to the branch (three-dot vs the comparison ref): if those are
+      // state-plane-only, everything real is already on the target.
+      const { stdout: uniqueRaw } = await execAsync(
+        `git diff --name-only ${targetRef}...${tipSha}`,
+        { cwd: root.dir, encoding: 'utf-8' },
+      );
+      deltaFiles = uniqueRaw.split('\n').map((f) => f.trim()).filter(Boolean);
+      statePlaneOnly = deltaFiles.length > 0 && deltaFiles.every((f) =>
+        f.startsWith('.pan/'));
+    }
+    if (statePlaneOnly) {
+      return stepOk(step, [
+        `${label} is squash-merged; ${branchRef} is ahead only by state-plane commits (${deltaFiles.length} file(s): .pan) — accepted per state-plane policy`,
+      ]);
+    }
+  } catch { /* diff failure falls through to the strict rejection below */ }
+
+  if (commitsNotOnTarget) {
+    return stepFailed(step, `${branchRef} has ${commitsNotOnTarget.length} commit(s) after merged ${fallbackLabel} that are not on ${targetRef}: ${commitsNotOnTarget.join(', ')}`);
+  }
+  return stepFailed(step, `${branchRef} does not match the head commit of merged ${fallbackLabel}; inspect before closing out.`);
 }
 
 interface GitLabMergeMatch {
@@ -158,8 +238,8 @@ async function verifyConventionBranchAgainst(
       return stepOk(step, ['All commits merged to main', ...(remoteCheck?.details ?? [])]);
     } catch {
       // --is-ancestor fails for squash merges where the branch still exists.
-      const gitlabMerged = await verifySquashMergedMrByBranch(root, root.sourceBranch, gitlabLookup);
-      if (gitlabMerged) {
+      const gitlabMerged = await verifySquashMergedMrByBranch(root, root.sourceBranch, comparison, gitlabLookup);
+      if (gitlabMerged?.result.success) {
         const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root, comparison, gitlabLookup);
         if (remoteCheck && !remoteCheck.success) return remoteCheck;
         return stepOk(step, [...(gitlabMerged.result.details ?? []), ...(remoteCheck?.details ?? [])]);
@@ -181,6 +261,8 @@ async function verifyConventionBranchAgainst(
       } catch {
         // diff failed — fall through to unmerged report
       }
+
+      if (gitlabMerged && !gitlabMerged.result.success) return gitlabMerged.result;
 
       const githubMerged = root.forge === 'github'
         ? await verifySquashMergedPrByBranch(ctx, root, root.sourceBranch, comparison)
@@ -237,31 +319,42 @@ async function verifyConventionBranchAgainst(
 async function verifySquashMergedMrByBranch(
   root: MergeVerificationRoot,
   branchRef: string,
+  comparison: { ref: string },
   lookup: GitLabMergeLookupCache,
 ): Promise<GitLabMergeMatch | null> {
   if (root.forge !== 'gitlab') return null;
   try {
     const { stdout } = await execAsync(`git rev-parse ${branchRef} 2>/dev/null`, { cwd: root.dir, encoding: 'utf-8' });
-    const headSha = stdout.trim();
-    if (!headSha) return null;
+    const tipSha = stdout.trim();
+    if (!tipSha) return null;
     const reused = lookup.attempted;
     if (!reused) {
       lookup.attempted = true;
-      lookup.headSha = headSha;
       lookup.artifact = await getForgeAdapter('gitlab').findMergedArtifact({
         sourceBranch: root.sourceBranch,
         targetBranch: root.targetBranch,
-        headSha,
         cwd: root.dir,
       });
     }
-    if (!lookup.artifact || lookup.headSha !== headSha) return null;
-    const label = lookup.artifact.id ? `MR !${lookup.artifact.id}` : 'GitLab MR';
-    const url = lookup.artifact.url ? ` (${lookup.artifact.url})` : '';
-    return {
-      result: stepOk('close-out:verify-merged', [`${label} is merged and ${branchRef} matches the merged MR head${url}`]),
-      reused,
-    };
+    const artifact = lookup.artifact;
+    if (!artifact?.headSha) return null;
+
+    if (tipSha === artifact.headSha) {
+      const label = artifact.id ? `MR !${artifact.id}` : 'GitLab MR';
+      const url = artifact.url ? ` (${artifact.url})` : '';
+      return {
+        result: stepOk('close-out:verify-merged', [`${label} is merged and ${branchRef} matches the merged MR head${url}`]),
+        reused,
+      };
+    }
+
+    const label = artifact.id ? `MR !${artifact.id}` : 'GitLab MR';
+    const fallbackLabel = artifact.id ? `MR !${artifact.id}` : 'merged GitLab MR';
+    const result = await judgePostMergeDelta({
+      root, branchRef, mergedHead: artifact.headSha, tipSha, targetRef: comparison.ref,
+      label, kind: 'MR', fallbackLabel,
+    });
+    return { result, reused };
   } catch {
     return null;
   }
@@ -311,9 +404,9 @@ async function verifyRemoteBranchIfPresent(
       // diff failed — fall through
     }
 
-    const gitlabMerged = await verifySquashMergedMrByBranch(root, remoteRef, gitlabLookup);
+    const gitlabMerged = await verifySquashMergedMrByBranch(root, remoteRef, comparison, gitlabLookup);
     if (gitlabMerged) {
-      return gitlabMerged.reused
+      return (gitlabMerged.reused && gitlabMerged.result.success)
         ? stepOk(step, [`Remote ${remoteRef} matches the merged MR head`])
         : gitlabMerged.result;
     }
@@ -387,74 +480,12 @@ async function verifySquashMergedPrByBranch(
       return stepOk(step, [`${prLabel} is squash-merged and ${branchRef} matches the merged PR head`]);
     }
 
-    // A workspace may merge a newer target branch after its PR head was pushed.
-    // Ignore those merge commits and allow close-out when every post-PR commit
-    // is already on the configured remote target; only branch-unique work is unsafe.
-    let commitsNotOnTarget: string[] | null = null;
-    try {
-      const { stdout: commitsRaw } = await execAsync(
-        `git log --no-merges --format=%H ${mergedPr.headRefOid}..${tipSha}`,
-        { cwd: root.dir, encoding: 'utf-8' },
-      );
-      const commits = commitsRaw.split('\n').map((sha) => sha.trim()).filter(Boolean);
-      const unmerged: string[] = [];
-      for (const commit of commits) {
-        try {
-          await execAsync(
-            `git merge-base --is-ancestor ${commit} ${remoteTargetRef}`,
-            { cwd: root.dir, encoding: 'utf-8' },
-          );
-        } catch {
-          unmerged.push(commit);
-        }
-      }
-      if (unmerged.length === 0) {
-        const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'GitHub PR';
-        return stepOk(step, [
-          `${prLabel} is squash-merged; all ${commits.length} post-PR non-merge commit(s) on ${branchRef} are already on ${remoteTargetRef}`,
-        ]);
-      }
-
-      commitsNotOnTarget = unmerged;
-    } catch { /* containment check failure falls through to the state-plane policy */ }
-
-    // PAN-2406 / state-plane policy rule 3: commits after the merged head that
-    // touch ONLY legacy state-plane paths under .pan/ are pipeline exhaust —
-    // e.g. 'chore: record merge status' — and must not block close-out.
-    try {
-      const { stdout: deltaRaw } = await execAsync(
-        `git diff --name-only ${mergedPr.headRefOid}..${tipSha}`,
-        { cwd: root.dir, encoding: 'utf-8' },
-      );
-      let deltaFiles = deltaRaw.split('\n').map((f) => f.trim()).filter(Boolean);
-      let statePlaneOnly = deltaFiles.length > 0 && deltaFiles.every((f) =>
-        f.startsWith('.pan/'));
-      if (!statePlaneOnly) {
-        // Branch may have merged its target INTO itself after the PR merged —
-        // the two-dot delta then contains target-branch files. Judge only changes
-        // UNIQUE to the branch (three-dot vs the remote target): if those are
-        // state-plane-only, everything real is already on the target.
-        const { stdout: uniqueRaw } = await execAsync(
-          `git diff --name-only ${remoteTargetRef}...${tipSha}`,
-          { cwd: root.dir, encoding: 'utf-8' },
-        );
-        deltaFiles = uniqueRaw.split('\n').map((f) => f.trim()).filter(Boolean);
-        statePlaneOnly = deltaFiles.every((f) =>
-          f.startsWith('.pan/'));
-      }
-      if (statePlaneOnly) {
-        const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'GitHub PR';
-        return stepOk(step, [
-          `${prLabel} is squash-merged; ${branchRef} is ahead only by state-plane commits (${deltaFiles.length} file(s): .pan) — accepted per state-plane policy`,
-        ]);
-      }
-    } catch { /* diff failure falls through to the strict rejection below */ }
-
-    const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'merged GitHub PR';
-    if (commitsNotOnTarget) {
-      return stepFailed(step, `${branchRef} has ${commitsNotOnTarget.length} commit(s) after merged ${prLabel} that are not on ${remoteTargetRef}: ${commitsNotOnTarget.join(', ')}`);
-    }
-    return stepFailed(step, `${branchRef} does not match the head commit of merged ${prLabel}; inspect before closing out.`);
+    const label = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'GitHub PR';
+    const fallbackLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'merged GitHub PR';
+    return await judgePostMergeDelta({
+      root, branchRef, mergedHead: mergedPr.headRefOid, tipSha, targetRef: remoteTargetRef,
+      label, kind: 'PR', fallbackLabel,
+    });
   } catch {
     return null;
   }

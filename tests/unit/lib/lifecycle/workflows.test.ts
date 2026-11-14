@@ -888,11 +888,20 @@ describe('workflows', () => {
             stderr: '',
           };
         }
+        if (command === 'git log --no-merges --format=%H merged-head..newer-tip') {
+          return { stdout: 'post-commit\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor post-commit origin/main') {
+          throw new Error('commit is not on main');
+        }
+        if (command === 'git diff --name-only merged-head..newer-tip') {
+          return { stdout: 'src/example.ts\n', stderr: '' };
+        }
+        if (command === 'git diff --name-only origin/main...newer-tip') {
+          return { stdout: 'src/example.ts\n', stderr: '' };
+        }
         if (command.startsWith('git diff origin/main...feature/pan-100')) {
           return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
-        }
-        if (command === 'git log origin/main..feature/pan-100 --oneline 2>/dev/null || true') {
-          return { stdout: 'unmerged-commit\n', stderr: '' };
         }
         return { stdout: '', stderr: '' };
       });
@@ -903,7 +912,126 @@ describe('workflows', () => {
       );
 
       expect(verifyStep?.success).toBe(false);
-      expect(verifyStep?.error).toBe('1 unmerged commit(s) on feature/pan-100. Merge before closing out.');
+      expect(verifyStep?.error).toBe('feature/pan-100 has 1 commit(s) after merged MR !75 that are not on origin/main: post-commit');
+    });
+
+    it('accepts a merged GitLab MR when post-MR commits are already on origin/main', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor feature/pan-100 origin/main') {
+          throw new Error('not an ancestor after squash merge');
+        }
+        if (command === 'git rev-parse feature/pan-100 2>/dev/null') {
+          return { stdout: 'newer-tip\n', stderr: '' };
+        }
+        if (command === 'glab mr list --source-branch feature/pan-100 --all --output json') {
+          return {
+            stdout: '[{"iid":75,"web_url":"https://gitlab.com/acme/app/-/merge_requests/75","state":"merged","source_branch":"feature/pan-100","target_branch":"main","sha":"merged-head"}]',
+            stderr: '',
+          };
+        }
+        if (command === 'git log --no-merges --format=%H merged-head..newer-tip') {
+          return { stdout: 'post-commit\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor post-commit origin/main') {
+          return { stdout: '', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const verifyStep = await verifyConventionBranchMerged(
+        { issueId: 'PAN-100', projectPath: testDir },
+        { repoKey: 'fe', dir: testDir, sourceBranch: 'feature/pan-100', targetBranch: 'main', forge: 'gitlab' },
+      );
+
+      expect(verifyStep?.success).toBe(true);
+      expect(verifyStep?.details).toEqual([
+        'MR !75 is squash-merged; all 1 post-MR non-merge commit(s) on feature/pan-100 are already on origin/main',
+      ]);
+    });
+
+    it('accepts a merged GitLab MR when only .pan/ commits follow the MR head', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor feature/pan-100 origin/main') {
+          throw new Error('not an ancestor after squash merge');
+        }
+        if (command === 'git rev-parse feature/pan-100 2>/dev/null') {
+          return { stdout: 'newer-tip\n', stderr: '' };
+        }
+        if (command === 'glab mr list --source-branch feature/pan-100 --all --output json') {
+          return {
+            stdout: '[{"iid":75,"web_url":"https://gitlab.com/acme/app/-/merge_requests/75","state":"merged","source_branch":"feature/pan-100","target_branch":"main","sha":"merged-head"}]',
+            stderr: '',
+          };
+        }
+        if (command === 'git log --no-merges --format=%H merged-head..newer-tip') {
+          return { stdout: 'post-commit\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor post-commit origin/main') {
+          throw new Error('commit is not on main');
+        }
+        if (command === 'git diff --name-only merged-head..newer-tip') {
+          return { stdout: '.pan/continues/pan-100.xbrief.json\n', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const verifyStep = await verifyConventionBranchMerged(
+        { issueId: 'PAN-100', projectPath: testDir },
+        { repoKey: 'fe', dir: testDir, sourceBranch: 'feature/pan-100', targetBranch: 'main', forge: 'gitlab' },
+      );
+
+      expect(verifyStep?.success).toBe(true);
+      expect(verifyStep?.details?.[0]).toContain('ahead only by state-plane commits');
+    });
+
+    it('rejects a merged GitLab MR when post-MR commits leave an empty delta', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor feature/pan-100 origin/main') {
+          throw new Error('not an ancestor after squash merge');
+        }
+        if (command === 'git rev-parse feature/pan-100 2>/dev/null') {
+          return { stdout: 'newer-tip\n', stderr: '' };
+        }
+        if (command === 'glab mr list --source-branch feature/pan-100 --all --output json') {
+          return {
+            stdout: '[{"iid":75,"web_url":"https://gitlab.com/acme/app/-/merge_requests/75","state":"merged","source_branch":"feature/pan-100","target_branch":"main","sha":"merged-head"}]',
+            stderr: '',
+          };
+        }
+        if (command === 'git log --no-merges --format=%H merged-head..newer-tip') {
+          return { stdout: 'post-commit\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor post-commit origin/main') {
+          throw new Error('commit is not on main');
+        }
+        if (command === 'git diff --name-only merged-head..newer-tip') {
+          return { stdout: '', stderr: '' };
+        }
+        if (command === 'git diff --name-only origin/main...newer-tip') {
+          return { stdout: '', stderr: '' };
+        }
+        if (command.startsWith('git diff origin/main...feature/pan-100')) {
+          return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const verifyStep = await verifyConventionBranchMerged(
+        { issueId: 'PAN-100', projectPath: testDir },
+        { repoKey: 'fe', dir: testDir, sourceBranch: 'feature/pan-100', targetBranch: 'main', forge: 'gitlab' },
+      );
+
+      expect(verifyStep?.success).toBe(false);
+      expect(verifyStep?.error).toBe('feature/pan-100 has 1 commit(s) after merged MR !75 that are not on origin/main: post-commit');
     });
 
     it('preserves the diff-empty fallback when GitLab has no merged MR', async () => {
