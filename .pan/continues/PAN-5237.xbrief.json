@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5237",
   "created": "2026-11-14T04:16:13.968Z",
-  "updated": "2026-11-14T04:49:55.740Z",
+  "updated": "2026-11-14T04:57:08.365Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -127,6 +127,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5237",
       "claimedAt": "2026-11-14T04:49:55.739Z"
+    },
+    "outbox-cancel-controls": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5237",
+      "claimedAt": "2026-11-14T04:57:08.365Z"
     }
   }
 }
