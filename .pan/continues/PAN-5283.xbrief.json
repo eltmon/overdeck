@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5283",
   "created": "2026-11-14T19:04:13.506Z",
-  "updated": "2026-11-14T20:16:42.128Z",
+  "updated": "2026-11-14T20:17:05.817Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -242,9 +242,26 @@
       "doneAt": "2026-11-14T20:16:39.843Z"
     },
     "wi14-health-strip": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5283",
-      "claimedAt": "2026-11-14T20:16:42.128Z"
+      "claimedAt": "2026-11-14T20:16:42.128Z",
+      "doneAt": "2026-11-14T20:17:05.816Z"
+    },
+    "wi14-health-strip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:17:05.816Z"
+    },
+    "wi14-health-strip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:17:05.816Z"
+    },
+    "wi14-health-strip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:17:05.816Z"
+    },
+    "wi14-health-strip.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:17:05.816Z"
     }
   }
 }
