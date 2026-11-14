@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5278",
   "created": "2026-11-14T18:11:34.102Z",
-  "updated": "2026-11-14T23:24:18.842Z",
+  "updated": "2026-11-14T23:25:33.376Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -164,9 +164,26 @@
       "doneAt": "2026-11-14T23:24:17.615Z"
     },
     "accounts-route": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5278",
-      "claimedAt": "2026-11-14T23:24:18.841Z"
+      "claimedAt": "2026-11-14T23:24:18.841Z",
+      "doneAt": "2026-11-14T23:25:33.375Z"
+    },
+    "accounts-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:25:33.375Z"
+    },
+    "accounts-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:25:33.375Z"
+    },
+    "accounts-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:25:33.375Z"
+    },
+    "accounts-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:25:33.375Z"
     }
   },
   "agentModel": "claude-opus-5-5"
