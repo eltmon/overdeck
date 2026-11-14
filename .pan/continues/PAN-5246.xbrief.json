@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5246",
   "created": "2026-11-14T12:41:52.786Z",
-  "updated": "2026-11-14T13:35:52.229Z",
+  "updated": "2026-11-14T13:36:04.405Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -248,6 +248,11 @@
     "sections-test.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T13:35:52.229Z"
+    },
+    "e2e-pane-rows": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5246",
+      "claimedAt": "2026-11-14T13:36:04.405Z"
     }
   }
 }
