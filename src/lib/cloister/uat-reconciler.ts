@@ -19,6 +19,12 @@
  *      and its CI run a duplicate, so that feature merges directly. A
  *      UAT-held project still gets the one-member batch: it is the UAT stack
  *      the operator tests on.
+ *      PAN-4753 D4: with the merge train on in an auto GitHub monorepo
+ *      project, the batch window (`selectBatch`) decides instead: wait until
+ *      `merge_train.batch_size` features are ready or the oldest has waited
+ *      `merge_train.batch_wait_minutes`, then assemble (a lone feature at the
+ *      timeout makes a one-member batch). The auto-promote tick merges it once
+ *      its combined CI is green.
  *   4. Trim/reap the chain (cleanup hook).
  *
  * Pure orchestration with injected deps — interval wiring and real data
@@ -26,6 +32,7 @@
  */
 import type { ReadyFeature, GenerationStorePort } from './uat-generation-engine.js';
 import type { UatGeneration } from '../overdeck/merge-sync.js';
+import type { BatchChoice } from './batch-window.js';
 
 /**
  * An 'assembling' row with NO PROGRESS for this long is marked failed (train
@@ -120,6 +127,17 @@ export interface UatReconcilerDeps {
    * Omitted = every feature is batch-owned (pre-PAN-4970 behavior).
    */
   mergesPerPr?(feature: ReadyFeature): boolean | Promise<boolean>;
+  /**
+   * PAN-4753 D4: the batch window. Given the batch-owned ready set (merge
+   * order) and the live generations (newest first), answers the features to
+   * assemble now (`features`; the single-feature rule does not apply), a
+   * reason to wait (`wait`; no assembly this tick), or null when no window
+   * applies to this project (today's behavior). Omitted = null.
+   */
+  selectBatch?(
+    batchReadySet: readonly ReadyFeature[],
+    live: readonly UatGeneration[],
+  ): Promise<BatchChoice | null>;
   now?: () => number;
   log?: (msg: string) => void;
 }
@@ -128,11 +146,15 @@ export interface ReconcileResult {
   action:
     | 'disabled' | 'no-queue' | 'idle' | 'assembled' | 'assembly-failed' | 'assembly-blocked' | 'backoff' | 'in-flight'
     /** PAN-3965: exactly one feature is ready — it merges directly, no batch. */
-    | 'single-feature';
+    | 'single-feature'
+    /** PAN-4753: the batch window is still open — not enough features, not waited long enough. */
+    | 'waiting';
   invalidated: string[];
   generation?: UatGeneration;
   /** PAN-4970: ready features the per-PR auto-merge scheduler owns this tick, upper-cased and sorted. */
   perPr?: string[];
+  /** PAN-4753: why the batch window is still open (action `waiting`). */
+  waitReason?: string;
 }
 
 /**
@@ -228,6 +250,8 @@ function isStale(
 
 /** Per-project last-logged per-PR set, so the line logs only on change. */
 const lastLoggedPerPr = new Map<string, string>();
+/** Per-project last-logged batch-window wait reason (PAN-4753), so it logs only on change. */
+const lastLoggedWait = new Map<string, string>();
 
 /**
  * Partition the ready set into per-PR-owned ids and the batch-owned subset.
@@ -345,11 +369,31 @@ export async function reconcileUatGenerations(
       return { action: 'idle', invalidated, perPr };
     }
 
+    // PAN-4753 D4: the batch window picks what to assemble, or says wait.
+    let windowed = false;
+    let toAssemble: readonly ReadyFeature[] = batchReadySet;
+    if (deps.selectBatch) {
+      const choice = await deps.selectBatch(batchReadySet, deps.store.listChain(projectRoot, ['ready', 'superseded']));
+      if (choice && 'wait' in choice) {
+        if (lastLoggedWait.get(projectRoot) !== choice.wait) {
+          lastLoggedWait.set(projectRoot, choice.wait);
+          log(`[uat-reconciler] batch window open: ${choice.wait}`);
+        }
+        await deps.cleanup().catch(() => {});
+        return { action: 'waiting', invalidated, perPr, waitReason: choice.wait };
+      }
+      if (choice) {
+        windowed = true;
+        toAssemble = choice.features;
+      }
+    }
+    lastLoggedWait.delete(projectRoot);
+
     // 3. Assemble when nothing live answers the current desired set.
-    const desired = desiredSignature(batchReadySet, headShas, mainSha);
+    const desired = desiredSignature(toAssemble, headShas, mainSha);
     if (!options.force) {
       const live = deps.store.listChain(projectRoot, ['ready', 'superseded']);
-      if (live.some((gen) => liveSignatureMatches(gen, batchReadySet, headShas, mainSha))) {
+      if (live.some((gen) => liveSignatureMatches(gen, toAssemble, headShas, mainSha))) {
         await deps.cleanup().catch(() => {});
         return { action: 'idle', invalidated, perPr };
       }
@@ -360,8 +404,8 @@ export async function reconcileUatGenerations(
     // batch assembled earlier is left alone (the stale checks above own it).
     // A feature held for UAT (its label, else the project, else global) keeps
     // the one-member batch: it is the UAT stack the operator tests on.
-    if (batchReadySet.length < MIN_BATCH_FEATURES && !((await deps.holdsForUat?.(batchReadySet[0]!)) ?? false)) {
-      log(`[uat-reconciler] 1 feature ready (${batchReadySet[0]!.issueId}) — merges directly; batches assemble when ${MIN_BATCH_FEATURES}+ are ready`);
+    if (!windowed && toAssemble.length < MIN_BATCH_FEATURES && !((await deps.holdsForUat?.(toAssemble[0]!)) ?? false)) {
+      log(`[uat-reconciler] 1 feature ready (${toAssemble[0]!.issueId}) — merges directly; batches assemble when ${MIN_BATCH_FEATURES}+ are ready`);
       await deps.cleanup().catch(() => {});
       return { action: 'single-feature', invalidated, perPr };
     }
@@ -401,8 +445,8 @@ export async function reconcileUatGenerations(
       }
     }
 
-    log(`[uat-reconciler] assembling next generation for ${batchReadySet.length} ready feature(s)`);
-    const generation = await deps.assemble(batchReadySet);
+    log(`[uat-reconciler] assembling next generation for ${toAssemble.length} ready feature(s)`);
+    const generation = await deps.assemble(toAssemble);
     await deps.cleanup().catch(() => {});
     return {
       action: generation.status === 'ready' ? 'assembled' : 'assembly-failed',

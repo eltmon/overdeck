@@ -39,6 +39,7 @@ import {
 import { buildConflictAgentHook } from '../../../lib/cloister/uat-conflict-agent.js';
 import { reconcileUatGenerations, type ReconcileResult } from '../../../lib/cloister/uat-reconciler.js';
 import { mergePathOwner } from './merge-path-owner.js';
+import { buildSelectBatch } from './merge-train-batching.js';
 import { ensureUatStack, probeUatStack, teardownUatStack } from '../../../lib/cloister/uat-stack.js';
 import {
   promoteUatGeneration,
@@ -241,6 +242,8 @@ async function runUatTrainReconcileForProject(
     cleanup: makeCleanupForProject(projectPath),
     holdsForUat: (feature) => issueHoldsForUat(feature.issueId, projectConfig, isFlywheelRequireUatBeforeMerge()),
     mergesPerPr: async (feature) => (await mergePathOwner(feature.issueId, projectPath, projectConfig)) === 'per-pr',
+    // PAN-4753 D4: the batch window (null outside auto GitHub monorepo projects).
+    selectBatch: buildSelectBatch(projectPath, projectConfig),
     log: (msg) => console.log(msg),
   }, options);
 }

@@ -35,6 +35,7 @@ import { startCodexPluginImporter, stopCodexPluginImporter } from './services/co
 import { startRestartAnnouncer, stopRestartAnnouncer } from './services/restart-announcer.js';
 import { startUatTrainReconciler, stopUatTrainReconciler } from './services/uat-train.js';
 import { runAutoMergeSchedulerTick } from './services/auto-merge-scheduler.js';
+import { runBatchAutoPromoteTick } from './services/batch-auto-promote.js';
 import { invalidatePullRequestListingOnApproval } from './services/issue-pr-refresh.js';
 import { runApprovalAtHeadRefreshTick } from './services/approval-at-head-refresh.js';
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
@@ -516,6 +517,10 @@ if (startUatTrainReconciler({
   onTick: () => Promise.all([
     runAutoMergeSchedulerTick().catch((err) => console.warn('[auto-merge] scheduler tick failed:', err instanceof Error ? err.message : err)),
     runApprovalAtHeadRefreshTick().catch((err) => console.warn('[approval-refresh] tick failed:', err instanceof Error ? err.message : err)),
+    // PAN-4753 D4: merge a batch whose combined CI is green; drop a failing member.
+    import('./routes/specialists.js')
+      .then(({ firePostMergeLifecycle }) => runBatchAutoPromoteTick(firePostMergeLifecycle))
+      .catch((err) => console.warn('[batch-auto-promote] tick failed:', err instanceof Error ? err.message : err)),
   ]),
 })) {
   console.log('[overdeck] UAT batch-train reconciler started');

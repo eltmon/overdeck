@@ -22,6 +22,7 @@ import { resolveGitHubIssue } from '../tracker-utils.js';
 import { getProjectAutoMergeDefault, projectAutoMergeDefault, shouldHoldForUat } from './auto-merge-policy.js';
 import { evaluateMergeReadiness, getPrFacts, withForgeApprovalAtHead, type PrFacts, type ReadGitHubReviews } from './pr-facts.js';
 import { issueRunsTestsOnCi } from './verification-tests-mode.js';
+import { BATCH_ROUTE_REASON, isHighPriorityMerge, issueDroppedFromBatch, issueTrainOn, mergeRouteFor } from './merge-route.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -47,6 +48,10 @@ export interface AutoMergeEligibilityDeps {
   readReviews?: ReadGitHubReviews;
   /** The logins Overdeck posts as, for a review whose association alone is not trusted. */
   overdeckLogins?: () => Promise<readonly string[]>;
+  /** PAN-4753: the issue's effective merge-train flag; `issueTrainOn` by default. */
+  isTrainOn?: (issueId: string) => boolean;
+  /** PAN-4753: dropped from a batch for a failed combined CI; `issueDroppedFromBatch` by default. */
+  droppedFromBatch?: (issueId: string) => boolean;
 }
 
 /** The per-issue auto-merge decision as the tracker's labels express it. */
@@ -172,6 +177,19 @@ export async function isAutoMergeEligible(
   );
   if (hold) {
     return { eligible: false, reason: 'held for UAT (auto-merge toggled off)' };
+  }
+
+  // PAN-4753 D4: with the train on, a normal-priority PR waits for a batch. A
+  // row scheduled while the train was off is blocked here after an off→on
+  // flip, so it never merges next to the batch that now owns it.
+  const route = mergeRouteFor({
+    heldForUat: false,
+    trainOn: (deps.isTrainOn ?? issueTrainOn)(issueId),
+    highPriority: isHighPriorityMerge({ labels }),
+    droppedFromBatch: (deps.droppedFromBatch ?? issueDroppedFromBatch)(issueId),
+  });
+  if (route === 'batch') {
+    return { eligible: false, reason: BATCH_ROUTE_REASON };
   }
 
   return { eligible: true };

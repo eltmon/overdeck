@@ -697,3 +697,58 @@ describe('PAN-4970 per-PR partition', () => {
     expect(result.perPr).toEqual([]);
   });
 });
+
+describe('batch window (PAN-4753 D4)', () => {
+  const ONE: ReadyFeature[] = [{ issueId: 'PAN-1', title: 'First', branch: 'feature/pan-1' }];
+
+  it('assembles nothing while the window says wait', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj);
+    deps.selectBatch = async () => ({ wait: '2 of 3 ready; oldest waited 4 of 30 min' });
+    const result = await reconcileUatGenerations(proj, deps);
+    expect(result).toMatchObject({ action: 'waiting', waitReason: '2 of 3 ready; oldest waited 4 of 30 min' });
+    expect(deps.assembled).toEqual([]);
+  });
+
+  it('assembles exactly the features the window chose', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj);
+    deps.selectBatch = async (features) => ({ features: [features[0]!] });
+    const result = await reconcileUatGenerations(proj, deps);
+    expect(result.action).toBe('assembled');
+    expect(deps.assembled).toEqual([[READY[0]]]);
+  });
+
+  it('makes a one-member batch the window chose, despite the single-feature rule', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj, { readySet: ONE, holdsForUat: false });
+    deps.selectBatch = async (features) => ({ features: [...features] });
+    const result = await reconcileUatGenerations(proj, deps);
+    expect(result.action).toBe('assembled');
+    expect(deps.assembled).toEqual([ONE]);
+  });
+
+  it('keeps today\'s single-feature rule when no window applies (null)', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj, { readySet: ONE, holdsForUat: false });
+    deps.selectBatch = async () => null;
+    const result = await reconcileUatGenerations(proj, deps);
+    expect(result.action).toBe('single-feature');
+    expect(deps.assembled).toEqual([]);
+  });
+
+  it('passes the live generations so a frozen batch is not rebuilt', async () => {
+    const proj = freshProject();
+    const live = gen(proj, 'uat/pan-live-0610', 'ready');
+    const deps = makeDeps(proj, { rows: [live] });
+    const seen: string[][] = [];
+    deps.selectBatch = async (features, gens) => {
+      seen.push(gens.map((g) => g.name));
+      return { features: [...features] };
+    };
+    const result = await reconcileUatGenerations(proj, deps);
+    expect(seen).toEqual([['uat/pan-live-0610']]);
+    expect(result.action).toBe('idle');
+    expect(deps.assembled).toEqual([]);
+  });
+});

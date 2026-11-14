@@ -38,6 +38,9 @@ function deps(facts: PrFacts, labels: string[] = [], globalUat = false) {
     isGlobalUatRequired: () => globalUat,
     ciTestsRequired: () => false,
     readReviews: vi.fn(async () => ({ headRefOid: facts.headSha, reviews: [] })),
+    // PAN-4753 D4: train off (the per-PR path) unless a test turns it on.
+    isTrainOn: () => false,
+    droppedFromBatch: () => false,
   };
 }
 
@@ -151,6 +154,16 @@ describe('auto-merge eligibility', () => {
     const d = { ...deps(readyFacts(), [], false), getProjectDefault: vi.fn(() => 'hold' as const) };
     await expect(isAutoMergeEligible('PAN-1486', d))
       .resolves.toEqual({ eligible: false, reason: 'held for UAT (auto-merge toggled off)' });
+  });
+
+  it('blocks a normal-priority PR while the merge train is on: it waits for the batch (PAN-4753 D4)', async () => {
+    await expect(isAutoMergeEligible('PAN-1486', { ...deps(readyFacts()), isTrainOn: () => true }))
+      .resolves.toEqual({ eligible: false, reason: 'the merge train batches this PR; it merges with the next batch' });
+  });
+
+  it('keeps a critical PR eligible while the merge train is on (PAN-4753 D4)', async () => {
+    await expect(isAutoMergeEligible('PAN-1486', { ...deps(readyFacts(), ['critical']), isTrainOn: () => true }))
+      .resolves.toEqual({ eligible: true });
   });
 
   it('accepts a mergeable, approved GitLab MR', async () => {
