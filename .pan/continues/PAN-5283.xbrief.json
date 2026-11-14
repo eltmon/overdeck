@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5283",
   "created": "2026-11-14T19:04:13.506Z",
-  "updated": "2026-11-14T20:14:39.033Z",
+  "updated": "2026-11-14T20:15:03.394Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -176,9 +176,30 @@
       "doneAt": "2026-11-14T20:10:19.780Z"
     },
     "wi8-health-deriver": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5283",
-      "claimedAt": "2026-11-14T20:14:39.033Z"
+      "claimedAt": "2026-11-14T20:14:39.033Z",
+      "doneAt": "2026-11-14T20:15:03.394Z"
+    },
+    "wi8-health-deriver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:15:03.394Z"
+    },
+    "wi8-health-deriver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:15:03.394Z"
+    },
+    "wi8-health-deriver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:15:03.394Z"
+    },
+    "wi8-health-deriver.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:15:03.394Z"
+    },
+    "wi8-health-deriver.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:15:03.394Z"
     }
   }
 }
