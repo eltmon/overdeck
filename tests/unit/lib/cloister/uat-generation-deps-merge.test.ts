@@ -16,10 +16,26 @@ import { buildUatGenerationGitDeps } from '../../../../src/lib/cloister/uat-gene
 const execFileAsync = promisify(execFile);
 const git = async (cwd: string, ...args: string[]) => (await execFileAsync('git', args, { cwd })).stdout.trim();
 
+/**
+ * Repo-local GIT_* variables (`git rev-parse --local-env-vars`). Inherited from
+ * a hook or a parent git, they would point every fixture git call, and the
+ * adapter's own, at the outer repository instead of the temp one.
+ */
+const REPO_LOCAL_GIT_ENV = [
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_CONFIG', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT',
+  'GIT_OBJECT_DIRECTORY', 'GIT_DIR', 'GIT_WORK_TREE', 'GIT_IMPLICIT_WORK_TREE', 'GIT_GRAFT_FILE',
+  'GIT_INDEX_FILE', 'GIT_NO_REPLACE_OBJECTS', 'GIT_REPLACE_REF_BASE', 'GIT_PREFIX', 'GIT_SHALLOW_FILE',
+  'GIT_COMMON_DIR',
+];
+
 let root = '';
 let project = '';
+let savedGitEnv: Record<string, string | undefined> = {};
 
 beforeEach(async () => {
+  // Scrubbed for the whole fixture lifetime: setup, the adapter calls, teardown.
+  savedGitEnv = Object.fromEntries(REPO_LOCAL_GIT_ENV.map((name) => [name, process.env[name]]));
+  for (const name of REPO_LOCAL_GIT_ENV) delete process.env[name];
   root = mkdtempSync(join(tmpdir(), 'pan-5269-'));
   const origin = join(root, 'origin.git');
   project = join(root, 'project');
@@ -44,6 +60,10 @@ beforeEach(async () => {
 
 afterEach(() => {
   rmSync(root, { recursive: true, force: true });
+  for (const [name, value] of Object.entries(savedGitEnv)) {
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
 });
 
 describe('batch assembly merge (PAN-5269)', () => {
