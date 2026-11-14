@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5238",
   "created": "2026-11-14T04:52:40.022Z",
-  "updated": "2026-11-14T05:12:23.034Z",
+  "updated": "2026-11-14T05:33:18.652Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,22 @@
       "doneAt": "2026-11-14T05:12:17.399Z"
     },
     "manifest-concurrent-walks": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5238",
-      "claimedAt": "2026-11-14T05:12:23.034Z"
+      "claimedAt": "2026-11-14T05:12:23.034Z",
+      "doneAt": "2026-11-14T05:33:18.652Z"
+    },
+    "manifest-concurrent-walks.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:33:18.652Z"
+    },
+    "manifest-concurrent-walks.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:33:18.652Z"
+    },
+    "manifest-concurrent-walks.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:33:18.652Z"
     }
   }
 }
