@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5217",
   "created": "2026-11-14T01:19:58.249Z",
-  "updated": "2026-11-14T01:19:58.249Z",
+  "updated": "2026-11-14T01:33:36.976Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,30 @@
   "sessionHistory": [],
   "items": {
     "row-jump-button": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5217",
-      "claimedAt": "2026-11-14T01:19:58.248Z"
+      "claimedAt": "2026-11-14T01:19:58.248Z",
+      "doneAt": "2026-11-14T01:33:36.976Z"
+    },
+    "row-jump-button.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:33:36.976Z"
+    },
+    "row-jump-button.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:33:36.976Z"
+    },
+    "row-jump-button.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:33:36.976Z"
+    },
+    "row-jump-button.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:33:36.976Z"
+    },
+    "row-jump-button.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:33:36.976Z"
     }
   }
 }
