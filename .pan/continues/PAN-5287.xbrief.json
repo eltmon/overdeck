@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5287",
   "created": "2026-11-14T19:49:14.970Z",
-  "updated": "2026-11-14T20:46:15.418Z",
+  "updated": "2026-11-14T20:46:17.588Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -222,7 +222,7 @@
     "explorer-shortcuts": {
       "status": "in_progress",
       "claimedBy": "agent-pan-5287",
-      "claimedAt": "2026-11-14T20:42:43.108Z"
+      "claimedAt": "2026-11-14T20:46:17.588Z"
     },
     "workflow-fixture": {
       "status": "in_progress",
