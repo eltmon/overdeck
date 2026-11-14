@@ -336,7 +336,7 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
                     {changedHere.length > 0 && (
                       <button
                         type="button"
-                        disabled={resettingAll}
+                        disabled={resettingAll || Object.keys(saving).length > 0}
                         onClick={() => void resetAll()}
                         title={`Return ${changedHere.length === 1 ? 'this skill' : `these ${changedHere.length} skills`} to what this ${level} inherits`}
                         className="rounded px-1.5 py-0.5 text-xs text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"

@@ -262,6 +262,31 @@ describe('SkillOverridesPanel — issue', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Reset all' })).not.toBeDisabled());
   });
 
+  it('disables Reset all while an individual row save is pending', async () => {
+    const oneChanged = {
+      project: 'tst', issue: 'TST-1',
+      skills: [skill({ name: 'grilling', issue: false, enabled: false, source: 'issue' }), skill({ name: 'okf' })],
+    };
+    let resolvePut: (() => void) | undefined;
+    fetchImpl = vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        putBodies.push(JSON.parse(String(init.body)));
+        await new Promise<void>(resolve => { resolvePut = resolve; });
+        return { ok: true, status: 200, json: async () => ({ ok: true }) };
+      }
+      return { ok: true, status: 200, json: async () => oneChanged, url };
+    });
+    vi.stubGlobal('fetch', fetchImpl);
+    renderPanel({ level: 'issue', issueId: 'TST-1' });
+    await waitFor(() => expect(row('okf')).toBeTruthy());
+
+    fireEvent.click(within(row('okf')).getByRole('switch'));
+    await waitFor(() => expect(putBodies).toHaveLength(1));
+    expect(screen.getByRole('button', { name: 'Reset all' })).toBeDisabled();
+    resolvePut?.();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Reset all' })).not.toBeDisabled());
+  });
+
   it('says nothing is changed when no skill has a stored value', async () => {
     mockApi({ project: 'tst', issue: 'TST-1', skills: [skill({ name: 'okf' })] });
     renderPanel({ level: 'issue', issueId: 'TST-1' });
