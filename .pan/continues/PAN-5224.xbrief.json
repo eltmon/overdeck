@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5224",
   "created": "2026-11-14T03:12:38.408Z",
-  "updated": "2026-11-14T03:38:14.561Z",
+  "updated": "2026-11-14T03:38:23.756Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,11 @@
     "membership-pr-snapshot-ttl.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T03:38:14.561Z"
+    },
+    "webhook-health-wiring": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5224",
+      "claimedAt": "2026-11-14T03:38:23.756Z"
     }
   }
 }
