@@ -154,9 +154,24 @@ describe('pan flywheel verbs (PAN-3964 FR-6)', () => {
     mocks.deriveFlywheelStatus.mockResolvedValue(status);
     await run('status');
     const out = log.mock.calls.map((c) => String(c[0])).join('\n');
-    expect(out).toContain('no agent');
+    expect(out).toContain('working · no agent');
     expect(out).toContain('Fix the thing');
     expect(out).toContain('in flight (loop) 1');
+  });
+
+  it('pan flywheel status prints the blocker text for a blocked row', async () => {
+    mocks.deriveFlywheelStatus.mockResolvedValue({
+      ...status,
+      inFlight: [{
+        ...status.inFlight[0]!,
+        stage: 'checks',
+        blocker: { kind: 'gate-queue', severity: 'waiting', text: 'typecheck queued: 11.5 GB free, needs 2.2 GB, gates keep 12.0 GB (20 min)' },
+      }],
+    });
+    await run('status');
+    const line = log.mock.calls.map((c) => String(c[0])).join('\n').split('\n').find((l) => l.startsWith('    PAN-1'));
+    expect(line).toContain('checks · typecheck queued: 11.5 GB free, needs 2.2 GB, gates keep 12.0 GB (20 min)');
+    expect(line).not.toContain('no agent');
   });
 
   it('status prints (tracker unknown) in place of a missing title (PAN-4199 ac2)', async () => {

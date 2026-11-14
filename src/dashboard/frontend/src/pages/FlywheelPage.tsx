@@ -9,7 +9,7 @@
  * idle. A Needs-you jump opens the conversation in its own Command Deck pane
  * at the message (PAN-5239), not in this embedded column.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Activity } from 'lucide-react';
 
@@ -200,10 +200,12 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue, onOpenConversati
         <div className="border-b border-border px-5 py-1.5 text-xs text-destructive" role="alert">{configMutation.error.message}</div>
       )}
 
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      {/* D16 (PAN-5283): below md the rail stacks above the conversation at full
+          width; the stored split width applies from md up, through a variable. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden md:flex-row md:overflow-hidden">
         <section
-          className="flex shrink-0 flex-col overflow-y-auto border-r border-border"
-          style={{ width: `${leftWidth}px`, minWidth: `${SPLIT_MIN_LEFT}px` }}
+          className="flex w-full min-w-0 flex-col border-b border-border md:w-[var(--fw-left)] md:min-w-[360px] md:shrink-0 md:overflow-y-auto md:border-b-0 md:border-r"
+          style={{ '--fw-left': `${leftWidth}px` } as CSSProperties}
           aria-label="Flywheel control rail"
         >
           <PendingAutoMergesCard onNavigateIssue={onNavigateIssue} />
@@ -247,11 +249,11 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue, onOpenConversati
           role="separator"
           aria-orientation="vertical"
           aria-label="Resize flywheel panes"
-          className="w-1.5 shrink-0 cursor-col-resize bg-border/40 hover:bg-primary/40"
+          className="hidden w-1.5 shrink-0 cursor-col-resize bg-border/40 hover:bg-primary/40 md:block"
           onPointerDown={handleResizePointerDown}
         />
 
-        <div className="min-w-0 flex-1 overflow-hidden" aria-label="Flywheel conversation column">
+        <div className="min-h-[70vh] min-w-0 flex-1 overflow-hidden md:min-h-0" aria-label="Flywheel conversation column">
           <FlywheelConversationPane onOpenSettings={onOpenSettings} />
         </div>
       </div>

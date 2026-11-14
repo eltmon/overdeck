@@ -1,17 +1,17 @@
 /**
- * Status tab of the Flywheel rail (PAN-3964 FR-9). Renders the derived status
- * only — the last tick the loop printed, its freshness, the needs-you items,
- * one actionable row each, and one row per feature workspace in the
- * flywheel's project.
+ * Status tab of the Flywheel rail (PAN-3964 FR-9, PAN-5283 WI-16). Renders
+ * the derived status only, top to bottom: the health strip, the last tick the
+ * loop printed and its freshness, the Needs-you action cards, the lane board
+ * of in-flight and shipped-today cards, and the shipped-today timeline.
  */
-import { MessageSquare } from 'lucide-react';
-import type { MouseEvent } from 'react';
-
-import type { FlywheelDerivedStatus, FlywheelFreshness, FlywheelLastTick } from '@overdeck/contracts';
-import { needsYouItemKey, parseNeedsYouTarget, splitNeedsYouItems } from '@overdeck/contracts';
+import type { FlywheelDerivedStatus, FlywheelFreshness } from '@overdeck/contracts';
+import { shippedCardCount } from '@overdeck/contracts';
 
 import { formatAge } from '../../lib/flywheelApi';
-import { needsYouSegments } from '../../lib/flywheelNeedsYouLinks';
+import { FlywheelHealthStrip } from './FlywheelHealthStrip';
+import { FlywheelLaneBoard } from './FlywheelLaneBoard';
+import { FlywheelNeedsYouCards } from './FlywheelNeedsYouCards';
+import { FlywheelShippedToday } from './FlywheelShippedToday';
 import { EmptyState, StatusBadge, type Tone } from './primitives';
 
 const FRESHNESS_TONE: Record<FlywheelFreshness, Tone> = {
@@ -37,48 +37,13 @@ export function FreshnessBadge({ freshness, at, nowMs }: { freshness: FlywheelFr
   );
 }
 
-const ATTENTION_TONE: Record<string, Tone> = { 'needs-you': 'warning', stuck: 'destructive', 'api-error': 'destructive' };
-
-/** A pane state is the machine's, not the operator's: only `blocked` is on them. */
-const PANE_STATE_TONE: Record<string, Tone> = { working: 'info', blocked: 'warning' };
-
-/** Shared link style for needs-you issue, PR and item-target links (PAN-5239 D6). */
-export const NEEDS_YOU_LINK_CLASS =
-  'cursor-pointer rounded-sm text-foreground underline decoration-muted-foreground/60 underline-offset-2 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
-
-/** True when the click ended a drag-selection inside the row, not a plain click (PAN-5275 FR-7). */
-function endsSelectionWithin(row: HTMLElement): boolean {
-  const selection = window.getSelection();
-  return !!selection && !selection.isCollapsed && !!selection.anchorNode && row.contains(selection.anchorNode);
-}
-
 /**
- * What the board is counting. A running loop's own tick list is the authority
- * on what it picked up; with no tick, the rows are just the workspace census
- * and the heading says so rather than implying the loop chose them.
+ * The board heading and the page header (D17): every in-flight card, then the
+ * Deploy and Done-today cards. The owner chip on each card says which ones the
+ * loop drives.
  */
-export function inFlightCountLabel(status: FlywheelDerivedStatus): string {
-  return status.inFlightSource === 'tick'
-    ? `${status.inFlight.filter((row) => row.inTick).length} in flight (loop)`
-    : `${status.inFlight.length} feature workspaces`;
-}
-
-export interface NeedsYouRow {
-  key: string;
-  text: string;
-  label: string;
-  target?: string;
-  messageId?: string;
-}
-
-/** One row per item; the server's first-raised id, when it sent one (PAN-5198, PAN-5239). */
-export function needsYouRows(tick: FlywheelLastTick): NeedsYouRow[] {
-  const items = tick.needsYouItems ?? splitNeedsYouItems(tick.needsYou).map((text) => ({ text }));
-  return items.map((item) => {
-    const messageId = 'firstRaisedMessageId' in item ? item.firstRaisedMessageId : undefined;
-    const { label, target } = parseNeedsYouTarget(item.text);
-    return { key: needsYouItemKey(item.text), text: item.text, label, ...(target ? { target } : {}), ...(messageId ? { messageId } : {}) };
-  });
+export function inFlightCountLabel(status: Pick<FlywheelDerivedStatus, 'inFlight' | 'shipped'>): string {
+  return `${status.inFlight.length} in flight · ${shippedCardCount(status)} shipped today`;
 }
 
 interface FlywheelStatusPaneProps {
@@ -105,6 +70,8 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
       {unreachable && (
         <p className="text-xs text-destructive" role="status">Can&apos;t reach the server — retrying. Showing the last status.</p>
       )}
+
+      {status.health && <FlywheelHealthStrip health={status.health} nowMs={nowMs} />}
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
         <dt className="text-muted-foreground">Run</dt>
@@ -150,226 +117,28 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
             <span className="text-xs text-muted-foreground" title={tick.at}>{formatAge(tick.at, nowMs)}</span>
             {status.freshness && status.run === 'running' && <FreshnessBadge freshness={status.freshness} at={tick.at} nowMs={nowMs} />}
           </div>
-          {needsYouRows(tick).length > 0 && (
-            <div
-              role="group"
-              aria-label="Needs you"
-              data-testid="flywheel-needs-you"
-              className="border-l-2 border-warning bg-warning/[0.08] px-3 py-2 text-sm text-foreground"
-            >
-              <span className="mr-2 text-[11px] font-medium uppercase tracking-wider text-warning-foreground">Needs you</span>
-              <ul>
-                {needsYouRows(tick).map((row) => {
-                  const jumpId = row.messageId;
-                  return (
-                    <li
-                      key={row.key}
-                      data-testid="flywheel-needs-you-item"
-                      className={
-                        jumpId
-                          ? 'group -mx-1 flex cursor-pointer items-baseline gap-1.5 rounded-sm px-1 hover:bg-[color-mix(in_srgb,var(--warning)_14%,transparent)]'
-                          : '-mx-1 flex items-baseline gap-1.5 px-1'
-                      }
-                      onClick={
-                        jumpId
-                          ? (e: MouseEvent<HTMLLIElement>) => {
-                              if (endsSelectionWithin(e.currentTarget)) return;
-                              onNeedsYouClick?.(jumpId);
-                            }
-                          : undefined
-                      }
-                    >
-                      {jumpId ? (
-                        <button
-                          type="button"
-                          aria-label="Show where this was raised"
-                          title="Open the conversation at the message that first raised this, or the question the flywheel is waiting on"
-                          data-testid="flywheel-needs-you-jump"
-                          className="shrink-0 self-center cursor-pointer rounded-sm text-muted-foreground hover:text-foreground group-hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onNeedsYouClick?.(jumpId);
-                          }}
-                        >
-                          <MessageSquare className="h-3 w-3" aria-hidden="true" />
-                        </button>
-                      ) : (
-                        // Keeps rows without a jump button in the same text column (PAN-5239 review).
-                        <span className="h-3 w-3 shrink-0" aria-hidden="true" />
-                      )}
-                      <span className="min-w-0">
-                        {row.target ? (
-                          <a
-                            href={row.target}
-                            target="_blank"
-                            rel="noreferrer noopener"
-                            className={NEEDS_YOU_LINK_CLASS}
-                            data-testid="flywheel-needs-you-link"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {row.label}
-                          </a>
-                        ) : (
-                          needsYouSegments(row.label, status.inFlight).map((segment, i) => {
-                            if (segment.kind === 'issue') {
-                              return (
-                                <button
-                                  key={i}
-                                  type="button"
-                                  className={`font-mono ${NEEDS_YOU_LINK_CLASS}`}
-                                  data-testid="flywheel-needs-you-issue"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onNavigateIssue?.(segment.issueId);
-                                  }}
-                                >
-                                  {segment.text}
-                                </button>
-                              );
-                            }
-                            if (segment.kind === 'pr') {
-                              return (
-                                <a
-                                  key={i}
-                                  href={segment.url}
-                                  target="_blank"
-                                  rel="noreferrer noopener"
-                                  className={`font-mono ${NEEDS_YOU_LINK_CLASS}`}
-                                  data-testid="flywheel-needs-you-pr"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  {segment.text}
-                                </a>
-                              );
-                            }
-                            return <span key={i}>{segment.text}</span>;
-                          })
-                        )}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
         </section>
       )}
 
+      <FlywheelNeedsYouCards
+        tick={tick}
+        inFlight={status.inFlight}
+        nowMs={nowMs}
+        onNavigateIssue={onNavigateIssue}
+        onNeedsYouClick={onNeedsYouClick}
+      />
+
       <section aria-label="In-flight issues">
-        <h3 className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        <h3 className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground" data-testid="flywheel-board-count">
           {inFlightCountLabel(status)}
         </h3>
-        {status.inFlight.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No feature workspaces in this project.</p>
-        ) : (
-          <table className="w-full text-xs">
-            <thead className="text-left text-muted-foreground">
-              <tr>
-                <th className="py-1 pr-2 font-medium">Issue</th>
-                <th className="py-1 pr-2 font-medium">State</th>
-                <th className="py-1 pr-2 font-medium">PR</th>
-                <th className="py-1 font-medium">Last journal</th>
-              </tr>
-            </thead>
-            <tbody>
-              {status.inFlight.map((row) => (
-                <tr
-                  key={row.issueId}
-                  className="border-t border-border/60 align-top"
-                  data-testid={`flywheel-inflight-${row.issueId}`}
-                  data-attention={row.attention}
-                >
-                  <td className="py-1.5 pr-2">
-                    <button
-                      type="button"
-                      className="whitespace-nowrap font-mono text-foreground hover:underline"
-                      onClick={() => onNavigateIssue?.(row.issueId)}
-                    >
-                      {row.issueId}
-                    </button>
-                    {row.title && (
-                      <span
-                        className="block max-w-[18rem] truncate text-muted-foreground"
-                        title={row.title}
-                        data-testid={`flywheel-title-${row.issueId}`}
-                      >
-                        {row.title}
-                      </span>
-                    )}
-                    {row.trackerUnknown && (
-                      <span className="mt-0.5 block">
-                        <StatusBadge tone="neutral" testId={`flywheel-tracker-unknown-${row.issueId}`}>tracker unknown</StatusBadge>
-                      </span>
-                    )}
-                    {row.strike && (
-                      <span className="mt-0.5 block">
-                        <StatusBadge tone="neutral" testId={`flywheel-strike-${row.issueId}`}>strike</StatusBadge>
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-1.5 pr-2">
-                    <span className="text-muted-foreground">{row.state}</span>
-                    {row.attention && (
-                      <span className="ml-1.5"><StatusBadge tone={ATTENTION_TONE[row.attention] ?? 'neutral'}>{row.attention}</StatusBadge></span>
-                    )}
-                    {/* `working` with no live pane is what a stalled issue looks like. */}
-                    {row.state === 'working' && row.liveAgents === 0 && (
-                      <span className="ml-1.5"><StatusBadge tone="neutral" testId={`flywheel-no-agent-${row.issueId}`}>no agent</StatusBadge></span>
-                    )}
-                    {row.inTick && (
-                      <span className="ml-1.5"><StatusBadge tone="info" testId={`flywheel-in-tick-${row.issueId}`}>flywheel</StatusBadge></span>
-                    )}
-                  </td>
-                  <td className="py-1.5 pr-2 text-muted-foreground">
-                    {row.pr ? (
-                      <a href={row.pr.url} target="_blank" rel="noreferrer" className="hover:underline">
-                        <span className="font-mono">#{row.pr.number}</span> · {row.pr.reviewState} · {row.pr.checks}
-                      </a>
-                    ) : '—'}
-                  </td>
-                  <td className="py-1.5 text-muted-foreground">
-                    {row.lastJournal ? (
-                      <span title={row.lastJournal.at}>
-                        <span className="font-mono">{row.lastJournal.type}</span> · {formatAge(row.lastJournal.at, nowMs)}
-                      </span>
-                    ) : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {status.inFlight.length === 0 && !status.shipped?.merges.length && (
+          <p className="mb-2 text-xs text-muted-foreground">No feature workspaces in this project.</p>
         )}
+        <FlywheelLaneBoard status={status} nowMs={nowMs} onNavigateIssue={onNavigateIssue} />
       </section>
 
-      <section aria-label="Live agents">
-        <h3 className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          Agents · {status.agents.length}
-        </h3>
-        {status.agents.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No agent panes are live for these issues.</p>
-        ) : (
-          <ul className="space-y-1 text-xs">
-            {status.agents.map((agent) => (
-              <li
-                key={`${agent.issueId}-${agent.role}-${agent.agentId ?? ''}`}
-                className="flex items-baseline gap-2"
-                data-testid={`flywheel-agent-${agent.issueId}-${agent.role}`}
-              >
-                <button
-                  type="button"
-                  className="whitespace-nowrap font-mono text-foreground hover:underline"
-                  onClick={() => onNavigateIssue?.(agent.issueId)}
-                >
-                  {agent.issueId}
-                </button>
-                <span className="text-muted-foreground">{agent.role}</span>
-                <span className="min-w-0 flex-1 truncate font-mono text-muted-foreground">{agent.model}</span>
-                <StatusBadge tone={PANE_STATE_TONE[agent.state] ?? 'neutral'}>{agent.state}</StatusBadge>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {status.shipped && <FlywheelShippedToday events={status.shipped.events} />}
     </div>
   );
 }

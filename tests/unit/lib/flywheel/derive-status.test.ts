@@ -25,6 +25,17 @@ vi.mock('../../../../src/lib/overdeck/derived-issue-state.js', () => ({
 
 const NOW = Date.parse('2026-09-23T10:00:00.000Z');
 
+/** The board fields of a backlog row nobody drives (PAN-5283). */
+const PLAN_ROW_BOARD = {
+  stage: 'plan',
+  stageSince: null,
+  owner: { kind: 'operator' },
+  agent: null,
+  blocker: null,
+  cost: null,
+  lastActivity: null,
+} as const;
+
 function conversation(overrides: Partial<LegacyConversation> = {}): LegacyConversation {
   return {
     id: 42,
@@ -57,6 +68,17 @@ function baseDeps(overrides: DeriveFlywheelStatusDeps = {}): DeriveFlywheelStatu
     listPanes: () => [],
     loadStates: async () => new Map(),
     lastJournal: () => null,
+    isAgentAlive: async () => true,
+    // PAN-5283: every board read stubbed so no test reads the host.
+    listIssueConversations: () => [],
+    readStartedBy: () => null,
+    issueCost: () => null,
+    readGateQueue: async () => ({ slots: 2, owners: [], waiters: [] }),
+    readMemory: async () => null,
+    softReserveBytes: () => 0,
+    readAutoMerge: () => null,
+    listWindowGenerations: () => [],
+    batchingPausedUntil: () => null,
     policies: () => ({ auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: false }),
     runningBook: () => null,
     now: () => NOW,
@@ -116,7 +138,7 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
     expect(status.conversation).toMatchObject({ name: 'conv-flywheel', id: 42, model: 'claude-opus-5-5', sessionAlive: true });
     expect(status.lastTick).toEqual({
       tick: 2, pick: 'PAN-2', phase: 'launch', inFlight: ['PAN-1', 'PAN-2'], needsYou: 'decide the scope', at: '2026-09-23T09:59:30.000Z',
-      needsYouItems: [{ text: 'decide the scope', firstRaisedTick: 2, firstRaisedAt: '2026-09-23T09:59:30.000Z' }],
+      needsYouItems: [{ text: 'decide the scope', firstRaisedTick: 2, firstRaisedAt: '2026-09-23T09:59:30.000Z', context: 'done.' }],
     });
     expect(status.freshness).toBe('live');
   });
@@ -132,7 +154,7 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
       }),
     });
     expect(status.lastTick?.needsYouItems).toEqual([
-      { text: 'merge PR #7', firstRaisedTick: 1, firstRaisedAt: '2026-09-23T09:00:00.000Z' },
+      { text: 'merge PR #7', firstRaisedTick: 1, firstRaisedAt: '2026-09-23T09:00:00.000Z', context: 'done.' },
     ]);
   });
 
@@ -185,8 +207,16 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
         liveAgents: 0,
         inTick: false,
         lastJournal: { at: '2026-09-23T09:58:00.000Z', type: 'review.dispatched', source: 'pan-done' },
+        // PAN-5283 board fields: an in-review row with nobody driving it.
+        stage: 'review',
+        stageSince: '2026-09-23T09:58:00.000Z',
+        owner: { kind: 'operator' },
+        agent: null,
+        blocker: { kind: 'agent-question', severity: 'needs-you', text: 'agent is waiting for your answer', action: 'answer-agent' },
+        cost: null,
+        lastActivity: { at: '2026-09-23T09:58:00.000Z', label: 'review started' },
       },
-      { issueId: 'PAN-2', title: null, state: 'backlog', trackerUnknown: true, liveAgents: 0, inTick: false, lastJournal: null },
+      { issueId: 'PAN-2', title: null, state: 'backlog', trackerUnknown: true, liveAgents: 0, inTick: false, lastJournal: null, ...PLAN_ROW_BOARD },
     ]);
   });
 
@@ -269,7 +299,7 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
         }),
       });
       expect(status.inFlight).toEqual([
-        { issueId: 'PAN-2', title: null, state: 'backlog', trackerUnknown: true, liveAgents: 0, inTick: false, lastJournal: null },
+        { issueId: 'PAN-2', title: null, state: 'backlog', trackerUnknown: true, liveAgents: 0, inTick: false, lastJournal: null, ...PLAN_ROW_BOARD },
       ]);
     });
 
@@ -397,6 +427,50 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
       });
       expect(status.agents.map((agent) => `${agent.issueId}/${agent.role}`))
         .toEqual(['PAN-1/work', 'PAN-2/review', 'PAN-2/work']);
+    });
+
+    it('a done pane whose agent is alive counts as a live agent', async () => {
+      const isAgentAlive = vi.fn(async () => true);
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [{ issueId: 'PAN-1', workspacePath: '/ws/feature-pan-1' }],
+          loadStates: async () => new Map<string, DerivedIssueState>([['PAN-1', { issueId: 'PAN-1', state: 'working' }]]),
+          listPanes: () => [{ ...pane('PAN-1', 'done'), agentId: 'agent-pan-1' }],
+          isAgentAlive,
+        }),
+      });
+      expect(isAgentAlive).toHaveBeenCalledWith('agent-pan-1');
+      expect(status.inFlight[0]?.liveAgents).toBe(1);
+      expect(status.agents).toEqual([
+        { issueId: 'PAN-1', role: 'work', harness: 'claude-code', model: 'claude-opus-5-5', state: 'done', agentId: 'agent-pan-1' },
+      ]);
+    });
+
+    it('a done pane whose agent is dead is excluded', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [{ issueId: 'PAN-1', workspacePath: '/ws/feature-pan-1' }],
+          loadStates: async () => new Map<string, DerivedIssueState>([['PAN-1', { issueId: 'PAN-1', state: 'working' }]]),
+          listPanes: () => [pane('PAN-1', 'done')],
+          isAgentAlive: async () => false,
+        }),
+      });
+      expect(status.inFlight[0]?.liveAgents).toBe(0);
+      expect(status.agents).toEqual([]);
+    });
+
+    it('an exited pane is excluded without a probe', async () => {
+      const isAgentAlive = vi.fn(async () => true);
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [{ issueId: 'PAN-1', workspacePath: '/ws/feature-pan-1' }],
+          loadStates: async () => new Map<string, DerivedIssueState>([['PAN-1', { issueId: 'PAN-1', state: 'working' }]]),
+          listPanes: () => [pane('PAN-1', 'exited'), pane('PAN-1', 'working', 'review')],
+          isAgentAlive,
+        }),
+      });
+      expect(isAgentAlive).not.toHaveBeenCalled();
+      expect(status.inFlight[0]?.liveAgents).toBe(1);
     });
   });
 
@@ -643,3 +717,127 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
     expect(Object.keys(spies).every((key) => !/^(set|write|create|mark|append|delete)/.test(key))).toBe(true);
   });
 });
+
+describe('board fields (PAN-5283 WI-5)', () => {
+  const working = async () => new Map<string, DerivedIssueState>([['PAN-1', { issueId: 'PAN-1', state: 'working' }]]);
+  const ws = () => [{ issueId: 'PAN-1', workspacePath: '/ws/feature-pan-1' }];
+
+  function handoff(overrides: Partial<LegacyConversation> = {}): LegacyConversation {
+    return conversation({
+      id: 7,
+      name: '20261114-d9c5',
+      tmuxSession: 'conv-20261114-d9c5',
+      title: 'Handoff for PAN-1',
+      cwd: '/home/u/Projects/hoff-pan-1',
+      issueId: 'PAN-1',
+      totalCost: 0,
+      ...overrides,
+    } as Partial<LegacyConversation>);
+  }
+
+  it('a row whose gate is queued shows the gate-queue blocker and a waiting agent', async () => {
+    const waiter = { workspacePath: '/ws/feature-pan-1', gateName: 'tsc:tsconfig.json', createdAt: NOW - 20 * 60_000, footprintBytes: 2.2 * 1024 ** 3 };
+    const status = await deriveFlywheelStatus({
+      deps: baseDeps({
+        listWorkspaces: ws,
+        loadStates: working,
+        readGateQueue: async () => ({ slots: 2, owners: [], waiters: [waiter] }),
+        readMemory: async () => ({ memAvailableBytes: 11.5 * 1024 ** 3, memTotalBytes: 64 * 1024 ** 3 }),
+        softReserveBytes: () => 12 * 1024 ** 3,
+      }),
+    });
+    const row = status.inFlight[0]!;
+    expect(row.stage).toBe('checks');
+    expect(row.blocker).toEqual({
+      kind: 'gate-queue',
+      severity: 'waiting',
+      text: 'typecheck queued: 11.5 GB free, needs 2.2 GB, gates keep 12.0 GB (20 min)',
+    });
+    expect(row.agent?.state).toBe('waiting');
+    expect(row.stageSince).toBe(new Date(NOW - 20 * 60_000).toISOString());
+  });
+
+  it('a handoff conversation is the issue\'s agent', async () => {
+    const status = await deriveFlywheelStatus({
+      deps: baseDeps({
+        listWorkspaces: ws,
+        loadStates: working,
+        listIssueConversations: (id) => (id === 'PAN-1' ? [handoff()] : []),
+        readStartedBy: () => 'operator:cli',
+      }),
+    });
+    const row = status.inFlight[0]!;
+    expect(row.agent).toMatchObject({ role: 'handoff', conversationName: '20261114-d9c5', model: 'claude-opus-5-5' });
+    expect(row.owner).toEqual({ kind: 'conversation', name: '20261114-d9c5', title: 'Handoff for PAN-1' });
+    expect(row.blocker).toBeNull();
+  });
+
+  it('a waiter in a hoff worktree maps to its issue through the conversation cwd', async () => {
+    const waiter = { workspacePath: '/home/u/Projects/hoff-pan-1', gateName: 'vitest', createdAt: NOW - 5 * 60_000 };
+    const status = await deriveFlywheelStatus({
+      deps: baseDeps({
+        listWorkspaces: ws,
+        loadStates: working,
+        listIssueConversations: () => [handoff()],
+        readGateQueue: async () => ({ slots: 2, owners: [], waiters: [waiter] }),
+      }),
+    });
+    expect(status.inFlight[0]!.blocker).toEqual({ kind: 'gate-queue', severity: 'waiting', text: 'tests queued: waiting for CPU to settle (5 min)' });
+  });
+
+  it('an issue with no live agent in build shows the no-agent blocker', async () => {
+    const status = await deriveFlywheelStatus({ deps: baseDeps({ listWorkspaces: ws, loadStates: working }) });
+    const row = status.inFlight[0]!;
+    expect(row.stage).toBe('build');
+    expect(row.agent).toBeNull();
+    expect(row.blocker).toEqual({ kind: 'no-agent', severity: 'stuck', text: 'no agent running' });
+  });
+
+  it('rows carry cost from the aggregate and fall back to conversation cost', async () => {
+    const run = (issueCost: () => number | null) => deriveFlywheelStatus({
+      deps: baseDeps({
+        listWorkspaces: ws,
+        loadStates: working,
+        issueCost,
+        listIssueConversations: () => [handoff({ totalCost: 0.21 }), handoff({ name: 'b', totalCost: 0.25 })],
+      }),
+    });
+    expect((await run(() => 4.12)).inFlight[0]!.cost).toBe(4.12);
+    expect((await run(() => 0)).inFlight[0]!.cost).toBeCloseTo(0.46);
+  });
+
+  it('a board read that throws leaves the status intact with that fact unknown', async () => {
+    const status = await deriveFlywheelStatus({
+      deps: baseDeps({
+        listWorkspaces: ws,
+        loadStates: working,
+        readGateQueue: async () => { throw new Error('admission dir unreadable'); },
+        listIssueConversations: () => { throw new Error('db locked'); },
+        issueCost: () => { throw new Error('db locked'); },
+        journalTail: () => { throw new Error('torn journal'); },
+      }),
+    });
+    const row = status.inFlight[0]!;
+    expect(row.cost).toBeNull();
+    expect(row.lastActivity).toBeNull();
+    expect(row.lastJournal).toBeNull();
+    expect(row.blocker?.kind).toBe('no-agent');
+  });
+
+  it('a pending auto-merge row puts the card in merge with its time', async () => {
+    const status = await deriveFlywheelStatus({
+      deps: baseDeps({
+        listWorkspaces: ws,
+        loadStates: async () => new Map<string, DerivedIssueState>([['PAN-1', { issueId: 'PAN-1', state: 'ready' }]]),
+        readAutoMerge: () => ({
+          id: 1, issueId: 'PAN-1', prUrl: 'u', projectKey: 'overdeck', forge: 'github', status: 'cancelled',
+          scheduledMergeAt: '2026-09-23T10:30:00.000Z', scheduledAt: '2026-09-23T09:30:00.000Z',
+        }),
+      }),
+    });
+    // The newest row is cancelled, so it does not pin the card.
+    expect(status.inFlight[0]!.stage).toBe('merge');
+    expect(status.inFlight[0]!.blocker).toBeNull();
+  });
+});
+

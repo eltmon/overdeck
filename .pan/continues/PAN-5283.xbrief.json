@@ -1,0 +1,373 @@
+{
+  "version": "1",
+  "issueId": "PAN-5283",
+  "created": "2026-11-14T19:04:13.506Z",
+  "updated": "2026-11-14T20:40:20.061Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-contract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T19:04:13.506Z",
+      "doneAt": "2026-11-14T19:06:25.210Z"
+    },
+    "wi1-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:06:25.210Z"
+    },
+    "wi1-contract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:06:25.210Z"
+    },
+    "wi1-contract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:06:25.210Z"
+    },
+    "wi2-gate-queue-snapshot": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T19:06:32.559Z",
+      "doneAt": "2026-11-14T19:17:48.083Z"
+    },
+    "wi2-gate-queue-snapshot.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:17:48.083Z"
+    },
+    "wi2-gate-queue-snapshot.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:17:48.083Z"
+    },
+    "wi2-gate-queue-snapshot.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:17:48.083Z"
+    },
+    "wi3-liveness-fix": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T19:17:49.720Z",
+      "doneAt": "2026-11-14T19:18:16.168Z"
+    },
+    "wi3-liveness-fix.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:18:16.168Z"
+    },
+    "wi3-liveness-fix.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:18:16.168Z"
+    },
+    "wi3-liveness-fix.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:18:16.168Z"
+    },
+    "wi4-board-derivations": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T19:18:22.730Z",
+      "doneAt": "2026-11-14T19:20:01.240Z"
+    },
+    "wi4-board-derivations.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:20:01.240Z"
+    },
+    "wi4-board-derivations.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:20:01.240Z"
+    },
+    "wi4-board-derivations.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:20:01.240Z"
+    },
+    "wi4-board-derivations.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:20:01.240Z"
+    },
+    "wi4-board-derivations.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:20:01.240Z"
+    },
+    "wi6-batch-pause-until": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T19:20:03.076Z",
+      "doneAt": "2026-11-14T19:21:33.514Z"
+    },
+    "wi6-batch-pause-until.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:21:33.514Z"
+    },
+    "wi6-batch-pause-until.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:21:33.514Z"
+    },
+    "wi7-needs-you-context": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T19:21:34.982Z",
+      "doneAt": "2026-11-14T19:25:37.993Z"
+    },
+    "wi7-needs-you-context.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:25:37.993Z"
+    },
+    "wi7-needs-you-context.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:25:37.993Z"
+    },
+    "wi7-needs-you-context.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:25:37.993Z"
+    },
+    "wi10-cli-blocker": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T19:25:45.182Z",
+      "doneAt": "2026-11-14T19:28:10.448Z"
+    },
+    "wi10-cli-blocker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:28:10.448Z"
+    },
+    "wi10-cli-blocker.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:28:10.448Z"
+    },
+    "wi5-wire-board": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T20:07:34.327Z",
+      "doneAt": "2026-11-14T20:08:01.590Z"
+    },
+    "wi5-wire-board.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:08:01.590Z"
+    },
+    "wi5-wire-board.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:08:01.590Z"
+    },
+    "wi5-wire-board.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:08:01.590Z"
+    },
+    "wi5-wire-board.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:08:01.590Z"
+    },
+    "wi5-wire-board.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:08:01.590Z"
+    },
+    "wi11-mockup": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T20:09:50.977Z",
+      "doneAt": "2026-11-14T20:10:19.780Z"
+    },
+    "wi11-mockup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:10:19.780Z"
+    },
+    "wi11-mockup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:10:19.780Z"
+    },
+    "wi8-health-deriver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T20:14:39.033Z",
+      "doneAt": "2026-11-14T20:15:03.394Z"
+    },
+    "wi8-health-deriver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:15:03.394Z"
+    },
+    "wi8-health-deriver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:15:03.394Z"
+    },
+    "wi8-health-deriver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:15:03.394Z"
+    },
+    "wi8-health-deriver.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:15:03.394Z"
+    },
+    "wi8-health-deriver.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:15:03.394Z"
+    },
+    "wi9-route-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T20:15:26.678Z",
+      "doneAt": "2026-11-14T20:15:56.201Z"
+    },
+    "wi9-route-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:15:56.201Z"
+    },
+    "wi9-route-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:15:56.201Z"
+    },
+    "wi12-lane-board": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T20:16:17.400Z",
+      "doneAt": "2026-11-14T20:16:39.843Z"
+    },
+    "wi12-lane-board.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:16:39.843Z"
+    },
+    "wi12-lane-board.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:16:39.843Z"
+    },
+    "wi12-lane-board.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:16:39.843Z"
+    },
+    "wi12-lane-board.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:16:39.843Z"
+    },
+    "wi12-lane-board.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:16:39.843Z"
+    },
+    "wi14-health-strip": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T20:16:42.128Z",
+      "doneAt": "2026-11-14T20:17:05.816Z"
+    },
+    "wi14-health-strip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:17:05.816Z"
+    },
+    "wi14-health-strip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:17:05.816Z"
+    },
+    "wi14-health-strip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:17:05.816Z"
+    },
+    "wi14-health-strip.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:17:05.816Z"
+    },
+    "wi15-shipped-today": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T20:17:07.263Z",
+      "doneAt": "2026-11-14T20:17:27.105Z"
+    },
+    "wi15-shipped-today.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:17:27.105Z"
+    },
+    "wi15-shipped-today.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:17:27.105Z"
+    },
+    "wi15-shipped-today.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:17:27.105Z"
+    },
+    "wi13-needs-you-cards": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T20:27:11.555Z",
+      "doneAt": "2026-11-14T20:27:32.058Z"
+    },
+    "wi13-needs-you-cards.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:27:32.058Z"
+    },
+    "wi13-needs-you-cards.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:27:32.058Z"
+    },
+    "wi13-needs-you-cards.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:27:32.058Z"
+    },
+    "wi13-needs-you-cards.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:27:32.058Z"
+    },
+    "wi13-needs-you-cards.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:27:32.058Z"
+    },
+    "wi16-compose-status-tab": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T20:35:06.965Z",
+      "doneAt": "2026-11-14T20:35:26.460Z"
+    },
+    "wi16-compose-status-tab.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:35:26.460Z"
+    },
+    "wi16-compose-status-tab.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:35:26.460Z"
+    },
+    "wi16-compose-status-tab.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:35:26.460Z"
+    },
+    "wi16-compose-status-tab.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:35:26.460Z"
+    },
+    "wi17-playwright-screens": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T20:39:30.381Z",
+      "doneAt": "2026-11-14T20:39:48.894Z"
+    },
+    "wi17-playwright-screens.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:39:48.894Z"
+    },
+    "wi17-playwright-screens.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:39:48.894Z"
+    },
+    "wi17-playwright-screens.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:39:48.894Z"
+    },
+    "wi18-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T20:40:02.236Z",
+      "doneAt": "2026-11-14T20:40:20.061Z"
+    },
+    "wi18-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:40:20.061Z"
+    },
+    "wi18-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:40:20.061Z"
+    },
+    "wi18-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:40:20.061Z"
+    },
+    "wi18-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:40:20.061Z"
+    }
+  }
+}

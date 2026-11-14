@@ -1,67 +1,75 @@
 import { useEffect } from 'react'
 import { usePanesStore, type WorkspaceId } from '../../lib/panesStore'
 import { useTerminalStateStore, selectThreadTerminalState } from '../terminal/terminalStateStore'
+import { registerShortcut, type ShortcutDef } from '../../lib/shortcuts/registry'
 
-/** True when focus is in a text-entry context where the Launcher / fields own
- * the keyboard (so the Stage must not hijack ⌘-combos). */
-function isTextEntryFocused(): boolean {
-  const el = document.activeElement as HTMLElement | null
-  if (!el) return false
-  const tag = el.tagName
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable
-}
+const TAB_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const
 
-/**
- * useStageShortcuts — Stage keyboard map (PAN-1549). Active only while mounted:
- *  ⌘1   focus HOME (index 0)
- *  ⌘2–9 focus pane N (no-op if absent)
- *  ⌘T   open a new pane
- *  ⌘W   close the active pane (never HOME)
- *
- * Shortcuts are suppressed while a text input / the Launcher is focused; the
- * ⌘↵ Launcher family is intentionally not handled here.
- */
-export function useStageShortcuts(workspaceId: WorkspaceId): void {
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (!e.metaKey) return
-      if (e.altKey || e.ctrlKey || e.shiftKey) return // leave ⌥/⌃/⇧ combos (Launcher etc.) alone
-      if (isTextEntryFocused()) return
-
-      const store = usePanesStore.getState()
-      const panes = store.panesByWorkspace[workspaceId] ?? []
-
-      // ⌘1..⌘9 — focus pane by index.
-      if (/^[1-9]$/.test(e.key)) {
-        const index = Number(e.key) - 1
-        const pane = panes[index]
-        if (pane) {
-          e.preventDefault()
-          store.setActivePane(workspaceId, pane.paneId)
-        }
-        return
-      }
-
-      const key = e.key.toLowerCase()
-      if (key === 't') {
-        // PAN-1561: ⌘T toggles the terminal drawer (terminals are drawer-only,
-        // not deck tabs).
-        e.preventDefault()
+function stageShortcuts(workspaceId: WorkspaceId): ShortcutDef[] {
+  const panes = () => usePanesStore.getState().panesByWorkspace[workspaceId] ?? []
+  const focusTabs = TAB_NUMBERS.map(
+    (n): ShortcutDef => ({
+      id: `stage.focus-tab-${n}`,
+      keys: { mac: `Meta+${n}`, other: `Ctrl+Alt+${n}` },
+      scope: 'not-editing',
+      label: 'Go to tab 1–9',
+      group: 'Tabs',
+      hidden: n > 1,
+      when: () => panes()[n - 1] !== undefined,
+      run: () => {
+        const pane = panes()[n - 1]
+        if (pane) usePanesStore.getState().setActivePane(workspaceId, pane.paneId)
+      },
+    }),
+  )
+  return [
+    ...focusTabs,
+    {
+      id: 'stage.close-tab',
+      keys: { mac: 'Meta+W', other: 'Ctrl+Alt+W' },
+      scope: 'not-editing',
+      label: 'Close tab',
+      group: 'Tabs',
+      when: () => !!usePanesStore.getState().activePaneByWorkspace[workspaceId],
+      run: () => {
+        const store = usePanesStore.getState()
+        const activeId = store.activePaneByWorkspace[workspaceId]
+        if (activeId) store.closePane(workspaceId, activeId) // refuses HOME internally
+      },
+    },
+    {
+      // PAN-1561: terminals are drawer-only, not deck tabs. Unbound off macOS,
+      // where Windows and GNOME take Super+T (PAN-5287 S-D6).
+      id: 'stage.toggle-terminal',
+      keys: { mac: 'Meta+T', other: null },
+      scope: 'not-editing',
+      label: 'Toggle terminal',
+      group: 'Tabs',
+      run: () => {
         const tStore = useTerminalStateStore.getState()
         const open = selectThreadTerminalState(tStore.terminalStateByThreadId, workspaceId).terminalOpen
         tStore.setTerminalOpen(workspaceId, !open)
-        return
-      }
-      if (key === 'w') {
-        const activeId = store.activePaneByWorkspace[workspaceId]
-        if (activeId) {
-          e.preventDefault()
-          store.closePane(workspaceId, activeId) // refuses HOME internally
-        }
-      }
-    }
+      },
+    },
+  ]
+}
 
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+/**
+ * useStageShortcuts — Stage keyboard map (PAN-1549, PAN-5287), registered with
+ * the shortcut registry while mounted:
+ *  ⌘1..9 (Ctrl+Alt+1..9 off macOS)  focus pane N (no-op if absent)
+ *  ⌘W    (Ctrl+Alt+W off macOS)     close the active pane (never HOME)
+ *  ⌘T    (macOS only)               toggle the terminal drawer
+ *
+ * They are `not-editing` shortcuts, so a focused text field, terminal or code
+ * editor keeps the keys. Chrome never delivers Ctrl+1..9 or Ctrl+W to the page
+ * on Linux and Windows, hence Ctrl+Alt there.
+ */
+export function useStageShortcuts(workspaceId: WorkspaceId): void {
+  useEffect(() => {
+    const unregister = stageShortcuts(workspaceId).map(registerShortcut)
+    return () => {
+      for (const off of unregister) off()
+    }
   }, [workspaceId])
 }

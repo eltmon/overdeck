@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { EmergencyStopOverlay } from './EmergencyStopOverlay';
+import { installShortcutListener, resetShortcutsForTests } from '../lib/shortcuts/registry';
 
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
@@ -14,12 +15,14 @@ vi.mock('sonner', () => ({
 }));
 
 function pressChord() {
-  // Cmd/Ctrl + Shift + . — fire both modifier flags so the test passes on either platform.
-  fireEvent.keyDown(document, { key: '.', code: 'Period', metaKey: true, ctrlKey: true, shiftKey: true });
+  // The current platform's modifier only: ⌘⇧. on macOS, Ctrl+Shift+. elsewhere.
+  const mac = navigator.platform.includes('Mac');
+  fireEvent.keyDown(document, { key: '>', code: 'Period', metaKey: mac, ctrlKey: !mac, shiftKey: true });
 }
 
 describe('EmergencyStopOverlay', () => {
   beforeEach(() => {
+    installShortcutListener();
     toastSuccess.mockClear();
     toastError.mockClear();
     toastWarning.mockClear();
@@ -30,7 +33,26 @@ describe('EmergencyStopOverlay', () => {
   });
 
   afterEach(() => {
+    resetShortcutsForTests();
     vi.restoreAllMocks();
+  });
+
+  it('opens on Ctrl+Shift+. on Linux and not on ⌘⇧. there (PAN-5287)', () => {
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue('Linux x86_64');
+    render(<EmergencyStopOverlay />);
+    fireEvent.keyDown(document, { key: '>', code: 'Period', metaKey: true, shiftKey: true });
+    expect(screen.queryByText(/Emergency STOP — kill all agents\?/)).not.toBeInTheDocument();
+    fireEvent.keyDown(document, { key: '>', code: 'Period', ctrlKey: true, shiftKey: true });
+    expect(screen.getByText(/Emergency STOP — kill all agents\?/)).toBeInTheDocument();
+  });
+
+  it('opens on ⌘⇧. on macOS, even with focus in a text field', () => {
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel');
+    render(<><EmergencyStopOverlay /><input data-testid="field" /></>);
+    const field = screen.getByTestId('field');
+    field.focus();
+    fireEvent.keyDown(field, { key: '>', code: 'Period', metaKey: true, shiftKey: true });
+    expect(screen.getByText(/Emergency STOP — kill all agents\?/)).toBeInTheDocument();
   });
 
   it('does not render the dialog until the hotkey is pressed', () => {

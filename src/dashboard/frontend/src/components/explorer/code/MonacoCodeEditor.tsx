@@ -6,7 +6,9 @@
  * css/html/json/typescript language services) stays out of every other
  * chunk. TypeScript and JavaScript show syntax errors only (no project
  * context exists for semantic checks). Keybindings are registered per editor with `addAction`, never
- * `addCommand` (global across editors) or a window listener.
+ * `addCommand` (global across editors). App-level shortcuts go through
+ * lib/shortcuts/registry.ts, whose capture-phase listener runs before Monaco
+ * and wins over it (PAN-5287).
  */
 import Editor, { type OnMount } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js'

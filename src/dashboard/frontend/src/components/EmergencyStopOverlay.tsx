@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { StopCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { useShortcut, type ShortcutDef } from '../lib/shortcuts/registry';
 
 /**
  * Global emergency-STOP hotkey. `Cmd/Ctrl + Shift + .` opens a confirm; confirming
@@ -63,18 +64,20 @@ export function EmergencyStopOverlay() {
   const [busy, setBusy] = useState(false);
 
   // Arm: Cmd/Ctrl + Shift + . — works from anywhere, including inputs (it's a panic
-  // key; never gate it behind "not typing").
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const mod = IS_MAC ? e.metaKey : e.ctrlKey;
-      if (mod && e.shiftKey && (e.code === 'Period' || e.key === '.' || e.key === '>')) {
-        e.preventDefault();
-        setOpen(true);
-      }
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, []);
+  // key; never gate it behind "not typing"), so it is a global registry shortcut.
+  useShortcut(
+    useMemo(
+      (): ShortcutDef => ({
+        id: 'safety.emergency-stop',
+        keys: { mac: 'Meta+Shift+.', other: 'Ctrl+Shift+.' },
+        scope: 'global',
+        label: 'Emergency stop',
+        group: 'Safety',
+        run: () => setOpen(true),
+      }),
+      [],
+    ),
+  );
 
   // Also open when a visible affordance (app-bar STOP button) requests it.
   useEffect(() => {

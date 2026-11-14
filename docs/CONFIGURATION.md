@@ -575,6 +575,60 @@ automatically with the dashboard — no manual installation needed.
 - **Direct APIs** (Kimi, GLM, MiniMax, MiMo): Use `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` ← Simpler, less overhead
 - **Incompatible APIs** (OpenAI, Gemini): Use CLIProxy sidecar ← Handles auth bridging and API translation
 
+#### CLIProxy configuration (v8)
+
+Overdeck pins CLIProxy `v8.0.71` and writes `~/.overdeck/cliproxy/config.yaml` in
+the v8 layout (`config-version: 8`) on every start. Overdeck owns that file and
+keeps it at mode 0600, so put your own settings in
+`~/.overdeck/cliproxy/config.extra.yaml` instead.
+
+- **Your additions:** Overdeck parses `config.extra.yaml` as YAML and deep-merges it
+  over the generated config. Your values win on conflicts, except that Overdeck's
+  own client key always stays in `access.api-keys`. Legacy v7 keys are converted
+  in memory, and your file is never edited: `host`/`port` → `server.*`,
+  `remote-management` → `management`, a list-shaped `api-keys` → `access.api-keys`,
+  `request-retry`/`max-retry-interval` → `routing.retry.*`, `debug` →
+  `observability.logs.debug`, `proxy-url` → `requests.proxy-url`, `auth-dir`,
+  `oauth-model-alias` and `oauth-excluded-models` → `oauth.auth-dir`,
+  `oauth.model-alias` and `oauth.excluded-models`. If the file is not valid YAML,
+  or is not a mapping, Overdeck logs a warning, ignores it, and starts the proxy
+  anyway.
+- **Management API:** on, localhost only (`management.allow-remote: false`). The
+  plaintext key is in `~/.overdeck/cliproxy/management-key` (mode 0600). Overdeck
+  creates the file with a random key when it is missing. CLIProxy replaces the
+  plaintext key in `config.yaml` with a bcrypt hash when it starts, so read the
+  key from `management-key`, not from `config.yaml`.
+- **Session affinity:** on, with a 1-hour TTL (`routing.session-affinity`,
+  `routing.session-affinity-ttl`), so a conversation stays on one account.
+- **Claude accounts never serve Codex aliases:** Overdeck adds every alias under
+  `oauth.model-alias.codex` to `oauth.excluded-models.claude`, so a name such as
+  `claude-opus-4-6` that you aliased to a Codex model always goes to Codex. To let
+  a Claude account serve one of those names, remove that alias from
+  `config.extra.yaml`.
+
+**Upgrading:** run `pan restart --cliproxy` once after you update Overdeck. A
+dashboard reload does not restart a running proxy, so an older proxy keeps
+running until you do. Then list the models the proxy serves:
+
+```bash
+curl -s -H "Authorization: Bearer overdeck-local-cliproxy-key" http://127.0.0.1:8317/v1/models
+```
+
+v8 hides an alias whose upstream model is not in the account's catalog. If an
+alias you rely on is missing, point it at a listed model in `config.extra.yaml`.
+
+**Rotating the management key:** set `management.secret-key` in
+`config.extra.yaml`, or delete `~/.overdeck/cliproxy/management-key` and run
+`pan restart --cliproxy` so Overdeck generates a new key. Editing `management-key`
+by hand does not take effect while `config.yaml` holds the hash of the old key.
+
+**Adding a Claude account:** run the command below, open the printed URL in a
+browser on the same machine, and finish the sign-in.
+
+```bash
+~/.overdeck/bin/cliproxy -config ~/.overdeck/cliproxy/config.yaml -claude-login -no-browser
+```
+
 ### Important Notes
 
 - This configures **Claude Code** (the CLI tool), not Overdeck's agent routing
