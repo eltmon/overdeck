@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5237",
   "created": "2026-11-14T04:16:13.968Z",
-  "updated": "2026-11-14T05:00:12.078Z",
+  "updated": "2026-11-14T05:11:42.829Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,9 +160,26 @@
       "doneAt": "2026-11-14T05:00:10.633Z"
     },
     "composer-restore-target": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5237",
-      "claimedAt": "2026-11-14T05:00:12.078Z"
+      "claimedAt": "2026-11-14T05:00:12.078Z",
+      "doneAt": "2026-11-14T05:11:42.829Z"
+    },
+    "composer-restore-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:11:42.829Z"
+    },
+    "composer-restore-target.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:11:42.829Z"
+    },
+    "composer-restore-target.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:11:42.829Z"
+    },
+    "composer-restore-target.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:11:42.829Z"
     }
   }
 }
