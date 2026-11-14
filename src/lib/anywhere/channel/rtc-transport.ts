@@ -29,7 +29,7 @@ import type { SignalData } from '@overdeck/contracts';
 import { RTCPeerConnection, type RTCDataChannel } from 'werift';
 
 import { anywhereDebug, shortId } from '../debug-log.js';
-import { relayIceServers, type RTCIceServerLike } from './relay-ice-servers.js';
+import { relayIceServers, turnUrlRank, type RTCIceServerLike } from './relay-ice-servers.js';
 import { RtcDuplex } from './rtc-duplex.js';
 
 export type { RTCIceServerLike } from './relay-ice-servers.js';
@@ -110,6 +110,23 @@ export class CandidateTally {
     const { host, srflx, relay } = this.counts;
     return `${this.total} (host ${host}, srflx ${srflx}, relay ${relay})`;
   }
+}
+
+export const NO_RELAY_CANDIDATE_CAUSE = 'no-relay-candidate';
+
+/** The relay leg gathered no TURN relay candidate (PAN-5242). */
+export function isNoRelayCandidate(error: unknown): boolean {
+  return error instanceof ChannelOpenError && error.detail.cause === NO_RELAY_CANDIDATE_CAUSE;
+}
+
+/** The first TURN URL in an ICE list: the one werift uses after `relayIceServers` ordering. */
+export function firstTurnUrl(servers: readonly RTCIceServerLike[]): string | null {
+  for (const server of servers) {
+    for (const url of Array.isArray(server.urls) ? server.urls : [server.urls]) {
+      if (turnUrlRank(url) !== null) return url;
+    }
+  }
+  return null;
 }
 
 interface PeerEntry {
@@ -212,6 +229,15 @@ export class RtcTransport {
         throw error;
       }
       this.log(`rtc session ${shortId(entry.session)} offer to ${shortId(peer)} (${routeOf(relay)}): gathered ${entry.gathered.format()}`);
+      const turnUrl = relay ? firstTurnUrl(iceServers) : null;
+      if (turnUrl !== null && entry.gathered.counts.relay === 0) {
+        this.closeEntry(entry);
+        throw new ChannelOpenError(
+          'unreachable',
+          `relay connection: gathered no TURN relay candidate from ${turnUrl}; the TURN server could not be reached from this host or refused the allocation`,
+          { cause: NO_RELAY_CANDIDATE_CAUSE },
+        );
+      }
       this.sendLocalDescription(entry, 'offer');
       return { entry, channel };
     } catch (error) {

@@ -9,7 +9,15 @@ import { ChannelOpenError } from '@overdeck/anywhere-channel';
 import type { SignalData } from '@overdeck/contracts';
 import { Candidate, RTCPeerConnection } from 'werift';
 
-import { CandidateTally, candidateKind, RtcDialAbortedError, type RtcPurpose, type RtcSignalingPort, RtcTransport } from '../rtc-transport.js';
+import {
+  CandidateTally,
+  candidateKind,
+  isNoRelayCandidate,
+  RtcDialAbortedError,
+  type RtcPurpose,
+  type RtcSignalingPort,
+  RtcTransport,
+} from '../rtc-transport.js';
 
 const A = '00000000-0000-4000-8000-00000000000a';
 const B = '00000000-0000-4000-8000-00000000000b';
@@ -334,6 +342,43 @@ describe('RtcTransport candidate tallies (PAN-5242 WI-2)', () => {
     expect(bLines).toContainEqual(expect.stringMatching(/^rtc session [0-9a-f]{8} answered$/));
     expect([...aLines, ...bLines]).toContainEqual(expect.stringMatching(/ connected \(direct; gathered \d+ \(host /));
   }, 20_000);
+});
+
+describe('RtcTransport relay fail-fast (PAN-5242 WI-3)', () => {
+  it('fails a relay dial at once when it gathers no relay candidate', async () => {
+    const h = hub();
+    const a = new RtcTransport(h.port(A, async () => [{ urls: ['turn:127.0.0.1:1?transport=tcp'], username: 'u', credential: 'p' }]), () => undefined);
+    transports.push(a);
+    const error = await a
+      .dial(B, { relay: true, purpose: 'link', signal: new AbortController().signal })
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ChannelOpenError);
+    expect((error as ChannelOpenError).code).toBe('unreachable');
+    expect(isNoRelayCandidate(error)).toBe(true);
+    expect((error as Error).message).toContain('turn:127.0.0.1:1?transport=tcp');
+    expect(h.sent.some((frame) => frame.data.sdp)).toBe(false);
+    expect(a.peerConnectionCount()).toBe(0);
+  }, 5_000);
+
+  it('does not fail fast when the relay list has no TURN URL', async () => {
+    const h = hub();
+    const a = new RtcTransport(h.port(A), () => undefined);
+    transports.push(a);
+    const noAnswer = 'cccccccc-0000-4000-8000-00000000000c';
+    const controller = new AbortController();
+    const dial = a.dial(noAnswer, { relay: true, purpose: 'link', signal: controller.signal }).catch((error: unknown) => error);
+    await vi.waitFor(() => expect(h.sent.some((frame) => frame.data.sdp?.type === 'offer')).toBe(true));
+    controller.abort();
+    const error = await dial;
+    expect(error).toBeInstanceOf(RtcDialAbortedError);
+    expect(isNoRelayCandidate(error)).toBe(false);
+  }, 20_000);
+
+  it('recognizes only the no-relay-candidate cause', () => {
+    expect(isNoRelayCandidate(new Error('x'))).toBe(false);
+    expect(isNoRelayCandidate(new ChannelOpenError('unreachable', 'x'))).toBe(false);
+    expect(isNoRelayCandidate(new ChannelOpenError('unreachable', 'x', { cause: 'no-relay-candidate' }))).toBe(true);
+  });
 });
 
 describe('RtcTransport ICE restart (PAN-5046 FR-6)', () => {
