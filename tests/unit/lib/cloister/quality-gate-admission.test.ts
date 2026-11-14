@@ -29,6 +29,7 @@ import {
   acquireQualityGateAdmission,
   QualityGateAdmissionTimeoutError,
   readQualityGateAdmissionOwnerPids,
+  readQualityGateAdmissionQueue,
   sampleQualityGatePressure,
   type QualityGateAdmissionDeps,
   type QualityGatePressureSample,
@@ -676,7 +677,7 @@ describe('memory admission (PAN-5248)', () => {
     }, { onWaiting }))
     const settled = settledFlag(promise)
 
-    await drive(15)
+    await drive(40, () => reads > 2)
     expect(reads).toBeGreaterThan(2)
     expect(settled()).toBe(false)
     expect(ownerFiles(rootDir)).toEqual([])
@@ -738,6 +739,226 @@ describe('memory admission (PAN-5248)', () => {
     expect(existsSync(join(unkeyedRoot, 'footprints'))).toBe(false)
     await unkeyed.release()
   })
+})
+
+async function driveUntilRejected(promise: Promise<unknown>): Promise<unknown> {
+  let error: unknown
+  let done = false
+  promise.then(() => { done = true }, (reason: unknown) => { error = reason; done = true })
+  await driveUntil(() => done)
+  return error
+}
+
+describe('head-of-line fairness (PAN-5285)', () => {
+  const GiB = 1024 ** 3
+  const MiB = 1024 ** 2
+  const OTHER_PID = 525_285
+  const big = { workspacePath: '/tmp/big', gateName: 'vitest', attempt: 1, footprintKey: 'vitest:.:suite', issueId: 'PAN-1' }
+  const small = { workspacePath: '/tmp/small', gateName: 'tsc', attempt: 1, footprintKey: 'tsc:small.json' }
+  const otherAlive = (pid: number) => pid === process.pid || pid === OTHER_PID
+
+  /** Shared clock, 64 GiB host, soft reserve 12 GiB, hard reserve 4 GiB, a 1 s bypass bound. */
+  function fairDeps(
+    rootDir: string,
+    clock: () => number,
+    available: () => number,
+    extra: Partial<QualityGateAdmissionDeps> = {},
+  ): QualityGateAdmissionDeps {
+    return {
+      ...deps(rootDir),
+      now: clock,
+      softReserveBytes: 12 * GiB,
+      hardReserveBytes: 4 * GiB,
+      headBypassMs: 1_000,
+      sampleMemory: async () => ({ memAvailableBytes: available(), memTotalBytes: 64 * GiB }),
+      readTreeRssBytes: async () => 100 * MiB,
+      ...extra,
+    }
+  }
+
+  function settledFlag(promise: Promise<unknown>): () => boolean {
+    let settled = false
+    promise.finally(() => { settled = true }).catch(() => undefined)
+    return () => settled
+  }
+
+  async function seedPeaks(rootDir: string): Promise<void> {
+    await recordGateFootprintPeak(big.footprintKey, 9 * GiB, rootDir)
+    await recordGateFootprintPeak(small.footprintKey, 100 * MiB, rootDir)
+  }
+
+  it('a memory-blocked head lets a fitting second waiter in', async () => {
+    const rootDir = home()
+    await seedPeaks(rootDir)
+    let clock = 1
+    const headPromise = acquireQualityGateAdmission(big, fairDeps(rootDir, () => clock, () => 16 * GiB))
+    const headSettled = settledFlag(headPromise)
+    await drive(3)
+    clock = 2
+    const second = await driveUntilResolved(acquireQualityGateAdmission(small, fairDeps(rootDir, () => clock, () => 16 * GiB)))
+
+    expect(headSettled()).toBe(false)
+    expect(second.admittedAlone).toBe(false)
+    expect(second.footprintBytes).toBe(100 * MiB)
+    await second.release()
+
+    // Past the bound with the slots empty, the head now starts alone.
+    clock = 5_000
+    const head = await driveUntilResolved(headPromise)
+    expect(head.admittedAlone).toBe(true)
+    await head.release()
+  })
+
+  it('keeps FIFO when the waiter ahead would fit', async () => {
+    const rootDir = home()
+    await seedPeaks(rootDir)
+    let pressured = true
+    const cpu = { slots: 2, samplePressure: async () => (pressured ? high : low) }
+    const onWaiting = vi.fn()
+    const firstPromise = acquireQualityGateAdmission(small, fairDeps(rootDir, () => 1, () => 16 * GiB, cpu))
+    await drive(3)
+    const secondPromise = acquireQualityGateAdmission(small, fairDeps(rootDir, () => 2, () => 16 * GiB, { ...cpu, onWaiting }))
+    const secondSettled = settledFlag(secondPromise)
+    await drive(10)
+
+    // The first waiter fits memory and waits on CPU, so the second may not pass it.
+    expect(secondSettled()).toBe(false)
+    expect(onWaiting).toHaveBeenCalledWith(expect.objectContaining({ kind: 'queue', position: 1 }))
+    pressured = false
+    await (await driveUntilResolved(firstPromise)).release()
+    await (await driveUntilResolved(secondPromise)).release()
+  })
+
+  it('admits an unfittable head alone once it is past the bound and the slots are empty', async () => {
+    const rootDir = home()
+    await seedPeaks(rootDir)
+    writeFileSync(join(rootDir, 'owner.json'), ownerJson(OTHER_PID, 1))
+    let clock = 1
+    const onSecondWaiting = vi.fn()
+    // staleMs well above the clock, so the held slot is not reclaimed as stale.
+    const both = { slots: 2, isProcessAlive: otherAlive, staleMs: 60_000 }
+    const headPromise = acquireQualityGateAdmission(big, fairDeps(rootDir, () => clock, () => 16 * GiB, both))
+    const headSettled = settledFlag(headPromise)
+    await drive(3)
+    clock = 2_000
+    const secondPromise = acquireQualityGateAdmission(small, fairDeps(rootDir, () => clock, () => 16 * GiB, { ...both, onWaiting: onSecondWaiting }))
+    const secondSettled = settledFlag(secondPromise)
+    await drive(10)
+
+    // Past the bound, nobody passes the head while the held slot drains.
+    expect(headSettled()).toBe(false)
+    expect(secondSettled()).toBe(false)
+    expect(onSecondWaiting).toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'queue', headAlone: true, blocker: { gateName: 'vitest', issueId: 'PAN-1', workspacePath: '/tmp/big' },
+    }))
+
+    unlinkSync(join(rootDir, 'owner.json'))
+    const head = await driveUntilResolved(headPromise)
+    expect(head.admittedAlone).toBe(true)
+    expect(head.footprintBytes).toBe(9 * GiB)
+    expect(JSON.parse(readFileSync(join(rootDir, 'owner.json'), 'utf8'))).toMatchObject({ admittedAlone: true })
+    await head.release()
+    await (await driveUntilResolved(secondPromise)).release()
+  })
+
+  it('never admits a head alone below the hard reserve, and lets smaller gates pass it instead', async () => {
+    const rootDir = home()
+    await seedPeaks(rootDir)
+    let clock = 1
+    // Alone, the 9 GiB head would leave 3.5 GiB, under the 4 GiB hard reserve.
+    const available = () => 12.5 * GiB
+    // Two slots, so the head only ever waits on memory, never on the slot the second gate holds.
+    const headPromise = acquireQualityGateAdmission(big, fairDeps(rootDir, () => clock, available, { maxWaitMs: 10_000, slots: 2 }))
+    clock = 5_000
+    await drive(10)
+
+    const second = await driveUntilResolved(acquireQualityGateAdmission(small, fairDeps(rootDir, () => clock, available, { slots: 2 })))
+    expect(second.admittedAlone).toBe(false)
+    await second.release()
+
+    clock = 20_000
+    expect(await driveUntilRejected(headPromise)).toMatchObject({ lastWaitReason: 'memory' })
+  })
+
+  it('passes an older-version head that froze a huge estimate, even past the bound', async () => {
+    const rootDir = home()
+    await seedPeaks(rootDir)
+    writeFileSync(join(rootDir, 'waiter-0000000000000000-0000525285-000000.json'), JSON.stringify({
+      ...big, ticketId: '0000000000000000-0000525285-000000', pid: OTHER_PID, createdAt: 0, footprintBytes: 9 * GiB,
+    }))
+    const handle = await driveUntilResolved(acquireQualityGateAdmission(small, fairDeps(rootDir, () => 60_000, () => 16 * GiB, {
+      isProcessAlive: otherAlive,
+    })))
+    expect(handle.admittedAlone).toBe(false)
+    await handle.release()
+  })
+
+  it('re-reads the estimate every poll, so a corrected footprint unblocks a queued waiter', async () => {
+    const rootDir = home()
+    let estimate = 9 * GiB
+    const promise = acquireQualityGateAdmission(big, fairDeps(rootDir, () => 1, () => 16 * GiB, {
+      readFootprintEstimate: async () => estimate,
+    }))
+    const settled = settledFlag(promise)
+    await drive(10)
+    expect(settled()).toBe(false)
+
+    estimate = 1 * GiB
+    const handle = await driveUntilResolved(promise)
+    expect(handle.footprintBytes).toBe(1 * GiB)
+    expect(handle.admittedAlone).toBe(false)
+    await handle.release()
+  })
+
+  it('re-reads the soft reserve every poll, so a lowered reserve unblocks a queued waiter', async () => {
+    const rootDir = home()
+    const mid = { ...small, footprintKey: 'tsc:mid.json' }
+    await recordGateFootprintPeak(mid.footprintKey, 5 * GiB, rootDir)
+    let softGb = 12
+    configMocks.loadGlobalConfigNoMigration.mockReset()
+    configMocks.loadGlobalConfigNoMigration.mockImplementation(async () => ({
+      config: { resources: { governorSoftReserveGb: softGb, governorHardReserveGb: 4 } },
+    }))
+    try {
+      // Config-resolved reserves: no softReserveBytes or hardReserveBytes in deps.
+      const { softReserveBytes: _soft, hardReserveBytes: _hard, ...configured } = fairDeps(rootDir, () => 1, () => 16 * GiB)
+      const onWaiting = vi.fn()
+      const promise = acquireQualityGateAdmission(mid, { ...configured, onWaiting })
+      const settled = settledFlag(promise)
+      await drive(10)
+      // 16 - 5 = 11 GiB is under the 12 GiB reserve.
+      expect(settled()).toBe(false)
+      expect(onWaiting).toHaveBeenCalledWith(expect.objectContaining({ kind: 'memory', softReserveBytes: 12 * GiB }))
+
+      softGb = 10
+      await (await driveUntilResolved(promise)).release()
+    } finally {
+      configMocks.loadGlobalConfigNoMigration.mockReset()
+    }
+  })
+
+  it('writes the wait reason into the ticket for status readers', async () => {
+    const rootDir = home()
+    await seedPeaks(rootDir)
+    let clock = 1
+    const promise = acquireQualityGateAdmission(big, fairDeps(rootDir, () => clock, () => 16 * GiB, {
+      maxWaitMs: 500, headBypassMs: 60_000,
+    }))
+    await drive(10)
+
+    const [waiter] = await readQualityGateAdmissionQueue(rootDir, (pid) => pid === process.pid)
+    expect(waiter).toMatchObject({
+      gateName: 'vitest',
+      issueId: 'PAN-1',
+      footprintKey: 'vitest:.:suite',
+      wait: { since: 1, reason: { kind: 'memory', footprintBytes: 9 * GiB, softReserveBytes: 12 * GiB } },
+    })
+    expect(await readQualityGateAdmissionQueue(join(rootDir, 'missing'))).toEqual([])
+
+    clock = 1_000
+    await driveUntilRejected(promise)
+  })
+
 })
 
 describe('sampleQualityGatePressure (PAN-4311)', () => {

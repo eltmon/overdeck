@@ -53,13 +53,28 @@ export function describeMemoryWait(reason: MemoryWaitReason): string {
     + `needs ${gib(reason.footprintBytes)}, soft reserve ${gib(reason.softReserveBytes)}`
 }
 
-function describeWait(reason: QualityGateWaitReason): string {
+/** One line naming what a gate waits on; queue waits name the gate ahead (PAN-5285). */
+export function describeWait(reason: QualityGateWaitReason): string {
   switch (reason.kind) {
     case 'memory': return `waiting for memory: ${describeMemoryWait(reason)}`
     case 'cpu': return 'waiting for CPU pressure to clear'
     case 'slots': return 'waiting for a free admission slot'
-    case 'queue': return 'waiting in the admission queue'
+    case 'queue': {
+      const blocker = reason.blocker
+      if (!blocker) return 'waiting in the admission queue'
+      const who = `${blocker.gateName}${blocker.issueId ? ` (${blocker.issueId})` : ''} in ${blocker.workspacePath}`
+      const place = reason.position != null ? ` at position ${reason.position + 1}` : ''
+      return reason.headAlone
+        ? `waiting in the admission queue${place}: ${who} has waited past the bypass bound and runs alone next`
+        : `waiting in the admission queue${place} behind ${who}`
+    }
   }
+}
+
+/** PAN-5285: the line a gate admitted alone prints, because it starts below the soft reserve. */
+export function admittedAloneMessage(subject: string, footprintBytes: number): string {
+  return `[gate-admission] ${subject} admitted alone after waiting past the bypass bound: `
+    + `needs ${gib(footprintBytes)}, which leaves less than the soft reserve but at least the hard reserve free`
 }
 
 /** The memory numbers of a memory-reason admission timeout, or null for any other failure. */
@@ -145,6 +160,7 @@ export async function runAdmittedCommand(
         { workspacePath: cwd, gateName: footprintKey, attempt: 1, footprintKey },
         { maxWaitMs, onWaiting: (reason) => warn(`[gate-admission] ${footprintKey} ${describeWait(reason)}`) },
       )
+      if (handle.admittedAlone) warn(admittedAloneMessage(footprintKey, handle.footprintBytes))
     } catch (error) {
       const memoryTimeout = memoryTimeoutOf(error)
       if (memoryTimeout) {

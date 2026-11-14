@@ -111,7 +111,7 @@ target-branch sync, skipped when CI is already green on the exact tip commit
   again; if the host is pressured on that second look, it gives the slot back
   and keeps waiting. A gate with a memory footprint also waits while starting
   it would push MemAvailable below `resources.governor_soft_reserve_gb`; see
-  [CPU and memory admission](#cpu-and-memory-admission-pan-4311-pan-4546-pan-5248).
+  [CPU and memory admission](#cpu-and-memory-admission-pan-4311-pan-4546-pan-5248-pan-5285).
 - **Agent shells share the queue.** Both `vitest.config.ts` and
   `src/dashboard/frontend/vitest.config.ts` load
   `tests/vitest-cpu-admission.ts` as `globalSetup`, which calls
@@ -474,7 +474,7 @@ Work agents run only the tests they touched (the work prompt names
 CI" only in a CI-mode project); reviewers never run the suite — they read the
 CI result on the head (`gh pr checks <pr>`) where tests run on CI.
 
-### CPU and memory admission (PAN-4311, PAN-4546, PAN-5248)
+### CPU and memory admission (PAN-4311, PAN-4546, PAN-5248, PAN-5285)
 
 Before each local gate starts, it waits in a machine-wide FIFO queue under
 `~/.overdeck/verification-workers/admission/`. Direct local Vitest runs and
@@ -488,19 +488,28 @@ gates keep their slots; nothing is preempted. The file layout and stale-owner
 reclaim are described in the CPU-pressure bullet of
 [Agent Auto-Resume Gates](#agent-auto-resume-gates).
 
-Admission also checks memory (PAN-5248). The head waiter starts only while
+Admission also checks memory (PAN-5248). A gate starts only while
 `MemAvailable − reservations − footprint ≥ resources.governor_soft_reserve_gb`
-(the memory governor's "hold new agents" level, read from the global config):
+(the memory governor's "hold new agents" level, read from the global config).
+The estimate and the reserve are re-read on every poll (PAN-5285), so
+correcting a footprint file or lowering the reserve reaches gates that are
+already queued, without killing them:
 
 - **Footprint.** The gate's estimate is the largest of the last 5 peak RSS
   values recorded for its footprint key, or 2.5 GiB when none exists. The
   estimate is clamped to `memTotal − soft reserve`, so a gate larger than the
   host can hold still starts once memory recovers. Peaks live one file per key
   in `~/.overdeck/verification-workers/admission/footprints/`.
-- **Keys.** `tsc:<tsconfig path>` for a typecheck lane, `vitest:<cwd relative
-  to the repo root>` (or `vitest:.`) for a local Vitest run, and
-  `gate:<name>:<raw gate command>` for a verification gate. Placeholders such
-  as `{{CHANGED_BASE}}` stay literal in the key.
+- **Keys.** `tsc:<tsconfig path>` for a typecheck lane,
+  `vitest:<cwd relative to the repo root, or .>:<suite|files>` for a local
+  Vitest run, and `gate:<name>:<raw gate command>` for a verification gate.
+  Placeholders such as `{{CHANGED_BASE}}` stay literal in the key. A Vitest run
+  is `files` when it names at most 10 filters and none is a directory;
+  otherwise it is `suite` (no filters, `vitest run tests/unit`, or the frontend
+  subset's long list). The two shapes never share peaks, so a full-suite peak
+  from `npm test` no longer becomes the estimate for `vitest run <file>`
+  (PAN-5285). Peaks stored under the old shapeless `vitest:.` key are no
+  longer read.
 - **Peaks.** A peak is the largest sum of `VmRSS` over the gate's process tree,
   sampled every 2 s. It is recorded only when the gate exited on its own; a
   timeout or a signal records nothing. macOS records no peaks and keeps the
@@ -523,13 +532,40 @@ Admission also checks memory (PAN-5248). The head waiter starts only while
   local Vitest run stops with the same line. Every other admission failure (a
   CPU or queue timeout, a file-system error) runs the command unadmitted with
   `[gate-admission] proceeding without admission: <reason>`.
-- **Logs.** A gate blocked on memory says so: the wrapper prints
+- **Passing a memory-blocked head (PAN-5285).** FIFO yields only to memory. A
+  waiter may pass the waiters ahead of it when every one of them is blocked on
+  memory; each waiter judges the ones ahead from their tickets with the same
+  memory reading, so the first waiter that fits starts and the rest keep their
+  places. A waiter ahead that fits, or that waits on a slot or on CPU, keeps
+  everyone behind it in place.
+- **Admitted alone (PAN-5285).** Later gates may pass the head for 5 minutes,
+  counted from when the head joined the queue. After that the head is due to
+  run alone: nobody passes it while any slot is held, the slots drain, and
+  once none is held the head starts even though it fails the soft-reserve
+  rule. The safety floor is the governor's hard reserve: the head starts alone
+  only while `MemAvailable − footprint ≥ resources.governor_hard_reserve_gb`.
+  It also skips the soft-reserve re-check after settling, but gives its slot
+  back if another gate joined it. A head that would break the hard reserve is
+  never forced; smaller gates keep passing it until memory recovers or its
+  wait times out. Tickets from checkouts older than PAN-5285 cannot run
+  alone, so later gates pass them with no time limit.
+- **Logs.** A waiting gate says why. The wrapper and a local Vitest run print
   `[gate-admission] <key> waiting for memory: available X GiB, reserved Y GiB,
-  needs Z GiB, soft reserve W GiB`, and the verification worker logs
-  `[quality-gate] Waiting for memory: <identity> available …`. A head waiter
-  blocked on memory also holds the waiters behind it, so FIFO order stays
-  strict. To relieve a stall, free memory or lower
-  `resources.governor_soft_reserve_gb`.
+  needs Z GiB, soft reserve W GiB`, `… waiting in the admission queue at
+  position N behind <gate> (<issue>) in <workspace>`, `… waiting for a free
+  admission slot` or `… waiting for CPU pressure to clear`. The verification
+  worker logs `[quality-gate] Waiting for memory: <identity> available …` and
+  `[quality-gate] <reason>: <identity>` for the other reasons, and sends them
+  to the run log. A changed reason is printed at most once a minute. A gate
+  admitted alone prints `[gate-admission] <key> admitted alone after waiting
+  past the bypass bound: needs X GiB, …`.
+- **Status readers.** Each waiter writes its current reason and the time it
+  began into its `waiter-*.json` ticket (`wait: { since, reason }`).
+  `readQualityGateAdmissionQueue()` in `quality-gate-admission.ts` returns the
+  live waiters, oldest first, with that field, for status surfaces such as the
+  Flywheel page (PAN-5283). To relieve a stall, free memory or lower
+  `resources.governor_soft_reserve_gb`; queued gates pick up the new value on
+  their next poll.
 
 ### Same head: joining or restarting a live worker (PAN-4527)
 

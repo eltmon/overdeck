@@ -30,6 +30,7 @@ function fakeHandle(order: string[] = []): QualityGateAdmissionHandle {
     slot: 0,
     slots: 2,
     footprintBytes: 2.5 * GiB,
+    admittedAlone: false,
     recordPeak: vi.fn(async (bytes: number) => { order.push(`recordPeak:${bytes}`) }),
     release: vi.fn(async () => { order.push('release') }),
   }
@@ -149,6 +150,20 @@ describe('runAdmittedCommand (PAN-5248)', () => {
     const lines = warn.mock.calls.map(([line]) => String(line))
     expect(lines[0]).toBe('[gate-admission] tsc:tsconfig.json waiting for memory: available 13.0 GiB, reserved 0.0 GiB, needs 2.5 GiB, soft reserve 12.0 GiB')
     expect(lines.every((line) => line.startsWith('[gate-admission]') && !/error TS/.test(line))).toBe(true)
+  })
+
+  it('names the gate ahead in a queue wait and announces an alone admission (PAN-5285)', async () => {
+    const { deps, warn } = setup({
+      acquire: vi.fn(async (_request, acquireDeps) => {
+        acquireDeps?.onWaiting?.({ kind: 'queue', position: 0, blocker: { gateName: 'vitest', workspacePath: '/w' }, headAlone: true })
+        return { ...fakeHandle(), admittedAlone: true, footprintBytes: 9 * GiB }
+      }),
+    })
+    await runAdmittedCommand(input, deps)
+    const lines = warn.mock.calls.map(([line]) => String(line))
+    expect(lines[0]).toBe('[gate-admission] tsc:tsconfig.json waiting in the admission queue at position 1: '
+      + 'vitest in /w has waited past the bypass bound and runs alone next')
+    expect(lines[1]).toContain('[gate-admission] tsc:tsconfig.json admitted alone after waiting past the bypass bound: needs 9.0 GiB')
   })
 
   it('releases and resolves 1 when the command cannot start', async () => {

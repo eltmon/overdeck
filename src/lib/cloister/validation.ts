@@ -19,7 +19,7 @@ import {
   acquireQualityGateAdmission,
   type QualityGateAdmissionHandle,
 } from './quality-gate-admission.js';
-import { describeMemoryWait } from './gate-admission-run.js';
+import { admittedAloneMessage, describeMemoryWait, describeWait } from './gate-admission-run.js';
 import { startPeakRssSampler, type PeakRssSampler } from '../system-health/process-tree-rss.js';
 
 const execAsync = promisify(exec);
@@ -476,12 +476,21 @@ export async function runQualityGates(
             ...(gate.container && gate.container_name ? { fullReservation: true } : {}),
           }, {
             onWaiting: (reason) => {
-              if (reason.kind !== 'memory') return;
-              console.log(`[quality-gate] Waiting for memory: ${identity} ${describeMemoryWait(reason)}`);
-              opts.onLog?.(`Waiting for memory before ${name}…`);
+              if (reason.kind === 'memory') {
+                console.log(`[quality-gate] Waiting for memory: ${identity} ${describeMemoryWait(reason)}`);
+                opts.onLog?.(`Waiting for memory before ${name}…`);
+                return;
+              }
+              // PAN-5285: every wait reason reaches the run log, so a stalled queue is visible.
+              console.log(`[quality-gate] ${describeWait(reason)}: ${identity}`);
+              opts.onLog?.(`${name} ${describeWait(reason)}…`);
             },
           });
           console.log(`[quality-gate] Admitted (slot ${admission.slot + 1}/${admission.slots}): ${identity}`);
+          if (admission.admittedAlone) {
+            console.log(admittedAloneMessage(identity, admission.footprintBytes));
+            opts.onLog?.(`${name} admitted alone after waiting past the bypass bound`);
+          }
           if (await opts.shouldStop?.()) {
             stopped = true;
             break;
