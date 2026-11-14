@@ -23,6 +23,11 @@ describe('route-scope table (PAN-2351)', () => {
     expect(requiredScopeFor('GET', '/api/issues/PAN-1')).toBe('read:state');
     expect(requiredScopeFor('GET', '/api/issues/resource-allocated')).toBe('admin');
     expect(requiredScopeFor('GET', '/api/issues/PAN-1/tasks')).toBe('admin');
+    // PAN-5219: the phone issue sheet's cost and checks sections.
+    expect(requiredScopeFor('GET', '/api/issues/MIN-1141/costs')).toBe('read:costs');
+    expect(requiredScopeFor('GET', '/api/issues/PAN-1/check-runs')).toBe('read:state');
+    expect(requiredScopeFor('POST', '/api/issues/PAN-1/costs')).toBe('admin');
+    expect(requiredScopeFor('GET', '/api/issues/PAN-1/pr')).toBe('admin');
     expect(requiredScopeFor('GET', '/api/registered-projects')).toBe('read:state');
     expect(requiredScopeFor('GET', '/api/github/identities')).toBe('read:state');
     expect(requiredScopeFor('POST', '/api/registered-projects')).toBe('admin');

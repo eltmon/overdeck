@@ -10,6 +10,8 @@
  *       /m?conversation=<id>     → that conversation, full screen
  *       /m/pipeline              → pipeline board (PAN-4661)
  *       /m/pipeline?issue=<id>   → that issue's read-only sheet, full screen
+ *       /m/pipeline?issue=<id>&event=<kind>&at=<iso> → that issue's sheet with
+ *         its What happened line (PAN-5219)
  *     `pipeline` is a fixed path segment (no dot, no extension), so PAN-2355
  *     D-3 still holds: ids stay in the query.
  * D-4 A standalone branch, lazy-loaded from App.tsx, with no desktop chrome
@@ -22,6 +24,7 @@
  */
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { Inbox, ListOrdered, type LucideIcon, MessageSquare, Settings } from 'lucide-react';
+import { parsePhoneIssueEvent, phoneIssueSheetPath, type PhoneIssueEvent } from '@overdeck/contracts';
 import { EventRouter } from '../EventRouter';
 import { useConnectionState } from '../../lib/connectionState';
 import { isNativeShell } from '../../lib/nativeShell';
@@ -42,6 +45,8 @@ export interface MobileRoute {
   subjectId: string | null;
   conversationId: string | null;
   issueId: string | null;
+  /** PAN-5219: the notification event the sheet opened from, when any. */
+  issueEvent?: { kind: PhoneIssueEvent; at: string | null };
 }
 
 // D-4661-3: a pipeline pathname decides the tab and ignores every other query
@@ -49,7 +54,10 @@ export interface MobileRoute {
 export function readMobileRoute(search: string, pathname = '/m'): MobileRoute {
   const params = new URLSearchParams(search);
   if (pathname === '/m/pipeline' || pathname === '/m/pipeline/') {
-    return { tab: 'pipeline', issueId: params.get('issue') || null, subjectId: null, conversationId: null };
+    const issueId = params.get('issue') || null;
+    const kind = parsePhoneIssueEvent(params.get('event'));
+    const issueEvent = issueId && kind ? { kind, at: params.get('at') || null } : undefined;
+    return { tab: 'pipeline', issueId, subjectId: null, conversationId: null, issueEvent };
   }
   const conversationId = params.get('conversation') || null;
   if (conversationId) return { tab: 'conversations', subjectId: null, conversationId, issueId: null };
@@ -59,7 +67,8 @@ export function readMobileRoute(search: string, pathname = '/m'): MobileRoute {
 
 function mobilePath(route: MobileRoute): string {
   if (route.tab === 'pipeline') {
-    return `/m/pipeline${route.issueId ? `?issue=${encodeURIComponent(route.issueId)}` : ''}`;
+    if (!route.issueId) return '/m/pipeline';
+    return phoneIssueSheetPath(route.issueId, route.issueEvent?.at ? { kind: route.issueEvent.kind, at: route.issueEvent.at } : null);
   }
   const params = new URLSearchParams();
   if (route.conversationId) params.set('conversation', route.conversationId);
@@ -180,7 +189,7 @@ export default function MobileApp({ headerSlot }: { headerSlot?: ReactNode } = {
                   onBack={closeConversation}
                 />
               ) : route.issueId ? (
-                <MobileIssueSheet issueId={route.issueId} onBack={closeIssue} />
+                <MobileIssueSheet issueId={route.issueId} event={route.issueEvent ?? null} onBack={closeIssue} />
               ) : (
                 <MobilePipeline onOpen={openIssue} />
               )}

@@ -24,6 +24,15 @@ function fetchFailureReason(err: unknown): string {
   return String(err).slice(0, 200);
 }
 
+async function refResolves(dir: string, ref: string): Promise<boolean> {
+  try {
+    await execAsync(`git rev-parse --verify --quiet ${ref}^{commit}`, { cwd: dir, encoding: 'utf-8' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function resolveTargetComparison(dir: string, targetBranch: string): Promise<TargetComparison> {
   try {
     await execAsync(
@@ -33,12 +42,16 @@ export async function resolveTargetComparison(dir: string, targetBranch: string)
     return { ref: `origin/${targetBranch}` };
   } catch (err) {
     const reason = fetchFailureReason(err);
-    try {
-      await execAsync(`git rev-parse --verify --quiet refs/heads/${targetBranch}^{commit}`, { cwd: dir, encoding: 'utf-8' });
-    } catch {
-      return { ref: null, error: `Cannot verify merge: git fetch origin ${targetBranch} failed (${reason}) and no local ${targetBranch} branch exists` };
+    if (await refResolves(dir, `refs/remotes/origin/${targetBranch}`)) {
+      return {
+        ref: `origin/${targetBranch}`,
+        note: `Checked against the last-fetched origin/${targetBranch} because git fetch origin ${targetBranch} failed: ${reason}`,
+      };
     }
-    return { ref: targetBranch, note: `Checked against local ${targetBranch} because git fetch origin ${targetBranch} failed: ${reason}` };
+    if (await refResolves(dir, `refs/heads/${targetBranch}`)) {
+      return { ref: targetBranch, note: `Checked against local ${targetBranch} because git fetch origin ${targetBranch} failed: ${reason}` };
+    }
+    return { ref: null, error: `Cannot verify merge: git fetch origin ${targetBranch} failed (${reason}) and neither origin/${targetBranch} nor a local ${targetBranch} branch exists` };
   }
 }
 

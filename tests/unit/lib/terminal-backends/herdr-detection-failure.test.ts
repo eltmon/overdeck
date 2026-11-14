@@ -69,7 +69,7 @@ describe('startAgent detection failure', () => {
             },
           };
         case 'pane.read':
-          return { text: 'launcher line 1\nlauncher line 2' };
+          return { type: 'pane_read', read: { text: 'launcher line 1\nlauncher line 2' } };
         default:
           return {};
       }
@@ -81,6 +81,7 @@ describe('startAgent detection failure', () => {
     expect(error.message).toContain('herdr detected no agent in pane wE:p2');
     expect(error.message).toContain('node /dist/pty-supervisor.js claude --name agent-pan-3705');
     expect(error.message).toContain('launcher line 2');
+    expect(error.message).not.toContain('Pane output is empty');
 
     // Diagnosed BEFORE the close — a closed pane has nothing left to read.
     const methods = log.map((call) => call.method);

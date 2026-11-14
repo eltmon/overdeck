@@ -16,6 +16,7 @@
 import { screenComposerPayloadPresence, type ComposerPayloadPresence } from '../pane-composer.js';
 import { paneHasBlockingChoiceMenu } from '../pane-choice-menu.js';
 import { toWellFormedText } from '../well-formed-text.js';
+import { herdrPaneReadText } from './herdr-pane-read.js';
 import { STEER_HERDR_KEYS, type SubmitMode } from './steer-keys.js';
 
 /** Structural, like steer-keys.ts: importing herdr-api here would close an import cycle through types.ts. */
@@ -52,8 +53,8 @@ export async function pasteAndSubmitHerdrPane(
     try {
       const result = await api.call('pane.read', {
         pane_id: paneId, source: 'visible', lines: SCREEN_LINES, strip_ansi: true,
-      }) as { text?: string } | null;
-      return result?.text ?? '';
+      });
+      return herdrPaneReadText(result);
     } catch {
       return null;
     }
@@ -85,10 +86,10 @@ export async function pasteAndSubmitHerdrPane(
   const settleRemaining = pasteSettleMs(text) - (now() - start);
   if (settleRemaining > 0) await sleep(settleRemaining);
 
-  // Step 3: the paste was never seen — only a blocked pane or menu withholds the keystroke.
-  if (presence !== 'present' && (await blocked() || paneHasBlockingChoiceMenu(lastScreen))) {
+  // Step 3: a blocked agent or a visible menu withholds the keystroke, seen paste or not (PAN-5232).
+  if (await blocked() || paneHasBlockingChoiceMenu(lastScreen)) {
     console.warn(
-      `[herdr-submit] ${paneId}: paste not visible and the pane is blocked on a menu; not pressing ${label} (PAN-4492)`,
+      `[herdr-submit] ${paneId}: the agent is blocked or a menu is on screen; not pressing ${label} (PAN-4492)`,
     );
     return 'blocked';
   }

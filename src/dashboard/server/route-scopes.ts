@@ -33,6 +33,9 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/issues/resource-allocated', scope: 'admin' },
   // PAN-5171: one issue for the drawer, cockpit and phone sheet headers.
   { method: 'GET', path: '/api/issues/:id', scope: 'read:state' },
+  // PAN-5219: the phone issue sheet's cost and checks sections.
+  { method: 'GET', path: '/api/issues/:id/check-runs', scope: 'read:state' },
+  { method: 'GET', path: '/api/issues/:id/costs', scope: 'read:costs' },
   { method: 'GET', path: '/api/agents', scope: 'read:state' },
   { method: 'GET', path: '/api/agent-directory', scope: 'read:state' },
   { method: 'GET', path: '/api/flywheel/status', scope: 'read:state' },

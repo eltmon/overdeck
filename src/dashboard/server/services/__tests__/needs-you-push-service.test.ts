@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { phoneIssueSheetPath } from '@overdeck/contracts';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../agent-enrichment-service.js', () => ({ pollEnrichmentNow: vi.fn() }));
@@ -143,7 +144,12 @@ describe('needs-you push service (PAN-2354)', () => {
       payload: { issueId: 'PAN-7', entry: { type: 'merge.failed', issueId: 'PAN-7', at: '2026-11-01T00:00:00.000Z' } },
     });
     await vi.advanceTimersByTimeAsync(0);
-    expect(provider.sent).toEqual([expect.objectContaining({ kind: 'failed', body: 'Merge failed.', url: '/m' })]);
+    expect(provider.sent).toEqual([expect.objectContaining({
+      kind: 'failed',
+      body: 'Merge failed.',
+      // PAN-5219: issue edges now open the phone issue sheet, not /m.
+      url: phoneIssueSheetPath('PAN-7', { kind: 'merge.failed', at: '2026-11-01T00:00:00.000Z' }),
+    })]);
   });
 
   // PAN-5074: a planning agent stopped by finalize must not push "stopped responding".

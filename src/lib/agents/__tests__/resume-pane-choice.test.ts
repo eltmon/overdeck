@@ -34,6 +34,16 @@ const PERMISSION_MENU = [
   'Enter to confirm · Esc to cancel',
 ].join('\n');
 
+const BASH_PERMISSION_MENU = [
+  'Do you want to allow this Bash command?',
+  '',
+  '❯ 1. Yes',
+  "  2. Yes, and don't ask again",
+  '  3. No',
+  '',
+  'Esc to cancel · Tab to amend',
+].join('\n');
+
 const CLEAR_COMPOSER = [
   '● Resumed from a compacted summary.',
   '',
@@ -133,7 +143,7 @@ describe('prepareAutonomousAgentResumePane on a Herdr pane (review of #3992, M2)
       if (method === 'pane.read') {
         const screen = screens[Math.min(reads, screens.length - 1)]!;
         reads += 1;
-        return { text: screen };
+        return { type: 'pane_read', read: { text: screen } };
       }
       if (method === 'pane.send_keys') return {};
       throw new Error(`unexpected herdr call ${method}`);
@@ -149,8 +159,23 @@ describe('prepareAutonomousAgentResumePane on a Herdr pane (review of #3992, M2)
     });
 
     expect(result).toEqual({ ready: true, action: 'resumed-from-summary' });
-    expect(herdrApi.call).toHaveBeenCalledWith('pane.read', expect.objectContaining({ pane_id: 'w1:p7' }));
+    expect(herdrApi.call).toHaveBeenCalledWith(
+      'pane.read',
+      expect.objectContaining({ pane_id: 'w1:p7', source: 'visible' }),
+    );
     expect(herdrApi.call).toHaveBeenCalledWith('pane.send_keys', { pane_id: 'w1:p7', keys: ['enter'] });
+  });
+
+  it('refuses to resume when the Herdr pane shows a permission menu the card parser drops', async () => {
+    herdrScreens(BASH_PERMISSION_MENU);
+
+    const result = await prepareAutonomousAgentResumePane('agent-pan-3960', 'work', { pane });
+
+    expect(result).toEqual({
+      ready: false,
+      reason: 'pane is blocked on a choice menu other than the Claude resume-summary gate',
+    });
+    expect(herdrApi.call).not.toHaveBeenCalledWith('pane.send_keys', expect.anything());
   });
 
   it('passes through when the Herdr pane shows a composer', async () => {

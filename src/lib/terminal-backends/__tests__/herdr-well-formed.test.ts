@@ -107,7 +107,7 @@ describe('pasteAndSubmitHerdrPane sanitizes the paste text', () => {
     const api = {
       call: async (method: string, params: Record<string, unknown>) => {
         calls.push({ method, params });
-        if (method === 'pane.read') return { text: nextScreen() };
+        if (method === 'pane.read') return { type: 'pane_read', read: { text: nextScreen() } };
         if (method === 'agent.get') return { agent: { agent_status: 'idle' } };
         return {};
       },

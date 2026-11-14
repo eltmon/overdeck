@@ -54,8 +54,9 @@ iPhone and desktop browsers.
    payload**; only your phone can decrypt it.
 4. **Delivery.** Your machine sends the encrypted message straight to the push
    service, which wakes your phone. Tapping the notification opens the
-   dashboard at the item (`/m?subject=<id>`), or at `/m` for finished and failed
-   items.
+   dashboard at the item (`/m?subject=<id>`), or, for a finished, failed or
+   stopped item about an issue, at the issue sheet
+   (`/m/pipeline?issue=<id>`); items with no issue open `/m`.
 
 Overdeck only sends to the Google, Apple, Mozilla and Microsoft push services.
 A subscription to any other address is refused.

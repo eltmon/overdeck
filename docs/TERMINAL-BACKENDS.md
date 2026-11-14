@@ -1014,6 +1014,31 @@ Verified live on 2026-09-18 against the running `overdeck` session.
   `invalid_request: … unexpected end of hex escape` (PAN-4506) — the kickoff never lands.
   `herdr-api.ts` replaces every lone surrogate with U+FFFD (`src/lib/well-formed-text.ts`,
   `toWellFormedText`) before writing `call` and `stream` requests to the wire.
+- **`call()` returns `result` unchanged, so readers must use the per-method key.** `pane.read`
+  answers `{"type":"pane_read","read":{…,"text":…}}`, so the text is `result.read.text`. Every
+  reader goes through `herdrPaneReadText` (`src/lib/terminal-backends/herdr-pane-read.ts`), which
+  also accepts a legacy `{text}` and returns `''` with one warning for anything else. Until
+  PAN-5232, three readers took `result.text` and every Herdr pane read was empty.
+
+  Audit of every `api.call` in `herdr*.ts`, `herdr-residue-reaper.ts`, `herdr-host.ts` and
+  `agent-pane-io.ts` (verified live and against the schema fixture, 2026-11-14):
+
+  | Method | Key the code reads | Schema variant (`result.type`) → key | Verified |
+  |--------|--------------------|----------------------|----------|
+  | `pane.read` | `result.read.text` (via `herdrPaneReadText`) | `pane_read` → `read.text` | live + schema |
+  | `agent.get` | `agent` | `agent_info` → `agent` | live + schema |
+  | `agent.list` | `agents` | `agent_list` → `agents` | live + schema |
+  | `agent.wait` | `agent` | `agent_info` → `agent` | live + schema |
+  | `agent.prompt` | `agent` | `agent_prompted` → `agent` | schema only (mutating) |
+  | `pane.get` | `pane` | `pane_info` → `pane` | live + schema |
+  | `pane.process_info` | `process_info.{shell_pid,foreground_processes}` | `pane_process_info` → `process_info` | live + schema |
+  | `pane.layout` | `layout.panes` | `pane_layout` → `layout.panes` | live + schema |
+  | `session.snapshot` | `snapshot.panes` | `session_snapshot` → `snapshot.panes` | live + schema |
+  | `workspace.list` | `workspaces` | `workspace_list` → `workspaces` | live + schema |
+  | `workspace.create` | `workspace` | `workspace_created` → `workspace` | schema only (mutating) |
+  | `tab.create` | `root_pane` | `tab_created` → `root_pane` | schema only (mutating) |
+  | `ping` | `version`, `protocol` | `pong` → `version`, `protocol` | live + schema |
+  | `pane.send_*`, `pane.close`, `pane.report_metadata`, `agent.rename`, `workspace.report_metadata`, `workspace.close` | result not read | — | — |
 
 ### Why `startAgent` does not call `agent.start`
 
@@ -1371,3 +1396,50 @@ server and its headless Herdr server were killed and the scratch `OVERDECK_HOME`
 directory were deleted. The real host dashboard (`:3011`) and its Herdr session were never
 restarted, stopped, or otherwise touched; `GET /api/health` against it before and after this check
 shows the same long-running `pid`.
+
+## Live verification record — Herdr pane reads (PAN-5232)
+
+**Part 1, read-only, against the live `overdeck` session (2026-11-14).** A one-off
+`npx tsx` script (session scratchpad, not committed) called the real `readHerdrPaneText`,
+`findHerdrAgentPane` and `waitForClaudeReady` against the same idle Claude conversation
+(`conv-20261111-2742`, pane `w2:p94`) the planning agent probed against the unfixed code. No
+`pane.send_text`, `pane.send_keys` or `agent.prompt` call was made — every call in the script is a
+read (`pane.read`, `agent.get`).
+
+| | Before (unfixed, 2026-11-14) | After (this fix) |
+|---|---|---|
+| `readHerdrPaneText(pane, 3, 'recent')` | len 0 | len 117, last line `"  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← 1 agent"` |
+| `readHerdrPaneText(pane, 200, 'visible')` | len 0, has `❯` false | len 640, has `❯` true |
+| `waitForClaudeReady(conv-20261111-2742)` | 30251 ms (timed out; logged "Timed out waiting for Claude Code prompt … harness probe: alive") | 751 ms (logged `[conversations] Claude Code ready in conv-20261111-2742`) |
+
+**Part 2, isolated launch (2026-11-14).** Built this branch (`npm run build:dashboard`), started a
+second, throwaway Herdr session (`herdr --session overdeck-156a1092 server`) and a second dashboard
+instance against it (`API_PORT=3091 HOST=127.0.0.1 OVERDECK_HOME=<scratch home> node
+dist/dashboard/server.js`) — entirely separate from the real `overdeck` session and the host
+dashboard on `:3011`. Created two throwaway Claude conversations through `POST /api/conversations`
+(harness defaults to `claude-code`); both reached readiness from a cold start:
+
+```
+conv-20261114-8234  → "[conversations] Claude Code ready in conv-20261114-8234"
+conv-20261114-8961  → POST at 1794630814373 ms, ready at 1794630820197 ms → 5824 ms to ready
+```
+
+Both are well under the 30 s deadline `waitForClaudeReady` enforces. Both conversations were
+stopped (`POST /api/conversations/<name>/stop`), then the scratch dashboard process, the scratch
+`herdr --session overdeck-156a1092 server` process and its tmux helper were killed, and the scratch
+`OVERDECK_HOME` directory and `~/.config/herdr/sessions/overdeck-156a1092` were deleted. The real
+host dashboard (`:3011`) kept the same `pid` in `GET /api/health` before and after. **No
+`pane.send_text`, `pane.send_keys` or `agent.prompt` call was made against any operator pane** —
+every call against the live `overdeck` session in Part 1 was read-only, and Part 2's conversations
+ran on their own isolated Herdr session.
+
+### Degraded behaviour while Herdr pane reads returned `''` (now fixed)
+
+| Caller | With `''` (before PAN-5232) | With real text (after) |
+|--------|-------------------------------|----------------------------|
+| `waitForClaudeReady` (`src/lib/overdeck/claude-readiness.ts`) | Never saw `❯`, waited the full 30 s, then logged a timeout and continued. The startup-dialog error and the early-exit throw could never fire. | Returns as soon as the prompt shows (751 ms and 5824 ms, above). A blocking startup dialog or an early harness exit now throws a spawn error. |
+| `pasteAndSubmitHerdrPane` (`src/lib/terminal-backends/herdr-submit.ts`) | Composer never parsed; every delivery polled, pressed Enter, polled again, and returned `unconfirmed`. The menu guard was blind; only `agent_status === 'blocked'` protected it, and a visible paste used to skip even that check. | Returns `submitted` once the composer clears, and never presses a keystroke while the agent is `blocked` or a menu is on screen, paste seen or not. |
+| `prepareAutonomousAgentResumePane` (`src/lib/agents/resume-pane-choice.ts`) | `paneChoiceFromText('')` found no menu and returned `{ready: true, action: 'clear'}`, typing the continuation into whatever screen was there, including the resume-summary gate. A permission menu the card parser drops was invisible. | Detects the resume-summary gate and selects it; a guard-mode menu (permission, multi-select) the card parser drops now returns `ready: false` instead of being typed into. |
+| `ensureMainInputTarget` (`src/lib/agents/input-target.ts`) | Empty state, `rows.length === 0`, returned `{ok: true, check: 'no-selector'}`. The selector check never ran. | Parses Claude Code's agent selector and may press keys to move input back to `main`, or refuse delivery when the prompt holds unsent text. |
+| `progressFingerprint` (`src/lib/cloister/service-crash.ts`) | `!pane.trim()` → `null` (unknown) on every check; pane-based progress detection never contributed. | A real fingerprint; an unchanged pane can now count toward the stall tiers. |
+| `checkApiErrorAgents` (`src/lib/cloister/deacon-api-recovery.ts`) | Skipped every Herdr agent (`!paneOutput?.trim()`). | Nudges an idle agent whose pane shows an API-error pattern at the prompt. |

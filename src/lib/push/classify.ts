@@ -8,8 +8,9 @@
  * everything else returns no item. Titles and bodies follow D-8: the Web Push
  * title may name the conversation, the public (ntfy) title never does, and the
  * default body never carries question text. URLs follow D-7 and are always
- * same-origin paths.
+ * same-origin paths; issue edges open the phone issue sheet (PAN-5219).
  */
+import { phoneIssueSheetPath, type PhoneIssueEvent } from '@overdeck/contracts';
 import type { NeedsYouNotification } from './types.js';
 
 export interface PendingItem {
@@ -73,14 +74,16 @@ const DEFAULT_BODY: Record<'question' | 'approval', string> = {
   approval: 'Tap to review.',
 };
 
-/** `pipeline.journal` entry types that notify (D-5), with their kind and body. */
-const JOURNAL_EDGES: Record<string, { kind: 'finished' | 'failed'; body: string }> = {
+type JournalEdge = { kind: 'finished' | 'failed'; body: string };
+const JOURNAL_EDGE_TABLE = {
   'verification.started': { kind: 'finished', body: 'Work is done; verification started.' },
   'merge.completed': { kind: 'finished', body: 'Merged.' },
   'merge.failed': { kind: 'failed', body: 'Merge failed.' },
   'review.stall-escalated': { kind: 'failed', body: 'A review stalled and needs you.' },
   'conflict.repair-escalated': { kind: 'failed', body: 'A conflict repair needs you.' },
-};
+} as const satisfies Record<Exclude<PhoneIssueEvent, 'stopped'>, JournalEdge>;
+/** `pipeline.journal` entry types that notify (D-5), with their kind and body. */
+const JOURNAL_EDGES: Readonly<Record<string, JournalEdge | undefined>> = JOURNAL_EDGE_TABLE;
 
 function truncate(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
@@ -208,7 +211,7 @@ export function edgeNotificationFromEvent(
       title: `${KIND_WORD.failed} · ${issueId ?? agentId}`,
       publicTitle: publicTitle('failed', issueId),
       body: 'The agent stopped responding.',
-      url: PHONE_SHELL_URL,
+      url: issueId ? phoneIssueSheetPath(issueId, { kind: 'stopped', at: event.timestamp }) : PHONE_SHELL_URL,
       issueId,
     };
   }
@@ -228,7 +231,7 @@ export function edgeNotificationFromEvent(
       title: `${KIND_WORD[edge.kind]} · ${issueId}`,
       publicTitle: publicTitle(edge.kind, issueId),
       body: edge.body,
-      url: PHONE_SHELL_URL,
+      url: phoneIssueSheetPath(issueId, { kind: entryType as PhoneIssueEvent, at: nonEmpty(entry['at']) ?? event.timestamp }),
       issueId,
     };
   }

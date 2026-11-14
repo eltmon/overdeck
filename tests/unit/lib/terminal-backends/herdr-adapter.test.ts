@@ -298,7 +298,7 @@ describe('HerdrBackend.prompt steer submit (PAN-4292)', () => {
     let submitted = false;
     const { api, log } = fakeApi(({ method }) => {
       if (method === 'agent.get') return { agent: { pane_id: 'w1:p2', agent_status: 'working', tokens: {} } };
-      if (method === 'pane.read') return { text: submitted ? emptyComposer : composerWith(text) };
+      if (method === 'pane.read') return { type: 'pane_read', read: { text: submitted ? emptyComposer : composerWith(text) } };
       if (method === 'pane.send_keys') { submitted = true; return {}; }
       return {};
     });
@@ -351,7 +351,7 @@ describe('HerdrBackend.prompt steer submit (PAN-4292)', () => {
     let submitted = false;
     const { api, log } = fakeApi(({ method }) => {
       if (method === 'agent.get') return { agent: { pane_id: 'w1:p2', agent: 'claude', agent_status: 'idle', tokens: {} } };
-      if (method === 'pane.read') return { text: submitted ? emptyComposer : composerWith(text) };
+      if (method === 'pane.read') return { type: 'pane_read', read: { text: submitted ? emptyComposer : composerWith(text) } };
       if (method === 'pane.send_keys') { submitted = true; return {}; }
       return {};
     });

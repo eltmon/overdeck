@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   readDevSupervisorMarker: vi.fn(),
   agentRestartBlockReason: vi.fn(),
   repointGlobalCliToDeployment: vi.fn(),
+  writePanCliShims: vi.fn(),
 }));
 
 vi.mock('../../../lib/restart-lock.js', () => ({
@@ -61,6 +62,13 @@ vi.mock('../../../lib/deploy/build-from-origin.js', async (importActual) => ({
 
 vi.mock('../../../lib/deploy/global-cli-link.js', () => ({
   repointGlobalCliToDeployment: mocks.repointGlobalCliToDeployment,
+}));
+
+// PAN-5225: without this mock the real writer finds no CLI bundle in this
+// fixture and returns missing-bundle, changing the test's result for a
+// reason unrelated to the health timeout.
+vi.mock('../../../lib/pan-cli-shim.js', () => ({
+  writePanCliShims: mocks.writePanCliShims,
 }));
 
 vi.mock('../../../lib/platform-lifecycle.js', async (importActual) => ({
@@ -137,6 +145,7 @@ beforeEach(() => {
   mocks.agentRestartBlockReason.mockResolvedValue(null);
   mocks.sweepDashboardDeployments.mockResolvedValue(undefined);
   mocks.repointGlobalCliToDeployment.mockResolvedValue({ status: 'absent' });
+  mocks.writePanCliShims.mockResolvedValue({ status: 'written', dir: '/tmp/cli-bin' });
 });
 
 afterEach(async () => {
