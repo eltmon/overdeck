@@ -91,6 +91,7 @@ describe('SkillOverridesPanel — global', () => {
     expect(screen.getByTestId('skills-summary').textContent).toBe('2 on·0 off·1 core');
     expect(screen.getByText(/Changes apply to Claude Code and Codex agents at their next launch\./)).toBeTruthy();
     expect(fetchImpl).toHaveBeenCalledWith('/api/skills/overrides');
+    expect(screen.queryByRole('button', { name: /^Pin /})).toBeNull();
   });
 
   it('collapses the Overdeck group until a search matches inside it', async () => {
@@ -151,26 +152,64 @@ describe('SkillOverridesPanel — issue', () => {
     expect(document.querySelector('[data-skill="pan-done"]')).toBeNull();
     expect(screen.getByText('1 core skills, always on')).toBeTruthy();
     expect(within(row('local')).getByText('project skill')).toBeTruthy();
-    expect(within(row('codebase-design')).getByRole('button', { name: 'Inherit (off via project)' })).toBeTruthy();
+    expect(within(row('codebase-design')).getByText('off · project')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: /^All/ }));
     expect(row('okf')).toBeTruthy();
-    expect(within(row('okf')).getByRole('button', { name: 'Inherit (on via global)' })).toBeTruthy();
+    expect(within(row('okf')).getByText('on · global')).toBeTruthy();
   });
 
-  it('sends enabled false for Off and enabled null for Inherit', async () => {
+  it('shows one switch and a source per row, and no Inherit buttons', async () => {
     mockApi(issueSkills);
     renderPanel({ level: 'issue', issueId: 'TST-1' });
     await waitFor(() => expect(row('grilling')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: /^All/ }));
 
-    fireEvent.click(within(row('local')).getByRole('button', { name: 'Off' }));
+    expect(within(row('okf')).getByText('on · global')).toBeTruthy();
+    expect(within(row('codebase-design')).getByText('off · project')).toBeTruthy();
+    expect(within(row('grilling')).getByText('off · this issue')).toBeTruthy();
+    expect(within(row('local')).getByText('on · pinned here')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Inherit/ })).toBeNull();
+    expect(within(row('okf')).getAllByRole('switch')).toHaveLength(1);
+  });
+
+  it('the switch sends the override, or null when it returns to the inherited value', async () => {
+    mockApi(issueSkills);
+    renderPanel({ level: 'issue', issueId: 'TST-1' });
+    await waitFor(() => expect(row('grilling')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: /^All/ }));
+
+    fireEvent.click(within(row('okf')).getByRole('switch'));
     await waitFor(() => expect(putBodies).toHaveLength(1));
-    fireEvent.click(within(row('grilling')).getByRole('button', { name: /^Inherit/ }));
+    fireEvent.click(within(row('grilling')).getByRole('switch'));
     await waitFor(() => expect(putBodies).toHaveLength(2));
+    fireEvent.click(within(row('codebase-design')).getByRole('switch'));
+    await waitFor(() => expect(putBodies).toHaveLength(3));
 
     expect(putBodies).toEqual([
-      { level: 'issue', skill: 'local', enabled: false, issueId: 'TST-1' },
+      { level: 'issue', skill: 'okf', enabled: false, issueId: 'TST-1' },
       { level: 'issue', skill: 'grilling', enabled: null, issueId: 'TST-1' },
+      { level: 'issue', skill: 'codebase-design', enabled: true, issueId: 'TST-1' },
+    ]);
+  });
+
+  it('Pin sends the inherited value and Reset sends null', async () => {
+    mockApi(issueSkills);
+    renderPanel({ level: 'issue', issueId: 'TST-1' });
+    await waitFor(() => expect(row('grilling')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: /^All/ }));
+
+    fireEvent.click(within(row('okf')).getByRole('button', { name: 'Pin okf on for this issue' }));
+    await waitFor(() => expect(putBodies).toHaveLength(1));
+    fireEvent.click(within(row('codebase-design')).getByRole('button', { name: 'Pin codebase-design off for this issue' }));
+    await waitFor(() => expect(putBodies).toHaveLength(2));
+    fireEvent.click(within(row('local')).getByRole('button', { name: 'Reset local to the global default' }));
+    await waitFor(() => expect(putBodies).toHaveLength(3));
+
+    expect(putBodies).toEqual([
+      { level: 'issue', skill: 'okf', enabled: true, issueId: 'TST-1' },
+      { level: 'issue', skill: 'codebase-design', enabled: false, issueId: 'TST-1' },
+      { level: 'issue', skill: 'local', enabled: null, issueId: 'TST-1' },
     ]);
   });
 
@@ -179,18 +218,19 @@ describe('SkillOverridesPanel — issue', () => {
     renderPanel({ level: 'issue', issueId: 'TST-1' });
     await waitFor(() => expect(row('grilling')).toBeTruthy());
 
-    fireEvent.click(within(row('grilling')).getByRole('button', { name: 'On' }));
+    fireEvent.click(within(row('grilling')).getByRole('switch'));
     await waitFor(() => expect(within(row('grilling')).getByRole('alert').textContent).toContain('unknown skill: grilling'));
     fireEvent.click(within(row('grilling')).getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(putBodies).toHaveLength(2));
     expect(putBodies[1]).toEqual(putBodies[0]);
+    expect(putBodies[0]).toEqual({ level: 'issue', skill: 'grilling', enabled: null, issueId: 'TST-1' });
   });
 
   it('reports a pending push as a neutral notice', async () => {
     mockApi(issueSkills, { body: { ok: true, committed: true, pushed: false, reason: 'main has no upstream' } });
     renderPanel({ level: 'issue', issueId: 'TST-1' });
     await waitFor(() => expect(row('grilling')).toBeTruthy());
-    fireEvent.click(within(row('grilling')).getByRole('button', { name: 'On' }));
+    fireEvent.click(within(row('grilling')).getByRole('switch'));
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Saved locally; push pending: main has no upstream'));
   });
 
@@ -206,6 +246,26 @@ describe('SkillOverridesPanel — issue', () => {
     mockApi(issueSkills);
     renderPanel({ level: 'issue', issueId: 'TST-1', enabled: false });
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+describe('SkillOverridesPanel — project', () => {
+  it('uses the same control with project wording', async () => {
+    mockApi({
+      project: 'tst', issue: null,
+      skills: [
+        skill({ name: 'grilling', global: false, enabled: false, source: 'global' }),
+        skill({ name: 'okf', project: false, enabled: false, source: 'project' }),
+      ],
+    });
+    renderPanel({ level: 'project', projectKey: 'tst' });
+    await waitFor(() => expect(row('grilling')).toBeTruthy());
+
+    expect(within(row('grilling')).getByText('off · global')).toBeTruthy();
+    expect(within(row('okf')).getByText('off · this project')).toBeTruthy();
+
+    fireEvent.click(within(row('grilling')).getByRole('switch', { name: 'grilling for this project' }));
+    await waitFor(() => expect(putBodies).toEqual([{ level: 'project', skill: 'grilling', enabled: true, projectKey: 'tst' }]));
   });
 });
 
@@ -239,7 +299,7 @@ describe('skill override sections', () => {
     renderSection(<IssueSkillsSection issueId="TST-1" />);
     fireEvent.click(screen.getByRole('button', { name: 'Skills for this issue' }));
     await waitFor(() => expect(row('grilling')).toBeTruthy());
-    fireEvent.click(within(row('grilling')).getByRole('button', { name: 'On' }));
+    fireEvent.click(within(row('grilling')).getByRole('switch'));
     await waitFor(() => expect(screen.getByTestId('skills-changed-since-launch').textContent)
       .toBe('Skills changed since launch; applies next launch (work agent running).'));
   });

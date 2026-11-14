@@ -3,7 +3,9 @@
  *
  * - global (Skills page): a two-state switch per skill. Off stores an
  *   override; on clears it, because on is the default.
- * - project / issue: Inherit | On | Off. Inherit shows the value it inherits.
+ * - project / issue: one switch showing the effective state, the source
+ *   beside it, and Pin (store the inherited value) or Reset (clear the
+ *   stored value). Skills changed at this level are listed first (PAN-5245).
  *
  * The operator-approved UI decisions on the issue shape the details: core
  * skills collapse to one summary row below global, project-only skills are
@@ -19,7 +21,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Lock, Search, X } from 'lucide-react';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { cn } from '../../lib/utils';
-import { GroupHeader, LevelChoice, RowError, SkillSwitch } from './SkillControls';
+import { GroupHeader, LevelSwitch, RowError, SkillSwitch } from './SkillControls';
 import { SkillPacksSection, type PackState } from './SkillPacksSection';
 
 export type SkillOverrideLevel = 'global' | 'project' | 'issue';
@@ -385,9 +387,7 @@ function SkillRow({ skill, level, below, saving, error, onSave }: SkillRowProps)
     <div
       className={cn(
         'list-row grid items-start gap-x-4 gap-y-1 px-3 py-2',
-        level === 'global'
-          ? 'grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(11rem,15rem)_minmax(0,1fr)_auto]'
-          : 'grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(11rem,15rem)_minmax(0,1fr)_auto_4.5rem]',
+        'grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(11rem,15rem)_minmax(0,1fr)_auto]',
       )}
       data-skill={skill.name}
     >
@@ -412,22 +412,9 @@ function SkillRow({ skill, level, below, saving, error, onSave }: SkillRowProps)
             onToggle={() => onSave(skill.global === false ? null : false)}
           />
         ) : (
-          <LevelChoice
-            label={`${skill.name} at ${level} level`}
-            current={current}
-            inheritLabel={`Inherit (${inherit.on ? 'on' : 'off'} via ${inherit.from})`}
-            saving={saving}
-            onSet={onSave}
-          />
+          <LevelSwitch skill={skill.name} level={level} current={current} inherited={inherit} saving={saving} onSet={onSave} />
         )}
       </div>
-
-      {level !== 'global' && (
-        <div className="hidden text-right font-mono-ui text-xs leading-5 md:block">
-          <span className={skill.enabled ? 'text-foreground' : 'text-muted-foreground'}>{skill.enabled ? 'on' : 'off'}</span>
-          <span className="block text-muted-foreground">{skill.source}</span>
-        </div>
-      )}
     </div>
   );
 }
