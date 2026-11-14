@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5225",
   "created": "2026-11-14T03:19:12.068Z",
-  "updated": "2026-11-14T03:45:51.769Z",
+  "updated": "2026-11-14T03:45:58.879Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,11 @@
     "landing-no-changes.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T03:45:51.769Z"
+    },
+    "extract-post-merge-row": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5225",
+      "claimedAt": "2026-11-14T03:45:58.879Z"
     }
   }
 }
