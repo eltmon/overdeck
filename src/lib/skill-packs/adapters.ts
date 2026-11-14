@@ -10,6 +10,7 @@
 import { lstat, readdir, readFile } from 'node:fs/promises';
 import { basename, isAbsolute, join, posix } from 'node:path';
 import { parse as parseYaml } from 'yaml';
+import { createPromiseConcurrencyLimiter } from '../concurrency.js';
 import { SAGEOX_DISCLOSURE } from '../sageox/disclosure.js';
 import { ATLASSIAN_DISCLOSURE, ATLASSIAN_OPT_IN_SKILLS, ATLASSIAN_PACK_COMMIT, ATLASSIAN_PACK_ID, ATLASSIAN_PACK_URL } from './atlassian.js';
 import { DEFT_READONLY_SKILLS, DEFT_SKILL_PREFIX, DEFT_SKILLS_DIR } from './deft.js';
@@ -158,6 +159,8 @@ const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const PLAIN_MAX_DEPTH = 4;
 const PLUGIN_JSON = join('.claude-plugin', 'plugin.json');
 const LICENSE_TOKENS = ['MIT', 'Apache', 'BSD', 'GPL'] as const;
+const MANIFEST_FS_CONCURRENCY = 32;
+const limitFs = createPromiseConcurrencyLimiter(MANIFEST_FS_CONCURRENCY);
 
 /** Frontmatter `name` (null when absent) and the first line of `description` ('' when absent or unparseable). */
 export function readSkillFrontmatter(content: string): { name: string | null; description: string } {
@@ -335,28 +338,28 @@ async function gstackSkillDirs(
 const RUNTIME_SKIP_DIRS = new Set(['.git', '.github', 'node_modules', 'test']);
 
 async function listExecutables(root: string, skillDir: string, skipTopLevel: ReadonlySet<string> = new Set()): Promise<string[]> {
-  const found: string[] = [];
-  const walk = async (rel: string): Promise<void> => {
+  const walk = async (rel: string): Promise<string[]> => {
     let dirents;
     try {
-      dirents = await readdir(join(root, rel), { withFileTypes: true });
+      dirents = await limitFs(() => readdir(join(root, rel), { withFileTypes: true }));
     } catch {
-      return;
+      return [];
     }
-    for (const dirent of [...dirents].sort((a, b) => a.name.localeCompare(b.name))) {
-      const child = posix.join(rel, dirent.name);
-      if (dirent.isDirectory()) {
-        if (rel === skillDir && skipTopLevel.has(dirent.name)) continue;
-        await walk(child);
-        continue;
-      }
-      if (!dirent.isFile()) continue;
-      const stats = await lstat(join(root, child));
-      if (dirent.name.endsWith('.sh') || (stats.mode & 0o111) !== 0) found.push(child);
-    }
+    const sorted = [...dirents].sort((a, b) => a.name.localeCompare(b.name));
+    const parts = await Promise.all(
+      sorted.map(async (dirent): Promise<string[]> => {
+        const child = posix.join(rel, dirent.name);
+        if (dirent.isDirectory()) {
+          return rel === skillDir && skipTopLevel.has(dirent.name) ? [] : walk(child);
+        }
+        if (!dirent.isFile()) return [];
+        const stats = await limitFs(() => lstat(join(root, child)));
+        return dirent.name.endsWith('.sh') || (stats.mode & 0o111) !== 0 ? [child] : [];
+      }),
+    );
+    return parts.flat();
   };
-  await walk(skillDir);
-  return found;
+  return walk(skillDir);
 }
 
 const MCP_SERVER_NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
@@ -501,9 +504,11 @@ export async function readPackManifest(
   const skills: PackSkill[] = [];
   const seen = new Set<string>();
   const executables: string[] = [];
-  for (const dir of skillDirs) {
-    const content = await readTextOrNull(join(base, dir, 'SKILL.md'));
-    if (content === null) continue;
+  const contents = await Promise.all(skillDirs.map((dir) => limitFs(() => readTextOrNull(join(base, dir, 'SKILL.md')))));
+  const executableDirs: string[] = [];
+  skillDirs.forEach((dir, index) => {
+    const content = contents[index] ?? null;
+    if (content === null) return;
     const frontmatter = readSkillFrontmatter(content);
     // Deft skills are named by the stripped dir name, never the `deft-directive-*` frontmatter name;
     // gstack skills by their dir name, which is what the skill map classifies.
@@ -512,12 +517,13 @@ export async function readPackManifest(
       : gstack
         ? dir
         : (frontmatter.name ?? basename(dir));
-    if (!SKILL_NAME_PATTERN.test(name) || seen.has(name)) continue;
+    if (!SKILL_NAME_PATTERN.test(name) || seen.has(name)) return;
     seen.add(name);
     const repoDir = prefix ? posix.join(prefix, dir) : dir;
     skills.push({ name, dir: repoDir, description: frontmatter.description, optIn: optIn.has(name) });
-    if (gstack) continue;
-    const dirExecutables = await listExecutables(base, dir);
+    if (!gstack) executableDirs.push(dir);
+  });
+  for (const dirExecutables of await Promise.all(executableDirs.map((dir) => listExecutables(base, dir)))) {
     executables.push(...(prefix ? dirExecutables.map((e) => posix.join(prefix, e)) : dirExecutables));
   }
   // A runtime pack runs scripts from anywhere in its tree, so every runtime executable is listed.

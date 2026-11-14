@@ -107,6 +107,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   loop must use async exec/spawn (PAN-70: ~70 calls cleaned up). Note doctor's
   `checkCommand` (`src/cli/commands/doctor.ts`) is execSync-based — CLI-only, do
   not import it into server-reachable code.
+- **Long chains of sequential `await fs.*` stall under threadpool load** — every
+  `fs/promises` call queues on libuv's 4-thread pool, which the server keeps busy
+  (121 MB `parseTranscriptSnapshot` reads, cost sweeps). A loop that awaits one
+  `readFile`/`lstat` per file pays the queue wait once per file: the skill catalog's
+  ~3,900 serial calls took 66 s under synthetic saturation and 0.5 s on a quiet pool,
+  consistent with a reported 37–77 s load (PAN-5238).
+  Issue directory reads concurrently through `createPromiseConcurrencyLimiter`
+  (`src/lib/concurrency.ts`), wrapping only leaf fs calls so a recursive walk cannot deadlock.
 - **tmux sync primitives are legacy debt** — `capturePaneSync`/`killSessionSync` etc. exist but new
   callers must use async variants; raw `send-keys "text" C-m` drops Enter.
 - **RTK output compression** — when `agents.rtk.enabled`, Bash output agents see

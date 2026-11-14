@@ -4,7 +4,7 @@
  */
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   listSkillStates: vi.fn(),
@@ -86,6 +86,36 @@ describe('GET /api/skills/overrides', () => {
     mocks.listSkillStates.mockRejectedValue(new SkillOverrideError('unknown-issue', 'no registered project owns issue ZZZ-1'));
     const result = await request('/api/skills/overrides?issue=ZZZ-1');
     expect(result).toEqual({ status: 404, body: { error: 'no registered project owns issue ZZZ-1', code: 'unknown-issue' } });
+  });
+
+  describe('slow-request logging (PAN-5238)', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('logs a slow GET', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      mocks.listSkillStates.mockImplementation(async (ctx: { projectKey?: string; issueId?: string }) => {
+        vi.setSystemTime(Date.now() + 2500);
+        return { project: ctx.projectKey ?? (ctx.issueId ? 'tst' : null), issue: ctx.issueId ?? null, skills: [grilling] };
+      });
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = await request('/api/skills/overrides?issue=TST-1');
+
+      expect(result.status).toBe(200);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0]?.[0]).toContain('[skill-overrides] slow GET level=issue');
+      expect(warn.mock.calls[0]?.[0]).toContain('issue=TST-1');
+    });
+
+    it('does not log a fast GET', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      await request('/api/skills/overrides?issue=TST-1');
+
+      expect(warn.mock.calls.some(([line]) => typeof line === 'string' && line.includes('[skill-overrides] slow'))).toBe(false);
+    });
   });
 });
 
