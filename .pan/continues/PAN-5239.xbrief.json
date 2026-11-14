@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5239",
+  "created": "2026-11-14T04:43:48.158Z",
+  "updated": "2026-11-14T04:43:48.159Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "contracts-target-key": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5239",
+      "claimedAt": "2026-11-14T04:43:48.158Z"
+    }
+  }
+}
