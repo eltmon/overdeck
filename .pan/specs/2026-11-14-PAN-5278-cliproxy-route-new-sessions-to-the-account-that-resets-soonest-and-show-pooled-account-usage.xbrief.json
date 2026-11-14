@@ -1,0 +1,837 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T18:07:30Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5278: CLIProxy: route new sessions to the account that resets soonest, and show pooled account usage",
+    "updated": "2026-11-14T18:09:54.396Z"
+  },
+  "plan": {
+    "id": "pan-5278",
+    "title": "CLIProxy: route new sessions to the account that resets soonest, and show pooled account usage",
+    "status": "proposed",
+    "uid": "db71486c-6e80-4868-9459-39ac6b61d441",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-14T18:07:30Z",
+    "updated": "2026-11-14T18:09:54.396Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5278",
+        "label": "PAN-5278",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5278/.pan/drafts/pan-5278.md",
+        "label": "PRD draft (.pan/drafts/pan-5278.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "cliproxy",
+      "routing",
+      "settings",
+      "providers"
+    ],
+    "narratives": {
+      "Problem": "CLIProxy round-robins requests across a provider's accounts, so quota an account has not used when its window resets is lost. Overdeck also gives operators no view of the pooled accounts' usage, and today the management API only works because the operator added it to config.extra.yaml by hand.",
+      "Proposal": "Without forking CLIProxy 7.3.16: generate session-affinity and a localhost-only management API in config.yaml; keep operator fields when the Codex bridge rewrites its auth file; add a leaf pool reader that lists accounts and reads Codex/Claude usage through the management api-call endpoint; a host-only controller ranks each provider's accounts by soonest weekly reset every 5 minutes (only when a provider has 2+ enabled accounts) and writes CLIProxy per-account priority; a read-only GET /api/cliproxy/accounts and a Settings → Providers panel show the pool.",
+      "NonGoals": "- Redeeming Codex reset credits, calling /v0/management/reset-quota, or any 'Use reset' button\n- Upgrading or forking CLIProxy (stay on v7.3.16)\n- Exposing the management API beyond localhost (allow-remote stays false; no Tailscale exposure; no MANAGEMENT_PASSWORD env var)\n- Signing Claude or any other accounts into the proxy\n- Ranking providers other than codex and claude\n- A setting to turn the controller off, or a route-scopes.ts row for the new route\n- Persisting the pool snapshot to disk or the read model\n- Writes from GET /api/cliproxy/accounts (it never PATCHes priorities)\n- Tests that contact port 8317 or any upstream provider"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Planned from the operator-revised PRD on main (aae9223552c): read-only route via readPoolSnapshot, sync ensureConfigFile deleted with no null-key writer, usage reads only when a provider has 2+ enabled accounts, PATCH persistence proven by the checkpoint item.",
+        "rationale": "The operator sent these revisions during planning; they are the authoritative input."
+      },
+      {
+        "summary": "ensureConfigFileAsync compares parsed YAML with a bcrypt secret-key masked instead of raw text (PRD Decision 11, NFR-5).",
+        "rationale": "Verified at v7.3.16 and on the live config: CLIProxy hashes the plaintext key and writes it back, also dropping blank lines, so a text compare rewrites config.yaml on every Gemini spawn and triggers a reload. MANAGEMENT_PASSWORD would enable remote access; Overdeck-side bcrypt needs a new dependency."
+      },
+      {
+        "summary": "When config.extra.yaml defines remote-management, Overdeck generates no key and reads the management-key file (PRD Decision 10).",
+        "rationale": "FR-2 says so, and generating a key there would write a file that does not match the operator's secret."
+      },
+      {
+        "summary": "The accounts route serves its cached snapshot for at most 5 minutes and the panel shows the snapshot age (PRD Decision 13, NFR-6).",
+        "rationale": "With one account per provider the controller never refreshes the snapshot, so without a max age the panel would show the first read forever."
+      },
+      {
+        "summary": "The PATCH checkpoint is its own spike item that blocks the pool reader, and records its result in the PRD.",
+        "rationale": "setAccountPriority's body depends on the result; a committed PRD section keeps the evidence where review can read it."
+      },
+      {
+        "summary": "Bridge tests live in tests/lib/cliproxy-bridge.test.ts rather than cliproxy-config.test.ts.",
+        "rationale": "Separate test files keep the two items' diffs independent; they still share src/lib/cliproxy.ts, which an edge serializes."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "The issue scopes one feature (generated config, bridge fix, pool reader, controller, route, panel) whose 19 files span few real code areas: src/lib, one server route file, one Settings section, and docs. The subsystem count also counts test and doc directories. The panel and route only make sense on top of the pool reader, and the DAG already lets independent items run in parallel slots, so sibling issues would add review overhead without parallelism.",
+      "canonicalFilename": "2026-11-14-PAN-5278-cliproxy-route-new-sessions-to-the-account-that-resets-soonest-and-show-pooled-account-usage.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "config-affinity-mgmt",
+        "title": "Generate session-affinity and localhost management-API blocks in CLIProxy config.yaml",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T18:07:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5278",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cliproxy.ts",
+            "tests/lib/cliproxy-config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cliproxy-config.test.ts tests/lib/cliproxy-spawn.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/lib/cliproxy-config.test.ts passes all routing/remote-management/configsEquivalent cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "bridge-keeps-fields",
+            "pool-reader"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 1 steps 1-6 and Decisions 10-11. In src/lib/cliproxy.ts add getCliproxyManagementKeyPath(), async ensureManagementKey() (randomBytes(24).toString('hex'), mode 0o600, reuse a non-empty existing file), exported async readManagementKey() (null when missing/empty), extraDefinesTopLevelKey(extra,key) (regex-escaped '^key:' multiline). Change buildCliproxyConfig to emit the routing block (strategy round-robin, session-affinity true, ttl \"1h\") unless extra defines routing, and the remote-management block (allow-remote false, secret-key = serializeYamlString(key)) unless extra defines remote-management. In ensureConfigFileAsync: if extra defines remote-management, generate no key and emit no block; otherwise await ensureManagementKey() and pass it (never null on the generated path). Convert startCliproxy line 631 to await ensureConfigFileAsync() and delete the sync ensureConfigFile, plus ensureDirs/readBridgedGeminiApiKey if they become unused. Replace the text-equality check with exported configsEquivalent(existing, generated): equal text => true; else parse both with yaml.parse, and if the existing remote-management.secret-key matches /^\\$2[aby]\\$/ set both secret-key values to one sentinel, then return isDeepStrictEqual; parse error => false. Update the module header (lines 1-16) to mention the generated routing and remote-management blocks. New test file tests/lib/cliproxy-config.test.ts mocks os.homedir() to a temp dir following tests/lib/cliproxy-spawn.test.ts; it never touches ~/.overdeck or port 8317."
+        },
+        "items": [
+          {
+            "id": "config-affinity-mgmt.ac1",
+            "title": "Given config.extra.yaml has no top-level routing key, when ensureConfigFileAsync runs, then the written config.yaml contains exactly one top-level routing key with session-affinity: true and session-affinity-ttl: \"1h\"; given extra defines routing, the generated routing block is omitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-affinity-mgmt.ac2",
+            "title": "Given no remote-management key in extra and no management-key file, when ensureConfigFileAsync runs, then it creates management-key with mode 0600 and config.yaml contains remote-management with allow-remote: false and that key; a second run reuses the same key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-affinity-mgmt.ac3",
+            "title": "Given config.extra.yaml defines remote-management, when ensureConfigFileAsync runs, then no management-key file is created and config.yaml contains only the extra's remote-management block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-affinity-mgmt.ac4",
+            "title": "Given config.yaml on disk equals the generated text except a $2a$ bcrypt secret-key and one dropped blank line, when ensureConfigFileAsync runs, then it does not rewrite config.yaml; a changed api-keys entry makes configsEquivalent return false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-affinity-mgmt.ac5",
+            "title": "git grep -n 'function ensureConfigFile(' src returns no match, and startCliproxy awaits ensureConfigFileAsync",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bridge-keeps-fields",
+        "title": "Codex auth bridge preserves priority, weight and disabled in codex-primary.json",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:07:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cliproxy.ts",
+            "tests/lib/cliproxy-bridge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cliproxy-bridge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/lib/cliproxy-bridge.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 2. In bridgeCodexAuthToCliproxy (src/lib/cliproxy.ts ~line 173) read the existing codex-primary.json if present, keep priority and weight only when Number.isInteger, keep disabled only when boolean. Build creds with disabled: kept.disabled ?? false and spread priority/weight only when kept. Add optional priority/weight to CliproxyCodexCredentials. Keep the 'unchanged => return true' comparison against the merged serialization. Tests go in a NEW file tests/lib/cliproxy-bridge.test.ts (mock os.homedir to a temp dir; write a fake ~/.codex/auth.json with JWT-shaped tokens built at runtime)."
+        },
+        "items": [
+          {
+            "id": "bridge-keeps-fields.ac1",
+            "title": "Given codex-primary.json holds priority: 30, weight: 2 and disabled: true, when bridgeCodexAuthToCliproxy() rewrites it from a refreshed ~/.codex/auth.json, then the new file still has priority 30, weight 2 and disabled true and the new access_token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bridge-keeps-fields.ac2",
+            "title": "Given codex-primary.json holds priority: \"high\" (non-integer), when the bridge runs, then the rewritten file has no priority field and disabled defaults to false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bridge-keeps-fields.ac3",
+            "title": "Given codex-primary.json does not exist, when the bridge runs, then it writes the file with disabled false and no priority or weight keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verify-priority-patch",
+        "title": "Checkpoint: prove PATCH auth-files/fields persists priority on a throwaway CLIProxy",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T18:07:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "spike",
+          "issueLabel": "pan-5278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/pan-5278.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n '## Checkpoint result' .pan/drafts/pan-5278.md"
+          ],
+          "expected_outputs": [
+            "the PRD has a Checkpoint result section naming PATCH or file-rewrite"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD 'Implementation checkpoint'. Run ~/.overdeck/bin/cliproxy -config <ws>/.tmp/pan-5278-cpa/config.yaml on port 18317 with its own auth-dir holding two fake codex auth files (dummy tokens) and a remote-management secret-key. PATCH /v0/management/auth-files/fields {name, priority: 20}, then GET /v0/management/auth-files and read the auth file on disk; then restart the throwaway instance and GET again. Never use port 8317, ~/.overdeck/cliproxy/, or real auth files. Stop the throwaway process afterwards. Append a '## Checkpoint result' section to .pan/drafts/pan-5278.md with the commands and trimmed output, and state the chosen path: PATCH, or the fallback (setAccountPriority rewrites the auth JSON via temp file + rename). Do not commit the .tmp directory."
+        },
+        "items": [
+          {
+            "id": "verify-priority-patch.ac1",
+            "title": "Given a throwaway CLIProxy on port 18317, when PATCH auth-files/fields sets priority 20 on one fake account, then GET auth-files reports priority 20 for it and the auth JSON file on disk contains \"priority\": 20 (or the section records that it did not)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-priority-patch.ac2",
+            "title": "When the checkpoint finishes, then the PRD contains a '## Checkpoint result' section that names the chosen mechanism (PATCH or file-rewrite fallback) and quotes the throwaway-instance output, and no process remains listening on port 18317",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pool-reader",
+        "title": "Pool reader: list CLIProxy accounts and read Codex/Claude usage through api-call",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T18:07:30Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5278",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/cliproxy-pool.ts",
+            "tests/lib/cliproxy-pool.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cliproxy-pool.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "tests/lib/cliproxy-pool.test.ts passes",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "rank-priorities",
+            "routing-controller",
+            "accounts-route",
+            "settings-panel"
+          ],
+          "parallelSafeReason": "It creates two new files (src/lib/cliproxy-pool.ts and its test) that no other item edits; it only reads exports from src/lib/cliproxy.ts after config-affinity-mgmt lands."
+        },
+        "narrative": {
+          "Action": "PRD work item 3. New leaf module src/lib/cliproxy-pool.ts importing only ./cliproxy.js (CLIPROXY_BASE_URL, readManagementKey, CliproxyError) and Node built-ins. Export the PoolWindow/PoolAccount/PoolSnapshot types exactly as in the PRD, plus listPoolAccounts() (local GET auth-files only, no upstream calls), readPool(), setAccountPriority(name, priority). Use fetch with AbortController + setTimeout(15_000), never AbortSignal.timeout. Upstream calls go through POST /v0/management/api-call with $TOKEN$ headers; at most 4 concurrent; codex and claude parse rules, labels, weekly window and exhausted rule from the PRD glossary and steps 4-6. setAccountPriority uses the mechanism the verify-priority-patch checkpoint recorded (PATCH by default; temp-file + rename rewrite of the auth JSON if the checkpoint says PATCH does not persist). Never log or return the management key, tokens, or upstream body text. Module header explains the job and the no-secrets rule. Tests stub globalThis.fetch with vi.fn routed by URL/body; fake timers for the timeout case."
+        },
+        "items": [
+          {
+            "id": "pool-reader.ac1",
+            "title": "Given no management-key file, when readPool() runs, then it returns managementAvailable false and an empty accounts list without calling fetch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pool-reader.ac2",
+            "title": "Given auth-files lists one codex account and the live wham/usage body from the PRD, when readPool() runs, then that account has plan 'pro', a 'weekly' window with usedPercent 9, weeklyResetsAt = ISO of reset_at*1000, and exhausted false; with limit_reached true it reports exhausted true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pool-reader.ac3",
+            "title": "Given a claude account whose usage body has five_hour and seven_day, when readPool() runs, then it returns '5-hour' and 'weekly' windows with resets_at as resetsAt; disabled and gemini accounts get no api-call and usageRead false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pool-reader.ac4",
+            "title": "Given one account's api-call returns status_code 429, when readPool() runs, then only that account has error 'HTTP 429 from provider' and other accounts read normally; a hung api-call is aborted after 15 s under vi.advanceTimersByTimeAsync",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pool-reader.ac5",
+            "title": "JSON.stringify of the returned snapshot never contains the management key or any access token string from the fixtures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rank-priorities",
+        "title": "Pure reset-first ranking: planPriorities",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:07:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cliproxy-routing.ts",
+            "tests/lib/cliproxy-routing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cliproxy-routing.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "planPriorities cases in tests/lib/cliproxy-routing.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Decision 2 and work item 4 step 1. Create src/lib/cliproxy-routing.ts (module header: owns CLIProxy priority on eligible codex/claude accounts; never touches disabled or unreadable accounts) with exported pure planPriorities(accounts): Map<name, priority>. Per provider (codex, claude only): eligible = not disabled, usageRead, error null, weeklyResetsAt present. Do nothing when fewer than 2 eligible. Sort non-exhausted by weeklyResetsAt ascending, ties by lower weekly usedPercent, then authIndex ascending; priorities n*10 down to 10. Exhausted eligible => 0. Return only entries where desired !== account.priority (null counts as different). Import types from ./cliproxy-pool.js only."
+        },
+        "items": [
+          {
+            "id": "rank-priorities.ac1",
+            "title": "Given two eligible codex accounts resetting in 1 day and 4 days, when planPriorities runs, then the 1-day account gets 20 and the 4-day account gets 10",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rank-priorities.ac2",
+            "title": "Given equal reset times, when planPriorities runs, then the lower usedPercent ranks first, and with equal usedPercent the lower authIndex ranks first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rank-priorities.ac3",
+            "title": "Given three eligible accounts where one is exhausted, then the exhausted one gets 0 and the other two get 20 and 10",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rank-priorities.ac4",
+            "title": "Given one eligible account plus one disabled and one with an error, then planPriorities returns an empty map (fewer than two eligible; disabled and errored accounts untouched)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rank-priorities.ac5",
+            "title": "Given accounts whose current priority already equals the desired value, then those names are absent from the returned map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "routing-controller",
+        "title": "Controller tick: refreshPool, readPoolSnapshot and the 5-minute timer gated on 2+ enabled accounts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T18:07:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cliproxy-routing.ts",
+            "tests/lib/cliproxy-routing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cliproxy-routing.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "controller cases in tests/lib/cliproxy-routing.test.ts pass",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 4 steps 2-4. In src/lib/cliproxy-routing.ts add getPoolSnapshot() (module variable), refreshPool() (readPool -> planPriorities -> setAccountPriority one at a time; update changed priorities in the snapshot; a failed PATCH logs '[cliproxy-routing] priority update failed for <name>' with the name only and leaves that account unchanged), readPoolSnapshot() (readPool, store, never calls setAccountPriority), and startCliproxyRoutingController(): first tick at 10 s, then every 5 min, tickInFlight guard like startCliproxyWatchdog. Each tick calls listPoolAccounts() first and calls refreshPool() only when codex or claude has 2+ non-disabled accounts; otherwise no usage reads. Errors are logged, never thrown. refreshPool is the only caller of setAccountPriority. Tests mock ./cliproxy-pool.js and use vi.useFakeTimers + vi.advanceTimersByTimeAsync, no real waits."
+        },
+        "items": [
+          {
+            "id": "routing-controller.ac1",
+            "title": "Given a mocked pool with two codex accounts, when the controller starts and fake time advances 10 s, then refreshPool runs once and setAccountPriority receives the planned priorities; advancing another 5 min runs it again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routing-controller.ac2",
+            "title": "Given a tick still in flight, when the next interval fires, then no second readPool call starts until the first resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routing-controller.ac3",
+            "title": "Given listPoolAccounts reports one codex account and no claude accounts, when ticks fire, then readPool and setAccountPriority are never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routing-controller.ac4",
+            "title": "Given setAccountPriority rejects for one account, when refreshPool runs, then the other changes still apply, the snapshot keeps the old priority for the failed one, and the logged message contains the account name but no key or token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routing-controller.ac5",
+            "title": "When readPoolSnapshot() runs, then setAccountPriority is not called and getPoolSnapshot() returns the new snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "host-wiring",
+        "title": "Start the routing controller on host dashboards only",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:07:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/cliproxy.ts",
+            "tests/unit/dashboard/server/routes/cliproxy-watchdog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/cliproxy-watchdog.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "cliproxy-watchdog.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Decision 5 and work item 4 wire-up. Add a third parameter startRouting: () => void = startCliproxyRoutingController to startCliproxyWatchdogForDashboard in src/dashboard/server/routes/cliproxy.ts (line ~91); call it right after startWatchdog() on host dashboards. Keep the existing two-argument calls (src/dashboard/server/main.ts line 708) and existing tests working unchanged. Add test cases to tests/unit/dashboard/server/routes/cliproxy-watchdog.test.ts."
+        },
+        "items": [
+          {
+            "id": "host-wiring.ac1",
+            "title": "Given isPeerDashboard true, when startCliproxyWatchdogForDashboard(true, startWatchdog, startRouting) runs, then it returns false and neither mock is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-wiring.ac2",
+            "title": "Given isPeerDashboard false, when it runs, then it returns true and calls startWatchdog and startRouting once each",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-wiring.ac3",
+            "title": "Given the existing one-argument call startCliproxyWatchdogForDashboard(isPeerDashboard) in src/dashboard/server/main.ts, then typecheck passes without changing it and the two pre-existing watchdog tests still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "accounts-route",
+        "title": "Read-only GET /api/cliproxy/accounts with a 5-minute snapshot cache",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:07:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/cliproxy.ts",
+            "tests/unit/dashboard/server/routes/cliproxy-accounts.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/cliproxy-accounts.test.ts tests/unit/lib/overdeck",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "cliproxy-accounts.test.ts and the no-loss matrix tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 5 and Decisions 8 and 13. Add getCliproxyAccountsRoute next to getCliproxyStatusRoute in src/dashboard/server/routes/cliproxy.ts using the PRD snippet: serve getPoolSnapshot() when younger than 5 minutes by checkedAt, otherwise or with ?refresh=1 call readPoolSnapshot(); never call refreshPool or setAccountPriority. Add it to cliproxyRouteLayer. No route-scopes.ts row (stays admin). Add the no-loss-matrix row after line 162: { surface: 'GET /api/cliproxy/accounts', kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'CLIProxy pooled-account usage (PAN-5278); outside 8 remodel domains' }. Route test mocks ../../../../../src/lib/cliproxy-routing.js; fake timers for the age case."
+        },
+        "items": [
+          {
+            "id": "accounts-route.ac1",
+            "title": "Given a cached snapshot 1 minute old, when GET /api/cliproxy/accounts is called, then it returns that snapshot as JSON and readPoolSnapshot is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "accounts-route.ac2",
+            "title": "Given ?refresh=1, or no snapshot yet, or a snapshot older than 5 minutes, when the route is called, then it calls readPoolSnapshot once and returns its result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "accounts-route.ac3",
+            "title": "Given any route test case, when the route handler runs, then the refreshPool and setAccountPriority mocks record zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "accounts-route.ac4",
+            "title": "tests/unit/lib/overdeck/no-loss-matrix.ts contains a row with surface 'GET /api/cliproxy/accounts' and the no-loss matrix test accepts it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-panel",
+        "title": "Read-only 'CLIProxy accounts' panel in Settings → Providers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:07:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/CliproxyAccountsPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/CliproxyAccountsPanel.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/ProviderManagementSection.tsx",
+            "src/dashboard/frontend/src/App/api.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/Settings/sections/__tests__/CliproxyAccountsPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "CliproxyAccountsPanel.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 6 and Decision 13. Add fetchCliproxyAccounts(refresh=false) and a frontend copy of the PoolSnapshot type next to fetchCliproxyStatus (src/dashboard/frontend/src/App/api.ts line 145). New CliproxyAccountsPanel.tsx renders: heading 'CLIProxy accounts'; the line 'New sessions go to the account whose weekly quota resets soonest. Sessions already running stay on their account.'; a snapshot-age line from checkedAt ('checked 3 min ago'); one row per account with ProviderLogo (components/shared/branding), email in SensitiveText (components/SensitiveText.tsx), plan, one text bar per window ('weekly 9% · resets in 6d 5h'), rank ('next' for its provider's highest priority, then '2nd','3rd'…, 'last resort' for priority 0), and state text (disabled, exhausted, or the error); 'usage not read' for unread providers; 'CLIProxy management API is off' alone when managementAvailable is false; 'Add a second account to use reset-first routing.' when a provider has one account; a Refresh button calling fetchCliproxyAccounts(true). Render <CliproxyAccountsPanel /> after the provider rows in ProviderManagementSection.tsx. Follow the pan-style-guide skill: no pill badges, no decorative colour, warning colour only on exhausted rows. Browser verification uses an isolated Playwright instance/profile with /api/cliproxy/accounts mocked by route interception; never a shared browser session."
+        },
+        "items": [
+          {
+            "id": "settings-panel.ac1",
+            "title": "Given a mocked snapshot with two codex accounts, when the panel renders, then it shows two rows, each with its window text such as 'weekly 9% · resets in', the email inside SensitiveText, and a 'checked … ago' line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-panel.ac2",
+            "title": "Given managementAvailable false, when the panel renders, then it shows 'CLIProxy management API is off' and no account rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-panel.ac3",
+            "title": "Given a provider with a single account, when the panel renders, then it shows 'Add a second account to use reset-first routing.'; a gemini account row shows 'usage not read'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-panel.ac4",
+            "title": "When the Refresh button is clicked, then fetch is called with a URL ending '/api/cliproxy/accounts?refresh=1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-panel.ac5",
+            "title": "An isolated-profile Playwright screenshot of Settings → Providers with a mocked response (two codex accounts, one exhausted at priority 0) renders 'next' on the non-exhausted row and 'last resort' on the exhausted row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-changelog",
+        "title": "Document the account pool, reset-first routing and key rotation; add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:07:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/CONFIGURATION.md",
+            "configuration/harnesses.mdx",
+            "changelog.d/pan-5278.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 7 (the src/lib/cliproxy.ts header edit is in config-affinity-mgmt; the new modules' headers are in their own items). In docs/CONFIGURATION.md under '### CLIProxy Sidecar (OpenAI, Gemini)' (line 568) add '#### Account pool and reset-first routing': session affinity (1h TTL; bound sessions keep their account), the management-key file and localhost-only API, the ranking rule (Decision 2: soonest weekly reset first, exhausted last, only with 2+ eligible accounts, Overdeck owns priority), taking an account out of rotation with disabled: true, that config.extra.yaml routing:/remote-management: blocks replace the generated ones, and key rotation (delete management-key and config.yaml, then pan restart --cliproxy). In configuration/harnesses.mdx near '### Multi-provider via pi/ohmypi vs CLIProxy' (line 1225) add a short paragraph pointing to Settings → Providers → CLIProxy accounts. Add changelog.d/pan-5278.md with a '#### New' heading and one bullet linking https://github.com/eltmon/overdeck/issues/5278, per changelog.d/README.md."
+        },
+        "items": [
+          {
+            "id": "docs-and-changelog.ac1",
+            "title": "docs/CONFIGURATION.md contains the heading 'Account pool and reset-first routing' and text stating that the account whose weekly quota resets soonest gets the highest priority and that disabled: true takes an account out of rotation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac2",
+            "title": "docs/CONFIGURATION.md states the rotation procedure: delete management-key and config.yaml, then run pan restart --cliproxy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac3",
+            "title": "configuration/harnesses.mdx contains a paragraph in its CLIProxy section that names the Settings → Providers 'CLIProxy accounts' panel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac4",
+            "title": "changelog.d/pan-5278.md exists with exactly one '#### New' heading and a bullet linking issue 5278, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "config-affinity-mgmt",
+        "to": "bridge-keeps-fields",
+        "type": "blocks"
+      },
+      {
+        "from": "config-affinity-mgmt",
+        "to": "pool-reader",
+        "type": "blocks"
+      },
+      {
+        "from": "verify-priority-patch",
+        "to": "pool-reader",
+        "type": "blocks"
+      },
+      {
+        "from": "pool-reader",
+        "to": "rank-priorities",
+        "type": "blocks"
+      },
+      {
+        "from": "rank-priorities",
+        "to": "routing-controller",
+        "type": "blocks"
+      },
+      {
+        "from": "routing-controller",
+        "to": "host-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "routing-controller",
+        "to": "accounts-route",
+        "type": "blocks"
+      },
+      {
+        "from": "host-wiring",
+        "to": "accounts-route",
+        "type": "blocks"
+      },
+      {
+        "from": "pool-reader",
+        "to": "settings-panel",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
