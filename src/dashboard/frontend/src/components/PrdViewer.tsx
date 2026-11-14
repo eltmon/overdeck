@@ -16,6 +16,44 @@ interface PrdViewerProps {
   onClose: () => void;
 }
 
+export function useIssuePrdQuery(issueId: string) {
+  return useQuery<PrdResponse | null>({
+    queryKey: ['issue-prd', issueId],
+    queryFn: async () => {
+      const response = await fetch(`/api/issues/${issueId}/prd`);
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error(`Failed to fetch PRD: HTTP ${response.status}`);
+      return response.json() as Promise<PrdResponse>;
+    },
+    retry: false,
+  });
+}
+
+/** The PRD's states and content, without a dialog (PAN-5253: the Plan tab's PRD view). */
+export function PrdBody({ issueId }: { issueId: string }) {
+  const { data, isLoading, isError } = useIssuePrdQuery(issueId);
+  return (
+    <>
+      {isLoading && (
+        <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+          Loading PRD...
+        </div>
+      )}
+      {isError && (
+        <div className="flex items-center justify-center h-full text-sm text-destructive">
+          Failed to load PRD.
+        </div>
+      )}
+      {!isLoading && !isError && !data && (
+        <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+          No PRD draft for this issue.
+        </div>
+      )}
+      {data && <ChatMarkdown text={data.content} issueId={issueId} />}
+    </>
+  );
+}
+
 export function PrdViewer({ issueId, onClose }: PrdViewerProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -31,16 +69,7 @@ export function PrdViewer({ issueId, onClose }: PrdViewerProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  const { data, isLoading, isError } = useQuery<PrdResponse | null>({
-    queryKey: ['issue-prd', issueId],
-    queryFn: async () => {
-      const response = await fetch(`/api/issues/${issueId}/prd`);
-      if (response.status === 404) return null;
-      if (!response.ok) throw new Error(`Failed to fetch PRD: HTTP ${response.status}`);
-      return response.json() as Promise<PrdResponse>;
-    },
-    retry: false,
-  });
+  const { data } = useIssuePrdQuery(issueId);
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
@@ -78,22 +107,7 @@ export function PrdViewer({ issueId, onClose }: PrdViewerProps) {
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
-          {isLoading && (
-            <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-              Loading PRD...
-            </div>
-          )}
-          {isError && (
-            <div className="flex items-center justify-center h-full text-sm text-destructive">
-              Failed to load PRD.
-            </div>
-          )}
-          {!isLoading && !isError && !data && (
-            <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-              No PRD draft for this issue.
-            </div>
-          )}
-          {data && <ChatMarkdown text={data.content} issueId={issueId} />}
+          <PrdBody issueId={issueId} />
         </div>
       </div>
     </div>
