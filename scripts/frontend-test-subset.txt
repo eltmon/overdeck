@@ -375,5 +375,6 @@ src/pages/__tests__/FlywheelPage.test.tsx
 src/pages/__tests__/NewProjectPage.no-loss.test.tsx
 src/pages/__tests__/NewWorkspacePage.test.tsx
 src/test-utils/renderCounter.test.tsx
+src/vite-build-commit.test.ts
 src/components/chat/messagesTimeline/__tests__/toolBodyLoader.test.tsx
 src/components/chat/__tests__/MessagesTimeline.test.tsx

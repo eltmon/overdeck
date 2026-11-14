@@ -1,6 +1,9 @@
+import { execFile } from 'node:child_process';
 import { existsSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
 import { defineConfig, type Plugin, type ViteDevServer } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -31,6 +34,27 @@ export function resolveProxy(
 }
 
 const { behindTraefik, apiTarget, wsTarget } = resolveProxy();
+
+const execFileAsync = promisify(execFile);
+
+/**
+ * PAN-5236: the commit `vite build` compiles into the bundle as
+ * __OVERDECK_FRONTEND_BUILD_COMMIT__. `vite serve` gets null: `pan dev`
+ * hot-rebuilds only the server, so a dev tab would always look stale.
+ */
+export async function resolveFrontendBuildCommit(
+  command: 'build' | 'serve',
+  readHead: () => Promise<string> = async () =>
+    (await execFileAsync('git', ['rev-parse', 'HEAD'], { cwd: fileURLToPath(new URL('../../..', import.meta.url)), encoding: 'utf8' })).stdout,
+): Promise<string | null> {
+  if (command !== 'build') return null;
+  try {
+    const commit = (await readHead()).trim();
+    return commit.length > 0 ? commit : null;
+  } catch {
+    return null;
+  }
+}
 
 // PAN-1670: `pan dev` hot-reload restarts only the API child (3011); Vite (3010)
 // stays up, so the index.html boot watchdog never fires (no asset 404) and the
@@ -82,8 +106,11 @@ const profileOverrides = {
   },
 } as const;
 
-export default defineConfig(({ mode }) => ({
+export default defineConfig(async ({ command, mode }) => ({
   plugins: [react(), panDevFullReloadOnSignal()],
+  define: {
+    __OVERDECK_FRONTEND_BUILD_COMMIT__: JSON.stringify(await resolveFrontendBuildCommit(command)),
+  },
   resolve: {
     alias: [pdfjsAssetsAlias],
   },
