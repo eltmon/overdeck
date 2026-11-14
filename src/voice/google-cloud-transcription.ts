@@ -1,7 +1,8 @@
 import { PassThrough } from 'node:stream';
 import type { ITurnEmitter } from './transcription.js';
 
-const SAMPLE_RATE = 24000;
+/** Every /ws/voice client captures 16 kHz PCM16 mono; see ws-voice.ts. */
+const SAMPLE_RATE = 16000;
 const MAX_BACKEND_AUDIO_BUFFER_BYTES = 1_000_000;
 
 type GoogleStreamingRecognizeResponse = {
