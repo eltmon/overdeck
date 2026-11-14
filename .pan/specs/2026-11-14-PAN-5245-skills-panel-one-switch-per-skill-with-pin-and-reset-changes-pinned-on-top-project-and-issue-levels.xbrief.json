@@ -4,17 +4,17 @@
     "created": "2026-11-14T04:57:49Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5245: Skills panel: one switch per skill with pin and reset, changes pinned on top (project and issue levels)",
-    "updated": "2026-11-14T04:59:57.896Z"
+    "updated": "2026-11-14T05:12:18.823Z"
   },
   "plan": {
     "id": "pan-5245",
     "title": "Skills panel: one switch per skill with pin and reset, changes pinned on top (project and issue levels)",
-    "status": "proposed",
+    "status": "running",
     "uid": "2db25949-7e81-4008-a963-cbf65c234342",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T04:57:49Z",
-    "updated": "2026-11-14T04:59:57.896Z",
+    "updated": "2026-11-14T05:12:18.823Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5245",
@@ -751,5 +751,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
