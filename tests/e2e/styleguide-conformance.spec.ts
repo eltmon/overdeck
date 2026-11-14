@@ -5,6 +5,7 @@ import { chromium, type Browser, type BrowserContext, type Page } from 'playwrig
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
+import { createViteCacheDir, pdfjsAssetsAlias, removeViteCacheDir } from './fixtures/vite-harness.js';
 
 type ViteDevServer = {
   listen: () => Promise<void> | void;
@@ -14,6 +15,7 @@ type ViteDevServer = {
 
 const require = createRequire(import.meta.url);
 let vite: ViteDevServer;
+let viteCacheDir: string | undefined;
 let browser: Browser;
 let baseUrl: string;
 let linkedFrontendNodeModules = false;
@@ -356,6 +358,7 @@ async function openRoute(path: string, options?: { snapshotIssues?: unknown[]; i
 
 beforeAll(async () => {
   await ensureFrontendNodeModules();
+  viteCacheDir = await createViteCacheDir(projectRoot, 'styleguide');
   const vitePath = resolvePackage('vite');
   const reactPath = resolvePackage('@vitejs/plugin-react');
   const { createServer } = await import(vitePath) as { createServer: (options: Record<string, unknown>) => Promise<ViteDevServer> };
@@ -363,6 +366,8 @@ beforeAll(async () => {
   vite = await createServer({
     root: frontendRoot,
     configFile: false,
+    cacheDir: viteCacheDir,
+    resolve: { alias: [pdfjsAssetsAlias(resolvePackage)] },
     plugins: [react(), {
       name: 'styleguide-mock-ws-transport',
       enforce: 'pre',
@@ -436,6 +441,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await browser?.close();
   await vite?.close();
+  await removeViteCacheDir(viteCacheDir);
   await Promise.all(linkedFrontendPackages.map((packagePath) => unlink(packagePath)));
   if (linkedFrontendNodeModules) {
     await unlink(join(frontendRoot, 'node_modules'));
