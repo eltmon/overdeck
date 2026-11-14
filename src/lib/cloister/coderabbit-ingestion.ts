@@ -13,6 +13,7 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { lookupPullRequestNumberForBranch } from '../github-pr-lookup.js';
+import type { PullRequestSettlementFacts, SettlementCommit } from './advisory-followup-settlement.js';
 
 const execAsync = promisify(exec);
 
@@ -194,4 +195,59 @@ export async function fetchCodeRabbitReviewThreads(
         ...(row.html_url ? { url: row.html_url } : {}),
       };
     });
+}
+
+function jsonLines<T>(stdout: string): T[] {
+  return stdout.split('\n').filter((line) => line.trim()).map((line) => JSON.parse(line) as T);
+}
+
+async function fetchLaterCommits(repo: string, prNumber: number, since: string, gh: GhRunner): Promise<SettlementCommit[]> {
+  const cutoff = Date.parse(since);
+  const rows = jsonLines<{ sha?: string; date?: string; parents?: number }>(await gh([
+    'api', '--paginate', `repos/${repo}/pulls/${prNumber}/commits?per_page=100`,
+    '--jq', '.[] | {sha, date: .commit.committer.date, parents: (.parents | length)}',
+  ]));
+  const kept = rows.filter((row): row is { sha: string; date: string; parents: number } =>
+    typeof row.sha === 'string' && typeof row.date === 'string' && row.parents === 1 && Date.parse(row.date) > cutoff);
+  return Promise.all(kept.map(async (row) => {
+    let files: string[] | null;
+    try {
+      const parsed = JSON.parse(await gh(['api', `repos/${repo}/commits/${row.sha}`, '--jq', '[.files[].filename]'])) as unknown;
+      files = Array.isArray(parsed) ? parsed.filter((file): file is string => typeof file === 'string') : null;
+    } catch {
+      files = null;
+    }
+    return { sha: row.sha, committedAt: row.date, files };
+  }));
+}
+
+async function fetchRepliedThreadIds(repo: string, prNumber: number, gh: GhRunner): Promise<number[]> {
+  const rows = jsonLines<{ in_reply_to_id?: number; login?: string }>(await gh([
+    'api', '--paginate', `repos/${repo}/pulls/${prNumber}/comments?per_page=100`,
+    '--jq', '.[] | select(.in_reply_to_id != null) | {in_reply_to_id, login: .user.login}',
+  ]));
+  const ids = new Set<number>();
+  for (const row of rows) {
+    if (typeof row.in_reply_to_id === 'number' && row.login !== CODERABBIT_BOT_LOGIN) ids.add(row.in_reply_to_id);
+  }
+  return [...ids];
+}
+
+/**
+ * PAN-5218: the facts that settle CodeRabbit threads: the PR's single-parent
+ * commits later than `since` with their changed files, and the threads someone
+ * other than CodeRabbit replied on. Each failing read yields null (or
+ * `files: null` for one commit); never rejects.
+ */
+export async function fetchPullRequestSettlementFacts(
+  repo: string,
+  prNumber: number,
+  since: string,
+  gh: GhRunner,
+): Promise<PullRequestSettlementFacts> {
+  const [commits, repliedThreadIds] = await Promise.all([
+    fetchLaterCommits(repo, prNumber, since, gh).catch(() => null),
+    fetchRepliedThreadIds(repo, prNumber, gh).catch(() => null),
+  ]);
+  return { commits, repliedThreadIds };
 }
