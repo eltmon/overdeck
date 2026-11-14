@@ -46,6 +46,8 @@ export interface TrainIo {
   /** In-flight issues with an open PR in the merged issue's project. */
   listProjectIssuesWithPr: (mergedIssueId: string) => Promise<string[]>;
   evaluateGate: (issueId: string) => Promise<MergeGateResult>;
+  /** PAN-4753: the sibling waits for the batch window, so the roll leaves it alone; `issueWaitsForBatch` by default. */
+  waitsForBatch: (issueId: string) => Promise<boolean>;
   reviewRequester: () => GuardedReviewRequester | null;
   /** `git patch-id --stable` of `git diff base head`; empty when the diff is. */
   patchId: (cwd: string, base: string, head: string) => Promise<string>;
@@ -79,6 +81,7 @@ const defaultIo: TrainIo = {
     return listInFlightIssuesWithPr({ listProjects: async () => [{ key: project.projectKey, config }] });
   },
   evaluateGate: async (issueId) => (await import('./merge-gate.js')).evaluateIssueMergeGate(issueId),
+  waitsForBatch: async (issueId) => (await import('./auto-merge-eligibility.js')).issueWaitsForBatch(issueId),
   reviewRequester: getGuardedReviewRequester,
   patchId: async (cwd, base, head) => {
     if (!SHA_RE.test(base) || !SHA_RE.test(head)) throw new Error(`patch-id needs full shas, got ${base}..${head}`);
@@ -128,6 +131,9 @@ export function buildRealReconcileDeps(overrides: Partial<TrainIo> = {}): Reconc
       const siblings: string[] = [];
       for (const issueId of await io.listProjectIssuesWithPr(merged)) {
         if (issueId.toUpperCase() === merged) continue;
+        // PAN-4753: a feature waiting for the batch window is assembled on
+        // current main by the batch; rebasing it would only restart its CI.
+        if (await io.waitsForBatch(issueId).catch(() => false)) continue;
         if (isTrainSibling(await io.evaluateGate(issueId))) siblings.push(issueId);
       }
       return siblings;

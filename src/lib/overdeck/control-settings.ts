@@ -281,6 +281,46 @@ export function isMergeTrainEnabled(): boolean {
   return getSetting(FLYWHEEL_MERGE_TRAIN_ENABLED_KEY) === 'true';
 }
 
+/** PAN-4753 D4: batch window keys, with their bounds and defaults. */
+export const MERGE_TRAIN_BATCH_SIZE_KEY = 'merge_train.batch_size';
+export const MERGE_TRAIN_BATCH_WAIT_MINUTES_KEY = 'merge_train.batch_wait_minutes';
+export const MERGE_TRAIN_BATCH_SIZE_BOUNDS = { min: 1, max: 20, default: 3 } as const;
+export const MERGE_TRAIN_BATCH_WAIT_MINUTES_BOUNDS = { min: 1, max: 1440, default: 30 } as const;
+
+/** A whole number within the bounds (number, or a string of digits), else null. */
+export function parseBoundedInteger(value: unknown, bounds: { min: number; max: number }): number | null {
+  const n = typeof value === 'number' ? value : typeof value === 'string' && /^\d+$/.test(value.trim()) ? Number(value.trim()) : NaN;
+  return Number.isInteger(n) && n >= bounds.min && n <= bounds.max ? n : null;
+}
+
+/** Features that make a batch (`merge_train.batch_size`, default 3). */
+export function getMergeTrainBatchSize(): number {
+  return parseBoundedInteger(getSetting(MERGE_TRAIN_BATCH_SIZE_KEY), MERGE_TRAIN_BATCH_SIZE_BOUNDS)
+    ?? MERGE_TRAIN_BATCH_SIZE_BOUNDS.default;
+}
+
+/** Throws RangeError outside {@link MERGE_TRAIN_BATCH_SIZE_BOUNDS}. */
+export function setMergeTrainBatchSize(size: number): void {
+  if (parseBoundedInteger(size, MERGE_TRAIN_BATCH_SIZE_BOUNDS) === null) {
+    throw new RangeError(`batch_size must be a whole number from ${MERGE_TRAIN_BATCH_SIZE_BOUNDS.min} to ${MERGE_TRAIN_BATCH_SIZE_BOUNDS.max}, got ${size}`);
+  }
+  setSetting(MERGE_TRAIN_BATCH_SIZE_KEY, String(size));
+}
+
+/** Minutes the oldest ready feature waits before a smaller batch merges (`merge_train.batch_wait_minutes`, default 30). */
+export function getMergeTrainBatchWaitMinutes(): number {
+  return parseBoundedInteger(getSetting(MERGE_TRAIN_BATCH_WAIT_MINUTES_KEY), MERGE_TRAIN_BATCH_WAIT_MINUTES_BOUNDS)
+    ?? MERGE_TRAIN_BATCH_WAIT_MINUTES_BOUNDS.default;
+}
+
+/** Throws RangeError outside {@link MERGE_TRAIN_BATCH_WAIT_MINUTES_BOUNDS}. */
+export function setMergeTrainBatchWaitMinutes(minutes: number): void {
+  if (parseBoundedInteger(minutes, MERGE_TRAIN_BATCH_WAIT_MINUTES_BOUNDS) === null) {
+    throw new RangeError(`batch_wait_minutes must be a whole number from ${MERGE_TRAIN_BATCH_WAIT_MINUTES_BOUNDS.min} to ${MERGE_TRAIN_BATCH_WAIT_MINUTES_BOUNDS.max}, got ${minutes}`);
+  }
+  setSetting(MERGE_TRAIN_BATCH_WAIT_MINUTES_KEY, String(minutes));
+}
+
 /** Drop-in for setMergeTrainEnabled() from app-settings.ts. */
 export function setMergeTrainEnabled(enabled: boolean): void {
   // Write to new key only; never write to legacy key

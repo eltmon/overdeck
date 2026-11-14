@@ -6,6 +6,7 @@ import {
   HOLD_FOR_UAT_LABEL,
   autoMergeFromLabels,
   isAutoMergeEligible,
+  issueWaitsForBatch,
   issueHoldsForUat,
 } from '../auto-merge-eligibility.js';
 import { emptyPrFacts, type PrFacts } from '../pr-facts.js';
@@ -38,6 +39,9 @@ function deps(facts: PrFacts, labels: string[] = [], globalUat = false) {
     isGlobalUatRequired: () => globalUat,
     ciTestsRequired: () => false,
     readReviews: vi.fn(async () => ({ headRefOid: facts.headSha, reviews: [] })),
+    // PAN-4753 D4: train off (the per-PR path) unless a test turns it on.
+    isTrainOn: () => false,
+    droppedFromBatch: () => false,
   };
 }
 
@@ -153,6 +157,16 @@ describe('auto-merge eligibility', () => {
       .resolves.toEqual({ eligible: false, reason: 'held for UAT (auto-merge toggled off)' });
   });
 
+  it('blocks a normal-priority PR while the merge train is on: it waits for the batch (PAN-4753 D4)', async () => {
+    await expect(isAutoMergeEligible('PAN-1486', { ...deps(readyFacts()), isTrainOn: () => true }))
+      .resolves.toEqual({ eligible: false, reason: 'the merge train batches this PR; it merges with the next batch' });
+  });
+
+  it('keeps a critical PR eligible while the merge train is on (PAN-4753 D4)', async () => {
+    await expect(isAutoMergeEligible('PAN-1486', { ...deps(readyFacts(), ['critical']), isTrainOn: () => true }))
+      .resolves.toEqual({ eligible: true });
+  });
+
   it('accepts a mergeable, approved GitLab MR', async () => {
     const facts = readyFacts({
       issueId: 'MIN-831',
@@ -193,5 +207,30 @@ describe('issueHoldsForUat (review of #3993: the per-issue tier the merge train 
   it('strict: a label read failure throws instead of guessing (the #4036 merge gate)', async () => {
     const failing = { getIssueLabels: async () => { throw new Error('gh: rate limited'); }, strict: true };
     await expect(issueHoldsForUat('PAN-1', { auto_merge_default: 'auto' }, false, failing)).rejects.toThrow('rate limited');
+  });
+});
+
+describe('issueWaitsForBatch (PAN-4753: the roll leaves batch-waiting features alone)', () => {
+  const base = {
+    getIssueLabels: async () => [] as string[],
+    getProjectDefault: () => undefined,
+    isGlobalUatRequired: () => false,
+    isTrainOn: () => true,
+    droppedFromBatch: () => false,
+  };
+
+  it('is true for a normal-priority feature while the train is on', async () => {
+    await expect(issueWaitsForBatch('PAN-1', base)).resolves.toBe(true);
+  });
+
+  it('is false with the train off, for high priority, for a held feature, and for a dropped one', async () => {
+    await expect(issueWaitsForBatch('PAN-1', { ...base, isTrainOn: () => false })).resolves.toBe(false);
+    await expect(issueWaitsForBatch('PAN-1', { ...base, getIssueLabels: async () => ['critical'] })).resolves.toBe(false);
+    await expect(issueWaitsForBatch('PAN-1', { ...base, getIssueLabels: async () => ['hold-for-uat'] })).resolves.toBe(false);
+    await expect(issueWaitsForBatch('PAN-1', { ...base, droppedFromBatch: () => true })).resolves.toBe(false);
+  });
+
+  it('is false when the labels cannot be read, so the roll keeps rebasing', async () => {
+    await expect(issueWaitsForBatch('PAN-1', { ...base, getIssueLabels: async () => { throw new Error('tracker down'); } })).resolves.toBe(false);
   });
 });

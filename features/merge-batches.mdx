@@ -12,8 +12,21 @@ available at all times, so you can exercise the combined result and then land
 exactly what you tested — in a single click.
 
 <Note>
-Batch trains run only while a **Flywheel** run is active and the merge-train flag
-(`flywheel.merge_train_enabled`) is on. They are inert otherwise.
+Batches run only while the **Merge train** switch on the Flywheel page header
+(`merge_train_enabled`) is on. With it on, normal-priority PRs in a project that
+does not hold for UAT merge together automatically once the batch's own CI run
+is green: when `batch_size` PRs are ready (default 3) or the oldest has waited
+`batch_wait_minutes` (default 30; both in **Settings → Merge Train**).
+High-priority PRs (strikes, `critical`, `blocks-main`, `P0`, `urgent`, or
+`substrate-improvement` plus `bug`) merge on their own. A PR only you may merge
+(held for UAT, an auto-merge you cancelled, or a Deft human-merge policy) waits
+in its own batch for you. With the switch off, every ready PR merges on its own
+and nothing batches.
+
+Automatic batches need batch CI: a GitHub Actions workflow named `CI` that runs
+on pushes to `uat/**` branches. Without it, a batch waits at most 10 minutes for
+a CI run, then dissolves, its PRs merge one at a time, and the activity feed
+says batching needs a `uat/**` CI trigger. Batching is tried again a day later.
 </Note>
 
 ## What you see

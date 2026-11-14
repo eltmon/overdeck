@@ -246,3 +246,30 @@ describe('perPrTrainActiveForProject', () => {
     await expect(perPrTrainActiveForProject(PROJECT_PATH, GITHUB_MONOREPO, deps())).resolves.toBe(true);
   });
 });
+
+describe('mergePathOwner with the PAN-4753 D4 route rule', () => {
+  async function ownerWith(opts: { trainOn: boolean; labels?: string[] }) {
+    const { autoMergePolicyRefusal } = await import('../auto-merge-door-policy.js');
+    const policyRefusal = (issueId: string) => autoMergePolicyRefusal(issueId, {
+      getIssueLabels: () => opts.labels ?? [],
+      getProjectAutoMergeDefault: () => 'auto',
+      isRequireUatBeforeMerge: () => false,
+      isIssueClosed: () => false,
+      isTrainOn: () => opts.trainOn,
+      droppedFromBatch: () => false,
+    });
+    return mergePathOwner(ISSUE_ID, PROJECT_PATH, GITHUB_MONOREPO, deps({ policyRefusal }));
+  }
+
+  it('gives every normal feature to the per-PR path while the train is off', async () => {
+    await expect(ownerWith({ trainOn: false })).resolves.toBe('per-pr');
+  });
+
+  it('gives a normal feature to the batch while the train is on', async () => {
+    await expect(ownerWith({ trainOn: true })).resolves.toBe('batch');
+  });
+
+  it('keeps a high-priority feature on the per-PR path while the train is on', async () => {
+    await expect(ownerWith({ trainOn: true, labels: ['blocks-main'] })).resolves.toBe('per-pr');
+  });
+});

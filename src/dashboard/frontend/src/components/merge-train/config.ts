@@ -9,6 +9,10 @@ export interface MergeTrainConfig {
   auto_pickup_backlog: boolean;
   require_uat_before_merge: boolean;
   merge_train_enabled: boolean;
+  /** PAN-4753: features that make a batch while the train is on. */
+  batch_size: number;
+  /** PAN-4753: minutes the oldest ready feature waits before a smaller batch merges. */
+  batch_wait_minutes: number;
 }
 
 export type MergeTrainConfigPatch = Partial<MergeTrainConfig>;
@@ -49,6 +53,8 @@ export function useMergeTrainConfigMutation() {
         auto_pickup_backlog: previous?.auto_pickup_backlog ?? false,
         require_uat_before_merge: previous?.require_uat_before_merge ?? true,
         merge_train_enabled: previous?.merge_train_enabled ?? false,
+        batch_size: previous?.batch_size ?? 3,
+        batch_wait_minutes: previous?.batch_wait_minutes ?? 30,
         ...patch,
       });
       return { previous };
