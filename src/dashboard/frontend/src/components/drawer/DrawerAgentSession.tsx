@@ -22,7 +22,7 @@
 
 import { Fragment, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { GitFork, TriangleAlert, AlertCircle, Wrench, ChevronDown } from 'lucide-react';
+import { GitFork, TriangleAlert, AlertCircle, Wrench, ChevronDown, Copy } from 'lucide-react';
 
 import { ConversationPanel } from '../chat/ConversationPanel';
 import { StartAgentCta } from '../issue-view/StartAgentCta';
@@ -236,6 +236,18 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, onCha
             {drifted ? 'Drifted' : 'Worktree'}
           </span>
           <span className={styles.terminalBranchBarText}>{gitInfo?.actualBranch}</span>
+          {layout === 'conversation-header' && gitInfo?.actualBranch && !missing ? (
+            <button
+              type="button"
+              data-testid="drawer-agent-branch-copy"
+              aria-label="Copy branch name"
+              title="Copy branch name"
+              onClick={() => void navigator.clipboard?.writeText(gitInfo?.actualBranch ?? '')}
+              className="grid h-[18px] w-[18px] place-items-center rounded-[var(--radius-sm)] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Copy aria-hidden className="h-[11px] w-[11px]" />
+            </button>
+          ) : null}
         </>
       )}
     </span>
