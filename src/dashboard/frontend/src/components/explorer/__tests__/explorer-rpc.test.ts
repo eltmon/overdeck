@@ -31,7 +31,7 @@ import {
 beforeEach(() => {
   transportMock.methods = {
     [WS_METHODS.explorerListDir]: vi.fn().mockReturnValue({ entries: [], truncated: false, absPath: '/r' }),
-    [WS_METHODS.explorerGitStage]: vi.fn().mockReturnValue({}),
+    [WS_METHODS.explorerGitStage]: vi.fn().mockReturnValue({ trashIds: ['issue-PAN-1/20261113T000000000Z-0'] }),
     [WS_METHODS.explorerSearchFiles]: vi.fn().mockReturnValue({ paths: [] }),
     [WS_METHODS.explorerSearchContent]: vi.fn().mockReturnValue({ matches: [], truncated: false }),
     [WS_METHODS.explorerWatch]: vi.fn().mockReturnValue('stream'),
@@ -57,13 +57,14 @@ describe('explorer-rpc unary calls', () => {
     expect(result).toEqual({ entries: [], truncated: false, absPath: '/r' })
   })
 
-  it('gitStage sends the paths and the action', async () => {
-    await gitStage('issue:PAN-1', ['a.ts', 'b.ts'], 'discard')
+  it('gitStage sends the paths and the action and resolves to the RPC result', async () => {
+    const result = await gitStage('issue:PAN-1', ['a.ts', 'b.ts'], 'discard')
     expect(transportMock.methods[WS_METHODS.explorerGitStage]).toHaveBeenCalledWith({
       rootId: 'issue:PAN-1',
       paths: ['a.ts', 'b.ts'],
       action: 'discard',
     })
+    expect(result).toEqual({ trashIds: ['issue-PAN-1/20261113T000000000Z-0'] })
   })
 
   it('searchFiles defaults the limit to 50', async () => {

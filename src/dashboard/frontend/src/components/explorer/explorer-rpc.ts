@@ -9,6 +9,7 @@ import {
   WS_METHODS,
   type ExplorerEntryResult,
   type ExplorerGitStageInput,
+  type ExplorerGitStageResult,
   type ExplorerGitStatusResult,
   type ExplorerListDirResult,
   type ExplorerReadFileResult,
@@ -78,8 +79,9 @@ export function gitStatus(rootId: string): Promise<ExplorerGitStatusResult> {
   return getTransport().request((client) => (client as PanRpcProtocolClient)[WS_METHODS.explorerGitStatus]({ rootId }))
 }
 
-export async function gitStage(rootId: string, paths: readonly string[], action: GitStageAction): Promise<void> {
-  await getTransport().request((client) =>
+/** Stage, unstage or discard; a discard returns the trash ids of the files it moved to the Overdeck trash. */
+export function gitStage(rootId: string, paths: readonly string[], action: GitStageAction): Promise<ExplorerGitStageResult> {
+  return getTransport().request((client) =>
     (client as PanRpcProtocolClient)[WS_METHODS.explorerGitStage]({ rootId, paths: [...paths], action }),
   )
 }
