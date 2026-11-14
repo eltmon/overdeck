@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5245",
+  "created": "2026-11-14T05:12:59.498Z",
+  "updated": "2026-11-14T05:12:59.498Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "ci-subset-test-harness": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5245",
+      "claimedAt": "2026-11-14T05:12:59.497Z"
+    }
+  }
+}
