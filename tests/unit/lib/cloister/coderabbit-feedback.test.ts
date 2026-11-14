@@ -30,6 +30,11 @@ const THREADS: CodeRabbitThread[] = [
   { id: 11, path: 'src/a.ts', line: 7, severity: 'Major', title: 'Guard the null case', url: 'https://github.com/x/11' },
   { id: 12, path: 'src/b.ts', title: 'Typo in the log line' },
 ];
+const DETAILS = {
+  repo: 'eltmon/overdeck', prNumber: 42, reviewId: 900,
+  reviewUrl: 'https://github.com/eltmon/overdeck/pull/42#pullrequestreview-900',
+  threads: THREADS,
+};
 
 function makeDeps(overrides: Partial<CodeRabbitFeedbackDeps> = {}) {
   const deps = {
@@ -38,6 +43,7 @@ function makeDeps(overrides: Partial<CodeRabbitFeedbackDeps> = {}) {
     writeFeedback: vi.fn(async () => ({ success: true, filePath: `${WS}/.pan/feedback/003-coderabbit-findings.md` })),
     alreadyDelivered: vi.fn(() => false),
     recordDelivered: vi.fn(),
+    recordUndelivered: vi.fn(),
     resolveTarget: vi.fn(async () => ({ agentId: 'agent-pan-1' })),
     deliver: vi.fn(async () => ({ delivered: true })),
     surfaceNeedsYou: vi.fn(async () => {}),
@@ -68,8 +74,34 @@ describe('relayCodeRabbitReview', () => {
     expect(deps.deliver).toHaveBeenCalledWith('agent-pan-1', expect.stringContaining('MUST READ'), key);
     expect(deps.recordDelivered).toHaveBeenCalledWith(WS, {
       issueId: 'PAN-1', kind: 'coderabbit', dedupKey: key, agentId: 'agent-pan-1', source: 'coderabbit-feedback',
+      details: DETAILS,
     });
+    expect(deps.recordUndelivered).not.toHaveBeenCalled();
     expect(deps.surfaceNeedsYou).not.toHaveBeenCalled();
+  });
+
+  it('journals feedback.undelivered with the same details on every Needs-you branch (PAN-5218)', async () => {
+    const branches: Array<[string, Partial<CodeRabbitFeedbackDeps>, string]> = [
+      ['file not written', { writeFeedback: vi.fn(async () => ({ success: false, error: 'disk full' })) }, 'disk full'],
+      ['no target', { resolveTarget: vi.fn(async () => ({ reason: 'no work agent for PAN-1' })) }, 'no work agent for PAN-1'],
+      ['delivery threw', { deliver: vi.fn(async () => { throw new Error('socket closed'); }) }, 'socket closed'],
+      ['not accepted', { deliver: vi.fn(async () => ({ delivered: false, reason: 'pane is gone' })) }, 'pane is gone'],
+    ];
+    for (const [, overrides, why] of branches) {
+      __resetCodeRabbitRelaysForTests();
+      const deps = makeDeps(overrides);
+      const outcome = await relayCodeRabbitReview(EVENT, deps);
+      expect(outcome.kind).toBe('needs-you');
+      const reason = (outcome as { reason: string }).reason;
+      expect(reason).toContain(why);
+      expect(deps.recordUndelivered).toHaveBeenCalledTimes(1);
+      expect(deps.recordUndelivered).toHaveBeenCalledWith(WS, {
+        issueId: 'PAN-1', kind: 'coderabbit', dedupKey: codeRabbitDedupKey('PAN-1', 900), reason,
+        source: 'coderabbit-feedback', details: DETAILS,
+      });
+      expect(deps.surfaceNeedsYou).toHaveBeenCalledTimes(1);
+      expect(deps.recordDelivered).not.toHaveBeenCalled();
+    }
   });
 
   it('routes nothing when the review has no inline findings', async () => {
@@ -152,6 +184,16 @@ describe('buildCodeRabbitFeedbackBody', () => {
     expect(body).toContain('pan review request PAN-1');
     expect(body).toContain('If you only replied, you are done.');
     expect(body).toContain('If PR #42 has already merged when you read this');
+    expect(body).toContain('after the merge Overdeck files a follow-up issue');
+    expect(body).toContain('-m "CodeRabbit <thread ids>:');
+  });
+
+  it('asks the agent to name thread ids in its re-review request (PAN-5218)', async () => {
+    const deps = makeDeps();
+    await relayCodeRabbitReview(EVENT, deps);
+    expect(deps.deliver).toHaveBeenCalledWith(
+      'agent-pan-1', expect.stringContaining('pan review request PAN-1 -m "CodeRabbit <thread ids>:'), expect.any(String),
+    );
   });
 });
 
