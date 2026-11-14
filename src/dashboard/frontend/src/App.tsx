@@ -66,6 +66,7 @@ import {
   StandaloneTerminalRoute,
 } from './App/StandaloneRoutes';
 import { AppRoutes, type PendingConversationTarget } from './App/AppRoutes';
+import { useAppShortcuts } from './App/hooks/useAppShortcuts';
 import { AppChrome } from './App/AppChrome';
 import { useUiMode } from './lib/simple/uiMode';
 import { AppLiveStoreHost, countRunningAgents } from './App/AppLiveStoreHost';
@@ -635,71 +636,8 @@ export default function App() {
   // consumers live in AppLiveStoreHost. The running count is a number.
   const runningAgentCount = useDashboardStore((s) => countRunningAgents(s.agentsById));
 
-  // PAN-1234: global 'g' chord state for lens navigation (g p, g b, g a, g c).
-  const chordRef = useRef<{ prefix: string | null; timer: ReturnType<typeof setTimeout> | null }>({ prefix: null, timer: null });
-
-  // Global keyboard shortcuts: / for search, Cmd+K for command palette
-  useEffect(() => {
-    const CHORD_TIMEOUT_MS = 1500;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const isMac = navigator.platform.includes('Mac');
-      const isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
-      const target = e.target as HTMLElement;
-      const inInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
-
-      // PAN-1234: lens-navigation chord (e.g. g p → Pipeline). Disabled inside
-      // inputs/textareas/contentEditable or while the command palette is open.
-      if (!inInput && !isPaletteOpen) {
-        if (e.key === 'g') {
-          e.preventDefault();
-          chordRef.current.prefix = 'g';
-          if (chordRef.current.timer) clearTimeout(chordRef.current.timer);
-          chordRef.current.timer = setTimeout(() => {
-            chordRef.current.prefix = null;
-            chordRef.current.timer = null;
-          }, CHORD_TIMEOUT_MS);
-          return;
-        }
-
-        if (chordRef.current.prefix === 'g') {
-          if (chordRef.current.timer) clearTimeout(chordRef.current.timer);
-          chordRef.current.timer = null;
-          chordRef.current.prefix = null;
-
-          const lens = e.key === 'p' ? 'pipeline'
-            : e.key === 'b' ? 'kanban'
-            : e.key === 'a' ? 'agents'
-            : e.key === 'c' ? 'command-deck'
-            : null;
-          if (lens) {
-            e.preventDefault();
-            setActiveTab(lens);
-          }
-          return;
-        }
-      }
-
-      if (e.key === '/' && !inInput) {
-        e.preventDefault();
-        setIsSearchOpen(true);
-      } else if (e.key === 'k' && isCmdOrCtrl && !e.shiftKey) {
-        e.preventDefault();
-        setPaletteInitialScope('all');
-        setIsPaletteOpen((prev) => !prev);
-      } else if (e.key === 'j' && isCmdOrCtrl && !e.shiftKey) {
-        // PAN-2908 C-CONVO: ⌘J jumps straight to conversations.
-        e.preventDefault();
-        setPaletteInitialScope('conversations');
-        setIsPaletteOpen(true);
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      if (chordRef.current.timer) clearTimeout(chordRef.current.timer);
-    };
-  }, [isPaletteOpen, setActiveTab, setIsSearchOpen, setIsPaletteOpen]);
+  // App-level shortcuts go through the shortcut registry (PAN-5287).
+  useAppShortcuts({ isPaletteOpen, setActiveTab, setIsSearchOpen, setIsPaletteOpen, setPaletteInitialScope });
 
   // Listen for menu actions from desktop app (open-settings, etc.)
   useEffect(() => {
