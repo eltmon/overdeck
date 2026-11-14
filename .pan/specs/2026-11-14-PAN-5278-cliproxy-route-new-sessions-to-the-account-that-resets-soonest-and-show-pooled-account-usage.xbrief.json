@@ -4,17 +4,17 @@
     "created": "2026-11-14T18:07:30Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5278: CLIProxy: route new sessions to the account that resets soonest, and show pooled account usage",
-    "updated": "2026-11-14T18:09:54.396Z"
+    "updated": "2026-11-14T18:11:16.886Z"
   },
   "plan": {
     "id": "pan-5278",
     "title": "CLIProxy: route new sessions to the account that resets soonest, and show pooled account usage",
-    "status": "proposed",
+    "status": "running",
     "uid": "db71486c-6e80-4868-9459-39ac6b61d441",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T18:07:30Z",
-    "updated": "2026-11-14T18:09:54.396Z",
+    "updated": "2026-11-14T18:11:16.886Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5278",
@@ -833,5 +833,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }

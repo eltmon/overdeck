@@ -2,17 +2,24 @@
   "version": "1",
   "issueId": "PAN-5278",
   "created": "2026-11-14T18:11:34.102Z",
-  "updated": "2026-11-14T18:11:34.102Z",
+  "updated": "2026-11-14T23:08:27.871Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-14T23:08:27.870Z"
+    }
+  ],
   "items": {
     "config-affinity-mgmt": {
       "status": "in_progress",
       "claimedBy": "agent-pan-5278",
       "claimedAt": "2026-11-14T18:11:34.102Z"
     }
-  }
+  },
+  "agentModel": "claude-opus-5-5"
 }
