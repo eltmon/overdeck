@@ -172,4 +172,28 @@ describe('resolveNeedsYouItems (PAN-5198)', () => {
     expect(items).toHaveLength(1);
     expect(items[0]?.firstRaisedTick).toBe(1);
   });
+  function proseTick(tick: number, needsYou: string, prose: string): TickMarkerMessage {
+    const base = tickMessage(tick, needsYou);
+    return { ...base, text: `${prose}\n${base.text}` };
+  }
+
+  it('needs-you items carry the first-raised message prose without the tick line (PAN-5283 D18)', () => {
+    const messages = [proseTick(4, 'fix main', 'CI is red on main.'), tickMessage(5, 'fix main')];
+    const [item] = resolveNeedsYouItems(messages);
+    expect(item?.firstRaisedTick).toBe(4);
+    expect(item?.context).toBe('CI is red on main.');
+  });
+
+  it('context is omitted when the message is only the tick line', () => {
+    const [item] = resolveNeedsYouItems([tickMessage(4, 'fix main')]);
+    expect(item).not.toHaveProperty('context');
+  });
+
+  it('context is cut to the last 280 characters with a leading ellipsis', () => {
+    const prose = `${'a'.repeat(120)}\n  ${'b'.repeat(279)}`;
+    const [item] = resolveNeedsYouItems([proseTick(4, 'fix main', prose)]);
+    expect(item?.context).toHaveLength(281);
+    expect(item?.context).toBe(`… ${'b'.repeat(279)}`);
+    expect(item?.context?.startsWith('…')).toBe(true);
+  });
 });
