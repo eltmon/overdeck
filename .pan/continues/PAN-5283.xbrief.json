@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5283",
   "created": "2026-11-14T19:04:13.506Z",
-  "updated": "2026-11-14T20:07:34.327Z",
+  "updated": "2026-11-14T20:08:01.590Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,9 +136,30 @@
       "doneAt": "2026-11-14T19:28:10.448Z"
     },
     "wi5-wire-board": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5283",
-      "claimedAt": "2026-11-14T20:07:34.327Z"
+      "claimedAt": "2026-11-14T20:07:34.327Z",
+      "doneAt": "2026-11-14T20:08:01.590Z"
+    },
+    "wi5-wire-board.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:08:01.590Z"
+    },
+    "wi5-wire-board.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:08:01.590Z"
+    },
+    "wi5-wire-board.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:08:01.590Z"
+    },
+    "wi5-wire-board.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:08:01.590Z"
+    },
+    "wi5-wire-board.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:08:01.590Z"
     }
   }
 }
