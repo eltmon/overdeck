@@ -8,10 +8,19 @@
  *
  * The window applies only where the batch can merge with no human click: the
  * train is on (the reconciler checked), the project is GitHub and monorepo,
- * the project does not hold for UAT, and no batch-owned feature is held for
- * UAT by its own label. Anywhere else it answers `null`, and the reconciler
- * keeps today's semantics: assemble at once and let the operator test and
- * promote (D2), which is what Mind Your Now, GitLab and polyrepo projects get.
+ * and the project does not hold for UAT. Anywhere else it answers `null`, and
+ * the reconciler keeps today's semantics: assemble at once and let the
+ * operator test and promote (D2), which is what Mind Your Now, GitLab and
+ * polyrepo projects get.
+ *
+ * Two lanes (operator, 2026-11-14): in a project where the window applies, a
+ * feature held for UAT by its own `hold-for-uat` label never delays the rest.
+ * The ready set is split. Unheld features go to the **window lane**, whose
+ * batches are named `uat/<prefix>-train-…` and merge on the window once their
+ * combined CI is green. Held features go to the **UAT lane**, whose batches
+ * keep today's names and today's semantics (the operator tests and promotes).
+ * Each lane sees only its own generations ({@link laneStore}), so assembling
+ * one never supersedes, invalidates or trims the other.
  *
  * Ready-since is derived from the forge: the newest check-run completion on
  * the PR head in the cached open-PR listing (`readySinceFromRollup`). A PR
@@ -19,7 +28,8 @@
  * process saw it ready, keyed on its head so a new push restarts the clock.
  */
 import type { ProjectConfig } from '../../../lib/projects.js';
-import type { ReadyFeature } from '../../../lib/cloister/uat-generation-engine.js';
+import type { GenerationStorePort, ReadyFeature } from '../../../lib/cloister/uat-generation-engine.js';
+import type { ReconcileResult } from '../../../lib/cloister/uat-reconciler.js';
 import type { UatGeneration } from '../../../lib/overdeck/merge-sync.js';
 import type { GhPrRow } from '../../../lib/overdeck/pr-listing.js';
 import { chooseBatch, readySinceFromRollup, type BatchChoice } from '../../../lib/cloister/batch-window.js';
@@ -45,6 +55,46 @@ export interface BatchWindowDeps {
   batchSize?: () => number;
   batchWaitMinutes?: () => number;
   now?: () => number;
+}
+
+export type BatchLane = 'window' | 'uat';
+
+/** Codename label suffix of window-lane batches: `uat/pan-train-otter-1114`. */
+export const WINDOW_LANE_LABEL_SUFFIX = 'train';
+
+/** True for a window-lane batch name. Codenames are single words, never `train`. */
+export function isWindowBatch(name: string): boolean {
+  return /^uat\/[a-z0-9]+-train-/i.test(name);
+}
+
+/** The store as one lane sees it: `listChain` returns only that lane's generations. */
+export function laneStore(store: GenerationStorePort, lane: BatchLane): GenerationStorePort {
+  const mine = (name: string) => isWindowBatch(name) === (lane === 'window');
+  return {
+    ...store,
+    listChain: (projectRoot, statuses) => store.listChain(projectRoot, statuses).filter((gen) => mine(gen.name)),
+  };
+}
+
+/** Split a ready set into the window lane (unheld) and the UAT lane (held by label, project or global). */
+export function splitReadySetByHold(
+  features: readonly ReadyFeature[],
+  config: ProjectConfig | undefined,
+  deps: Pick<BatchWindowDeps, 'getIssueLabels' | 'isRequireUatBeforeMerge'> = {},
+): Record<BatchLane, ReadyFeature[]> {
+  const split: Record<BatchLane, ReadyFeature[]> = { window: [], uat: [] };
+  for (const feature of features) split[issueHeldForUat(feature.issueId, config, deps) ? 'uat' : 'window'].push(feature);
+  return split;
+}
+
+/**
+ * One result for a two-lane pass, for callers that report a project's
+ * reconcile: the lane that did something wins (UAT lane first, as before),
+ * and both lanes' invalidations are listed.
+ */
+export function combineLaneResults(window: ReconcileResult, uat: ReconcileResult): ReconcileResult {
+  const primary = uat.action === 'idle' || uat.action === 'no-queue' ? window : uat;
+  return { ...primary, invalidated: [...window.invalidated, ...uat.invalidated] };
 }
 
 /** Process-local first-seen fallback, keyed `<projectPath>|<ISSUE>|<head>`. */
@@ -93,7 +143,7 @@ async function defaultListOpenPrs(projectPath: string): Promise<readonly GhPrRow
   return readOpenRepoPullRequests(projectPath);
 }
 
-/** The reconciler's `selectBatch` dep for one project. */
+/** The reconciler's `selectBatch` dep for one project's window lane. */
 export function buildSelectBatch(
   projectPath: string,
   config: ProjectConfig | undefined,
@@ -103,7 +153,6 @@ export function buildSelectBatch(
   return async (batchReadySet, live) => {
     const forgeOf = deps.forgeOf ?? (await defaultForgeOf());
     if (!batchWindowAppliesToProject(projectPath, config, { ...deps, forgeOf })) return null;
-    if (batchReadySet.some((f) => issueHeldForUat(f.issueId, config, deps))) return null;
 
     const rows = (await (deps.listOpenPrs ?? defaultListOpenPrs)(projectPath)) ?? [];
     const at = now();

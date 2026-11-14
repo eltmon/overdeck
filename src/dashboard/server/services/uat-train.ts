@@ -19,6 +19,7 @@ import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import {
   assembleUatGeneration,
   cleanupUatGenerations,
+  type GenerationStorePort,
   type ReadyFeature,
 } from '../../../lib/cloister/uat-generation-engine.js';
 import {
@@ -39,7 +40,15 @@ import {
 import { buildConflictAgentHook } from '../../../lib/cloister/uat-conflict-agent.js';
 import { reconcileUatGenerations, type ReconcileResult } from '../../../lib/cloister/uat-reconciler.js';
 import { mergePathOwner } from './merge-path-owner.js';
-import { buildSelectBatch } from './merge-train-batching.js';
+import {
+  batchWindowAppliesToProject,
+  buildSelectBatch,
+  combineLaneResults,
+  laneStore,
+  splitReadySetByHold,
+  WINDOW_LANE_LABEL_SUFFIX,
+  type BatchLane,
+} from './merge-train-batching.js';
 import { ensureUatStack, probeUatStack, teardownUatStack } from '../../../lib/cloister/uat-stack.js';
 import {
   promoteUatGeneration,
@@ -58,7 +67,7 @@ import {
   type UatGeneration,
   type UatGenerationRepo,
 } from '../../../lib/overdeck/merge-sync.js';
-import { getDerivedIssueState, listReadyIssuesForProject } from './derived-issue-state.js';
+import { forgeForProject, getDerivedIssueState, listReadyIssuesForProject } from './derived-issue-state.js';
 import { evaluateIssueMergeGate } from '../../../lib/cloister/merge-gate.js';
 import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.js';
 import { findXBriefByIssue, invalidateXBriefIndex, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
@@ -128,7 +137,7 @@ function codenameLabel(features: readonly ReadyFeature[]): string {
 /**
  * PAN-1696 reconciler-decouple: Per-project cleanup function factory.
  */
-function makeCleanupForProject(projectPath: string): () => Promise<void> {
+function makeCleanupForProject(projectPath: string, store: GenerationStorePort = buildUatGenerationStore()): () => Promise<void> {
   return async () => {
     // A polyrepo generation's artifacts live in N repos plus a wrapper folder,
     // none of them reachable from the wrapper path the monorepo cleanup uses.
@@ -138,7 +147,7 @@ function makeCleanupForProject(projectPath: string): () => Promise<void> {
       : buildUatGenerationCleanupGit(projectPath);
 
     await cleanupUatGenerations(projectPath, {
-      store: buildUatGenerationStore(),
+      store,
       ...cleanupGit,
       teardownStack: (gen) => teardownUatStack(gen),
       log: (msg) => console.log(msg),
@@ -229,23 +238,41 @@ async function runUatTrainReconcileForProject(
   }
 
   const gitDeps = buildUatGenerationGitDeps(projectPath);
+  // PAN-4753: one lane (today) unless the batch window applies; then the
+  // window lane (unheld features) and the UAT lane (held ones) run in turn.
+  let readyOnce: Promise<ReadyFeature[] | null> | undefined;
+  const readySet = () => (readyOnce ??= getReadySetForProject(projectPath));
+  const laneDeps = (lane?: BatchLane) => {
+    const store = lane ? laneStore(buildUatGenerationStore(), lane) : buildUatGenerationStore();
+    return {
+      isEnabled: () => true,  // Already checked above
+      getReadySet: async () => {
+        const all = await readySet();
+        return all && lane ? splitReadySetByHold(all, projectConfig)[lane] : all;
+      },
+      getMainHeadSha: () => gitDeps.fetchMain(),
+      getBranchHeadSha: (branch: string) => gitDeps.branchHeadSha(branch),
+      isGenerationContainedInMain: (generation: UatGeneration) => gitDeps.isBranchContainedInMain?.(generation.name) ?? Promise.resolve(false),
+      store,
+      assemble: (features: readonly ReadyFeature[]) => assembleFromReadySetForProject(projectPath, features, {
+        store, ...(lane === 'window' ? { labelSuffix: WINDOW_LANE_LABEL_SUFFIX } : {}),
+      }),
+      teardownStack: (gen: UatGeneration) => teardownUatStack(gen),
+      cleanup: makeCleanupForProject(projectPath, store),
+      holdsForUat: (feature: ReadyFeature) => issueHoldsForUat(feature.issueId, projectConfig, isFlywheelRequireUatBeforeMerge()),
+      mergesPerPr: async (feature: ReadyFeature) => (await mergePathOwner(feature.issueId, projectPath, projectConfig)) === 'per-pr',
+      ...(lane === 'window' ? { selectBatch: buildSelectBatch(projectPath, projectConfig), laneKey: lane } : {}),
+      ...(lane === 'uat' ? { laneKey: lane } : {}),
+      log: (msg: string) => console.log(msg),
+    };
+  };
 
-  return reconcileUatGenerations(projectPath, {
-    isEnabled: () => true,  // Already checked above
-    getReadySet: () => getReadySetForProject(projectPath),
-    getMainHeadSha: () => gitDeps.fetchMain(),
-    getBranchHeadSha: (branch) => gitDeps.branchHeadSha(branch),
-    isGenerationContainedInMain: (generation) => gitDeps.isBranchContainedInMain?.(generation.name) ?? Promise.resolve(false),
-    store: buildUatGenerationStore(),
-    assemble: (features) => assembleFromReadySetForProject(projectPath, features),
-    teardownStack: (gen) => teardownUatStack(gen),
-    cleanup: makeCleanupForProject(projectPath),
-    holdsForUat: (feature) => issueHoldsForUat(feature.issueId, projectConfig, isFlywheelRequireUatBeforeMerge()),
-    mergesPerPr: async (feature) => (await mergePathOwner(feature.issueId, projectPath, projectConfig)) === 'per-pr',
-    // PAN-4753 D4: the batch window (null outside auto GitHub monorepo projects).
-    selectBatch: buildSelectBatch(projectPath, projectConfig),
-    log: (msg) => console.log(msg),
-  }, options);
+  if (!batchWindowAppliesToProject(projectPath, projectConfig, { forgeOf: forgeForProject })) {
+    return reconcileUatGenerations(projectPath, laneDeps(), options);
+  }
+  const windowLane = await reconcileUatGenerations(projectPath, laneDeps('window'), options);
+  const uatLane = await reconcileUatGenerations(projectPath, laneDeps('uat'), options);
+  return combineLaneResults(windowLane, uatLane);
 }
 
 /**
@@ -432,12 +459,14 @@ async function assemblePolyrepoFromReadySetForProject(
 async function assembleFromReadySetForProject(
   projectPath: string,
   features: readonly ReadyFeature[],
+  // PAN-4753: a lane's own store (so its supersede step stays in the lane) and label suffix.
+  opts: { store?: GenerationStorePort; labelSuffix?: string } = {},
 ): Promise<UatGeneration> {
-  const store = buildUatGenerationStore();
+  const store = opts.store ?? buildUatGenerationStore();
   return assembleUatGeneration(
     {
       projectRoot: projectPath,
-      label: codenameLabel(features),
+      label: opts.labelSuffix ? `${codenameLabel(features)}-${opts.labelSuffix}` : codenameLabel(features),
       dateIso: new Date().toISOString(),
       features,
       takenBranchNames: await listRemoteUatBranches(projectPath),

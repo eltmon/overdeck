@@ -138,6 +138,13 @@ export interface UatReconcilerDeps {
     batchReadySet: readonly ReadyFeature[],
     live: readonly UatGeneration[],
   ): Promise<BatchChoice | null>;
+  /**
+   * PAN-4753: a project can run two batch lanes (the window batch and the
+   * held-for-UAT batch), each with its own filtered store. The lane key keeps
+   * their single-flight guard and change-only log lines apart. Omitted = one
+   * lane per project.
+   */
+  laneKey?: string;
   now?: () => number;
   log?: (msg: string) => void;
 }
@@ -295,10 +302,11 @@ export async function reconcileUatGenerations(
   const log = deps.log ?? (() => {});
   const now = deps.now ?? Date.now;
   const invalidated: string[] = [];
+  const key = deps.laneKey ? `${projectRoot}#${deps.laneKey}` : projectRoot;
 
   if (!deps.isEnabled()) return { action: 'disabled', invalidated };
 
-  if (inFlightReconciles.has(projectRoot)) return { action: 'in-flight', invalidated };
+  if (inFlightReconciles.has(key)) return { action: 'in-flight', invalidated };
 
   const tick = async (): Promise<ReconcileResult> => {
     const readySet = await deps.getReadySet();
@@ -306,7 +314,7 @@ export async function reconcileUatGenerations(
 
     // PAN-4970: drop whatever the per-PR auto-merge scheduler already owns
     // before anchors, staleness, single-feature, backoff and assembly run.
-    const { perPrIds, batchReadySet } = await partitionPerPr(projectRoot, readySet, deps, log);
+    const { perPrIds, batchReadySet } = await partitionPerPr(key, readySet, deps, log);
     const perPr = [...perPrIds].sort();
 
     // Polyrepo supplies composite anchors in place of single SHAs; both are
@@ -375,8 +383,8 @@ export async function reconcileUatGenerations(
     if (deps.selectBatch) {
       const choice = await deps.selectBatch(batchReadySet, deps.store.listChain(projectRoot, ['ready', 'superseded']));
       if (choice && 'wait' in choice) {
-        if (lastLoggedWait.get(projectRoot) !== choice.wait) {
-          lastLoggedWait.set(projectRoot, choice.wait);
+        if (lastLoggedWait.get(key) !== choice.wait) {
+          lastLoggedWait.set(key, choice.wait);
           log(`[uat-reconciler] batch window open: ${choice.wait}`);
         }
         await deps.cleanup().catch(() => {});
@@ -387,7 +395,7 @@ export async function reconcileUatGenerations(
         toAssemble = choice.features;
       }
     }
-    lastLoggedWait.delete(projectRoot);
+    lastLoggedWait.delete(key);
 
     // 3. Assemble when nothing live answers the current desired set.
     const desired = desiredSignature(toAssemble, headShas, mainSha);
@@ -456,7 +464,7 @@ export async function reconcileUatGenerations(
     };
   };
 
-  const pending = tick().finally(() => inFlightReconciles.delete(projectRoot));
-  inFlightReconciles.set(projectRoot, pending);
+  const pending = tick().finally(() => inFlightReconciles.delete(key));
+  inFlightReconciles.set(key, pending);
   return pending;
 }

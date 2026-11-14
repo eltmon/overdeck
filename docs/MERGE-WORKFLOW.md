@@ -55,7 +55,9 @@ project only, and `enabled` cannot turn it on while the switch is off.
   wins:
   1. **Held for UAT** (its `hold-for-uat` label, else the project's
      `auto_merge_default: hold`, else global Require UAT): batch, and the
-     operator tests and promotes it. Priority never bypasses a hold.
+     operator tests and promotes it. Priority never bypasses a hold. In an
+     auto project a held feature gets its own UAT batch and never delays the
+     unheld ones (see "Two lanes" below).
   2. **High priority:** merges at once, on its own, through the per-PR path,
      keeping the 5-minute cancel window. High priority is a strike branch
      (`strike/<id>`), or an issue labeled `critical`, `blocks-main`, `P0` or
@@ -76,17 +78,29 @@ resets it). A batch, once assembled, keeps its members; features that become
 ready later wait for the next batch. Both keys are in **Settings → Merge
 Train**.
 
+**Two lanes.** In a project where the window applies, the reconciler splits
+the ready set. Unheld features go to the **window lane**: its batches are
+named `uat/<prefix>-train-<codename>-<MMDD>` and merge on the window. Features
+held by their own `hold-for-uat` label go to the **UAT lane**: its batches
+keep the plain `uat/<prefix>-<codename>-<MMDD>` names and today's semantics,
+so the operator tests and promotes them. Each lane sees only its own
+generations, so assembling, superseding or trimming one never touches the
+other, and one held feature never delays the others. A hold project (every
+feature held) has only the UAT lane.
+
 **Combined CI and the merge.** The `CI` workflow runs on every push to a
 `uat/**` branch, so each batch gets its own run. Each 60-second tick, the
 auto-promote tick (`src/dashboard/server/services/batch-auto-promote.ts`)
-reads the `CI` workflow run for the newest `ready` batch's head commit. It
+reads the `CI` workflow run for the newest `ready` window-lane batch's head
+commit. It
 needs positive evidence: the newest run is completed with conclusion
 `success` (CodeRabbit is not part of that run, and the non-blocking flake lane
 cannot fail it). No run yet, a run in progress, or a cancelled run means wait.
 Then it promotes the batch through the same door as the operator's
 **Merge batch** click, which re-checks every member's PR and refuses a moved
-base. One tick runs at a time. A batch with any member held for UAT is never
-promoted automatically.
+base. One tick runs at a time. A UAT-lane batch is never promoted
+automatically, and neither is a window batch whose member became held after
+it was assembled.
 
 **The roll leaves waiting features alone.** With the train on, the
 merge-train roll after a merge skips features that wait for the batch window

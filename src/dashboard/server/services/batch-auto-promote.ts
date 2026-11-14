@@ -9,8 +9,9 @@
  * Each tick (the 60 s UAT-train tick), per project where the window applies
  * (`batchWindowAppliesToProject`, and the train on):
  *
- *   - take the newest `ready` generation; skip it when any member is held for
- *     UAT (a held batch waits for the operator, D2);
+ *   - take the newest `ready` window-lane generation (`uat/<prefix>-train-…`;
+ *     UAT-lane batches of held features are the operator's to promote, D2).
+ *     Skip it when a member has become held for UAT since it was assembled;
  *   - read the `CI` workflow run for its head commit (`push` event). Green
  *     needs positive evidence: the newest run is `completed` with conclusion
  *     `success`. No run yet, a run in progress, or a cancelled run means
@@ -45,7 +46,7 @@ import type { CommitCheckRuns } from '../../../lib/overdeck/pull-requests.js';
 import type { PromoteResult, UatPromoteDeps } from '../../../lib/cloister/uat-promote.js';
 import { isAdvisoryCheckName } from '../../../lib/advisory-checks.js';
 import { COMBINED_CI_DROP_PREFIX } from '../../../lib/cloister/merge-route.js';
-import { batchWindowAppliesToProject, issueHeldForUat } from './merge-train-batching.js';
+import { batchWindowAppliesToProject, issueHeldForUat, isWindowBatch } from './merge-train-batching.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -103,7 +104,7 @@ export interface BatchAutoPromoteDeps {
   forgeOf?: (projectPath: string) => 'github' | 'gitlab';
   isRequireUatBeforeMerge?: () => boolean;
   getIssueLabels?: (issueId: string) => readonly string[];
-  /** Live `ready` generations for the project, newest first. */
+  /** Live `ready` generations for the project (both lanes), newest first. */
   listReady?: (projectRoot: string) => UatGeneration[];
   /** The batch branch's head SHA on origin, or null when it is not there. */
   branchHead?: (projectPath: string, branch: string) => Promise<string | null>;
@@ -179,7 +180,7 @@ async function runTick(
   const forgeOf = deps.forgeOf ?? (await import('./derived-issue-state.js')).forgeForProject;
   const listReady = deps.listReady ?? (await (async () => {
     const { listUatGenerations } = await import('../../../lib/overdeck/merge-sync.js');
-    return (projectRoot: string) => listUatGenerations({ projectRoot, statuses: ['ready'], limit: 1 });
+    return (projectRoot: string) => listUatGenerations({ projectRoot, statuses: ['ready'], limit: 10 });
   })());
   const promote = deps.promote ?? (async (name: string) => {
     const { postUatGenerationPromotePayload } = await import('./uat-train.js');
@@ -208,7 +209,7 @@ async function runTick(
     try {
       if (!isTrainOn(config)) continue;
       if (!batchWindowAppliesToProject(projectPath, config, { forgeOf, ...(deps.isRequireUatBeforeMerge ? { isRequireUatBeforeMerge: deps.isRequireUatBeforeMerge } : {}) })) continue;
-      const gen = listReady(projectPath)[0];
+      const gen = listReady(projectPath).find((g) => isWindowBatch(g.name));
       if (!gen) continue;
 
       const held = gen.members.find((m) => issueHeldForUat(m.issueId, config, deps));
