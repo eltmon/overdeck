@@ -64,11 +64,11 @@ export interface NeedsYouRow {
   messageId?: string;
 }
 
-/** One row per item; the server's first-raised id, else the newest tick's (PAN-5198). */
+/** One row per item; the server's first-raised id, when it sent one (PAN-5198, PAN-5239). */
 export function needsYouRows(tick: FlywheelLastTick): NeedsYouRow[] {
   const items = tick.needsYouItems ?? splitNeedsYouItems(tick.needsYou).map((text) => ({ text }));
   return items.map((item) => {
-    const messageId = ('firstRaisedMessageId' in item ? item.firstRaisedMessageId : undefined) ?? tick.messageId;
+    const messageId = 'firstRaisedMessageId' in item ? item.firstRaisedMessageId : undefined;
     const { label, target } = parseNeedsYouTarget(item.text);
     return { key: needsYouItemKey(item.text), text: item.text, label, ...(target ? { target } : {}), ...(messageId ? { messageId } : {}) };
   });
@@ -79,7 +79,7 @@ interface FlywheelStatusPaneProps {
   unreachable: boolean;
   nowMs: number;
   onNavigateIssue?: (issueId: string) => void;
-  onNeedsYouClick?: (messageId: string | undefined) => void;
+  onNeedsYouClick?: (messageId: string) => void;
 }
 
 export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue, onNeedsYouClick }: FlywheelStatusPaneProps) {
@@ -154,16 +154,18 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
               <ul>
                 {needsYouRows(tick).map((row) => (
                   <li key={row.key} data-testid="flywheel-needs-you-item" className="flex items-baseline gap-1.5">
-                    <button
-                      type="button"
-                      aria-label="Show where this was raised"
-                      title="Show the message that first raised this, or the question the flywheel is waiting on"
-                      data-testid="flywheel-needs-you-jump"
-                      className="shrink-0 self-center rounded-sm text-muted-foreground hover:text-foreground"
-                      onClick={() => onNeedsYouClick?.(row.messageId)}
-                    >
-                      <MessageSquare className="h-3 w-3" aria-hidden="true" />
-                    </button>
+                    {row.messageId && (
+                      <button
+                        type="button"
+                        aria-label="Show where this was raised"
+                        title="Open the conversation at the message that first raised this, or the question the flywheel is waiting on"
+                        data-testid="flywheel-needs-you-jump"
+                        className="shrink-0 self-center cursor-pointer rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={() => onNeedsYouClick?.(row.messageId!)}
+                      >
+                        <MessageSquare className="h-3 w-3" aria-hidden="true" />
+                      </button>
+                    )}
                     <span className="min-w-0">
                       {row.target ? (
                         <a

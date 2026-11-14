@@ -194,7 +194,10 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
 
   it('clicking NEEDS YOU reopens the pending question when one is open (PAN-4751 ac1)', async () => {
     const status = flywheelStatus({
-      lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the scope', at: '2026-09-23T09:59:50.000Z' },
+      lastTick: {
+        tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the scope', at: '2026-09-23T09:59:50.000Z',
+        needsYouItems: [{ text: 'decide the scope', firstRaisedTick: 4, firstRaisedAt: '2026-09-23T09:59:50.000Z', firstRaisedMessageId: 'msg-9' }],
+      },
     });
     setup(status, { pendingInput: [{ name: 'conv-flywheel', pendingAskUserQuestion: { toolUseId: 'tu-1', askedAt: '2026-09-23T09:59:00.000Z', questions: [] } }] });
     const { client } = renderWithQuery(<FlywheelPage />);
@@ -209,7 +212,10 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
 
   it('with no pending question, NEEDS YOU jumps to the tick message and tracks handled state (PAN-4751 ac2, ac5)', async () => {
     const status = flywheelStatus({
-      lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the scope', at: '2026-09-23T09:59:50.000Z', messageId: 'msg-9' },
+      lastTick: {
+        tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the scope', at: '2026-09-23T09:59:50.000Z', messageId: 'msg-9',
+        needsYouItems: [{ text: 'decide the scope', firstRaisedTick: 4, firstRaisedAt: '2026-09-23T09:59:50.000Z', firstRaisedMessageId: 'msg-9' }],
+      },
     });
     setup(status, { pendingInput: [] });
     const { client } = renderWithQuery(<FlywheelPage />);

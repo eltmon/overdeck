@@ -38,7 +38,7 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
     expect(rows[0]).toHaveTextContent('waive PAN-5095 test removal');
     expect(rows[1]).toHaveTextContent('PR #7 merge');
     expect(rows[2]).toHaveTextContent('upload AAB');
-    expect(screen.getAllByTestId('flywheel-needs-you-jump')).toHaveLength(3);
+    expect(screen.queryAllByTestId('flywheel-needs-you-jump')).toHaveLength(0);
     for (const row of rows) {
       expect(row).not.toHaveAttribute('role');
       expect(row).not.toHaveAttribute('tabindex');
@@ -80,19 +80,40 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
     expect(onNeedsYouClick).toHaveBeenCalledWith('m2');
   });
 
-  it('jumps to the tick\'s messageId without needsYouItems (PAN-5198)', () => {
+  it('renders no jump button when the item has no first-raised id (PAN-5239)', () => {
     const onNeedsYouClick = vi.fn();
     const status = flywheelStatus({
       lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'PR #7 merge', at: '2026-09-23T09:59:50.000Z', messageId: 'm9' },
     });
     render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
+    expect(screen.queryByTestId('flywheel-needs-you-jump')).toBeNull();
+  });
+
+  it('renders exactly one jump button, on the row with a first-raised id (PAN-5239)', () => {
+    const onNeedsYouClick = vi.fn();
+    const status = flywheelStatus({
+      lastTick: {
+        tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'PR #7 merge; upload AAB', at: '2026-09-23T09:59:50.000Z', messageId: 'm9',
+        needsYouItems: [
+          { text: 'PR #7 merge', firstRaisedTick: 2, firstRaisedAt: '2026-09-23T09:30:00.000Z', firstRaisedMessageId: 'm2' },
+          { text: 'upload AAB', firstRaisedTick: 3, firstRaisedAt: '2026-09-23T09:40:00.000Z' },
+        ],
+      },
+    });
+    render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
+    const rows = screen.getAllByTestId('flywheel-needs-you-item');
+    expect(rows[0]!.querySelector('[data-testid="flywheel-needs-you-jump"]')).not.toBeNull();
+    expect(rows[1]!.querySelector('[data-testid="flywheel-needs-you-jump"]')).toBeNull();
     fireEvent.click(screen.getByTestId('flywheel-needs-you-jump'));
-    expect(onNeedsYouClick).toHaveBeenCalledWith('m9');
+    expect(onNeedsYouClick).toHaveBeenCalledWith('m2');
   });
 
   it('the jump button renders and does not throw without onNeedsYouClick (PAN-5217)', () => {
     const status = flywheelStatus({
-      lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the PAN-3920 scope', at: '2026-09-23T09:59:50.000Z' },
+      lastTick: {
+        tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the PAN-3920 scope', at: '2026-09-23T09:59:50.000Z',
+        needsYouItems: [{ text: 'decide the PAN-3920 scope', firstRaisedTick: 2, firstRaisedAt: '2026-09-23T09:30:00.000Z', firstRaisedMessageId: 'm2' }],
+      },
     });
     render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} />);
     expect(screen.getByTestId('flywheel-needs-you-jump')).toBeInTheDocument();
