@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5233",
   "created": "2026-11-14T03:57:41.720Z",
-  "updated": "2026-11-14T04:19:45.209Z",
+  "updated": "2026-11-14T04:19:51.979Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "origin-schema.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T04:19:45.208Z"
+    },
+    "origin-write-door": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5233",
+      "claimedAt": "2026-11-14T04:19:51.979Z"
     }
   }
 }
