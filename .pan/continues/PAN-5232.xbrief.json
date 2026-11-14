@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5232",
   "created": "2026-11-14T03:50:14.887Z",
-  "updated": "2026-11-14T04:05:38.268Z",
+  "updated": "2026-11-14T04:05:46.175Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
     "herdr-readers.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T04:05:38.267Z"
+    },
+    "submit-reader": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5232",
+      "claimedAt": "2026-11-14T04:05:46.175Z"
     }
   }
 }
