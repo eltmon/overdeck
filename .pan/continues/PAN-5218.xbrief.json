@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5218",
   "created": "2026-11-14T02:30:48.079Z",
-  "updated": "2026-11-14T02:45:33.062Z",
+  "updated": "2026-11-14T02:47:54.141Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,6 +160,26 @@
     "followup-patrol.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T02:45:33.062Z"
+    },
+    "docs": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:47:54.141Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:47:54.141Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:47:54.141Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:47:54.141Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:47:54.141Z"
     }
   }
 }
