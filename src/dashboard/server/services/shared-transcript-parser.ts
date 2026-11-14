@@ -4,6 +4,7 @@ import type { ParseResult, ParseState } from './conversation/types.js';
 import { runDashboardDbJob } from './dashboard-db-task.js';
 import {
   estimateParseResultChars,
+  estimateUnresolvedResultsChars,
   TRANSCRIPT_CACHE_MAX_RETAINED_CHARS,
   TRANSCRIPT_ENTRY_MAX_RETAINED_CHARS,
 } from './conversation/tool-result-bounds.js';
@@ -71,7 +72,7 @@ export function sharedTranscriptParser(parser: Parser) {
     }
     // PAN-5211: budgets count retained characters. A result over the hard cap is returned but
     // not kept, so concurrent subscribers share it only while its job is pending.
-    entry.retainedChars = estimateParseResultChars(parsed);
+    entry.retainedChars = estimateParseResultChars(parsed) + estimateUnresolvedResultsChars(parsed.unresolvedResults);
     if (entry.retainedChars > TRANSCRIPT_ENTRY_MAX_RETAINED_CHARS && snapshots.get(key) === entry) snapshots.delete(key);
     let retained = 0;
     for (const item of snapshots.values()) retained += item.retainedChars;

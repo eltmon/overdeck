@@ -142,6 +142,21 @@ describe('shared transcript parser retained-character budget (PAN-5211)', () => 
     expect(mocks.job).toHaveBeenCalledTimes(2);
   });
 
+  it('counts results waiting for their tool call toward the cap', async () => {
+    mocks.stat.mockResolvedValue({ dev: 11, ino: 11, size: 100, mtimeMs: 1 });
+    const waiting = {
+      messages: [], workLog: [],
+      unresolvedResults: new Map([['toolu_1', { isError: false, rawContent: [{ type: 'text', text: 'w'.repeat(17 * 1024 * 1024) }] }]]),
+    };
+    mocks.job.mockResolvedValue(waiting);
+    const parse = sharedTranscriptParser('claude-initial');
+
+    await parse('/waiting.jsonl');
+    await parse('/waiting.jsonl');
+
+    expect(mocks.job).toHaveBeenCalledTimes(2);
+  });
+
   it('reuses a result under the cap', async () => {
     mocks.stat.mockResolvedValue({ dev: 10, ino: 10, size: 100, mtimeMs: 1 });
     const small = { messages: [message('small')], workLog: [] };

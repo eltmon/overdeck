@@ -383,8 +383,12 @@ door that does not exist; a real record read door would be a separate change.
     - A line still over 8 MiB after the scrub is not parsed whole. An output for a call in
       the window becomes a `bodyOmitted` entry with `resultBytes`; anything else becomes a
       "Skipped a <X.Y> MB transcript record" info row.
-    - A cold open of a transcript over 64 MiB reads only its last 64 MiB (tail read). The
-      cost totals stay correct because Codex `token_count` totals are cumulative.
+    - A cold open of a transcript over 64 MiB reads only its last 64 MiB (tail read). Token
+      totals stay correct because Codex `token_count` totals are cumulative. Cost also needs
+      the pricing model, which only `turn_context` records carry, and one long turn can fill
+      the whole tail. So a tail read first pushes the newest `"type":"turn_context"` line
+      before the tail (scanning back up to 64 MiB, then the head of the file). That line
+      creates no row, so it changes no ids or sequences.
     - Stored tool results cap at 65,536 characters (first and last 32,768, joined by an
       "omitted" marker) through `services/conversation/tool-result-bounds.ts`, for Codex,
       pi, prime-agent, ohmypi and kimi. ACP keeps its 500-character cap.
@@ -408,14 +412,19 @@ door that does not exist; a real record read door would be a separate change.
       transcript as you scroll up." Older pages come from disk through
       `services/conversation/codex-transcript-ranges.ts` (`selectHistoryPageBefore`, which
       reads 8 MiB ranges and doubles up to 64 MiB). At a range boundary, a call whose output
-      lies after the range shows as open, and that output shows as a stand-alone "Tool
-      result" row.
+      lies after the range is marked `bodyOmitted`, so expanding it reads forward from the
+      call to its output. If that output is already in memory, it also shows as a stand-alone
+      "Tool result" row with its own `codex-tool-out-@<offset>` id. A record longer than
+      64 MiB just before a range is skipped, so paging moves past it.
     - Expanding a row that came from a disk page sends its `sequence` as `?seq=<n>`. When
       the in-memory parse lacks the id, the server checks that `seq` is a line start and
       parses forward from it until the row has its output.
-    - Codex bookmarks saved with the old counter ids (`codex-user-3`) are migrated once per
-      conversation per process, on the first bookmark list
-      (`src/lib/overdeck/codex-bookmark-migration.ts`). Ids it cannot map are left alone.
+    - Codex bookmarks saved with the old counter ids (`codex-user-3`) are migrated on the
+      first bookmark list (`src/lib/overdeck/codex-bookmark-migration.ts`). The pass counts
+      rows by the old parser's rules (every call id kept, oversized records counted by
+      kind), applies all renames in one transaction, and records success for the life of
+      the process; a pass that could not read the transcript runs again on the next list.
+      Ids it cannot map are left alone.
     - Every other consumer of a bounded Codex conversation sees only its in-memory rows:
       title generation, retitle, title refinement and the admin title backfill read the
       newest rows; conversation diffs cover the in-memory rows only;

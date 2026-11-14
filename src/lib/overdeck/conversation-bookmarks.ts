@@ -164,3 +164,19 @@ export function renameConversationBookmarkId(name: string, fromId: string, toId:
     return Number(result.changes) > 0;
   })();
 }
+
+/** PAN-5211 D20: apply several bookmark id renames in one transaction; returns how many rows moved. */
+export function renameConversationBookmarkIds(
+  name: string,
+  renames: ReadonlyArray<readonly [fromId: string, toId: string]>,
+  now: number = Date.now(),
+): number {
+  if (renames.length === 0) return 0;
+  const db = getOverdeckDatabase();
+  return db.transaction((): number => {
+    let moved = 0;
+    for (const [fromId, toId] of renames) if (renameConversationBookmarkId(name, fromId, toId, now)) moved += 1;
+    return moved;
+  })();
+}
+

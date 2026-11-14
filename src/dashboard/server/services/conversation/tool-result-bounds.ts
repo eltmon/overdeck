@@ -206,3 +206,18 @@ export function estimateParseResultChars(r: {
   for (const entry of r.workLog) total += estimateWorkLogEntryChars(entry);
   return total;
 }
+
+/**
+ * PAN-5211: retained characters of results that arrived before their tool call (the Claude parser's
+ * `unresolvedResults`). They sit outside `messages` and `workLog`, so they are counted separately.
+ */
+export function estimateUnresolvedResultsChars(
+  results: ReadonlyMap<string, { readonly resultText?: string; readonly rawContent: unknown }> | undefined,
+): number {
+  let total = 0;
+  for (const [id, result] of results ?? []) {
+    total += ROW_OVERHEAD_CHARS + id.length + stringLength(result.resultText) + estimateValueChars(result.rawContent);
+  }
+  return total;
+}
+

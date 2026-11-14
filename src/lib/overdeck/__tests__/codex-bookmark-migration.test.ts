@@ -95,3 +95,40 @@ describe('migrateCodexCounterBookmarks', () => {
     expect(listConversationBookmarks('codex-conv').find((b) => b.label === 'Gone')?.messageId).toBe('codex-user-99');
   });
 });
+
+describe('migrateCodexCounterBookmarks — pre-PAN-5211 counting rules', () => {
+  it('counts an oversized message the way the old parser did', async () => {
+    const { createConversation } = await import('../conversations.js');
+    const { upsertConversationBookmark, listConversationBookmarks } = await import('../conversation-bookmarks.js');
+    const { migrateCodexCounterBookmarks } = await import('../codex-bookmark-migration.js');
+    createConversation({ name: 'codex-big', tmuxSession: 'conv-codex-big', cwd: testHome, harness: 'codex' });
+    // Counter ids: first = 1, the 9 MB message = 2, the call = 3, target = 4.
+    upsertConversationBookmark('codex-big', { messageId: 'codex-user-4', label: 'Target', messageCreatedAt: null }, 1000);
+    const lines = [
+      event({ type: 'user_message', message: 'first' }),
+      event({ type: 'user_message', message: 'b'.repeat(9 * 1024 * 1024) }),
+      item({ type: 'function_call', name: 'exec_command', arguments: '{}', call_id: 'call_1' }),
+      event({ type: 'user_message', message: 'target' }),
+    ];
+    const file = join(testHome, 'rollout-2026-11-13T00-00-00-big.jsonl');
+    writeFileSync(file, lines.join('\n') + '\n');
+    const targetOffset = lines.slice(0, 3).reduce((sum, l) => sum + Buffer.byteLength(l) + 1, 0);
+
+    await migrateCodexCounterBookmarks('codex-big', { resolveSessionFile: async () => file });
+
+    expect(listConversationBookmarks('codex-big')[0]?.messageId).toBe(`codex-user-@${targetOffset}`);
+  });
+
+  it('tries again after the transcript could not be resolved', async () => {
+    const { file } = await setup();
+    const { migrateCodexCounterBookmarks } = await import('../codex-bookmark-migration.js');
+    const { listConversationBookmarks } = await import('../conversation-bookmarks.js');
+
+    await migrateCodexCounterBookmarks('codex-conv', { resolveSessionFile: async () => null });
+    expect(listConversationBookmarks('codex-conv').find((b) => b.label === 'Second')?.messageId).toBe('codex-user-3');
+
+    await migrateCodexCounterBookmarks('codex-conv', { resolveSessionFile: async () => file });
+    expect(listConversationBookmarks('codex-conv').find((b) => b.label === 'Second')?.messageId).toBe(await offsetIdOf(file, 'second'));
+  });
+});
+
