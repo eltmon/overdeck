@@ -4,17 +4,17 @@
     "created": "2026-11-14T06:00:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5244: Issue drawer: conversation first, with a compact pipeline strip and a Skills tab",
-    "updated": "2026-11-14T05:20:54.265Z"
+    "updated": "2026-11-14T05:23:07.523Z"
   },
   "plan": {
     "id": "pan-5244",
     "title": "Issue drawer: conversation first, with a compact pipeline strip and a Skills tab",
-    "status": "proposed",
+    "status": "running",
     "uid": "4e48f3fa-9d55-46c8-9633-194a8da87e11",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T06:00:00Z",
-    "updated": "2026-11-14T05:20:54.265Z",
+    "updated": "2026-11-14T05:23:07.523Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5244",
@@ -1688,5 +1688,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
