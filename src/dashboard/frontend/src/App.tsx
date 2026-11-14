@@ -67,6 +67,7 @@ import {
 } from './App/StandaloneRoutes';
 import { AppRoutes, type PendingConversationTarget } from './App/AppRoutes';
 import { useAppShortcuts } from './App/hooks/useAppShortcuts';
+import { ShortcutsSheet } from './lib/shortcuts/ShortcutsSheet';
 import { AppChrome } from './App/AppChrome';
 import { useUiMode } from './lib/simple/uiMode';
 import { AppLiveStoreHost, countRunningAgents } from './App/AppLiveStoreHost';
@@ -637,7 +638,9 @@ export default function App() {
   const runningAgentCount = useDashboardStore((s) => countRunningAgents(s.agentsById));
 
   // App-level shortcuts go through the shortcut registry (PAN-5287).
-  useAppShortcuts({ isPaletteOpen, setActiveTab, setIsSearchOpen, setIsPaletteOpen, setPaletteInitialScope });
+  const [shortcutsSheetOpen, setShortcutsSheetOpen] = useState(false);
+  const openShortcutsSheet = useCallback(() => setShortcutsSheetOpen(true), []);
+  useAppShortcuts({ isPaletteOpen, activeTab, openShortcutsSheet, setActiveTab, setIsSearchOpen, setIsPaletteOpen, setPaletteInitialScope });
 
   // Listen for menu actions from desktop app (open-settings, etc.)
   useEffect(() => {
@@ -884,6 +887,7 @@ export default function App() {
 
       {/* Emergency STOP hotkey (Cmd/Ctrl+Shift+.) — kills all agents, freezes auto-resume */}
       <EmergencyStopOverlay />
+      {shortcutsSheetOpen && <ShortcutsSheet onClose={() => setShortcutsSheetOpen(false)} />}
 
       {/* Toast Notifications */}
       <Toaster />

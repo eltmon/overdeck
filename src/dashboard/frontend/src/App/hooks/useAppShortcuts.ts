@@ -1,5 +1,5 @@
 // App-level keyboard shortcuts (PAN-5287 §6.7/§6.8, WI-S9): the palette, the
-// conversations palette, search and the `g` lens chords, registered with the
+// conversations palette, search, the `?` sheet and the `g` lens chords, registered with the
 // shortcut registry. App calls this once; it also installs the registry's
 // window listeners for the whole app.
 
@@ -9,6 +9,8 @@ import { installShortcutListener, registerShortcut, type ShortcutDef } from '../
 
 export interface AppShortcutActions {
   isPaletteOpen: boolean
+  activeTab: Tab
+  openShortcutsSheet: () => void
   setActiveTab: (tab: Tab) => void
   setIsSearchOpen: (open: boolean) => void
   setIsPaletteOpen: (update: boolean | ((prev: boolean) => boolean)) => void
@@ -23,12 +25,16 @@ const LENSES: ReadonlyArray<{ id: string; key: string; tab: Tab; label: string }
 ]
 
 export function useAppShortcuts(actions: AppShortcutActions): void {
-  const { isPaletteOpen, setActiveTab, setIsSearchOpen, setIsPaletteOpen, setPaletteInitialScope } = actions
+  const { isPaletteOpen, activeTab, openShortcutsSheet, setActiveTab, setIsSearchOpen, setIsPaletteOpen, setPaletteInitialScope } =
+    actions
   useEffect(() => installShortcutListener(), [])
 
   // The lens chords are disabled while the palette is open (PAN-1234).
   const paletteOpenRef = useRef(isPaletteOpen)
   paletteOpenRef.current = isPaletteOpen
+  // God View uses ? for its own help (PAN-5287 S-D8).
+  const activeTabRef = useRef(activeTab)
+  activeTabRef.current = activeTab
 
   const defs = useMemo<ShortcutDef[]>(
     () => [
@@ -63,6 +69,15 @@ export function useAppShortcuts(actions: AppShortcutActions): void {
         group: 'General',
         run: () => setIsSearchOpen(true),
       },
+      {
+        id: 'app.shortcuts-sheet',
+        keys: { mac: '?', other: '?' },
+        scope: 'not-editing',
+        label: 'Keyboard shortcuts',
+        group: 'General',
+        when: () => activeTabRef.current !== 'god-view',
+        run: () => openShortcutsSheet(),
+      },
       ...LENSES.map(
         (lens): ShortcutDef => ({
           id: lens.id,
@@ -75,7 +90,7 @@ export function useAppShortcuts(actions: AppShortcutActions): void {
         }),
       ),
     ],
-    [setActiveTab, setIsSearchOpen, setIsPaletteOpen, setPaletteInitialScope],
+    [openShortcutsSheet, setActiveTab, setIsSearchOpen, setIsPaletteOpen, setPaletteInitialScope],
   )
 
   useEffect(() => {
