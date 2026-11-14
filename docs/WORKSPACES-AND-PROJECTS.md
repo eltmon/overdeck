@@ -750,8 +750,9 @@ trailer-only `git` shim beside their `gh` shim (`buildConversationShimLines`)
 that adds `Overdeck-Conversation` and refuses nothing. An agent launched from
 inside a conversation drops the conversation's guard dir from PATH, so its
 commits carry only `Overdeck-Agent`. Each shim passes
-`-c trailer.<key>.ifexists=addIfDifferent` for that one call, so
-`git commit --amend` never adds a second copy.
+`-c trailer.<key>.ifexists=addIfDifferent` and `-c trailer.<key>.ifmissing=add`
+for that one call, so `git commit --amend` never adds a second copy and a
+configured `trailer.ifmissing=doNothing` cannot drop the trailer.
 
 Only `git commit` is stamped: `merge`, `cherry-pick`, `revert`, `rebase` and
 `am` are not changed, and a cherry-picked or rebased commit keeps the trailers

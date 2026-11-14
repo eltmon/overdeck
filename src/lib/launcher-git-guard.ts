@@ -46,7 +46,8 @@
  * PAN-5281: for `git commit`, the agent shim adds the trailer
  * `Overdeck-Agent: <agentId>` (the id is written into the shim at launch) and
  * passes `-c trailer.Overdeck-Agent.ifexists=addIfDifferent` so an amend never
- * duplicates it. Conversations get a trailer-only `git` shim beside their `gh`
+ * duplicates it, plus `-c trailer.Overdeck-Agent.ifmissing=add` so a repository
+ * `trailer.ifmissing=doNothing` cannot drop it. Conversations get a trailer-only `git` shim beside their `gh`
  * shim that adds `Overdeck-Conversation: <id>` and refuses nothing. The bypass
  * skips the trailer; an absolute `/usr/bin/git` is not attributed; git older
  * than 2.32 (no `commit --trailer`) gets no trailer.
@@ -321,7 +322,8 @@ const FIND_COMMAND_SHIM_LINES: readonly string[] = [
 /**
  * PAN-5281: add `--trailer "<key>: <value>"` right after the `commit`
  * subcommand, and prepend `-c trailer.<key>.ifexists=addIfDifferent` so an
- * amend never duplicates it. The option walk mirrors
+ * amend never duplicates it and `-c trailer.<key>.ifmissing=add` so a
+ * configured `trailer.ifmissing=doNothing` cannot drop it. The option walk mirrors
  * `_overdeck_git_find_command`. POSIX sh has no arrays, so the arguments are
  * rotated through `set --`: each one is shifted off the front and appended
  * to the back, and the trailer is appended right after the subcommand.
@@ -350,7 +352,7 @@ const TRAILER_SH = [
   '      cmd) set -- "$@" --trailer "$_OVERDECK_TRAILER_KEY: $_OVERDECK_TRAILER_VALUE"; _ot_state=done ;;',
   '    esac',
   '  done',
-  '  set -- -c "trailer.$_OVERDECK_TRAILER_KEY.ifexists=addIfDifferent" "$@"',
+  '  set -- -c "trailer.$_OVERDECK_TRAILER_KEY.ifexists=addIfDifferent" -c "trailer.$_OVERDECK_TRAILER_KEY.ifmissing=add" "$@"',
   'fi',
 ];
 

@@ -87,10 +87,12 @@ export async function listAttributedCommits(opts: {
   }
 
   // Filter in git, cap in JS: `--max-count` would apply before the trailer
-  // check below, so a body-only match could take the only slot.
-  const grep = `^${escapeRegExp(key)}:[[:space:]]*${escapeRegExp(value)}[[:space:]]*$`;
+  // check below, so a body-only match could take the only slot. Git's trailer
+  // parser matches keys case-insensitively and allows whitespace before the
+  // colon, so the prefilter does too (`-i`); the exact value check stays below.
+  const grep = `^${escapeRegExp(key)}[[:space:]]*:[[:space:]]*${escapeRegExp(value)}[[:space:]]*$`;
   const logArgs = [
-    'log', 'HEAD', '--no-merges', '--no-color', '-E', `--grep=${grep}`,
+    'log', 'HEAD', '--no-merges', '--no-color', '-E', '-i', `--grep=${grep}`,
     ...(opts.since ? [`--since=${opts.since}`] : []),
     `--format=%H%x1f%s%x1f%aI%x1f%(trailers:key=${key},valueonly,separator=%x1d)`,
   ];

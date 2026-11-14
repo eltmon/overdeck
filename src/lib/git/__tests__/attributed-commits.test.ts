@@ -24,6 +24,8 @@ const fixtureEnv: NodeJS.ProcessEnv = (() => {
     OVERDECK_PAN_GIT_OP: '1',
     GIT_AUTHOR_NAME: 'attr', GIT_AUTHOR_EMAIL: 'attr@example.test',
     GIT_COMMITTER_NAME: 'attr', GIT_COMMITTER_EMAIL: 'attr@example.test',
+    // A global commit.gpgSign=true would make every fixture commit fail without a key.
+    GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'commit.gpgSign', GIT_CONFIG_VALUE_0: 'false',
   };
   delete env.OVERDECK_AGENT_ID;
   delete env.OVERDECK_CONVERSATION;
@@ -113,6 +115,15 @@ describe('listAttributedCommits (PAN-5281)', () => {
   it('maxCount counts confirmed matches', async () => {
     const commits = await listAttributedCommits({ repoPath: repo, key: 'Overdeck-Conversation', value: 'conv-a', maxCount: 1 });
     expect(commits.map((c) => c.sha)).toEqual([shas.four]);
+  });
+
+  it('matches a key in another case and with whitespace before the colon', async () => {
+    const other = join(home, 'key-forms');
+    git(['init', '--quiet', '-b', 'main', other], home);
+    git(['commit', '--quiet', '--allow-empty', '-m', 'lower', '-m', 'overdeck-conversation : conv-c'], other);
+    git(['commit', '--quiet', '--allow-empty', '-m', 'other value', '-m', 'Overdeck-Conversation: conv-cc'], other);
+    const commits = await listAttributedCommits({ repoPath: other, key: 'Overdeck-Conversation', value: 'conv-c' });
+    expect(commits.map((c) => c.subject)).toEqual(['lower']);
   });
 
   it('excludes merge commits', async () => {

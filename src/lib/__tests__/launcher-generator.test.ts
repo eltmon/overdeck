@@ -510,7 +510,7 @@ describe('generateLauncherScript', () => {
             cmd) set -- "\\$@" --trailer "\\$_OVERDECK_TRAILER_KEY: \\$_OVERDECK_TRAILER_VALUE"; _ot_state=done ;;
           esac
         done
-        set -- -c "trailer.\\$_OVERDECK_TRAILER_KEY.ifexists=addIfDifferent" "\\$@"
+        set -- -c "trailer.\\$_OVERDECK_TRAILER_KEY.ifexists=addIfDifferent" -c "trailer.\\$_OVERDECK_TRAILER_KEY.ifmissing=add" "\\$@"
       fi
       case "\\$_overdeck_git_command" in
         rebase|stash|reset|commit|push|merge|cherry-pick) ;;
@@ -873,7 +873,7 @@ describe('generateLauncherScript', () => {
             cmd) set -- "\\$@" --trailer "\\$_OVERDECK_TRAILER_KEY: \\$_OVERDECK_TRAILER_VALUE"; _ot_state=done ;;
           esac
         done
-        set -- -c "trailer.\\$_OVERDECK_TRAILER_KEY.ifexists=addIfDifferent" "\\$@"
+        set -- -c "trailer.\\$_OVERDECK_TRAILER_KEY.ifexists=addIfDifferent" -c "trailer.\\$_OVERDECK_TRAILER_KEY.ifmissing=add" "\\$@"
       fi
       case "\\$_overdeck_git_command" in
         rebase|stash|reset|commit|push|merge|cherry-pick) ;;

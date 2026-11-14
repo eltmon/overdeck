@@ -27,6 +27,8 @@ const baseEnv: NodeJS.ProcessEnv = (() => {
     PATH: (process.env.PATH ?? '').split(':').filter((s) => !s.endsWith('/git-guard')).join(':'),
     GIT_AUTHOR_NAME: 'trailer', GIT_AUTHOR_EMAIL: 'trailer@example.test',
     GIT_COMMITTER_NAME: 'trailer', GIT_COMMITTER_EMAIL: 'trailer@example.test',
+    // A global commit.gpgSign=true would make every fixture commit fail without a key.
+    GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'commit.gpgSign', GIT_CONFIG_VALUE_0: 'false',
   };
   delete env.OVERDECK_AGENT_ID;
   delete env.OVERDECK_CONVERSATION;
@@ -86,6 +88,14 @@ afterAll(() => {
 describe('conversation git shim (PAN-5281)', () => {
   it('adds an Overdeck-Conversation trailer to git commit', () => {
     const fixture = newRepo();
+    const result = run(['commit', '--allow-empty', '-m', 'x'], fixture);
+    expect(result.status).toBe(0);
+    expect(trailerValues('Overdeck-Conversation', fixture)).toEqual([CONVERSATION_ID]);
+  });
+
+  it('adds the trailer when the repository sets trailer.ifmissing=doNothing', () => {
+    const fixture = newRepo();
+    realGit(['config', 'trailer.ifmissing', 'doNothing'], fixture);
     const result = run(['commit', '--allow-empty', '-m', 'x'], fixture);
     expect(result.status).toBe(0);
     expect(trailerValues('Overdeck-Conversation', fixture)).toEqual([CONVERSATION_ID]);
