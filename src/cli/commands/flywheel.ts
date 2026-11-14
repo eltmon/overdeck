@@ -179,7 +179,10 @@ export function formatFlywheelStatus(status: FlywheelDerivedStatus, nowMs = Date
       const pr = row.pr ? `PR #${row.pr.number} ${row.pr.reviewState}/${row.pr.checks}` : 'no PR';
       const journal = row.lastJournal ? `${row.lastJournal.type} ${relativeAge(row.lastJournal.at, nowMs)}` : '—';
       // `working` with no live pane is the shape a stalled issue takes.
-      const base = row.state === 'working' && row.liveAgents === 0 ? `${row.state} · no agent` : row.state;
+      // The page and the CLI print the same plain-language blocker (PAN-5283 FR-11).
+      const base = row.blocker
+        ? `${row.stage ?? row.state} · ${row.blocker.text}`
+        : row.state === 'working' && row.liveAgents === 0 ? `${row.state} · no agent` : row.state;
       const state = row.strike ? `${base} · strike` : base;
       const title = row.trackerUnknown ? '(tracker unknown)' : truncate(row.title ?? '', 48);
       lines.push(`    ${`${row.issueId}${row.inTick ? '*' : ''}`.padEnd(11)} ${state.padEnd(28)} ${(row.attention ?? '').padEnd(10)} ${title.padEnd(48)} ${pr.padEnd(32)} ${journal}`);

@@ -517,6 +517,7 @@ if (startUatTrainReconciler({
   onTick: () => Promise.all([
     runAutoMergeSchedulerTick().catch((err) => console.warn('[auto-merge] scheduler tick failed:', err instanceof Error ? err.message : err)),
     runApprovalAtHeadRefreshTick().catch((err) => console.warn('[approval-refresh] tick failed:', err instanceof Error ? err.message : err)),
+    import('./services/strike-review.js').then(({ runStrikeReviewTick }) => runStrikeReviewTick()).catch((err) => console.warn('[strike-review] tick failed:', err instanceof Error ? err.message : err)),
     // PAN-4753 D4: merge a batch whose combined CI is green; drop a failing member.
     import('./routes/specialists.js')
       .then(({ firePostMergeLifecycle }) => runBatchAutoPromoteTick(firePostMergeLifecycle))

@@ -290,3 +290,31 @@ describe('scheduleAutoMergeWithResult (#3983)', () => {
     expect(getLatestAutoMerge('PAN-1')).toMatchObject({ id: result.entry.id, status: 'pending' });
   });
 });
+
+describe('pending auto-merge kind (PAN-4753 WI-6)', () => {
+  it('stores the scheduled kind, defaulting to feature', () => {
+    const db = odb.raw();
+    seedIssue(db, 'PAN-1');
+    seedIssue(db, 'PAN-2');
+    const base = { prUrl: 'https://github.com/org/repo/pull/99', projectKey: 'pan', scheduledMergeAt: '2026-06-10T00:00:00.000Z' };
+    const feature = scheduleAutoMergeWithResult({ ...base, issueId: 'PAN-1' });
+    const strike = scheduleAutoMergeWithResult({ ...base, issueId: 'PAN-2', kind: 'strike' });
+    expect(feature.entry.kind).toBe('feature');
+    expect(strike.entry.kind).toBe('strike');
+    expect(getLatestAutoMerge('PAN-2')?.kind).toBe('strike');
+  });
+
+  it('lists due strike rows before due feature rows (R5)', () => {
+    const db = odb.raw();
+    seedIssue(db, 'PAN-1');
+    seedIssue(db, 'PAN-2');
+    seedIssue(db, 'PAN-3');
+    seedPendingAutoMerge(db, { issueId: 'PAN-1', scheduledMergeAt: '2026-06-10T00:00:00.000Z' });
+    const strikeId = seedPendingAutoMerge(db, { issueId: 'PAN-2', scheduledMergeAt: '2026-06-10T00:30:00.000Z' });
+    db.prepare("UPDATE pending_auto_merges SET kind = 'strike' WHERE id = ?").run(strikeId);
+    seedPendingAutoMerge(db, { issueId: 'PAN-3', scheduledMergeAt: '2026-06-10T00:10:00.000Z' });
+
+    const due = listDuePendingAutoMerges('2026-06-10T01:00:00.000Z');
+    expect(due.map((e) => [e.issueId, e.kind])).toEqual([['PAN-2', 'strike'], ['PAN-1', 'feature'], ['PAN-3', 'feature']]);
+  });
+});

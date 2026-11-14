@@ -63,8 +63,7 @@ project only, and `enabled` cannot turn it on while the switch is off.
      (`strike/<id>`), or an issue labeled `critical`, `blocks-main`, `P0` or
      `urgent`, or labeled both `substrate-improvement` and `bug`. A
      `substrate-improvement` issue that is not a `bug` batches. Strike PRs
-     never batch and stay operator-merged until strike auto-merge lands
-     (PAN-4753 WI-1/5/6).
+     never batch; see "Strike PRs" below.
   3. **Dropped from a batch** (below): per-PR.
   4. **Everything else:** batch.
 
@@ -140,6 +139,60 @@ own`. That member then takes the per-PR path. The others return to the batch
 window with their wait clocks unchanged, so they re-assemble without it as
 soon as the window allows (at once, when the oldest has already waited
 `batch_wait_minutes`).
+
+### Strike PRs: expedited review and auto-merge (PAN-4753)
+
+A strike PR (branch `strike/<id>`, workspace `workspaces/feature-<id>-strike`,
+PAN-3973) skips planning and is authored as the operator, who cannot approve
+it on GitHub. Three pieces let it merge without a hand-written approval:
+
+1. **Expedited review.** On each 60-second UAT-train tick,
+   `runStrikeReviewTick` (`src/dashboard/server/services/strike-review.ts`)
+   lists the open strike PRs of every GitHub project and starts one
+   quick-mode review (a single reviewer, no convoy) for each PR that is not a
+   draft, has green checks, does not conflict with its base and has no review
+   at its current head. It starts at most two reviews per tick, oldest PR
+   first. "Once per head" is the strike workspace's pipeline journal: a
+   `review.requested` entry with `data.headSha`, written once the dispatch
+   succeeds. A request with no verdict after 30 minutes is asked again when
+   no reviewer for that head is alive, and a failed dispatch
+   (`review.dispatch-failed`) waits 10 minutes before the next try. A live
+   reviewer left from an older head never holds a new head's review. The
+   reviewer reads the strike workspace, so the workspace HEAD must equal the
+   PR head before a review starts. An issue that also has a feature workspace
+   is reviewed as a feature, so its strike PR is not auto-reviewed and stays
+   operator-merged. The merge-train flag does not
+   gate it (it decides batching only); `OVERDECK_DISABLE_AUTO_MERGE=1` stops
+   it. GitLab projects are skipped. `pan review request <id>` and
+   `POST /api/review/:issueId/request` start the same review for a
+   strike-only issue (`?force=true` reviews the same head again).
+2. **The verdict.** The reviewer records it with
+   `pan admin specialists done review <id>` as usual. For an issue with only
+   a strike workspace, the command reads `strike/<id>`
+   (`resolveReviewTarget`, `src/lib/cloister/review-target.ts`) and journals
+   the reviewed head (`headSha`) and the reviewer's notes (`summary`). The
+   verdict is pinned to the reviewed commit; when the PR moved past it, the
+   verdict is refused and the new head gets its own review. An
+   APPROVED verdict is a GitHub APPROVE by the App bot, or a trusted
+   `sha=` verdict marker when the forge refuses the review, so the merge gate
+   sees a head approval. A CHANGES_REQUESTED verdict stops the strike: no
+   rework is delivered, and the next push gets a new review.
+3. **Auto-merge.** The scheduler lists `strike/<id>` PRs as candidates next
+   to `feature/<id>` PRs, walks strikes first, and gates each strike on its
+   own branch. A strike branch is high priority, so it is scheduled per-PR
+   even with the train on, as `pending_auto_merges.kind = 'strike'`. It keeps
+   the 5-minute cancel window (D4). The executor takes due strike rows before
+   due feature rows and merges them through `buildStrikeMergeRequest` with
+   `expectedHeadSha`, so the merge is pinned to the approved head and still
+   needs that head approval. When the branch is behind `main`, only the
+   server rebases it; if that fails, the row fails and the operator updates
+   the branch (`pan sync-main <id>`) or merges it by hand.
+
+A strike held for UAT (its label, the project default, or global Require UAT)
+is never scheduled: it waits for the operator's strike Merge button,
+`POST /api/merge-train/strikes/:issueId/merge` (PAN-4750). That
+operator-started strike merge is the only merge that skips the head-approval
+rule; every automatic merge, strike or feature, still needs it.
 
 ### Merging from the Flywheel UAT card (PAN-4598)
 

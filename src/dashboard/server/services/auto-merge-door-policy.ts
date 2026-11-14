@@ -87,6 +87,8 @@ export function cachedIssueClosed(issueId: string): boolean {
 export function autoMergePolicyRefusal(
   issueId: string,
   deps: AutoMergePolicyDeps = {},
+  /** PAN-4753 WI-6: the PR branch; a `strike/<id>` branch is high priority. */
+  options: { branch?: string } = {},
 ): { status: 412 | 422; body: { error: string } } | null {
   if ((deps.isIssueClosed ?? cachedIssueClosed)(issueId)) {
     return { status: 422, body: { error: `${issueId} is closed in the tracker` } };
@@ -98,7 +100,7 @@ export function autoMergePolicyRefusal(
     return { status: 412, body: { error: 'UAT is still required before merge' } };
   }
   const trainOn = (deps.isTrainOn ?? issueTrainOn)(issueId);
-  const highPriority = isHighPriorityMerge({ labels });
+  const highPriority = isHighPriorityMerge({ branch: options.branch ?? null, labels });
   const route = mergeRouteFor({
     heldForUat: false,
     trainOn,

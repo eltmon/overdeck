@@ -28,6 +28,8 @@ export interface PendingAutoMerge {
   cancelledBy?: string;
   /** #3983: the PR head the merge gate judged ready when this row was scheduled. */
   headSha?: string;
+  /** PAN-4753: a `feature/<id>` PR or a `strike/<id>` PR. */
+  kind: 'feature' | 'strike';
 }
 
 export type UatGenerationStatus =

@@ -69,6 +69,8 @@ export const FlywheelNeedsYouItem = Schema.Struct({
   firstRaisedAt: Schema.String,
   /** The first-raised tick message's id, when the harness records one. */
   firstRaisedMessageId: Schema.optional(Schema.String),
+  /** The first-raised message's prose without its tick line (PAN-5283 D18). */
+  context: Schema.optional(Schema.String),
 })
 export type FlywheelNeedsYouItem = typeof FlywheelNeedsYouItem.Type
 
@@ -146,6 +148,71 @@ export const FlywheelAgentSummary = Schema.Struct({
 })
 export type FlywheelAgentSummary = typeof FlywheelAgentSummary.Type
 
+/** The lane an in-flight card sits in (PAN-5283 D1). */
+export const FlywheelStage = Schema.Literals(["plan", "build", "checks", "review", "merge"])
+export type FlywheelStage = typeof FlywheelStage.Type
+
+/** Who drives an issue (PAN-5283 D3). */
+export const FlywheelOwner = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("flywheel") }),
+  Schema.Struct({
+    kind: Schema.Literal("conversation"),
+    name: Schema.String,
+    title: Schema.NullOr(Schema.String),
+  }),
+  Schema.Struct({ kind: Schema.Literal("operator") }),
+])
+export type FlywheelOwner = typeof FlywheelOwner.Type
+
+/** The agent a card shows (PAN-5283 D4): a live pane, or a handoff conversation. */
+export const FlywheelCardAgent = Schema.Struct({
+  /** The pane role, or `handoff` for a handoff conversation. */
+  role: Schema.String,
+  model: Schema.NullOr(Schema.String),
+  harness: Schema.NullOr(Schema.String),
+  state: Schema.Literals(["working", "blocked", "idle", "waiting", "unknown"]),
+  agentId: Schema.optional(Schema.String),
+  conversationName: Schema.optional(Schema.String),
+})
+export type FlywheelCardAgent = typeof FlywheelCardAgent.Type
+
+export const FlywheelBlockerKind = Schema.Literals([
+  "gate-queue",
+  "agent-question",
+  "agent-error",
+  "start-failed",
+  "pr-outside-pipeline",
+  "agent-stuck",
+  "test-removal-waiver",
+  "verification-failed",
+  "ci-failed",
+  "feedback-undelivered",
+  "merge-failed",
+  "auto-merge-scheduled",
+  "auto-merge-blocked",
+  "train-batch",
+  "train-paused",
+  "ci-red",
+  "merge-conflict",
+  "declared-blocked",
+  "review-stalled",
+  "no-agent",
+])
+export type FlywheelBlockerKind = typeof FlywheelBlockerKind.Type
+
+/** One plain-language sentence on why a card is not moving (PAN-5283 D11). */
+export const FlywheelBlocker = Schema.Struct({
+  kind: FlywheelBlockerKind,
+  severity: Schema.Literals(["waiting", "stuck", "needs-you"]),
+  text: Schema.String,
+  action: Schema.optional(Schema.Literals(["waive-test-removal", "start-issue", "answer-agent"])),
+})
+export type FlywheelBlocker = typeof FlywheelBlocker.Type
+
+/** The newest journal entry, as a plain-text label. */
+export const FlywheelActivity = Schema.Struct({ at: Schema.String, label: Schema.String })
+export type FlywheelActivity = typeof FlywheelActivity.Type
+
 export const FlywheelInFlightRow = Schema.Struct({
   issueId: Schema.String,
   /** The tracker's title, or `null` when no tracker answered for this issue. */
@@ -162,6 +229,15 @@ export const FlywheelInFlightRow = Schema.Struct({
   /** The loop named this id in its newest tick marker's in-flight list. */
   inTick: Schema.Boolean,
   lastJournal: Schema.NullOr(FlywheelJournalSummary),
+  // Board fields (PAN-5283 FR-1): derived on read, optional so older payloads decode.
+  stage: Schema.optional(FlywheelStage),
+  stageSince: Schema.optional(Schema.NullOr(Schema.String)),
+  owner: Schema.optional(FlywheelOwner),
+  agent: Schema.optional(Schema.NullOr(FlywheelCardAgent)),
+  blocker: Schema.optional(Schema.NullOr(FlywheelBlocker)),
+  /** USD spent on the issue, or `null` when unknown. */
+  cost: Schema.optional(Schema.NullOr(Schema.Number)),
+  lastActivity: Schema.optional(Schema.NullOr(FlywheelActivity)),
 })
 export type FlywheelInFlightRow = typeof FlywheelInFlightRow.Type
 
@@ -173,6 +249,78 @@ export const FlywheelOrderBookSummary = Schema.Struct({
   total: Schema.Number,
 })
 export type FlywheelOrderBookSummary = typeof FlywheelOrderBookSummary.Type
+
+/** One PR merge on the default branch since local midnight (PAN-5283 D12). */
+export const FlywheelShippedMerge = Schema.Struct({
+  sha: Schema.String,
+  at: Schema.String,
+  subject: Schema.String,
+  prNumber: Schema.Number,
+  prUrl: Schema.NullOr(Schema.String),
+  issueId: Schema.NullOr(Schema.String),
+  title: Schema.NullOr(Schema.String),
+  /** `null` when deploy does not apply to this project (PAN-5283 D13). */
+  deployed: Schema.NullOr(Schema.Boolean),
+})
+export type FlywheelShippedMerge = typeof FlywheelShippedMerge.Type
+
+export const FlywheelShippedEvent = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("merge"), at: Schema.String, merge: FlywheelShippedMerge }),
+  Schema.Struct({
+    kind: Schema.Literal("deploy"),
+    at: Schema.String,
+    trigger: Schema.String,
+    issueId: Schema.NullOr(Schema.String),
+    initiator: Schema.NullOr(Schema.String),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("release"),
+    at: Schema.String,
+    tag: Schema.String,
+    url: Schema.NullOr(Schema.String),
+  }),
+])
+export type FlywheelShippedEvent = typeof FlywheelShippedEvent.Type
+
+export const FlywheelShipped = Schema.Struct({
+  merges: Schema.Array(FlywheelShippedMerge),
+  events: Schema.Array(FlywheelShippedEvent),
+})
+export type FlywheelShipped = typeof FlywheelShipped.Type
+
+/** Facts the global header does not show (PAN-5283 FR-9). Server route only. */
+export const FlywheelHealth = Schema.Struct({
+  mainCi: Schema.NullOr(
+    Schema.Struct({
+      conclusion: Schema.String,
+      sha: Schema.String,
+      url: Schema.NullOr(Schema.String),
+      at: Schema.String,
+    }),
+  ),
+  deployed: Schema.NullOr(
+    Schema.Struct({ buildCommit: Schema.String, behindVerdict: Schema.NullOr(Schema.Number) }),
+  ),
+  gateQueue: Schema.Struct({
+    running: Schema.Number,
+    queued: Schema.Number,
+    slots: Schema.Number,
+    oldestWaitSince: Schema.NullOr(Schema.String),
+  }),
+  nextBatch: Schema.NullOr(
+    Schema.Struct({
+      name: Schema.String,
+      status: Schema.String,
+      members: Schema.Array(Schema.String),
+      createdAt: Schema.String,
+    }),
+  ),
+  batchingPausedUntil: Schema.NullOr(Schema.String),
+  lastRelease: Schema.NullOr(
+    Schema.Struct({ tag: Schema.String, at: Schema.String, url: Schema.NullOr(Schema.String) }),
+  ),
+})
+export type FlywheelHealth = typeof FlywheelHealth.Type
 
 export const FlywheelDerivedStatus = Schema.Struct({
   run: FlywheelRunState,
@@ -191,7 +339,15 @@ export const FlywheelDerivedStatus = Schema.Struct({
   orderBook: Schema.NullOr(FlywheelOrderBookSummary),
   projectRoot: Schema.String,
   generatedAt: Schema.String,
+  /** Added by the status route, never by `pan flywheel status` (PAN-5283 D7). */
+  health: Schema.optional(FlywheelHealth),
+  shipped: Schema.optional(FlywheelShipped),
 })
 export type FlywheelDerivedStatus = typeof FlywheelDerivedStatus.Type
+
+/** Cards on the Deploy and Done-today lanes. */
+export function shippedCardCount(status: Pick<FlywheelDerivedStatus, "shipped">): number {
+  return status.shipped?.merges.length ?? 0
+}
 
 export const decodeFlywheelDerivedStatus = Schema.decodeUnknownSync(FlywheelDerivedStatus)

@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo, useReducer } from 'react';
+import { useShortcut, type ShortcutDef } from '../../lib/shortcuts/registry';
 import { toast } from 'sonner';
 import { useShallow } from 'zustand/react/shallow';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -1167,6 +1168,12 @@ export function CommandDeck({
     const projectKey = selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined;
     void createConversationForProject(projectKey);
   }, [createConversationForProject, selectedProject]);
+  // PAN-5287 S-D7: N starts a conversation here; moves to the left column in child F.
+  useShortcut(useMemo((): ShortcutDef => ({
+    id: 'deck.new-conversation', keys: { mac: 'N', other: 'N' }, scope: 'not-editing',
+    label: 'New conversation', group: 'General', run: () => handleNewConversation(),
+    when: () => !document.querySelector('[aria-modal="true"]'),
+  }), [handleNewConversation]));
 
   const handleNewProjectConversation = useCallback((projectKey: string) => {
     void createConversationForProject(projectKey);

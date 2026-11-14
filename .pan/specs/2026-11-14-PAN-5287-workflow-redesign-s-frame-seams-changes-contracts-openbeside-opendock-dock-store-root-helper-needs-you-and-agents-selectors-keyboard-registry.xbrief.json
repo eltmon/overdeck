@@ -1,0 +1,1545 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T19:38:09Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5287: Workflow redesign S: frame seams (changes contracts, openBeside/openDock, dock store, root helper, needs-you and agents selectors, keyboard registry)",
+    "updated": "2026-11-14T19:48:47.291Z"
+  },
+  "plan": {
+    "id": "pan-5287",
+    "title": "Workflow redesign S: frame seams (changes contracts, openBeside/openDock, dock store, root helper, needs-you and agents selectors, keyboard registry)",
+    "status": "running",
+    "uid": "59307f82-b190-447d-bbbf-866d79ea0479",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-14T19:38:09Z",
+    "updated": "2026-11-14T19:48:47.291Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5287",
+        "label": "PAN-5287",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5287/.pan/drafts/pan-5287.md",
+        "label": "PRD draft (.pan/drafts/pan-5287.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5287/.pan/drafts/pan-5284.md",
+        "label": "Parent epic PRD (.pan/drafts/pan-5284.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "workflow-redesign",
+      "keyboard",
+      "contracts",
+      "selectors"
+    ],
+    "metadata": {
+      "sizeJustification": "This is child S of the PAN-5284 epic, already split from the epic by the operator's order book: the seam bundle every later child builds on. Its 19 items are small, mostly independent vertical slices (each owns its own files and tests) that fan out in parallel after two foundations (contracts, registry core); the file count comes from one test file per seam plus the existing handlers the registry must absorb, not from one large change. Splitting it further into sibling issues would force children A, B and E to wait on several merges instead of one.",
+      "canonicalFilename": "2026-11-14-PAN-5287-workflow-redesign-s-frame-seams-changes-contracts-openbeside-opendock-dock-store-root-helper-needs-you-and-agents-selectors-keyboard-registry.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The workflow redesign (PAN-5284) has eight UI and API children that all need the same shared pieces: the conversation-changes types, a way to open a file beside the chat and to open the dock, a dock store, a mapping from a conversation to an explorer root, one Needs-you selector and one Agents-working selector that every count surface agrees on, and one keyboard registry. Today eight places count Needs-you differently, app shortcuts live in five separate listeners, and Stage tab shortcuts use keys Chrome never delivers on Linux.",
+      "Proposal": "Land the seams first, with no UI change except the D-7 key bindings and a ? sheet: plain TypeScript contracts in @overdeck/contracts; openBeside/openDock on StageDeckContext implemented in Stage/index.tsx; a zustand workDockStore persisted per deck; rootIdForConversation/rootLabelFor/useRootLabel; pure buildNeedsYouItems/buildAgentsWorking builders with thin hooks over existing react-query keys; a shortcut registry with a window capture listener for global keys and a window bubble listener for not-editing keys (so terminals and Home type-to-focus keep their keys), then migrate App, Stage, Sidebar, emergency stop, explorer and a new N binding onto it; a seed script for the shared workflow UAT fixture; docs and changelog.",
+      "NonGoals": "- Any dock, left-column, top-bar, conversation-header or project-Home UI (children B, D1, E, F, G)\n- Switching any existing count surface (top bar, Home page, project Home, conversation list) to the new selectors\n- Replacing rootLabel() call sites or ExplorerPane's header label\n- Binding global Ctrl+Shift+E, Ctrl+Shift+G, Ctrl+Shift+F or Ctrl+P (child B binds them with the dock)\n- Any server code or the /changes API (child A)\n- Migrating page-local or modal-local key handling: Escape-to-close, Kanban/Pipeline j/k, composer voice shortcut, useTypeToFocus, MessagesTimeline Ctrl+F, God View keys, the open-favorite-editor shortcut in lib/keybindings.ts\n- Seeding the operator's live dashboard (~/.overdeck) with the fixture\n- Raising any scripts/file-size-allowlist.txt row"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Contracts are plain TypeScript interfaces copied from parent §6.1 (S-D1).",
+        "rationale": "The parent PRD shows interfaces and calls S 'types only'; child A can add schemas if its route needs decoding."
+      },
+      {
+        "summary": "openDock writes workDockStore only; no key or button calls it in S (S-D2).",
+        "rationale": "The dock UI arrives in child B; binding Ctrl+Shift+E/G now would persist open:true with nothing rendered."
+      },
+      {
+        "summary": "Add useRootLabel but keep rootLabel() and its ExplorerPane call sites (S-D3).",
+        "rationale": "AC-S requires no visible change and explorer-rpc.test.ts pins rootLabel; child B switches the label when it moves the explorer into the dock."
+      },
+      {
+        "summary": "The registry installs a window capture listener for global keys and a window bubble listener for not-editing keys, instead of one capture listener (S-D5).",
+        "rationale": "A pure capture listener would take keys from xterm (Ctrl+K/J/W reach the shell today because xterm cancels them) and from Home's useTypeToFocus, whose test pins that g and / go to the composer; two phases keep today's behavior while letting global keys beat Monaco as D-7 requires."
+      },
+      {
+        "summary": "S binds only the D-7 keys whose actions exist today; Files/Changes/Search/global Go-to-file are left to child B (S-D6).",
+        "rationale": "Those actions need the dock; registering them early would swallow keys with no visible result."
+      },
+      {
+        "summary": "N is registered in CommandDeck/index.tsx next to handleNewConversation (S-D7).",
+        "rationale": "D-7 maps N to today's quick create, which exists only there; the edit is at most 12 lines under the 1612 cap, and child F moves it with the button. The Command Deck mounts only on its own route, so N does nothing elsewhere."
+      },
+      {
+        "summary": "The ? sheet entry yields while God View is active (S-D8).",
+        "rationale": "GodViewConfluence uses ? for its own help and skips defaultPrevented events, so a global ? would break it."
+      },
+      {
+        "summary": "Stage tab ⌘N chips render only on macOS (S-D9).",
+        "rationale": "After D-7 the ⌘N chip is wrong on Linux/Windows and a 'Ctrl Alt 1' chip on every tab would crowd the bar; child D2 removes the chips anyway."
+      },
+      {
+        "summary": "Explorer quick open/content search follow the platform modifier only (S-D10); predicates stay exported.",
+        "rationale": "D-7 defines Ctrl+P / ⌘P; the pinned predicate tests stay green."
+      },
+      {
+        "summary": "Migrating Sidebar.tsx, ExplorerPane.tsx/useExplorerShortcuts.ts and CommandDeck/index.tsx in S despite the parent §8 ownership table.",
+        "rationale": "§8 forbids edits only while the owner's PR is open; S is every child's prerequisite and the Flywheel holds their planning until S merges, so no owner PR can be open. Edits are limited to handler removal plus registration."
+      },
+      {
+        "summary": "The fixture script refuses OVERDECK_HOME equal to the operator's ~/.overdeck and writes transcripts under --home (default $HOME) (S-D11).",
+        "rationale": "resolveSessionFile finds Claude transcripts only under os.homedir(); the fixture repo path is unique, so its encoded transcript directory is new and never touches an existing transcript."
+      },
+      {
+        "summary": "NeedsYouItem carries optional subject and decision payloads (S-D12).",
+        "rationale": "Child E's menu needs answer controls; carrying the source avoids re-deriving it."
+      },
+      {
+        "summary": "The changelog file is changelog.d/pan-5287.md, not 5287.md as the child stub said.",
+        "rationale": "changelog.d/README.md requires the lowercase issue id with prefix and lint:docs checks it."
+      },
+      {
+        "summary": "Add a user page features/keyboard-shortcuts.mdx and fix the Ctrl/Cmd wording in features/file-explorer.mdx.",
+        "rationale": "Tab switching changes on Linux/Windows, a documented-surface change users must be able to look up; the prd-authoring rule requires the docs item."
+      }
+    ],
+    "items": [
+      {
+        "id": "contracts",
+        "title": "Add conversation-changes contract types to @overdeck/contracts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T19:38:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5287",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/conversation-changes.ts",
+            "packages/contracts/src/index.ts",
+            "packages/contracts/src/__tests__/conversation-changes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:contracts",
+            "npx vitest run --configLoader runner packages/contracts/src/__tests__/conversation-changes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:contracts completes without errors (the @ts-expect-error line is consumed)",
+            "conversation-changes.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.1 and WI-S1. Create packages/contracts/src/conversation-changes.ts with exactly the eight types in the PRD block (double quotes, no semicolons, matching the package). Append export * from \"./conversation-changes\" to packages/contracts/src/index.ts. Write packages/contracts/src/__tests__/conversation-changes.test.ts that imports the types from \"../index\", builds one value of each with satisfies, asserts one field per value at runtime, and has one // @ts-expect-error assigning 'other' to a ChangeScope."
+        },
+        "items": [
+          {
+            "id": "contracts.ac1",
+            "title": "Given the new module, when a file imports ChangeScope, ChangedFile, UncommittedFile, ChangeCommit, ConversationChangeTotals, ConversationChanges, ProjectCommit and ProjectChanges from \"../index\", then npm run typecheck:contracts exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts.ac2",
+            "title": "Given a ChangeScope variable, when the test assigns 'other' under // @ts-expect-error, then typecheck:contracts accepts it (an unused directive would fail), proving the union rejects unknown scopes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts.ac3",
+            "title": "When vitest runs packages/contracts/src/__tests__/conversation-changes.test.ts, then it passes and asserts at least one field of each of the eight types",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dock-store",
+        "title": "Add the per-deck workDockStore with localStorage persistence",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T19:38:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5287",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/dock/workDockStore.ts",
+            "src/dashboard/frontend/src/components/dock/__tests__/workDockStore.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/dock/__tests__/workDockStore.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "workDockStore.test.ts passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.3 and WI-S3. Create components/dock/workDockStore.ts exporting DockTab, DockState, DOCK_DEFAULT_WIDTH=340, DOCK_MIN_WIDTH=260, DOCK_MAX_WIDTH=720, dockStorageKey, and useWorkDockStore with ensureDeck/openDock/closeDock/setTab/setWidth/setRootOverride. Persist only {open, tab, width} under overdeck.dock.<deckKey> with try/catch like components/explorer/explorerStore.ts. Hydrate defensively field by field. Use a type-only import for OpenDockInput (or define it here and re-export from StageDeckContext if lint:circular objects). Write the tests listed in §6.3."
+        },
+        "items": [
+          {
+            "id": "dock-store.ac1",
+            "title": "Given a fresh deck, when ensureDeck('d1') runs, then it returns open false, tab 'files', width 340",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-store.ac2",
+            "title": "When openDock('d1', { tab: 'changes', changesScope: 'turn' }) runs, then localStorage['overdeck.dock.d1'] parses to an object whose keys are exactly open, tab and width with open true and tab 'changes'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-store.ac3",
+            "title": "When setWidth is called with 100 and then 9000, then the stored width becomes 260 and then 720",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-store.ac4",
+            "title": "Given corrupt JSON in localStorage for a deck, when ensureDeck reads it, then it falls back to the defaults; and two decks keep independent state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stage-seams",
+        "title": "Add openBeside and openDock to StageDeckContext and implement them in the Stage",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T19:38:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5287",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/StageDeckContext.tsx",
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/__tests__/openBeside.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/Stage/__tests__/openBeside.test.tsx src/components/Stage/__tests__/revealPane.test.tsx src/components/Stage/__tests__/explorer-migration.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "openBeside.test.tsx, revealPane.test.tsx and explorer-migration.test.tsx pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.2 and WI-S2. In StageDeckContext.tsx add optional openBeside(input: OpenBesideInput): string and openDock(input: OpenDockInput): void plus the two exported input types. In Stage/index.tsx implement openBeside exactly as the PRD snippet: capture beside = input.besidePaneId ?? activeId BEFORE openCodePane; when split and the pane is not a leaf, replace a region other than beside, preferring one that already shows a code pane; when not split and beside !== id, set a row split {a: beside, b: id}; setActivePane; return id. Define it after panesById. Implement openDock as useWorkDockStore.getState().openDock(deckKey, input). Add both to deckContextValue. Do not change openInSplit or revealPane. Write the five cases in §6.2 modelled on revealPane.test.tsx."
+        },
+        "items": [
+          {
+            "id": "stage-seams.ac1",
+            "title": "Given an unsplit deck with an active agent pane, when a stub inside the agent pane calls openBeside({ rootId: 'project:overdeck', path: 'src/a.ts' }), then the saved pan-layout leaf ids are [agentPaneId, codePaneId] with dir 'row' and the code pane is active",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-seams.ac2",
+            "title": "Given a split layout [agent, browser], when openBeside opens a file beside the agent, then the leaves become [agent, code] and the agent leaf is never replaced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-seams.ac3",
+            "title": "When openBeside opens a.ts and then b.ts with preview true, then exactly one code pane exists, its explorerPath is 'src/b.ts', and the leaves are still [agent, code]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-seams.ac4",
+            "title": "Given leaves [agent, code(a.ts)] and a hidden browser tab, when openBeside opens c.ts non-preview beside the agent, then the code region is reused and the leaves are [agent, code(c.ts)]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-seams.ac5",
+            "title": "When a stub calls openDock({ tab: 'changes', changesScope: 'uncommitted' }), then useWorkDockStore.getState().byDeck[deck] has open true, tab 'changes' and changesScope 'uncommitted'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "root-helper",
+        "title": "Add rootIdForConversation, rootLabelFor and useRootLabel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T19:38:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5287",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/rootForConversation.ts",
+            "src/dashboard/frontend/src/components/explorer/__tests__/rootForConversation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/__tests__/rootForConversation.test.ts src/components/explorer/__tests__/explorer-rpc.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "rootForConversation.test.ts and explorer-rpc.test.ts pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.4 and WI-S4. Create components/explorer/rootForConversation.ts with RootContext, rootIdForConversation applying the six rules in order (linked → null; issueId → issue:<UPPER>; workspace registry row scratch/main/issue; cwd under <project>/workspaces/feature-<slug> → issue:<SLUG upper>, other workspaces/ paths → null; cwd equal to or inside a project path, longest path wins → project:<key>; else null), rootLabelFor (project name never the key when a name exists; issue id · title truncated to 40; workspace row name or 'Edit workspace'; unparseable id as given) and useRootLabel reading ['registered-projects'], ['workspace-registry'] and selectIssues. Leave rootLabel() in explorer-rpc.ts untouched."
+        },
+        "items": [
+          {
+            "id": "root-helper.ac1",
+            "title": "Given a conversation with origin 'linked' whose cwd equals a project path, when rootIdForConversation runs, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "root-helper.ac2",
+            "title": "Given cwd '<path>/src/lib' it returns 'project:<key>'; given cwd '<path>/workspaces/feature-pan-77/src' it returns 'issue:PAN-77'; given a cwd outside every project it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "root-helper.ac3",
+            "title": "Given issueId 'pan-12' it returns 'issue:PAN-12'; given a scratch registry row ws-1 it returns 'workspace:ws-1'; given nested project paths the longest matching path wins",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "root-helper.ac4",
+            "title": "Given project { key: 'panopticon-cli', name: 'overdeck' }, when rootLabelFor('project:panopticon-cli') runs, then it returns 'overdeck'; and a workspace id with no registry row returns 'Edit workspace'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "project-resolver",
+        "title": "Add the shared project resolver for selectors (issue prefix and conversation to project key)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T19:38:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5287",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/selectors/projectOf.ts",
+            "src/dashboard/frontend/src/lib/selectors/__tests__/projectOf.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/selectors/__tests__/projectOf.test.ts",
+            "npm run typecheck:frontend",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "projectOf.test.ts passes",
+            "typecheck:frontend completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.6 (projectOf). Create lib/selectors/projectOf.ts exporting ProjectResolver, buildProjectResolver(projects, conversations) and useProjectResolver(). issue(id): prefix = text before the last -<digits>, matched case-insensitively against each registered project's linearTeam (the issue prefix served by GET /api/registered-projects). conversation(name): find the conversation by name, by tmuxSession, or by tmuxSession === 'conv-' + name, then resolveEffectiveProjectKey(conv, projects) from components/CommandDeck/projectsData.ts. The hook reads ['registered-projects'] (fetchRegisteredProjects) and ['conversations'] (fetchConversations, refetchInterval 10000)."
+        },
+        "items": [
+          {
+            "id": "project-resolver.ac1",
+            "title": "Given a project with linearTeam 'PAN', when issue('PAN-12') and issue('pan-12') run, then both return that project's key, and issue('ZZZ-1') returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-resolver.ac2",
+            "title": "Given conversation { name: '20261113-6031', tmuxSession: 'conv-20261113-6031', projectKey: 'p1' }, when conversation('20261113-6031') or conversation('conv-20261113-6031') runs, then each returns 'p1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-resolver.ac3",
+            "title": "Given a conversation with no projectKey whose cwd is inside a project path, when conversation(name) runs, then it returns that project's key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agents-working",
+        "title": "Add the canonical agents-working selector (D-9)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T19:38:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5287",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/selectors/agentsWorking.ts",
+            "src/dashboard/frontend/src/lib/selectors/__tests__/agentsWorking.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/selectors/__tests__/agentsWorking.test.ts",
+            "npm run typecheck:frontend",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "agentsWorking.test.ts passes",
+            "typecheck:frontend completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.6 (agentsWorking). Create lib/selectors/agentsWorking.ts with WorkingRole, WorkingRow, AgentsWorking, the pure buildAgentsWorking(agents, conversations, projectOf, opts) and the hook useAgentsWorking(opts) over useDashboardStore(selectAgents), the ['conversations'] query and useProjectResolver(). Count agents with isRunningAgentStatus (components/AgentPillPopoverRow.tsx) and conversations with isWorking === true; dedupe a store agent id 'conv-<name>' against the conversation whose tmuxSession equals it (keep the conversation row); map roles per the PRD (plan→planning, work→building, review→review, test→test, else other; no role: planning- → planning, agent- → building); filter by projectKey; byRole carries every role key. No component uses it yet."
+        },
+        "items": [
+          {
+            "id": "agents-working.ac1",
+            "title": "Given agents with statuses running, active, starting, thinking, working, stopped and idle, when buildAgentsWorking runs, then count is 5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-working.ac2",
+            "title": "Given a running store agent 'conv-20261113-6031' and a working conversation with that tmuxSession, when buildAgentsWorking runs, then exactly one row exists and its kind is 'conversation'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-working.ac3",
+            "title": "Given agents on PAN-1 (project p1) and MIN-2 (project p2), when buildAgentsWorking runs with { projectKey: 'p1' }, then only the PAN-1 row remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-working.ac4",
+            "title": "When buildAgentsWorking returns, then the values of byRole sum to count and byRole has the keys planning, building, review, test, conversation and other",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "needs-you",
+        "title": "Add the canonical needs-you selector (D-8)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T19:38:09Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5287",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/selectors/needsYou.ts",
+            "src/dashboard/frontend/src/lib/selectors/__tests__/needsYou.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/selectors/__tests__/needsYou.test.ts",
+            "npm run typecheck:frontend",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "needsYou.test.ts passes",
+            "typecheck:frontend completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.5. Create lib/selectors/needsYou.ts with NeedsYouKind, NeedsYouItem (including optional subject and decision), NeedsYouSources, exported isSubjectUnresolved (copy of the rule in SessionFeedSidebar.tsx NeedsYouSection, search 'const auqResolved = !toolUseId'; do not import that file), the pure buildNeedsYouItems(sources, opts) applying steps 1–6 ((a) pending input keyed issue:/conversation:/agent:, (b) derived attention 'needs-you', (c) flywheel rows folded by /\\b[A-Z][A-Z0-9]+-\\d+\\b/ else flywheel:<row.key>, (d) decisions that are not pending-input decisions: remote or id not a subject agentId of the same source; project filter; ordering) and the hook useNeedsYouItems(opts). Hook sources: usePendingInputSubjects, useDecisions, useAskUserQuestionUiStore sets, derivedIssueStateByIssueId, selectIssues titles, useFlywheelStatus({ refetchInterval: 30_000 }) with needsYouRows, useProjectResolver. Only if lint:circular reports a cycle through FlywheelStatusPane.tsx, move needsYouRows and NeedsYouRow to lib/flywheelNeedsYouRows.ts and re-export them from FlywheelStatusPane.tsx."
+        },
+        "items": [
+          {
+            "id": "needs-you.ac1",
+            "title": "Given an agent subject on PAN-12 with an AUQ, a second subject on PAN-12, the derived attention 'needs-you' for PAN-12 and a flywheel row 'Merge PAN-12 needs you', when buildNeedsYouItems runs, then exactly one item has key 'issue:PAN-12'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you.ac2",
+            "title": "Given a subject whose AUQ toolUseId is in answeredToolUseIds and that has no plan payload, when buildNeedsYouItems runs, then no item is produced for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you.ac3",
+            "title": "Given a disk-alert decision, a remote fleet decision and an agent decision whose id equals a subject's agentId, when buildNeedsYouItems runs, then items 'decision:disk-alert' and the fleet decision appear once each and the agent decision adds no item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you.ac4",
+            "title": "Given a flywheel row with no issue id, when buildNeedsYouItems runs, then it emits an item with kind 'flywheel' and ask equal to the row text; with { projectKey } that item and decision items are excluded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you.ac5",
+            "title": "When open() runs on a pending-input item for an agent subject, then navigateToDecisionSubject and requestReopen are each called with that agentId (modules mocked)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "registry-core",
+        "title": "Add the keyboard shortcut registry core (key specs, two-phase dispatch, chords)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T19:38:09Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5287",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "app-migration",
+            "shortcuts-sheet",
+            "stage-shortcuts",
+            "panebar-chip",
+            "sidebar-shortcut",
+            "emergency-stop-shortcut",
+            "new-conversation-shortcut",
+            "explorer-shortcuts"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/shortcuts/keys.ts",
+            "src/dashboard/frontend/src/lib/shortcuts/registry.ts",
+            "src/dashboard/frontend/src/lib/shortcuts/__tests__/keys.test.ts",
+            "src/dashboard/frontend/src/lib/shortcuts/__tests__/registry.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/shortcuts/__tests__/keys.test.ts src/lib/shortcuts/__tests__/registry.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "keys.test.ts and registry.test.ts pass, including the Monaco-focused Ctrl+P case",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.7 'Key specs', 'Registration' and 'Required tests' (not the sheet). Create lib/shortcuts/keys.ts (Platform, currentPlatform reading navigator.platform on every call, ShortcutKeys, matchesSpec, formatSpec) and lib/shortcuts/registry.ts (ShortcutScope, ShortcutDef, registerShortcut, useShortcut, installShortcutListener, useShortcutList via useSyncExternalStore, resetShortcutsForTests, CHORD_TIMEOUT_MS = 1500). Dispatch exactly per rules 1–7: one window capture listener for global shortcuts that skips focus inside .xterm; one window bubble listener for not-editing shortcuts (focus not in input/textarea/select/contenteditable/.xterm/.monaco-editor) plus global shortcuts whose focus is inside .xterm; skip defaultPrevented and isComposing in bubble; focus element = event.target if Element else document.activeElement; newest registration first; a match calls preventDefault + stopPropagation then run; when() false or throwing passes the event untouched; chords arm on the first key, expire after 1500 ms, and an unbound second key is consumed by the cancel. Tests use vi.useFakeTimers for chords and stub navigator.platform."
+        },
+        "items": [
+          {
+            "id": "registry-core.ac1",
+            "title": "Given focus in a textarea inside .monaco-editor whose own keydown listener calls stopPropagation, when Ctrl+P is dispatched on it with a Linux platform, then a registered global Ctrl+P shortcut runs and the textarea's listener does not receive the event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registry-core.ac2",
+            "title": "Given focus in an input, a textarea, a contenteditable div, a .xterm textarea or a .monaco-editor textarea, when a not-editing shortcut's key is pressed, then it does not run; with focus on document.body it runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registry-core.ac3",
+            "title": "Given focus in a .xterm textarea whose listener calls stopPropagation, when Ctrl+K is pressed, then a global Ctrl+K shortcut does not run; when that listener does not stop it, the shortcut runs exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registry-core.ac4",
+            "title": "Given a document capture listener that stops propagation of 'g', when g then p is pressed, then a not-editing 'G P' chord does not run; without that listener g then p within 1500 ms runs it and g, 1501 ms, p does not (fake timers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registry-core.ac5",
+            "title": "Given { mac: 'Meta+W', other: 'Ctrl+Alt+W' }, when the platform is stubbed to MacIntel, then metaKey+w runs it and ctrlKey+altKey+w does not; with 'Linux x86_64' the reverse; and a when() returning false leaves defaultPrevented false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "app-migration",
+        "title": "Install the registry listener in App.tsx and migrate App's /, palette and lens-chord shortcuts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T19:38:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5287",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/App.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/App.test.tsx src/components/home/__tests__/useTypeToFocus.test.tsx",
+            "npm run typecheck:frontend",
+            "wc -l src/dashboard/frontend/src/App.tsx",
+            "grep -c \"addEventListener('keydown'\" src/dashboard/frontend/src/App.tsx"
+          ],
+          "expected_outputs": [
+            "App.test.tsx and useTypeToFocus.test.tsx pass",
+            "typecheck:frontend completes without errors",
+            "App.tsx has at most 955 lines",
+            "grep prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.8 App. In App.tsx call installShortcutListener() in a mount effect. Delete the effect under '// Global keyboard shortcuts: / for search, Cmd+K for command palette' and chordRef ('// PAN-1234: global 'g' chord state'). Register with useShortcut: app.palette (Meta+K / Ctrl+K, global), app.palette-conversations (Meta+J / Ctrl+J, global), app.search ('/', not-editing), app.lens-pipeline/-board/-agents/-command-deck ('G P', 'G B', 'G A', 'G C', not-editing, when palette closed via a ref). Labels and groups per the PRD table. Do not change App.test.tsx lens-chord cases; edit App.test.tsx only if a case needs setup for the new listener."
+        },
+        "items": [
+          {
+            "id": "app-migration.ac1",
+            "title": "When App renders and g then p is dispatched on document, then window.location.pathname becomes '/pipeline' (existing App.test.tsx cases for g p, g b, g a, g c and the unbound-second-key cancel pass unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-migration.ac2",
+            "title": "When Ctrl+K is dispatched with a Linux platform, then the command palette opens; dispatching it again closes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-migration.ac3",
+            "title": "When grep counts addEventListener('keydown' in App.tsx, then it prints 0, and wc -l reports at most 955 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "shortcuts-sheet",
+        "title": "Add the ? keyboard-shortcuts sheet",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T19:38:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5287",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/shortcuts/ShortcutsSheet.tsx",
+            "src/dashboard/frontend/src/lib/shortcuts/__tests__/ShortcutsSheet.test.tsx",
+            "src/dashboard/frontend/src/App.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/shortcuts/__tests__/ShortcutsSheet.test.tsx src/App.test.tsx",
+            "npm run typecheck:frontend",
+            "wc -l src/dashboard/frontend/src/App.tsx"
+          ],
+          "expected_outputs": [
+            "ShortcutsSheet.test.tsx and App.test.tsx pass",
+            "typecheck:frontend completes without errors",
+            "App.tsx has at most 955 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.7 '? sheet' and S-D8. Load the pan-style-guide skill first. Create lib/shortcuts/ShortcutsSheet.tsx using components/shared/Modal.tsx (title 'Keyboard shortcuts'), sections in order General, Navigation, Tabs, Files, Safety (empty omitted), rows from useShortcutList() with label and a keycap span of formatSpec(currentPlatform spec), omitting hidden rows and null specs; tokens only. In App.tsx register app.shortcuts-sheet ('?', not-editing, group General, label 'Show keyboard shortcuts', when activeTab !== 'god-view') and render the sheet when open."
+        },
+        "items": [
+          {
+            "id": "shortcuts-sheet.ac1",
+            "title": "Given registered shortcuts in groups Tabs and General, when ShortcutsSheet renders, then it shows the title 'Keyboard shortcuts' and the General section before the Tabs section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shortcuts-sheet.ac2",
+            "title": "Given a { mac: 'Meta+K', other: 'Ctrl+K' } shortcut, when the platform is mac the sheet renders keycap '⌘K', and when it is Linux the sheet renders 'Ctrl K'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shortcuts-sheet.ac3",
+            "title": "Given a hidden shortcut and one whose current-platform spec is null, when the sheet renders, then neither row appears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shortcuts-sheet.ac4",
+            "title": "When App renders with focus on document.body and '?' is pressed, then the Keyboard shortcuts dialog opens; when activeTab is 'god-view', '?' does not open it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stage-shortcuts",
+        "title": "Move Stage tab shortcuts onto the registry with the D-7 platform bindings",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T19:38:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5287",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/useStageShortcuts.ts",
+            "src/dashboard/frontend/src/components/Stage/useStageShortcuts.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/Stage/useStageShortcuts.test.tsx src/components/Stage/__tests__/revealPane.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "useStageShortcuts.test.tsx and revealPane.test.tsx pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.8 Stage. Rewrite components/Stage/useStageShortcuts.ts, keeping the export useStageShortcuts(workspaceId), to register via useShortcut: stage.focus-tab-1..9 (Meta+n / Ctrl+Alt+n, not-editing, when pane n-1 exists; 2–9 hidden; 1 labelled 'Go to tab 1–9'), stage.close-tab (Meta+W / Ctrl+Alt+W, when an active pane exists; closePane refuses HOME), stage.toggle-terminal (Meta+T / null). Update useStageShortcuts.test.tsx without deleting cases: stub the platform per case, install the listener in the Host, reset the registry in afterEach, and add Linux cases for Ctrl+Alt+1, Ctrl+Alt+W and 'Meta+T does nothing on Linux'."
+        },
+        "items": [
+          {
+            "id": "stage-shortcuts.ac1",
+            "title": "Given the Linux platform and three panes, when Ctrl+Alt+2 is pressed, then the second pane becomes active, and Ctrl+Alt+9 with no ninth pane leaves the active pane unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-shortcuts.ac2",
+            "title": "Given the mac platform, when ⌘1, ⌘2 and ⌘W are pressed, then the existing cases pass: ⌘1 focuses HOME, ⌘2 the second pane, and ⌘W closes the active pane but never HOME",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-shortcuts.ac3",
+            "title": "Given the Linux platform, when Meta+T is pressed, then the terminal drawer stays closed; given mac it toggles the drawer and creates no deck tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-shortcuts.ac4",
+            "title": "Given focus in a text input, when the close or terminal key for the platform is pressed, then the pane count is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "panebar-chip",
+        "title": "Show the Stage tab ⌘N hint only on macOS",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-14T19:38:09Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5287",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/PaneBar.tsx",
+            "src/dashboard/frontend/src/components/Stage/PaneBar.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/Stage/PaneBar.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "PaneBar.test.tsx passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD S-D9 and §6.8 PaneBar. In components/Stage/PaneBar.tsx (search '⌘{index + 1}') render the chip only when currentPlatform() === 'mac' (import from lib/shortcuts/keys). In PaneBar.test.tsx stub navigator.platform to MacIntel in the existing '⌘1 hint' case and add a Linux case asserting no tab contains '⌘1'."
+        },
+        "items": [
+          {
+            "id": "panebar-chip.ac1",
+            "title": "Given the mac platform, when PaneBar renders two panes, then the first tab contains '⌘1' and the second '⌘2'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panebar-chip.ac2",
+            "title": "Given the Linux platform, when PaneBar renders, then no tab contains the text '⌘1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sidebar-shortcut",
+        "title": "Move the sidebar [ collapse shortcut onto the registry",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-14T19:38:09Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5287",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Sidebar.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "wc -l src/dashboard/frontend/src/components/Sidebar.tsx",
+            "grep -c \"addEventListener('keydown'\" src/dashboard/frontend/src/components/Sidebar.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "Sidebar.tsx has at most 972 lines",
+            "grep prints 0"
+          ],
+          "readiness": "ready",
+          "acJustification": "A one-registration migration; behavior is covered by the registry's not-editing tests.",
+          "traces": [
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.8 Sidebar. In components/Sidebar.tsx replace the effect under '// Keyboard shortcut: [ to toggle collapse' with useShortcut({ id: 'sidebar.collapse', keys: { mac: '[', other: '[' }, scope: 'not-editing', group: 'General', label: 'Collapse the sidebar', run: toggleCollapsed }). Touch nothing else."
+        },
+        "items": [
+          {
+            "id": "sidebar-shortcut.ac1",
+            "title": "Given the Sidebar is rendered with focus on document.body, when '[' is pressed, then localStorage's sidebar-collapsed value flips; with focus in an input it does not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sidebar-shortcut.ac2",
+            "title": "When grep counts addEventListener('keydown' in Sidebar.tsx, then it prints 0, and wc -l reports at most 972 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "emergency-stop-shortcut",
+        "title": "Move the emergency-stop arm key onto the registry as a global shortcut",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T19:38:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5287",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/EmergencyStopOverlay.tsx",
+            "src/dashboard/frontend/src/components/EmergencyStopOverlay.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/EmergencyStopOverlay.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "EmergencyStopOverlay.test.tsx passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.8 Emergency stop. In components/EmergencyStopOverlay.tsx replace the arm effect ('// Arm: Cmd/Ctrl + Shift + . — works from anywhere') with useShortcut({ id: 'safety.emergency-stop', keys: { mac: 'Meta+Shift+.', other: 'Ctrl+Shift+.' }, scope: 'global', group: 'Safety', label: 'Stop all agents', run: () => setOpen(true) }). Keep the Enter/Escape effect. Update EmergencyStopOverlay.test.tsx to install the listener and dispatch only the current platform's modifier (stub the platform), without deleting cases."
+        },
+        "items": [
+          {
+            "id": "emergency-stop-shortcut.ac1",
+            "title": "Given the Linux platform and focus inside a textarea, when Ctrl+Shift+. is pressed, then the emergency-stop confirmation opens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emergency-stop-shortcut.ac2",
+            "title": "Given the mac platform, when ⌘⇧. is pressed, then the confirmation opens, and the existing Enter/Escape cases still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "new-conversation-shortcut",
+        "title": "Bind N to the Command Deck's quick-create new conversation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T19:38:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5287",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "wc -l src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "CommandDeck/index.tsx has at most 1602 lines",
+            "lint:file-size passes"
+          ],
+          "readiness": "ready",
+          "acJustification": "One registration call; its dispatch semantics are tested in registry-core.",
+          "traces": [
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD S-D7 and §6.8 New conversation. In components/CommandDeck/index.tsx, right after handleNewConversation ('const handleNewConversation = useCallback'), add one useShortcut call: id 'deck.new-conversation', keys { mac: 'N', other: 'N' }, scope 'not-editing', group 'General', label 'New conversation', run: handleNewConversation, when: () => document.querySelector('[aria-modal=\"true\"]') === null, with the comment '// PAN-5287 S-D7: moves to the left column in child F'. At most 12 added lines."
+        },
+        "items": [
+          {
+            "id": "new-conversation-shortcut.ac1",
+            "title": "Given the Command Deck is mounted with focus on document.body and no modal open, when 'n' is pressed, then handleNewConversation runs once (createConversationForProject is called for the selected project)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-conversation-shortcut.ac2",
+            "title": "When wc -l runs on CommandDeck/index.tsx, then it reports at most 1602 lines and npm run lint:file-size passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "explorer-shortcuts",
+        "title": "Route the explorer's quick open and content search keys through the registry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T19:38:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5287",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/search/useExplorerShortcuts.ts",
+            "src/dashboard/frontend/src/components/explorer/search/__tests__/useExplorerShortcuts.test.ts",
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/MonacoCodeEditor.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/search/__tests__/useExplorerShortcuts.test.ts src/components/explorer/__tests__/ExplorerPane.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "useExplorerShortcuts.test.ts and ExplorerPane.test.tsx pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.8 Explorer and S-D10. Change useExplorerShortcuts to useExplorerShortcuts({ rootRef, onQuickOpen, onContentSearch }): register explorer.quick-open (Meta+P / Ctrl+P) and explorer.content-search (Meta+Shift+F / Ctrl+Shift+F), scope global, group Files, with when = the focus element is inside rootRef.current; return nothing. Keep isQuickOpenKey and isContentSearchKey exported unchanged. In ExplorerPane.tsx remove onKeyDown={onKeyDown} from the root div (search 'data-testid=\"explorer-pane\" onKeyDown={onKeyDown}'), add a ref and pass it. Update useExplorerShortcuts.test.ts: keep the predicate cases; replace the handler cases with registry cases. Update the comment in explorer/code/MonacoCodeEditor.tsx (search '`addCommand` (global across editors) or a window listener') to say app-level shortcuts go through lib/shortcuts/registry.ts in the capture phase and win over Monaco."
+        },
+        "items": [
+          {
+            "id": "explorer-shortcuts.ac1",
+            "title": "Given the Linux platform and focus inside the explorer root, when Ctrl+P is pressed, then onQuickOpen runs once and the event's defaultPrevented is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "explorer-shortcuts.ac2",
+            "title": "Given focus outside the explorer root, when Ctrl+P is pressed, then onQuickOpen does not run and defaultPrevented stays false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "explorer-shortcuts.ac3",
+            "title": "When the predicate tests run, then isQuickOpenKey and isContentSearchKey keep their existing results, and ExplorerPane.test.tsx passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workflow-fixture",
+        "title": "Add the shared workflow UAT fixture seed script",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T19:38:09Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-5287",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/dev/seed-workflow-fixture.ts",
+            "tests/unit/scripts/seed-workflow-fixture.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/scripts/seed-workflow-fixture.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "seed-workflow-fixture.test.ts passes against real git",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.9 and S-D11. Create scripts/dev/seed-workflow-fixture.ts exporting seedWorkflowFixture({ root, home, now? }) with a CLI guard (import.meta.url === pathToFileURL(process.argv[1]).href), run as node --import tsx. Follow steps 1–11 in order with async execFile git: refuse a real OVERDECK_HOME; bare origin; repo with .gitignore build/; commits initial + pre-trailer (pushed), trailer commit 'Overdeck-Conversation: conv-fixture-1' (local), fixed author/committer dates; uncommitted lines 21–24 and 25–26 in docs/shared.md; build/output.txt; registerProject('workflow-fixture', issue_prefix 'WFX'); createConversation fixture-1/fixture-2 (claude-code, tmuxSession conv-fixture-N, claudeSessionId) then markConversationEnded; Claude Code transcripts at claudeProjectDir(repo, claudeProjectsRoot(home))/<uuid>.jsonl with Write/Bash git commit + tool_result '[main <sha>] feat: add app entry'/Edit/MultiEdit records (fixture-2: one Edit of docs/shared.md). Implementation checkpoint in §6.9 if createConversation/registerProject cannot run in a plain script. Test per §6.9 with temp dirs; never write under the real home."
+        },
+        "items": [
+          {
+            "id": "workflow-fixture.ac1",
+            "title": "Given temp root and home dirs, when seedWorkflowFixture runs, then git rev-list --count origin/main..main prints 1 and the HEAD commit's Overdeck-Conversation trailer is 'conv-fixture-1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workflow-fixture.ac2",
+            "title": "When the seed finishes, then git status --porcelain lists docs/shared.md and not build/, and git check-ignore build/output.txt exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workflow-fixture.ac3",
+            "title": "When listConversations() runs after the seed, then it returns fixture-1 with tmuxSession 'conv-fixture-1' and fixture-2 with tmuxSession 'conv-fixture-2'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workflow-fixture.ac4",
+            "title": "When getCachedMessages parses fixture-1's transcript, then fileEditsByAssistantId contains docs/shared.md and a work-log entry's result contains the pre-trailer commit's short sha",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workflow-fixture.ac5",
+            "title": "Given OVERDECK_HOME resolves to <homedir>/.overdeck, when seedWorkflowFixture runs, then it rejects with 'Refusing to seed: OVERDECK_HOME must be an isolated test home' and creates no repo",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-subset",
+        "title": "List this issue's new and rewritten frontend tests in the CI subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T19:38:09Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-5287",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c -E 'openBeside|useStageShortcuts.test|workDockStore|rootForConversation|EmergencyStopOverlay.test|agentsWorking|needsYou.test|projectOf|shortcuts/__tests__|PaneBar.test' scripts/frontend-test-subset.txt",
+            "node -e \"const fs=require('fs');const l=fs.readFileSync('scripts/frontend-test-subset.txt','utf8').split('\\n').map(s=>s.trim()).filter(x=>x&&!x.startsWith('#'));console.log(l.filter(p=>!fs.existsSync('src/dashboard/frontend/'+p)).length)\""
+          ],
+          "expected_outputs": [
+            "grep prints at least 12",
+            "the node check prints 0 (every listed path exists)"
+          ],
+          "readiness": "ready",
+          "acJustification": "A list edit; the ACs check membership and order.",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-S16. Add each of these paths (prefixed src/, relative to src/dashboard/frontend) to scripts/frontend-test-subset.txt in sorted position, skipping any already present: components/Stage/__tests__/openBeside.test.tsx, components/Stage/useStageShortcuts.test.tsx, components/Stage/PaneBar.test.tsx, components/dock/__tests__/workDockStore.test.ts, components/explorer/__tests__/rootForConversation.test.ts, components/EmergencyStopOverlay.test.tsx, lib/selectors/__tests__/agentsWorking.test.ts, lib/selectors/__tests__/needsYou.test.ts, lib/selectors/__tests__/projectOf.test.ts, lib/shortcuts/__tests__/keys.test.ts, lib/shortcuts/__tests__/registry.test.ts, lib/shortcuts/__tests__/ShortcutsSheet.test.tsx. Every listed file must exist."
+        },
+        "items": [
+          {
+            "id": "test-subset.ac1",
+            "title": "When scripts/frontend-test-subset.txt is read, then it contains each of the twelve paths exactly once and each path exists under src/dashboard/frontend",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-subset.ac2",
+            "title": "When the non-comment lines are compared with their sorted order, then the new lines sit in sorted position",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the frame seams, keyboard shortcuts and fixture; add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T19:38:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5287",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "features/keyboard-shortcuts.mdx",
+            "features/file-explorer.mdx",
+            "docs.json",
+            "changelog.d/pan-5287.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n '## Frame seams (PAN-5287)' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'features/keyboard-shortcuts' docs.json"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "grep finds the Frame seams heading",
+            "grep finds the docs.json entry"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §6.10 and WI-S17. Add '## Frame seams (PAN-5287)' to docs/DASHBOARD-ARCHITECTURE.md before '## File explorer server (PAN-5183)' with the six subsections (Stage seams, Dock store, Explorer root of a conversation, Needs-you and agents-working selectors, Keyboard registry, Workflow fixture) using the final names from the code. Create features/keyboard-shortcuts.mdx (title, description, 'Open the list', table with macOS and Linux/Windows columns for every S shortcut, 'Where shortcuts work', 'Keys the browser keeps') and add 'features/keyboard-shortcuts' to docs.json after 'features/file-explorer'. Change line 22 of features/file-explorer.mdx to the platform wording and link the new page. Write changelog.d/pan-5287.md exactly as the PRD block."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "When docs/DASHBOARD-ARCHITECTURE.md is read, then a '## Frame seams (PAN-5287)' section precedes '## File explorer server (PAN-5183)' and names workDockStore, openBeside, useNeedsYouItems, useAgentsWorking, lib/shortcuts/registry.ts and scripts/dev/seed-workflow-fixture.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "When features/keyboard-shortcuts.mdx renders, then its table lists Ctrl+Alt+1–9 and Ctrl+Alt+W for Linux/Windows and ⌘1–9 and ⌘W for macOS, and docs.json lists 'features/keyboard-shortcuts'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "When features/file-explorer.mdx is read, then it says Ctrl+P (⌘P on macOS) instead of Ctrl/Cmd+P and links /features/keyboard-shortcuts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "When npm run lint:docs runs, then it passes with changelog.d/pan-5287.md present under #### New and #### Improved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts",
+        "to": "dock-store",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts",
+        "to": "stage-seams",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-store",
+        "to": "stage-seams",
+        "type": "blocks"
+      },
+      {
+        "from": "project-resolver",
+        "to": "agents-working",
+        "type": "blocks"
+      },
+      {
+        "from": "project-resolver",
+        "to": "needs-you",
+        "type": "blocks"
+      },
+      {
+        "from": "registry-core",
+        "to": "app-migration",
+        "type": "blocks"
+      },
+      {
+        "from": "registry-core",
+        "to": "shortcuts-sheet",
+        "type": "blocks"
+      },
+      {
+        "from": "app-migration",
+        "to": "shortcuts-sheet",
+        "type": "blocks"
+      },
+      {
+        "from": "registry-core",
+        "to": "stage-shortcuts",
+        "type": "blocks"
+      },
+      {
+        "from": "registry-core",
+        "to": "panebar-chip",
+        "type": "blocks"
+      },
+      {
+        "from": "registry-core",
+        "to": "sidebar-shortcut",
+        "type": "blocks"
+      },
+      {
+        "from": "registry-core",
+        "to": "emergency-stop-shortcut",
+        "type": "blocks"
+      },
+      {
+        "from": "registry-core",
+        "to": "new-conversation-shortcut",
+        "type": "blocks"
+      },
+      {
+        "from": "registry-core",
+        "to": "explorer-shortcuts",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-seams",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-store",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "root-helper",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "project-resolver",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-working",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "needs-you",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "registry-core",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "shortcuts-sheet",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-shortcuts",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "panebar-chip",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "emergency-stop-shortcut",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-seams",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "root-helper",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-working",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "needs-you",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "shortcuts-sheet",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-shortcuts",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "new-conversation-shortcut",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "explorer-shortcuts",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "workflow-fixture",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

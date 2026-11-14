@@ -1,0 +1,957 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T18:52:50Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5282: Upgrade CLIProxy to v8.0.71 with a v8-layout generated config",
+    "updated": "2026-11-14T19:01:08.677Z"
+  },
+  "plan": {
+    "id": "pan-5282",
+    "title": "Upgrade CLIProxy to v8.0.71 with a v8-layout generated config",
+    "status": "proposed",
+    "uid": "451bfa5f-a218-472b-bc5b-3a499dbe922a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-14T18:52:50Z",
+    "updated": "2026-11-14T19:01:08.677Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5282",
+        "label": "PAN-5282",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5282/.pan/drafts/pan-5282.md",
+        "label": "PRD draft (.pan/drafts/pan-5282.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5278",
+        "label": "PAN-5278 (blocked by this issue)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "cliproxy",
+      "sidecar",
+      "config",
+      "upgrade"
+    ],
+    "narratives": {
+      "Problem": "Overdeck pins CLIProxy v7.3.16 and writes a legacy flat config.yaml by text concatenation with config.extra.yaml appended verbatim. Upstream is v8.0.71 with a nested v8 layout. PAN-5278 needs session affinity, a localhost management API with a known key, and Claude and Codex accounts that do not collide on Codex-aliased model names. Today a running proxy is never upgraded (startCliproxy returns early), and writing a v8 config under a hot-reloading v7 would break it.",
+      "Proposal": "Bump the pin to v8.0.71. Build the config as an object in a new pure module src/lib/cliproxy-config.ts (base layout, legacy-key conversion of extra, deep merge, client-token preservation, management key precedence, Codex-alias exclusion from the Claude channel, semantic write compare, start planner). Put async path-taking file helpers in src/lib/cliproxy-config-files.ts (management key file, extra reader, writeCliproxyConfig with 0600 modes). Wire them into cliproxy.ts so the v8 layout is written only once the installed binary is the pin; startCliproxy downloads before stopping a stale running proxy. Delete the sync and text-based twins. Verify against a throwaway v8.0.71 on port 18317, then update docs/CONFIGURATION.md, configuration/harnesses.mdx, the cliproxy skill and the changelog.",
+      "NonGoals": "- Converting legacy gemini-api-key or codex: blocks in config.extra.yaml\n- Rewriting per-account excluded_models in auth JSON files\n- Collecting aliases from per-auth model_aliases in auth JSON files\n- Changing or validating the operator's alias targets in config.extra.yaml\n- Editing the operator's config.extra.yaml on disk\n- Restarting CLIProxy on dashboard boot or pan reload\n- Reset-first routing, the pooled usage panel, or any management-API client code (PAN-5278)\n- Signing a Claude account in (operator step after merge)\n- Touching port 8317, ~/.overdeck/cliproxy/ or the live proxy from tests or the probe"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The upgrade of a running stale proxy happens only on explicit start paths (pan up, pan dev, pan restart --cliproxy, the Restart CLIProxy button, the watchdog), not on dashboard reload.",
+        "rationale": "A reload-time restart would interrupt in-flight GPT requests on every routine deploy; the upgrade is one-time and the operator triggers it right before signing Claude in. Docs and changelog tell them to run pan restart --cliproxy."
+      },
+      {
+        "summary": "When a stale proxy is running, startCliproxy downloads the new binary before stopping the old one, and writes the v8 config only after the install.",
+        "rationale": "A failed download then leaves the old proxy running on its untouched legacy config instead of leaving the operator with no proxy."
+      },
+      {
+        "summary": "Avoid config churn with a semantic compare that ignores CLIProxy's bcrypt rewrite of management.secret-key, not a sidecar file or an in-memory cache.",
+        "rationale": "Verified that CLIProxy (v7 live and v8 probe) rewrites only secret-key on startup; the compare works across the CLI and dashboard processes and still restores a hand-edited config.yaml."
+      },
+      {
+        "summary": "Use global oauth.excluded-models.claude only; drop the first draft's per-account fallback.",
+        "rationale": "A planning-time probe of v8.0.71 showed the global list hides all aliased names from a Claude auth file; the work item 9 probe re-checks it and escalates instead of improvising."
+      },
+      {
+        "summary": "A bcrypt-shaped secret-key in config.extra.yaml is ignored with a log line and the management-key file's plaintext key is used.",
+        "rationale": "The key file must always hold the active plaintext key for PAN-5278; a hash cannot be used as a bearer key."
+      },
+      {
+        "summary": "Put the pure builder in src/lib/cliproxy-config.ts and the file I/O in src/lib/cliproxy-config-files.ts unconditionally.",
+        "rationale": "Pure functions get direct unit tests, the file helpers take paths so tests use their own temp dirs, and cliproxy.ts stays a lifecycle module without a circular import."
+      },
+      {
+        "summary": "Leave CLIProxy's management control panel at its default (enabled) rather than setting management.disable-control-panel in the base config.",
+        "rationale": "The operator uses the Management Center panel today (~/.overdeck/cliproxy/static exists); operators who want it off set it in config.extra.yaml."
+      },
+      {
+        "summary": "Write config.yaml in place with writeFile, never temp file plus rename.",
+        "rationale": "The v8 probe showed an in-place write is hot-reloaded within about a second while a rename-based edit was missed by the watcher."
+      },
+      {
+        "summary": "Also write config.yaml with mode 0600 and tighten an existing file.",
+        "rationale": "The file holds the Gemini key and, until CLIProxy hashes it, the plaintext management key; the live file is 0664 today."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "13 small items over 10 files in 4 subsystems; well under the surface limits.",
+      "canonicalFilename": "2026-11-14-PAN-5282-upgrade-cliproxy-to-v8-0-71-with-a-v8-layout-generated-config.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "pin-bump",
+        "title": "Bump the CLIProxy pin to v8.0.71",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T18:52:50Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-5282",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cliproxy.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cliproxy-platform-asset.test.ts tests/lib/cliproxy-version-probe.test.ts"
+          ],
+          "expected_outputs": [
+            "both cliproxy test files report 0 failures"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 1. In src/lib/cliproxy.ts change `const CLIPROXY_RELEASE_VERSION = 'v7.3.16';` to `'v8.0.71'`, add the four-line PAN-5282 dated probe note to the comment block above it (exact text in the PRD), and change the isCliproxyUpToDateTask doc comment range from 'v7.2.113 through v7.3.16' to 'v7.2.113 through v8.0.71'. No test edits are needed: no test pins 7.3.16."
+        },
+        "items": [
+          {
+            "id": "pin-bump.ac1",
+            "title": "Given the change, `git grep -n \"CLIPROXY_RELEASE_VERSION = 'v8.0.71'\" src/lib/cliproxy.ts` prints exactly one line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pin-bump.ac2",
+            "title": "When `npx vitest run tests/lib/cliproxy-platform-asset.test.ts tests/lib/cliproxy-version-probe.test.ts` runs, it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pin-bump.ac3",
+            "title": "The comment above the pin contains a PAN-5282 line dated 2026-11-14 that records the probe results (banner, management API, Claude exclusion, secret-key rewrite)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-builder-base",
+        "title": "Pure v8 base config builder in cliproxy-config.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T18:52:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5282",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cliproxy-config.ts",
+            "tests/lib/cliproxy-config-v8.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cliproxy-config-v8.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "cliproxy-config-v8.test.ts reports 0 failures",
+            "lint:circular exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "legacy-merge",
+            "claude-exclusion",
+            "config-needs-write",
+            "config-writer",
+            "lifecycle-wiring"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 2. Create src/lib/cliproxy-config.ts (pure, imports only `yaml` named exports and node:util, never cliproxy.ts) with the CliproxyConfigInput/CliproxyConfigOutput interfaces and buildCliproxyConfigV8 returning the exact base object from the PRD (config-version 8, server, access.api-keys [clientToken], management allow-remote false + secret-key, routing round-robin + session-affinity true + ttl 1h, observability.logs.debug false, oauth.auth-dir, optional api-keys.gemini group named overdeck-gemini). Serialize with stringifyYaml(config, { lineWidth: 0 }). In this item extra is ignored and warnings is an empty array. Add the three named tests in tests/lib/cliproxy-config-v8.test.ts."
+        },
+        "items": [
+          {
+            "id": "config-builder-base.ac1",
+            "title": "Given a base input without a Gemini key, the parsed YAML contains config-version 8, server.host, server.port, access.api-keys with the client token, management.allow-remote false, routing.session-affinity true and oauth.auth-dir",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-builder-base.ac2",
+            "title": "Given a Gemini key, the parsed YAML contains api-keys.gemini[0] named overdeck-gemini whose keys[0].api-key equals that key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-builder-base.ac3",
+            "title": "When `npx vitest run tests/lib/cliproxy-config-v8.test.ts` runs, it exits 0 and `npm run lint:circular` exits 0 with the new module",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "legacy-merge",
+        "title": "Convert legacy extra keys and deep-merge extra over the base",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T18:52:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5282",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cliproxy-config.ts",
+            "tests/lib/cliproxy-config-v8.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cliproxy-config-v8.test.ts"
+          ],
+          "expected_outputs": [
+            "cliproxy-config-v8.test.ts reports 0 failures including the seven legacy-merge cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 3. In src/lib/cliproxy-config.ts add isBcryptHash, convertLegacyKeys (exact Decision 3 table; api-keys moves to access.api-keys only when it is a list; v8-spelled keys in extra beat legacy twins) and deepMerge (objects merge, arrays/scalars/null replace). buildCliproxyConfigV8 merges convertLegacyKeys(extra) over the base, re-adds the client token to access.api-keys (Decision 5), and resolves the management key: a non-empty non-bcrypt extra secret-key wins; a bcrypt-shaped one is replaced by the key-file key and adds the PRD warning string. Add the seven named tests with the nine-alias operator fixture."
+        },
+        "items": [
+          {
+            "id": "legacy-merge.ac1",
+            "title": "Given the operator fixture (legacy oauth-model-alias, remote-management, routing), the parsed YAML contains no top-level oauth-model-alias or remote-management key and oauth.model-alias.codex contains nine entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-merge.ac2",
+            "title": "Given extra replaces access.api-keys with ['other-key'], the output preserves 'overdeck-local-cliproxy-key' in access.api-keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-merge.ac3",
+            "title": "Given extra secret-key 'extra-plain-key', buildCliproxyConfigV8 returns activeManagementKey 'extra-plain-key'; given a bcrypt-shaped extra key, it returns the input managementKey and one warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-merge.ac4",
+            "title": "Given a legacy api-keys list it lands in access.api-keys, and given an api-keys mapping it stays at the root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-exclusion",
+        "title": "Exclude every Codex alias from the Claude channel",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T18:52:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5282",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cliproxy-config.ts",
+            "tests/lib/cliproxy-config-v8.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cliproxy-config-v8.test.ts"
+          ],
+          "expected_outputs": [
+            "cliproxy-config-v8.test.ts reports 0 failures including the three exclusion cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 4. In buildCliproxyConfigV8 after the merge, collect every string alias under oauth.model-alias.codex, union with existing oauth.excluded-models.claude strings, de-duplicate, sort, and write the list to oauth.excluded-models.claude only when non-empty, keeping other excluded-models channels. Add the three named tests to tests/lib/cliproxy-config-v8.test.ts."
+        },
+        "items": [
+          {
+            "id": "claude-exclusion.ac1",
+            "title": "Given the nine-alias fixture plus extra oauth.excluded-models.claude ['claude-3-opus'], the output's oauth.excluded-models.claude equals the ten names sorted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-exclusion.ac2",
+            "title": "Given no codex aliases, the output contains no oauth.excluded-models.claude key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-exclusion.ac3",
+            "title": "Given extra oauth-excluded-models.codex ['gpt-5-codex-mini'], the output preserves it as oauth.excluded-models.codex",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "key-file-helpers",
+        "title": "Management key and config.extra.yaml file helpers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T18:52:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5282",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cliproxy-config-files.ts",
+            "tests/lib/cliproxy-config-files.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cliproxy-config-files.test.ts"
+          ],
+          "expected_outputs": [
+            "cliproxy-config-files.test.ts reports 0 failures"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 5. Create src/lib/cliproxy-config-files.ts (async fs/promises only, every function takes its path as an argument; in this item it imports only node:crypto, node:fs/promises and yaml, never cliproxy.ts — the cliproxy-config.ts import arrives with config-writer, so this item runs in parallel with the builder chain) with generateManagementKey (randomBytes(24).toString('base64url')), readManagementKeyFile (trimmed, null when missing or empty), writeManagementKeyFile (mode 0o600 then chmod 0o600) and readConfigExtraFile (YAML parse; {} for missing/blank; {} plus the exact PRD log line for invalid YAML or a non-mapping). Add the five named tests in tests/lib/cliproxy-config-files.test.ts, each in its own mkdtemp dir."
+        },
+        "items": [
+          {
+            "id": "key-file-helpers.ac1",
+            "title": "Given a key file containing 'abc\\n', readManagementKeyFile returns 'abc'; given a missing or empty file it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "key-file-helpers.ac2",
+            "title": "When writeManagementKeyFile runs, the file stat mode & 0o777 equals 0o600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "key-file-helpers.ac3",
+            "title": "Given invalid YAML in the extra file, readConfigExtraFile returns {} and logs '[cliproxy] config.extra.yaml is not valid YAML; ignoring it'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "key-file-helpers.ac4",
+            "title": "When `npx vitest run tests/lib/cliproxy-config-files.test.ts` runs, it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-needs-write",
+        "title": "Semantic config compare that ignores CLIProxy's secret-key hash",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T18:52:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5282",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cliproxy-config.ts",
+            "tests/lib/cliproxy-config-v8.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cliproxy-config-v8.test.ts"
+          ],
+          "expected_outputs": [
+            "cliproxy-config-v8.test.ts reports 0 failures including the four compare cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 6. Add configNeedsWrite(existingText, generated, keyChanged) to src/lib/cliproxy-config.ts: true for null, unparseable or non-object text; otherwise substitute the generated plaintext for a bcrypt-shaped on-disk management.secret-key when keyChanged is false, then return !isDeepStrictEqual(copy, generated). Add the four named tests to tests/lib/cliproxy-config-v8.test.ts."
+        },
+        "items": [
+          {
+            "id": "config-needs-write.ac1",
+            "title": "Given existing text null or 'not: [valid', configNeedsWrite returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-needs-write.ac2",
+            "title": "Given existing YAML equal to the generated config except a bcrypt-shaped secret-key and keyChanged false, configNeedsWrite returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-needs-write.ac3",
+            "title": "Given the same hashed file and keyChanged true, configNeedsWrite returns true; given a differing routing.session-affinity-ttl it returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-writer",
+        "title": "writeCliproxyConfig: build, compare, write 0600, write back the key",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T18:52:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5282",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cliproxy-config-files.ts",
+            "tests/lib/cliproxy-config-files.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cliproxy-config-files.test.ts"
+          ],
+          "expected_outputs": [
+            "cliproxy-config-files.test.ts reports 0 failures including the four writer cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5",
+            "FR-9",
+            "FR-10",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 7. Add writeCliproxyConfig(opts) to src/lib/cliproxy-config-files.ts following the PRD steps exactly: read or generate the management key, read extra, build, log warnings with a '[cliproxy] ' prefix, write the key file when the active key differs from the stored one, write config.yaml in place with writeFile (mode 0o600, never a temp file plus rename, because v8's watcher misses renames) only when configNeedsWrite says so, always chmod an existing config.yaml to 0o600, and return { wrote, activeManagementKey }. Add the four named tests to tests/lib/cliproxy-config-files.test.ts."
+        },
+        "items": [
+          {
+            "id": "config-writer.ac1",
+            "title": "Given an empty temp dir, the first call creates the key file with mode 0600 and a second call reuses the same key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-writer.ac2",
+            "title": "Given a pre-existing config.yaml with mode 0664, after the call its mode & 0o777 equals 0o600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-writer.ac3",
+            "title": "Given config.yaml whose secret-key line was replaced with '$2a$10$abcdefghijklmnopqrstuv', the next call returns wrote false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-writer.ac4",
+            "title": "Given an extra file with a plaintext management secret-key, the call stores that key in the key file and returns it as activeManagementKey",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lifecycle-wiring",
+        "title": "Wire the v8 writer into cliproxy.ts with upgrade-safe start ordering",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T18:52:50Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5282",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/cliproxy-config.ts",
+            "src/lib/cliproxy.ts",
+            "tests/lib/cliproxy-start-plan.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cliproxy-start-plan.test.ts tests/lib/cliproxy-config-v8.test.ts tests/lib/cliproxy-config-files.test.ts tests/lib/cliproxy-spawn.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "the four cliproxy test files report 0 failures",
+            "typecheck exits 0",
+            "lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "live-probe"
+          ],
+          "readinessReason": "Edits src/lib/cliproxy.ts and cliproxy-config.ts; the blocks edges from pin-bump and config-writer already serialize it, so it is parallel-safe once they land."
+        },
+        "narrative": {
+          "Action": "PRD work item 8. Add planCliproxyStart (four-way pure planner) to src/lib/cliproxy-config.ts with tests in tests/lib/cliproxy-start-plan.test.ts. In src/lib/cliproxy.ts add getCliproxyManagementKeyPath and export readManagementKey, rewrite ensureConfigFileAsync to call writeCliproxyConfig with the default paths and constants, rewrite startCliproxy exactly as the PRD's After snippet (ensureDirsAsync; plan; config-only write when a current proxy runs; download before stopping a stale running proxy, then a 500 ms settle before writing and spawning), change bridgeGeminiAuthToCliproxy to write the config only when the binary is current and otherwise call startCliproxy, delete readConfigExtra, buildCliproxyConfig, sync ensureConfigFile, serializeYamlString and sync readBridgedGeminiApiKey plus now-unused imports, and rewrite the module header."
+        },
+        "items": [
+          {
+            "id": "lifecycle-wiring.ac1",
+            "title": "Given running true and binaryCurrent false, planCliproxyStart returns 'upgrade-running'; the other three combinations return the PRD values, and `npx vitest run tests/lib/cliproxy-start-plan.test.ts` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-wiring.ac2",
+            "title": "When `git grep -nE \"function (ensureConfigFile|readConfigExtra|buildCliproxyConfig|serializeYamlString|readBridgedGeminiApiKey)\\(\" src` runs, it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-wiring.ac3",
+            "title": "When `git grep -n \"export async function readManagementKey\" src/lib/cliproxy.ts` runs, it prints one line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-wiring.ac4",
+            "title": "In startCliproxy the 'upgrade-running' branch calls installCliproxy before stopCliproxy, waits 500 ms after the stop, and calls ensureConfigFileAsync only after the install, so a failed download throws while the old proxy keeps running",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-wiring.ac5",
+            "title": "When `npm run typecheck` and `npm run lint` run, both exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-probe",
+        "title": "Probe Overdeck's generated config against a throwaway v8.0.71 on port 18317",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T18:52:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5282",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cliproxy.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n \"PAN-5282\" src/lib/cliproxy.ts"
+          ],
+          "expected_outputs": [
+            "the grep prints the original note and the dated re-probe line"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "FR-9"
+          ],
+          "readinessReason": "Needs the finished lifecycle wiring and edits the same cliproxy.ts comment."
+        },
+        "narrative": {
+          "Action": "PRD work item 9. In the gitignored .tmp/cliproxy-v8-check/ dir, download the v8.0.71 binary, generate config.yaml with writeCliproxyConfig (port 18317, own auth dir, geminiApiKey 'fake-gemini-key', operator fixture as extra) from an uncommitted script run with npx tsx, add the two fake auth files, start the binary with HOME pointed inside that dir, check auth-files, the Claude file's model list, and that a second writeCliproxyConfig returns wrote false, then stop the process and delete the dir. Never touch port 8317 or ~/.overdeck/cliproxy/. Commit one dated re-probe line under the PAN-5282 note above CLIPROXY_RELEASE_VERSION and paste the output into the PR description. If the Claude list contains an aliased name, stop and pan tell flywheel-orchestrator."
+        },
+        "items": [
+          {
+            "id": "live-probe.ac1",
+            "title": "Given the throwaway instance, GET /v0/management/auth-files with the generated key returns 200 listing both fake files, and the startup log contains '1 Gemini API keys'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-probe.ac2",
+            "title": "Given the fake Claude auth file, GET /v0/management/auth-files/models returns a list that contains none of the fixture's nine Codex aliases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-probe.ac3",
+            "title": "After CLIProxy hashed the key, a second writeCliproxyConfig call returns wrote false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-probe.ac4",
+            "title": "The committed comment above CLIPROXY_RELEASE_VERSION contains a dated PAN-5282 re-probe line, and the PR description contains the three results",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-configuration",
+        "title": "Document the v8 CLIProxy config in docs/CONFIGURATION.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T18:52:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5282",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/CONFIGURATION.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 10. Add a 'CLIProxy configuration (v8)' subsection under 'CLIProxy Sidecar (OpenAI, Gemini)' (line 568) of docs/CONFIGURATION.md covering every bullet in the PRD: the v8.0.71 pin and Overdeck-owned 0600 config.yaml, the YAML merge of config.extra.yaml with legacy conversion, the management key file, session affinity, the Claude exclusion rule and how to opt a name out, the one-time pan restart --cliproxy upgrade plus the /v1/models alias check, how to rotate the management key, and an 'Adding a Claude account' step with the exact -claude-login -no-browser command."
+        },
+        "items": [
+          {
+            "id": "docs-configuration.ac1",
+            "title": "docs/CONFIGURATION.md contains the heading 'CLIProxy configuration (v8)' and the string 'v8.0.71'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-configuration.ac2",
+            "title": "docs/CONFIGURATION.md contains '-claude-login -no-browser', 'management-key', 'pan restart --cliproxy' and 'oauth.excluded-models.claude'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-configuration.ac3",
+            "title": "docs/CONFIGURATION.md contains a key-rotation sentence that names setting management.secret-key in config.extra.yaml or deleting management-key and running pan restart --cliproxy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-configuration.ac4",
+            "title": "When `npm run lint:docs` runs, it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-harnesses",
+        "title": "Mark the 7.3.16 notes in configuration/harnesses.mdx as history",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-14T18:52:50Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5282",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 11. In configuration/harnesses.mdx change line 366's '(the version `pan install` pins)' to '(the pin until PAN-5282 moved it to `v8.0.71`)' with the PAN-5282 GitHub link, keep the dated verification notes, and change line 1482's 'CLIProxy `v7.3.16` maps it' to 'CLIProxy maps it (verified on `v7.3.16`)'."
+        },
+        "items": [
+          {
+            "id": "docs-harnesses.ac1",
+            "title": "configuration/harnesses.mdx contains 'v8.0.71' and no longer contains 'the version `pan install` pins'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-harnesses.ac2",
+            "title": "configuration/harnesses.mdx contains 'verified on `v7.3.16`' in the effort paragraph, and `npm run lint:docs` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-cliproxy-skill",
+        "title": "Refresh the cliproxy skill's config section for v8",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-14T18:52:50Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5282",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/cliproxy/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:skills"
+          ],
+          "expected_outputs": [
+            "lint:skills exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 12. In sync-sources/skills/cliproxy/SKILL.md 'Config and Auth', replace the v6.9.24 binary row with the v8.0.71 pin, add rows for config.extra.yaml and management-key, replace the legacy 'Config contents' YAML block with the v8 base shape (secret-key shown as <from management-key>), and make 'Lifecycle in Overdeck' step 2 say the v8 config is written only after the binary is the pinned version. Do not edit .claude/skills/."
+        },
+        "items": [
+          {
+            "id": "docs-cliproxy-skill.ac1",
+            "title": "sync-sources/skills/cliproxy/SKILL.md contains 'v8.0.71' and 'config-version: 8' and no longer contains 'v6.9.24'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-cliproxy-skill.ac2",
+            "title": "sync-sources/skills/cliproxy/SKILL.md contains table rows naming config.extra.yaml and management-key, and `npm run lint:skills` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changelog",
+        "title": "Add the PAN-5282 changelog entry",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-14T18:52:50Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5282",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "changelog.d/pan-5282.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 13. Create changelog.d/pan-5282.md with the exact '#### Improved' bullet from the PRD (v8.0.71 upgrade, session affinity, localhost management API with the key file, Codex aliases kept off Claude accounts, extra keeps working, run pan restart --cliproxy once). Do not edit changelog.mdx."
+        },
+        "items": [
+          {
+            "id": "changelog.ac1",
+            "title": "changelog.d/pan-5282.md exists and contains '#### Improved' and 'pan restart --cliproxy'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog.ac2",
+            "title": "When `npm run lint:docs` runs, it exits 0 and changelog.mdx shows no diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "config-builder-base",
+        "to": "legacy-merge",
+        "type": "blocks"
+      },
+      {
+        "from": "legacy-merge",
+        "to": "claude-exclusion",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-exclusion",
+        "to": "config-needs-write",
+        "type": "blocks"
+      },
+      {
+        "from": "config-needs-write",
+        "to": "config-writer",
+        "type": "blocks"
+      },
+      {
+        "from": "key-file-helpers",
+        "to": "config-writer",
+        "type": "blocks"
+      },
+      {
+        "from": "config-writer",
+        "to": "lifecycle-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "pin-bump",
+        "to": "lifecycle-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "lifecycle-wiring",
+        "to": "live-probe",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

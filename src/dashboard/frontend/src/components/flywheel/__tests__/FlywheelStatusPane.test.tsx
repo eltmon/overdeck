@@ -122,15 +122,135 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
 
   it('no button-role element contains another button or link (PAN-5217, ACT 307n5z)', () => {
     const status = flywheelStatus({
-      lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'waive PAN-5095 test removal; PR #4001 merge', at: '2026-09-23T09:59:50.000Z' },
+      lastTick: {
+        tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'waive PAN-5095 test removal; PR #4001 merge', at: '2026-09-23T09:59:50.000Z',
+        needsYouItems: [
+          { text: 'waive PAN-5095 test removal; PR #4001 merge', firstRaisedTick: 2, firstRaisedAt: '2026-09-23T09:30:00.000Z', firstRaisedMessageId: 'm2' },
+        ],
+      },
     });
     render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} />);
     // The fixture must actually render nested candidates, or the check is vacuous.
     expect(screen.getByTestId('flywheel-needs-you-issue')).toBeInTheDocument();
     expect(screen.getByTestId('flywheel-needs-you-pr')).toBeInTheDocument();
+    expect(screen.getByTestId('flywheel-needs-you-jump')).toBeInTheDocument();
     for (const button of screen.getAllByRole('button')) {
       expect(button.querySelector('button, a, [role="button"], [role="link"]')).toBeNull();
     }
+  });
+
+  describe('whole-row jump (PAN-5275)', () => {
+    function jumpableRowStatus() {
+      return flywheelStatus({
+        lastTick: {
+          tick: 4, pick: null, phase: 'park', inFlight: [], at: '2026-09-23T09:59:50.000Z',
+          needsYou: 'waive PAN-5095 test removal; PR #4001 merge',
+          needsYouItems: [
+            { text: 'waive PAN-5095 test removal; PR #4001 merge', firstRaisedTick: 2, firstRaisedAt: '2026-09-23T09:30:00.000Z', firstRaisedMessageId: 'm2' },
+          ],
+        },
+      });
+    }
+
+    it('clicking the row text or the row itself jumps once per click (ac1)', () => {
+      const onNeedsYouClick = vi.fn();
+      render(<FlywheelStatusPane status={jumpableRowStatus()} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
+      const row = screen.getAllByTestId('flywheel-needs-you-item')[0]!;
+      const textSegment = Array.from(row.querySelectorAll('span')).find(
+        (el) => el.children.length === 0 && el.textContent?.includes('test removal'),
+      )!;
+      fireEvent.click(textSegment);
+      expect(onNeedsYouClick).toHaveBeenCalledTimes(1);
+      expect(onNeedsYouClick).toHaveBeenNthCalledWith(1, 'm2');
+      fireEvent.click(row);
+      expect(onNeedsYouClick).toHaveBeenCalledTimes(2);
+      expect(onNeedsYouClick).toHaveBeenNthCalledWith(2, 'm2');
+    });
+
+    it('clicking the jump button jumps exactly once (ac2)', () => {
+      const onNeedsYouClick = vi.fn();
+      render(<FlywheelStatusPane status={jumpableRowStatus()} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
+      fireEvent.click(screen.getByTestId('flywheel-needs-you-jump'));
+      expect(onNeedsYouClick).toHaveBeenCalledTimes(1);
+      expect(onNeedsYouClick).toHaveBeenCalledWith('m2');
+    });
+
+    it('an inner issue button navigates and does not jump (ac3)', () => {
+      const onNavigateIssue = vi.fn();
+      const onNeedsYouClick = vi.fn();
+      render(
+        <FlywheelStatusPane status={jumpableRowStatus()} unreachable={false} nowMs={NOW} onNavigateIssue={onNavigateIssue} onNeedsYouClick={onNeedsYouClick} />,
+      );
+      fireEvent.click(screen.getByTestId('flywheel-needs-you-issue'));
+      expect(onNavigateIssue).toHaveBeenCalledWith('PAN-5095');
+      expect(onNeedsYouClick).not.toHaveBeenCalled();
+    });
+
+    it('inner PR and target links do not jump (ac3)', () => {
+      const onNeedsYouClick = vi.fn();
+      const prevent = (e: Event) => e.preventDefault();
+      document.addEventListener('click', prevent, { capture: true });
+      const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+      try {
+        const first = render(<FlywheelStatusPane status={jumpableRowStatus()} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
+        fireEvent.click(screen.getByTestId('flywheel-needs-you-pr'));
+        expect(onNeedsYouClick).not.toHaveBeenCalled();
+        first.unmount();
+
+        const targetStatus = flywheelStatus({
+          lastTick: {
+            tick: 4, pick: null, phase: 'park', inFlight: [], at: '2026-09-23T09:59:50.000Z',
+            needsYou: 'upload AAB <https://play.google.com/console/x>',
+            needsYouItems: [
+              { text: 'upload AAB <https://play.google.com/console/x>', firstRaisedTick: 2, firstRaisedAt: '2026-09-23T09:30:00.000Z', firstRaisedMessageId: 'm3' },
+            ],
+          },
+        });
+        render(<FlywheelStatusPane status={targetStatus} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
+        fireEvent.click(screen.getByTestId('flywheel-needs-you-link'));
+        expect(onNeedsYouClick).not.toHaveBeenCalled();
+      } finally {
+        document.removeEventListener('click', prevent, { capture: true });
+        openSpy.mockRestore();
+      }
+    });
+
+    it('a jumpable row is pointer-styled but not a button (ac4)', () => {
+      render(<FlywheelStatusPane status={jumpableRowStatus()} unreachable={false} nowMs={NOW} />);
+      const row = screen.getAllByTestId('flywheel-needs-you-item')[0]!;
+      expect(row.className).toContain('cursor-pointer');
+      expect(row.className).toContain('hover:bg-[color-mix(in_srgb,var(--warning)_14%,transparent)]');
+      expect(row).not.toHaveAttribute('role');
+      expect(row).not.toHaveAttribute('tabindex');
+    });
+
+    it('a row without a first-raised id is plain text (ac5)', () => {
+      const onNeedsYouClick = vi.fn();
+      const status = flywheelStatus({
+        lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'upload AAB', at: '2026-09-23T09:59:50.000Z' },
+      });
+      render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
+      const row = screen.getByTestId('flywheel-needs-you-item');
+      expect(row.className).not.toContain('cursor-pointer');
+      expect(screen.queryByTestId('flywheel-needs-you-jump')).toBeNull();
+      fireEvent.click(row);
+      expect(onNeedsYouClick).not.toHaveBeenCalled();
+    });
+
+    it('ending a text selection inside the row does not jump (ac6)', () => {
+      const onNeedsYouClick = vi.fn();
+      render(<FlywheelStatusPane status={jumpableRowStatus()} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
+      const row = screen.getAllByTestId('flywheel-needs-you-item')[0]!;
+      const getSelectionSpy = vi
+        .spyOn(window, 'getSelection')
+        .mockReturnValue({ isCollapsed: false, anchorNode: row } as unknown as Selection);
+      fireEvent.click(row);
+      expect(onNeedsYouClick).not.toHaveBeenCalled();
+      getSelectionSpy.mockRestore();
+      fireEvent.click(row);
+      expect(onNeedsYouClick).toHaveBeenCalledTimes(1);
+      expect(onNeedsYouClick).toHaveBeenCalledWith('m2');
+    });
   });
 
   describe('Needs-you targets and link styling (PAN-5239)', () => {
@@ -197,17 +317,24 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
     });
   });
 
-  it('renders in-flight rows with state, attention, PR, and last journal; issue ids navigate', () => {
+  it('renders in-flight cards with title, PR and activity, never the raw journal type; cards navigate (PAN-5283)', () => {
     const onNavigateIssue = vi.fn();
-    render(<FlywheelStatusPane status={flywheelStatus()} unreachable={false} nowMs={NOW} onNavigateIssue={onNavigateIssue} />);
-    const row = screen.getByTestId('flywheel-inflight-PAN-3964');
-    expect(row).toHaveTextContent('in-review');
-    expect(row).toHaveTextContent('needs-you');
-    expect(row).toHaveTextContent('#4001 · review-requested · pending');
-    expect(row).toHaveTextContent('review.dispatched · 5m ago');
-    expect(screen.getByTestId('flywheel-inflight-PAN-3920')).toHaveTextContent('working');
-    // The Live agents list also links PAN-3964, so scope to this row's button.
-    fireEvent.click(row.querySelector('button')!);
+    const base = flywheelStatus();
+    const status = flywheelStatus({
+      inFlight: [
+        { ...base.inFlight[0]!, stage: 'review', lastActivity: { at: '2026-09-23T09:55:00.000Z', label: 'review started' } },
+        base.inFlight[1]!,
+      ],
+    });
+    render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} onNavigateIssue={onNavigateIssue} />);
+    const card = screen.getByTestId('flywheel-card-PAN-3964');
+    expect(card).toHaveTextContent('Restore the Flywheel page');
+    expect(card).toHaveTextContent('PR #4001');
+    expect(card).toHaveTextContent('last: review started · 5m ago');
+    expect(card).not.toHaveTextContent('review.dispatched');
+    expect(card).toHaveAttribute('data-stage', 'review');
+    expect(screen.getByTestId('flywheel-card-PAN-3920')).toHaveAttribute('data-stage', 'build');
+    fireEvent.click(card);
     expect(onNavigateIssue).toHaveBeenCalledWith('PAN-3964');
   });
 
@@ -247,7 +374,7 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
     });
   });
 
-  describe('no-agent and loop markers (PAN-4199 FR-5, FR-6)', () => {
+  describe('no-agent and loop markers (PAN-4199 FR-5, FR-6; PAN-5283 cards)', () => {
     function rowsStatus(rows: Array<Partial<FlywheelInFlightRow>>, overrides: Partial<Parameters<typeof flywheelStatus>[0]> = {}) {
       const base = flywheelStatus().inFlight[1]!;
       return flywheelStatus({
@@ -256,72 +383,86 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
       });
     }
 
-    it('marks a working row with no live pane, and only that row (ac1)', () => {
+    it('says no agent on a card nobody drives, and only that card (ac1)', () => {
       render(<FlywheelStatusPane status={rowsStatus([{ liveAgents: 0 }, { liveAgents: 1 }])} unreachable={false} nowMs={NOW} />);
-      expect(screen.getByTestId('flywheel-no-agent-PAN-1')).toHaveTextContent('no agent');
-      expect(screen.queryByTestId('flywheel-no-agent-PAN-2')).toBeNull();
+      expect(screen.getByTestId('flywheel-agentline-PAN-1')).toHaveTextContent('no agent');
+      expect(screen.getByTestId('flywheel-agentline-PAN-2')).toHaveTextContent('1 live agent');
     });
 
-    it('leaves a non-working row alone however few agents it has', () => {
-      render(<FlywheelStatusPane status={rowsStatus([{ state: 'in-review', liveAgents: 0 }])} unreachable={false} nowMs={NOW} />);
-      expect(screen.queryByTestId('flywheel-no-agent-PAN-1')).toBeNull();
+    it('shows no blocker line on a card the server found no blocker for', () => {
+      render(<FlywheelStatusPane status={rowsStatus([{ state: 'in-review', liveAgents: 0, blocker: null }])} unreachable={false} nowMs={NOW} />);
+      expect(screen.queryByTestId('flywheel-blocker-PAN-1')).toBeNull();
     });
 
-    it('marks the rows the loop named in its tick (ac2)', () => {
+    it('marks the cards the loop named in its tick with the Flywheel owner (ac2)', () => {
       render(<FlywheelStatusPane status={rowsStatus([{ inTick: true }, { inTick: false }])} unreachable={false} nowMs={NOW} />);
-      expect(screen.getByTestId('flywheel-in-tick-PAN-1')).toHaveTextContent('flywheel');
-      expect(screen.queryByTestId('flywheel-in-tick-PAN-2')).toBeNull();
+      expect(screen.getByTestId('flywheel-owner-PAN-1')).toHaveTextContent('Flywheel');
+      expect(screen.queryByTestId('flywheel-owner-PAN-2')).toBeNull();
     });
 
-    it('exposes each row\'s attention so the reveal can scroll to it', () => {
+    it('exposes each card\'s attention so the reveal can scroll to it', () => {
       render(<FlywheelStatusPane status={rowsStatus([{ attention: 'needs-you' }])} unreachable={false} nowMs={NOW} />);
-      expect(screen.getByTestId('flywheel-inflight-PAN-1')).toHaveAttribute('data-attention', 'needs-you');
+      expect(screen.getByTestId('flywheel-card-PAN-1')).toHaveAttribute('data-attention', 'needs-you');
     });
 
-    it('heads the section with the loop count or the census count', () => {
+    it('heads the board with every in-flight card and the shipped count, whatever the source (D17)', () => {
       const { unmount } = render(
         <FlywheelStatusPane status={rowsStatus([{ inTick: true }, { inTick: false }], { inFlightSource: 'tick' })} unreachable={false} nowMs={NOW} />,
       );
-      expect(screen.getByRole('region', { name: 'In-flight issues' })).toHaveTextContent('1 in flight (loop)');
+      expect(screen.getByRole('region', { name: 'In-flight issues' })).toHaveTextContent('2 in flight · 0 shipped today');
       unmount();
 
       render(<FlywheelStatusPane status={rowsStatus([{}, {}], { inFlightSource: 'census' })} unreachable={false} nowMs={NOW} />);
-      expect(screen.getByRole('region', { name: 'In-flight issues' })).toHaveTextContent('2 feature workspaces');
+      expect(screen.getByRole('region', { name: 'In-flight issues' })).toHaveTextContent('2 in flight · 0 shipped today');
     });
   });
 
-  describe('live agents (PAN-4199 WI-14)', () => {
-    const AGENTS = [
-      { issueId: 'PAN-3964', role: 'work', harness: 'claude-code', model: 'claude-opus-5-5', state: 'working' },
-      { issueId: 'PAN-3920', role: 'review', harness: 'codex', model: 'gpt-5.5', state: 'blocked' },
-    ];
+  describe('card agents (PAN-4199 WI-14, migrated to cards in PAN-5283)', () => {
+    function agentStatus() {
+      const base = flywheelStatus();
+      return flywheelStatus({
+        inFlight: [
+          { ...base.inFlight[0]!, agent: { role: 'work', model: 'claude-opus-5-5', harness: 'claude-code', state: 'working' } },
+          { ...base.inFlight[1]!, agent: { role: 'review', model: 'gpt-5.5', harness: 'codex', state: 'blocked' } },
+        ],
+      });
+    }
 
-    it('lists every agent with its issue, role, model, and pane state (ac1)', () => {
-      render(<FlywheelStatusPane status={flywheelStatus({ agents: AGENTS })} unreachable={false} nowMs={NOW} />);
-      const section = screen.getByRole('region', { name: 'Live agents' });
-      expect(section).toHaveTextContent('Agents · 2');
-      for (const agent of AGENTS) {
-        const row = screen.getByTestId(`flywheel-agent-${agent.issueId}-${agent.role}`);
-        expect(row).toHaveTextContent(agent.issueId);
-        expect(row).toHaveTextContent(agent.role);
-        expect(row).toHaveTextContent(agent.model);
-        expect(row).toHaveTextContent(agent.state);
-      }
+    it('shows each card\'s agent role, model, and state (ac1)', () => {
+      render(<FlywheelStatusPane status={agentStatus()} unreachable={false} nowMs={NOW} />);
+      expect(screen.getByTestId('flywheel-agentline-PAN-3964')).toHaveTextContent('work · claude-opus-5-5 · working');
+      expect(screen.getByTestId('flywheel-agentline-PAN-3920')).toHaveTextContent('review · gpt-5.5 · blocked');
+      expect(screen.queryByRole('region', { name: 'Live agents' })).toBeNull();
     });
 
-    it('navigates to the issue from an agent row (ac2)', () => {
+    it('navigates to the issue from the card that shows the agent (ac2)', () => {
       const onNavigateIssue = vi.fn();
-      render(
-        <FlywheelStatusPane status={flywheelStatus({ agents: [AGENTS[1]!] })} unreachable={false} nowMs={NOW} onNavigateIssue={onNavigateIssue} />,
-      );
-      const row = screen.getByTestId('flywheel-agent-PAN-3920-review');
-      fireEvent.click(row.querySelector('button')!);
+      render(<FlywheelStatusPane status={agentStatus()} unreachable={false} nowMs={NOW} onNavigateIssue={onNavigateIssue} />);
+      fireEvent.click(screen.getByTestId('flywheel-agentline-PAN-3920'));
       expect(onNavigateIssue).toHaveBeenCalledWith('PAN-3920');
     });
 
-    it('says so plainly when no pane is live (ac3)', () => {
-      render(<FlywheelStatusPane status={flywheelStatus({ agents: [] })} unreachable={false} nowMs={NOW} />);
-      expect(screen.getByText('No agent panes are live for these issues.')).toBeInTheDocument();
+    it('says so plainly when nothing drives a card (ac3)', () => {
+      const base = flywheelStatus();
+      render(<FlywheelStatusPane status={flywheelStatus({ inFlight: [{ ...base.inFlight[1]!, agent: null }] })} unreachable={false} nowMs={NOW} />);
+      expect(screen.getByTestId('flywheel-agentline-PAN-3920')).toHaveTextContent('no agent');
+    });
+  });
+
+  describe('board composition (PAN-5283 WI-16)', () => {
+    it('renders the health strip and the shipped-today timeline only when the route sent them', () => {
+      const health = {
+        mainCi: null, deployed: null, gateQueue: { running: 0, queued: 0, slots: 2, oldestWaitSince: null },
+        nextBatch: null, batchingPausedUntil: null, lastRelease: null,
+      };
+      const { unmount } = render(<FlywheelStatusPane status={flywheelStatus()} unreachable={false} nowMs={NOW} />);
+      expect(screen.queryByTestId('flywheel-health-strip')).toBeNull();
+      expect(screen.queryByTestId('flywheel-shipped-today')).toBeNull();
+      unmount();
+      render(<FlywheelStatusPane status={flywheelStatus({ health, shipped: { merges: [], events: [] } })} unreachable={false} nowMs={NOW} />);
+      expect(screen.getByTestId('flywheel-health-strip')).toBeInTheDocument();
+      expect(screen.getByTestId('flywheel-shipped-today')).toHaveTextContent('Nothing shipped yet today.');
+      expect(screen.getByTestId('flywheel-lane-board')).toBeInTheDocument();
     });
   });
 
