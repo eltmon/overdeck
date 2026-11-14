@@ -77,6 +77,7 @@ vi.mock('../../../src/lib/github-credentials.js', async (importOriginal) => {
 import {
   GITHUB_API_TIMEOUT_MS,
   GitHubRequestTimeoutError,
+  createIssueWithApp,
   generateInstallationToken,
   getBotIdentity,
   getCiCheckRunsState,
@@ -986,5 +987,45 @@ describe('per-repository App tokens (PAN-5153)', () => {
     const error = await Effect.runPromise(Effect.flip(refreshWorkspaceToken('/workspaces/feature-x')));
     expect(error._tag).toBe('FsError');
     expect(error.message).toBe('refreshWorkspaceToken failed for /workspaces/feature-x: GitHub App is not installed on a/b');
+  });
+});
+
+describe('createIssueWithApp (PAN-5218)', () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function mintThen(response: Response) {
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'token', expires_at: '2026-06-10T00:00:00Z' }), { status: 201 }))
+      .mockResolvedValueOnce(response);
+  }
+
+  it('POSTs the title and body to the repository issues endpoint and returns number and url', async () => {
+    mintThen(new Response(JSON.stringify({ number: 77, html_url: 'https://github.com/o/r/issues/77' }), { status: 201 }));
+
+    await expect(createIssueWithApp('o', 'r', { title: 'T', body: 'B' }))
+      .resolves.toEqual({ number: 77, url: 'https://github.com/o/r/issues/77' });
+
+    const calls = fetchMock.mock.calls.filter((call) => String(call[0]) === 'https://api.github.com/repos/o/r/issues');
+    expect(calls).toHaveLength(1);
+    const init = calls[0]![1] as RequestInit;
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual({ title: 'T', body: 'B' });
+  });
+
+  it('rejects a 403 with a message isIntegrationPermissionError recognises', async () => {
+    mintThen(new Response('Resource not accessible by integration', { status: 403 }));
+
+    const error = await createIssueWithApp('o', 'r', { title: 'T', body: 'B' }).catch((err: unknown) => err);
+    expect(error).toBeInstanceOf(Error);
+    expect(isIntegrationPermissionError((error as Error).message)).toBe(true);
   });
 });
