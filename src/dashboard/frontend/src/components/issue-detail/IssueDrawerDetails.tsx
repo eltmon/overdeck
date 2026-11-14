@@ -27,10 +27,16 @@ import { ActiveAgentPanel } from '../issue-view/ActiveAgentPanel';
 import { usePipelineRail } from '../issue-view/IssuePipelineStrip';
 import { UatEnvironmentPanel } from '../CommandDeck/UatEnvironmentPanel';
 import { useIssueActions } from '../IssueActionMenu/useIssueActions';
-import { useIssueCostsQuery } from '../CommandDeck/ZoneCOverviewTabs/queries';
+import { useIssueCostsQuery, usePrQuery } from '../CommandDeck/ZoneCOverviewTabs/queries';
 import { CostsTab } from '../CommandDeck/ZoneCOverviewTabs/CostsTab';
 import { StatusNarrative } from '../Stage/cockpit/StatusNarrative';
+import { LinkedConversations } from '../Stage/cockpit/LinkedConversations';
 import { DeftSubagentRows } from '../deft/DeftSubagentRows';
+import { DeftGatesPanel } from '../deft/DeftGatesPanel';
+import { DeftReviewCyclePanel } from '../deft/DeftReviewCyclePanel';
+import { DeftDeliveryChip } from '../deft/DeftBadges';
+import { deriveShip } from '../issue-view/derivations';
+import { ShipProgress } from '../issue-view/ShipProgress';
 import { ROLE_TO_PHASE, pickPhaseAgent } from './IssuePhaseRail';
 import { agentsToReviewerSessions, deriveSpecialistChips } from './deriveSpecialists';
 import { PickupSection, ResourcesFacet, WorkspaceSection, useDrawerWorkspace } from './IssueDetailSections';
@@ -180,6 +186,8 @@ export function IssueDrawerDetails({
     .filter((entry) => entry.agentId === agentId || entry.sessionId === agentId)
     .reduce((sum, entry) => sum + (entry.cost ?? 0), 0);
   const totalCost = costsData?.resolvedTotalCost ?? costsData?.totalCost ?? 0;
+  const pr = usePrQuery(issueId).data?.pr ?? null;
+  const mergeOid = typeof pr?.mergeCommit === 'string' ? pr.mergeCommit : pr?.mergeCommit?.oid;
 
   return (
     <div data-testid="drawer-tab-panel-overview" className="@container">
@@ -274,6 +282,25 @@ export function IssueDrawerDetails({
             })
           )}
         </section>
+
+        <DeftGatesPanel issueId={issueId} />
+        <DeftReviewCyclePanel issueId={issueId} />
+
+        <section data-testid="drawer-details-ship">
+          <h3 className={HEADING_CLASS}>Ship</h3>
+          <ShipProgress ship={deriveShip(derived)} />
+          {pr ? (
+            <p data-testid="drawer-details-diff" className="mt-[6px] text-[12px] text-muted-foreground">
+              <span className="text-success-foreground">+{pr.additions}</span> <span className="text-destructive-foreground">−{pr.deletions}</span> · {pr.changedFiles} file{pr.changedFiles === 1 ? '' : 's'}
+              {mergeOid ? <> · merged as <span className="font-mono-ui text-foreground">{mergeOid}</span></> : null}
+            </p>
+          ) : null}
+          <DeftDeliveryChip issueId={issueId} />
+        </section>
+
+        {derived?.pr?.url ? (
+          <div data-testid="drawer-details-linked"><LinkedConversations prUrl={derived.pr.url} /></div>
+        ) : null}
 
         <section data-section="DrawerActivityRail / DrawerActivityPanel" data-testid="drawer-details-activity">
           <h3 className={HEADING_CLASS}>Live activity</h3>

@@ -25,12 +25,20 @@ vi.mock('../../lib/useSharedTick', () => ({
   useSharedTick: (...args: unknown[]) => useSharedTickMock(...args),
 }));
 const useIssueCostsQueryMock = vi.fn(() => ({ data: undefined }));
+const usePrQueryMock = vi.fn(() => ({ data: undefined }));
 vi.mock('../CommandDeck/ZoneCOverviewTabs/queries', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../CommandDeck/ZoneCOverviewTabs/queries')>()),
   useIssueCostsQuery: (...args: unknown[]) => useIssueCostsQueryMock(...args),
+  usePrQuery: (...args: unknown[]) => usePrQueryMock(...args),
 }));
 vi.mock('../CommandDeck/ZoneCOverviewTabs/CostsTab', () => ({ CostsTab: () => <div data-testid="mock-costs-tab" /> }));
 vi.mock('../deft/DeftSubagentRows', () => ({ DeftSubagentRows: () => null }));
+vi.mock('../deft/DeftGatesPanel', () => ({ DeftGatesPanel: () => null }));
+vi.mock('../deft/DeftReviewCyclePanel', () => ({ DeftReviewCyclePanel: () => null }));
+vi.mock('../deft/DeftBadges', () => ({ DeftDeliveryChip: () => null }));
+vi.mock('../Stage/cockpit/LinkedConversations', () => ({
+  LinkedConversations: ({ prUrl }: { prUrl: string }) => <div data-testid="mock-linked-conversations">{prUrl}</div>,
+}));
 
 import type { Agent } from '../../types';
 import { useDashboardStore } from '../../lib/store';
@@ -79,6 +87,7 @@ beforeEach(() => {
   stubWorkspace({ exists: true, path: '/tmp/pan-1', containers: {} });
   useSharedTickMock.mockReturnValue(new Date('2026-05-22T00:00:00.000Z'));
   useIssueCostsQueryMock.mockReturnValue({ data: undefined });
+  usePrQueryMock.mockReturnValue({ data: undefined });
 });
 
 afterEach(() => {
@@ -195,6 +204,38 @@ describe('IssueDrawerDetails', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByTestId('drawer-details-costs')).toBeInTheDocument();
     expect(screen.getByTestId('mock-costs-tab')).toBeInTheDocument();
+  });
+
+  it('the Ship section renders the merge gate for a ready issue', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: { 'PAN-1': { issueId: 'PAN-1', state: 'ready' } },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderDetails();
+    const ship = screen.getByTestId('drawer-details-ship');
+    expect(ship.querySelector('[data-section="ship-progress-full"] [data-ship-status="ready"]')).toBeInTheDocument();
+  });
+
+  it('the Ship section shows the diff size and the merge commit', () => {
+    usePrQueryMock.mockReturnValue({
+      data: { issueId: 'PAN-1', pr: { additions: 12, deletions: 3, changedFiles: 1, mergeCommit: { oid: 'abc1234' } } },
+    });
+    renderDetails();
+    expect(screen.getByTestId('drawer-details-diff')).toHaveTextContent('+12 −3 · 1 file · merged as abc1234');
+  });
+
+  it('renders no linked conversations without a pull request', () => {
+    renderDetails();
+    expect(screen.queryByTestId('drawer-details-linked')).not.toBeInTheDocument();
+  });
+
+  it('renders linked conversations with the pull request url', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: {
+        'PAN-1': { issueId: 'PAN-1', state: 'in-review', pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'review-requested', checks: 'green', mergeable: true } },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderDetails();
+    expect(screen.getByTestId('drawer-details-linked')).toHaveTextContent('https://example.test/pr/1');
   });
 
   it('a phase without an agent shows no Open conversation button', () => {
