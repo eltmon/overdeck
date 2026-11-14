@@ -12,6 +12,7 @@ const execFileAsync = promisify(execFile);
 import { clearAgentPaused, clearAgentTroubled, getAgentState, spawnAgent } from '../../lib/agents.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
 import { attachHintLines, resolveAttach } from '../../lib/terminal-backends/attach-hint.js';
+import { AgentAlreadyRunningError } from '../../lib/agents/start-claim.js';
 import { resolveCliStartedBy } from '../../lib/agents/provenance.js';
 import { ensureInternalToken, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { describeConflictingWorkAgents } from '../../lib/work-agent-conflicts.js';
@@ -282,6 +283,31 @@ export async function fetchIssueForAutoStart(issueId: string): Promise<AutoSynth
 }
 
 /** PAN-4211: `--force` clears the troubled gate the way dashboard `clearGates` does. */
+/**
+ * PAN-5243: another start owns this agent (a start claim mid-launch, or a live
+ * pane whose record is starting or running). Report the winner, touch nothing,
+ * exit 0 — callers such as the dashboard's planning auto-handoff and the
+ * Flywheel read that as "agent is live", never as spawn-failed. False for any
+ * other error, and for a leftover pane on a stopped record, which stays exit 1.
+ */
+export async function reportLostStartRace(error: unknown, id: string, agentId: string, spinner: Pick<Ora, 'info'>): Promise<boolean> {
+  if (!(error instanceof AgentAlreadyRunningError)) return false;
+  const state = getAgentState(agentId);
+  if (error.phase === 'running' && state?.status !== 'running' && state?.status !== 'starting') return false;
+  spinner.info(error.message);
+  await printAlreadyRunningHints(id, state ?? { id: agentId });
+  return true;
+}
+
+/** The "already running" hints: the live pane, how to message it, how to attach (PAN-5243). Exits 0. */
+async function printAlreadyRunningHints(id: string, state: Parameters<typeof resolveAttach>[0] & { paneId?: string }): Promise<void> {
+  console.log('');
+  if (state.paneId) console.log(chalk.dim('Pane:    '), chalk.cyan(state.paneId));
+  console.log(chalk.dim('Message it:'), chalk.cyan(`pan tell ${id} "..."`));
+  console.log(chalk.dim('Attach:  '), chalk.cyan((await resolveAttach(state)).command));
+  process.exitCode = 0;
+}
+
 async function clearTroubledForForce(agentId: string, issueId: string): Promise<void> {
   await Effect.runPromise(clearAgentTroubled(agentId));
   await appendOperatorInterventionEvent({ issueId, kind: 'untroubled', source: 'pan start --force' });
@@ -597,10 +623,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   const swarmActive = resolveSwarmPolicy(id).mode === 'always';
   if (lifecycleState.isRunning && !lifecycleState.isRunningButStuck && !options.fresh) {
     console.log(chalk.green(`Work agent for ${id} is already running.`));
-    console.log('');
-    console.log(chalk.dim('Message it:'), chalk.cyan(`pan tell ${id} "..."`));
-    console.log(chalk.dim('Attach:  '), chalk.cyan((await resolveAttach(existingAgentState ?? { id: agentId })).command));
-    process.exitCode = 0;
+    await printAlreadyRunningHints(id, existingAgentState ?? { id: agentId });
     return;
   }
   const conflict = await describeConflictingWorkAgents(id, agentId, { ignoreRegisteredSlots: swarmActive });
@@ -1056,6 +1079,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     console.log(`  Kill:     pan kill ${id}`);
 
   } catch (error: any) {
+    if (await reportLostStartRace(error, id, agentId, spinner)) return;
     spinner.fail(error.message);
     return exitCli(1);
   }

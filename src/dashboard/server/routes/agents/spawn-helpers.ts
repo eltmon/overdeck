@@ -51,9 +51,12 @@ type SpawnPanCommand = (args: string[], cwd?: string) => Promise<string>;
  * (FR-24: agent state is written only after the tmux session exists — there
  * are no placeholders). The route claims before `spawnPanCommand` and
  * releases in `finally`; a dashboard restart clears the set, which is
- * correct — a restart also kills the detached child. The residual
- * launch-to-session window is covered by the CLI's own guard (spawnAgent
- * throws on a duplicate tmux session name).
+ * correct — a restart also kills the detached child. This set only covers
+ * starts made through this dashboard process. The cross-process gate is the
+ * agent-dir start claim `spawnAgent` takes (`src/lib/agents/start-claim.ts`,
+ * PAN-5243): a CLI `pan start` and the route's `pan start --local` child both
+ * take it, so a second start reports "already running" and exits 0 instead
+ * of launching a duplicate pane.
  */
 const startsInFlight = new Set<string>();
 
