@@ -123,6 +123,32 @@ describe('MessagesTimeline — search', () => {
     expect(retry).toHaveBeenCalledWith('not-delivered', 'BTW How can I launch Orca?');
   });
 
+  it('renders Cancelled with Resend for a cancelled entry (PAN-5237)', () => {
+    const retry = vi.fn();
+    render(<MessagesTimeline messages={[]} workLog={[]} streaming={false}
+      failedMessages={[
+        { id: 'cancelled', text: 'never mind', kind: 'prompt', createdAt: '', code: 'cancelled', deliveryUnknown: false, retryable: true },
+      ]} onRetryFailed={retry} />);
+    expect(screen.getByText('Cancelled')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Resend' }));
+    expect(retry).toHaveBeenCalledWith('cancelled', 'never mind');
+  });
+
+  it('offers Cancel on an offline-held entry and keeps Discard (PAN-5237)', async () => {
+    const { useComposerStore } = await import('../../../lib/composerStore');
+    const cancelHeldOffline = vi.spyOn(useComposerStore.getState(), 'cancelHeldOffline').mockImplementation(() => {});
+    try {
+      render(<MessagesTimeline messages={[]} workLog={[]} streaming={false}
+        failedMessages={[{ id: 'held', text: 'held ping', kind: 'prompt', createdAt: '', retryable: true, heldOffline: true }]} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(cancelHeldOffline).toHaveBeenCalledWith('held');
+      expect(screen.getByRole('button', { name: 'Discard' })).toBeInTheDocument();
+    } finally {
+      cancelHeldOffline.mockRestore();
+    }
+  });
+
   it('labels a held message and offers Retry only once the server is live (PAN-4279)', () => {
     const held = [{ id: 'held', text: 'held ping', kind: 'prompt' as const, createdAt: '', retryable: true, heldOffline: true }];
     useConnectionState.setState({ serverReachable: false, streamLive: false, restarting: false });
