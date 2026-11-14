@@ -14,9 +14,10 @@ vi.mock('../MobilePipeline', () => ({
   ),
 }));
 vi.mock('../MobileIssueSheet', () => ({
-  MobileIssueSheet: ({ issueId, onBack }: { issueId: string; onBack: () => void }) => (
+  MobileIssueSheet: ({ issueId, event, onBack }: { issueId: string; event: { kind: string; at: string | null } | null; onBack: () => void }) => (
     <div>
       <h2>{`sheet ${issueId}`}</h2>
+      {event && <p data-testid="mobile-issue-event">{event.kind === 'stopped' ? 'Agent stopped responding' : event.kind}</p>}
       <button type="button" onClick={onBack}>Back</button>
     </div>
   ),
@@ -39,6 +40,26 @@ describe('readMobileRoute', () => {
     expect(readMobileRoute('', '/m/pipeline')).toEqual({ tab: 'pipeline', issueId: null, subjectId: null, conversationId: null });
     expect(readMobileRoute('?issue=PAN.1', '/m/pipeline/')).toEqual({ tab: 'pipeline', issueId: 'PAN.1', subjectId: null, conversationId: null });
     expect(readMobileRoute('?conversation=4', '/m/pipeline')).toEqual({ tab: 'pipeline', issueId: null, subjectId: null, conversationId: null });
+  });
+
+  it('reads the PAN-5219 event and at on a pipeline issue URL', () => {
+    expect(readMobileRoute('?issue=PAN-5&event=stopped&at=2026-11-13T19%3A43%3A00.000Z', '/m/pipeline')).toEqual({
+      tab: 'pipeline',
+      issueId: 'PAN-5',
+      subjectId: null,
+      conversationId: null,
+      issueEvent: { kind: 'stopped', at: '2026-11-13T19:43:00.000Z' },
+    });
+  });
+
+  it('drops an unknown event and ignores event on /m', () => {
+    expect(readMobileRoute('?issue=PAN-5&event=bogus', '/m/pipeline')).toEqual({
+      tab: 'pipeline',
+      issueId: 'PAN-5',
+      subjectId: null,
+      conversationId: null,
+    });
+    expect(readMobileRoute('?event=stopped')).toEqual({ tab: 'needs-you', subjectId: null, conversationId: null, issueId: null });
   });
 });
 
@@ -184,6 +205,26 @@ describe('MobileApp', () => {
     expect(window.location.pathname).toBe('/m/pipeline');
     expect(window.location.search).toBe('');
     expect(screen.getByRole('navigation', { name: 'Phone sections' })).toBeInTheDocument();
+  });
+
+  it('renders the What happened line for a notification URL with event and at', () => {
+    setSecureContext(false);
+    window.history.replaceState(null, '', '/m/pipeline?issue=PAN-5&event=stopped&at=2026-11-13T19%3A43%3A00.000Z');
+    render(<MobileApp />);
+
+    expect(screen.getByTestId('mobile-issue-event')).toHaveTextContent('Agent stopped responding');
+  });
+
+  it('tapping Back from a notification-opened sheet pushes /m/pipeline with no event or at', () => {
+    setSecureContext(false);
+    window.history.replaceState(null, '', '/m/pipeline?issue=PAN-5&event=stopped&at=2026-11-13T19%3A43%3A00.000Z');
+    render(<MobileApp />);
+
+    act(() => {
+      screen.getByRole('button', { name: 'Back' }).click();
+    });
+    expect(window.location.pathname).toBe('/m/pipeline');
+    expect(window.location.search).toBe('');
   });
 });
 
