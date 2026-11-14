@@ -18,7 +18,7 @@ import { chromium, type Browser, type BrowserContext, type Page } from 'playwrig
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
-import { createViteCacheDir, pdfjsAssetsAlias, removeViteCacheDir } from './fixtures/vite-harness.js';
+import { createRecordingLogger, createViteCacheDir, pdfjsAssetsAlias, removeViteCacheDir } from './fixtures/vite-harness.js';
 
 type ViteDevServer = {
   listen: () => Promise<void> | void;
@@ -113,6 +113,7 @@ async function ensureFrontendNodeModules(): Promise<void> {
 }
 
 const renderPoll = { timeout: 20_000, interval: 100 };
+const viteLog: string[] = [];
 const now = '2026-09-18T00:00:00.000Z';
 const ISSUE = 'PAN-9101';
 
@@ -216,13 +217,32 @@ async function newContext(): Promise<BrowserContext> {
   return context;
 }
 
-async function openCockpit(): Promise<{ context: BrowserContext; page: Page; pageErrors: string[] }> {
+async function openCockpit(): Promise<{ context: BrowserContext; page: Page; pageErrors: string[]; failures: string[] }> {
   const context = await newContext();
   const page = await context.newPage();
   const pageErrors: string[] = [];
+  const failures: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('response', (response) => { if (response.status() >= 400) failures.push(`${response.status()} ${response.url()}`); });
+  page.on('requestfailed', (request) => failures.push(`failed ${request.url()} (${request.failure()?.errorText ?? 'unknown'})`));
   await page.goto(`${baseUrl}/command-deck/overdeck/${ISSUE}`);
-  return { context, page, pageErrors };
+  return { context, page, pageErrors, failures };
+}
+
+/** Wait for the Details tab; on timeout, fail with what the page and Vite saw (PAN-5298). */
+async function waitForDetailsTab(page: Page, failures: string[], pageErrors: string[]): Promise<void> {
+  const detailsTab = page.locator('[data-testid="drawer-tab-overview"]');
+  try {
+    await expect.poll(() => detailsTab.count(), renderPoll).toBe(1);
+  } catch (error) {
+    const section = (title: string, lines: string[]) => `${title} (${lines.length}):\n${lines.join('\n') || '  none'}`;
+    throw new Error([
+      'The Stage issue view never rendered its Details tab.',
+      section('Failed requests', failures),
+      section('Page errors', pageErrors),
+      section('Vite log, last 40 lines', viteLog.slice(-40)),
+    ].join('\n\n'), { cause: error });
+  }
 }
 
 beforeAll(async () => {
@@ -230,7 +250,10 @@ beforeAll(async () => {
   viteCacheDir = await createViteCacheDir(projectRoot, 'issue-tree');
   const vitePath = resolvePackage('vite');
   const reactPath = resolvePackage('@vitejs/plugin-react');
-  const { createServer } = await import(vitePath) as { createServer: (options: Record<string, unknown>) => Promise<ViteDevServer> };
+  const { createServer, createLogger } = await import(vitePath) as {
+    createServer: (options: Record<string, unknown>) => Promise<ViteDevServer>;
+    createLogger: Parameters<typeof createRecordingLogger>[0];
+  };
   const { default: react } = await import(reactPath) as { default: () => unknown };
   vite = await createServer({
     root: frontendRoot,
@@ -290,7 +313,8 @@ beforeAll(async () => {
       },
     }],
     server: { host: '127.0.0.1', port: 0, watch: null },
-    logLevel: 'error',
+    logLevel: 'info',
+    customLogger: createRecordingLogger(createLogger, viteLog),
   });
   await vite.listen();
   const address = vite.httpServer?.address() as AddressInfo;
@@ -308,12 +332,12 @@ afterAll(async () => {
 
 describe('the issue tree is the issue workspace', () => {
   it('renders a Herdr-spawned reviewer as the Review row with its model tag', async () => {
-    const { context, page, pageErrors } = await openCockpit();
+    const { context, page, pageErrors, failures } = await openCockpit();
     try {
       // Open Details by clicking its tab: nothing verifies that the Command
       // Deck's routing keeps a ?tab= query string until the frame mounts.
+      await waitForDetailsTab(page, failures, pageErrors);
       const detailsTab = page.locator('[data-testid="drawer-tab-overview"]');
-      await expect.poll(() => detailsTab.count(), renderPoll).toBe(1);
       await detailsTab.click();
       const table = page.locator('[data-testid="drawer-details-pipeline"]');
       await expect.poll(() => table.count(), renderPoll).toBe(1);
@@ -334,10 +358,10 @@ describe('the issue tree is the issue workspace', () => {
   }, 60_000);
 
   it('takes its rows from the pane inventory alone', async () => {
-    const { context, page } = await openCockpit();
+    const { context, page, pageErrors, failures } = await openCockpit();
     try {
+      await waitForDetailsTab(page, failures, pageErrors);
       const detailsTab = page.locator('[data-testid="drawer-tab-overview"]');
-      await expect.poll(() => detailsTab.count(), renderPoll).toBe(1);
       await detailsTab.click();
       const table = page.locator('[data-testid="drawer-details-pipeline"]');
       await expect.poll(() => table.count(), renderPoll).toBe(1);
