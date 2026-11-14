@@ -17,6 +17,7 @@ import {
   createConversation,
   getConversationByName,
   getSupervisedConversationByTmuxSession,
+  listIssueConversations,
   markConversationEnded,
   setClearedToConvId,
   markConversationRunning,
@@ -133,3 +134,29 @@ describe('getSupervisedConversationByTmuxSession — post-/clear siblings (PAN-3
 
 // ── AC3: reads/writes route through the two doors ────────────────────────────
 
+
+describe('listIssueConversations (PAN-5271)', () => {
+  let odb: OverdeckTestDb;
+
+  beforeEach(() => {
+    odb = setupOverdeckTestDb();
+  }, 15_000);
+
+  afterEach(() => {
+    teardownOverdeckTestDb(odb);
+  });
+
+  it('returns the unarchived operator conversations for the issue and skips agent and lane rows', () => {
+    createConversation({ name: 'hoff-a', tmuxSession: 'conv-hoff-a', cwd: '/tmp', issueId: 'PAN-5269' });
+    createConversation({ name: 'hoff-old', tmuxSession: 'conv-hoff-old', cwd: '/tmp', issueId: 'PAN-5269' });
+    archiveConversation('hoff-old');
+    createConversation({ name: 'agent-pan-5269-review', tmuxSession: 'agent-pan-5269-review', cwd: '/tmp', issueId: 'PAN-5269' });
+    createConversation({
+      name: 'hoff-critic', tmuxSession: 'conv-hoff-critic', cwd: '/tmp', issueId: 'PAN-5269',
+      parentName: 'hoff-a', lane: { run: 'run-1', key: 'critic', role: 'critic' },
+    });
+    createConversation({ name: 'other-issue', tmuxSession: 'conv-other-issue', cwd: '/tmp', issueId: 'PAN-1' });
+
+    expect(listIssueConversations('pan-5269').map(c => c.name)).toEqual(['hoff-a']);
+  });
+});

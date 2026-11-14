@@ -15,8 +15,9 @@
  * - One delivery per review: the key is the review id, checked against the
  *   journal (`feedback.delivered`, kind `coderabbit`) and against relays still
  *   running in this process, since GitHub can deliver one event twice.
- * - No reachable agent (an adopted PR has none), or a delivery that is not
- *   accepted, raises Needs-you with the feedback file and journals
+ * - No reachable agent (an adopted PR has none unless its handoff conversation
+ *   is live, PAN-5271), or a delivery that is not accepted, raises Needs-you
+ *   with the feedback file and journals
  *   `feedback.undelivered` (PAN-5218).
  * - Both journal entries carry the PR, the review and every thread, so a
  *   post-merge follow-up can quote them (`advisory-followup.ts`, PAN-5218).
