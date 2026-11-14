@@ -97,3 +97,26 @@ describe('performWorkspaceCreate — branch provenance (PAN-3847)', () => {
     warn.mockRestore();
   });
 });
+
+describe('performWorkspaceCreate — origin forwarding (PAN-5233 D-2)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.execFile.mockReturnValue({ stdout: '', stderr: '' });
+    mocks.listProjectsAsync.mockResolvedValue([
+      { key: 'overdeck', config: { path: '/project' } },
+    ]);
+    mocks.createWorkspace.mockResolvedValue({ id: 'ws-1' });
+  });
+
+  it('forwards options.origin to createWorkspace', async () => {
+    await performWorkspaceCreate(intent(), { origin: 'vault' });
+
+    expect(mocks.createWorkspace).toHaveBeenCalledWith(expect.objectContaining({ origin: 'vault' }));
+  });
+
+  it('passes origin undefined when no options are given', async () => {
+    await performWorkspaceCreate(intent());
+
+    expect(mocks.createWorkspace).toHaveBeenCalledWith(expect.objectContaining({ origin: undefined }));
+  });
+});

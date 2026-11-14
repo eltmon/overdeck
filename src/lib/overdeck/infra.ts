@@ -403,6 +403,7 @@ function ensureWorkspaceTablesSync(db: SqliteDatabase): void {
       \`id\` text PRIMARY KEY NOT NULL,
       \`project_id\` text NOT NULL,
       \`kind\` text NOT NULL,
+      \`origin\` text,
       \`name\` text NOT NULL,
       \`path\` text NOT NULL,
       \`branch_name\` text,
@@ -456,6 +457,26 @@ function ensureWorkspaceTablesSync(db: SqliteDatabase): void {
   // rather than a key inside layout_config, which react-resizable-panels owns
   // and rewrites wholesale on every panel drag.
   runSchemaTopUp(db, 'ALTER TABLE `workspaces` ADD COLUMN `run_command` text');
+
+  // PAN-5233: who caused the row to exist (operator | pipeline | vault | agent).
+  // Not derivable later, so it is stored. The backfill is idempotent and cheap
+  // after the first open (WHERE origin IS NULL matches nothing).
+  runSchemaTopUp(db, 'ALTER TABLE `workspaces` ADD COLUMN `origin` text');
+  try {
+    db.exec(`
+      UPDATE workspaces SET origin = CASE
+        WHEN kind = 'issue' THEN 'pipeline'
+        WHEN kind = 'main' THEN 'operator'
+        WHEN kind = 'scratch'
+          AND (name GLOB 'vault-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'
+            OR name GLOB 'vault-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[2-9]') THEN 'vault'
+        ELSE 'operator'
+      END
+      WHERE origin IS NULL
+    `);
+  } catch (error) {
+    console.error(`[schema] workspaces.origin backfill failed\n${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 /**

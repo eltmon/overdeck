@@ -30,7 +30,7 @@ function fakeRequest(credential = true) {
 
 function deps(branch: string, opts: { missing?: boolean } = {}): EditWorkspacePrDeps {
   const row: WorkspaceRow = {
-    id: 'w1', projectId: 'p', kind: 'scratch', name: branch.replace(/^scratch\//, ''), path: PATH, branchName: branch,
+    id: 'w1', projectId: 'p', kind: 'scratch', origin: 'operator', name: branch.replace(/^scratch\//, ''), path: PATH, branchName: branch,
     parentBranch: 'main', parentBranchGuessed: false, isGitRepository: true, issueId: null, layoutConfig: null,
     runCommand: null, isFavorite: false, isArchived: false, title: null, createdAt: 1, lastAccessedAt: 1,
   };

@@ -24,6 +24,7 @@ import { clearParentBranchCache } from '../../../src/lib/workspaces/create.js';
 
 vi.mock('../../../src/dashboard/server/routes/dashboard-auth.js', () => ({
   rejectUnsafeDashboardMutationRequest: () => null,
+  resolveRequestCredential: () => null,
 }));
 
 import { workspaceRegistryRouteLayer } from '../../../src/dashboard/server/routes/workspace-registry.js';

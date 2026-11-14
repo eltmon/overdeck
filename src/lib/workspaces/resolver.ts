@@ -9,10 +9,18 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { getOverdeckDatabase } from '../overdeck/infra.js';
-import type { PinnedDocRow, PinScope, ProjectRow, ProjectTargetRow, WorkspaceKind, WorkspaceRow } from './types.js';
+import type {
+  PinnedDocRow,
+  PinScope,
+  ProjectRow,
+  ProjectTargetRow,
+  WorkspaceKind,
+  WorkspaceOrigin,
+  WorkspaceRow,
+} from './types.js';
 
 const PROJECT_COLUMNS = `id, name, primary_path, created_at, last_accessed_at, is_system`;
-const WORKSPACE_COLUMNS = `id, project_id, kind, name, path, branch_name, parent_branch,
+const WORKSPACE_COLUMNS = `id, project_id, kind, origin, name, path, branch_name, parent_branch,
   parent_branch_guessed, is_git_repository, issue_id, layout_config, run_command, is_favorite,
   is_archived, title, created_at, last_accessed_at`;
 const PROJECT_TARGET_COLUMNS = `project_id, path, is_primary, created_at, last_used_at`;
@@ -34,6 +42,7 @@ function rowToWorkspace(row: Record<string, unknown>): WorkspaceRow {
     id: row['id'] as string,
     projectId: row['project_id'] as string,
     kind: row['kind'] as WorkspaceKind,
+    origin: (row['origin'] as WorkspaceOrigin | null) ?? (row['kind'] === 'issue' ? 'pipeline' : 'operator'),
     name: row['name'] as string,
     path: row['path'] as string,
     branchName: (row['branch_name'] as string | null) ?? null,

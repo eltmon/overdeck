@@ -26,6 +26,7 @@ const routeMocks = vi.hoisted(() => ({
   readCurrentStatus: vi.fn(),
   readRecentObservations: vi.fn(),
   rejectUnsafeDashboardMutationRequest: vi.fn(),
+  resolveRequestCredential: vi.fn(),
   resolveWorkspaceCreateIntent: vi.fn(),
   performWorkspaceCreate: vi.fn(),
 }));
@@ -63,9 +64,10 @@ vi.mock('../../../src/lib/memory/rollup.js', () => ({
 
 vi.mock('../../../src/dashboard/server/routes/dashboard-auth.js', () => ({
   rejectUnsafeDashboardMutationRequest: routeMocks.rejectUnsafeDashboardMutationRequest,
+  resolveRequestCredential: routeMocks.resolveRequestCredential,
 }));
 
-import { workspaceRegistryRouteLayer } from '../../../src/dashboard/server/routes/workspace-registry.js';
+import { workspaceOriginForCredential, workspaceRegistryRouteLayer } from '../../../src/dashboard/server/routes/workspace-registry.js';
 
 interface RouteResult {
   status: number;
@@ -97,6 +99,7 @@ function baseWorkspace(overrides: Partial<WorkspaceRow> = {}): WorkspaceRow {
     id: 'ws-1',
     projectId: 'overdeck',
     kind: 'scratch',
+    origin: 'operator',
     name: 'scratch-lens',
     path: '/repo/scratch-lens',
     branchName: null,
@@ -136,6 +139,7 @@ function resolvedIntent(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   for (const mock of Object.values(routeMocks)) mock.mockReset();
   routeMocks.rejectUnsafeDashboardMutationRequest.mockReturnValue(null);
+  routeMocks.resolveRequestCredential.mockReturnValue(null);
   routeMocks.readCurrentStatus.mockResolvedValue(undefined);
   routeMocks.readRecentObservations.mockResolvedValue([]);
   routeMocks.resolveWorkspaceCreateIntent.mockResolvedValue(resolvedIntent());
@@ -229,7 +233,7 @@ describe('POST /api/workspace-registry (AC-3)', () => {
 
     expect(result.status).toBe(201);
     expect(result.body).toEqual({ id: 'ws-new' });
-    expect(routeMocks.performWorkspaceCreate).toHaveBeenCalledWith(resolvedIntent());
+    expect(routeMocks.performWorkspaceCreate).toHaveBeenCalledWith(resolvedIntent(), { origin: 'operator' });
   });
 
   it('returns 422 carrying the findings array verbatim, and creates nothing', async () => {
@@ -255,7 +259,7 @@ describe('POST /api/workspace-registry (AC-3)', () => {
       findings: [],
     });
 
-    expect(routeMocks.performWorkspaceCreate).toHaveBeenCalledWith(resolvedIntent());
+    expect(routeMocks.performWorkspaceCreate).toHaveBeenCalledWith(resolvedIntent(), { origin: 'operator' });
   });
 
   it('routes bootstrapMain to a main-kind intent', async () => {
@@ -264,6 +268,47 @@ describe('POST /api/workspace-registry (AC-3)', () => {
     expect(routeMocks.resolveWorkspaceCreateIntent).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'main', projectKey: 'overdeck' }),
     );
+  });
+
+  it('a connector credential forces origin agent even when the body claims operator (PAN-5233 FR-5)', async () => {
+    routeMocks.resolveRequestCredential.mockReturnValue({ kind: 'connector', tokenId: 't', clientId: 'c', connectorKey: 'k', scopes: [] });
+
+    await call('POST', '/api/workspace-registry', { project: 'overdeck', name: 'lens', origin: 'operator' });
+
+    expect(routeMocks.performWorkspaceCreate).toHaveBeenCalledWith(resolvedIntent(), { origin: 'agent' });
+  });
+
+  it('a root-session credential resolves origin operator (PAN-5233 FR-5)', async () => {
+    routeMocks.resolveRequestCredential.mockReturnValue({ kind: 'root-session' });
+
+    await call('POST', '/api/workspace-registry', { project: 'overdeck', name: 'lens' });
+
+    expect(routeMocks.performWorkspaceCreate).toHaveBeenCalledWith(resolvedIntent(), { origin: 'operator' });
+  });
+});
+
+describe('workspaceOriginForCredential (PAN-5233 D-3)', () => {
+  it.each([
+    ['root-session', { kind: 'root-session' as const }, 'operator'],
+    ['device', { kind: 'device' as const, deviceId: 'd', scopes: [] }, 'operator'],
+    ['phone', { kind: 'phone' as const, tokenId: 't', clientId: 'c', phoneKey: 'k', scopes: [] }, 'operator'],
+    ['token without agentId', { kind: 'token' as const, tokenId: 't', scopes: [] }, 'operator'],
+    ['token with agentId', { kind: 'token' as const, tokenId: 't', scopes: [], agentId: 'agent-1' }, 'agent'],
+    [
+      'machine with actor operator',
+      { kind: 'machine' as const, tokenId: 't', environmentId: 'e', scopes: [], actor: 'operator' as const, access: {} as never },
+      'operator',
+    ],
+    [
+      'machine with actor agentId',
+      { kind: 'machine' as const, tokenId: 't', environmentId: 'e', scopes: [], actor: { agentId: 'agent-1' }, access: {} as never },
+      'agent',
+    ],
+    ['internal-token', { kind: 'internal-token' as const }, 'agent'],
+    ['connector', { kind: 'connector' as const, tokenId: 't', clientId: 'c', connectorKey: 'k', scopes: [] }, 'agent'],
+    ['null (unreachable past the mutation guard)', null, 'operator'],
+  ])('%s -> %s', (_label, credential, expected) => {
+    expect(workspaceOriginForCredential(credential)).toBe(expected);
   });
 });
 
