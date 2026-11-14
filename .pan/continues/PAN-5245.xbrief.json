@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5245",
   "created": "2026-11-14T05:12:59.498Z",
-  "updated": "2026-11-14T05:18:06.694Z",
+  "updated": "2026-11-14T05:26:04.667Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,30 @@
       "doneAt": "2026-11-14T05:17:56.324Z"
     },
     "level-switch-control": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5245",
-      "claimedAt": "2026-11-14T05:18:06.694Z"
+      "claimedAt": "2026-11-14T05:18:06.694Z",
+      "doneAt": "2026-11-14T05:26:04.667Z"
+    },
+    "level-switch-control.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:26:04.667Z"
+    },
+    "level-switch-control.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:26:04.667Z"
+    },
+    "level-switch-control.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:26:04.667Z"
+    },
+    "level-switch-control.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:26:04.667Z"
+    },
+    "level-switch-control.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:26:04.667Z"
     }
   }
 }
