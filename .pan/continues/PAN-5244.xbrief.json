@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5244",
   "created": "2026-11-14T05:28:55.884Z",
-  "updated": "2026-11-14T06:51:12.608Z",
+  "updated": "2026-11-14T06:51:44.638Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -376,6 +376,11 @@
     "drawer-header-row.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T06:51:12.608Z"
+    },
+    "remove-console-start-block": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T06:51:44.637Z"
     }
   }
 }
