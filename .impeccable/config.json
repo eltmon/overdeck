@@ -46,6 +46,15 @@
         ],
         "createdAt": "2026-11-14T17:58:54.623Z",
         "reason": "Claude: flagged elements are compact inline badges, keycaps and counters in a data-dense developer UI, matching the Overdeck style guide's badge pattern; throwaway mockup in gitignored .tmp"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          ".tmp/overdeck-workflow-mockup-v2.html"
+        ],
+        "createdAt": "2026-11-14T18:40:59.115Z",
+        "reason": "Claude: compact inline tags, keycaps and counters in a data-dense developer UI, matching the style guide's badge pattern; throwaway mockup"
       }
     ]
   }
