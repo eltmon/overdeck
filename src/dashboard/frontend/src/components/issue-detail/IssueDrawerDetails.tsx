@@ -9,12 +9,15 @@
  * It must not import `drawer/DrawerAgentSession` or `IssueDetailShell`.
  */
 import { ChevronRight } from 'lucide-react';
+import { presenceForPaneState, type BackendPane } from '@overdeck/contracts';
 
 import type { Agent } from '../../types';
 import { PHASES, phaseLabel, type Phase, type PhaseStepState } from '../../lib/simple/phases';
 import { isEndedAgent } from '../../lib/agentConversation';
 import { useAgentSessionOutcome } from '../../lib/useSessionOutcome';
 import { SESSION_ENDED_FALLBACK } from '../../lib/sessionOutcome';
+import { useBackendPanes } from '../../lib/store';
+import { useSharedTick } from '../../lib/useSharedTick';
 import { useIssueData } from '../drawer/useDrawerData';
 import { DrawerActivityRailView } from '../drawer/DrawerActivityRail';
 import { VerificationGates } from '../issue-view/VerificationGates';
@@ -23,7 +26,7 @@ import { usePipelineRail } from '../issue-view/IssuePipelineStrip';
 import { UatEnvironmentPanel } from '../CommandDeck/UatEnvironmentPanel';
 import { useIssueActions } from '../IssueActionMenu/useIssueActions';
 import { StatusNarrative } from '../Stage/cockpit/StatusNarrative';
-import { pickPhaseAgent } from './IssuePhaseRail';
+import { ROLE_TO_PHASE, pickPhaseAgent } from './IssuePhaseRail';
 import { agentsToReviewerSessions, deriveSpecialistChips } from './deriveSpecialists';
 import { PickupSection, ResourcesFacet, WorkspaceSection, useDrawerWorkspace } from './IssueDetailSections';
 
@@ -63,32 +66,67 @@ function shortDate(value: string | null | undefined): string | null {
   return date.toLocaleDateString([], { month: '2-digit', day: '2-digit' });
 }
 
-function PipelineRow({ phase, state, agent, onOpenAgentConversation }: {
+const shortModel = (model: string | null | undefined): string => (model ?? '').replace(/^claude-/, '');
+
+function formatDuration(seconds: number | null): string | null {
+  if (seconds === null) return null;
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
+}
+
+/** The first pane for `phase`, preferring one that is still active (D-13). */
+function pickPhasePane(panes: readonly BackendPane[], phase: Phase): BackendPane | undefined {
+  const candidates = panes.filter((pane) => ROLE_TO_PHASE[pane.role] === phase && presenceForPaneState(pane.state) !== 'ended');
+  return candidates.find((pane) => presenceForPaneState(pane.state) === 'active') ?? candidates[0];
+}
+
+function PipelineRow({ phase, state, agent, pane, now, onOpenAgentConversation }: {
   phase: Phase;
   state: PhaseStepState;
   agent: Agent | undefined;
+  pane: BackendPane | undefined;
+  now: Date;
   onOpenAgentConversation: (agentId: string) => void;
 }) {
   // A hook, so each row is its own component.
   const outcome = useAgentSessionOutcome(agent ?? null);
   let outcomeText: string;
-  if (!agent) {
+  if (!agent && !pane) {
     outcomeText = noAgentOutcome(phase, state);
-  } else if (agent.paused === true) {
+  } else if (agent?.paused === true) {
     outcomeText = 'Paused';
-  } else if (!isEndedAgent(agent)) {
-    outcomeText = 'Running now';
-  } else {
+  } else if (agent && !isEndedAgent(agent)) {
+    const startedAt = Date.parse(agent.startedAt);
+    const duration = Number.isFinite(startedAt) ? formatDuration(Math.max(0, Math.floor((now.getTime() - startedAt) / 1000))) : null;
+    outcomeText = duration ? `Running now · ${duration}` : 'Running now';
+  } else if (agent) {
     const started = shortDate(agent.startedAt);
     outcomeText = `${(outcome ?? SESSION_ENDED_FALLBACK).label}${started ? ` · started ${started}` : ''}`;
+  } else {
+    outcomeText = presenceForPaneState(pane!.state) === 'active' ? 'Running now' : 'Idle';
   }
+
+  const model = agent?.model ?? pane?.model;
+  const harness = agent?.harness ?? agent?.runtime ?? pane?.harness;
+  const metaLine = agent || pane ? [shortModel(model), harness].filter(Boolean).join(' · ') : null;
+
   return (
     <tr data-phase={phase} className="border-t border-border">
       <td className="py-[7px] pr-[12px] font-medium">{phaseLabel(phase)}</td>
       <td className="py-[7px] pr-[12px]">
-        {agent
-          ? <span className="font-mono-ui text-[12px] text-body-foreground">{agent.id}</span>
-          : <span className="text-muted-foreground">none</span>}
+        {agent ? (
+          <span className="font-mono-ui text-[12px] text-body-foreground">{agent.id}</span>
+        ) : pane?.agentId ? (
+          <span className="font-mono-ui text-[12px] text-body-foreground">{pane.agentId}</span>
+        ) : pane ? (
+          <span className="text-muted-foreground">backend pane</span>
+        ) : (
+          <span className="text-muted-foreground">none</span>
+        )}
+        {metaLine ? <span className="block text-[11.5px] text-muted-foreground">{metaLine}</span> : null}
       </td>
       <td className="py-[7px] pr-[12px] text-muted-foreground">{outcomeText}</td>
       <td className="py-[7px] text-right">
@@ -119,6 +157,8 @@ export function IssueDrawerDetails({
   const { rail, derived } = usePipelineRail(issueId);
   const { activityRail } = useIssueData(issueId);
   const { data: workspace } = useDrawerWorkspace(issueId);
+  const panes = useBackendPanes(issueId);
+  const now = useSharedTick();
   const chips = deriveSpecialistChips(agentsToReviewerSessions(agents), derived);
   const reviewStarted = chips.some((chip) => chip.status !== 'queued');
   const hasPlan = useIssueActions(issueId).state.hasPlan;
@@ -146,6 +186,8 @@ export function IssueDrawerDetails({
                   phase={phase}
                   state={rail[phase]}
                   agent={pickPhaseAgent(agents, phase)}
+                  pane={pickPhasePane(panes, phase)}
+                  now={now}
                   onOpenAgentConversation={onOpenAgentConversation}
                 />
               ))}

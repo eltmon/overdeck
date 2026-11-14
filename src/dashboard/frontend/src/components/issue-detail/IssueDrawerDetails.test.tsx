@@ -20,6 +20,10 @@ vi.mock('../PanOpenInPicker', () => ({ PanOpenInPicker: () => <div /> }));
 vi.mock('../IssueActionMenu/useIssueActions', () => ({
   useIssueActions: () => ({ all: [], state: { hasPlan: true } }),
 }));
+const useSharedTickMock = vi.fn(() => new Date('2026-05-22T00:00:00.000Z'));
+vi.mock('../../lib/useSharedTick', () => ({
+  useSharedTick: (...args: unknown[]) => useSharedTickMock(...args),
+}));
 
 import type { Agent } from '../../types';
 import { useDashboardStore } from '../../lib/store';
@@ -66,6 +70,7 @@ function renderDetails(props: Partial<IssueDrawerDetailsProps> = {}) {
 
 beforeEach(() => {
   stubWorkspace({ exists: true, path: '/tmp/pan-1', containers: {} });
+  useSharedTickMock.mockReturnValue(new Date('2026-05-22T00:00:00.000Z'));
 });
 
 afterEach(() => {
@@ -76,6 +81,7 @@ afterEach(() => {
     detailedActivity: [],
     agentsById: {},
     derivedIssueStateByIssueId: {},
+    backendPanesById: {},
   } as Parameters<typeof useDashboardStore.setState>[0]);
 });
 
@@ -101,6 +107,45 @@ describe('IssueDrawerDetails', () => {
     expect(row).toHaveTextContent('Running now');
     fireEvent.click(screen.getByTestId('drawer-details-open-work'));
     expect(onOpenAgentConversation).toHaveBeenCalledWith('agent-pan-1');
+  });
+
+  it("a phase row shows the agent's model and harness", () => {
+    renderDetails({ agents: [agent({ id: 'agent-pan-1', role: 'work', model: 'claude-opus-5', harness: 'claude-code' })] });
+    const row = screen.getByTestId('drawer-details-pipeline').querySelector('tr[data-phase="work"]') as HTMLElement;
+    expect(row).toHaveTextContent('opus-5 · claude-code');
+  });
+
+  it("a phase with a live pane and no agent shows the pane's model and Running now, and no pane id", () => {
+    useDashboardStore.setState({
+      backendPanesById: {
+        'pane-review-1': { id: 'pane-review-1', issue: 'PAN-1', role: 'review', model: 'claude-opus-5', harness: 'claude-code', state: 'working' },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderDetails();
+    const row = screen.getByTestId('drawer-details-pipeline').querySelector('tr[data-phase="review"]') as HTMLElement;
+    expect(row).toHaveTextContent('opus-5');
+    expect(row).toHaveTextContent('Running now');
+    expect(document.body).not.toHaveTextContent('pane-review-1');
+    expect(screen.queryByTestId('drawer-details-open-review')).toBeNull();
+  });
+
+  it('an exited pane adds no row content', () => {
+    useDashboardStore.setState({
+      backendPanesById: {
+        'pane-review-1': { id: 'pane-review-1', issue: 'PAN-1', role: 'review', model: 'claude-opus-5', harness: 'claude-code', state: 'exited' },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderDetails();
+    const row = screen.getByTestId('drawer-details-pipeline').querySelector('tr[data-phase="review"]') as HTMLElement;
+    expect(row).toHaveTextContent('none');
+    expect(row).toHaveTextContent('Not started');
+  });
+
+  it('a live agent row shows its running duration', () => {
+    useSharedTickMock.mockReturnValue(new Date('2026-05-22T00:02:05.000Z'));
+    renderDetails({ agents: [agent({ id: 'agent-pan-1', role: 'work', startedAt: '2026-05-22T00:00:00.000Z' })] });
+    const row = screen.getByTestId('drawer-details-pipeline').querySelector('tr[data-phase="work"]') as HTMLElement;
+    expect(row).toHaveTextContent('Running now · 2m');
   });
 
   it('a phase without an agent shows no Open conversation button', () => {
