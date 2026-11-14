@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5246",
   "created": "2026-11-14T12:41:52.786Z",
-  "updated": "2026-11-14T13:06:07.104Z",
+  "updated": "2026-11-14T13:06:08.410Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,6 +136,11 @@
     "markers-tab-bodies.ac2": {
       "status": "completed",
       "doneAt": "2026-11-14T13:06:07.104Z"
+    },
+    "markers-details": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5246",
+      "claimedAt": "2026-11-14T13:06:08.409Z"
     }
   }
 }
