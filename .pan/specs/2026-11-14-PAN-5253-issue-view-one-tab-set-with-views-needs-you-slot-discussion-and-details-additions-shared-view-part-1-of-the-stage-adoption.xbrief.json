@@ -4,17 +4,17 @@
     "created": "2026-11-14T08:09:44Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5253: Issue view: one tab set with views, needs-you slot, Discussion, and Details additions (shared view, part 1 of the Stage adoption)",
-    "updated": "2026-11-14T08:17:48.919Z"
+    "updated": "2026-11-14T08:18:57.781Z"
   },
   "plan": {
     "id": "pan-5253",
     "title": "Issue view: one tab set with views, needs-you slot, Discussion, and Details additions (shared view, part 1 of the Stage adoption)",
-    "status": "proposed",
+    "status": "running",
     "uid": "0d5d7336-571f-42f3-9837-d54c768225fe",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T08:09:44Z",
-    "updated": "2026-11-14T08:17:48.919Z",
+    "updated": "2026-11-14T08:18:57.781Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5253",
@@ -1587,5 +1587,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
