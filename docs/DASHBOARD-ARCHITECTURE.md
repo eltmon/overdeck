@@ -708,7 +708,26 @@ door that does not exist; a real record read door would be a separate change.
   failed POST never blocks the ones behind it, and a queued prompt behind a `held` bubble
   is held too. A queued bubble's `createdAt` restarts when its POST starts, so queue time
   never counts toward `TURN_STALL_MS`. `/pan` commands, held-kickoff starts and
-  limit-reset schedules still block the composer until their round trip finishes. Before pasting, the
+  limit-reset schedules still block the composer until their round trip finishes.
+  **Cancel (PAN-5237).** A composer prompt or outbox retry bubble carries `sendPhase`
+  (`queued`, then `in-flight` once its POST starts) and shows **Cancel** while it reads
+  "Sending…". Cancel on a queued or `held` bubble works locally: the send is skipped when its
+  queue turn comes and is never POSTed. Cancel on an in-flight bubble calls
+  `POST /api/conversations/:name/message/cancel` with its `clientMessageId`; the server answers
+  `{ outcome }`. `cancelled` means nothing reached the agent: the receipt's delivery gate
+  refuses the handler's next `commit()` and the message POST answers 409 `code: 'cancelled'`.
+  `delivered` means the handler already passed its commit point (the bubble reads "Already
+  delivered, can't cancel"). `unknown` means the server has no receipt for that id yet: it writes
+  a tombstone that refuses a late POST, but the bubble reads "Couldn't confirm the cancel" and
+  offers Cancel again. The client never aborts a cancelled POST: the server has no
+  per-conversation lock, so an aborted request would let the next queued message start while
+  the cancelled handler may still be sending ensure-main keys to the same pane. The next POST
+  starts only after the cancelled one answers. An in-flight send to `/api/agents/:id/message`
+  has no receipts, so it can be cancelled only while queued or held. A cancelled message's text
+  goes back into the mounted composer when it is empty (blank text, no pending attachments or
+  citations; `useComposerRestoreTarget`); otherwise it stays in the outbox as **Cancelled**,
+  whose **Resend** sends it with a fresh `clientMessageId` as a normal message. An offline-held
+  outbox entry has **Cancel** too, which stops the reconnect send the same way. Before pasting, the
   composer route checks Claude Code's agent selector and switches input back to the main
   agent (PAN-4268); if that cannot be confirmed the route answers 409
   `input-target-not-main`, the toast shows the reason, and the message moves to the
@@ -1041,7 +1060,7 @@ agent selector to main (PAN-4268), because that switch's `Down`/`Enter` would an
 With a prompt up it pastes nothing and answers 409 `permission-pending`. A registry-only entry
 never holds a message: the hook is best-effort, so a lost clearing post must not block every
 send. The composer keeps the message as a `held` bubble ("Waiting: the agent needs a permission
-answer first", with Discard) and resends it once a feed read newer than the hold shows no
+answer first", with Cancel, which keeps the text) and resends it once a feed read newer than the hold shows no
 on-screen (`answerable`) `pendingPermission` for that conversation, with a fresh `clientMessageId`
 and no `retry` flag —
 the receipts cache holds the 409 under the old id. A second `permission-pending` holds it again.

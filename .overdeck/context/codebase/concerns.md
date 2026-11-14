@@ -400,6 +400,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   502, for the same `(name, clientMessageId)`. A resend after a
   `permission-pending` hold or a `not-delivered` failure must mint a fresh
   `clientMessageId` and send no `retry` flag, like the not-found Resend.
+  Receipts also hold the PAN-5237 cancel gate and tombstones: a cancel before
+  the handler's `commit()` answers `cancelled`, after it `delivered`, and for an
+  unseen id `unknown` (with a tombstone that refuses a late POST). The client
+  must never abort a POST it cancelled: the cancelled handler may still be
+  sending ensure-main keys, and the next queued POST would overlap them.
 - **Origin checks never authenticate** — `validateOriginHeaders` passes a GET
   (so every WebSocket upgrade) that carries no `Origin`/`Referer`. Credentials
   are `hasDashboardAuthHeaders` (session cookie or internal token); peer trust
