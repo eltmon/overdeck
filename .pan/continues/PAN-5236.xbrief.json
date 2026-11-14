@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5236",
   "created": "2026-11-14T04:12:49.397Z",
-  "updated": "2026-11-14T05:15:13.356Z",
+  "updated": "2026-11-14T05:15:18.562Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,11 @@
     "browser-spec.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T05:15:13.355Z"
+    },
+    "docs-and-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5236",
+      "claimedAt": "2026-11-14T05:15:18.561Z"
     }
   }
 }
