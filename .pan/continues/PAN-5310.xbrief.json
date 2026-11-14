@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5310",
   "created": "2026-11-14T22:39:01.503Z",
-  "updated": "2026-11-14T23:21:47.168Z",
+  "updated": "2026-11-14T23:21:54.835Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
     "cli-github-tracker-first.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T23:21:47.167Z"
+    },
+    "merged-pr-read-for-backfilled": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5310",
+      "claimedAt": "2026-11-14T23:21:54.835Z"
     }
   }
 }
