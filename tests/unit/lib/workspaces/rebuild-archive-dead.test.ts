@@ -8,6 +8,24 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const EACCES_PATH = '/pan-5233-eacces-path';
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  return {
+    ...actual,
+    stat: (path: string, ...rest: unknown[]) => {
+      if (path === EACCES_PATH) {
+        const error = new Error('EACCES: permission denied') as NodeJS.ErrnoException;
+        error.code = 'EACCES';
+        return Promise.reject(error);
+      }
+      return (actual.stat as (...args: unknown[]) => Promise<unknown>)(path, ...rest);
+    },
+  };
+});
+
 import { archiveDeadIssueWorkspaces } from '../../../../src/lib/workspaces/rebuild.js';
 import { archiveWorkspace, createWorkspace, upsertProjectFromConfig } from '../../../../src/lib/workspaces/writer.js';
 import { getWorkspaceById } from '../../../../src/lib/workspaces/resolver.js';
@@ -86,5 +104,14 @@ describe('archiveDeadIssueWorkspaces (PAN-5233 FR-10)', () => {
 
     expect(result.scanned).toBe(0);
     expect(result.archived).toBe(0);
+  });
+
+  it('rethrows a permission error from stat instead of treating it as absence (CodeRabbit)', async () => {
+    const guarded = await createWorkspace({
+      projectId: 'overdeck', kind: 'issue', name: 'feature-pan-guarded', path: EACCES_PATH, issueId: 'PAN-GUARDED', createdAt: NOW - 20 * 60 * 1000,
+    });
+
+    await expect(archiveDeadIssueWorkspaces({ now: NOW })).rejects.toThrow(/EACCES/);
+    expect(getWorkspaceById(guarded)?.isArchived).toBe(false);
   });
 });

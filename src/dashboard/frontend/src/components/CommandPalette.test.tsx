@@ -546,9 +546,9 @@ describe('CommandPalette workspaces switcher (PAN-1990)', () => {
   // row still present. The hiding behavior itself is covered in
   // workspace-rail-filter.test.tsx.
   const WORKSPACES = [
-    { id: 'ws-old', projectId: 'overdeck', kind: 'scratch', name: 'old-scratch', issueId: null, isFavorite: false, isArchived: false, title: null, lastAccessedAt: 100 },
-    { id: 'ws-fav', projectId: 'overdeck', kind: 'scratch', name: 'fav-scratch', issueId: null, isFavorite: true, isArchived: false, title: null, lastAccessedAt: 50 },
-    { id: 'ws-issue', projectId: 'overdeck', kind: 'issue', name: 'feature-pan-9001', issueId: 'PAN-9001', isFavorite: true, isArchived: false, title: null, lastAccessedAt: 200 },
+    { id: 'ws-old', projectId: 'overdeck', kind: 'scratch', origin: 'operator', name: 'old-scratch', issueId: null, isFavorite: false, isArchived: false, title: null, lastAccessedAt: 100 },
+    { id: 'ws-fav', projectId: 'overdeck', kind: 'scratch', origin: 'operator', name: 'fav-scratch', issueId: null, isFavorite: true, isArchived: false, title: null, lastAccessedAt: 50 },
+    { id: 'ws-issue', projectId: 'overdeck', kind: 'issue', origin: 'pipeline', name: 'feature-pan-9001', issueId: 'PAN-9001', isFavorite: true, isArchived: false, title: null, lastAccessedAt: 200 },
   ];
 
   beforeEach(() => {
@@ -650,7 +650,7 @@ describe('CommandPalette workspaces switcher (PAN-1990)', () => {
       if (method === 'GET' && url === '/api/workspace-registry') {
         return Response.json({
           workspaces: [
-            { id: 'ws-hidden', projectId: 'overdeck', kind: 'issue', name: 'feature-pan-9002', issueId: 'PAN-9002', isFavorite: false, isArchived: false, title: null, lastAccessedAt: 300 },
+            { id: 'ws-hidden', projectId: 'overdeck', kind: 'issue', origin: 'pipeline', name: 'feature-pan-9002', issueId: 'PAN-9002', isFavorite: false, isArchived: false, title: null, lastAccessedAt: 300 },
           ],
         });
       }
@@ -671,8 +671,8 @@ describe('CommandPalette workspaces switcher (PAN-1990)', () => {
       if (method === 'GET' && url === '/api/workspace-registry') {
         return Response.json({
           workspaces: [
-            { id: 'ws-archived', projectId: 'overdeck', kind: 'scratch', name: 'archived-scratch', issueId: null, isFavorite: false, isArchived: true, title: null, lastAccessedAt: 900 },
-            { id: 'ws-live', projectId: 'overdeck', kind: 'scratch', name: 'live-scratch', issueId: null, isFavorite: false, isArchived: false, title: null, lastAccessedAt: 100 },
+            { id: 'ws-archived', projectId: 'overdeck', kind: 'scratch', origin: 'operator', name: 'archived-scratch', issueId: null, isFavorite: false, isArchived: true, title: null, lastAccessedAt: 900 },
+            { id: 'ws-live', projectId: 'overdeck', kind: 'scratch', origin: 'operator', name: 'live-scratch', issueId: null, isFavorite: false, isArchived: false, title: null, lastAccessedAt: 100 },
           ],
         });
       }

@@ -145,8 +145,12 @@ export async function rebuildMainAndScratchWorkspaces(
   return result;
 }
 
+/** False only when `path` is confirmed absent; a permission or other stat error is rethrown rather than treated as absence. */
 async function pathExists(path: string): Promise<boolean> {
-  return stat(path).then(() => true, () => false);
+  return stat(path).then(() => true, (error: NodeJS.ErrnoException) => {
+    if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return false;
+    throw error;
+  });
 }
 
 export interface ArchiveDeadIssueWorkspacesOptions {
