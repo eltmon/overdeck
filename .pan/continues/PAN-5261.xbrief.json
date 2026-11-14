@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5261",
   "created": "2026-11-14T08:29:10.265Z",
-  "updated": "2026-11-14T08:56:56.502Z",
+  "updated": "2026-11-14T08:57:01.930Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,11 @@
     "tracker-trigger-raw-rows.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T08:56:56.501Z"
+    },
+    "issue-state-cache": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5261",
+      "claimedAt": "2026-11-14T08:57:01.929Z"
     }
   }
 }
