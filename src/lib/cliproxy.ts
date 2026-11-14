@@ -66,7 +66,11 @@ export const CLIPROXY_BASE_URL = `http://${CLIPROXY_HOST}:${CLIPROXY_PORT}`;
 // claude --print tool round trip succeeded). CLIProxy refreshes its model
 // catalog every 3h from router-for-me/models models.json, which added Terra
 // on 2026-10-26 after the PAN-4633 probe, so no pin bump was needed.
-const CLIPROXY_RELEASE_VERSION = 'v7.3.16';
+// v8.0.71 (PAN-5282): v8 config layout (config-version: 8). Probed 2026-11-14 on
+// a throwaway instance: --version banner unchanged, /v0/management unchanged,
+// oauth.excluded-models.claude hides Codex-aliased names from a Claude account,
+// and startup rewrites only management.secret-key (plaintext -> bcrypt hash).
+const CLIPROXY_RELEASE_VERSION = 'v8.0.71';
 
 function getCliproxyDir(): string {
   return join(OVERDECK_HOME, 'cliproxy');
@@ -455,7 +459,7 @@ export function execFailureStdout(err: unknown): string {
  * machines on whatever shipped first (PAN-1584 — stuck on 6.9.45, which breaks
  * gpt-5.5 work agents via a Codex "System messages are not allowed" rejection).
  * An unreadable version is treated as out-of-date so we re-pull rather than
- * trust a mystery binary. CLIProxyAPI (v7.2.113 through v7.3.16) deliberately does not define
+ * trust a mystery binary. CLIProxyAPI (v7.2.113 through v8.0.71) deliberately does not define
  * `--version`: it prints this banner then exits 2, which avoids starting a server.
  */
 async function isCliproxyUpToDateTask(): Promise<boolean> {
