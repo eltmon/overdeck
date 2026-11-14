@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5248",
   "created": "2026-11-14T05:37:27.839Z",
-  "updated": "2026-11-14T06:39:44.883Z",
+  "updated": "2026-11-14T06:39:52.367Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -224,6 +224,11 @@
     "package-json-lanes.ac2": {
       "status": "completed",
       "doneAt": "2026-11-14T06:39:44.883Z"
+    },
+    "dashboard-types-lane": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T06:39:52.367Z"
     }
   }
 }
