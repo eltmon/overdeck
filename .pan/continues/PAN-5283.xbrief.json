@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5283",
   "created": "2026-11-14T19:04:13.506Z",
-  "updated": "2026-11-14T19:21:33.514Z",
+  "updated": "2026-11-14T19:21:34.982Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,11 @@
     "wi6-batch-pause-until.ac2": {
       "status": "completed",
       "doneAt": "2026-11-14T19:21:33.514Z"
+    },
+    "wi7-needs-you-context": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T19:21:34.982Z"
     }
   }
 }
