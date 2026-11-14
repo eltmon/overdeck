@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5224",
   "created": "2026-11-14T03:12:38.408Z",
-  "updated": "2026-11-14T03:25:05.999Z",
+  "updated": "2026-11-14T03:32:26.043Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -42,9 +42,26 @@
       "doneAt": "2026-11-14T03:24:57.176Z"
     },
     "pr-listing-webhook-ttl": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5224",
-      "claimedAt": "2026-11-14T03:25:05.999Z"
+      "claimedAt": "2026-11-14T03:25:05.999Z",
+      "doneAt": "2026-11-14T03:32:26.043Z"
+    },
+    "pr-listing-webhook-ttl.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:32:26.043Z"
+    },
+    "pr-listing-webhook-ttl.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:32:26.043Z"
+    },
+    "pr-listing-webhook-ttl.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:32:26.043Z"
+    },
+    "pr-listing-webhook-ttl.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:32:26.043Z"
     }
   }
 }
