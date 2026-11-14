@@ -77,7 +77,7 @@ operator merges it (PAN-3973). For each one it checks, in order:
    repository the GitHub App covers, an approving marker counts only from the
    App's bot: agents hold the operator's `gh` credentials and could post one
    as the owner. On other repositories the verdict is posted as the `gh` user,
-   and an approving marker counts from any trusted author. If the App's slug cannot be read, no bot approval counts. A review from any other account never counts, and each reviewer's
+   and an approving marker counts from any trusted author. If the App's slug cannot be read, no bot approval counts. The App's bot also files the follow-up issue for CodeRabbit findings a merge left unsettled, which needs the App's **Issues: Read and write** permission; without it Overdeck raises Needs-you instead. A review from any other account never counts, and each reviewer's
    latest review stands: a later "Request changes" or a dismissal withdraws an
    approval. An approval of an older commit, or a marker without `sha=`, never
    counts. A GitLab MR needs a named approver in `approved_by` (what
