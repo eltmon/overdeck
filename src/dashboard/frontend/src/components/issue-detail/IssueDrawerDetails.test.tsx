@@ -378,6 +378,17 @@ describe('IssueDrawerDetails', () => {
     expect(screen.queryByTestId('drawer-details-footer')).toBeNull();
   });
 
+  it('carries the cockpit markers', () => {
+    renderDetails();
+    for (const name of ['NowPanel', 'CrewStage', 'Cost / Artifacts / Ship homes', 'PickupGateCard', 'Awareness rail', 'UatEnvironmentPanel']) {
+      const el = document.querySelector(`[data-section="${name}"]`);
+      expect(el, name).toBeInTheDocument();
+      expect(el?.closest('[hidden]'), `${name} is hidden`).toBeNull();
+      expect(el?.attributes[0]?.name, `${name}: data-section is the first attribute`).toBe('data-section');
+      expect(el?.className ?? '', `${name}: no hidden token`).not.toMatch(/(^|\s)hidden(\s|$)/);
+    }
+  });
+
   it('shows the no-workspace line when the workspace does not exist', async () => {
     stubWorkspace(null, false);
     renderDetails();

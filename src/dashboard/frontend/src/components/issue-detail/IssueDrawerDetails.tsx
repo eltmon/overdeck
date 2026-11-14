@@ -215,12 +215,12 @@ export function IssueDrawerDetails({
         className="grid grid-cols-1 gap-x-[36px] gap-y-[22px] @[900px]:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]"
       >
       <div className="min-w-0 space-y-[22px]">
-        <section data-testid="drawer-details-status">
+        <section data-section="NowPanel" data-testid="drawer-details-status">
           <h3 className={HEADING_CLASS}>Status</h3>
           <StatusNarrative issueId={issueId} hasPlan={hasPlan} workRunning={workRunning} showNext />
         </section>
 
-        <section data-testid="drawer-details-pipeline">
+        <section data-section="CrewStage" data-testid="drawer-details-pipeline">
           <h3 className={HEADING_CLASS}>Pipeline</h3>
           <table className="w-full border-collapse text-[13px]">
             <tbody>
@@ -305,7 +305,7 @@ export function IssueDrawerDetails({
         <DeftGatesPanel issueId={issueId} />
         <DeftReviewCyclePanel issueId={issueId} />
 
-        <section data-testid="drawer-details-ship">
+        <section data-section="Cost / Artifacts / Ship homes" data-testid="drawer-details-ship">
           <h3 className={HEADING_CLASS}>Ship</h3>
           <ShipProgress ship={deriveShip(derived)} />
           {pr ? (
@@ -337,10 +337,12 @@ export function IssueDrawerDetails({
         </section>
       </div>
 
-      <div className="min-w-0 space-y-[22px]">
+      <div data-section="Awareness rail" className="min-w-0 space-y-[22px]">
         <section>
           <h3 className={HEADING_CLASS}>Pickup controls</h3>
-          <div data-section="DrawerPickupSection / PickupGateControls"><PickupSection issueId={issueId} /></div>
+          <div data-section="PickupGateCard" className="contents">
+            <div data-section="DrawerPickupSection / PickupGateControls"><PickupSection issueId={issueId} /></div>
+          </div>
         </section>
         <div data-section="DrawerVerificationGates"><VerificationGates issueId={issueId} /></div>
         <div data-section="DrawerWorkspaceSection">
