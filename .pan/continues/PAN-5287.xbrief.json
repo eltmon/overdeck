@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5287",
   "created": "2026-11-14T19:49:14.970Z",
-  "updated": "2026-11-14T20:13:00.871Z",
+  "updated": "2026-11-14T20:13:20.991Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
     "dock-store.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T20:13:00.871Z"
+    },
+    "stage-seams": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:13:20.990Z"
     }
   }
 }
