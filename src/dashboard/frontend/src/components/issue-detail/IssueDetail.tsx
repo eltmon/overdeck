@@ -22,13 +22,10 @@
  * shell and the ConversationPanel transcript renderer.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { toast } from 'sonner';
 
 import type { Agent } from '../../types';
 import type { DerivedIssueState } from '../../types';
 import { cn } from '../../lib/utils';
-import { trackerIssueUrl } from '../../lib/issueLinks';
 import { DrawerAgentSession, pickDefaultDrawerAgent } from '../drawer/DrawerAgentSession';
 import DrawerActivityRail from '../drawer/DrawerActivityRail';
 import DrawerArtifactsPanel from '../drawer/DrawerArtifactsPanel';
@@ -36,12 +33,10 @@ import { DrawerActivityPanel, DrawerPlanPanel } from '../drawer/DrawerSecondaryP
 import { TasksPanel } from '../TasksPanel';
 import { VerificationGates } from '../issue-view/VerificationGates';
 import { ActiveAgentPanel } from '../issue-view/ActiveAgentPanel';
-import { PickupGateControls } from '../backlog/PickupGateControls';
 import { IssueActionMenu } from '../IssueActionMenu';
 import { UatEnvironmentPanel } from '../CommandDeck/UatEnvironmentPanel';
-import { PanOpenInPicker } from '../PanOpenInPicker';
-import type { WorkspaceInfo } from '../../lib/workspace-types';
 import { IssueDetailShell } from './IssueDetailShell';
+import { PausedBanner, PickupSection, ResourcesFacet, WorkspaceSection } from './IssueDetailSections';
 import { IssueSkillsSection } from '../skills/SkillOverridesSections';
 import { ChangedFilesView } from '../Stage/cockpit/ChangedFilesView';
 
@@ -84,98 +79,6 @@ export interface IssueDetailProps {
   className?: string;
 }
 
-function PickupSection({ issueId }: { issueId: string }) {
-  return (
-    <section data-testid="drawer-pickup-section" className="rounded-[var(--radius)] border border-border bg-card p-[14px]">
-      <PickupGateControls
-        issueId={issueId}
-        onOpenIssueBrowser={(id) => {
-          const href = trackerIssueUrl(id);
-          if (href) window.open(href, '_blank', 'noopener,noreferrer');
-        }}
-      />
-    </section>
-  );
-}
-
-function useDrawerWorkspace(issueId: string) {
-  return useQuery<WorkspaceInfo | null>({
-    queryKey: ['drawer-workspace', issueId],
-    queryFn: async () => {
-      const res = await fetch(`/api/workspaces/${issueId}`);
-      if (!res.ok) return null;
-      return res.json() as Promise<WorkspaceInfo>;
-    },
-    retry: false,
-  });
-}
-
-function WorkspaceSection({ issueId }: { issueId: string }) {
-  const { data: workspace } = useDrawerWorkspace(issueId);
-
-  if (!workspace?.exists || !workspace.path) return null;
-
-  return (
-    <section data-testid="drawer-workspace-section" className="rounded-[var(--radius)] border border-border bg-card p-[14px]">
-      <div className="mb-[8px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Workspace</div>
-      <div className="flex items-center justify-between gap-[12px]">
-        <div className="min-w-0 truncate font-mono text-[11px] leading-[18px] text-muted-foreground" title={workspace.path}>
-          {workspace.path}
-        </div>
-        <div className="shrink-0">
-          <PanOpenInPicker openInCwd={workspace.path} />
-        </div>
-      </div>
-      {workspace.git?.branch && (
-        <div data-testid="drawer-workspace-branch" className="mt-[6px] truncate font-mono text-[11px] leading-[16px] text-muted-foreground" title={workspace.git.branch}>
-          ⎇ {workspace.git.branch}
-        </div>
-      )}
-    </section>
-  );
-}
-
-/** PAN-2908 C-DETAIL: the resources status facet for the always-visible right
- *  rail — workspace containers at a glance (names + health dots), same query
- *  as the Overview's Workspace section (shared cache, one fetch). */
-function ResourcesFacet({ issueId }: { issueId: string }) {
-  const { data: workspace } = useDrawerWorkspace(issueId);
-  const containers = Object.entries(workspace?.containers ?? {});
-  if (!workspace?.exists) return null;
-
-  return (
-    <div data-section="DrawerResourcesFacet" className="shrink-0 border-l border-border bg-card/70 px-[14px] py-[10px]">
-      <div className="mb-[6px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Resources</div>
-      {containers.length > 0 ? (
-        <div className="flex flex-wrap gap-x-3 gap-y-1">
-          {containers.map(([name, container]) => (
-            <span
-              key={name}
-              className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
-              title={`${name}: ${container.status ?? (container.running ? 'running' : 'stopped')}${container.uptime ? ` · up ${container.uptime}` : ''}`}
-            >
-              <span
-                data-testid={`drawer-resource-dot-${name}`}
-                className={cn(
-                  'h-[7px] w-[7px] rounded-full',
-                  container.running
-                    ? container.health === 'unhealthy'
-                      ? 'bg-destructive'
-                      : 'bg-success'
-                    : 'bg-muted-foreground/40',
-                )}
-              />
-              <span className="font-mono">{name}</span>
-            </span>
-          ))}
-        </div>
-      ) : (
-        <div className="text-[11px] text-muted-foreground">Workspace on disk — no containers running.</div>
-      )}
-    </div>
-  );
-}
-
 function tabLabel(tab: string) {
   return tab.replace(/-/g, ' ').replace(/\b\w/g, (match) => match.toUpperCase());
 }
@@ -189,59 +92,6 @@ function TabPlaceholder({ tab }: { tab: string }) {
       <p className="text-[13px] leading-6 text-muted-foreground">
         This drawer section will appear here as data streams in.
       </p>
-    </div>
-  );
-}
-
-/** PAN-1779: a pause gate must be unmissable — amber banner with the full
- * reason and a one-click Unpause. Amber = a human must act (style guide). */
-function PausedBanner({ agents }: { agents: ReadonlyArray<{ id: string; paused?: boolean; pausedReason?: string }> }) {
-  const paused = agents.filter((agent) => agent.paused === true);
-  if (paused.length === 0) return null;
-
-  const unpause = async (agentId: string) => {
-    try {
-      const res = await fetch(`/api/agents/${agentId}/unpause`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      const data = await res.json().catch(() => ({})) as { error?: string };
-      if (!res.ok) throw new Error(data.error || 'Failed to unpause agent');
-      toast.success(`${agentId} unpaused — deacon resumes it on the next patrol`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to unpause agent');
-    }
-  };
-
-  return (
-    <div data-testid="drawer-paused-banner" className="space-y-[6px] border-b border-border px-[22px] py-[10px]">
-      {paused.map((agent) => (
-        <div
-          key={agent.id}
-          className="flex items-center gap-[10px] rounded-[var(--radius-sm)] border px-[12px] py-[8px] badge-border-warning badge-bg-warning"
-        >
-          <span className="text-[14px] leading-none text-warning-foreground">⏸</span>
-          <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-medium text-warning-foreground">
-              <span className="font-mono">{agent.id}</span> is paused
-            </div>
-            {agent.pausedReason && (
-              <div className="truncate text-[12px] text-warning-foreground/75" title={agent.pausedReason}>
-                {agent.pausedReason}
-              </div>
-            )}
-          </div>
-          <button
-            type="button"
-            data-testid={`drawer-unpause-${agent.id}`}
-            onClick={() => void unpause(agent.id)}
-            className="inline-flex shrink-0 items-center gap-[4px] rounded-[var(--radius-sm)] border px-[10px] py-[5px] text-[12px] font-medium badge-border-warning text-warning-foreground transition-colors hover:bg-warning/20"
-          >
-            ▶ Unpause
-          </button>
-        </div>
-      ))}
     </div>
   );
 }
