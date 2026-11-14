@@ -1,0 +1,430 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T04:42:04Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5238: Skills for this issue takes 37-77 s to load (GET /api/skills/overrides?issue=)",
+    "updated": "2026-11-14T04:49:01.822Z"
+  },
+  "plan": {
+    "id": "pan-5238",
+    "title": "Skills for this issue takes 37-77 s to load (GET /api/skills/overrides?issue=)",
+    "status": "proposed",
+    "uid": "9f92be43-f817-4c8b-a28b-a57fca9e0017",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-14T04:42:04Z",
+    "updated": "2026-11-14T04:49:01.822Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5238",
+        "label": "PAN-5238",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5238.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "performance",
+      "dashboard-server",
+      "skill-overrides",
+      "skill-packs"
+    ],
+    "narratives": {
+      "Problem": "GET /api/skills/overrides makes about 3,900 fs/promises calls per request, and nearly all of them are awaited one at a time: 475 SKILL.md reads in listSkillCatalog, plus 3,408 lstat/readdir calls in listPackCatalog -> readPackManifest -> listExecutables. Each call queues on libuv's 4-thread pool. While the dashboard keeps that pool busy (121 MB parseTranscriptSnapshot reads, cost sweeps), the real functions took 66 s under synthetic saturation (26.0 s + 40.5 s), consistent with the report, against 0.5 s on a quiet pool. The issue's suspect, resolveProjectFromIssueSync, is mtime-cached and is not the cause. The slow window was not reproduced live; it fell in the first minutes after a dashboard restart.",
+      "Proposal": "Shorten the sequential chain. (1) listSkillCatalog reads roots and SKILL.md files concurrently through a 32-slot fs limiter (createPromiseConcurrencyLimiter), keeping first-root-wins precedence. (2) listPackCatalog reuses a pack manifest while its extract dir keeps the same inode, mtime, ctime, adapter and read options. (3) readPackManifest reads SKILL.md files and walks executables concurrently through a 32-slot limiter, with identical output order. (4) projectForIssue switches to the async resolver for rule compliance. (5) The GET route logs a slow line at 2000 ms or more as the fallback diagnostic. (6) docs/SKILL-PACKS.md and changelog.d/pan-5238.md describe the change.",
+      "NonGoals": "- Changing UV_THREADPOOL_SIZE or the dashboard launcher environment\n- Fixing what congests the threadpool (parseTranscriptSnapshot of 121 MB files, costReconcileSweep)\n- Any frontend change to SkillOverridesPanel or IssueSkillsSection\n- Caching the native skill catalog (~/.overdeck/skills, ~/.claude/skills, ~/.agents/skills, <project>/.pan/skills)\n- Changing listLowerLevelOverrides or listLowerLevelPackOverrides\n- Per-phase timing inside listSkillStates or any change to its signature\n- Any change to the response shape of GET or PUT /api/skills/overrides\n- Unbounded Promise.all over fs calls (every fs fan-out goes through a 32-slot limiter)\n- Invalidation hooks in updatePack/removePack/enablePackBrowser/disablePackBrowser (the inode+mtime stamp covers rebuilds)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the measured mechanism (a sequential fs chain under threadpool load) rather than only the issue's suspected sync lookup.",
+        "rationale": "Planning measured resolveProjectFromIssueSync as mtime-cached (one statSync), counted about 3,900 serial fs calls per request, and reproduced 66 s for the real catalog functions with a saturated threadpool against 0.5 s on a quiet one."
+      },
+      {
+        "summary": "Ship a slow-request log line on GET /api/skills/overrides as the fallback diagnostic.",
+        "rationale": "The 37-77 s window could not be reproduced live (every request now takes 0.26-3.3 s), and dashboard.log has no timestamps, so the next occurrence must leave evidence."
+      },
+      {
+        "summary": "Bound every fs fan-out at 32 in-flight tasks through the existing createPromiseConcurrencyLimiter, wrapping leaf fs calls only.",
+        "rationale": "Measured 466 reads under load: 24.2 s sequential, 1.5 s at 16, 0.73 s at 32, 0.45 s at 64. 32 keeps most of the gain while capping one request's share of the 4-thread pool queue; wrapping a recursive walk in a shared limiter can deadlock."
+      },
+      {
+        "summary": "Key the pack-manifest cache on extract-dir inode + mtime + ctime + adapter + read options, with no invalidation hooks.",
+        "rationale": "extractCommit renames a freshly built temp dir into place on every rebuild. Its rm runs before its mkdir, so ext4 may reuse the inode number, but mtime and ctime still change. The browser flag lives inside the read options."
+      },
+      {
+        "summary": "Swap projectForIssue to the async resolveProjectFromIssue as its own small item, traced to NFR-2 rather than to the performance FR.",
+        "rationale": "src/lib/projects.ts forbids sync callers in server-reachable code, and the swap is cheap, but it is not the cause of the latency."
+      }
+    ],
+    "items": [
+      {
+        "id": "catalog-concurrent-reads",
+        "title": "Read skill catalog roots and SKILL.md files concurrently through a 32-slot limiter",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T04:42:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5238",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/catalog.ts",
+            "src/lib/skill-overrides/__tests__/catalog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/catalog.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "catalog.test.ts passes the precedence case and the concurrency case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. In src/lib/skill-overrides/catalog.ts, import createPromiseConcurrencyLimiter from '../concurrency.js', add const CATALOG_FS_CONCURRENCY = 32 and const limitFs = createPromiseConcurrencyLimiter(CATALOG_FS_CONCURRENCY). In readRoot, wrap readdir and each readFile in limitFs and map dirents through Promise.all, filtering out nulls (the PRD gives the before/after code). In listSkillCatalog, run readRoot for every root through Promise.all, then merge perRoot in root order with first-name-wins. Never wrap readRoot itself in limitFs. Create src/lib/skill-overrides/__tests__/catalog.test.ts with real temp dirs passed as home/projectRoot: a precedence case and a concurrency case that mocks node:fs/promises readFile to count peak in-flight calls over 40 skills."
+        },
+        "items": [
+          {
+            "id": "catalog-concurrent-reads.ac1",
+            "title": "Given dup under both <home>/.overdeck/skills and <home>/.claude/skills, when listSkillCatalog runs, then it returns dup with origin 'overdeck', returns a project-only skill with origin 'project' and projectSkill true, omits a dir without SKILL.md, and sorts by name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "catalog-concurrent-reads.ac2",
+            "title": "Given 40 skill dirs in one root and a node:fs/promises mock counting in-flight readFile calls, when listSkillCatalog runs, then the peak in-flight count is above 1 and at most 32",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "catalog-concurrent-reads.ac3",
+            "title": "catalog.ts creates exactly one module-level limiter from CATALOG_FS_CONCURRENCY = 32, and limitFs wraps only readdir and readFile calls, never readRoot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pack-manifest-cache",
+        "title": "Reuse a pack manifest while its extract dir keeps the same inode, mtime, ctime, adapter and read options",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T04:42:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5238",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/catalog.ts",
+            "src/lib/skill-overrides/__tests__/catalog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/catalog.test.ts src/lib/skill-overrides/__tests__/launch.test.ts src/lib/skill-overrides/__tests__/conversation-flags.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "catalog.test.ts passes the three pack-manifest-cache cases, and launch.test.ts and conversation-flags.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 exactly. In src/lib/skill-overrides/catalog.ts, replace isDirectory with dirStats(path): Promise<Stats | null> (lstat result when it is a directory, else null; import type Stats from 'node:fs'). Add a module-level Map<string, { stamp: string; manifest: PackManifest }> named manifestCache. In listPackCatalog, build readOpts (optIn, skillsRoot, pluginRoot, browser === 'ready', skillsExclude) once, compute stamp = `${stats.ino}:${stats.mtimeMs}:${stats.ctimeMs}:${adapter}:${JSON.stringify(readOpts)}`, return the cached manifest on a stamp match, otherwise call readPackManifest(dir, adapter, readOpts) and store it. On a thrown read, set manifest = null and delete the entry. Keep the cached/browser/adapter computation running on every call, outside the cache. Update the module header comment. Add three cases to catalog.test.ts, mocking ../../skill-packs/sources.js (listPacks, packExtractDir, packRenderDir) and wrapping readPackManifest in vi.fn around the real one. manifestCache is module-level: every test case builds its own fresh mkdtempSync extract dir, and beforeEach calls vi.mocked(readPackManifest).mockClear(). Mock sources.js partially with importOriginal so its other exports stay real."
+        },
+        "items": [
+          {
+            "id": "pack-manifest-cache.ac1",
+            "title": "Given one registered pack with an unchanged extract dir, when listPackCatalog runs twice, then readPackManifest is called once and both results are deep-equal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-manifest-cache.ac2",
+            "title": "Given the extract dir is deleted and a new dir with a different skill is renamed into its place, when listPackCatalog runs again, then readPackManifest is called again and the result lists the new skill",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-manifest-cache.ac3",
+            "title": "Given readPackManifest rejects once, when listPackCatalog runs, then that pack's manifest is null, and the next call invokes readPackManifest again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "manifest-concurrent-walks",
+        "title": "Walk pack executables and read pack SKILL.md files concurrently with identical output order",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T04:42:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5238",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/adapters.ts",
+            "src/lib/skill-packs/__tests__/adapters-concurrency.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/adapters.test.ts src/lib/skill-packs/__tests__/adapters-concurrency.test.ts src/lib/skill-packs/__tests__/gstack.test.ts src/lib/skill-packs/__tests__/deft.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "adapters.test.ts passes unchanged, and adapters-concurrency.test.ts, gstack.test.ts and deft.test.ts pass",
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 exactly. In src/lib/skill-packs/adapters.ts, import createPromiseConcurrencyLimiter from '../concurrency.js' and add MANIFEST_FS_CONCURRENCY = 32 and a module-level limitFs. Rewrite listExecutables so walk returns string[]: it wraps readdir and lstat in limitFs, maps the sorted dirents through Promise.all, and flattens, which keeps sorted DFS order. Never wrap walk or listExecutables in limitFs. In readPackManifest, read every SKILL.md with Promise.all(skillDirs.map(dir => limitFs(() => readTextOrNull(...)))), keep the existing ordered frontmatter/name/SKILL_NAME_PATTERN/seen logic over the results inside skillDirs.forEach, turning each `continue` into `return` (the PRD shows the full snippet), collect the kept non-gstack dirs, then run listExecutables on them through Promise.all and push the results in order. Leave scanSkillDirs and gstackSkillDirs unchanged. Do not edit the existing adapters.test.ts. Create adapters-concurrency.test.ts with the two cases from the PRD."
+        },
+        "items": [
+          {
+            "id": "manifest-concurrent-walks.ac1",
+            "title": "Given the unchanged adapters.test.ts, when it runs against the new adapters.ts, then every case passes, including the executables order ['bin/gstack-x', 'review/bin/helper.sh', 'scripts/pack-render.sh']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "manifest-concurrent-walks.ac2",
+            "title": "Given a plain pack whose skills/a/scripts holds 40 files, 3 of them .sh, and a node:fs/promises mock counting in-flight lstat calls, when readPackManifest runs, then the peak is above 1 and at most 32, and capabilities.executables equals the 3 .sh paths in sorted order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "manifest-concurrent-walks.ac3",
+            "title": "Given skills/a and skills/b both declare name 'same', when readPackManifest runs, then manifest.skills holds one 'same' with dir skills/a, and executables contains no skills/b path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "async-issue-project-lookup",
+        "title": "Resolve an issue's project with the async resolver in projectForIssue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:42:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-5238",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/issue-file.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n resolveProjectFromIssueSync src/lib/skill-overrides/issue-file.ts || echo none",
+            "npx vitest run src/lib/skill-overrides/__tests__/store.test.ts src/lib/skill-overrides/__tests__/launch.test.ts src/lib/skill-overrides/__tests__/launch-pack-mcp.test.ts src/dashboard/server/routes/__tests__/deft-routes.test.ts src/cli/commands/__tests__/doctor-atlassian.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "grep prints none",
+            "all five listed suites pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. In src/lib/skill-overrides/issue-file.ts, import { Effect } from 'effect', replace resolveProjectFromIssueSync with resolveProjectFromIssue in the projects.js import, and in projectForIssue use `const resolved = await Effect.runPromise(resolveProjectFromIssue(issueId));`. This is the same pattern as src/dashboard/server/routes/fleet-work.ts. Run the five listed suites. If a suite fully mocks lib/projects.js with only resolveProjectFromIssueSync and now fails with 'No \"resolveProjectFromIssue\" export is defined on the mock', add resolveProjectFromIssue to that mock, returning Effect.succeed(<the same value>). In that case also add the test file to this item's commit. Never change production code to suit a mock."
+        },
+        "items": [
+          {
+            "id": "async-issue-project-lookup.ac1",
+            "title": "When grep -n resolveProjectFromIssueSync runs on src/lib/skill-overrides/issue-file.ts, then it prints no match, and projectForIssue awaits Effect.runPromise(resolveProjectFromIssue(issueId))",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "async-issue-project-lookup.ac2",
+            "title": "Given an issue whose prefix maps to a registered project, when projectForIssue runs, then it returns the same { projectKey, project } as before, and store.test.ts 'issue overrides' cases pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-slow-log",
+        "title": "Log a slow line for GET /api/skills/overrides at 2000 ms or more",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:42:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5238",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc/skill-overrides.ts",
+            "src/dashboard/server/routes/__tests__/skill-overrides-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/skill-overrides-route.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "skill-overrides-route.test.ts passes, including the slow and fast logging cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. In src/dashboard/server/routes/misc/skill-overrides.ts, add const SLOW_REQUEST_MS = 2000. In getSkillOverridesRoute's Effect.promise body, take const started = Date.now() before skillStatesResponseBody. In a finally block, when Date.now() - started >= SLOW_REQUEST_MS, call console.warn with `[skill-overrides] slow GET level=<issue|project|global> project=<key|-> issue=<id|-> ms=<n>`. Use Date.now(), not performance.now(). The response is unchanged. Add two tests to skill-overrides-route.test.ts. The slow case uses vi.useFakeTimers({ toFake: ['Date'] }), with a listSkillStates mock that calls vi.setSystemTime(Date.now() + 2500) before returning, and spies console.warn. Fake only Date, because faking setTimeout/setImmediate can stall the Effect scheduler. The fast case uses the default mock. Restore real timers in afterEach. Repo rule: delay tests use fake timers, never real waits."
+        },
+        "items": [
+          {
+            "id": "route-slow-log.ac1",
+            "title": "Given a Date-only fake clock that listSkillStates advances by 2500 ms before resolving, when GET /api/skills/overrides?issue=TST-1 runs, then it returns 200 and console.warn is called once with a string containing '[skill-overrides] slow GET level=issue' and 'issue=TST-1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-slow-log.ac2",
+            "title": "Given listSkillStates resolves immediately, when GET /api/skills/overrides runs, then console.warn is not called with any '[skill-overrides] slow' string and the response body equals the existing expectation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-changelog",
+        "title": "Describe concurrent catalog reads and the manifest cache in docs/SKILL-PACKS.md and changelog.d/pan-5238.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:42:04Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5238",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SKILL-PACKS.md",
+            "changelog.d/pan-5238.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c PAN-5238 docs/SKILL-PACKS.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints 2 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6. In docs/SKILL-PACKS.md, replace the catalog.ts row of the src/lib/skill-overrides/ module table with the PRD's text, which says the reads run concurrently through a 32-slot fs limiter and listPackCatalog reuses a manifest while its extract dir keeps the same inode, mtime and ctime (PAN-5238). Under '## Invariants', add the PRD's bullet: catalog and manifest reads never await one file at a time, because the serial chain took 66 s under synthetic pool saturation, matching the reported 37-77 s; wrap leaf fs calls in limitFs, never a function that itself calls it. Create changelog.d/pan-5238.md with the exact '#### Fixed' entry from the PRD. Run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "docs-and-changelog.ac1",
+            "title": "When grep -n 'PAN-5238' docs/SKILL-PACKS.md runs, then the catalog.ts row of the skill-overrides module table returns a match that states reads run through a 32-slot fs limiter and listPackCatalog reuses a manifest while the extract dir keeps the same inode, mtime and ctime",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac2",
+            "title": "docs/SKILL-PACKS.md '## Invariants' contains a bullet saying catalog and manifest reads never await one file at a time and that limitFs wraps only leaf fs calls, citing PAN-5238",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac3",
+            "title": "changelog.d/pan-5238.md exists with a single '#### Fixed' heading and one bullet linking https://github.com/eltmon/overdeck/issues/5238, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "catalog-concurrent-reads",
+        "to": "pack-manifest-cache",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-14-PAN-5238-skills-for-this-issue-takes-37-77-s-to-load-get-api-skills-overrides-issue.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
