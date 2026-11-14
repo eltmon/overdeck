@@ -9,8 +9,12 @@ import type { ProjectConfig } from '../../../../lib/projects.js';
 import type { WorkspaceRow } from '../../../../lib/workspaces/types.js';
 import type { EditWorkspacePrDeps } from '../../services/explorer/edit-workspace-pr.js';
 import type { ExplorerRoot } from '../../services/explorer/roots.js';
-import { _resetDashboardSessionTokenForTests } from '../dashboard-auth.js';
-import { handleEditWorkspaceStatus } from '../explorer-edit-workspaces.js';
+import {
+  DASHBOARD_SESSION_COOKIE,
+  _resetDashboardSessionTokenForTests,
+  dashboardSessionCookieHeader,
+} from '../dashboard-auth.js';
+import { handleEditWorkspaceCreatePr, handleEditWorkspaceStatus } from '../explorer-edit-workspaces.js';
 
 const TOKEN = 'explorer-edit-workspaces-internal-token';
 const PATH = '/p/workspaces/scratch-edit-1';
@@ -89,5 +93,54 @@ describe('handleEditWorkspaceStatus', () => {
       pr: { number: 4, canMerge: true },
       prSupport: { available: true, reason: null },
     });
+  });
+});
+
+describe('handleEditWorkspaceCreatePr', () => {
+  function postRequest(headers: Record<string, string>) {
+    return {
+      method: 'POST',
+      url: '/api/explorer/edit-workspaces/w1/pr',
+      headers: { 'content-type': 'application/json', ...headers },
+      remoteAddress: Option.none(),
+    } as unknown as Parameters<typeof handleEditWorkspaceCreatePr>[0];
+  }
+
+  const prDeps = (): EditWorkspacePrDeps => ({
+    ...deps('scratch/edit-1'),
+    gh: async (args) => (args[1] === 'list' ? { stdout: '[]' } : { stdout: 'https://github.com/o/r/pull/12\n' }),
+    commitAll: async () => ({ committed: true }),
+    pushHead: async () => {},
+  });
+
+  async function post(body: unknown, headers: Record<string, string> = { [INTERNAL_TOKEN_HEADER]: TOKEN }) {
+    const response = HttpServerResponse.toWeb(
+      await handleEditWorkspaceCreatePr(postRequest(headers), 'w1', async () => body, prDeps()),
+    );
+    return { status: response.status, body: (await response.json()) as Record<string, unknown> };
+  }
+
+  it('answers 400 INVALID_INPUT for an empty title', async () => {
+    const { status, body } = await post({ mode: 'direct', title: '   ', body: '', draft: false });
+    expect(status).toBe(400);
+    expect(body.code).toBe('INVALID_INPUT');
+  });
+
+  it('answers 400 INVALID_INPUT for an unknown mode', async () => {
+    const { status, body } = await post({ mode: 'sideways', title: 't', body: '', draft: false });
+    expect(status).toBe(400);
+    expect(body.code).toBe('INVALID_INPUT');
+  });
+
+  it('answers 403 without the CSRF header on a cookie request', async () => {
+    const cookie = dashboardSessionCookieHeader().split(';')[0] ?? `${DASHBOARD_SESSION_COOKIE}=`;
+    const { status } = await post({ mode: 'direct', title: 't', body: '', draft: false }, { cookie, origin: 'http://localhost:3011' });
+    expect(status).toBe(403);
+  });
+
+  it('answers 201 with the direct PR result', async () => {
+    const { status, body } = await post({ mode: 'direct', title: 'chore: edit a', body: 'b', draft: false });
+    expect(status).toBe(201);
+    expect(body).toEqual({ mode: 'direct', url: 'https://github.com/o/r/pull/12', number: 12, created: true });
   });
 });
