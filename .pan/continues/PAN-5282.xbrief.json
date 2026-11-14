@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5282",
   "created": "2026-11-14T19:03:45.838Z",
-  "updated": "2026-11-14T19:17:50.082Z",
+  "updated": "2026-11-14T19:17:51.967Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,11 @@
     "claude-exclusion.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T19:17:50.081Z"
+    },
+    "config-needs-write": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5282",
+      "claimedAt": "2026-11-14T19:17:51.967Z"
     }
   }
 }
