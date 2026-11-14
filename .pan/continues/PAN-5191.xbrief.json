@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5191",
   "created": "2026-11-14T01:35:38.518Z",
-  "updated": "2026-11-14T01:45:11.341Z",
+  "updated": "2026-11-14T01:46:18.974Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,9 +78,26 @@
       "doneAt": "2026-11-14T01:45:05.274Z"
     },
     "edit-remove": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5191",
-      "claimedAt": "2026-11-14T01:45:11.340Z"
+      "claimedAt": "2026-11-14T01:45:11.340Z",
+      "doneAt": "2026-11-14T01:46:18.974Z"
+    },
+    "edit-remove.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:46:18.974Z"
+    },
+    "edit-remove.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:46:18.974Z"
+    },
+    "edit-remove.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:46:18.974Z"
+    },
+    "edit-remove.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:46:18.974Z"
     }
   }
 }
