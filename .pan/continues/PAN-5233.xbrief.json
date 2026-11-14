@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5233",
   "created": "2026-11-14T03:57:41.720Z",
-  "updated": "2026-11-14T06:39:13.970Z",
+  "updated": "2026-11-14T06:39:25.019Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,11 @@
     "route-credential-origin.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T06:39:13.970Z"
+    },
+    "rail-origin-filter": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5233",
+      "claimedAt": "2026-11-14T06:39:25.018Z"
     }
   }
 }
