@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5283",
   "created": "2026-11-14T19:04:13.506Z",
-  "updated": "2026-11-14T19:06:25.210Z",
+  "updated": "2026-11-14T19:06:32.559Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
     "wi1-contract.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T19:06:25.210Z"
+    },
+    "wi2-gate-queue-snapshot": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T19:06:32.559Z"
     }
   }
 }
