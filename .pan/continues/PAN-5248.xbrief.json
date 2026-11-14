@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5248",
   "created": "2026-11-14T05:37:27.839Z",
-  "updated": "2026-11-14T06:01:08.452Z",
+  "updated": "2026-11-14T06:01:33.022Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,11 @@
     "admission-settle-and-timeout.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T06:01:08.451Z"
+    },
+    "admitted-command-runner": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T06:01:33.022Z"
     }
   }
 }
