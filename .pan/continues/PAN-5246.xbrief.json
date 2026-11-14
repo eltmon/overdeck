@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5246",
   "created": "2026-11-14T12:41:52.786Z",
-  "updated": "2026-11-14T13:14:15.227Z",
+  "updated": "2026-11-14T13:14:23.423Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -208,6 +208,11 @@
     "stage-frame.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T13:14:15.227Z"
+    },
+    "delete-orphans": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5246",
+      "claimedAt": "2026-11-14T13:14:23.423Z"
     }
   }
 }
