@@ -94,6 +94,39 @@ export function sendFailureDetails(err: unknown): SendFailureDetails {
   return { error: err instanceof Error ? err.message : String(err), retryable: true, deliveryUnknown: true };
 }
 
+export type ServerCancelOutcome = 'cancelled' | 'delivered' | 'unknown';
+
+const CANCEL_TIMEOUT_MS = 15_000;
+
+/**
+ * PAN-5237: ask the server to drop a send that has not reached the agent.
+ * Throws on transport or HTTP failure, or an answer without a known outcome.
+ */
+export async function requestConversationMessageCancel(
+  conversationName: string,
+  clientMessageId: string,
+): Promise<ServerCancelOutcome> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CANCEL_TIMEOUT_MS);
+  try {
+    const res = await fetch(`/api/conversations/${encodeURIComponent(conversationName)}/message/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({ clientMessageId }),
+    });
+    if (!res.ok) throw new Error(`Cancel request failed (${res.status})`);
+    const body: unknown = await res.json();
+    const outcome = body && typeof body === 'object' && 'outcome' in body ? body.outcome : undefined;
+    if (outcome !== 'cancelled' && outcome !== 'delivered' && outcome !== 'unknown') {
+      throw new Error('Cancel response did not include an outcome');
+    }
+    return outcome;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * POST a message to a conversation (or agent) session. The single source of
  * truth for the send endpoint + payload, used by both the composer's first send

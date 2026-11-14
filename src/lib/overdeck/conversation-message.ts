@@ -28,6 +28,7 @@ import { ComposerCommandParseError } from '../composer-commands/parser.js';
 import {
   composerCommandResultHttpStatus,
   handleComposerCommandMessage,
+  isComposerCommandMessage,
 } from '../composer-commands/router.js';
 import {
   extractConversationAttachmentPaths,
@@ -37,6 +38,11 @@ import {
   isManagedConversationAttachmentPath,
   removeConversationAttachment,
 } from '../../dashboard/server/services/conversation-attachments.js';
+import {
+  cancelledBeforeDeliveryResponse,
+  OPEN_DELIVERY_GATE,
+  type ConversationDeliveryGate,
+} from '../../dashboard/server/services/conversation-message-receipts.js';
 import {
   getConversationByName,
   setConversationClaudeSessionId,
@@ -218,6 +224,8 @@ export interface ConversationMessageDependencies {
   conversationPendingPermission?: (conv: Conversation) => Promise<PendingPermission | null>;
   /** PAN-4278: injectable for tests; the route inspects its DeliveryResult. */
   deliverAgentMessage?: typeof deliverAgentMessage;
+  /** PAN-5237: the receipt's cancel gate; absent = always deliver. */
+  deliveryGate?: ConversationDeliveryGate;
 }
 
 export function safeUploadExtension(filename: string, mimeType: string): string {
@@ -473,6 +481,10 @@ async function deliverConversationMessage(
   // attachments → harness delivery. Intercepting the portable namespace here
   // keeps operator commands out of prompt transforms, control channels, PTY/tmux
   // delivery, and harness transcripts while ordinary text follows the old path.
+  // PAN-5237: every irreversible step first claims the cancel gate (commit());
+  // after a commit, a cancel request answers `delivered`.
+  const gate = deps.deliveryGate ?? OPEN_DELIVERY_GATE;
+  if (isComposerCommandMessage(message) && !gate.commit()) return cancelledBeforeDeliveryResponse();
   try {
     const result = await handleComposerCommandMessage({
       message,
@@ -511,6 +523,7 @@ async function deliverConversationMessage(
     if (!compactSessionFile || !existsSync(compactSessionFile)) {
       return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
     }
+    if (!gate.commit()) return cancelledBeforeDeliveryResponse();
     const compactResult = await compactConversationNative(compactSessionFile, conv.name);
     setConversationClaudeSessionId(conv.name, compactResult.forkedSessionId);
     // PAN-2652: the view now follows the compacted fork, so the live process must
@@ -606,11 +619,14 @@ async function deliverConversationMessage(
   let switchedFromSubagent: string | undefined;
   let steerDegraded: string | undefined;
   if (isPiControlChannelHarness(harness)) {
+    if (!gate.commit()) return cancelledBeforeDeliveryResponse();
     await deliverConversationViaControlChannel(conv, deliveredMessage, {
       source: 'operator',
       deliverAs: pickDeliverAs(body['deliverAs']),
     });
   } else {
+    // PAN-5237: a cancelled send does no pane work at all (no ensure-main keys).
+    if (gate.isCancelled()) return cancelledBeforeDeliveryResponse();
     if (behavior.capabilities.paneInputGuard) {
       // PAN-4278: never paste into a permission prompt. Checked BEFORE
       // ensure-main, whose Down/Enter would move the menu cursor and answer it.
@@ -651,19 +667,24 @@ async function deliverConversationMessage(
     try {
       const method = resolveConversationDeliveryMethod(conv);
       // PAN-4185: a bare Kimi conversation gets the operator's text without the context envelope.
+      let kimiSessionId: string | null = null;
       if (behavior.capabilities.contextChannel === 'initial-message-envelope' && !conv.bareContext) {
         // The composer enables the moment the tmux session exists, but the
         // spawn path may still be diffing Kimi's session bucket to capture the
         // session id (up to 60s). Wait for the pointer file — bounded under the
         // frontend's 20s request timeout — instead of failing the first
         // message with "captured kimi-session-id is missing".
-        const kimiSessionId = await waitForManagedKimiSessionId(conv.tmuxSession);
+        kimiSessionId = await waitForManagedKimiSessionId(conv.tmuxSession);
         if (!kimiSessionId) {
           return jsonResponse(
             { error: 'Kimi session is still starting (no captured kimi-session-id yet). Wait a moment and send again.' },
             { status: 503 },
           );
         }
+      }
+      // PAN-5237: the commit point for pane delivery, right before the paste.
+      if (!gate.commit()) return cancelledBeforeDeliveryResponse();
+      if (kimiSessionId) {
         delivery = await deliver(
           conv.tmuxSession,
           deliveredMessage,

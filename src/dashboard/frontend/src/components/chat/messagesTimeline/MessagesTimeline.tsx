@@ -43,6 +43,7 @@ import { TimelineRowRenderer } from './TimelineRowRenderer';
 import { CiteSelectionLayer } from '../citations/CiteSelectionToolbar';
 import { CitationTargetContext } from '../../../lib/composerCitations';
 import { useConnectionPhase } from '../../../lib/connectionState';
+import { useComposerStore } from '../../../lib/composerStore';
 import { useConversationBookmarks } from '../bookmarks/ConversationBookmarks';
 import {
   ALWAYS_UNVIRTUALIZED_TAIL_ROWS,
@@ -769,6 +770,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
             <div className={styles.failedMessageActions}>
               <span className={styles.failedMessageLabel}>
                 {fm.heldOffline ? 'Waiting to send — will send when the server reconnects'
+                  : fm.code === 'cancelled' ? 'Cancelled'
                   : fm.code === 'not-delivered' ? 'Not delivered — resend'
                   : fm.notFoundInTranscript ? 'Not found in transcript'
                   : fm.deliveryUnknown ? 'Delivery not confirmed'
@@ -783,10 +785,21 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                 <button
                   className={styles.failedMessageBtn}
                   onClick={() => onRetryFailed?.(fm.id, fm.text)}
-                  title={fm.notFoundInTranscript || fm.code === 'not-delivered' ? 'Resend as a new message' : 'Retry sending'}
+                  title={fm.code === 'cancelled' ? 'Send this message again'
+                    : fm.notFoundInTranscript || fm.code === 'not-delivered' ? 'Resend as a new message' : 'Retry sending'}
                 >
                   <RotateCcw size={12} />
-                  {fm.notFoundInTranscript || fm.code === 'not-delivered' ? 'Resend' : 'Retry'}
+                  {fm.notFoundInTranscript || fm.code === 'not-delivered' || fm.code === 'cancelled' ? 'Resend' : 'Retry'}
+                </button>
+              )}
+              {fm.heldOffline && (
+                <button
+                  className={styles.failedMessageBtn}
+                  onClick={() => useComposerStore.getState().cancelHeldOffline(fm.id)}
+                  title="Don't send this when the server reconnects"
+                >
+                  <X size={12} />
+                  Cancel
                 </button>
               )}
               {fm.kind === 'prompt' && (
