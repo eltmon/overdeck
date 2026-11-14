@@ -482,6 +482,8 @@ export const AgentModelSetEvent = Schema.Struct({
     claudeSessionId: Schema.optional(Schema.NullOr(Schema.String)),
     sessionModel: Schema.optional(Schema.String),
     sessionHarness: Schema.optional(Schema.String),
+    /** The sender already appended this session to sessions.json (the pi/omp extensions, PAN-5223); the server must not index it again. */
+    sessionIndexed: Schema.optional(Schema.Boolean),
   }),
 })
 export type AgentModelSetEvent = typeof AgentModelSetEvent.Type

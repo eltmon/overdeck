@@ -41,6 +41,16 @@ describe('observeSessionIndexEvent', () => {
     );
   });
 
+  it('does not index a session the sender already indexed (pi/omp extensions, PAN-5223)', () => {
+    const append = vi.fn();
+    observeSessionIndexEvent({
+      type: 'agent.model_set',
+      timestamp: '2026-11-14T02:33:28.900Z',
+      payload: { agentId: 'conv-20261114-8358', model: 'pi', claudeSessionId: 'session-1', sessionIndexed: true },
+    } as DomainEvent, append);
+    expect(append).not.toHaveBeenCalled();
+  });
+
   it('passes a transcriptPath-carrying model_set event through as the recorded path', () => {
     const append = vi.fn();
     observeSessionIndexEvent({

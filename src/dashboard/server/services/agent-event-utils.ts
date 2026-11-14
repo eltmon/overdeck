@@ -118,6 +118,7 @@ export const bodyToEvent = (
           claudeSessionId: source['claudeSessionId'] as string | undefined,
           sessionModel: source['sessionModel'] as string | undefined,
           sessionHarness: source['sessionHarness'] as string | undefined,
+          ...(source['sessionIndexed'] === true ? { sessionIndexed: true } : {}),
         },
       };
     case 'cost-event': {

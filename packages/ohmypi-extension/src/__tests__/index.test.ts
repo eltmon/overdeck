@@ -182,6 +182,8 @@ describe('handleSessionStart', () => {
       kind: 'model_set',
       model: 'pi',
       claudeSessionId: 'sess-abc',
+      // PAN-5223: the extension indexed this session itself; the server must not add a second row.
+      sessionIndexed: true,
       timestamp: fixedTime,
     })
     expect(fetchCalls[1]!.body).toEqual({
@@ -254,7 +256,7 @@ describe('handleSessionStart', () => {
 
     // 2 buffered + activity + cost = 4 POSTs total.
     expect(fetchCalls.length).toBe(4)
-    expect(fetchCalls[0]!.body).toEqual({ kind: 'model_set', model: 'pi', claudeSessionId: 'sess-abc', timestamp: fixedTime })
+    expect(fetchCalls[0]!.body).toEqual({ kind: 'model_set', model: 'pi', claudeSessionId: 'sess-abc', sessionIndexed: true, timestamp: fixedTime })
     expect(fetchCalls[1]!.body).toEqual({ kind: 'activity', activity: 'idle', timestamp: fixedTime })
     expect(fetchCalls[2]!.body).toEqual({ kind: 'activity', activity: 'working', tool: 'Bash', timestamp: fixedTime })
     expect(fetchCalls[3]!.body).toMatchObject({ kind: 'cost-event', tool: 'Bash', costUsd: null })
