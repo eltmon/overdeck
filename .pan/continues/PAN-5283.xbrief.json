@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5283",
   "created": "2026-11-14T19:04:13.506Z",
-  "updated": "2026-11-14T19:20:01.241Z",
+  "updated": "2026-11-14T19:20:03.076Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,11 @@
     "wi4-board-derivations.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T19:20:01.240Z"
+    },
+    "wi6-batch-pause-until": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5283",
+      "claimedAt": "2026-11-14T19:20:03.076Z"
     }
   }
 }
