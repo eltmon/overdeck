@@ -49,6 +49,7 @@ import { isAdvisoryCheckName } from '../../../lib/advisory-checks.js';
 import {
   CANCELLED_BATCH_CI_PREFIX,
   COMBINED_CI_DROP_PREFIX,
+  FAST_FORWARD_BATCH_HEAD_PREFIX,
   NO_BATCH_CI_PREFIX,
 } from '../../../lib/cloister/merge-route.js';
 import { batchWindowAppliesToProject, isWindowBatch, needsHumanMerge } from './merge-train-batching.js';
@@ -284,10 +285,19 @@ async function runTick(
         // nothing replaced it) within the bound. Dissolve the batch; every
         // member merges one at a time, as with the train off.
         const minutes = Math.round(BATCH_CI_APPEAR_TIMEOUT_MS / 60_000);
-        const prefix = verdict === 'none' ? NO_BATCH_CI_PREFIX : CANCELLED_BATCH_CI_PREFIX;
-        const why = verdict === 'none'
-          ? `${prefix} for ${gen.name} within ${minutes} min (batching needs a workflow named ${BATCH_CI_WORKFLOW} that runs on uat/** pushes)`
-          : `${prefix} on ${gen.name} and not replaced within ${minutes} min`;
+        // A head that is a member's own commit (PAN-5269: assembly
+        // fast-forwarded) explains the missing run without saying anything
+        // about the project's CI, so it must not pause batching for a day.
+        const fastForwarded = verdict === 'none' && sha !== null
+          ? gen.members.find((m) => m.headSha === sha) ?? null
+          : null;
+        const prefix = fastForwarded ? FAST_FORWARD_BATCH_HEAD_PREFIX
+          : verdict === 'none' ? NO_BATCH_CI_PREFIX : CANCELLED_BATCH_CI_PREFIX;
+        const why = fastForwarded
+          ? `${prefix} (${fastForwarded.issueId} at ${sha!.slice(0, 10)}), so no ${BATCH_CI_WORKFLOW} run appeared for ${gen.name} within ${minutes} min`
+          : verdict === 'none'
+            ? `${prefix} for ${gen.name} within ${minutes} min (batching needs a workflow named ${BATCH_CI_WORKFLOW} that runs on uat/** pushes)`
+            : `${prefix} on ${gen.name} and not replaced within ${minutes} min`;
         markDropped(gen, {
           members: [],
           heldOut: [
@@ -300,7 +310,7 @@ async function runTick(
         await teardownStack(gen).catch((err) => {
           log(`[batch-auto-promote] stack teardown for ${gen.name} failed: ${err instanceof Error ? err.message : String(err)}`);
         });
-        if (verdict === 'none' && !noBatchCiNoticeSent.has(key)) {
+        if (verdict === 'none' && !fastForwarded && !noBatchCiNoticeSent.has(key)) {
           noBatchCiNoticeSent.add(key);
           notify({
             level: 'warn',

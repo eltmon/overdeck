@@ -145,7 +145,10 @@ export function buildUatGenerationGitDeps(
         .then(() => originRef)
         .catch(() => safeFeatureBranch);
       try {
-        await runGit(['merge', '--no-edit', ref], worktreePath);
+        // --no-ff (PAN-5269): a feature that already contains the base would
+        // otherwise fast-forward, so the uat branch would point at an existing
+        // feature commit and GitHub would run no `uat/**` push CI for it.
+        await runGit(['merge', '--no-ff', '--no-edit', ref], worktreePath);
         return { ok: true as const };
       } catch (err) {
         const { stdout } = await runGit(['ls-files', '-u'], worktreePath).catch(() => ({ stdout: '' }));

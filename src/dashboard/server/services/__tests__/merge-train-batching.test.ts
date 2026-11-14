@@ -19,7 +19,7 @@ type GenerationStorePort = import('../../../../lib/cloister/uat-generation-engin
 const {
   runBatchAutoPromoteTick, batchCiVerdict, failedGatingChecks, memberToDrop, _resetBatchAutoPromoteForTests, BATCH_CI_APPEAR_TIMEOUT_MS,
 } = await import('../batch-auto-promote.js');
-const { projectLacksBatchCi, NO_BATCH_CI_PREFIX } = await import('../../../../lib/cloister/merge-route.js');
+const { projectLacksBatchCi, NO_BATCH_CI_PREFIX, FAST_FORWARD_BATCH_HEAD_PREFIX } = await import('../../../../lib/cloister/merge-route.js');
 type PendingAutoMerge = import('../../../../lib/overdeck/merge-sync.js').PendingAutoMerge;
 type WorkflowRunSummary = import('../batch-auto-promote.js').WorkflowRunSummary;
 const { droppedFromBatch, mergeRouteFor } = await import('../../../../lib/cloister/merge-route.js');
@@ -514,6 +514,30 @@ describe('a batch never waits forever for CI (review of #5254)', () => {
     const again = dissolveWorld([]);
     vi.advanceTimersByTime(BATCH_CI_APPEAR_TIMEOUT_MS);
     await runBatchAutoPromoteTick(vi.fn(), { ...again.deps, notify });
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('a batch whose head is a member\'s own commit dissolves without pausing batching or sending the no-CI notice (PAN-5269)', async () => {
+    const { deps, markDropped, notify } = dissolveWorld([]);
+    // The uat branch fast-forwarded onto PAN-2's existing head, so GitHub ran no push CI for it.
+    const world = { ...deps, branchHead: async () => 'h2' };
+    vi.advanceTimersByTime(BATCH_CI_APPEAR_TIMEOUT_MS);
+    const [outcome] = await runBatchAutoPromoteTick(vi.fn(), world);
+    expect(outcome).toMatchObject({ action: 'dissolved' });
+    const { members, heldOut } = markDropped.mock.calls[0]![1] as Pick<UatGeneration, 'members' | 'heldOut'>;
+    expect(members).toEqual([]);
+    expect(heldOut.every((h) => h.reason.startsWith(FAST_FORWARD_BATCH_HEAD_PREFIX))).toBe(true);
+    expect(notify).not.toHaveBeenCalled();
+
+    // Members still merge one at a time, but the project keeps batching.
+    const invalidated = [{ ...generation([]), status: 'invalidated' as const, heldOut, updatedAt: new Date().toISOString() }];
+    expect(droppedFromBatch('PAN-1', '/repos/overdeck', { listInvalidated: () => invalidated })).toBe(true);
+    expect(projectLacksBatchCi('/repos/overdeck', { listInvalidated: () => invalidated, now: () => Date.now() })).toBe(false);
+
+    // A later genuine no-CI dissolve in the same project still sends its notice.
+    const genuine = dissolveWorld([]);
+    vi.advanceTimersByTime(BATCH_CI_APPEAR_TIMEOUT_MS);
+    await runBatchAutoPromoteTick(vi.fn(), { ...genuine.deps, notify });
     expect(notify).toHaveBeenCalledTimes(1);
   });
 
