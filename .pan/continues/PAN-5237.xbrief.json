@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5237",
   "created": "2026-11-14T04:16:13.968Z",
-  "updated": "2026-11-14T04:16:13.968Z",
+  "updated": "2026-11-14T04:22:19.662Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,30 @@
   "sessionHistory": [],
   "items": {
     "receipt-cancel-gate": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5237",
-      "claimedAt": "2026-11-14T04:16:13.968Z"
+      "claimedAt": "2026-11-14T04:16:13.968Z",
+      "doneAt": "2026-11-14T04:22:19.661Z"
+    },
+    "receipt-cancel-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:22:19.661Z"
+    },
+    "receipt-cancel-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:22:19.661Z"
+    },
+    "receipt-cancel-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:22:19.661Z"
+    },
+    "receipt-cancel-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:22:19.661Z"
+    },
+    "receipt-cancel-gate.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:22:19.661Z"
     }
   }
 }
