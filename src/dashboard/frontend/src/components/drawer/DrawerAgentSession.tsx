@@ -163,6 +163,21 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, onCha
   ) : null;
 
   if (!agent || !conversation) {
+    if (layout === 'conversation-header') {
+      return (
+        <div data-testid={testId} className="flex min-h-0 flex-1 flex-col">
+          <div data-section="StartAgentCta" data-testid="drawer-start-surface" className="m-auto w-full max-w-[440px] px-[20px] py-[32px]">
+            <div className="mb-[4px] text-[15px] font-semibold text-foreground">No agent has run on this issue yet</div>
+            <p className="mb-[16px] text-[13px] leading-[1.6] text-body-foreground">
+              {view === 'conversation'
+                ? "Plan it first, or start work directly. Overdeck creates the workspace, and each agent's conversation appears here while it works."
+                : "Plan it first, or start work directly. Overdeck creates the workspace, and the agent's live terminal appears here while it works."}
+            </p>
+            {issueId && <StartAgentCta issueId={issueId} density="console" />}
+          </div>
+        </div>
+      );
+    }
     return (
       <div
         data-testid={testId}
@@ -345,6 +360,13 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, onCha
             </Fragment>
           ))}
         </div>
+        {ended && issueId ? (
+          // D-13: the Conversation tab's resume path (Resume, Start with
+          // overrides, or nothing, by StartAgentCta's own rules).
+          <div data-testid="drawer-agent-restart-row" className="shrink-0 border-b border-border px-[20px] py-[8px] empty:hidden">
+            <StartAgentCta issueId={issueId} density="console" />
+          </div>
+        ) : null}
         {belowHeader}
         <div className="min-h-0 flex-1 overflow-hidden">
           {sessionBody}
