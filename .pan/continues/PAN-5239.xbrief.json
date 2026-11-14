@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5239",
   "created": "2026-11-14T04:43:48.158Z",
-  "updated": "2026-11-14T05:33:22.813Z",
+  "updated": "2026-11-14T05:36:45.118Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,9 +148,22 @@
       "doneAt": "2026-11-14T05:33:09.245Z"
     },
     "skill-tick-targets": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5239",
-      "claimedAt": "2026-11-14T05:33:22.812Z"
+      "claimedAt": "2026-11-14T05:33:22.812Z",
+      "doneAt": "2026-11-14T05:36:45.117Z"
+    },
+    "skill-tick-targets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:36:45.117Z"
+    },
+    "skill-tick-targets.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:36:45.117Z"
+    },
+    "skill-tick-targets.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:36:45.117Z"
     }
   }
 }
