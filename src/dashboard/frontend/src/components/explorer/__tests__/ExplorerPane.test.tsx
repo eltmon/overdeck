@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, onTestFinished } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { PanRpcError, type ExplorerEntry, type ExplorerListDirResult, type ExplorerWatchBatch } from '@overdeck/contracts'
 
@@ -36,6 +36,7 @@ vi.mock('../explorer-rpc', async (importOriginal) => {
 import { DialogProvider } from '../../DialogProvider'
 import { StageDeckProvider } from '../../Stage/StageDeckContext'
 import { ExplorerPane, PREVIEW_OPEN_DELAY_MS } from '../ExplorerPane'
+import { installShortcutListener, resetShortcutsForTests } from '../../../lib/shortcuts/registry'
 import { useExplorerStore } from '../explorerStore'
 import { usePanesStore, selectPanesForWorkspace } from '../../../lib/panesStore'
 import type { WorkspacePane } from '../../../lib/panesStore'
@@ -183,6 +184,14 @@ describe('ExplorerPane', () => {
   })
 
   it('opens quick open on Ctrl+P and content search on Ctrl+Shift+F', async () => {
+    // PAN-5287: the explorer keys are shortcut-registry entries scoped to the pane.
+    const platform = vi.spyOn(navigator, 'platform', 'get').mockReturnValue('Linux x86_64')
+    const uninstall = installShortcutListener()
+    onTestFinished(() => {
+      platform.mockRestore()
+      uninstall()
+      resetShortcutsForTests()
+    })
     renderPane()
     await screen.findByText('README.md')
     const tree = screen.getByRole('tree')
