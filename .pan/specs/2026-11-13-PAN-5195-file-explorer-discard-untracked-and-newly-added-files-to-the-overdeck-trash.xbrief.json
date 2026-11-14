@@ -4,17 +4,17 @@
     "created": "2026-11-13T20:42:49Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5195: File explorer: discard untracked and newly added files to the Overdeck trash",
-    "updated": "2026-11-13T20:47:41.980Z"
+    "updated": "2026-11-14T01:02:41.074Z"
   },
   "plan": {
     "id": "pan-5195",
     "title": "File explorer: discard untracked and newly added files to the Overdeck trash",
-    "status": "proposed",
+    "status": "running",
     "uid": "c4f91c4c-c79c-4187-a726-ac56c76a840b",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-13T20:42:49Z",
-    "updated": "2026-11-13T20:47:41.980Z",
+    "updated": "2026-11-14T01:02:41.074Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5195",
@@ -332,5 +332,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
