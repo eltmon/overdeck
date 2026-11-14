@@ -26,6 +26,7 @@ import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { Inbox, ListOrdered, type LucideIcon, MessageSquare, Settings } from 'lucide-react';
 import { parsePhoneIssueEvent, phoneIssueSheetPath, type PhoneIssueEvent } from '@overdeck/contracts';
 import { EventRouter } from '../EventRouter';
+import { NewBuildBanner } from '../NewBuildBanner';
 import { useConnectionState } from '../../lib/connectionState';
 import { isNativeShell } from '../../lib/nativeShell';
 import { MobileNeedsYou } from './MobileNeedsYou';
@@ -155,6 +156,8 @@ export default function MobileApp({ headerSlot }: { headerSlot?: ReactNode } = {
         <MobilePairScreen />
       ) : (
         <>
+          {/* PAN-5236: the web /m shell only — the phone app's bundle cannot be reloaded to update (D-8). */}
+          {!native && <NewBuildBanner safeAreaTop />}
           {!fullScreen && (
             <MobileScreenHeader
               leading={<OverdeckLockup className="h-6" />}

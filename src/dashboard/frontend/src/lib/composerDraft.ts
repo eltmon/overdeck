@@ -28,3 +28,16 @@ export function saveDraft(conversationName: string, text: string): void {
 export function clearDraft(conversationName: string): void {
   saveDraft(conversationName, '');
 }
+
+/** PAN-5236: true when any conversation has unsent text saved. */
+export function hasSavedDraft(): boolean {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('conv-draft:') && localStorage.getItem(key)) return true;
+    }
+  } catch {
+    // Storage unavailable
+  }
+  return false;
+}

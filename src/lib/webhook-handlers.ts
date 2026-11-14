@@ -5,10 +5,10 @@
  * `review_status` row. GitHub already owns that state and `cloister/pr-facts`
  * reads it on demand, so nothing is written back here any more. What is left is
  * the work a webhook can do that a read cannot: invalidate the PR-tab cache,
- * record a default-branch CI suite observation, relay a CI failure to the work
- * agent, start the review pipeline for a PR opened or readied outside
- * `pan done`, and fire the post-merge lifecycle for merges that bypassed
- * Overdeck.
+ * invalidate the PR listing (through the coalescer), record a default-branch
+ * CI suite observation, relay a CI failure to the work agent, start the
+ * review pipeline for a PR opened or readied outside `pan done`, and fire the
+ * post-merge lifecycle for merges that bypassed Overdeck.
  * Shared advisory-check classification keeps CodeRabbit out of merge gates; a
  * CodeRabbit review's inline findings are routed to the work agent (PAN-4773).
  */
@@ -215,6 +215,18 @@ export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {
 
   const repo = payload.repository!.full_name;
 
+  {
+    const listedPrs = suite.pull_requests ?? [];
+    const branchIssueId = suite.head_branch ? issueIdFromBranch(suite.head_branch) : null;
+    if (listedPrs.length > 0 || branchIssueId) {
+      const ids = listedPrs.length > 0
+        ? [...new Set(listedPrs.map((listedPr) => issueIdFromBranch(listedPr.head.ref)).filter((id): id is string => Boolean(id)))]
+        : [branchIssueId!];
+      const { notePullRequestWebhook } = await import('../dashboard/server/services/pr-webhook-freshness.js');
+      notePullRequestWebhook(repo, ids, `check_suite:${payload.action ?? 'unknown'}`);
+    }
+  }
+
   const failing = Boolean(suite.conclusion) && FAILING_CHECK_CONCLUSIONS.has(suite.conclusion!.toUpperCase());
   const listed = suite.pull_requests ?? [];
   const prs = listed.length > 0 || !failing
@@ -253,6 +265,21 @@ export async function handleCheckRun(payload: WebhookPayload): Promise<void> {
   const repo = payload.repository!.full_name;
   const sourceKey = `check_run:${run.name ?? String(run.id ?? 'unknown')}`;
   const isAdvisory = isAdvisoryCheckName(run.name);
+
+  {
+    const runConclusion = run.conclusion?.toUpperCase();
+    const coalescerTrigger = payload.action === 'created'
+      || (payload.action === 'completed' && runConclusion != null && FAILING_CHECK_CONCLUSIONS.has(runConclusion));
+    if (coalescerTrigger) {
+      const listedRuns = run.pull_requests ?? [];
+      const branchIssueId = run.check_suite?.head_branch ? issueIdFromBranch(run.check_suite.head_branch) : null;
+      const ids = listedRuns.length > 0
+        ? [...new Set(listedRuns.map((listedPr) => issueIdFromBranch(listedPr.head.ref)).filter((id): id is string => Boolean(id)))]
+        : (branchIssueId ? [branchIssueId] : []);
+      const { notePullRequestWebhook } = await import('../dashboard/server/services/pr-webhook-freshness.js');
+      notePullRequestWebhook(repo, ids, `check_run:${payload.action ?? 'unknown'}`);
+    }
+  }
 
   const conclusion = run.conclusion?.toUpperCase();
   const actionable = Boolean(conclusion) && (
@@ -309,14 +336,26 @@ export async function handlePullRequest(payload: WebhookPayload): Promise<void> 
   if (!isTrackedRepository(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   if (!pr) return;
+  const repo = payload.repository!.full_name;
   const issueId = issueIdFromBranch(pr.head.ref);
+  {
+    const { notePullRequestWebhook } = await import('../dashboard/server/services/pr-webhook-freshness.js');
+    notePullRequestWebhook(repo, issueId ? [issueId] : [], `pull_request:${payload.action ?? 'unknown'}`);
+  }
   if (!issueId) return;
   bumpIssuePrTabCacheGeneration(issueId);
 
-  const repo = payload.repository!.full_name;
-
   if (['opened', 'closed', 'reopened', 'ready_for_review'].includes(payload.action ?? '')) {
     try {
+      // PAN-5224: invalidate the membership open-PR snapshot before the
+      // enqueue below starts a membership gather (1s debounce), so it never
+      // reads a pre-event snapshot while the coalescer's own trailing fire
+      // (up to 6s away) is still pending.
+      const [owner, repoName] = repo.split('/');
+      if (owner && repoName) {
+        const { invalidateOpenPullRequestsSnapshot } = await import('./pipeline-membership-gather.js');
+        invalidateOpenPullRequestsSnapshot(owner, repoName);
+      }
       const { listProjectsSync, resolveProjectFromIssueSync } = await import('./projects.js');
       const resolved = resolveProjectFromIssueSync(issueId);
       const project = resolved
@@ -424,7 +463,12 @@ export async function handlePullRequestReview(payload: WebhookPayload): Promise<
   const pr = payload.pull_request;
   const review = payload.review;
   if (!pr || !review) return;
+  const repo = payload.repository!.full_name;
   const issueId = issueIdFromBranch(pr.head.ref);
+  {
+    const { notePullRequestWebhook } = await import('../dashboard/server/services/pr-webhook-freshness.js');
+    notePullRequestWebhook(repo, issueId ? [issueId] : [], `pull_request_review:${payload.action ?? 'unknown'}`);
+  }
   if (!issueId) return;
   bumpIssuePrTabCacheGeneration(issueId);
   // PAN-4773: a CodeRabbit review's inline findings go to the work agent. Never awaited, never gating.
@@ -469,11 +513,17 @@ export async function handlePullRequestReviewThread(payload: WebhookPayload): Pr
 /** Handle a `status` GitHub webhook payload. */
 export async function handleStatus(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepository(payload.repository?.full_name)) return;
-  const state = payload.state;
+  const repo = payload.repository!.full_name;
   const branches = payload.branches;
+  if (branches && branches.length > 0) {
+    const ids = [...new Set(branches.map((branch) => issueIdFromBranch(branch.name)).filter((id): id is string => Boolean(id)))];
+    const { notePullRequestWebhook } = await import('../dashboard/server/services/pr-webhook-freshness.js');
+    notePullRequestWebhook(repo, ids, `status:${payload.state ?? 'unknown'}`);
+  }
+
+  const state = payload.state;
   if (!state || !branches || branches.length === 0) return;
 
-  const repo = payload.repository!.full_name;
   const context = payload.context ?? 'default';
   const sourceKey = `status:${context}`;
   if (isAdvisoryCheckName(context)) {

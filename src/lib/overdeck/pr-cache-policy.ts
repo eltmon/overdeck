@@ -11,6 +11,7 @@ import { promisify } from 'node:util';
 import { createSettledTtlPromiseCache } from '../concurrency.js';
 import { findProjectByPath } from '../projects.js';
 import { tryResolveProjectTrackerType } from '../project-tracker-type.js';
+import { PR_LISTING_ACTIVE_TTL_MS, PR_LISTING_IDLE_TTL_MS, prListingIdleTtlMs } from './pr-freshness.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -48,16 +49,20 @@ export async function shouldListPullRequests(projectPath: string): Promise<boole
 }
 
 /** How long a PR listing with no open PR is trusted: nothing there can change without a new PR. */
-export const PR_CACHE_IDLE_TTL_MS = 5 * 60_000;
+export const PR_CACHE_IDLE_TTL_MS = PR_LISTING_IDLE_TTL_MS;
 
 /**
- * `activeTtlMs`, or `PR_CACHE_IDLE_TTL_MS` when `rows` is a listing with no
+ * `activeTtlMs`, or `prListingIdleTtlMs()` when `rows` is a listing with no
  * OPEN row: a repo with only merged/closed PRs in its window can't produce a
  * state change until a new PR opens, so the next read need not hit the forge
- * as often as one still tracking an open PR.
+ * as often as one still tracking an open PR. An OPEN row with
+ * `mergeable: 'UNKNOWN'` (GitHub still computing mergeability) keeps the 30 s
+ * fallback cadence regardless of webhook health (FR-1) — a stale UNKNOWN
+ * blocks merge-gating readers.
  */
-export function prListingTtlMs(rows: readonly { state?: string }[] | null, activeTtlMs: number): number {
+export function prListingTtlMs(rows: readonly { state?: string; mergeable?: string }[] | null, activeTtlMs: number): number {
   if (!rows) return activeTtlMs;
-  const hasOpenPr = rows.some((row) => row.state?.toUpperCase() === 'OPEN');
-  return hasOpenPr ? activeTtlMs : PR_CACHE_IDLE_TTL_MS;
+  const openRows = rows.filter((row) => row.state?.toUpperCase() === 'OPEN');
+  if (openRows.some((row) => row.mergeable === 'UNKNOWN')) return PR_LISTING_ACTIVE_TTL_MS;
+  return openRows.length > 0 ? activeTtlMs : prListingIdleTtlMs();
 }

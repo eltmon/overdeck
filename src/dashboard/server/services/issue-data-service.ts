@@ -236,6 +236,9 @@ export class IssueDataService {
   private planningRefreshActive = 0;
   private derivedRefreshQueued = false;
   private derivedRefreshIssueIds = new Set<string>();
+  // PAN-5224: a run never overwrites a later-started one.
+  private derivedRefreshRun = 0;
+  private derivedWrittenRun = new Map<string, number>();
   private getIssuesCache = new Map<string, GetIssuesCacheEntry>();
   /** Issues resolved on demand after aging out of the tracker sync window
    * (PAN-3659). Keyed by uppercase identifier; merged into computeIssues and
@@ -969,6 +972,7 @@ export class IssueDataService {
   }
 
   private async refreshDerivedStates(issueIds: readonly string[]): Promise<void> {
+    const run = ++this.derivedRefreshRun; // PAN-5224: a run never overwrites a later-started one
     const byProject = new Map<string, string[]>();
     const issues: Record<string, { open: boolean; labels: readonly string[] } | null> = {};
     for (const raw of issueIds) {
@@ -985,6 +989,8 @@ export class IssueDataService {
       try {
         const states = await loadIssueStatesForProject(projectPath, ids, { issues, panes: await getBackendPanes() });
         for (const [issueId, state] of states) {
+          if ((this.derivedWrittenRun.get(issueId) ?? 0) > run) continue;
+          this.derivedWrittenRun.set(issueId, run);
           const previous = this.derivedStatesCache[issueId];
           this.derivedStatesCache[issueId] = state;
           if (previous && JSON.stringify(previous) === JSON.stringify(state)) continue;

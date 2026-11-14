@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { clearDraft, loadDraft, saveDraft } from '../composerDraft.js';
+import { clearDraft, hasSavedDraft, loadDraft, saveDraft } from '../composerDraft.js';
 
 beforeEach(() => {
   localStorage.clear();
@@ -16,5 +16,26 @@ describe('clearDraft / loadDraft / saveDraft', () => {
     expect(loadDraft('c1')).toBe('');
     saveDraft('c1', 'hello');
     expect(loadDraft('c1')).toBe('hello');
+  });
+});
+
+describe('hasSavedDraft', () => {
+  it('is false with no draft keys', () => {
+    expect(hasSavedDraft()).toBe(false);
+  });
+
+  it('is false when the saved draft is empty', () => {
+    localStorage.setItem('conv-draft:a', '');
+    expect(hasSavedDraft()).toBe(false);
+  });
+
+  it('is true when a draft has text', () => {
+    localStorage.setItem('conv-draft:a', 'hi');
+    expect(hasSavedDraft()).toBe(true);
+  });
+
+  it('ignores unrelated keys', () => {
+    localStorage.setItem('other-key', 'hi');
+    expect(hasSavedDraft()).toBe(false);
   });
 });

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createProjectResourceRefreshQueue,
+  membershipRefreshForProject,
   PROJECT_RESOURCE_REFRESH_DEBOUNCE_MS,
   shouldRefreshMembershipForResourceRefresh,
 } from '../../../src/dashboard/server/services/project-resource-refresh-queue.js';
@@ -58,6 +59,47 @@ describe('project resource refresh queue', () => {
     };
 
     expect(shouldRefreshMembershipForResourceRefresh(context)).toBe(true);
+  });
+
+  describe('membershipRefreshForProject (PAN-5224)', () => {
+    const alpha = project('alpha');
+
+    it('healthy webhooks + GitHub tracker: periodic-convergence waits for the fallback interval (ac1)', () => {
+      const deps = {
+        ageMs: () => 10 * 60_000,
+        fallbackMs: (trackerIsGithub: boolean) => (trackerIsGithub ? 30 * 60_000 : 5 * 60_000),
+        trackerType: () => 'github' as const,
+      };
+      expect(membershipRefreshForProject(alpha, new Set(['periodic-convergence']), deps)).toBe(false);
+      expect(membershipRefreshForProject(alpha, new Set(['periodic-convergence']), { ...deps, ageMs: () => 31 * 60_000 })).toBe(true);
+      expect(membershipRefreshForProject(alpha, new Set(['periodic-convergence']), { ...deps, ageMs: () => null })).toBe(true);
+    });
+
+    it('a Linear-tracker project, or webhooks not healthy, refreshes at the short fallback (ac2)', () => {
+      const linearDeps = {
+        ageMs: () => 6 * 60_000,
+        fallbackMs: (trackerIsGithub: boolean) => (trackerIsGithub ? 30 * 60_000 : 5 * 60_000),
+        trackerType: () => 'linear' as const,
+      };
+      expect(membershipRefreshForProject(alpha, new Set(['periodic-convergence']), linearDeps)).toBe(true);
+
+      const unhealthyDeps = {
+        ageMs: () => 6 * 60_000,
+        fallbackMs: () => 5 * 60_000,
+        trackerType: () => 'github' as const,
+      };
+      expect(membershipRefreshForProject(alpha, new Set(['periodic-convergence']), unhealthyDeps)).toBe(true);
+    });
+
+    it('any non-periodic membership reason refreshes at once; agent.started alone does not (ac3)', () => {
+      const deps = {
+        ageMs: () => 0,
+        fallbackMs: () => Number.POSITIVE_INFINITY,
+        trackerType: () => 'github' as const,
+      };
+      expect(membershipRefreshForProject(alpha, new Set(['periodic-convergence', 'pull_request:opened']), deps)).toBe(true);
+      expect(membershipRefreshForProject(alpha, new Set(['agent.started']), deps)).toBe(false);
+    });
   });
 
   it('runs at most one follow-up when the active project changes again', async () => {

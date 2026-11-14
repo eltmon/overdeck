@@ -860,7 +860,7 @@ function publishProjectResourceSnapshot(project: ProjectConfig, issues: Internal
 }
 
 export interface RefreshResourceAllocatedProjectsOptions {
-  refreshMembership?: boolean;
+  refreshMembership?: boolean | ((project: ProjectConfig) => boolean);
 }
 
 /** Refresh only the requested projects, capturing fleet-wide signals once for the batch. */
@@ -873,7 +873,10 @@ export async function refreshResourceAllocatedProjects(
   const failures: Error[] = [];
   for (const project of projects) {
     try {
-      if (options.refreshMembership !== false) {
+      const refresh = typeof options.refreshMembership === 'function'
+        ? options.refreshMembership(project)
+        : options.refreshMembership !== false;
+      if (refresh) {
         await refreshMembershipSnapshotsForProjects([project]);
       }
       const issues = await computeResourceAllocatedIssues([project], sharedSignals);

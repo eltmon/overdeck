@@ -1,5 +1,8 @@
 import type { ProjectConfig } from '../../../lib/projects.js';
 import { listProjectsSync } from '../../../lib/projects.js';
+import { membershipFallbackMs } from '../../../lib/overdeck/pr-freshness.js';
+import { tryResolveProjectTrackerType } from '../../../lib/project-tracker-type.js';
+import { membershipSnapshotAgeMs } from './pipeline-membership.js';
 import { refreshResourceAllocatedProjects } from './resource-discovery.js';
 
 export const PROJECT_RESOURCE_REFRESH_DEBOUNCE_MS = 1_000;
@@ -198,6 +201,9 @@ const MEMBERSHIP_REFRESH_REASONS = new Set([
   'pull_request:opened',
   'pull_request:closed',
   'pull_request:reopened',
+  'review-door',
+  'merge.completed',
+  'tracker:issues-changed',
 ]);
 
 export function shouldRefreshMembershipForResourceRefresh(
@@ -207,9 +213,30 @@ export function shouldRefreshMembershipForResourceRefresh(
     .some((projectReasons) => [...projectReasons].some((reason) => MEMBERSHIP_REFRESH_REASONS.has(reason)));
 }
 
+/**
+ * PAN-5224: any membership reason other than `periodic-convergence` refreshes
+ * at once. `periodic-convergence` alone refreshes only once the project's
+ * membership snapshot is at least as old as its fallback interval (longer
+ * while webhooks are healthy and the project's tracker is GitHub) — the
+ * fallback this project would otherwise miss entirely, since nothing else
+ * invalidates its membership snapshot on a 5-minute convergence tick.
+ */
+export function membershipRefreshForProject(
+  project: ProjectConfig,
+  reasons: ReadonlySet<string>,
+  deps = { ageMs: membershipSnapshotAgeMs, fallbackMs: membershipFallbackMs, trackerType: tryResolveProjectTrackerType },
+): boolean {
+  const immediate = [...reasons].some((reason) => reason !== 'periodic-convergence' && MEMBERSHIP_REFRESH_REASONS.has(reason));
+  if (immediate) return true;
+  if (!reasons.has('periodic-convergence')) return false;
+  const age = deps.ageMs(project.path);
+  return age === null || age >= deps.fallbackMs(deps.trackerType(project) === 'github');
+}
+
 const projectResourceRefreshQueue = createProjectResourceRefreshQueue({
   refreshProjects: (projects, context) => refreshResourceAllocatedProjects(projects, {
-    refreshMembership: shouldRefreshMembershipForResourceRefresh(context),
+    refreshMembership: (project) =>
+      membershipRefreshForProject(project, context.reasonsByProjectPath.get(project.path) ?? new Set()),
   }),
 });
 

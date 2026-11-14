@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { EventRouter } from '../components/EventRouter';
+import { NewBuildBanner } from '../components/NewBuildBanner';
 import { StandaloneTerminal } from '../components/StandaloneTerminal';
 import { DiffPanel } from '../components/DiffPanel';
 import { DiffWorkerPoolProvider } from '../components/DiffWorkerPoolProvider';
@@ -54,8 +55,10 @@ export function StandaloneConversationPopoutRoute({ conversationId }: { conversa
   });
 
   return (
-    <div className="h-screen overflow-hidden bg-background">
+    <div className="flex h-screen flex-col overflow-hidden bg-background">
       <EventRouter />
+      <NewBuildBanner />
+      <div className="min-h-0 flex-1">
       {!Number.isFinite(numericId) || numericId <= 0 ? (
         <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
           Invalid conversation id.
@@ -75,6 +78,7 @@ export function StandaloneConversationPopoutRoute({ conversationId }: { conversa
           onArchived={() => window.close()}
         />
       )}
+      </div>
     </div>
   );
 }

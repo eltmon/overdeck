@@ -665,10 +665,22 @@ export const ReadModelServiceLive = Layer.effect(
         }
         console.log(`[boot-timing] ReadModel bootstrap merge completed at +${Math.round(performance.now() - mergeT0)}ms`);
 
+        // PAN-5224 FR-5: seed the tracker-change membership trigger with the
+        // unfiltered issue set before the callback below can fire against it.
+        const { seedTrackerIssues, noteTrackerIssues } = yield* Effect.promise(
+          () => import('./services/membership-tracker-trigger.js'),
+        );
+        seedTrackerIssues(issueService.getIssues({ cycle: 'all' }));
+
         // Wire live issue updates — when IssueDataService polls new data,
         // update the read model directly AND emit to event store for
         // WebSocket subscribers (PAN-433).
         issueService.onIssuesChanged((issues) => {
+          // PAN-5224 FR-5: `issues` (the callback's own argument) is
+          // cycle-filtered; re-read the unfiltered set for the tracker-change
+          // membership trigger's diff.
+          noteTrackerIssues(issueService.getIssues({ cycle: 'all' }));
+
           const cleaned = cleanIssues(issues);
           const delta = createIssueDelta(state.issuesRaw, cleaned);
           if (!delta) return;

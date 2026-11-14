@@ -37,6 +37,8 @@ const mockGetPrFacts = vi.fn();
 const mockAdopt = vi.fn(async (..._args: unknown[]) => ({ kind: 'started', workspacePath: '/tmp/test-project/workspaces/feature-pan-1' }));
 const mockRefreshIssuePullRequestStateNow = vi.fn();
 const mockMaybeRelayCodeRabbitReview = vi.fn((..._args: unknown[]) => null);
+const mockNotePullRequestWebhook = vi.fn();
+const mockInvalidateOpenPullRequestsSnapshot = vi.fn();
 
 vi.mock('../../../src/dashboard/server/services/pr-tab-cache.js', () => ({
   bumpIssuePrTabCacheGeneration: (...args: Parameters<typeof mockBumpIssuePrTabCacheGeneration>) =>
@@ -88,6 +90,14 @@ vi.mock('../../../src/dashboard/server/services/project-resource-refresh-queue.j
 
 vi.mock('../../../src/lib/cloister/coderabbit-feedback.js', () => ({
   maybeRelayCodeRabbitReview: (...args: unknown[]) => mockMaybeRelayCodeRabbitReview(...args),
+}));
+
+vi.mock('../../../src/dashboard/server/services/pr-webhook-freshness.js', () => ({
+  notePullRequestWebhook: (...args: unknown[]) => mockNotePullRequestWebhook(...args),
+}));
+
+vi.mock('../../../src/lib/pipeline-membership-gather.js', () => ({
+  invalidateOpenPullRequestsSnapshot: (...args: unknown[]) => mockInvalidateOpenPullRequestsSnapshot(...args),
 }));
 
 vi.mock('../../../src/lib/cloister/pr-adoption-review.js', () => ({
@@ -780,5 +790,104 @@ describe('handleStatus', () => {
     }));
 
     expect(mockRecordCiTestGatePass).not.toHaveBeenCalled();
+  });
+});
+
+describe('notePullRequestWebhook coalescer calls (PAN-5224)', () => {
+  it('handlePullRequest calls notePullRequestWebhook with the issue id and reason (ac1)', async () => {
+    await handlePullRequest(makePayload({
+      action: 'synchronize',
+      pull_request: { number: 9, head: { ref: 'feature/pan-7', sha: 'abc' } },
+    }));
+
+    expect(mockNotePullRequestWebhook).toHaveBeenCalledWith(
+      'test-owner/test-repo', ['PAN-7'], 'pull_request:synchronize',
+    );
+  });
+
+  it('handleCheckSuite calls it for a successful suite with empty pull_requests on a feature branch, not on the default branch (ac2)', async () => {
+    await handleCheckSuite(makePayload({
+      check_suite: {
+        status: 'completed', conclusion: 'success',
+        head_branch: 'feature/pan-7', pull_requests: [],
+      },
+    }));
+    expect(mockNotePullRequestWebhook).toHaveBeenCalledWith(
+      'test-owner/test-repo', ['PAN-7'], 'check_suite:completed',
+    );
+
+    mockNotePullRequestWebhook.mockClear();
+
+    await handleCheckSuite(makePayload({
+      check_suite: {
+        status: 'completed', conclusion: 'success',
+        head_branch: 'main', pull_requests: [],
+      },
+    }));
+    expect(mockNotePullRequestWebhook).not.toHaveBeenCalled();
+  });
+
+  it('handleCheckRun calls it on created, not on a completed success (ac3)', async () => {
+    await handleCheckRun(makePayload({
+      action: 'completed',
+      check_run: {
+        name: 'build', conclusion: 'success',
+        pull_requests: [{ number: 5, head: { ref: 'feature/pan-7', sha: 'cafe' } }],
+      },
+    }));
+    expect(mockNotePullRequestWebhook).not.toHaveBeenCalled();
+
+    await handleCheckRun(makePayload({
+      action: 'created',
+      check_run: {
+        name: 'build',
+        pull_requests: [{ number: 5, head: { ref: 'feature/pan-7', sha: 'cafe' } }],
+      },
+    }));
+    expect(mockNotePullRequestWebhook).toHaveBeenCalledWith(
+      'test-owner/test-repo', ['PAN-7'], 'check_run:created',
+    );
+  });
+
+  it('handlePullRequestReview and handleStatus call it; an untracked repository never does (ac4)', async () => {
+    await handlePullRequestReview(makePayload({
+      action: 'submitted',
+      pull_request: { number: 9, head: { ref: 'feature/pan-7', sha: 'abc' } },
+      review: { state: 'commented' },
+    }));
+    expect(mockNotePullRequestWebhook).toHaveBeenCalledWith(
+      'test-owner/test-repo', ['PAN-7'], 'pull_request_review:submitted',
+    );
+
+    mockNotePullRequestWebhook.mockClear();
+
+    await handleStatus(makePayload({
+      state: 'pending',
+      branches: [{ name: 'feature/pan-7' }],
+    }));
+    expect(mockNotePullRequestWebhook).toHaveBeenCalledWith(
+      'test-owner/test-repo', ['PAN-7'], 'status:pending',
+    );
+
+    mockNotePullRequestWebhook.mockClear();
+
+    await handlePullRequest(makePayload({
+      repository: { full_name: 'untracked/repo' },
+      action: 'synchronize',
+      pull_request: { number: 9, head: { ref: 'feature/pan-7', sha: 'abc' } },
+    }));
+    expect(mockNotePullRequestWebhook).not.toHaveBeenCalled();
+  });
+
+  it('handlePullRequest invalidates the membership open-PR snapshot before enqueueing the resource refresh (ac5)', async () => {
+    await handlePullRequest(makePayload({
+      action: 'opened',
+      pull_request: { number: 9, head: { ref: 'feature/pan-7', sha: 'abc' } },
+    }));
+
+    expect(mockInvalidateOpenPullRequestsSnapshot).toHaveBeenCalledWith('test-owner', 'test-repo');
+    const invalidateOrder = mockInvalidateOpenPullRequestsSnapshot.mock.invocationCallOrder[0]!;
+    const enqueueOrder = mockEnqueueProjectResourceRefresh.mock.invocationCallOrder[0]!;
+    expect(invalidateOrder).toBeLessThan(enqueueOrder);
   });
 });
