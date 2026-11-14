@@ -1,0 +1,29 @@
+{
+  "version": "1",
+  "issueId": "PAN-5218",
+  "created": "2026-11-14T02:30:48.079Z",
+  "updated": "2026-11-14T02:30:48.080Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "journal-types": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:30:48.079Z"
+    },
+    "journal-types.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:30:48.079Z"
+    },
+    "journal-types.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:30:48.079Z"
+    },
+    "journal-types.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T02:30:48.079Z"
+    }
+  }
+}
