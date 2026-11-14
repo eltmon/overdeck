@@ -47,6 +47,7 @@ import type { Agent } from '../../types';
 import { useDashboardStore } from '../../lib/store';
 import { resetDrawerIssueSubscriptionForTest } from '../drawer/useDrawerData';
 import { IssueDrawerDetails, type IssueDrawerDetailsProps } from './IssueDrawerDetails';
+import { StatusNarrative } from '../Stage/cockpit/StatusNarrative';
 
 function agent(overrides: Partial<Agent> & { id: string }): Agent {
   return {
@@ -112,6 +113,23 @@ describe('IssueDrawerDetails', () => {
     } as Parameters<typeof useDashboardStore.setState>[0]);
     renderDetails();
     expect(screen.getByTestId('drawer-details-status')).toHaveTextContent('The reviewer asked for changes');
+  });
+
+  it('the Status section shows the next step as text', () => {
+    renderDetails();
+    const next = within(screen.getByTestId('drawer-details-status')).getByTestId('status-narrative-next');
+    expect(next.textContent?.trim()).not.toBe('');
+  });
+
+  it('StatusNarrative without showNext renders only the headline', () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <StatusNarrative issueId="PAN-1" hasPlan={false} workRunning={false} />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByTestId('status-narrative')).toBeInTheDocument();
+    expect(screen.queryByTestId('status-narrative-next')).toBeNull();
   });
 
   it('the Status section reads as running for a pane-only work phase (no work agent)', () => {

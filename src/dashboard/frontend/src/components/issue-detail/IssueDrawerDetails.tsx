@@ -215,7 +215,7 @@ export function IssueDrawerDetails({
       <div className="min-w-0 space-y-[22px]">
         <section data-testid="drawer-details-status">
           <h3 className={HEADING_CLASS}>Status</h3>
-          <StatusNarrative issueId={issueId} hasPlan={hasPlan} workRunning={workRunning} />
+          <StatusNarrative issueId={issueId} hasPlan={hasPlan} workRunning={workRunning} showNext />
         </section>
 
         <section data-testid="drawer-details-pipeline">
