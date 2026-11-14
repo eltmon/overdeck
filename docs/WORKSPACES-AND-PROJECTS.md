@@ -731,6 +731,43 @@ Because Claude Code reads a single JSON object from a SessionStart hook's
 stdout, the hook concatenates the briefing with the post-compaction note into
 one `additionalContext` rather than printing two objects.
 
+## Commit attribution (PAN-5281)
+
+Every `git commit` an Overdeck session makes ends with one trailer naming the
+session:
+
+- an agent commit carries `Overdeck-Agent: <agent id>` (the value exported as
+  `OVERDECK_AGENT_ID`, for example `agent-pan-5185`);
+- a conversation commit carries `Overdeck-Conversation: <conversation session
+  name>` (the value exported as `OVERDECK_CONVERSATION`, for example
+  `conv-20261113-6031`).
+
+The `git` shims on the session's PATH add the trailer, and the id is written
+into the shim at launch, so a changed environment variable cannot change the
+attribution. The agent git shim (`buildGitGuardLines` in
+`src/lib/launcher-git-guard.ts`) adds `Overdeck-Agent`. Conversations get a
+trailer-only `git` shim beside their `gh` shim (`buildConversationShimLines`)
+that adds `Overdeck-Conversation` and refuses nothing. An agent launched from
+inside a conversation drops the conversation's guard dir from PATH, so its
+commits carry only `Overdeck-Agent`. Each shim passes
+`-c trailer.<key>.ifexists=addIfDifferent` for that one call, so
+`git commit --amend` never adds a second copy.
+
+Only `git commit` is stamped: `merge`, `cherry-pick`, `revert`, `rebase` and
+`am` are not changed, and a cherry-picked or rebased commit keeps the trailers
+its message already has. No git hook is used, so repository hooks
+(`core.hooksPath`, husky) are untouched.
+
+These commits are not attributed: commits made with `OVERDECK_PAN_GIT_OP=1`
+(the bypass `pan`'s own git operations use), through an absolute
+`/usr/bin/git`, through a git alias for `commit`, or with git older than 2.32
+(no `commit --trailer`; the launcher probes for it once). Remote (Fly) agents
+are not attributed either.
+
+`listAttributedCommits` in `src/lib/git/attributed-commits.ts` reads the
+trailers back: it lists a session's non-merge commits reachable from `HEAD`,
+newest first, with each commit's files, status and line counts.
+
 ## Wrapper-repo git posture (polyrepo projects)
 
 For a `workspace.type: polyrepo` project (PAN-2948), the workspace *root* is
