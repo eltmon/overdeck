@@ -857,6 +857,55 @@ describe('Definition-of-Done post-merge row', () => {
     expect(row).toMatchObject({ status: 'pass' });
     expect(isAliveSpy).not.toHaveBeenCalled();
   });
+
+  // PAN-5225: a non-GitHub-tracked issue has no canonical state and no PR
+  // mergedAt, so complete merged forge artifacts stand in for mergedAt.
+  const nonGitHubCtx = { issueId, projectPath: '/tmp/overdeck' };
+
+  it('passes a non-GitHub issue whose forge merge evidence is complete', async () => {
+    const row = await checkPostMergeRow(nonGitHubCtx, undefined, {
+      readCanonicalState: async () => null,
+      readMergedAt: () => undefined,
+      listAgents: clearAgents,
+      isAlive: aliveAgent,
+    }, {
+      forgeMerge: async () => ({ repos: [{ repoKey: 'fe', state: 'merged', url: 'u', reason: '' }] }),
+    });
+
+    expect(row).toMatchObject({ status: 'pass' });
+    expect(row.observed).toContain('forge merge complete: fe merged (u)');
+    expect(row.observed).toContain('merged forge artifacts stand in for the PR mergedAt');
+  });
+
+  it('still misses when the forge merge evidence is incomplete', async () => {
+    const row = await checkPostMergeRow(nonGitHubCtx, undefined, {
+      readCanonicalState: async () => null,
+      readMergedAt: () => undefined,
+      listAgents: clearAgents,
+      isAlive: aliveAgent,
+    }, {
+      forgeMerge: async () => ({ repos: [{ repoKey: 'openclaw-plugin', state: 'unlanded', reason: 'openclaw-plugin: feature/min-1139 is not on origin/main and has no merged review artifact' }] }),
+    });
+
+    expect(row).toMatchObject({
+      status: 'miss',
+      observed: 'canonical state unavailable; PR mergedAt: not merged; no running work/planning agents',
+    });
+  });
+
+  it('misses when a live work agent blocks despite complete forge evidence', async () => {
+    const row = await checkPostMergeRow(nonGitHubCtx, undefined, {
+      readCanonicalState: async () => null,
+      readMergedAt: () => undefined,
+      listAgents: () => [{ id: 'agent-pan-2715', issueId, role: 'work', status: 'running' }],
+      isAlive: aliveAgent,
+    }, {
+      forgeMerge: async () => ({ repos: [{ repoKey: 'fe', state: 'merged', url: 'u', reason: '' }] }),
+    });
+
+    expect(row).toMatchObject({ status: 'miss' });
+    expect(row.observed).toContain('running agents: agent-pan-2715');
+  });
 });
 
 describe('Definition-of-Done main-verification row', () => {
@@ -1322,6 +1371,40 @@ describe('assembled Definition-of-Done gate', () => {
     forgeMergeSpy.mockClear();
     const githubCtx = { ...ctx, github: { owner: 'eltmon', repo: 'overdeck', number: 100 } };
     await evaluateDodGate(githubCtx, {}, { ...deps(), review, tests, forgeMerge: forgeMergeSpy });
+    expect(forgeMergeSpy).not.toHaveBeenCalled();
+  });
+
+  it('evaluateDodGate reads forge landing once across rows 1, 2 and 5, through the real checkPostMergeRow wiring (PAN-5225)', async () => {
+    const forgeMergeSpy = vi.fn(async () => ({ repos: [{ repoKey: 'fe', state: 'merged' as const, url: 'u', reason: '' }] }));
+    const review = async (_issueId: string, _settlement?: unknown, landing?: { forgeMerge?: () => Promise<unknown> }) => {
+      await landing?.forgeMerge?.();
+      return makeRow('review', 'skip');
+    };
+    const tests = async (_issueId: string, _settlement?: unknown, landing?: { forgeMerge?: () => Promise<unknown> }) => {
+      await landing?.forgeMerge?.();
+      return makeRow('tests', 'skip');
+    };
+    // Real checkPostMergeRow, reached the same way defaultEvaluateDodGateDeps.postMerge
+    // calls it — stubbed deps (3rd arg), the gate's own landing threaded through (4th arg).
+    const postMerge = (
+      postMergeCtx: Parameters<typeof checkPostMergeRow>[0],
+      mergedRow: Parameters<typeof checkPostMergeRow>[1],
+      landing: Parameters<typeof checkPostMergeRow>[3],
+    ) => checkPostMergeRow(postMergeCtx, mergedRow, {
+      readCanonicalState: async () => null,
+      readMergedAt: () => undefined,
+      listAgents: () => [],
+      isAlive: async () => ({ alive: false, reason: 'no-session' }),
+    }, landing);
+
+    const nonGitHubCtx = { issueId, projectPath: '/repo/overdeck' };
+    const gate = await evaluateDodGate(nonGitHubCtx, {}, { ...deps(), review, tests, postMerge, forgeMerge: forgeMergeSpy });
+    expect(forgeMergeSpy).toHaveBeenCalledTimes(1);
+    expect(gate.rows.find(row => row.id === 'post-merge')?.observed).toContain('forge merge complete');
+
+    forgeMergeSpy.mockClear();
+    const githubCtx = { ...nonGitHubCtx, github: { owner: 'eltmon', repo: 'overdeck', number: 100 } };
+    await evaluateDodGate(githubCtx, {}, { ...deps(), review, tests, postMerge, forgeMerge: forgeMergeSpy });
     expect(forgeMergeSpy).not.toHaveBeenCalled();
   });
 

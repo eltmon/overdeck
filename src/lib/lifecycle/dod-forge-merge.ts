@@ -60,6 +60,9 @@ export async function assessRepoLanding(repo: ResolvedProjectRepo): Promise<Repo
     try {
       await execAsync(`git merge-base --is-ancestor ${tip} ${ref}`, { cwd: repoPath, encoding: 'utf-8' });
     } catch {
+      if (await addsNoChanges(repoPath, ref, tip)) {
+        return { repoKey, state: 'no-branch-work', reason: `${repoKey}: ${sourceBranch} adds no changes over ${ref}` };
+      }
       return { repoKey, state: 'unlanded', reason: `${repoKey}: ${sourceBranch} is not on ${ref} and has no merged review artifact` };
     }
 
@@ -73,6 +76,17 @@ export async function assessRepoLanding(repo: ResolvedProjectRepo): Promise<Repo
       : { repoKey, state: 'unlanded', reason: `${repoKey}: ${sourceBranch} work reached ${ref} without a merged review artifact` };
   } catch (err) {
     return { repoKey, state: 'unverifiable', reason: `${repoKey}: git read failed: ${(err as Error).message}` };
+  }
+}
+
+/** `git diff --quiet <ref>...<tip>`: exit 0 = no net change since the merge-base, 1 = changes; any other failure throws to the caller's unverifiable catch. */
+async function addsNoChanges(repoPath: string, ref: string, tip: string): Promise<boolean> {
+  try {
+    await execAsync(`git diff --quiet ${ref}...${tip}`, { cwd: repoPath, encoding: 'utf-8' });
+    return true;
+  } catch (err) {
+    if ((err as { code?: unknown }).code === 1) return false;
+    throw err;
   }
 }
 

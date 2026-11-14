@@ -96,10 +96,49 @@ describe('verify-merged real-git fixtures (PAN-5209: stale local main)', () => {
     expect(result?.error).toBe('1 unmerged commit(s) on feature/pan-900. Merge before closing out.');
   });
 
-  it('falls back to local main and says so when origin cannot be fetched', async () => {
+  it('falls back to the last-fetched origin/main and passes when it already contains the branch', async () => {
+    tmpRoot = join(tmpdir(), `overdeck-verify-merged-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(tmpRoot, { recursive: true });
+    const { primaryPath, c1 } = await createFixture(tmpRoot);
+    await run('git fetch origin', primaryPath);
+    await run(`git remote set-url origin ${join(tmpRoot, 'missing.git')}`, primaryPath);
+
+    const result = await verifyConventionBranchMerged(
+      { issueId: 'PAN-900', projectPath: primaryPath },
+      { repoKey: 'myn-skills', dir: primaryPath, sourceBranch: 'feature/pan-900', targetBranch: 'main', forge: 'github' },
+    );
+
+    expect(result?.success).toBe(true);
+    expect(result?.details).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^Checked against the last-fetched origin\/main because git fetch origin main failed: .+/)]),
+    );
+
+    const localMain = await run('git rev-parse main', primaryPath);
+    expect(localMain).toBe(c1);
+  });
+
+  it('falls back to the last-fetched origin/main and says so on failure', async () => {
     tmpRoot = join(tmpdir(), `overdeck-verify-merged-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(tmpRoot, { recursive: true });
     const { primaryPath } = await createFixture(tmpRoot);
+    await run(`git remote set-url origin ${join(tmpRoot, 'missing.git')}`, primaryPath);
+
+    const result = await verifyConventionBranchMerged(
+      { issueId: 'PAN-900', projectPath: primaryPath },
+      { repoKey: 'myn-skills', dir: primaryPath, sourceBranch: 'feature/pan-900', targetBranch: 'main', forge: 'github' },
+    );
+
+    expect(result?.success).toBe(false);
+    expect(result?.error).toMatch(
+      /^2 unmerged commit\(s\) on feature\/pan-900\. Merge before closing out\. \(Checked against the last-fetched origin\/main because git fetch origin main failed: .+\)$/,
+    );
+  });
+
+  it('falls back to local main only when no origin/main exists', async () => {
+    tmpRoot = join(tmpdir(), `overdeck-verify-merged-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(tmpRoot, { recursive: true });
+    const { primaryPath } = await createFixture(tmpRoot);
+    await run('git update-ref -d refs/remotes/origin/main', primaryPath);
     await run(`git remote set-url origin ${join(tmpRoot, 'missing.git')}`, primaryPath);
 
     const result = await verifyConventionBranchMerged(
@@ -117,6 +156,7 @@ describe('verify-merged real-git fixtures (PAN-5209: stale local main)', () => {
     const { primaryPath } = await createFixture(tmpRoot);
     await run('git checkout --detach', primaryPath);
     await run('git branch -D main', primaryPath);
+    await run('git update-ref -d refs/remotes/origin/main', primaryPath);
     await run(`git remote set-url origin ${join(tmpRoot, 'missing.git')}`, primaryPath);
 
     const result = await verifyConventionBranchMerged(
@@ -125,6 +165,8 @@ describe('verify-merged real-git fixtures (PAN-5209: stale local main)', () => {
     );
 
     expect(result?.success).toBe(false);
-    expect(result?.error).toMatch(/^Cannot verify merge: git fetch origin main failed \(.+\) and no local main branch exists$/);
+    expect(result?.error).toMatch(
+      /^Cannot verify merge: git fetch origin main failed \(.+\) and neither origin\/main nor a local main branch exists$/,
+    );
   });
 });
