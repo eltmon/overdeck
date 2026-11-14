@@ -1,0 +1,909 @@
+<!doctype html>
+<html lang="en" data-theme="broadsheet">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Issue view, one view in two shells — mockup</title>
+<style>
+@font-face { font-family: 'Geist Variable'; font-style: normal; font-display: swap; font-weight: 100 900; src: url('../../design/style-guide/mockups/fonts/Geist-Variable.woff2') format('woff2'); }
+@font-face { font-family: 'Geist Mono Variable'; font-style: normal; font-display: swap; font-weight: 100 900; src: url('../../design/style-guide/mockups/fonts/GeistMono-Variable.woff2') format('woff2'); }
+
+/* Broadsheet tokens, copied from src/dashboard/frontend/src/index.css */
+:root {
+  color-scheme: light;
+  --background: hsl(0 0% 96.5%);
+  --foreground: hsl(35 10% 14%);
+  --card: hsl(30 8% 94.5%);
+  --popover: hsl(0 0% 99%);
+  --muted: hsl(30 8% 94.5%);
+  --muted-foreground: hsl(35 5% 42%);
+  --body-foreground: hsl(35 8% 28%);
+  --faint-foreground: hsl(35 3% 62%);
+  --border: hsl(30 4% 88.5%);
+  --accent: color-mix(in srgb, black 4%, transparent);
+  --primary: oklch(0.488 0.217 264);
+  --primary-ink: oklch(0.42 0.19 264);
+  --primary-foreground: #fff;
+  --info: #3b82f6;           --info-fg: #1d4ed8;
+  --success: #10b981;        --success-fg: #047857;
+  --warning: #f59e0b;        --warning-fg: #92400e;
+  --destructive: #ef4444;    --destructive-fg: #b91c1c;
+  --signal-review: #a855f7;  --review-fg: #7e22ce;
+  --signal-cost: #06b6d4;    --cost-fg: #0e7490;
+  --wash: color-mix(in srgb, hsl(30 6% 75%) 55%, transparent);
+  --shadow-floating: 0 4px 16px rgba(0,0,0,.12), 0 2px 6px rgba(0,0,0,.08);
+  --shadow-drawer: -18px 0 48px rgba(40,30,20,.14), -2px 0 6px rgba(40,30,20,.06);
+  --terminal-bg: hsl(30 6% 13%);
+  --terminal-fg: hsl(30 8% 86%);
+  --radius: 6px;
+  --font-body: 'Geist Variable', system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', 'SF Mono', Consolas, monospace;
+  --font-mono-ui: 'SFMono-Regular', 'SF Mono', ui-monospace, Menlo, Monaco, Consolas, monospace;
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+}
+:root.dark {
+  color-scheme: dark;
+  --background: hsl(0 0% 12.5%);
+  --foreground: hsl(30 8% 94%);
+  --card: hsl(0 0% 17%);
+  --popover: hsl(0 0% 18%);
+  --muted: hsl(0 0% 15%);
+  --muted-foreground: hsl(30 2% 66%);
+  --body-foreground: hsl(30 2% 88%);
+  --faint-foreground: hsl(30 1% 48%);
+  --border: hsl(0 0% 22.7%);
+  --accent: color-mix(in srgb, white 8%, transparent);
+  --primary: oklch(0.588 0.217 264);
+  --primary-ink: oklch(0.7 0.19 264);
+  --info-fg: #60a5fa; --success-fg: #34d399; --warning-fg: #fbbf24;
+  --destructive-fg: #f87171; --review-fg: #c084fc; --cost-fg: #22d3ee;
+  --wash: color-mix(in srgb, hsl(30 4% 38%) 50%, transparent);
+  --shadow-floating: 0 4px 16px rgba(0,0,0,.3), 0 2px 6px rgba(0,0,0,.18);
+  --shadow-drawer: -18px 0 48px rgba(0,0,0,.4), -2px 0 6px rgba(0,0,0,.25);
+  --terminal-bg: hsl(0 0% 8%);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font-body); font-size: 13px; line-height: 1.6; color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  background: radial-gradient(130% 190% at 0% 0%, var(--wash) 0%, transparent 55%), var(--background);
+  display: flex; flex-direction: column; overflow: hidden; caret-color: var(--primary);
+}
+::selection { background: color-mix(in srgb, var(--primary) 22%, transparent); }
+* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--foreground) 22%, transparent) transparent; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:disabled { cursor: default; }
+a { color: inherit; text-decoration: none; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+.mono { font-family: var(--font-mono-ui); font-size: 12px; font-variant-numeric: tabular-nums; }
+svg.i { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ── Mockup chrome (not part of the proposal) ─────────────────────────── */
+.mockbar { flex: none; min-height: 44px; display: flex; align-items: center; gap: 14px; padding: 8px 16px; border-bottom: 1px solid var(--border); color: var(--muted-foreground); background: var(--background); }
+.mockbar b { font-weight: 600; color: var(--foreground); }
+.mockbar span { white-space: nowrap; }
+@media (max-width: 1299px) { .mockbar .sample { display: none; } }
+.mockbar .spacer { flex: 1; }
+.seg { display: flex; align-items: center; gap: 2px; background: var(--accent); border: 1px solid var(--border); border-radius: 4px; padding: 2px; flex: none; }
+.seg button { padding: 3px 12px; font-size: 12px; font-weight: 500; border-radius: 3px; color: var(--muted-foreground); transition: background .1s, color .1s; }
+.seg button:hover { background: var(--popover); color: var(--foreground); }
+.seg button[aria-selected="true"] { background: var(--popover); color: var(--foreground); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.stage { flex: 1; min-height: 0; display: flex; }
+.notes { flex: 1; min-width: 0; overflow-y: auto; padding: 28px 32px; }
+.notes-inner { max-width: 400px; margin-left: auto; }
+.notes h2 { font-size: 15px; font-weight: 600; letter-spacing: -.01em; margin-bottom: 4px; }
+.notes p { color: var(--body-foreground); max-width: 46ch; }
+.notes dl { margin-top: 18px; display: grid; grid-template-columns: 1fr; }
+.notes dt { color: var(--body-foreground); font-size: 12px; padding-top: 9px; border-top: 1px solid var(--border); }
+.notes dd { color: var(--foreground); padding-bottom: 9px; }
+@media (max-width: 1559px) {
+  .notes { display: none; }
+  body.notes-open .notes { display: block; position: fixed; left: 12px; top: 52px; bottom: 12px; width: 420px; z-index: 80; background: var(--popover); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-floating); padding: 20px 22px; }
+  body.notes-open .notes-inner { margin: 0; }
+}
+@media (min-width: 1560px) { .notes-btn { display: none; } }
+
+/* ── Drawer ───────────────────────────────────────────────────────────── */
+.drawer { flex: none; width: 980px; max-width: 100%; display: flex; flex-direction: column; min-height: 0; background: var(--background); border-left: 1px solid var(--border); box-shadow: var(--shadow-drawer); }
+.dh { flex: none; border-bottom: 1px solid var(--border); position: relative; z-index: 5; }
+.dh-top { display: flex; align-items: center; gap: 10px; padding: 12px 16px 8px 20px; }
+.dh-id { color: var(--muted-foreground); flex: none; }
+.dh-title { font-size: 15px; font-weight: 600; letter-spacing: -.012em; line-height: 1.3; min-width: 0; flex: 0 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dh-top .spacer { flex: 1; }
+.badge { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px; border-radius: 4px; font-size: 11.5px; font-weight: 500; border: 1px solid var(--border); color: var(--muted-foreground); white-space: nowrap; }
+.badge.machine { background: color-mix(in srgb, var(--info) 8%, transparent); border-color: color-mix(in srgb, var(--info) 32%, transparent); color: var(--info-fg); }
+.badge.outcome { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 32%, transparent); color: var(--success-fg); }
+.cost { color: var(--cost-fg); flex: none; }
+.btn { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border-radius: var(--radius); border: 1px solid var(--border); font-size: 12px; font-weight: 500; color: var(--body-foreground); white-space: nowrap; transition: background .12s, border-color .12s, color .12s; }
+.btn:hover { background: var(--accent); color: var(--foreground); }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+.btn.primary:hover { background: color-mix(in srgb, var(--primary) 88%, black); }
+.btn.quiet { border-color: transparent; color: var(--muted-foreground); padding: 0 6px; }
+.btn.icon { width: 26px; padding: 0; justify-content: center; }
+.btn[aria-expanded="true"] { background: var(--accent); color: var(--foreground); }
+
+/* Pipeline strip: phases double as the conversation switcher */
+.strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 0 16px 8px 14px; position: relative; }
+.phases { display: flex; align-items: center; flex: none; }
+.step { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-radius: var(--radius); border: 1px solid transparent; font-size: 12.5px; font-weight: 500; color: var(--body-foreground); white-space: nowrap; transition: background .12s; }
+.step:not(:disabled):hover { background: var(--accent); }
+.step[aria-pressed="true"] { background: var(--popover); border-color: color-mix(in srgb, var(--foreground) 28%, transparent); color: var(--foreground); }
+.step:disabled { color: var(--muted-foreground); font-weight: 400; }
+.step.done:disabled { color: var(--body-foreground); font-weight: 500; }
+.step .n { font-family: var(--font-mono-ui); font-size: 11px; color: var(--muted-foreground); }
+.step .g { width: 14px; height: 14px; display: grid; place-items: center; color: var(--muted-foreground); }
+.step .g svg { width: 12px; height: 12px; }
+.step .ring { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid currentColor; }
+.step .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.step.live { color: var(--info-fg); }
+.step.live .g { color: var(--info); }
+.pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--info); position: relative; }
+.pulse::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 1.5px solid var(--info); opacity: 0; animation: pulse 1.8s var(--ease-out) infinite; }
+@keyframes pulse { 0% { transform: scale(.5); opacity: .7; } 100% { transform: scale(1.15); opacity: 0; } }
+.link { flex: none; width: 10px; height: 1px; background: var(--border); }
+.strip .spacer { flex: 1; }
+.strip-right { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.vr { width: 1px; height: 16px; background: var(--border); margin: 0 2px; }
+.tg { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px 0 7px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 12px; font-weight: 500; color: var(--muted-foreground); white-space: nowrap; transition: background .12s, border-color .12s, color .12s; }
+.tg:hover { color: var(--foreground); }
+.tg[aria-checked="true"] { border-color: color-mix(in srgb, var(--foreground) 40%, transparent); background: var(--muted); color: var(--foreground); }
+.sw { width: 20px; height: 12px; border-radius: 6px; background: color-mix(in srgb, var(--foreground) 20%, transparent); position: relative; transition: background .16s; flex: none; }
+.sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 8px; height: 8px; border-radius: 50%; background: var(--popover); transition: transform .16s var(--ease-out); }
+[aria-checked="true"] > .sw { background: var(--foreground); }
+[aria-checked="true"] > .sw.red { background: var(--destructive); }
+[aria-checked="true"] > .sw.amber { background: var(--warning); }
+[aria-checked="true"] > .sw::after { transform: translateX(8px); }
+.quiet-state { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted-foreground); white-space: nowrap; }
+
+/* Popovers */
+.pop { position: absolute; z-index: 40; background: var(--popover); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-floating); transform-origin: top right; }
+.pop.anim { animation: pop .16s var(--ease-out); }
+@keyframes pop { from { opacity: 0; transform: translateY(-4px) scale(.985); } }
+.pop h3 { font-size: 12px; font-weight: 600; color: var(--foreground); }
+.pop-pickup { right: 16px; top: 34px; width: 380px; padding: 14px 16px 12px; }
+.pop-gates { right: 16px; top: 34px; width: 300px; padding: 12px 14px; }
+.pop-menu { right: 46px; top: 42px; width: 250px; padding: 6px; }
+.pop-menu .grp { padding: 7px 8px 3px; font-size: 11px; color: var(--muted-foreground); }
+.pop-menu button { display: flex; align-items: center; gap: 8px; width: 100%; height: 28px; padding: 0 8px; border-radius: 4px; text-align: left; color: var(--body-foreground); }
+.pop-menu button:hover { background: var(--accent); color: var(--foreground); }
+.pop-menu button.danger { color: var(--destructive-fg); }
+.pop-menu hr { border: 0; border-top: 1px solid var(--border); margin: 5px 0; }
+
+/* Pickup panel (shared by the popover and the Details tab) */
+.pk-row { display: flex; align-items: flex-start; gap: 12px; padding: 9px 0; border-top: 1px solid var(--border); width: 100%; text-align: left; }
+.pk-row:first-of-type { border-top: 0; }
+.pk-row .t { flex: 1; min-width: 0; }
+.pk-row .t b { display: block; font-weight: 500; color: var(--foreground); }
+.pk-row .t span { display: block; font-size: 12px; line-height: 1.45; color: var(--muted-foreground); }
+.pk-row .sw { margin-top: 4px; width: 26px; height: 15px; border-radius: 8px; }
+.pk-row .sw::after { width: 11px; height: 11px; }
+.pk-row[aria-checked="true"] > .sw::after { transform: translateX(11px); }
+.pk-plan { display: flex; align-items: center; gap: 8px; margin: 8px 0 2px; }
+.pk-note { font-size: 12px; line-height: 1.45; color: var(--muted-foreground); }
+.pk-foot { margin-top: 8px; padding-top: 9px; border-top: 1px solid var(--border); }
+.gate { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+.gate .ok { color: var(--success-fg); display: grid; }
+.gate .mono { margin-left: auto; color: var(--muted-foreground); }
+
+/* Tabs */
+.tabs { display: flex; align-items: flex-end; gap: 2px; padding: 0 12px; }
+.tab { position: relative; height: 34px; padding: 0 10px; font-size: 13px; font-weight: 500; color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 6px; }
+.tab:hover { color: var(--foreground); }
+.tab[aria-selected="true"] { color: var(--foreground); }
+.tab[aria-selected="true"]::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2px; background: var(--primary); }
+.tab .n { font-family: var(--font-mono-ui); font-size: 10.5px; color: var(--muted-foreground); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; line-height: 15px; }
+
+/* ── Conversation tab: the Command Deck conversation, unchanged ───────── */
+.body { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
+.conv-head { flex: none; display: flex; align-items: center; gap: 8px; padding: 9px 16px 0 20px; }
+.conv-name { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+.conv-head .spacer { flex: 1; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 12px; font-weight: 500; color: var(--body-foreground); white-space: nowrap; }
+.chip:hover { background: var(--accent); }
+.conv-meta { flex: none; display: flex; align-items: center; gap: 8px; padding: 7px 20px 9px; font-size: 12px; color: var(--muted-foreground); border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; }
+.conv-meta .state { display: inline-flex; align-items: center; gap: 6px; color: var(--body-foreground); }
+.conv-meta .state i { width: 6px; height: 6px; border-radius: 50%; background: var(--faint-foreground); }
+.conv-meta .state.live { color: var(--info-fg); }
+.conv-meta .state.live i { background: var(--info); }
+.conv-meta .sep { color: var(--muted-foreground); }
+.conv-meta .tagchip { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px; border-radius: 4px; background: var(--accent); color: var(--body-foreground); }
+.reviewers { flex: none; display: flex; align-items: center; gap: 6px; padding: 8px 20px; border-bottom: 1px solid var(--border); }
+.reviewers .lbl { font-size: 12px; color: var(--muted-foreground); margin-right: 4px; }
+.rv { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 12px; font-weight: 500; color: var(--body-foreground); }
+.rv:hover { background: var(--accent); }
+.rv[aria-pressed="true"] { border-color: color-mix(in srgb, var(--foreground) 40%, transparent); background: var(--muted); color: var(--foreground); }
+.rv svg { width: 12px; height: 12px; color: var(--muted-foreground); }
+.timeline { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 20px 10px; }
+.tl { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.user-row { display: flex; justify-content: flex-end; padding: 2px 0; }
+.user-bubble { max-width: 80%; background: color-mix(in srgb, var(--primary) 8%, transparent); border-radius: 18px 18px 4px 18px; padding: 12px 16px; }
+.user-bubble p { font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+.ts { display: block; margin-top: 4px; font-size: 10.5px; color: var(--muted-foreground); }
+.asst-row { display: flex; align-items: flex-start; gap: 8px; padding: 2px 0; }
+.asst-row > svg { margin-top: 3px; width: 16px; height: 16px; color: var(--primary); opacity: .7; }
+.asst-row .c { flex: 1; min-width: 0; }
+.asst-row p { font-size: 14px; line-height: 1.55; color: var(--foreground); max-width: 68ch; }
+.asst-row p + p { margin-top: 8px; }
+.asst-row code, .user-bubble code { font-family: var(--font-mono); font-size: 12.5px; background: var(--accent); border-radius: 4px; padding: 1px 4px; }
+.worklog { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; background: var(--accent); display: flex; flex-direction: column; gap: 4px; }
+.wl { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted-foreground); min-height: 20px; }
+.wl > i { width: 5px; height: 5px; border-radius: 50%; background: var(--info); flex: none; }
+.wl b { font-weight: 500; color: var(--foreground); flex: none; }
+.wl .d { font-family: var(--font-mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.wl .m { font-family: var(--font-mono); font-size: 11.5px; flex: none; }
+.wl svg { width: 12px; height: 12px; }
+.wl-more { color: var(--primary-ink); font-size: 12px; display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; padding: 2px 0; }
+.perm { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted-foreground); padding-left: 2px; }
+.perm svg { width: 12px; height: 12px; }
+.mark { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--muted-foreground); }
+.mark::before, .mark::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.working { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--info-fg); padding-left: 4px; }
+.empty { margin: auto; text-align: center; max-width: 44ch; color: var(--muted-foreground); padding: 40px 0; }
+.empty b { display: block; color: var(--foreground); font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.bottom { position: absolute; right: 26px; bottom: 132px; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 15px; background: var(--popover); border: 1px solid var(--border); box-shadow: var(--shadow-floating); font-size: 12px; font-weight: 500; color: var(--body-foreground); }
+.bottom[hidden] { display: none; }
+.composer { flex: none; padding: 10px 20px 16px; }
+.cbox { max-width: 760px; margin: 0 auto; border: 1px solid var(--border); border-radius: 12px; background: var(--background); box-shadow: 0 1px 4px rgba(0,0,0,.06); display: flex; flex-direction: column; transition: border-color .15s, box-shadow .15s; }
+.cbox:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent); }
+.cbox textarea { font: inherit; font-size: 14px; line-height: 1.5; color: var(--foreground); background: none; border: 0; outline: 0; resize: none; min-height: 48px; padding: 12px 12px 6px; }
+.cbox textarea::placeholder { color: var(--muted-foreground); }
+.ctools { display: flex; align-items: center; gap: 4px; padding: 0 8px 9px; color: var(--muted-foreground); font-size: 12px; }
+.ctools .pick { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 7px; border-radius: var(--radius); }
+.ctools .pick:hover { background: var(--accent); color: var(--foreground); }
+.ctools .pick svg { width: 12px; height: 12px; }
+.ctools .spacer { flex: 1; }
+.ctools .hint { font-size: 11.5px; margin-right: 6px; }
+.ctools .sq { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--border); color: var(--body-foreground); }
+.ctools .sq:hover { background: var(--accent); }
+.ctools .meter { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-mono-ui); font-size: 9.5px; color: var(--body-foreground); background: conic-gradient(var(--success) 0 22%, var(--border) 22% 100%); position: relative; margin: 0 4px; }
+.ctools .meter::before { content: ''; position: absolute; inset: 2px; border-radius: 50%; background: var(--background); }
+.ctools .meter span { position: relative; }
+.ctools .send { width: 34px; height: 30px; display: grid; place-items: center; border-radius: 8px; background: var(--primary); color: #fff; }
+.ctools .send.neutral { background: var(--foreground); color: var(--background); }
+.ctools .send svg { width: 15px; height: 15px; }
+.terminal { flex: 1; min-height: 0; margin: 12px 20px 16px; border-radius: 8px; background: var(--terminal-bg); color: var(--terminal-fg); font-family: var(--font-mono); font-size: 12.5px; line-height: 1.55; padding: 14px 16px; overflow: auto; white-space: pre-wrap; }
+.terminal .dim { opacity: .55; }
+.terminal .cur { display: inline-block; width: 7px; height: 14px; background: var(--terminal-fg); vertical-align: -2px; animation: blink 1.1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ── Other tabs ───────────────────────────────────────────────────────── */
+.panel { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px 28px; }
+.panel h2 { font-size: 13px; font-weight: 600; margin: 22px 0 8px; }
+.panel h2:first-child { margin-top: 0; }
+.task { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--border); }
+.task .g { width: 14px; display: grid; place-items: center; color: var(--muted-foreground); }
+.task.doing { color: var(--info-fg); }
+.task.todo { color: var(--muted-foreground); }
+.task .mono { margin-left: auto; color: var(--muted-foreground); }
+.placeholder { border: 1px dashed var(--border); border-radius: 10px; padding: 28px; color: var(--muted-foreground); max-width: 62ch; }
+.placeholder b { display: block; color: var(--foreground); font-weight: 600; margin-bottom: 2px; }
+.details { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 0 36px; }
+table.pl { width: 100%; border-collapse: collapse; }
+table.pl td { padding: 7px 10px 7px 0; border-top: 1px solid var(--border); vertical-align: middle; white-space: nowrap; }
+table.pl td:first-child { font-weight: 500; }
+table.pl td.o { color: var(--muted-foreground); white-space: normal; }
+table.pl .open { color: var(--primary-ink); font-size: 12px; }
+table.pl .open:disabled { visibility: hidden; }
+.skills { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); color: var(--body-foreground); }
+
+.badge.human { background: color-mix(in srgb, var(--warning) 8%, transparent); border-color: color-mix(in srgb, var(--warning) 32%, transparent); color: var(--warning-fg); }
+.step.paused { color: var(--warning-fg); }
+.step.paused .g { color: var(--warning); }
+.banner { display: flex; align-items: center; gap: 12px; margin: 0 16px 10px 20px; padding: 8px 12px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent); background: color-mix(in srgb, var(--warning) 8%, transparent); color: var(--warning-fg); }
+.banner b { font-weight: 600; display: block; }
+.banner span.t { display: block; font-size: 12px; }
+.banner .btn { margin-left: auto; background: var(--background); }
+.start { margin: auto; max-width: 440px; padding: 32px 0; }
+.start b { display: block; font-size: 15px; font-weight: 600; letter-spacing: -.01em; margin-bottom: 4px; }
+.start p { color: var(--body-foreground); margin-bottom: 16px; }
+.start-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.start-form label { display: grid; gap: 4px; font-size: 12px; color: var(--muted-foreground); }
+.start-form select { height: 32px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--background); color: var(--foreground); font: inherit; padding: 0 8px; }
+.start-actions { display: flex; gap: 8px; }
+.start-actions .btn { height: 32px; padding: 0 14px; font-size: 13px; }
+button.conv-name { border-radius: var(--radius); padding: 2px 6px; margin-left: -6px; }
+button.conv-name:hover { background: var(--accent); }
+button.conv-name > svg { color: var(--muted-foreground); }
+.conv-head { position: relative; }
+.pop-agents { left: 14px; right: auto; top: 40px; width: 340px; transform-origin: top left; }
+.pop-agents button { height: 34px; }
+.pop-agents .mono { margin-left: auto; color: var(--muted-foreground); font-size: 11.5px; }
+.kv { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border); }
+.kv .mono { color: var(--body-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.kv .btn { margin-left: auto; }
+
+.deck, .stage-tabs, .crumb, .stage-only { display: none; }
+body.shell-stage .notes { display: none; }
+body.shell-stage .deck { display: flex; flex: 0 0 400px; min-width: 0; flex-direction: column; border-right: 1px solid var(--border); background: var(--card); overflow-y: auto; }
+body.shell-stage .drawer { width: auto; flex: 1; min-width: 0; box-shadow: none; border-left: 0; }
+body.shell-stage .stage-tabs { display: flex; }
+body.shell-stage .crumb, body.shell-stage .stage-only { display: inline-flex; }
+body.shell-stage .drawer-only { display: none; }
+@media (max-width: 1100px) { body.shell-stage .deck { flex-basis: 300px; } }
+.deck h3 { display: flex; align-items: center; gap: 8px; padding: 12px 14px 6px; font-size: 11px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-foreground); }
+.deck h3 .mono { margin-left: auto; letter-spacing: 0; }
+.deck-top { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); font-weight: 600; }
+.deck-top span { font-weight: 400; color: var(--muted-foreground); font-size: 12px; }
+.deck-row { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 30px; padding: 3px 14px; text-align: left; color: var(--body-foreground); }
+.deck-row:hover { background: var(--accent); }
+.deck-row.issue { align-items: flex-start; padding-top: 7px; padding-bottom: 7px; background: var(--background); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); color: var(--foreground); font-weight: 500; }
+.deck-row.issue .mono { color: var(--muted-foreground); font-weight: 400; }
+.deck-row.agent { padding-left: 38px; font-size: 12.5px; }
+.deck-row.agent.sub { padding-left: 58px; }
+.deck-row[aria-current="true"] { background: var(--background); color: var(--foreground); box-shadow: inset 2px 0 0 var(--primary); }
+.deck-row .r { margin-left: auto; font-family: var(--font-mono-ui); font-size: 11px; color: var(--muted-foreground); white-space: nowrap; }
+.deck-row .g { width: 14px; display: grid; place-items: center; color: var(--muted-foreground); flex: none; }
+.deck-row .g svg { width: 12px; height: 12px; }
+.stage-tabs { flex: none; align-items: flex-end; gap: 2px; height: 38px; padding: 0 10px; border-bottom: 1px solid var(--border); background: var(--card); }
+.stage-tabs span { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-radius: 6px 6px 0 0; font-size: 12.5px; color: var(--muted-foreground); white-space: nowrap; }
+.stage-tabs span.on { background: var(--background); color: var(--foreground); font-weight: 500; border: 1px solid var(--border); border-bottom-color: var(--background); margin-bottom: -1px; }
+.stage-tabs svg { width: 12px; height: 12px; }
+.crumb { align-items: center; gap: 6px; color: var(--muted-foreground); font-size: 12px; white-space: nowrap; flex: none; }
+.subseg { display: flex; align-items: center; gap: 4px; margin-bottom: 14px; }
+.subseg button { height: 26px; padding: 0 10px; border-radius: var(--radius); font-size: 12px; font-weight: 500; color: var(--muted-foreground); }
+.subseg button:hover { background: var(--accent); color: var(--foreground); }
+.subseg button[aria-selected="true"] { background: var(--muted); color: var(--foreground); box-shadow: inset 0 0 0 1px var(--border); }
+.cmt { max-width: 70ch; padding: 10px 0; border-top: 1px solid var(--border); }
+.cmt b { font-weight: 600; }
+.cmt .mono { color: var(--muted-foreground); margin-left: 8px; }
+.cmt p { color: var(--body-foreground); margin-top: 2px; }
+.choices { display: flex; flex-wrap: wrap; gap: 8px; padding-left: 24px; }
+.choices .btn { height: 30px; padding: 0 12px; font-size: 13px; }
+
+/* ── Skills tab ───────────────────────────────────────────────────────── */
+.sk-sum { color: var(--muted-foreground); margin-bottom: 2px; }
+.sk-sum b { color: var(--foreground); font-weight: 600; font-variant-numeric: tabular-nums; }
+.sk-note { color: var(--body-foreground); max-width: 74ch; margin-bottom: 14px; }
+.sk-notice { display: flex; align-items: center; gap: 12px; padding: 8px 12px; margin-bottom: 14px; border-radius: 8px; border: 1px solid var(--border); color: var(--body-foreground); }
+.sk-notice.act { border-color: color-mix(in srgb, var(--warning) 32%, transparent); background: color-mix(in srgb, var(--warning) 8%, transparent); color: var(--warning-fg); }
+.sk-notice .btn { margin-left: auto; background: var(--background); }
+.sk-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.sk-search { position: relative; flex: 1; min-width: 220px; }
+.sk-search svg { position: absolute; left: 10px; top: 9px; color: var(--muted-foreground); }
+.sk-search input { width: 100%; height: 32px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--background); padding: 0 10px 0 32px; font: inherit; color: var(--foreground); outline: 0; transition: border-color .15s, box-shadow .15s; }
+.sk-search input::placeholder { color: var(--muted-foreground); }
+.sk-search input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent); }
+.fchip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 12px; font-weight: 500; color: var(--body-foreground); }
+.fchip:hover { background: var(--accent); }
+.fchip[aria-pressed="true"] { border-color: color-mix(in srgb, var(--foreground) 40%, transparent); background: var(--muted); color: var(--foreground); }
+.fchip .mono { font-size: 11px; color: var(--muted-foreground); }
+.sk-box { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 14px; }
+.sk-gh { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 6px 12px; text-align: left; font-weight: 500; background: var(--card); border-top: 1px solid var(--border); }
+.sk-box > .sk-gh:first-child { border-top: 0; }
+button.sk-gh:hover { background: color-mix(in srgb, var(--card), var(--foreground) 4%); }
+.sk-gh > svg { color: var(--muted-foreground); transition: transform .15s var(--ease-out); }
+.sk-gh[aria-expanded="true"] > svg:first-child { transform: rotate(90deg); }
+.sk-gh .hint { font-weight: 400; font-size: 12px; color: var(--muted-foreground); }
+.sk-gh .cnt { margin-left: auto; color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 8px; }
+.sk-row { display: grid; grid-template-columns: minmax(140px, 200px) minmax(0, 1fr) 124px 30px 26px; align-items: center; gap: 12px; min-height: 36px; padding: 4px 10px 4px 12px; border-top: 1px solid var(--border); }
+.sk-row:hover { background: var(--accent); }
+.sk-row .nm { font-family: var(--font-mono-ui); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sk-row.off .nm { color: var(--muted-foreground); text-decoration: line-through; text-decoration-color: var(--faint-foreground); }
+.sk-row .ds { font-size: 12px; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sk-row .src { font-family: var(--font-mono-ui); font-size: 11.5px; color: var(--muted-foreground); text-align: right; white-space: nowrap; }
+.sk-row .src.here { color: var(--foreground); }
+.swb { display: grid; place-items: center; width: 30px; height: 26px; border-radius: var(--radius); }
+.swb .sw { width: 28px; height: 16px; border-radius: 8px; }
+.swb .sw::after { width: 12px; height: 12px; }
+.swb[aria-checked="true"] > .sw::after { transform: translateX(12px); }
+.sk-core { padding: 8px 12px 10px 36px; border-top: 1px solid var(--border); font-family: var(--font-mono-ui); font-size: 12px; color: var(--muted-foreground); display: flex; flex-wrap: wrap; gap: 2px 14px; }
+.sk-more { padding: 7px 12px 8px 12px; border-top: 1px solid var(--border); font-size: 12px; color: var(--primary-ink); width: 100%; text-align: left; }
+.sk-empty { padding: 14px 12px; border-top: 1px solid var(--border); color: var(--muted-foreground); }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="mockbar">
+  <span><b>Mockup</b> · one issue view, two shells</span>
+  <div class="seg" role="tablist" aria-label="Shell" id="shell"></div>
+  <div class="seg" role="tablist" aria-label="Preview a state" id="scn"></div>
+  
+  <span class="spacer"></span>
+  <button class="btn notes-btn" data-act="notes">What the cockpit adds</button>
+  <button class="btn" data-act="theme" id="themeBtn">Dark</button>
+</div>
+<div class="stage">
+  <aside class="notes"><div class="notes-inner">
+    <h2>One view, two shells</h2>
+    <p>The drawer and the Stage tab render the same header, strip, tabs and conversation. Only the frame differs: the drawer slides over the page, the Stage tab sits beside the issue tree. Switch shells in the bar above.</p>
+    <dl>
+      <dt>Needs-you slot and blocker spotlight</dt><dd>One banner slot under the strip, shared with the paused banner. See the "Needs you" state.</dd>
+      <dt>Discussion tab</dt><dd>New Discussion tab in both shells.</dd>
+      <dt>Plan: Tasks, Map, PRD</dt><dd>Tasks keeps its own tab. Plan gains a PRD view next to the map.</dd>
+      <dt>Changes: Files, Checks, Artifacts</dt><dd>One Changes tab with the three views. Checks lists each CI check.</dd>
+      <dt>Activity: Feed, Status history</dt><dd>Two views in the Activity tab.</dd>
+      <dt>Cost rollup</dt><dd>A cost column in the Details pipeline table; the total stays in the title row.</dd>
+      <dt>Ship: merge gate, progress and log</dt><dd>A Ship section in Details, and the Ship phase opens the merge agent's conversation.</dd>
+      <dt>Crew spine, workers</dt><dd>The strip plus the agent menu on the conversation header. In the Stage tab the issue tree on the left is the crew.</dd>
+      <dt>Stack and containers, UAT environment</dt><dd>Workspace section in Details.</dd>
+      <dt>Linked conversations</dt><dd>A section in Details.</dd>
+      <dt>Breadcrumb, Open tracker menu</dt><dd>Title row, Stage tab only (the drawer keeps the short form).</dd>
+      <dt>Branch chip with copy</dt><dd>The branch chip in the conversation's status line, in both shells.</dd>
+      <dt>Awareness rail</dt><dd>Dropped from the issue view. The Command Deck already has its own Awareness column on the right.</dd>
+    </dl>
+  </div></aside>
+  <nav class="deck" id="deck" aria-label="Command Deck"></nav>
+  <section class="drawer" id="drawer" aria-label="Issue PAN-5185"></section>
+</div>
+
+<script>
+const P = {
+  check: '<path d="M20 6 9 17l-5-5"/>', x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  ext: '<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  right: '<path d="m9 18 6-6-6-6"/>', down: '<path d="m6 9 6 6 6-6"/>', minus: '<path d="M5 12h14"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  bot: '<path d="M12 8V4H8"/><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/>',
+  send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11zM21.854 2.147l-10.94 10.939"/>',
+  clip: '<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
+  mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3ZM19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+  wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  bookmark: '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>',
+  copy: '<rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  branch: '<path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+  arrowDown: '<path d="M12 5v14M19 12l-7 7-7-7"/>', play: '<path d="M6 3l14 9-14 9z"/>',
+  sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4"/>',
+  pr: '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/>',
+  undo: '<path d="M3 7v6h6M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>',
+  pause: '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  pin: '<path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
+};
+const I = (n) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${P[n]}</svg>`;
+
+/* ── Sample data ─────────────────────────────────────────────────────── */
+const TASKS = ['Contracts: request and response schemas', 'Contracts: error codes and path-safety types', 'Roots: resolve registered project roots', 'Roots: reject paths outside a root after symlink resolution', 'Read: directory listing route', 'Read: file content route with a size cap', 'Read: binary and large-file handling', 'Git: status per path', 'Git: ignored-file filtering', 'Search: filename search', 'Search: content search with a result cap', 'Watcher: child process entry and protocol', 'Watcher: restart-once supervision', 'Route scopes and no-loss matrix rows', 'Docs: file explorer server reference'];
+
+const WORK_ITEMS = [
+  { u: 'Work PAN-5185 from the released plan. It has 15 tasks: the server core for the file explorer. Claim each task before you start it and commit once per task.', time: '9:02 AM' },
+  { a: ['I\'ve read the plan. The 15 tasks fall into four groups: contracts, the roots and read routes, git and search, and the watcher child process. I\'ll start with the contracts because every route depends on them.'] },
+  { tools: [['Task', 'claim contracts.schemas'], ['Read', 'packages/contracts/src/index.ts', '9 KB'], ['Write', 'packages/contracts/src/file-explorer.ts'], ['Bash', 'npm run typecheck', 'exit 0']] },
+  { perm: 'Read, Write, Bash' },
+  { a: ['Contracts are in. Roots come next. The route only serves paths inside a registered project root, so I resolve symlinks first and run the containment check on the resolved path.'] },
+  { tools: [['Edit', 'src/dashboard/server/routes/file-explorer.ts'], ['Bash', 'npx vitest run file-explorer-roots', '23 passed']], earlier: 6 },
+];
+const WORK_DONE = [
+  { a: ['The watcher runs as a child process, so a burst of file events can\'t block the dashboard\'s event loop. It restarts once after a crash and then reports the failure.'] },
+  { tools: [['Write', 'src/dashboard/server/file-explorer/watcher-child.ts'], ['Bash', 'npx vitest run watcher-child', '11 passed'], ['Bash', 'git push origin feature/pan-5185']], earlier: 14 },
+  { a: ['All 15 tasks are done and typecheck passes. I pushed the branch and signalled done, so review starts next.'], time: '2:41 PM' },
+  { mark: 'Handed to review · 11/13' },
+];
+const A = (name, id, model, items, extra = {}) => ({ name, id, model, harness: 'claude-code', items, ...extra });
+
+function agentsFor(scn) {
+  if (scn === 'fresh') return {};
+  const plan = A('Planner', 'planning-pan-5185', 'Opus 5.5', [
+    { u: 'Plan PAN-5185 automatically.', time: '8:14 AM' },
+    { a: ['I read the issue and its PRD. The work is the server half of the file explorer, with no UI.', 'The plan has 15 tasks in four groups. I made two decisions on my own: the watcher runs as a child process, and search results are capped on the server.'] },
+    { tools: [['Read', '.pan/drafts/pan-5185.md', '31 KB'], ['Write', '.pan/specs/pan-5185.xbrief.json'], ['Bash', 'pan plan finalize PAN-5185', 'exit 0']] },
+    { mark: 'Plan finalized · 15 tasks · 11/13' },
+  ], { state: 'ended', outcome: 'Plan finalized', cost: '$3.42', started: '11/13 8:14 AM' });
+  if (scn === 'planned') return { plan };
+  if (scn === 'working' || scn === 'paused' || scn === 'needs') {
+    const paused = scn === 'paused';
+    const needs = scn === 'needs';
+    return {
+      plan,
+      work: A('Work agent', 'agent-pan-5185', 'Opus 5.5', paused ? [...WORK_ITEMS, { mark: 'Paused by the operator · 10:40 AM' }] : needs ? [...WORK_ITEMS, { a: ['Before I write content search I need one decision. Should it follow symlinks that point outside the project root?'] }, { ask: ['No, stay inside the root', 'Yes, follow them', 'Let me explain'] }] : [...WORK_ITEMS, { live: 'Editing the search route' }], { state: paused || needs ? 'stopped' : 'live', outcome: paused ? 'paused' : needs ? 'waiting for your answer' : 'active', cost: '$15.48', started: '11/13 9:02 AM' }),
+      worker1: A('Worker 1', 'agent-pan-5185-worker-1', 'Sonnet 5.5', [
+        { u: 'Write the unit tests for the roots containment check. Report back when they pass.', time: '9:40 AM' },
+        { tools: [['Write', 'tests/unit/file-explorer-roots.test.ts'], ['Bash', 'npx vitest run file-explorer-roots', '23 passed']] },
+        { a: ['The containment tests are written and pass. I reported the result to the work agent.'] },
+        { mark: 'Reported back · 9:58 AM' },
+      ], { state: 'ended', outcome: 'Reported back', cost: '$0.92', started: '11/13 9:40 AM' }),
+    };
+  }
+  const rev = (name, id, text) => A(name, id, 'Opus 5.5', [{ a: [text] }, { mark: 'Approved · 11/13' }], { state: 'ended', outcome: 'Review approved', cost: '$1.10', started: '11/13 2:44 PM' });
+  return {
+    plan,
+    work: A('Work agent', 'agent-pan-5185', 'Opus 5.5', [...WORK_ITEMS, ...WORK_DONE], { state: 'stopped', outcome: 'Handed to review', cost: '$31.20', started: '11/13 9:02 AM' }),
+    review: A('Review', 'agent-pan-5185-review', 'Opus 5.5', [
+      { a: ['All four reviewers approved and none raised a blocking finding.', 'Two advisory notes are recorded on the PR: the content-search cap is a constant that could become a setting, and the watcher restart count has no test for a second crash.'] },
+      { mark: 'Review approved · convoy complete · 11/13' },
+    ], { state: 'ended', outcome: 'Review approved', cost: '$4.85', started: '11/13 2:44 PM' }),
+    'review.correctness': rev('Correctness reviewer', 'agent-pan-5185-review-correctness', 'The containment check runs on the resolved path, and the tests cover a symlink that points outside the root. Approved.'),
+    'review.security': rev('Security reviewer', 'agent-pan-5185-review-security', 'Every route is scope-checked and no path reaches the filesystem before the root check. Approved.'),
+    'review.performance': rev('Performance reviewer', 'agent-pan-5185-review-performance', 'No synchronous filesystem or child-process call is reachable from the server routes. Approved.'),
+    'review.requirements': rev('Requirements reviewer', 'agent-pan-5185-review-requirements', 'All 15 tasks map to a commit and the docs task is included. Approved.'),
+    ship: A('Ship', 'merge-pan-5185', 'Sonnet 5.5', [
+      { tools: [['Bash', 'git rebase origin/main', 'exit 0'], ['Bash', 'gh pr merge 5194 --squash', 'merged']] },
+      { a: ['Rebased onto main without conflicts and squash-merged PR #5194 after CI passed.'] },
+      { mark: 'Merged · 11/13' },
+    ], { state: 'ended', outcome: 'Merged', cost: '$1.40', started: '11/13 4:12 PM' }),
+  };
+}
+const SCN = {
+  fresh: { label: 'No agent yet', badge: ['Backlog', ''], cost: '$0.00', done: 0, total: 0, def: null, phases: { plan: 'next', work: 'none', review: 'none', test: 'none', ship: 'none', done: 'none' } },
+  planned: { label: 'Plan ready', badge: ['Planned', ''], cost: '$3.42', done: 0, def: 'plan', phases: { plan: 'done', work: 'next', review: 'none', test: 'none', ship: 'none', done: 'none' } },
+  working: { label: 'Agent working', badge: ['Working', 'machine'], cost: '$18.90', done: 6, def: 'work', phases: { plan: 'done', work: 'live', review: 'none', test: 'none', ship: 'none', done: 'none' } },
+  paused: { label: 'Paused', badge: ['Paused', 'human'], cost: '$18.90', done: 6, def: 'work', phases: { plan: 'done', work: 'paused', review: 'none', test: 'none', ship: 'none', done: 'none' } },
+  needs: { label: 'Needs you', badge: ['Needs you', 'human'], cost: '$18.90', done: 6, def: 'work', phases: { plan: 'done', work: 'paused', review: 'none', test: 'none', ship: 'none', done: 'none' } },
+  merged: { label: 'Merged', badge: ['Merged', 'outcome'], cost: '$41.87', done: 15, def: 'work', phases: { plan: 'done', work: 'done', review: 'done', test: 'skip', ship: 'done', done: 'done' } },
+};
+const PHASES = [['plan', 'Plan'], ['work', 'Work'], ['review', 'Review'], ['test', 'Test'], ['ship', 'Ship'], ['done', 'Done']];
+const TABS = [['conversation', 'Conversation'], ['tasks', 'Tasks'], ['plan', 'Plan'], ['files', 'Changes'], ['activity', 'Activity'], ['discussion', 'Discussion'], ['skills', 'Skills'], ['details', 'Details']];
+const SUBS = { plan: [['map', 'Map'], ['prd', 'PRD']], files: [['files', 'Files'], ['checks', 'Checks'], ['artifacts', 'Artifacts']], activity: [['feed', 'Feed'], ['history', 'Status history']] };
+
+const st = { scn: 'merged', agent: 'work', tab: 'conversation', view: 'conversation', pop: null, anim: '', ready: false, blocks: false, park: false, released: true, sent: {}, shell: 'drawer', sub: { plan: 'map', files: 'files', activity: 'feed' },
+  sk: { 'd3-viz': false, elevenlabs: true }, pk: {}, skQ: '', skF: 'all', grp: {}, skDirty: false };
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ── Header ──────────────────────────────────────────────────────────── */
+function glyph(s) {
+  if (s === 'done') return I('check');
+  if (s === 'live') return '<span class="pulse"></span>';
+  if (s === 'next' || s === 'paused') return '<span class="ring"></span>';
+  if (s === 'skip') return I('minus');
+  return '<span class="dot"></span>';
+}
+function strip(agents) {
+  const sc = SCN[st.scn];
+  const steps = PHASES.map(([id, label], i) => {
+    const s = sc.phases[id];
+    const has = id === 'test' ? st.scn === 'merged' : id !== 'done' && !!agents[id];
+    const sel = st.tab === 'conversation' && (st.agent === id || (id === 'review' && (st.agent || '').startsWith('review')));
+    const tip = s === 'done' ? `${label} finished 11/13` : s === 'live' ? `${label} is running` : s === 'skip' ? 'No test agent ran' : s === 'next' ? 'Starts when an agent picks the issue up' : s === 'paused' ? `${label} agent is paused` : 'Not started';
+    const n = id === 'review' && s === 'done' ? '<span class="n">4/4</span>' : '';
+    return `${i ? '<span class="link"></span>' : ''}<button class="step ${s}" ${has ? `data-act="agent:${id}"` : 'disabled'} aria-pressed="${sel}" title="${tip}${has ? '. Open its conversation.' : ''}"><span class="g">${glyph(s)}</span>${label}${n}</button>`;
+  }).join('');
+  const tg = (key, label, cls, tip) => `<button class="tg" role="switch" aria-checked="${st[key]}" data-act="tog:${key}" title="${tip}"><span class="sw ${cls}"></span>${label}</button>`;
+  let right = '';
+  if (st.scn === 'merged') {
+    right = `<button class="btn" data-act="pop:gates" aria-expanded="${st.pop === 'gates'}"><span style="color:var(--success-fg);display:grid">${I('check')}</span>Checks pass</button>`;
+  } else {
+    right = tg('ready', 'Ready', '', HINT.ready) + tg('blocks', 'Blocks main', 'red', HINT.blocks) + tg('park', 'Park', 'amber', HINT.park)
+      + `<button class="btn icon" data-act="pop:pickup" aria-expanded="${st.pop === 'pickup'}" aria-label="Pickup controls and hints" title="Pickup controls and hints">${I('sliders')}</button><span class="vr"></span>`
+      + (st.scn === 'fresh' ? '<span class="quiet-state">Not planned yet</span>' : st.released
+        ? `<span class="quiet-state" title="${st.scn === 'planned' ? 'Released: eligible for pickup' : 'Released and picked up'}">Released</span>${st.scn === 'planned' ? `<button class="btn quiet" data-act="recall" title="Pull it back to planned (held)">${I('undo')}Recall</button>` : ''}`
+        : `<button class="btn primary" data-act="release" title="Plan ready. Release it so an agent can pick it up.">Release${I('play')}</button>`);
+  }
+  const banner = st.scn === 'needs' ? `<div class="banner" role="status">${I('info')}<div><b>The work agent is waiting for your answer</b><span class="t">Should content search follow symlinks that point outside the project root?</span></div><button class="btn" data-act="agent:work">Answer in conversation</button></div>` : st.scn === 'paused' ? `<div class="banner" role="status">${I('pause')}<div><b><span class="mono">agent-pan-5185</span> is paused</b><span class="t">Paused by the operator at 10:40 AM. It keeps its memory and resumes where it stopped.</span></div><button class="btn" data-act="scn:working">${I('play')}Unpause</button></div>` : '';
+  return `<div class="strip"><div class="phases" aria-label="Pipeline">${steps}</div><span class="spacer"></span><div class="strip-right">${right}</div>${st.pop === 'pickup' ? `<div class="pop ${st.anim} pop-pickup" data-pop>${pickupPanel(true)}</div>` : ''}${st.pop === 'gates' ? `<div class="pop ${st.anim} pop-gates" data-pop>${gatesPanel()}</div>` : ''}</div>${banner}`;
+}
+const HINT = {
+  ready: 'Definition of Ready. When off, the Flywheel won\'t auto-pick it.',
+  blocks: 'The Flywheel prioritizes it even with auto-pickup off. Never if vetoed.',
+  park: 'Defer: needs human design or discussion. Excluded from auto-pickup, reversible.',
+};
+function pickupPanel(inPop) {
+  const row = (key, label, cls) => `<button class="pk-row" role="switch" aria-checked="${st[key]}" data-act="tog:${key}"><span class="t"><b>${label}</b><span>${HINT[key]}</span></span><span class="sw ${cls}"></span></button>`;
+  const over = st.scn === 'merged';
+  const fresh = st.scn === 'fresh';
+  const plan = fresh ? 'No plan yet. Planning generates the spec and tasks. The plan must be released before an agent can pick it up.'
+    : over ? 'This issue has merged, so pickup no longer applies. The switches stay for the record.'
+    : st.released ? 'Released: eligible for pickup. Recall pulls it back to planned (held).'
+    : 'Plan ready. Review it, then Release it from the strip. An agent can\'t pick it up until it is released.';
+  return `${inPop ? '<h3>Pickup controls</h3>' : ''}
+    <div class="pk-plan"><span class="badge">${fresh ? 'not planned' : st.released ? 'released' : 'planned'}</span>${fresh ? '' : '<span class="badge">has spec + tasks</span>'}<span style="flex:1"></span>${over ? '' : fresh ? `<button class="btn quiet">Plan…</button>` : `<button class="btn quiet" title="Run planning again">Re-plan</button>`}</div>
+    <p class="pk-note" style="margin-bottom:6px">${plan}</p>
+    ${row('ready', 'Ready', '')}${row('blocks', 'Blocks main', 'red')}${row('park', 'Park', 'amber')}
+    <p class="pk-note pk-foot">Not in the ranked backlog yet. Planning mode and the promote / veto gate appear here once a sequencer pass ranks it.</p>`;
+}
+function gatesPanel() {
+  const g = (n, m) => `<div class="gate"><span class="ok">${I('check')}</span>${n}<span class="mono">${m}</span></div>`;
+  return `<h3 style="margin-bottom:4px">Verification gates</h3>${g('Install', 'pass')}${g('Typecheck', 'pass')}${g('Tests', 'CI · pass')}`;
+}
+function menu() {
+  const b = (l, c = '') => `<button class="${c}">${l}</button>`;
+  const m = { fresh: [['Next step', ['Plan…', 'Start work']], ['Actions', ['Add to order book']]], needs: [['Next step', ['Answer the agent']], ['Actions', ['Stop agent', 'Restart agent…']], ['Inspect', ['Open in editor', 'Show plan and tasks']]], paused: [['Next step', ['Unpause']], ['Communicate', ['Message agent']], ['Actions', ['Stop agent', 'Restart agent…']], ['Inspect', ['Open in editor', 'Show plan and tasks']]], planned: [['Next step', ['Accept plan', 'Start work']], ['Actions', ['Update from main', 'Add to order book']], ['Inspect', ['Open in editor', 'Show plan and tasks']]], working: [['Communicate', ['Message agent']], ['Actions', ['Finish work and start review', 'Stop agent', 'Restart agent…']], ['Inspect', ['Open in editor', 'Show plan and tasks']]], merged: [['Next step', ['Close out']], ['Inspect', ['Open in editor', 'Open pull request', 'Show plan and tasks']]] }[st.scn];
+  return `<div class="pop ${st.anim} pop-menu" data-pop>${m.map(([g, items]) => `<div class="grp">${g}</div>${items.map((l) => b(l)).join('')}`).join('')}${st.scn === 'merged' ? '' : `<hr>${b('Reset to Todo', 'danger')}${b('Cancel issue', 'danger')}`}</div>`;
+}
+function header(agents) {
+  const sc = SCN[st.scn];
+  const tabs = TABS.map(([id, label]) => `<button class="tab" role="tab" aria-selected="${st.tab === id}" data-act="tab:${id}">${label}${id === 'tasks' ? `<span class="n">${sc.done}/${sc.total ?? 15}</span>` : id === 'skills' && skChanged().length ? `<span class="n" title="Skills changed for this issue">${skChanged().length}</span>` : ''}</button>`).join('');
+  return `<div class="stage-tabs"><span>${I('bot')}Chat 4954${I('x')}</span><span>${I('bot')}Chat 1486${I('x')}</span><span class="on">PAN-5185${I('x')}</span></div><header class="dh">
+    <div class="dh-top">
+      <span class="crumb">overdeck / Issues /</span>
+      <span class="dh-id mono">PAN-5185</span>
+      <h1 class="dh-title" title="File explorer A: server core (contracts, roots, read, git, search, watcher child)">File explorer A: server core (contracts, roots, read, git, search, watcher child)</h1>
+      <span class="badge ${sc.badge[1]}">${sc.badge[0]}</span>
+      <span class="spacer"></span>
+      <span class="cost mono" title="Spend on this issue so far">${sc.cost}</span>
+      ${st.scn === 'merged' ? `<button class="btn" title="Next step: archive the workspace and close the issue">Close out</button><a class="btn" href="#" title="+6,964 −7 across 51 files">${I('pr')}<span class="mono">#5194</span></a>` : ''}
+      <a class="btn drawer-only" href="#">${I('ext')}Issue</a><button class="btn stage-only">${I('ext')}Open tracker${I('down')}</button>
+      <button class="btn icon" data-act="pop:menu" aria-expanded="${st.pop === 'menu'}" aria-label="Issue actions">${I('more')}</button>
+      <button class="btn icon quiet drawer-only" aria-label="Close">${I('x')}</button>
+      ${st.pop === 'menu' ? menu() : ''}
+    </div>
+    ${strip(agents)}
+    <nav class="tabs" role="tablist" aria-label="Issue sections">${tabs}</nav>
+  </header>`;
+}
+
+/* ── Conversation ────────────────────────────────────────────────────── */
+function item(it) {
+  if (it.u) return `<div class="user-row"><div class="user-bubble"><p>${esc(it.u)}</p><span class="ts">${it.time || 'now'}</span></div></div>`;
+  if (it.a) return `<div class="asst-row">${I('bot')}<div class="c">${it.a.map((p) => `<p>${esc(p)}</p>`).join('')}${it.time ? `<span class="ts">${it.time}</span>` : ''}</div></div>`;
+  if (it.tools) return `<div class="worklog">${it.earlier ? `<button class="wl-more">${I('right')}Show ${it.earlier} earlier</button>` : ''}${it.tools.map(([l, d, m]) => `<div class="wl"><i></i><b>${l}</b><span class="d">${esc(d)}</span>${m ? `<span class="m">${m}</span>` : ''}${I('right')}</div>`).join('')}</div>`;
+  if (it.perm) return `<div class="perm">${I('shield')}Permissions: ${it.perm}</div>`;
+  if (it.mark) return `<div class="mark">${it.mark}</div>`;
+  if (it.ask) return `<div class="choices">${it.ask.map((c, i) => `<button class="btn ${i ? '' : 'primary'}" data-act="scn:working">${c}</button>`).join('')}</div>`;
+  if (it.live) return `<div class="working"><span class="pulse"></span>${it.live}</div>`;
+  return '';
+}
+function conversation(agents) {
+  if (st.agent === 'test') return `<div class="timeline" style="display:flex"><div class="empty"><b>No test agent ran</b>The test suite ran on CI against the pull request head, so this phase has no conversation.</div></div>`;
+  const a = agents[st.agent] || agents[SCN[st.scn].def];
+  if (!a) return `<div class="timeline" style="display:flex"><div class="start"><b>No agent has run on this issue yet</b><p>Plan it first, or start work directly. Overdeck creates the workspace, and each agent's conversation appears here while it works.</p>
+    <div class="start-form"><label>Model<select aria-label="Model"><option>Default (Opus 5.5)</option><option>Sonnet 5.5</option><option>GPT-5.6</option></select></label><label>Harness<select aria-label="Harness"><option>Default (claude-code)</option><option>codex</option><option>pi</option></select></label></div>
+    <div class="start-actions"><button class="btn primary" data-act="scn:planned">Plan…</button><button class="btn" data-act="scn:working">Start work</button></div></div></div>`;
+  const live = a.state === 'live';
+  const all = Object.entries(agents);
+  const sent = st.sent[st.scn + a.id] || [];
+  const inReview = (st.agent || '').startsWith('review');
+  const rv = (id, label) => `<button class="rv" data-act="agent:${id}" aria-pressed="${st.agent === id}">${id === 'review' ? '' : I('check')}${label}</button>`;
+  const reviewers = inReview ? `<div class="reviewers"><span class="lbl">Reviewers</span>${rv('review', 'Synthesis')}${rv('review.correctness', 'Correctness')}${rv('review.security', 'Security')}${rv('review.performance', 'Performance')}${rv('review.requirements', 'Requirements')}</div>` : '';
+  const head = `<div class="conv-head">
+      ${all.length > 1 ? `<button class="conv-name" data-act="pop:agents" aria-expanded="${st.pop === 'agents'}" title="Every agent on this issue, workers included">${live ? '<span class="pulse"></span>' : ''}${a.name}${I('down')}</button>` : `<span class="conv-name">${live ? '<span class="pulse"></span>' : ''}${a.name}</span>`}
+      ${st.pop === 'agents' ? `<div class="pop ${st.anim} pop-menu pop-agents" data-pop><div class="grp">${all.length} agents on this issue</div>${all.map(([k, x]) => `<button data-act="agent:${k}">${x.name}<span class="mono">${x.state === 'live' ? 'active' : x.outcome}</span></button>`).join('')}</div>` : ''}
+      <div class="seg" role="tablist" aria-label="View" style="margin-left:6px"><button role="tab" aria-selected="${st.view === 'conversation'}" data-act="view:conversation">Conversation</button><button role="tab" aria-selected="${st.view === 'terminal'}" data-act="view:terminal">Terminal</button></div>
+      <span class="spacer"></span>
+      <button class="chip">${I('info')}About</button><button class="chip">${I('wrench')}Tools</button><button class="chip">${I('bookmark')}Bookmarks</button>
+      <button class="btn icon quiet" aria-label="Copy conversation">${I('copy')}</button>
+    </div>
+    <div class="conv-meta">
+      <span class="state ${live ? 'live' : ''}"><i></i>${live ? 'active' : a.outcome === 'paused' || st.scn === 'needs' ? a.outcome : a.state === 'stopped' ? 'stopped · ' + a.outcome : a.outcome}</span><span class="sep">·</span>
+      <button class="tagchip" title="Copy the branch name">${I('branch')}feature/pan-5185${I('copy')}</button><span class="sep">·</span>
+      <span>${a.model} · ${a.harness}</span><span class="sep">·</span>
+      <span class="mono" style="color:var(--cost-fg)">${a.cost}</span><span class="sep">·</span>
+      <span class="mono">${a.id}</span><span class="sep">·</span><span>started ${a.started}</span>
+    </div>${reviewers}`;
+  if (st.view === 'terminal') {
+    const t = live
+      ? `<span class="dim">feature/pan-5185 · ${a.model} · high</span>\n\n● Editing the search route\n  ⎿ src/dashboard/server/routes/file-explorer-search.ts\n\n<span class="dim">  esc to interrupt · 6 of 15 tasks</span>\n\n❯ <span class="cur"></span>`
+      : `<span class="dim">feature/pan-5185 · ${a.model} · high</span>\n\n● ${esc(a.items.filter((i) => i.a).pop().a.slice(-1)[0])}\n\n<span class="dim">${a.outcome}. The pane is closed. Send a message to resume this agent with its memory.</span>`;
+    return head + `<div class="terminal">${t}</div>` + composer(a, live);
+  }
+  const resumed = sent.length && !live ? `<div class="working"><span class="pulse"></span>Resuming the ${a.name.toLowerCase()} with its memory</div>` : '';
+  return head + `<div class="timeline" id="timeline"><div class="tl">${a.items.map(item).join('')}${sent.map((u) => item({ u })).join('')}${resumed}</div></div>
+    <button class="bottom" id="bottom" data-act="bottom" hidden>${I('arrowDown')}Bottom</button>` + composer(a, live);
+}
+function composer(a, live) {
+  const releasePending = (st.scn === 'planned' && !st.released) || st.scn === 'needs';
+  const ph = live ? `Message the ${a.name.toLowerCase()}…` : `Send a message to resume the ${a.name.toLowerCase()}…`;
+  return `<div class="composer"><div class="cbox">
+    <textarea id="msg" rows="2" placeholder="${ph}" aria-label="${ph}"></textarea>
+    <div class="ctools">
+      <button class="pick">${a.model}${I('down')}</button><button class="pick">High${I('down')}</button>
+      <span class="spacer"></span>
+      <span class="hint">${live ? '' : 'Sending resumes it'}</span>
+      <button class="sq" aria-label="Attach a file">${I('clip')}</button><button class="sq" aria-label="Dictate">${I('mic')}</button>
+      <span class="meter" title="Context used: 22%"><span>22</span></span>
+      <button class="send ${releasePending ? 'neutral' : ''}" data-act="send" aria-label="Send">${I('send')}</button>
+    </div></div></div>`;
+}
+
+/* ── Other tabs ──────────────────────────────────────────────────────── */
+function tasksTab() {
+  const d = SCN[st.scn].done;
+  if (SCN[st.scn].total === 0) return stub('No plan yet', 'Tasks appear here once the issue is planned.');
+  return `<div class="panel"><h2>${d} of 15 tasks done</h2>${TASKS.map((t, i) => {
+    const s = i < d ? 'done' : i === d && ['working', 'paused', 'needs'].includes(st.scn) ? 'doing' : 'todo';
+    return `<div class="task ${s}"><span class="g">${s === 'done' ? I('check') : s === 'doing' ? '<span class="pulse"></span>' : '<span class="step" style="padding:0;height:auto"><span class="ring"></span></span>'}</span>${t}<span class="mono">${s === 'done' ? 'done' : s === 'doing' ? 'in progress' : 'pending'}</span></div>`;
+  }).join('')}</div>`;
+}
+const stub = (title, text) => `<div class="panel"><div class="placeholder"><b>${title}</b>${text}</div></div>`;
+function detailsTab(agents) {
+  const sc = SCN[st.scn];
+  const out = { done: 'Finished 11/13', live: 'Running now', next: 'Waiting for pickup', none: 'Not started', skip: 'No agent ran' };
+  const rows = PHASES.map(([id, label]) => {
+    const a = agents[id];
+    return `<tr><td>${label}</td><td class="mono">${a ? a.id : '—'}</td><td class="o">${a && sc.phases[id] === 'done' ? a.outcome + ' · 11/13' : out[sc.phases[id]] ?? 'Waiting for you'}</td><td class="mono" style="color:var(--cost-fg);text-align:right">${a ? a.cost : ''}</td><td style="text-align:right"><button class="open" ${a ? `data-act="agent:${id}"` : 'disabled'}>Open conversation</button></td></tr>`;
+  }).join('');
+  const verdicts = st.scn === 'merged' ? ['security', 'correctness', 'performance', 'requirements'].map((r) => `<tr><td class="mono">review.${r}</td><td class="o">Approved · convoy complete</td><td style="text-align:right"><button class="open" data-act="agent:review.${r}">Open conversation</button></td></tr>`).join('') : `<tr><td class="o">Review has not started.</td></tr>`;
+  return `<div class="panel"><div class="details">
+    <div>
+      <h2>Pipeline</h2><table class="pl">${rows}</table>
+      <h2>Review</h2><table class="pl">${verdicts}</table>
+      <h2>Ship</h2>${st.scn === 'merged' ? `<table class="pl"><tr><td>Pull request</td><td class="mono">#5194</td><td class="o">Merged 11/13 · +6,964 −7 · 51 files</td></tr><tr><td>Checks</td><td class="mono">7/7</td><td class="o">Passed</td></tr><tr><td>Merge</td><td class="mono">squash</td><td class="o">Rebased, verified, merged. <button class="open" data-act="agent:ship">Open the merge log</button></td></tr></table>` : '<p class="pk-note">No pull request yet. The merge gate, its progress and the merge log appear here.</p>'}
+      <h2>Linked conversations</h2><p class="pk-note">${st.scn === 'fresh' ? 'None.' : 'Redesign issue view conversation-first · fable-5-2'}</p>
+      <h2>Live activity</h2><p class="pk-note">${st.scn === 'working' ? 'Work agent: editing the search route. 6 of 15 tasks done.' : st.scn === 'paused' ? 'Work agent paused by the operator at 10:40 AM.' : st.scn === 'needs' ? 'Work agent is waiting for your answer.' : 'No activity yet.'}</p>
+    </div>
+    <div>
+      <h2>Pickup controls</h2>${pickupPanel(false)}
+      <h2>Verification gates</h2>${st.scn === 'merged' ? gatesPanel().replace(/<h3.*?<\/h3>/, '') : '<p class="pk-note">Gates run when the work agent signals done.</p>'}
+      <h2>Workspace</h2>${st.scn === 'fresh' ? '<p class="pk-note">No workspace yet. Overdeck creates it when the first agent starts.</p>' : `<div class="kv"><span class="mono" title="/home/eltmon/Projects/overdeck/workspaces/feature-pan-5185">~/Projects/overdeck/workspaces/feature-pan-5185</span><button class="btn">Open in${I('down')}</button></div><div class="kv">${I('branch')}<span class="mono">feature/pan-5185</span></div><p class="pk-note" style="padding-top:6px;border-top:1px solid var(--border)">Workspace on disk. No containers running.</p>`}
+      <h2>UAT environment</h2><p class="pk-note">No UAT environment is running for this issue.</p>
+      <h2>Skills</h2><button class="skills" data-act="tab:skills">${I('right')}${SK_TOTAL - skOff()} of ${SK_TOTAL} on · ${skChanged().length} changed for this issue</button>
+    </div>
+  </div></div>`;
+}
+
+/* ── Skills tab (names, descriptions, counts and the two overrides are live data for PAN-5185) ── */
+const SK_TOTAL = 201;
+const CORE = ['pan', 'pan-done', 'pan-flywheel', 'pan-foreman', 'pan-plan', 'pan-start', 'pan-task', 'pan-tell', 'pan-worker', 'work-complete', 'write-xbrief'];
+const SK_GROUPS = [
+  { key: 'overdeck', title: 'Overdeck', hint: '~/.overdeck/skills', total: 118, rows: [['bug-fix', 'Systematic approach to investigating and fixing bugs'], ['clear-writing', 'Use when writing prose humans will read: documentation, commit messages, error messages'], ['code-review-security', 'Deep security analysis focusing on OWASP Top 10'], ['codebase-design', 'Shared vocabulary for designing deep modules'], ['feature-work', 'Standard workflow for implementing new features with testing'], ['github-cli', 'GitHub CLI (gh) reference for issues, PRs, and API calls'], ['okf', 'Maintain a project knowledge wiki in Open Knowledge Format'], ['pan-style-guide', 'Overdeck dashboard UI style guide: typography, color-signal semantics, badge formula'], ['react-best-practices', 'React and Next.js performance optimization guidelines from Vercel Engineering'], ['refactor', 'Safe refactoring approach with test coverage first']] },
+  { key: 'personal', title: 'Personal', hint: '~/.claude/skills, ~/.agents/skills', total: 72, rows: [['backups', 'Check and manage Backblaze B2 backups via restic'], ['beautiful-mermaid', 'Render Mermaid diagrams as SVG and PNG using the Beautiful Mermaid library'], ['d3-viz', 'Creating interactive data visualisations using d3.js'], ['elevenlabs', 'Generate AI voiceovers, sound effects, and music using ElevenLabs APIs'], ['remotion', 'Toolkit-specific Remotion patterns: custom transitions, shared components'], ['tailwind-design-system', 'Build scalable design systems with Tailwind CSS v4, design tokens, component libraries'], ['threejs-fundamentals', 'Three.js scene setup, cameras, renderer, Object3D hierarchy, coordinate systems']] },
+];
+const PACKS = [['gstack', 36, 'Hooks, agents and 14 project-mutating skills are not applied'], ['impeccable', 1, '1 executable is not applied'], ['mattpocock', 25, '2 executables and 1 project-mutating skill are not applied'], ['pstack', 58, 'Agents, 6 executables and 7 project-mutating skills are not applied']];
+const SK_DESC = Object.fromEntries(SK_GROUPS.flatMap((g) => g.rows));
+const skChanged = () => Object.keys(st.sk).sort();
+const skOff = () => Object.values(st.sk).filter((v) => v === false).length;
+const grpOpen = (k) => st.grp[k] ?? (k === 'personal');
+function skRow(n) {
+  const o = st.sk[n];
+  const on = o !== false;
+  const src = o === undefined ? 'on · global' : o ? 'on · pinned here' : 'off · this issue';
+  const side = o === undefined
+    ? `<button class="btn icon quiet" data-act="skpin:${n}" aria-label="Pin ${n} on for this issue" title="Pin on for this issue. A later change to the global default won't turn it off here.">${I('pin')}</button>`
+    : `<button class="btn icon quiet" data-act="skreset:${n}" aria-label="Reset ${n} to the global default" title="Reset to the global default (on)">${I('undo')}</button>`;
+  return `<div class="sk-row ${on ? '' : 'off'}"><span class="nm">${n}</span><span class="ds" title="${esc(SK_DESC[n])}">${esc(SK_DESC[n])}</span><span class="src ${o === undefined ? '' : 'here'}">${src}</span><button class="swb" role="switch" aria-checked="${on}" data-act="sk:${n}" aria-label="${n} for this issue" title="${on ? 'Turn off for this issue' : 'Turn back on'}"><span class="sw"></span></button>${side}</div>`;
+}
+function skillList() {
+  const q = st.skQ.trim().toLowerCase();
+  const narrowing = q !== '' || st.skF !== 'all';
+  const match = ([n, d]) => (!q || n.includes(q) || d.toLowerCase().includes(q)) && (st.skF === 'all' || (st.skF === 'off' ? st.sk[n] === false : st.sk[n] !== undefined));
+  const changed = skChanged();
+  const pinned = narrowing ? '' : `<div class="sk-box"><div class="sk-gh">Changed for this issue<span class="cnt mono">${changed.length}${changed.length ? `<button class="btn quiet" data-act="skresetall">Reset all</button>` : ''}</span></div>${changed.length ? changed.map(skRow).join('') : '<div class="sk-empty">Nothing is changed. This issue\'s agents launch with the global skill set.</div>'}</div>`;
+  let any = false;
+  const groups = SK_GROUPS.map((g) => {
+    const rows = g.rows.filter(match);
+    if (narrowing && !rows.length) return '';
+    any = true;
+    const open = narrowing || grpOpen(g.key);
+    const off = g.rows.filter(([n]) => st.sk[n] === false).length;
+    const head = `<button class="sk-gh" data-act="grp:${g.key}" aria-expanded="${open}">${I('right')}${g.title}<span class="hint">${g.hint}</span><span class="cnt mono">${narrowing ? `${rows.length} match${rows.length === 1 ? '' : 'es'}` : `${g.total - off} of ${g.total} on`}</span></button>`;
+    return head + (open ? rows.map(([n]) => skRow(n)).join('') + (narrowing ? '' : `<button class="sk-more">Show all ${g.total}</button>`) : '');
+  }).join('');
+  const core = narrowing ? '' : `<button class="sk-gh" data-act="grp:core" aria-expanded="${grpOpen('core')}">${I('right')}${CORE.length} core skills, always on<span class="cnt">${I('lock')}</span></button>${grpOpen('core') ? `<div class="sk-core">${CORE.map((n) => `<span>${n}</span>`).join('')}</div>` : ''}`;
+  const packsOn = PACKS.filter(([id]) => st.pk[id]).length;
+  const packs = narrowing ? '' : `<button class="sk-gh" data-act="grp:packs" aria-expanded="${grpOpen('packs')}">${I('right')}Packs<span class="hint">installed skill packs, off unless turned on</span><span class="cnt mono">${packsOn} of ${PACKS.length} on</span></button>${grpOpen('packs') ? PACKS.map(([id, n, note]) => `<div class="sk-row ${st.pk[id] ? '' : 'off'}"><span class="nm" style="text-decoration:none">${id}</span><span class="ds">${n} skill${n === 1 ? '' : 's'}. ${note}.</span><span class="src ${st.pk[id] ? 'here' : ''}">${st.pk[id] ? 'on · this issue' : 'off · global'}</span><button class="swb" role="switch" aria-checked="${!!st.pk[id]}" data-act="pack:${id}" aria-label="${id} pack for this issue"><span class="sw"></span></button><span></span></div>`).join('') : ''}`;
+  const none = narrowing && !any ? `<div class="sk-box"><div class="sk-empty" style="border:0">No skills match ${q ? `"${esc(st.skQ.trim())}"` : 'this filter'}.</div></div>` : '';
+  return pinned + none + (any || !narrowing ? `<div class="sk-box">${core}${groups}${packs}</div>` : '');
+}
+function skillsTab() {
+  const live = ['working', 'needs'].includes(st.scn);
+  const notice = !st.skDirty ? '' : live
+    ? `<div class="sk-notice act" role="status">Skills changed since launch. The work agent keeps the skills it launched with until it restarts.<button class="btn">Restart agent…</button></div>`
+    : `<div class="sk-notice" role="status">Saved. The next agent that launches for this issue gets these skills.</div>`;
+  const f = (k, label, n) => `<button class="fchip" aria-pressed="${st.skF === k}" data-act="skf:${k}">${label}<span class="mono">${n}</span></button>`;
+  return `<div class="panel">
+    <h2>Skills for this issue</h2>
+    <p class="sk-sum"><b>${SK_TOTAL - skOff()}</b> of ${SK_TOTAL} on · <b>${skChanged().length}</b> changed for this issue · ${CORE.length} core · ${PACKS.filter(([id]) => st.pk[id]).length} of ${PACKS.length} packs on</p>
+    <p class="sk-note">Flip a switch to change a skill for this issue only. Changes apply to Claude Code and Codex agents at their next launch; remote (Fly) launches get every skill.</p>
+    ${notice}
+    <div class="sk-bar">
+      <label class="sk-search">${I('search')}<input id="skq" type="search" value="${esc(st.skQ)}" placeholder="Find a skill by name or description" aria-label="Find a skill"></label>
+      ${f('all', 'All', SK_TOTAL)}${f('changed', 'Changed here', skChanged().length)}${f('off', 'Off', skOff())}
+    </div>
+    <div id="skill-list">${skillList()}</div>
+  </div>`;
+}
+
+const SUB_TEXT = {
+  map: ['Plan map', 'The task dependency map renders here, unchanged from today.'],
+  prd: ['PRD', 'The issue\'s PRD renders here (today: cockpit only).'],
+  files: ['Files', 'The changed-files tree and diff render here, unchanged from today.'],
+  artifacts: ['Artifacts', 'Review reports and other artifacts render here, unchanged from today.'],
+  feed: ['Feed', 'The live activity feed renders here, unchanged from today.'],
+  history: ['Status history', 'Every status change of the issue, oldest first (today: cockpit only).'],
+};
+function subTab(tab) {
+  const cur = st.sub[tab];
+  const seg = `<div class="subseg" role="tablist" aria-label="${tab} views">${SUBS[tab].map(([k, l]) => `<button role="tab" aria-selected="${cur === k}" data-act="sub:${tab}.${k}">${l}</button>`).join('')}</div>`;
+  let body;
+  if (cur === 'checks') {
+    const ok = st.scn === 'merged';
+    const row = (n, t) => `<div class="task ${ok ? '' : 'todo'}"><span class="g">${ok ? `<span style="color:var(--success-fg);display:grid">${I('check')}</span>` : '<span class="step" style="padding:0;height:auto"><span class="ring"></span></span>'}</span>${n}<span class="mono">${ok ? t : 'not run'}</span></div>`;
+    body = `<h2>${ok ? '7 of 7 checks passed on #5194' : 'No pull request yet'}</h2>` + [['typecheck', '1m 12s'], ['lint', '48s'], ['build', '2m 03s'], ['test (server)', '6m 41s'], ['test (frontend subset)', '2m 19s'], ['effect façade ratchet', '21s'], ['no-loss matrix', '14s']].map(([n, t]) => row(n, t)).join('');
+  } else body = `<div class="placeholder"><b>${SUB_TEXT[cur][0]}</b>${SUB_TEXT[cur][1]}</div>`;
+  return `<div class="panel">${seg}${body}</div>`;
+}
+function discussionTab() {
+  const c = (who, when, text) => `<div class="cmt"><b>${who}</b><span class="mono">${when}</span><p>${text}</p></div>`;
+  return `<div class="panel"><h2>Discussion</h2>${c('eltmon', '11/13 8:02 AM', 'Server half only. The explorer UI is PAN-5191.')}${c('overdeck-agent', '11/13 2:44 PM', 'Review requested: full mode, four reviewers.')}${c('overdeck-agent', '11/13 4:20 PM', 'Merged in #5194.')}<p class="pk-note" style="margin-top:10px">The canonical discussion surface renders here (today: cockpit only).</p></div>`;
+}
+function deck(agents) {
+  const sc = SCN[st.scn];
+  const row = (k, label, right, cls = '') => `<button class="deck-row agent ${cls}" ${agents[k] ? `data-act="agent:${k}" aria-current="${st.tab === 'conversation' && st.agent === k}"` : 'disabled'}><span class="g">${agents[k] && agents[k].state === 'live' ? '<span class="pulse"></span>' : agents[k] ? I('check') : '<span class="dot" style="width:5px;height:5px;border-radius:50%;background:currentColor"></span>'}</span>${label}<span class="r">${agents[k] ? (agents[k].state === 'live' ? 'active' : agents[k].outcome) : right}</span></button>`;
+  const revs = agents.review ? ['correctness', 'security', 'performance', 'requirements'].map((r) => row('review.' + r, r[0].toUpperCase() + r.slice(1), '', 'sub')).join('') : '';
+  return `<div class="deck-top">Command Deck<span>overdeck</span></div>
+    <h3>Conversations<span class="mono">3</span></h3>
+    <button class="deck-row">Redesign issue view conversation-first<span class="r">fable-5-2</span></button>
+    <button class="deck-row">Implement click-to-terminal navigation<span class="r">opus-5-5</span></button>
+    <button class="deck-row">Flywheel<span class="r">opus-5-5</span></button>
+    <h3>Issues<span class="mono">9</span></h3>
+    <button class="deck-row issue" data-act="tab:conversation"><span><span class="mono">PAN-5185</span> File explorer A: server core<br><span class="badge ${sc.badge[1]}" style="margin-top:4px">${sc.badge[0]}</span></span></button>
+    ${row('plan', 'Planning', 'not started')}${row('work', 'Work', 'not started')}${agents.worker1 ? row('worker1', 'Worker 1', '', 'sub') : ''}${row('review', 'Review', 'not started')}${revs}${row('ship', 'Ship', 'not started')}
+    <button class="deck-row"><span class="mono">PAN-5191</span> File explorer F: edit workspaces<span class="r">Merged</span></button>
+    <button class="deck-row"><span class="mono">PAN-5238</span> Skills for this issue loads slowly<span class="r">Planning</span></button>`;
+}
+
+/* ── Render + events ─────────────────────────────────────────────────── */
+function render(keepScroll) {
+  const agents = agentsFor(st.scn);
+  const old = document.getElementById('timeline');
+  const top = old ? old.scrollTop : null;
+  const draft = document.getElementById('msg') ? document.getElementById('msg').value : '';
+  const panelTop = document.querySelector('.panel') ? document.querySelector('.panel').scrollTop : 0;
+  const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.act : null;
+  const body = st.tab === 'conversation' ? conversation(agents)
+    : st.tab === 'tasks' ? tasksTab()
+    : st.tab === 'details' ? detailsTab(agents)
+    : st.tab === 'skills' ? skillsTab()
+    : st.tab === 'discussion' ? discussionTab()
+    : subTab(st.tab);
+  document.getElementById('drawer').innerHTML = header(agents) + `<main class="body">${body}</main>`;
+  document.getElementById('deck').innerHTML = deck(agents);
+  document.getElementById('shell').innerHTML = [['drawer', 'Drawer'], ['stage', 'Stage tab']].map(([k, l]) => `<button role="tab" aria-selected="${st.shell === k}" data-act="shell:${k}">${l}</button>`).join('');
+  document.body.classList.toggle('shell-stage', st.shell === 'stage');
+  document.getElementById('scn').innerHTML = Object.entries(SCN).map(([k, v]) => `<button role="tab" aria-selected="${st.scn === k}" data-act="scn:${k}">${v.label}</button>`).join('');
+  const tl = document.getElementById('timeline');
+  if (tl) {
+    tl.scrollTop = keepScroll && top !== null ? top : tl.scrollHeight;
+    const pill = document.getElementById('bottom');
+    const sync = () => { pill.hidden = tl.scrollHeight - tl.scrollTop - tl.clientHeight < 48; };
+    tl.addEventListener('scroll', sync); sync();
+  }
+  const msg = document.getElementById('msg');
+  if (msg && keepScroll) msg.value = draft;
+  st.anim = '';
+  if (keepScroll && document.querySelector('.panel')) document.querySelector('.panel').scrollTop = panelTop;
+  const again = focused && document.querySelector(`[data-act="${focused}"]`);
+  if (again) again.focus();
+}
+function send() {
+  const msg = document.getElementById('msg');
+  if (!msg || !msg.value.trim()) return;
+  const a = agentsFor(st.scn)[st.agent];
+  if (!a) return;
+  (st.sent[st.scn + a.id] ||= []).push(msg.value.trim());
+  st.view = 'conversation';
+  render(false);
+}
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-act]');
+  if (!el) { if (st.pop && !e.target.closest('[data-pop]')) { st.pop = null; render(true); } return; }
+  const [act, arg] = el.dataset.act.split(':');
+  let keep = true;
+  if (act === 'scn') { st.scn = arg; st.agent = SCN[arg].def; st.released = arg !== 'planned' && arg !== 'fresh'; st.pop = null; st.view = 'conversation'; keep = false; }
+  else if (act === 'agent') { st.agent = arg; st.tab = 'conversation'; st.pop = null; keep = false; }
+  else if (act === 'tab') { st.tab = arg; st.pop = null; keep = false; }
+  else if (act === 'view') st.view = arg;
+  else if (act === 'pop') { st.pop = st.pop === arg ? null : arg; st.anim = 'anim'; }
+  else if (act === 'tog') st[arg] = !st[arg];
+  else if (act === 'sk') { if (st.sk[arg] === false) delete st.sk[arg]; else st.sk[arg] = false; st.skDirty = true; }
+  else if (act === 'skpin') { st.sk[arg] = true; st.skDirty = true; }
+  else if (act === 'skreset') { delete st.sk[arg]; st.skDirty = true; }
+  else if (act === 'skresetall') { st.sk = {}; st.skDirty = true; }
+  else if (act === 'pack') { st.pk[arg] = !st.pk[arg]; st.skDirty = true; }
+  else if (act === 'grp') st.grp[arg] = !grpOpen(arg);
+  else if (act === 'skf') st.skF = arg;
+  else if (act === 'release') st.released = true;
+  else if (act === 'recall') st.released = false;
+  else if (act === 'send') return send();
+  else if (act === 'bottom') { const tl = document.getElementById('timeline'); if (tl) tl.scrollTo({ top: tl.scrollHeight, behavior: 'smooth' }); return; }
+  else if (act === 'shell') st.shell = arg;
+  else if (act === 'sub') { const [t, k] = arg.split('.'); st.sub[t] = k; keep = false; }
+  else if (act === 'theme') { const d = document.documentElement.classList.toggle('dark'); document.getElementById('themeBtn').textContent = d ? 'Light' : 'Dark'; return; }
+  else if (act === 'notes') { document.body.classList.toggle('notes-open'); return; }
+  render(keep);
+});
+document.addEventListener('input', (e) => {
+  if (e.target.id !== 'skq') return;
+  st.skQ = e.target.value;
+  document.getElementById('skill-list').innerHTML = skillList();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && st.pop) { st.pop = null; render(true); }
+  if (e.key === 'Enter' && !e.shiftKey && e.target.id === 'msg') { e.preventDefault(); send(); }
+});
+const q = new URLSearchParams(location.search);
+if (SCN[q.get('scn')]) { st.scn = q.get('scn'); st.agent = SCN[st.scn].def; st.released = st.scn !== 'planned' && st.scn !== 'fresh'; }
+if (q.get('agent')) st.agent = q.get('agent');
+if (q.get('tab')) st.tab = q.get('tab');
+if (q.get('pop')) st.pop = q.get('pop');
+if (q.get('view')) st.view = q.get('view');
+if (q.get('shell')) st.shell = q.get('shell');
+if (q.get('sub')) { const [t, k] = q.get('sub').split('.'); st.sub[t] = k; }
+if (q.get('theme') === 'dark') { document.documentElement.classList.add('dark'); document.getElementById('themeBtn').textContent = 'Light'; }
+render(false);
+</script>
+</body>
+</html>
