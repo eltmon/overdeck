@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5282",
   "created": "2026-11-14T19:03:45.838Z",
-  "updated": "2026-11-14T20:44:30.712Z",
+  "updated": "2026-11-14T20:44:31.988Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -193,6 +193,11 @@
     "docs-configuration.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T20:44:30.712Z"
+    },
+    "docs-harnesses": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5282",
+      "claimedAt": "2026-11-14T20:44:31.988Z"
     }
   }
 }
