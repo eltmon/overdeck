@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5191",
   "created": "2026-11-14T01:35:38.518Z",
-  "updated": "2026-11-14T01:38:14.414Z",
+  "updated": "2026-11-14T01:43:43.219Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,30 @@
     "edit-gh.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T01:38:14.414Z"
+    },
+    "begin-edit": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:43:43.219Z"
+    },
+    "begin-edit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:43:43.219Z"
+    },
+    "begin-edit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:43:43.219Z"
+    },
+    "begin-edit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:43:43.219Z"
+    },
+    "begin-edit.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:43:43.219Z"
+    },
+    "begin-edit.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:43:43.219Z"
     }
   }
 }
