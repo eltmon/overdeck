@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5245",
   "created": "2026-11-14T05:12:59.498Z",
-  "updated": "2026-11-14T06:14:09.189Z",
+  "updated": "2026-11-14T06:14:18.433Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -180,6 +180,11 @@
     "amber-live-agent-notice.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T06:14:09.189Z"
+    },
+    "user-docs-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5245",
+      "claimedAt": "2026-11-14T06:14:18.433Z"
     }
   }
 }
