@@ -1,0 +1,13 @@
+plan-digest: f0b567c9114dcf0c51e4734467a79b8df152368db1255d8a8205ef46a8590004
+
+## blocks-the-design: Coalescer change kind persists across windows
+
+The PRD says a trailing entry upgrades to `pr-state` but specifies no reset after that fire (`.pan/drafts/PAN-5261.md`, line 219). The existing timer clears `issueIds` and `reasons` while retaining its entry (`src/dashboard/server/services/pr-webhook-freshness.ts`, lines 113–120). If a trailing window contains one `pr-state` event, the next status-only trailing window will still act as `pr-state` and re-read the closed listing. Reset `entry.change` to `pr-status` when the timer captures and clears a window, and test two successive trailing windows where only the first contains `pr-state`.
+
+## blocks-the-design: In-flight answer can refill an invalidated issue-state cache
+
+WI-6 specifies a plain Map populated after `list` resolves (`.pan/drafts/PAN-5261.md`, lines 277–315); WI-7 deletes the key on a tracker change before enqueueing a refresh (lines 325–332). An older GraphQL lookup can resolve after that deletion and put its obsolete answer back for 30 minutes, so the newly enqueued gather can reuse the wrong state. The existing cache mechanism explicitly supports dropping an in-flight entry (`src/lib/concurrency.ts`, lines 42–51 and 63–95); the trigger enqueues immediately after processing changed identifiers (`src/dashboard/server/services/membership-tracker-trigger.ts`, lines 80–88). Require a per-key generation check before storing a response, or equivalent in-flight invalidation, and test a deferred lookup that resolves after invalidation.
+
+## blocks-the-design: SHA-wide check dedupe hides distinct checks
+
+FR-5 suppresses every `check_run:created` after the first for a repo and head SHA (`.pan/drafts/PAN-5261.md`, line 71; WI-4, lines 236–257). Yet the open listing includes the complete `statusCheckRollup` (`src/lib/overdeck/pr-listing.ts`, lines 51–52), and a later created check adds a distinct row. The handler only fires for `created` and failing `completed`; a successful completion does not provide a replacement fire (`src/lib/webhook-handlers.ts`, lines 267–280). If another check starts more than six seconds after the first, the plan can leave the rollup stale until a suite event or fallback read, violating NFR-2's check freshness bound. Dedupe repeated delivery of the same check-run identity instead of all checks on one SHA, or rely on the existing six-second coalescer (`src/dashboard/server/services/pr-webhook-freshness.ts`, lines 100–120); add a test with two distinct runs on the same SHA separated by more than six seconds.
