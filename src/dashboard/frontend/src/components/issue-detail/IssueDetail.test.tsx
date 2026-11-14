@@ -416,6 +416,20 @@ describe('IssueDetail (C-DETAIL one component)', () => {
     expect(document.querySelectorAll('[data-section="SpecialistStrip"]')).toHaveLength(1);
   });
 
+  it('page density shows the reviewers row while a review agent is selected, as the drawer does', () => {
+    function PageDetail() {
+      const [tab, setTab] = useState('conversation');
+      return <IssueDetail issueId="PAN-1" density="page" agents={AGENTS} tab={tab} onSelectTab={setTab} />;
+    }
+    renderDetail(<PageDetail />);
+    expect(document.querySelector('[data-section="SpecialistStrip"]')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('open-review-conversation'));
+
+    expect(screen.getByTestId('mock-agent-session-conversation')).toHaveAttribute('data-agent-id', 'agent-review-1');
+    expect(document.querySelectorAll('[data-section="SpecialistStrip"]')).toHaveLength(1);
+  });
+
   it('adds a Decisions tab before Discussion for a Deft issue', () => {
     useDeftIssueSummaryMock.mockReturnValue({ isDeft: true, summary: null, isLoading: false });
     renderDetail(
