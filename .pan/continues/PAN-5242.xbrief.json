@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5242",
   "created": "2026-11-14T05:32:10.178Z",
-  "updated": "2026-11-14T05:59:04.863Z",
+  "updated": "2026-11-14T05:59:17.838Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "route-named-errors.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T05:59:04.863Z"
+    },
+    "candidate-tallies": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5242",
+      "claimedAt": "2026-11-14T05:59:17.837Z"
     }
   }
 }
