@@ -10,6 +10,28 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: do not edit this page for an unreleased change. Each PR adds its bullets to changelog.d/<issue>.md (format: changelog.d/README.md), and pan release stable folds them into a dated <Update> block here. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so in its entry and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.83.0" description="2026-11-13">
+  #### New
+
+  - **File explorer in the Stage:** the **Files** button on a project's home and on an issue tab now opens a live tree of that checkout, colored by git status, with quick open (Ctrl/Cmd+P), content search (Ctrl/Cmd+Shift+F) and a right-click menu to copy paths and stage, unstage or discard changes. The **Changed** filter replaces the old changed-files list. ([#5186](https://github.com/eltmon/overdeck/issues/5186))
+  - **Edit files from the explorer:** clicking a file in the Files tree now opens it in a Monaco code tab with syntax highlighting. A single click reuses one preview tab; editing it or double-clicking keeps it open. Edits save automatically a second after you stop typing, when you leave the editor, or at once with Ctrl/Cmd+S. If another program changes the file while you have unsaved edits, a banner lets you compare, reload, keep your edits or overwrite, and a Changes toggle shows your edits against the last commit. ([#5187](https://github.com/eltmon/overdeck/issues/5187))
+  - **File explorer viewers and file transfer:** the explorer can now show images, PDFs, audio, fonts, large text files, CSV and TSV tables, zip and tar archives and SQLite databases, and the dashboard server can stream any file or folder from an explorer root and accept file uploads into a workspace. These are the building blocks the explorer's file tabs, Download menu and file drop use. ([#5188](https://github.com/eltmon/overdeck/issues/5188))
+  - **Office, notebook and Mermaid previews in the file explorer:** Word, Excel and PowerPoint files, OpenDocument text, spreadsheets and presentations, Jupyter notebooks and Mermaid diagrams now open as read-only previews in a file tab. Notebooks show their saved outputs and never run code. A file that cannot be previewed shows its size and a Download button. ([#5189](https://github.com/eltmon/overdeck/issues/5189))
+  - **File actions in the explorer:** create, rename, duplicate, move by drag and delete files and folders in an issue workspace's file tree. Deleted files go to the Overdeck trash, and `Ctrl/Cmd+Z` undoes the last action. Drop files from your desktop onto a folder to upload them, or drag rows into a conversation composer to insert their paths. ([#5190](https://github.com/eltmon/overdeck/issues/5190))
+
+  #### Improved
+
+  - **Flywheel needs-you items:** the Needs you block on the Flywheel page shows one row per item. Issue IDs open the issue, known PRs open on GitHub, and clicking a row scrolls the conversation to the message where the loop first raised that item. ([#5198](https://github.com/eltmon/overdeck/issues/5198))
+  - **A cleaner phone app:** the phone screens get a new header with the Overdeck logo, icons in the tab bar, clearer rows and empty screens, and a faint logo behind the main lists. The logo animates once when the app opens; tap to skip it. In the browser phone view (`/m`), the gear in the header now sets System, Light or Dark, and the install and notification hints move into one banner you can dismiss. ([#5208](https://github.com/eltmon/overdeck/issues/5208))
+
+  #### Fixed
+
+  - **Polyrepo work agents start again:** a polyrepo workspace no longer refuses its work agent because of Overdeck's own synced files (`.claude/`, `.mcp.json`, `.hume-config`) at the workspace root. The root `.gitignore` now lists them, and the next `pan start` repairs a workspace created before this fix. Issues already stuck in Planned do not restart by themselves: run `pan start <issue>` once for each. ([#5199](https://github.com/eltmon/overdeck/issues/5199))
+  - **Large Codex conversations no longer fill dashboard memory:** The dashboard no longer holds very large Codex conversations in memory. Screenshots in tool output show as a short `[image: png, 412 KB]` note, long tool output is trimmed to its start and end, and a very large conversation opens with its recent history and loads older history from disk as you scroll up. Expanding a trimmed Codex tool row still loads its full text. ([#5211](https://github.com/eltmon/overdeck/issues/5211))
+
+  [Compare v0.82.2...v0.83.0](https://github.com/eltmon/overdeck/compare/v0.82.2...v0.83.0)
+</Update>
+
 <Update label="v0.82.2" description="2026-11-13">
   #### Fixed
 
