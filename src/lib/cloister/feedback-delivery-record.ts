@@ -65,14 +65,38 @@ export function feedbackAlreadyDelivered(workspacePath: string | undefined, dedu
 /** Record, at the moment it happened, that verdict feedback reached an agent. */
 export function recordFeedbackDelivered(
   workspacePath: string | undefined,
-  entry: { issueId: string; kind: VerdictFeedbackKind; dedupKey: string; agentId: string; source: string },
+  entry: {
+    issueId: string; kind: VerdictFeedbackKind; dedupKey: string; agentId: string; source: string;
+    /** PAN-5218: what a post-merge follow-up needs (the CodeRabbit relay's PR, review and threads). */
+    details?: Record<string, unknown>;
+  },
 ): void {
   if (!workspacePath) return;
   appendPipelineEntry(workspacePath, {
     type: 'feedback.delivered',
     issueId: entry.issueId,
     source: entry.source,
-    data: { kind: entry.kind, dedupKey: entry.dedupKey, agentId: entry.agentId },
+    data: { kind: entry.kind, dedupKey: entry.dedupKey, agentId: entry.agentId, ...entry.details },
+  });
+}
+
+/**
+ * PAN-5218: record that feedback reached no agent and Needs-you was raised
+ * instead, so a post-merge follow-up can still be filed for it.
+ */
+export function recordFeedbackUndelivered(
+  workspacePath: string | undefined,
+  entry: {
+    issueId: string; kind: VerdictFeedbackKind; dedupKey: string; reason: string; source: string;
+    details?: Record<string, unknown>;
+  },
+): void {
+  if (!workspacePath) return;
+  appendPipelineEntry(workspacePath, {
+    type: 'feedback.undelivered',
+    issueId: entry.issueId,
+    source: entry.source,
+    data: { kind: entry.kind, dedupKey: entry.dedupKey, reason: entry.reason, ...entry.details },
   });
 }
 

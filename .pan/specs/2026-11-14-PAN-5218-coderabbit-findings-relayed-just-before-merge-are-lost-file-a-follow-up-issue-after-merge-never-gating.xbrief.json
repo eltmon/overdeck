@@ -1,0 +1,783 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T01:15:09Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5218: CodeRabbit findings relayed just before merge are lost: file a follow-up issue after merge (never gating)",
+    "updated": "2026-11-14T01:27:25.086Z"
+  },
+  "plan": {
+    "id": "pan-5218",
+    "title": "CodeRabbit findings relayed just before merge are lost: file a follow-up issue after merge (never gating)",
+    "status": "proposed",
+    "uid": "fb66ab8b-aabc-46d3-b840-a7f88c1dd5db",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-14T01:15:09Z",
+    "updated": "2026-11-14T01:27:25.086Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5218",
+        "label": "PAN-5218",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5218.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "cloister",
+      "coderabbit",
+      "post-merge",
+      "pipeline-journal",
+      "github-app"
+    ],
+    "metadata": {
+      "sizeJustification": "One vertical feature: the relay records what a follow-up needs, a pure per-thread settlement rule decides, a filer creates the issue, a post-merge kick and a deacon-lite patrol trigger it. Splitting into sibling issues would ship a journal shape nothing reads, or a filer nothing triggers durably.",
+      "canonicalFilename": "2026-11-14-PAN-5218-coderabbit-findings-relayed-just-before-merge-are-lost-file-a-follow-up-issue-after-merge-never-gating.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "A CodeRabbit finding relayed to a work agent is lost when the PR merges before the agent acts on it (PAN-5198 / PR #5203: delivered at 21:00:37, merged at 21:10:53, nothing in between). The feedback body asks the agent to open a follow-up if the PR already merged, but nothing makes sure that happens. CodeRabbit must stay advisory and never gate a merge.",
+      "Proposal": "The CodeRabbit relay journals repo, PR number, review id/url and the thread list on feedback.delivered, and journals feedback.undelivered on every Needs-you branch. A pure settlement function decides per thread: a non-CodeRabbit reply on the thread, a later single-parent PR commit that changed the thread's file, or a later review.requested note naming the thread id settles it; a failed read counts as no evidence. fileAdvisoryFollowups files one App-authored GitHub issue per delivery with unsettled threads (after a body search for the delivery key), journaling feedback.followup_filed, or raises Needs-you and journals feedback.followup_failed. Two non-gating triggers: a fire-and-forget kick in postMergeLifecycle after merge.completed, and a deacon-lite patrol that re-runs the filer for merged issues with pending candidates (merge.completed >= 10 min old, candidate >= 2 min old), covering restarts and relays that finish after the merge.",
+      "NonGoals": "- Changing the Flywheel author/assignee gate (roles/flywheel.md, sync-sources/skills/pan-flywheel/SKILL.md, tests/unit/prompts/prompt-invariants.test.ts) to accept overdeck-agent\n- Granting the GitHub App issues: write, or editing scripts/create-github-app.mjs\n- Filing follow-ups as the gh user, or on Linear, GitLab, Jira or Rally trackers\n- Backfilling deliveries journaled before this change (entries without data.threads are skipped)\n- Automatic retry after a recorded feedback.followup_failed\n- Strict exactly-once issue creation across processes (one issue per key on every normal path is the guarantee)\n- Any merge gate, merge delay, or merge-readiness read of CodeRabbit state; merge-agent.ts must not mention coderabbit\n- Changing how last-entry journal readers (deacon-lite.ts recoverStalledReviews, undispatched-review-recovery.ts, pr-outside-pipeline.ts) treat feedback entries\n- Editing src/dashboard/server/main.ts or raising any file-size allowlist row"
+    },
+    "autoDecisions": [
+      {
+        "summary": "File follow-ups only through the GitHub App; on any failure (including the missing issues: write permission) raise Needs-you instead of falling back to the gh user.",
+        "rationale": "The issue specifies a bot-authored issue and names Needs-you as the failure path; filing under the operator's identity from server code is a policy change nobody asked for."
+      },
+      {
+        "summary": "A reply on a CodeRabbit thread from anyone other than coderabbitai[bot] is the agent's explicit skip for that thread.",
+        "rationale": "The relay body already tells the agent to reply with its reason when it rejects a finding and says it is then done; inventing a second skip channel would leave replied findings to be filed as noise."
+      },
+      {
+        "summary": "Settlement is per thread and tied to the thread (reply on it, later commit changing its file, re-review note naming its id); a failed forge read counts as no evidence, so the thread is filed.",
+        "rationale": "A PR-wide commit or a generic CodeRabbit note would settle unrelated findings (plan critique round 1); a redundant follow-up costs one closed issue, a false 'settled' loses the finding."
+      },
+      {
+        "summary": "Do not change the Flywheel author gate in this issue; report the panopticon-agent[bot] vs overdeck-agent mismatch to the orchestrator.",
+        "rationale": "The gate is a security rail pinned by prompt-invariants.test.ts, and follow-up bodies quote third-party CodeRabbit text, so auto-trusting them is a separate security decision."
+      },
+      {
+        "summary": "Name the new entry feedback.followup_filed exactly as the issue does; name the no-agent entry feedback.undelivered.",
+        "rationale": "Reviewers verify against the issue text; the issue names the entry explicitly."
+      },
+      {
+        "summary": "Two triggers: a non-awaited kick in postMergeLifecycle after merge.completed, and a deacon-lite patrol that re-runs the filer for merged issues with pending candidates.",
+        "rationale": "The relay is not awaited and can journal after merge.completed, and nothing re-runs a finished lifecycle; the journal candidate is the durable job record, and main.ts has no file-size headroom for a new dashboard service."
+      },
+      {
+        "summary": "Non-GitHub trackers (resolveGitHubIssue returns isGitHub false) raise Needs-you with the findings instead of filing.",
+        "rationale": "The bot identity and the Flywheel gate are GitHub concepts; creating Linear/GitLab issues is out of scope."
+      },
+      {
+        "summary": "Dedup is the journal marker plus a GitHub search for the delivery key in issue bodies before creating; strict exactly-once across processes is not promised.",
+        "rationale": "appendPipelineEntry never reports a failed write; the search repairs the marker on a retry, and a cross-process lock is out of proportion for an advisory feature."
+      },
+      {
+        "summary": "List every unsettled thread in the follow-up body with no cap; a body GitHub rejects is a filing failure with the full list in Needs-you.",
+        "rationale": "A cap would drop findings, which is the bug being fixed."
+      }
+    ],
+    "items": [
+      {
+        "id": "journal-types",
+        "title": "Add feedback.undelivered, feedback.followup_filed and feedback.followup_failed journal entry types with pan show summaries",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T01:15:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5218",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/pipeline-journal.ts",
+            "src/cli/commands/show.ts",
+            "src/cli/commands/__tests__/show-pipeline-journal.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/cli/commands/__tests__/show-pipeline-journal.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "show-pipeline-journal.test.ts passes including the two new summary cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-1. Extend PipelineJournalEntryType in pipeline-journal.ts (line 40) with 'feedback.undelivered' | 'feedback.followup_filed' | 'feedback.followup_failed'. In summarizePipelineEntry (show.ts line 120) add after case 'feedback.skipped' the three cases in the PRD snippet: '<kind> feedback not delivered — <reason>', '<kind> follow-up filed: #<issueNumber>', '<kind> follow-up not filed — <reason>'. Add the three cases to src/cli/commands/__tests__/show-pipeline-journal.test.ts."
+        },
+        "items": [
+          {
+            "id": "journal-types.ac1",
+            "title": "Given an entry { type: 'feedback.followup_filed', data: { kind: 'coderabbit', issueNumber: 12 } }, when summarizePipelineEntry runs, then it returns 'coderabbit follow-up filed: #12'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "journal-types.ac2",
+            "title": "Given an entry { type: 'feedback.undelivered', data: { kind: 'coderabbit', reason: 'no agent' } }, when summarizePipelineEntry runs, then it returns 'coderabbit feedback not delivered — no agent'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "journal-types.ac3",
+            "title": "Given an entry { type: 'feedback.followup_failed', data: { kind: 'coderabbit', reason: 'no App' } }, when summarizePipelineEntry runs, then it returns 'coderabbit follow-up not filed — no App'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settlement-core",
+        "title": "Pure settlement function for advisory deliveries per the PRD truth table",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T01:15:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5218",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "relay-records",
+            "settlement-facts-fetch",
+            "followup-filer",
+            "followup-patrol"
+          ],
+          "files_scope": [
+            "src/lib/cloister/advisory-followup-settlement.ts",
+            "tests/unit/lib/cloister/advisory-followup-settlement.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/advisory-followup-settlement.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "advisory-followup-settlement.test.ts passes with one case per truth-table row"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-2. Create src/lib/cloister/advisory-followup-settlement.ts, pure (type-only import of PipelineJournalEntry). Export ADVISORY_FOLLOWUP_KINDS = ['coderabbit'], AdvisoryThreadRecord, AdvisoryDeliveryData, SettlementCommit { sha; committedAt; files: string[] | null }, PullRequestSettlementFacts { commits: SettlementCommit[] | null; repliedThreadIds: number[] | null }, AdvisorySettlement (outcomes already-filed | already-failed | legacy | settled | unsettled), advisoryCandidates(entries) (latest feedback.delivered/feedback.undelivered per advisory dedupKey, oldest first), isAdvisoryCandidateClosed(entries, dedupKey) (feedback.followup_filed or feedback.followup_failed for the key), and settleAdvisoryDelivery(candidate, entries, facts) implementing the PRD truth table: delivery-level rows in order (already-filed, already-failed, legacy), then per thread settled by T (non-CodeRabbit reply id), P (thread.path in files of a commit with committedAt strictly later than at) or R (review.requested strictly later than at whose data.note contains String(thread.id)); no unsettled threads gives 'settled', else 'unsettled' with only the unsettled threads in order. null facts mean no evidence. Write the W-2 test list including the worked two-review case."
+        },
+        "items": [
+          {
+            "id": "settlement-core.ac1",
+            "title": "Given a journal holding feedback.followup_filed (or feedback.followup_failed) for the candidate's dedupKey, settleAdvisoryDelivery returns 'already-filed' (or 'already-failed') before reading any facts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settlement-core.ac2",
+            "title": "Given thread 11 on src/a.ts and a later commit whose files contain only src/b.ts, thread 11 stays unsettled; given a later commit whose files contain src/a.ts, it is settled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settlement-core.ac3",
+            "title": "Given review A (thread 11, src/a.ts) and review B (thread 21, src/b.ts), a later commit to src/b.ts and a later review.requested note 'Agent re-review request (1/3): CodeRabbit 21: guarded b', then B returns 'settled' and A returns 'unsettled' carrying thread 11",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settlement-core.ac4",
+            "title": "Given a non-CodeRabbit reply to thread 12 and none to thread 11, the candidate returns 'unsettled' carrying only thread 11; given repliedThreadIds null and commits null, it returns 'unsettled' carrying both threads",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settlement-core.ac5",
+            "title": "Given an entry without data.threads it returns 'legacy', and advisoryCandidates returns only the latest of two entries sharing a dedupKey",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relay-records",
+        "title": "CodeRabbit relay journals repo, PR, review and threads on delivery and feedback.undelivered on Needs-you",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T01:15:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5218",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/feedback-delivery-record.ts",
+            "src/lib/cloister/coderabbit-feedback.ts",
+            "tests/unit/lib/cloister/coderabbit-feedback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/coderabbit-feedback.test.ts tests/unit/lib/cloister/review-verdict-feedback.test.ts tests/unit/lib/cloister/uat-failure-feedback.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "coderabbit-feedback, review-verdict-feedback and uat-failure-feedback tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-3. In feedback-delivery-record.ts add optional details?: Record<string, unknown> to recordFeedbackDelivered's entry, spread into data after kind/dedupKey/agentId; add recordFeedbackUndelivered(workspacePath, { issueId, kind, dedupKey, reason, source, details? }) appending feedback.undelivered with data { kind, dedupKey, reason, ...details }. In coderabbit-feedback.ts runRelay, after threads are fetched build details = { repo, prNumber, reviewId, reviewUrl: `https://github.com/${repo}/pull/${prNumber}#pullrequestreview-${reviewId}`, threads: [{ id, path, line, severity, title, url }] }; pass it to recordDelivered; in the needsYou helper call (deps.recordUndelivered ?? recordFeedbackUndelivered) with the reason and details before surfacing Needs-you; add recordUndelivered to CodeRabbitFeedbackDeps. Replace body steps 4-5 and the delivery message exactly as PRD W-3 step 4 ('pan review request <id> -m \"CodeRabbit <thread ids>: <what you changed>\"'; 'stop: after the merge Overdeck files a follow-up issue / for every thread with no reply, no later commit to its file, and no re-review request naming its thread id.'). Update and add tests per PRD W-3 step 5."
+        },
+        "items": [
+          {
+            "id": "relay-records.ac1",
+            "title": "Given a delivered relay, recordDelivered receives details with repo 'eltmon/overdeck', prNumber 42, reviewId 900, reviewUrl ending '#pullrequestreview-900' and threads equal to the relayed THREADS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-records.ac2",
+            "title": "Given each Needs-you branch (feedback file not written, no reachable agent, delivery throws, delivery not accepted), recordUndelivered is called once with kind 'coderabbit', the dedupKey, the Needs-you reason and the same details, and surfaceNeedsYou is still called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-records.ac3",
+            "title": "buildCodeRabbitFeedbackBody output contains 'after the merge Overdeck files a follow-up issue' and '-m \"CodeRabbit <thread ids>:', and the delivery message contains 'pan review request PAN-1 -m \"CodeRabbit <thread ids>:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-records.ac4",
+            "title": "Given a review or UAT relay that calls recordFeedbackDelivered without details, the appended entry's data contains exactly kind, dedupKey and agentId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settlement-facts-fetch",
+        "title": "Read a PR's later non-merge commits with their files and the non-CodeRabbit thread replies",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:15:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5218",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/coderabbit-ingestion.ts",
+            "tests/unit/lib/cloister/coderabbit-ingestion.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/coderabbit-ingestion.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "coderabbit-ingestion.test.ts passes including the settlement-facts cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-4. Add exported async fetchPullRequestSettlementFacts(repo, prNumber, since, gh: GhRunner): Promise<PullRequestSettlementFacts> in coderabbit-ingestion.ts. (1) commit list via gh(['api','--paginate',`repos/${repo}/pulls/${prNumber}/commits?per_page=100`,'--jq','.[] | {sha, date: .commit.committer.date, parents: (.parents | length)}']), keep parents === 1 and Date.parse(date) > Date.parse(since); (2) per kept commit gh(['api',`repos/${repo}/commits/${sha}`,'--jq','[.files[].filename]']) -> files, failure -> files: null; (3) replies via gh(['api','--paginate',`repos/${repo}/pulls/${prNumber}/comments?per_page=100`,'--jq','.[] | select(.in_reply_to_id != null) | {in_reply_to_id, login: .user.login}']), unique in_reply_to_id where login !== CODERABBIT_BOT_LOGIN. Steps 1 and 3 each in their own try/catch returning null; never rejects. Type import from advisory-followup-settlement.ts."
+        },
+        "items": [
+          {
+            "id": "settlement-facts-fetch.ac1",
+            "title": "Given a fake gh returning a single-parent commit after since, a merge commit (parents 2) and a single-parent commit before since, commits contains only the first, with files read from its commits/<sha> response",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settlement-facts-fetch.ac2",
+            "title": "Given commits/<sha> rejects for one kept commit, that commit is returned with files null and the others keep their files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settlement-facts-fetch.ac3",
+            "title": "Given replies to thread 11 from 'eltmon' and to thread 12 from 'coderabbitai[bot]', repliedThreadIds equals [11]; given the comments read rejects, repliedThreadIds is null while commits still returns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "app-create-issue",
+        "title": "createIssueWithApp opens a GitHub issue as the App bot",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:15:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5218",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-app.ts",
+            "tests/unit/lib/github-app.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/github-app.test.ts",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "github-app.test.ts passes including the createIssueWithApp cases",
+            "file-size lint passes with github-app.ts at or under 1083 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-5. Add exported async createIssueWithApp(owner, repo, { title, body }) after listIssuesWithAnyLabel in github-app.ts, calling githubApi<{ number; html_url }>(`/repos/${owner}/${repo}/issues`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, body }) }) and returning { number, url: html_url }. Test with the file's fetchMock: request URL/method/body, returned shape, and a 403 'Resource not accessible by integration' rejection that isIntegrationPermissionError accepts."
+        },
+        "items": [
+          {
+            "id": "app-create-issue.ac1",
+            "title": "Given a 201 response { number: 77, html_url: 'https://github.com/o/r/issues/77' }, createIssueWithApp('o','r',{title,body}) sends one POST to https://api.github.com/repos/o/r/issues with the JSON title and body and resolves { number: 77, url: 'https://github.com/o/r/issues/77' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-create-issue.ac2",
+            "title": "Given a 403 response body 'Resource not accessible by integration', createIssueWithApp rejects with a message for which isIntegrationPermissionError returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "followup-filer",
+        "title": "fileAdvisoryFollowups files one App-authored issue per unsettled delivery or raises Needs-you",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T01:15:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5218",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/advisory-followup.ts",
+            "tests/unit/lib/cloister/advisory-followup.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/advisory-followup.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "advisory-followup.test.ts passes with the seven W-6 cases",
+            "no circular dependency reported"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-6. Create src/lib/cloister/advisory-followup.ts with AdvisoryFollowupDeps (readJournal, fetchFacts(repo, pr, since), resolveTrackerRepo, appConfigured, findExisting, createIssue, appendEntry, surfaceNeedsYou, log), AdvisoryFollowupOutcome and fileAdvisoryFollowups(issueId, workspacePath, deps?) exactly as specified in the PRD (defaults: readPipelineJournal; fetchPullRequestSettlementFacts with a runGh-based GhRunner like coderabbit-feedback.ts line 76; resolveGitHubIssue mapped to {owner, repo} or null; isGitHubAppConfigured; findExisting via gh search/issues with q=repo:<o>/<r> is:issue in:body \"<dedupKey>\"; createIssueWithApp; appendPipelineEntry; surfaceIssueFeedbackNeedsYou; console.log). Never throws; one in-flight run per issue (concurrent calls join). Steps 1-5 of PRD W-6: drop closed candidates first (no forge reads when none remain); facts once per repo#prNumber with since = earliest candidate at; settle; for unsettled: null tracker -> fail, App not configured -> fail, findExisting hit -> append feedback.followup_filed with recovered: true, miss -> createIssue with the PRD title/body listing every unsettled thread then append feedback.followup_filed (source 'advisory-followup'); createIssue error -> fail (isIntegrationPermissionError reason names 'Issues: Read and write'). Fail = surfaceNeedsYou with details { specialist: 'coderabbit', prNumber, dedupKey, findings } plus append feedback.followup_failed { kind, dedupKey, reason }. Write the nine W-6 tests."
+        },
+        "items": [
+          {
+            "id": "followup-filer.ac1",
+            "title": "Given an unsettled coderabbit feedback.delivered followed by merge.completed, fileAdvisoryFollowups calls createIssue exactly once with title 'CodeRabbit follow-up for PAN-1 (PR #42): 2 unsettled finding(s)' and appends one feedback.followup_filed with that dedupKey; a second run on the grown journal calls createIssue and fetchFacts zero times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "followup-filer.ac2",
+            "title": "Given one of two threads is settled by a reply, the created body contains only the unsettled thread's line; given both threads settled (reply and later commit to its path), createIssue is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "followup-filer.ac3",
+            "title": "Given findExisting resolves { number: 9, url }, createIssue is called zero times and feedback.followup_filed is appended with issueNumber 9 and recovered true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "followup-filer.ac4",
+            "title": "Given createIssue rejects with 'GitHub API POST /repos/o/r/issues failed: 403 Resource not accessible by integration', surfaceNeedsYou receives a reason containing 'Issues: Read and write' and details.findings, and feedback.followup_failed is appended while feedback.followup_filed is not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "followup-filer.ac5",
+            "title": "Given a 120-thread unsettled delivery the created body contains all 120 thread lines; given two deliveries on one PR fetchFacts is called once; given a null tracker repo surfaceNeedsYou is called and createIssue is not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "postmerge-wiring",
+        "title": "postMergeLifecycle fires fileAdvisoryFollowups after merge.completed without awaiting it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T01:15:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5218",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/merge-agent.ts",
+            "tests/unit/lib/cloister/postmerge-merge-train.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/postmerge-merge-train.test.ts",
+            "npm run lint:no-coderabbit-merge-gate",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "postmerge-merge-train.test.ts passes including the three wiring cases",
+            "✓ no CodeRabbit references in merge-gate files",
+            "file-size lint passes with merge-agent.ts at or under 932 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-7. In merge-agent.ts, inside the `if (workspacePath)` block right after the merge.completed appendPipelineEntry (line ~265), add the PRD 'After' snippet: a comment and `void import('./advisory-followup.js').then(({ fileAdvisoryFollowups }) => fileAdvisoryFollowups(issueId.toUpperCase(), workspacePath)).catch(...)` that logs a warning. No new line may contain 'coderabbit' in any case. Add a second describe to tests/unit/lib/cloister/postmerge-merge-train.test.ts mocking ../../../../src/lib/cloister/advisory-followup.js and ../../../../src/lib/overdeck/issue-projects.js (getIssueWorkspacePath -> '/tmp/overdeck-test/workspaces/feature-pan-2468'), with the three cases in PRD W-7, using the existing settle() helper."
+        },
+        "items": [
+          {
+            "id": "postmerge-wiring.ac1",
+            "title": "Given a verified merge, after settle() fileAdvisoryFollowups has been called once with ('PAN-2468', '/tmp/overdeck-test/workspaces/feature-pan-2468')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "postmerge-wiring.ac2",
+            "title": "Given fileAdvisoryFollowups returns a promise that never resolves, postMergeLifecycle still resolves undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "postmerge-wiring.ac3",
+            "title": "Given the merge cannot be verified, fileAdvisoryFollowups is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "postmerge-wiring.ac4",
+            "title": "npm run lint:no-coderabbit-merge-gate exits 0 and prints '✓ no CodeRabbit references in merge-gate files'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "followup-patrol",
+        "title": "Deacon-lite patrol re-runs the filer for merged issues with pending advisory candidates",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T01:15:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5218",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/advisory-followup-patrol.ts",
+            "src/lib/cloister/deacon-lite.ts",
+            "tests/unit/lib/cloister/advisory-followup-patrol.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/advisory-followup-patrol.test.ts",
+            "npm run lint:circular",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "advisory-followup-patrol.test.ts passes with the six W-8 cases",
+            "no circular dependency reported",
+            "file-size lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-8. Create src/lib/cloister/advisory-followup-patrol.ts exporting ADVISORY_PATROL_MERGE_AGE_MS = 10 * 60_000, ADVISORY_PATROL_CANDIDATE_AGE_MS = 2 * 60_000, AdvisoryPatrolDeps { listWorkspaces, readJournal, file, log } and recoverAdvisoryFollowups(now = Date.now(), deps = {}): Promise<string[]>. For each workspace with an issueId and existing path: read the journal; run file(issueId, path) only when a merge.completed entry is at least the merge age old and at least one advisoryCandidates entry with isAdvisoryCandidateClosed false is at least the candidate age old; log and continue on one workspace's failure; never throw. Defaults: listWorkspaces from ../workspaces/resolver.js, readPipelineJournal, fileAdvisoryFollowups, console.log. In deacon-lite.ts import it and add `await recoverAdvisoryFollowups();` with the PRD comment at the end of runDeaconLite. Tests use injected deps and a fixed now (no timers)."
+        },
+        "items": [
+          {
+            "id": "followup-patrol.ac1",
+            "title": "Given a journal ordered [merge.completed, feedback.delivered] with both entries older than the thresholds, recoverAdvisoryFollowups calls file once with that issue's id and workspace path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "followup-patrol.ac2",
+            "title": "Given a merge.completed only 5 minutes old, or a pending candidate only 1 minute old, or no merge.completed at all, file is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "followup-patrol.ac3",
+            "title": "Given the candidate's key is closed by feedback.followup_failed or feedback.followup_filed, file is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "followup-patrol.ac4",
+            "title": "Given file rejects for the first of two eligible workspaces, file is still called for the second and recoverAdvisoryFollowups resolves without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document post-merge CodeRabbit follow-ups in PIPELINE-GATES, auto-merge config page and changelog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:15:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5218",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "configuration/auto-merge.mdx",
+            "changelog.d/pan-5218.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-9, steps 1-4 verbatim: the '**Unsettled findings become a follow-up issue after merge (PAN-5218).**' paragraph in the CodeRabbit section of docs/PIPELINE-GATES.md (line ~837) naming both triggers, per-thread settlement, the body search, feedback.followup_filed, feedback.followup_failed, feedback.undelivered, the 'Issues: Read and write' App permission and the author-gate caveat, plus the 'and journals feedback.undelivered' addition to the no-agent bullet; the entry-type table edit for the feedback.delivered row and the two new rows (~line 1818); the sentence appended to the GitHub App bot bullet in configuration/auto-merge.mdx line 87; and changelog.d/pan-5218.md under '#### Improved' with the exact PRD bullet."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/PIPELINE-GATES.md contains a paragraph starting 'Unsettled findings become a follow-up issue after merge (PAN-5218)' that names the post-merge kick, the deacon-lite patrol, per-thread settlement, feedback.followup_filed, feedback.followup_failed and the 'Issues: Read and write' App permission",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "The docs/PIPELINE-GATES.md entry-type table contains feedback.followup_filed and feedback.followup_failed rows naming cloister/advisory-followup.ts, and the feedback.delivered row no longer contains 'writes `feedback.delivered` only'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "configuration/auto-merge.mdx's GitHub App bot bullet contains the sentence stating that follow-up issues need the Issues: Read and write permission and that Overdeck raises Needs-you without it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "changelog.d/pan-5218.md exists with a single '#### Improved' heading and one bullet linking issue #5218, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "journal-types",
+        "to": "settlement-core",
+        "type": "blocks"
+      },
+      {
+        "from": "journal-types",
+        "to": "relay-records",
+        "type": "blocks"
+      },
+      {
+        "from": "settlement-core",
+        "to": "relay-records",
+        "type": "blocks"
+      },
+      {
+        "from": "settlement-core",
+        "to": "settlement-facts-fetch",
+        "type": "blocks"
+      },
+      {
+        "from": "settlement-core",
+        "to": "followup-filer",
+        "type": "blocks"
+      },
+      {
+        "from": "settlement-facts-fetch",
+        "to": "followup-filer",
+        "type": "blocks"
+      },
+      {
+        "from": "app-create-issue",
+        "to": "followup-filer",
+        "type": "blocks"
+      },
+      {
+        "from": "journal-types",
+        "to": "followup-filer",
+        "type": "blocks"
+      },
+      {
+        "from": "followup-filer",
+        "to": "postmerge-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "followup-filer",
+        "to": "followup-patrol",
+        "type": "blocks"
+      },
+      {
+        "from": "settlement-core",
+        "to": "followup-patrol",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

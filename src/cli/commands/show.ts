@@ -164,6 +164,12 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
       return `${data.kind ?? 'verdict'} feedback to ${data.agentId ?? 'the work agent'}`;
     case 'feedback.skipped':
       return `${data.kind ?? 'verdict'} feedback already delivered; not re-sent`;
+    case 'feedback.undelivered':
+      return `${data.kind ?? 'verdict'} feedback not delivered — ${data.reason ?? 'unknown'}`;
+    case 'feedback.followup_filed':
+      return `${data.kind ?? 'verdict'} follow-up filed: #${data.issueNumber ?? '?'}`;
+    case 'feedback.followup_failed':
+      return `${data.kind ?? 'verdict'} follow-up not filed — ${data.reason ?? 'unknown'}`;
     case 'merge.attempted':
       return typeof data.kind === 'string' ? data.kind : '';
     case 'merge.completed':

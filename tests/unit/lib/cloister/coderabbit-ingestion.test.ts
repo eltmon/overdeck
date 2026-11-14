@@ -5,7 +5,9 @@ import { exec } from 'node:child_process';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   fetchCodeRabbitFindings,
+  fetchPullRequestSettlementFacts,
   type CodeRabbitFinding,
+  type GhRunner,
 } from '../../../../src/lib/cloister/coderabbit-ingestion.js';
 import { lookupPullRequestNumberForBranch } from '../../../../src/lib/github-pr-lookup.js';
 import { postPrComment } from '../../../../src/lib/cloister/review-verdict-feedback.js';
@@ -129,3 +131,80 @@ describe('fetchCodeRabbitFindings', () => {
   });
 });
 
+
+describe('fetchPullRequestSettlementFacts (PAN-5218)', () => {
+  const SINCE = '2026-11-13T21:00:00Z';
+  const commitList = [
+    { sha: 'later', date: '2026-11-13T21:05:00Z', parents: 1 },
+    { sha: 'merge', date: '2026-11-13T21:06:00Z', parents: 2 },
+    { sha: 'earlier', date: '2026-11-13T20:55:00Z', parents: 1 },
+    { sha: 'later2', date: '2026-11-13T21:07:00Z', parents: 1 },
+  ].map((row) => JSON.stringify(row)).join('\n');
+  const replies = [
+    { in_reply_to_id: 11, login: 'eltmon' },
+    { in_reply_to_id: 12, login: 'coderabbitai[bot]' },
+    { in_reply_to_id: 11, login: 'overdeck-agent[bot]' },
+  ].map((row) => JSON.stringify(row)).join('\n');
+
+  function fakeGh(overrides: Record<string, () => Promise<string>> = {}): GhRunner & ReturnType<typeof vi.fn> {
+    return vi.fn(async (args: string[]) => {
+      const path = args.find((arg) => arg.startsWith('repos/')) ?? '';
+      for (const [key, respond] of Object.entries(overrides)) if (path.includes(key)) return respond();
+      if (path.includes('/pulls/42/commits')) return commitList;
+      if (path.includes('/pulls/42/comments')) return replies;
+      if (path.endsWith('/commits/later')) return JSON.stringify(['src/a.ts']);
+      if (path.endsWith('/commits/later2')) return JSON.stringify(['src/b.ts', 'src/c.ts']);
+      throw new Error(`unexpected gh call: ${args.join(' ')}`);
+    }) as GhRunner & ReturnType<typeof vi.fn>;
+  }
+
+  it('dates commits by author, which a rebase keeps, not by committer', async () => {
+    const gh = fakeGh();
+    await fetchPullRequestSettlementFacts('eltmon/overdeck', 42, SINCE, gh);
+    const listCall = gh.mock.calls.map(([args]) => args as string[]).find((args) => args.some((arg) => arg.includes('/pulls/42/commits')))!;
+    expect(listCall[listCall.indexOf('--jq') + 1]).toContain('date: .commit.author.date');
+  });
+
+  it('keeps only later single-parent commits, with files from their commit reads', async () => {
+    const gh = fakeGh();
+    const facts = await fetchPullRequestSettlementFacts('eltmon/overdeck', 42, SINCE, gh);
+    expect(facts.commits).toEqual([
+      { sha: 'later', authoredAt: '2026-11-13T21:05:00Z', files: ['src/a.ts'] },
+      { sha: 'later2', authoredAt: '2026-11-13T21:07:00Z', files: ['src/b.ts', 'src/c.ts'] },
+    ]);
+    const reads = gh.mock.calls.map(([args]) => (args as string[]).find((arg) => arg.startsWith('repos/')));
+    expect(reads).not.toContain('repos/eltmon/overdeck/commits/merge');
+    expect(reads).not.toContain('repos/eltmon/overdeck/commits/earlier');
+  });
+
+  it('gives files: null for a commit whose read failed, and keeps the others', async () => {
+    const facts = await fetchPullRequestSettlementFacts('eltmon/overdeck', 42, SINCE, fakeGh({
+      '/commits/later2': async () => { throw new Error('gh: 502'); },
+    }));
+    expect(facts.commits).toEqual([
+      { sha: 'later', authoredAt: '2026-11-13T21:05:00Z', files: ['src/a.ts'] },
+      { sha: 'later2', authoredAt: '2026-11-13T21:07:00Z', files: null },
+    ]);
+  });
+
+  it('leaves out CodeRabbit self-replies', async () => {
+    const facts = await fetchPullRequestSettlementFacts('eltmon/overdeck', 42, SINCE, fakeGh());
+    expect(facts.repliedThreadIds).toEqual([11]);
+  });
+
+  it('gives repliedThreadIds: null when the comments read fails, while commits still return', async () => {
+    const facts = await fetchPullRequestSettlementFacts('eltmon/overdeck', 42, SINCE, fakeGh({
+      '/pulls/42/comments': async () => { throw new Error('gh: 502'); },
+    }));
+    expect(facts.repliedThreadIds).toBeNull();
+    expect(facts.commits).toHaveLength(2);
+  });
+
+  it('gives commits: null when the commit list read fails', async () => {
+    const facts = await fetchPullRequestSettlementFacts('eltmon/overdeck', 42, SINCE, fakeGh({
+      '/pulls/42/commits': async () => { throw new Error('gh: 502'); },
+    }));
+    expect(facts.commits).toBeNull();
+    expect(facts.repliedThreadIds).toEqual([11]);
+  });
+});

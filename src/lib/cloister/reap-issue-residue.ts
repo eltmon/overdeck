@@ -80,6 +80,15 @@ export async function reapIssueResidue(projectPath: string, issueId: string): Pr
     return actions;
   }
 
+  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+  // PAN-5218: the journal dies with the workspace; file any advisory follow-up still pending first.
+  try {
+    const { flushAdvisoryFollowupsBeforeReap } = await import('./advisory-followup-patrol.js');
+    await flushAdvisoryFollowupsBeforeReap(issueId, workspacePath);
+  } catch {
+    // Never holds the reap.
+  }
+
   // PAN-3920: registered workers' `.swarm/worker-<n>` worktrees and their
   // `<feature>-worker-<n>` branches go with the issue.
   try {
@@ -88,7 +97,6 @@ export async function reapIssueResidue(projectPath: string, issueId: string): Pr
     // Git unavailable — the workspace removal below still runs.
   }
 
-  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
   if (existsSync(workspacePath)) {
     try {
       await execAsync(`git worktree remove "${workspacePath}" --force`, { cwd: projectPath });

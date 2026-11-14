@@ -164,6 +164,17 @@ vi.mock('../../../../src/lib/cloister/merge-train.js', () => ({
   runMergeTrainReconcile: mockRunMergeTrainReconcile,
 }));
 
+// PAN-5218: the advisory follow-up kick, and a workspace for the lifecycle to journal into.
+const WORKSPACE_PATH = '/tmp/overdeck-test/workspaces/feature-pan-2468';
+const mockFileAdvisoryFollowups = vi.hoisted(() => vi.fn(async (_issueId: string, _workspacePath: string) => [] as unknown[]));
+vi.mock('../../../../src/lib/cloister/advisory-followup.js', () => ({
+  fileAdvisoryFollowups: mockFileAdvisoryFollowups,
+}));
+vi.mock('../../../../src/lib/overdeck/issue-projects.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/overdeck/issue-projects.js')>();
+  return { ...actual, getIssueWorkspacePath: vi.fn(() => '/tmp/overdeck-test/workspaces/feature-pan-2468') };
+});
+
 import { postMergeLifecycle, resetPostMergeState } from '../../../../src/lib/cloister/merge-agent.js';
 
 const ISSUE_ID = 'PAN-2468';
@@ -232,6 +243,66 @@ describe('postMergeLifecycle rolls the merge train (PAN-4801)', () => {
 
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('Refusing post-merge lifecycle'));
     expect(mockRunMergeTrainReconcile).not.toHaveBeenCalled();
+    warn.mockRestore();
+  }, 30_000);
+});
+
+describe('postMergeLifecycle kicks the advisory follow-up filer (PAN-5218)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockExecAsync.mockImplementation(defaultExecAsync);
+    mockSpawn.mockReturnValue(mockSpawnChild);
+    mockIsGitHubAppConfigured.mockReturnValue(false);
+    mockListPullRequestsForHead.mockResolvedValue([]);
+    mockLoadConfigSync.mockReturnValue({ config: {} });
+    mockRunMergeTrainReconcile.mockResolvedValue([]);
+    mockFileAdvisoryFollowups.mockResolvedValue([]);
+    resetPostMergeState(ISSUE_ID);
+  });
+
+  it('calls the filer once with the issue and its workspace after a verified merge', async () => {
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+    await settle();
+
+    expect(mockFileAdvisoryFollowups).toHaveBeenCalledOnce();
+    expect(mockFileAdvisoryFollowups).toHaveBeenCalledWith(ISSUE_ID, WORKSPACE_PATH);
+  }, 30_000);
+
+  it('does not hold the lifecycle when the filer never resolves', async () => {
+    mockFileAdvisoryFollowups.mockImplementation(() => new Promise(() => undefined));
+
+    await expect(postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH)).resolves.toBeUndefined();
+    await settle();
+
+    expect(mockFileAdvisoryFollowups).toHaveBeenCalledOnce();
+    expect(mockRunMergeTrainReconcile).toHaveBeenCalledOnce();
+  }, 30_000);
+
+  it('logs a filer that throws, and the rest of the lifecycle still runs', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    mockFileAdvisoryFollowups.mockImplementation(() => { throw new Error('filer exploded'); });
+
+    await expect(postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH)).resolves.toBeUndefined();
+    await settle();
+
+    expect(warn).toHaveBeenCalledWith(`[merge-agent] Advisory follow-up for ${ISSUE_ID} failed: filer exploded`);
+    // The merge train roll comes after the kick in the lifecycle: it still happened.
+    expect(mockRunMergeTrainReconcile).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  }, 30_000);
+
+  it('never calls the filer when the merge cannot be verified', async () => {
+    mockExecAsync.mockImplementation(async (cmd: string) => {
+      if (cmd.includes('git merge-base --is-ancestor')) throw new Error('not an ancestor');
+      if (cmd.includes('gh pr list')) return { stdout: '[{"number":2468,"state":"open","mergedAt":null}]', stderr: '' };
+      return defaultExecAsync(cmd);
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+    await settle();
+
+    expect(mockFileAdvisoryFollowups).not.toHaveBeenCalled();
     warn.mockRestore();
   }, 30_000);
 });
