@@ -200,11 +200,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   primary repo checkouts (MYN sub-repos were weeks behind), so any merge check that compares
   with the bare local branch reports merged work as unmerged. Compare with a fetched
   `origin/<target>`. Known local-`main` readers: close-out row 4
-  (`lifecycle/workflows.ts verifyConventionBranchMerged`, PAN-5209), `close-out.ts
+  (`lifecycle/verify-merged.ts verifyConventionBranchMerged`, fixed in PAN-5209 by fetching
+  `origin/<target>` before comparing), `close-out.ts
   isBranchMerged` (reaper) and `pipeline-membership-gather.ts
-  resolveRepositoryDefaultBranch` (prefers local over `origin/`).
+  resolveRepositoryDefaultBranch` (prefers local over `origin/`) — these last two are not fixed.
 - **Close-out ceremony lives in `lifecycle/workflows.ts closeOut()`** — `pan close` and
-  `POST /api/issues/:id/close-out` both call it. `src/lib/close-out.ts` now holds only
+  `POST /api/issues/:id/close-out` both call it. Row 4's merge verification lives in
+  `lifecycle/verify-merged.ts` and compares against a fetched `origin/<target>`, not the
+  local branch (PAN-5209). `src/lib/close-out.ts` now holds only
   merge detection (`isBranchMerged`, squash-aware via the merged PR). `closeOut()` reads
   only `close_out.remove_workspace` and `delete_feature_branch`; `close_out.auto` and
   `auto_delay_minutes` have had no consumer since PAN-3917 W4 (`94255f055fe`). The

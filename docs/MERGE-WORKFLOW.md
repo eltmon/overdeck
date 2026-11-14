@@ -521,12 +521,37 @@ Close-out's DoD row 8 (deploy) probes the dashboard's `/api/health` up to 3 time
 can stall for several seconds right after a close-out. The row reports `dashboard not
 reachable` only when every attempt fails, and the observed text says `after 3 attempts`.
 
+Close-out's DoD row 4 (merged) check lives in `src/lib/lifecycle/verify-merged.ts`. It runs `git fetch
+origin +refs/heads/<target>:refs/remotes/origin/<target>` in each required repo's checkout and compares
+every ancestry, diff, and `git log` check with `origin/<target>`, never the local branch — primary
+checkouts never pull `main`, so the local branch goes stale and a merged feature branch reads as
+unmerged. The fetch only updates the remote-tracking ref; it never moves local `<target>`. A failed fetch
+falls back to the bare local `<target>` (when it exists) and the row's text says
+`Checked against local <target> because git fetch origin <target> failed: <reason>`; with no local
+`<target>` either, the row fails before any git comparison runs. A merged GitLab MR whose head differs
+from the branch tip passes under the same rule a squash-merged GitHub PR already does: when every later
+non-merge commit is on `origin/<target>`, or the branch-unique delta touches only `.pan/` paths
+(PAN-5209).
+
 Close-out's DoD rows 1 (review) and 2 (tests) read the issue's PR from the forge, retrying once after
 1 s (`src/lib/lifecycle/dod-pr-read.ts`). A read that fails twice is a `MISS` whose observed text is
 `pull request read failed on the forge after 2 attempts: <error>` — never `no pull request found`, which
 now means only that the forge answered and no PR exists. A failed read is never waived by the strike
 path or by tracker-closed settlement. Each failed attempt prints a `[dod-gate] … pull request read
 failed (attempt n of 2)` warning. `fetchIssuePullRequest` never caches a failed read (PAN-4821).
+
+For an issue that is not tracked on GitHub (`ctx.github` unset) whose GitHub PR read answers "no PR",
+rows 1 and 2 fall back to repo landing evidence from `src/lib/lifecycle/dod-forge-merge.ts`: the forge is
+asked first for every required repo, with no ahead-count gate (unlike the Single Merge Oracle,
+`assessMergeCompleteness` in `src/lib/cloister/merge-completeness.ts`, which skips the forge once a repo
+counts zero commits ahead — the exact MYN polyrepo shape this fallback exists for). A repo with no merged
+artifact has no branch work of its own when its branch is missing on the forge or its tip sits on
+`origin/<target>`'s first-parent line; otherwise it is unlanded. Complete evidence (no unlanded or
+unverifiable repo, at least one merged) makes both rows `SKIP` — never `PASS`, since no review decision or
+check result was actually read — with observed text `forge merge complete: <repo list>`. A failed forge or
+git read on any repo is a hard `MISS` (`forge merge evidence unavailable: <reasons>`) that no strike or
+tracker-closed waiver covers (PAN-4821 applies here too). This is read-only and runs at most once per
+close-out, memoized across both rows (PAN-5209).
 
 Close-out prunes only regenerable agent-directory weight: `pending.lock`,
 `*.sock`, and each `codex-home*/` entry except `sessions/`. It keeps
