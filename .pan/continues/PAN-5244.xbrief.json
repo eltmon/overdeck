@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5244",
   "created": "2026-11-14T05:28:55.884Z",
-  "updated": "2026-11-14T06:10:35.570Z",
+  "updated": "2026-11-14T06:10:43.481Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,11 @@
     "pickup-strip-variant.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T06:10:35.569Z"
+    },
+    "checks-chip": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T06:10:43.480Z"
     }
   }
 }
