@@ -14,10 +14,10 @@
  * migrateMemoryHomesToWorkspaces() moves legacy issue-keyed memory homes
  * (memory/{projectId}/{issueId}/, from before this item) onto their
  * workspace UUID and re-points memory_fts.workspace_id by issueId.
- * archiveTerminalIssueWorkspaces() archives (never deletes) issue rows whose
- * issue reached a terminal stage, so pipeline worktrees stop accumulating in the
- * user-facing surfaces (PAN-3286 FR-14). Terminality is passed in, resolved by
- * the caller through IssuesResolver — this module reads no issue state.
+ * archiveDeadIssueWorkspaces() archives (never deletes) non-archived issue
+ * rows whose worktree directory no longer exists, skipping rows younger than
+ * 10 minutes (the row is written before `git worktree add` runs). Reachable
+ * via `pan admin db rebuild-workspaces` (PAN-5233 FR-10).
  * migrateMemoryHomesToWorkspacesOnce() is the boot-safe wrapper, gated by a
  * marker file so a dashboard restart never re-scans every project's memory
  * home. Wired into the dashboard boot path in main.ts, right after the
@@ -145,67 +145,55 @@ export async function rebuildMainAndScratchWorkspaces(
   return result;
 }
 
-export interface ArchiveTerminalIssueWorkspacesOptions {
-  /**
-   * Issue ids the caller resolved as terminal through the canonical issues read
-   * door (`resolveTerminalIssueIds` in src/lib/overdeck/terminal-issues.ts).
-   * Required, so this function cannot silently open a second issue-state read
-   * path — it decides nothing about terminality itself (review fix, FR-14).
-   */
-  terminalIssueIds: ReadonlySet<string>;
-  dryRun?: boolean;
-  verbose?: boolean;
+async function pathExists(path: string): Promise<boolean> {
+  return stat(path).then(() => true, () => false);
 }
 
-export interface ArchiveTerminalIssueWorkspacesResult {
+export interface ArchiveDeadIssueWorkspacesOptions {
+  dryRun?: boolean;
+  verbose?: boolean;
+  /** Injectable clock for tests; defaults to Date.now(). */
+  now?: number;
+}
+
+export interface ArchiveDeadIssueWorkspacesResult {
   scanned: number;
   archived: number;
   skipped: number;
   archivedIds: string[];
 }
 
-/**
- * Archive — never delete — every non-archived kind='issue' row whose issue the
- * caller resolved as terminal (PAN-3286 FR-14, D-13). The rows stay because they
- * own their memory homes; archiving just takes them out of the user-facing
- * surfaces, and `unarchiveWorkspace` reverses it.
- *
- * Terminality is an *input* here, resolved through `IssuesResolver` by
- * `resolveTerminalIssueIds()` — this function performs no issue-state read, so
- * it adds no second read door. Mutation goes through `archiveWorkspace` on the
- * write door (NFR-1). `--dry-run` performs zero writes.
- */
-export async function archiveTerminalIssueWorkspaces(
-  options: ArchiveTerminalIssueWorkspacesOptions,
-): Promise<ArchiveTerminalIssueWorkspacesResult> {
-  const result: ArchiveTerminalIssueWorkspacesResult = { scanned: 0, archived: 0, skipped: 0, archivedIds: [] };
-  // The issues table stores ids as the tracker reports them; compare
-  // case-insensitively so a `feature-pan-1` row's `PAN-1` matches either casing.
-  const terminalIds = new Set([...options.terminalIssueIds].map((id) => id.toUpperCase()));
+/** workspace-manager/create.ts writes the issue row before `git worktree add`; leave young rows alone. */
+const DEAD_ROW_MIN_AGE_MS = 10 * 60 * 1000;
 
+/**
+ * Archive — never delete — every non-archived kind='issue' row whose
+ * directory no longer exists (PAN-5233 FR-10). The rows keep owning their
+ * memory homes; `unarchiveWorkspace` reverses it, and backfillIssueWorkspaces
+ * enrolls a fresh row if the directory comes back. --dry-run writes nothing.
+ */
+export async function archiveDeadIssueWorkspaces(
+  options: ArchiveDeadIssueWorkspacesOptions = {},
+): Promise<ArchiveDeadIssueWorkspacesResult> {
+  const now = options.now ?? Date.now();
+  const result: ArchiveDeadIssueWorkspacesResult = { scanned: 0, archived: 0, skipped: 0, archivedIds: [] };
   for (const workspace of listWorkspaces({ kind: 'issue' })) {
     result.scanned += 1;
-    if (!workspace.issueId || !terminalIds.has(workspace.issueId.toUpperCase())) {
+    if (now - workspace.createdAt < DEAD_ROW_MIN_AGE_MS || await pathExists(workspace.path)) {
       result.skipped += 1;
       continue;
     }
-
     if (options.verbose) {
-      console.log(`[rebuild-workspaces] ${options.dryRun ? 'would archive' : 'archiving'} terminal-issue workspace ${workspace.id} (${workspace.name}, ${workspace.issueId})`);
+      console.log(`[rebuild-workspaces] ${options.dryRun ? 'would archive' : 'archiving'} dead issue workspace ${workspace.id} (${workspace.name}, ${workspace.path})`);
     }
     if (!options.dryRun) await archiveWorkspace(workspace.id);
     result.archived += 1;
     result.archivedIds.push(workspace.id);
   }
-
   return result;
 }
 
 const ISSUE_HOME_DIR_PATTERN = /^[a-z]+-\d+$/i;
-
-async function pathExists(path: string): Promise<boolean> {
-  return stat(path).then(() => true, () => false);
-}
 
 /**
  * Move every entry from `oldPath` into `newPath` (creating `newPath` if

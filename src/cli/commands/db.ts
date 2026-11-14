@@ -19,13 +19,12 @@ import {
   type DatabaseProvisionerLogger,
 } from '../../lib/db-provisioners/index.js';
 import {
-  archiveTerminalIssueWorkspaces,
+  archiveDeadIssueWorkspaces,
   backfillIssueWorkspaces,
   migrateMemoryHomesToWorkspaces,
   rebuildMainAndScratchWorkspaces,
   seedProjectsFromYaml,
 } from '../../lib/workspaces/rebuild.js';
-import { resolveTerminalIssueIds } from '../../lib/overdeck/terminal-issues.js';
 import type { DatabaseConfig, ProjectConfig as FullProjectConfig } from '../../lib/workspace-config.js';
 const execAsync = promisify(exec);
 
@@ -481,28 +480,22 @@ async function rebuildWorkspacesCommand(options: {
     }
 
     const result = await rebuildMainAndScratchWorkspaces({ dryRun: options.dryRun, verbose: options.verbose });
-    // PAN-3286 FR-14: hygiene pass — take worktrees for finished issues out of
-    // the user-facing surfaces. Archives, never deletes; the rows keep owning
-    // their memory homes.
-    const archival = await archiveTerminalIssueWorkspaces({
-      // Terminality is resolved through IssuesResolver, the canonical issues
-      // read door — the archival pass performs no issue-state read of its own.
-      terminalIssueIds: await resolveTerminalIssueIds(),
-      dryRun: options.dryRun,
-      verbose: options.verbose,
-    });
+    // PAN-5233 FR-10: hygiene pass — take issue worktrees whose directory is
+    // gone out of the user-facing surfaces. Archives, never deletes; the rows
+    // keep owning their memory homes.
+    const archival = await archiveDeadIssueWorkspaces({ dryRun: options.dryRun, verbose: options.verbose });
 
     if (options.dryRun) {
       spinner.info(
         `Dry run: scanned ${result.scanned}, would create ${result.created}, skip ${result.skipped}; `
-        + `would archive ${archival.archived} of ${archival.scanned} issue workspaces for terminal issues`,
+        + `would archive ${archival.archived} of ${archival.scanned} issue workspaces whose directory is gone`,
       );
       return;
     }
 
     spinner.succeed(
       `Rebuilt workspaces: scanned ${result.scanned}, created ${result.created}, skipped ${result.skipped}; `
-      + `archived ${archival.archived} of ${archival.scanned} issue workspaces for terminal issues`,
+      + `archived ${archival.archived} of ${archival.scanned} issue workspaces whose directory is gone`,
     );
   } catch (error: any) {
     spinner.fail(`Rebuild failed: ${error.message}`);
