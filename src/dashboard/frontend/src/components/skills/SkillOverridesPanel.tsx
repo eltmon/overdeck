@@ -274,7 +274,10 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
       )}
       {notice && <p className="text-sm text-muted-foreground" role="status">{notice}</p>}
       {changed && liveAgents.length > 0 && (
-        <p className="text-sm text-muted-foreground" data-testid="skills-changed-since-launch">
+        <p
+          className="rounded-md border px-3 py-2 text-sm badge-bg-warning badge-border-warning text-warning-foreground"
+          data-testid="skills-changed-since-launch"
+        >
           Skills changed since launch; applies next launch ({liveAgents.join(', ')} running).
         </p>
       )}

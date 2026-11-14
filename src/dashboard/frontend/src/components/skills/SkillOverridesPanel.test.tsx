@@ -447,6 +447,9 @@ describe('skill override sections', () => {
     fireEvent.click(within(row('grilling')).getByRole('switch'));
     await waitFor(() => expect(screen.getByTestId('skills-changed-since-launch').textContent)
       .toBe('Skills changed since launch; applies next launch (work agent running).'));
+    const notice = screen.getByTestId('skills-changed-since-launch');
+    expect(notice.classList.contains('badge-bg-warning')).toBe(true);
+    expect(notice.classList.contains('badge-border-warning')).toBe(true);
   });
 
   it('project section fetches nothing until opened', async () => {
