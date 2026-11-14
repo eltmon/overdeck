@@ -1354,7 +1354,7 @@ describe('assembled Definition-of-Done gate', () => {
     expect(gate.rows.map(row => row.id)).toEqual(DOD_ROWS.slice(0, 8).map(row => row.id));
   });
 
-  it('reads repo landing evidence once for a non-GitHub issue, and never for a GitHub issue (PAN-5209/PAN-5225)', async () => {
+  it('reads repo landing evidence once for a non-GitHub issue, and never for a GitHub issue (PAN-5209)', async () => {
     const forgeMergeSpy = vi.fn(async () => ({ repos: [] }));
     const review = async (_issueId: string, _settlement?: unknown, landing?: { forgeMerge?: () => Promise<unknown> }) => {
       await landing?.forgeMerge?.();
@@ -1364,16 +1364,46 @@ describe('assembled Definition-of-Done gate', () => {
       await landing?.forgeMerge?.();
       return makeRow('tests', 'skip');
     };
-    const postMerge = async (_ctx: unknown, _merged?: unknown, landing?: { forgeMerge?: () => Promise<unknown> }) => {
-      await landing?.forgeMerge?.();
-      return makeRow('post-merge', 'skip');
-    };
 
-    await evaluateDodGate(ctx, {}, { ...deps(), review, tests, postMerge, forgeMerge: forgeMergeSpy });
+    await evaluateDodGate(ctx, {}, { ...deps(), review, tests, forgeMerge: forgeMergeSpy });
     expect(forgeMergeSpy).toHaveBeenCalledTimes(1);
 
     forgeMergeSpy.mockClear();
     const githubCtx = { ...ctx, github: { owner: 'eltmon', repo: 'overdeck', number: 100 } };
+    await evaluateDodGate(githubCtx, {}, { ...deps(), review, tests, forgeMerge: forgeMergeSpy });
+    expect(forgeMergeSpy).not.toHaveBeenCalled();
+  });
+
+  it('evaluateDodGate reads forge landing once across rows 1, 2 and 5, through the real checkPostMergeRow wiring (PAN-5225)', async () => {
+    const forgeMergeSpy = vi.fn(async () => ({ repos: [{ repoKey: 'fe', state: 'merged' as const, url: 'u', reason: '' }] }));
+    const review = async (_issueId: string, _settlement?: unknown, landing?: { forgeMerge?: () => Promise<unknown> }) => {
+      await landing?.forgeMerge?.();
+      return makeRow('review', 'skip');
+    };
+    const tests = async (_issueId: string, _settlement?: unknown, landing?: { forgeMerge?: () => Promise<unknown> }) => {
+      await landing?.forgeMerge?.();
+      return makeRow('tests', 'skip');
+    };
+    // Real checkPostMergeRow, reached the same way defaultEvaluateDodGateDeps.postMerge
+    // calls it — stubbed deps (3rd arg), the gate's own landing threaded through (4th arg).
+    const postMerge = (
+      postMergeCtx: Parameters<typeof checkPostMergeRow>[0],
+      mergedRow: Parameters<typeof checkPostMergeRow>[1],
+      landing: Parameters<typeof checkPostMergeRow>[3],
+    ) => checkPostMergeRow(postMergeCtx, mergedRow, {
+      readCanonicalState: async () => null,
+      readMergedAt: () => undefined,
+      listAgents: () => [],
+      isAlive: async () => ({ alive: false, reason: 'no-session' }),
+    }, landing);
+
+    const nonGitHubCtx = { issueId, projectPath: '/repo/overdeck' };
+    const gate = await evaluateDodGate(nonGitHubCtx, {}, { ...deps(), review, tests, postMerge, forgeMerge: forgeMergeSpy });
+    expect(forgeMergeSpy).toHaveBeenCalledTimes(1);
+    expect(gate.rows.find(row => row.id === 'post-merge')?.observed).toContain('forge merge complete');
+
+    forgeMergeSpy.mockClear();
+    const githubCtx = { ...nonGitHubCtx, github: { owner: 'eltmon', repo: 'overdeck', number: 100 } };
     await evaluateDodGate(githubCtx, {}, { ...deps(), review, tests, postMerge, forgeMerge: forgeMergeSpy });
     expect(forgeMergeSpy).not.toHaveBeenCalled();
   });
