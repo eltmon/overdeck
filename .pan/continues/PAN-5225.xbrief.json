@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5225",
   "created": "2026-11-14T03:19:12.068Z",
-  "updated": "2026-11-14T03:36:34.242Z",
+  "updated": "2026-11-14T03:45:02.761Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,26 @@
       "doneAt": "2026-11-14T03:36:29.514Z"
     },
     "target-fallback-remote-tracking": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5225",
-      "claimedAt": "2026-11-14T03:36:34.242Z"
+      "claimedAt": "2026-11-14T03:36:34.242Z",
+      "doneAt": "2026-11-14T03:45:02.761Z"
+    },
+    "target-fallback-remote-tracking.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:45:02.761Z"
+    },
+    "target-fallback-remote-tracking.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:45:02.761Z"
+    },
+    "target-fallback-remote-tracking.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:45:02.761Z"
+    },
+    "target-fallback-remote-tracking.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:45:02.761Z"
     }
   }
 }
