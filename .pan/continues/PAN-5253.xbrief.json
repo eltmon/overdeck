@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5253",
   "created": "2026-11-14T08:19:14.576Z",
-  "updated": "2026-11-14T09:35:17.157Z",
+  "updated": "2026-11-14T09:35:24.264Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -288,6 +288,11 @@
     "details-ship-linked.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T09:35:17.157Z"
+    },
+    "details-stack": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5253",
+      "claimedAt": "2026-11-14T09:35:24.264Z"
     }
   }
 }
