@@ -100,6 +100,7 @@ src/components/Settings/sections/__tests__/AutoSettleIdleRow.test.tsx
 src/components/Settings/sections/__tests__/AutoSettleOnMergeRow.test.tsx
 src/components/Settings/sections/__tests__/CloseOutSection.test.tsx
 src/components/Settings/sections/__tests__/GitHubIdentitiesSection.test.tsx
+src/components/Settings/sections/__tests__/MergeTrainBatchingSection.test.tsx
 src/components/Settings/sections/__tests__/ProviderManagementSection.test.tsx
 src/components/Settings/sections/__tests__/HarnessesSection.test.tsx
 src/components/Settings/sections/__tests__/PermissionsSection.test.tsx

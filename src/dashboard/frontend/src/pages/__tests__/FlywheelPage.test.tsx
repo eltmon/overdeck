@@ -22,7 +22,7 @@ import { flywheelStatus, renderWithQuery, stubFetch } from '../../components/fly
 import { consumePendingReveal, requestRevealNeedsYou } from '../../lib/flywheelReveal';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 
-const config = { auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: true };
+const config = { auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: true, batch_size: 3, batch_wait_minutes: 30 };
 
 // The Stats tab and the headline strip share the ['flywheel','stats',30] query.
 const STATS = {
@@ -93,7 +93,7 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     expect(screen.queryByText(/No flywheel running/)).toBeNull();
   });
 
-  it('policy switches POST /api/merge-train/config; merge train is a read-only link', async () => {
+  it('policy switches POST /api/merge-train/config', async () => {
     const fetchMock = setup(flywheelStatus());
     renderWithQuery(<FlywheelPage />);
     const autoPickup = await screen.findByRole('switch', { name: 'Auto-pickup' });
@@ -107,10 +107,21 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/merge-train/config', expect.objectContaining({
       body: JSON.stringify({ require_uat_before_merge: false }),
     })));
-    const mergeTrain = screen.getByTestId('flywheel-merge-train-chip');
-    expect(mergeTrain).toHaveTextContent('Merge train: on');
-    expect(mergeTrain).toHaveAttribute('href', '/awaiting-merge');
-    expect(screen.queryByRole('switch', { name: 'Merge train' })).toBeNull();
+  });
+
+  it('the merge train header switch shows the setting and writes merge_train_enabled (PAN-4753 WI-11)', async () => {
+    const fetchMock = setup(flywheelStatus());
+    renderWithQuery(<FlywheelPage />);
+    const mergeTrain = await screen.findByRole('switch', { name: 'Merge train' });
+    await waitFor(() => expect(mergeTrain).toBeEnabled());
+    expect(mergeTrain).toHaveAttribute('aria-checked', 'true');
+    expect(mergeTrain).toHaveAttribute('data-testid', 'flywheel-merge-train-switch');
+    expect(screen.queryByTestId('flywheel-merge-train-chip')).toBeNull();
+    fireEvent.click(mergeTrain);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/merge-train/config', expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ merge_train_enabled: false }),
+    })));
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Merge train' })).toHaveAttribute('aria-checked', 'false'));
   });
 
   it('the header counts the loop\'s own in-flight ids when a tick named them (PAN-4199 ac3)', async () => {
