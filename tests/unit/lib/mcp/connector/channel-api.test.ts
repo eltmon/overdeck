@@ -177,6 +177,36 @@ describe('ConnectorLink', () => {
     directRefused.link.stop();
   });
 
+  it('reports no WebRTC egress when the relay probe gathered no relay candidate (PAN-5242)', async () => {
+    const { link } = setup({
+      probe: async (url) => {
+        if (url.startsWith('rtc://')) throw new ChannelOpenError('timeout', 'D');
+        throw new ChannelOpenError('unreachable', 'R', { cause: 'no-relay-candidate' });
+      },
+    });
+    await link.connect();
+    expect(link.noWebrtcEgress()).toBe(true);
+    expect(link.lastError()).toBe('relay: R; direct: D');
+    link.stop();
+  });
+
+  it('clears no WebRTC egress once a later round succeeds', async () => {
+    let succeed = false;
+    const { link } = setup({
+      probe: async (url) => {
+        if (succeed) return fakeSocket();
+        if (url.startsWith('rtc://')) throw new ChannelOpenError('timeout', 'D');
+        throw new ChannelOpenError('unreachable', 'R', { cause: 'no-relay-candidate' });
+      },
+    });
+    await link.connect();
+    expect(link.noWebrtcEgress()).toBe(true);
+    succeed = true;
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(link.noWebrtcEgress()).toBe(false);
+    link.stop();
+  });
+
   it('clears the code after a later successful probe', async () => {
     let refuse = true;
     const { link } = setup({

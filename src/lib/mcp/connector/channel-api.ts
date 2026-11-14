@@ -22,7 +22,7 @@ import type { DirectoryWebClient } from '@overdeck/anywhere-channel/web';
 
 import type { ChannelSocket } from '../../anywhere/channel/channel-socket.js';
 import { ChannelOpenError, type ChannelOpenErrorCode, openChannel, type OpenChannelOptions, type TransportUrl } from '../../anywhere/channel/open.js';
-import type { RtcTransport } from '../../anywhere/channel/rtc-transport.js';
+import { isNoRelayCandidate, type RtcTransport } from '../../anywhere/channel/rtc-transport.js';
 import { linkFetch, type LinkRouteInfo, type LinkRouteSource, LinkUnavailableError } from '../../anywhere/link-client.js';
 import type { MachineKeyPair } from '../../anywhere/machine-key.js';
 import type { DashboardApi } from '../dashboard-api.js';
@@ -69,6 +69,7 @@ export class ConnectorLink implements LinkRouteSource {
   private machineOnline: boolean;
   private error: string | null = null;
   private errorCode: ChannelOpenErrorCode | null = null;
+  private relayNoCandidate = false;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly waiters = new Set<(online: boolean) => void>();
   private readonly offDirectory: () => void;
@@ -138,6 +139,11 @@ export class ConnectorLink implements LinkRouteSource {
     return this.errorCode;
   }
 
+  /** The last failed round's relay probe gathered no TURN relay candidate (PAN-5242). */
+  noWebrtcEgress(): boolean {
+    return this.relayNoCandidate;
+  }
+
   /** One probe round now: direct, then relay when allowed. A failure schedules the next round. */
   async connect(): Promise<void> {
     if (this.stopped || this.probing || !this.machineOnline) return;
@@ -146,23 +152,26 @@ export class ConnectorLink implements LinkRouteSource {
     try {
       if (this.rounds > 0) this.input.rtc.transport.close(this.environmentId);
       this.rounds += 1;
+      this.relayNoCandidate = false;
       const direct = `rtc://${this.environmentId}` as const;
       try {
         await this.probe(direct, 'direct');
         return;
       } catch (error) {
-        this.error = errorText(error);
+        this.error = `direct: ${errorText(error)}`;
         this.errorCode = openErrorCode(error);
       }
       const refusal = this.input.rtc.relayRefusal();
       if (refusal !== null) {
         this.error = noDirectPathMessage(this.label);
       } else {
+        const directText = this.error;
         try {
           await this.probe(`rtc+turn://${this.environmentId}`, 'relay');
           return;
         } catch (error) {
-          this.error = errorText(error);
+          this.error = `relay: ${errorText(error)}; ${directText}`;
+          this.relayNoCandidate = isNoRelayCandidate(error);
           if (!refusedByMachine(this.errorCode)) this.errorCode = openErrorCode(error);
         }
       }
@@ -201,6 +210,7 @@ export class ConnectorLink implements LinkRouteSource {
     this.attempt = 0;
     this.error = null;
     this.errorCode = null;
+    this.relayNoCandidate = false;
     this.wake(true);
   }
 
