@@ -1,0 +1,621 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T03:23:13Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5232: Herdr pane reads always return empty text: readers use result.text, herdr 0.9.1 returns result.read.text",
+    "updated": "2026-11-14T03:41:00.885Z"
+  },
+  "plan": {
+    "id": "pan-5232",
+    "title": "Herdr pane reads always return empty text: readers use result.text, herdr 0.9.1 returns result.read.text",
+    "status": "proposed",
+    "uid": "efa8330e-9f6b-4e9b-9f95-67f348b8d37a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-14T03:23:13Z",
+    "updated": "2026-11-14T03:41:00.885Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5232",
+        "label": "PAN-5232",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "herdr",
+      "terminal-backend",
+      "bug",
+      "pane-read"
+    ],
+    "narratives": {
+      "Problem": "HerdrApiClient.call() returns the response result unchanged. Herdr 0.9.1 answers pane.read with {type:'pane_read', read:{text,...}}, but three readers take result.text: readHerdrPaneText and diagnoseDetectionFailure in herdr.ts, and the composer read in herdr-submit.ts. Every Herdr pane read is therefore '', and readiness waits, crash/stall checks, resume-menu handling, input-target checks, API-error nudges and submit verification are blind. Every unit test mocks the wrong {text} shape, so the suite stayed green.",
+      "Proposal": "Add one import-free parser, herdrPaneReadText (src/lib/terminal-backends/herdr-pane-read.ts), that reads result.read.text, accepts legacy result.text, and returns '' with one warning otherwise. Route all three readers through it, convert every wire-level pane.read mock to the 0.9.1 shape, pin the exact 0.9.1 response with a contract test through the real HerdrApiClient and the schema fixture, document the wire shape plus the audit of every other result key (all others verified correct live and against the schema), and record read-only live evidence plus the list of behaviour that was degraded.",
+      "NonGoals": "- Changing HerdrApiClient.call() to unwrap results\n- Changing any screen parser (composer, agent selector, resume gate, readiness regexes, API-error patterns); bugs that real text exposes become follow-up issues (W3's Step 3 guard and W7's guard check reuse paneHasBlockingChoiceMenu and change no parser)\n- Sending text or keys to any operator pane during verification\n- Upgrading Herdr, pinning another version, or regenerating the schema fixture\n- Raising the herdr.ts row in scripts/file-size-allowlist.txt\n- Any change to the tmux backend path\n- Adding the guard-mode menu check to the tmux resume branch"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix diagnoseDetectionFailure's pane.read too, though the issue lists only two readers",
+        "rationale": "It has the identical result.text bug (herdr.ts ~line 718); requirement 1 says every reader uses the shared parser."
+      },
+      {
+        "summary": "An unrecognized pane.read shape returns '' and warns once per process instead of throwing",
+        "rationale": "'' is the behaviour every caller already tolerates; a throw would make ensureMainInputTarget refuse every Claude delivery and block every autonomous resume on a future shape change. The contract test makes a shape change fail CI."
+      },
+      {
+        "summary": "Convert every wire-level pane.read test mock to the 0.9.1 shape; only the parser unit test covers the legacy shape",
+        "rationale": "The wrong-shape mocks are what hid this bug; leaving them green through the legacy fallback would keep tests describing a wire Herdr does not speak."
+      },
+      {
+        "summary": "Live check = a required read-only run (readHerdrPaneText plus waitForClaudeReady on an existing idle conversation) plus a required attempt at an isolated-instance Claude launch, with the read-only run as the stated fallback",
+        "rationale": "Requirement 4 asks for a launch reaching readiness; only a cold launch exercises the dialog and early-exit paths. A work agent cannot deploy to or paste into the operator's live dashboard, but the PAN-5122 isolated-instance recipe is proven."
+      },
+      {
+        "summary": "Put the parser in a new leaf module rather than in herdr.ts or herdr-api.ts",
+        "rationale": "herdr-submit.ts must not import herdr-api.ts (import cycle through types.ts), and herdr.ts sits 2 lines under its file-size cap."
+      },
+      {
+        "summary": "Adopt both plan-critic blocking findings: herdr-submit Step 3 checks blocked/menu before the first Enter whatever the paste presence, and the Herdr resume path refuses guard-mode menus and reads visible",
+        "rationale": "Making reads work would otherwise skip the blocked check that every delivery gets today and press Enter into a permission menu, contradicting herdr-submit.ts's own header; the resume path would type a continuation into a permission menu the card parser drops."
+      }
+    ],
+    "items": [
+      {
+        "id": "pane-read-parser",
+        "title": "Add the herdrPaneReadText parser module with unit tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T03:23:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-5232",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "foundationFor": [
+            "herdr-readers",
+            "submit-reader",
+            "contract-test"
+          ],
+          "files_scope": [
+            "src/lib/terminal-backends/herdr-pane-read.ts",
+            "tests/unit/lib/terminal-backends/herdr-pane-read.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/terminal-backends/herdr-pane-read.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "herdr-pane-read.test.ts: all cases pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5232.md work item W1 and decisions D1-D3. Create src/lib/terminal-backends/herdr-pane-read.ts exporting herdrPaneReadText(result: unknown): string, using the exact code in W1. The module imports nothing (herdr-submit.ts must not import herdr-api.ts: import cycle through types.ts). Precedence: result.read.text if it is a string, else result.text if it is a string, else '' plus one console.warn per process with the message in D3 (contains 'PAN-5232' and the top-level keys). Never throw. Write the six unit cases listed in W1 in tests/unit/lib/terminal-backends/herdr-pane-read.test.ts."
+        },
+        "items": [
+          {
+            "id": "pane-read-parser.ac1",
+            "title": "Given the herdr 0.9.1 result {type:'pane_read', read:{text:'abc\\n'}}, herdrPaneReadText returns 'abc\\n'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-read-parser.ac2",
+            "title": "Given the legacy result {text:'legacy'}, herdrPaneReadText returns 'legacy'; given both shapes, read.text wins",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-read-parser.ac3",
+            "title": "Given a result with no read.text and no string text (missing read, read:{}, read.text a number, null, undefined, a string), herdrPaneReadText returns '' and does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-read-parser.ac4",
+            "title": "When two unrecognized results are parsed, console.warn is called exactly once and the logged message contains 'PAN-5232'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-read-parser.ac5",
+            "title": "herdr-pane-read.ts contains no import statement (git grep -n '^import' src/lib/terminal-backends/herdr-pane-read.ts returns nothing)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "herdr-readers",
+        "title": "Route readHerdrPaneText and diagnoseDetectionFailure through the parser",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T03:23:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-5232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "files_scope": [
+            "src/lib/terminal-backends/herdr.ts",
+            "tests/unit/lib/terminal-backends/herdr-pane-bound.test.ts",
+            "tests/unit/lib/terminal-backends/herdr-detection-failure.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/terminal-backends/herdr-pane-bound.test.ts tests/unit/lib/terminal-backends/herdr-detection-failure.test.ts",
+            "npm run typecheck",
+            "wc -l src/lib/terminal-backends/herdr.ts"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "wc prints a line count of 1008 or less"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2 and D4/D6. In src/lib/terminal-backends/herdr.ts replace R1 (readHerdrPaneText: `return result.text ?? '';`) with `return herdrPaneReadText(result);` and R2 (diagnoseDetectionFailure: `const text = (read.text ?? '').trimEnd();`) with `const text = herdrPaneReadText(read).trimEnd();`; drop the `<{ text?: string }>` type arguments on both pane.read calls; add `import { herdrPaneReadText } from './herdr-pane-read.js';`. herdr.ts is 1006 lines with an allowlist cap of 1008: net growth must be 2 lines or fewer; never edit scripts/file-size-allowlist.txt. Convert the pane.read mocks in herdr-pane-bound.test.ts (~line 402) and herdr-detection-failure.test.ts (~line 72) from {text} to {type:'pane_read', read:{text}}. In herdr-detection-failure.test.ts add expect(error.message).not.toContain('Pane output is empty') beside the existing 'launcher line 2' assertion. Completeness check (never committed): temporarily make the parser's legacy branch return '', run npx vitest run tests/unit/lib/terminal-backends src/lib/terminal-backends, convert every pane.read mock that fails, then restore the branch."
+        },
+        "items": [
+          {
+            "id": "herdr-readers.ac1",
+            "title": "git grep -n \"\\.text ?? ''\" src/lib/terminal-backends/herdr.ts returns no match, and both pane.read sites in herdr.ts call herdrPaneReadText",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "herdr-readers.ac2",
+            "title": "wc -l src/lib/terminal-backends/herdr.ts prints 1008 or less and scripts/file-size-allowlist.txt is unchanged in the diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "herdr-readers.ac3",
+            "title": "Given a 0.9.1-shaped pane.read mock, readHerdrPaneText resolves to the mock's read.text in herdr-pane-bound.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "herdr-readers.ac4",
+            "title": "Given a 0.9.1-shaped pane.read mock, the detection-failure error message contains 'launcher line 2' and does not contain 'Pane output is empty'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "submit-reader",
+        "title": "Route the herdr-submit composer read through the parser and guard the first Enter",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T03:23:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-5232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "files_scope": [
+            "src/lib/terminal-backends/herdr-submit.ts",
+            "tests/unit/lib/terminal-backends/herdr-submit.test.ts",
+            "tests/unit/lib/terminal-backends/herdr-adapter.test.ts",
+            "src/lib/terminal-backends/__tests__/herdr-well-formed.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/terminal-backends/herdr-submit.test.ts tests/unit/lib/terminal-backends/herdr-adapter.test.ts src/lib/terminal-backends/__tests__/herdr-well-formed.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "NFR-2",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3, D4/D8 and Critique response 1. In src/lib/terminal-backends/herdr-submit.ts, inside pasteAndSubmitHerdrPane's read(), remove the `as { text?: string } | null` cast and replace `return result?.text ?? '';` with `return herdrPaneReadText(result);`; import herdrPaneReadText from './herdr-pane-read.js' (no import of herdr-api.ts). Step 3 guard: replace `if (presence !== 'present' && (await blocked() || paneHasBlockingChoiceMenu(lastScreen))) {` with `if (await blocked() || paneHasBlockingChoiceMenu(lastScreen)) {` and the warn text with the After snippet in W3, so a visible paste never skips the blocked/menu check before the first Enter (the module header already forbids a keystroke while blocked or a menu shows). Convert every pane.read mock in herdr-submit.test.ts (~lines 70, 87, 106, 123, 139, 155, 170), herdr-adapter.test.ts (~lines 301, 354) and herdr-well-formed.test.ts (~line 110) to {type:'pane_read', read:{text:...}}. In herdr-submit.test.ts: the two tests 'holds when the agent is blocked at the decision point' and 'holds when a permission menu appears on the same screen as the composer' now expect 'blocked' with zero pane.send_keys and are renamed per W3; add 'holds when the agent becomes blocked after Enter' (agent.get idle first, then blocked; composer keeps the payload) expecting 'held' and exactly one pane.send_keys. All other expectations stay unchanged; any other failure that is not a mock typo: stop, record it in continue.json, file a follow-up (D8). Completeness check (never committed): temporarily make the parser's legacy branch return '', run npx vitest run tests/unit/lib/terminal-backends src/lib/terminal-backends, convert every pane.read mock that fails, restore the branch."
+        },
+        "items": [
+          {
+            "id": "submit-reader.ac1",
+            "title": "git grep -n 'result?.text' src/lib/terminal-backends/herdr-submit.ts returns no match, read() returns herdrPaneReadText(result), and herdr-submit.ts contains no import from './herdr-api.js'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "submit-reader.ac2",
+            "title": "Given a visible paste and agent_status 'blocked', pasteAndSubmitHerdrPane returns 'blocked' and sends zero pane.send_keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "submit-reader.ac3",
+            "title": "Given a visible paste with a permission menu on the same screen, pasteAndSubmitHerdrPane returns 'blocked' and sends zero pane.send_keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "submit-reader.ac4",
+            "title": "Given an agent that becomes blocked after the first Enter while the composer keeps the payload, pasteAndSubmitHerdrPane returns 'held' after exactly one pane.send_keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "submit-reader.ac5",
+            "title": "Given 0.9.1-shaped mocks, the submitted, resubmitted, unconfirmed and steer-chord tests preserve their existing expectations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resume-guard",
+        "title": "Read the Herdr resume screen as visible and refuse permission menus before resuming",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T03:23:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/resume-pane-choice.ts",
+            "src/lib/agents/__tests__/resume-pane-choice.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/resume-pane-choice.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "resume-pane-choice.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7 and Critique responses 2-3. In src/lib/agents/resume-pane-choice.ts backendPaneChoiceDeps, change the capture to readHerdrPaneText(pane.paneId, lines, 'visible'). In prepareAutonomousAgentResumePane's Herdr branch (if (onOtherBackend)), right after `choice = paneChoiceFromText(screen);`, add `if (!choice && paneHasBlockingChoiceMenu(screen)) return { ready: false, reason: 'pane is blocked on a choice menu other than the Claude resume-summary gate' };` with `import { paneHasBlockingChoiceMenu } from '../pane-choice-menu.js';`. Leave the tmux branch unchanged. In resume-pane-choice.test.ts convert the pane.read mock (~line 136) to {type:'pane_read', read:{text: screen}}, assert the pane.read call carries source 'visible', and add a case where the Herdr pane shows the Bash permission menu from tests/lib/pane-choice-menu.test.ts ('Do you want to allow this Bash command?' with options 1. Yes / 2. Yes, and don't ask again / 3. No and footer 'Esc to cancel · Tab to amend'): the result is ready:false and no pane.send_keys is called."
+        },
+        "items": [
+          {
+            "id": "resume-guard.ac1",
+            "title": "Given a Herdr pane, prepareAutonomousAgentResumePane sends pane.read with source 'visible' (asserted in resume-pane-choice.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-guard.ac2",
+            "title": "Given a Herdr pane showing a Bash permission menu, prepareAutonomousAgentResumePane returns ready:false and sends no pane.send_keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-guard.ac3",
+            "title": "Given 0.9.1-shaped mocks showing the resume-summary gate, prepareAutonomousAgentResumePane returns {ready:true, action:'resumed-from-summary'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-guard.ac4",
+            "title": "The tmux branch of prepareAutonomousAgentResumePane shows no change in the diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "contract-test",
+        "title": "Pin the herdr 0.9.1 pane.read wire shape with a contract test through HerdrApiClient",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T03:23:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-5232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "test",
+          "files_scope": [
+            "tests/unit/lib/terminal-backends/herdr-pane-read-contract.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/terminal-backends/herdr-pane-read-contract.test.ts"
+          ],
+          "expected_outputs": [
+            "herdr-pane-read-contract.test.ts: all three cases pass"
+          ],
+          "traces": [
+            "FR-3",
+            "NFR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4 and D5. New test file. Build a fake connect factory for HerdrApiClient (pattern: FakeSocket in tests/unit/lib/terminal-backends/herdr-api.test.ts): each connection emits 'connect' on the next tick, parses the written request, and feeds the canned response for that method with id set to the request id. Use the exact canned pane.read line from W4 (full 0.9.1 key set, synthetic text). Case 1: readHerdrPaneText('w2:p7C', 1, 'recent', client) resolves to the canned text. Case 2: pasteAndSubmitHerdrPane(client, 'w2:p7C', 'hello world', 'enter', {sleep, now}) with an injected fake clock returns 'submitted' (screen shows 'hello world' between two ─ rule rows until pane.send_keys arrives, then an empty composer; agent.get answers agent_status idle). Case 3: load the schema fixture src/lib/terminal-backends/__fixtures__/herdr-v0.9.1/schema.json and assert the pane_read ResponseResult variant's non-type properties are exactly ['read'], read.$ref ends with '/PaneReadResult', and PaneReadResult.required contains 'text'. No real socket, no real delays, no reading of source files. Case 1 also calls client.call('pane.read', ...) directly and asserts result.text is undefined and result.read.text equals the canned text."
+        },
+        "items": [
+          {
+            "id": "contract-test.ac1",
+            "title": "Given the exact herdr 0.9.1 NDJSON pane.read line fed through HerdrApiClient, readHerdrPaneText resolves to the line's read.text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-test.ac2",
+            "title": "Given the same client, the raw client.call('pane.read', ...) result returns text undefined and read.text equal to the canned text, pinning that call() does not unwrap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-test.ac3",
+            "title": "Given the same client and a composer that clears after Enter, pasteAndSubmitHerdrPane returns 'submitted'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-test.ac4",
+            "title": "Given the committed schema fixture, the test asserts the pane_read variant carries only 'read' and PaneReadResult.required contains 'text'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-wire-shape",
+        "title": "Document the pane.read wire shape, the result-key audit and the changelog entry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T03:23:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-5232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "docs",
+          "files_scope": [
+            "docs/TERMINAL-BACKENDS.md",
+            "changelog.d/pan-5232.md"
+          ],
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5. In docs/TERMINAL-BACKENDS.md section '## Herdr wire facts (v0.9.1, protocol 22)', add the bullet text from W5 (call() returns result unchanged; pane.read text is result.read.text; every reader goes through herdrPaneReadText in src/lib/terminal-backends/herdr-pane-read.ts; legacy {text} accepted; '' plus one warning otherwise; three readers were broken until PAN-5232) followed by the audit table from the PRD section 'Audit of every other Herdr result read'. Create changelog.d/pan-5232.md with exactly the #### Fixed entry in W5. Run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "docs-wire-shape.ac1",
+            "title": "docs/TERMINAL-BACKENDS.md wire-facts section contains 'result.read.text' and 'herdrPaneReadText'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-wire-shape.ac2",
+            "title": "docs/TERMINAL-BACKENDS.md contains the audit table with a row for each of pane.read, agent.get, agent.wait, pane.layout and session.snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-wire-shape.ac3",
+            "title": "changelog.d/pan-5232.md contains a '#### Fixed' heading and a bullet linking https://github.com/eltmon/overdeck/issues/5232",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-wire-shape.ac4",
+            "title": "npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-verification",
+        "title": "Record live read-only evidence that Herdr pane reads and Claude readiness work",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T03:23:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-5232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "kind": "test",
+          "files_scope": [
+            "docs/TERMINAL-BACKENDS.md"
+          ],
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0 and the new live record section is present"
+          ],
+          "traces": [
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6 and D7. Part 1 (required, read-only): write a one-off script in the session scratchpad with the .mts extension (a .ts file fails under npx tsx with ERR_REQUIRE_ASYNC_MODULE; never /tmp, never committed) importing by absolute path readHerdrPaneText/findHerdrAgentPane from src/lib/terminal-backends/herdr.ts, herdrSocketPath from src/lib/terminal-backends/select.ts and waitForClaudeReady from src/lib/overdeck/claude-readiness.ts; print the socket path; run npx tsx <script>.mts <conv-id> against a live idle Claude conversation (agent.list: agent 'claude', agent_status 'idle', name starting 'conv-'); end with process.exit(0). Record recent-read length and last line, visible line count and whether it contains ❯, and waitForClaudeReady elapsed ms. Use the planning agent's Before numbers from W6 (recent len 0, visible len 0, waitForClaudeReady 30251 ms timed out on conv-20261111-2742). Part 2 (required attempt): isolated dashboard per the PAN-5122 recipe (npm run build:dashboard; API_PORT=3091 HOST=127.0.0.1 OVERDECK_HOME=<scratch home> node dist/dashboard/server.js; herdr --session <scratch session> server); launch one throwaway Claude conversation and record the time to the '[conversations] Claude Code ready in' log line; if it cannot start, record the failing command and error (implementation checkpoint, fallback = part 1). Stop the isolated server and scratch Herdr session afterwards. Never send text or keys to any operator pane. Append '## Live verification record — Herdr pane reads (PAN-5232)' at the end of docs/TERMINAL-BACKENDS.md with a Before/After table, the isolated-launch outcome and the PRD's degraded-behaviour table. After pan done opens the PR, paste the same content into the PR description with gh pr edit."
+        },
+        "items": [
+          {
+            "id": "live-verification.ac1",
+            "title": "docs/TERMINAL-BACKENDS.md contains a '## Live verification record — Herdr pane reads (PAN-5232)' section whose After column shows a non-empty readHerdrPaneText result from a live pane next to the Before length 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verification.ac2",
+            "title": "The live record shows a waitForClaudeReady elapsed time below 30000 ms next to the 30251 ms Before value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verification.ac3",
+            "title": "The live record shows the isolated-launch outcome: the elapsed time to the 'Claude Code ready in' log line, or the failing command and its error when the instance could not start",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verification.ac4",
+            "title": "The live record contains the degraded-behaviour table with a row for waitForClaudeReady, pasteAndSubmitHerdrPane, prepareAutonomousAgentResumePane, ensureMainInputTarget, progressFingerprint and checkApiErrorAgents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verification.ac5",
+            "title": "The live record contains a line stating that no pane.send_text, pane.send_keys or agent.prompt call was made against an operator pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pane-read-parser",
+        "to": "herdr-readers",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-read-parser",
+        "to": "submit-reader",
+        "type": "blocks"
+      },
+      {
+        "from": "herdr-readers",
+        "to": "contract-test",
+        "type": "blocks"
+      },
+      {
+        "from": "submit-reader",
+        "to": "contract-test",
+        "type": "blocks"
+      },
+      {
+        "from": "herdr-readers",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-wire-shape",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "herdr-readers",
+        "to": "resume-guard",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-14-PAN-5232-herdr-pane-reads-always-return-empty-text-readers-use-result-text-herdr-0-9-1-returns-result-read-text.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
