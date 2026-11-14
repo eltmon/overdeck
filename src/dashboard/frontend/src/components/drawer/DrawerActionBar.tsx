@@ -6,7 +6,8 @@ export default function DrawerActionBar() {
   const issueId = issue?.identifier;
 
   return (
-    <footer data-component="drawer-action-bar" data-testid="drawer-action-bar" className="flex items-center gap-[10px] border-t border-border bg-card/70 px-[22px] py-[12px]">
+    // PAN-5244: the action strip sits in the drawer's one-row header.
+    <div data-component="drawer-action-bar" data-testid="drawer-action-bar" className="flex shrink-0 items-center">
       {issueId ? (
         // PAN-2908 C-ACTIONS: merge is a first-class registry entry — it renders
         // in the primary strip at READY_TO_MERGE. The bespoke pinned MergeButton
@@ -15,9 +16,9 @@ export default function DrawerActionBar() {
           issueId={issueId}
           mode="primary-strip"
           pinRight={['viewPr']}
-          className="flex min-w-0 flex-1 items-center gap-1"
+          className="flex items-center gap-1"
         />
-      ) : <div className="flex-1" />}
-    </footer>
+      ) : null}
+    </div>
   );
 }

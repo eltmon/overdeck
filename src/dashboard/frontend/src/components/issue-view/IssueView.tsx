@@ -3,7 +3,6 @@ import { ShipProgress } from './ShipProgress';
 import { deriveShip } from './derivations';
 import { useDerivedIssueState } from '../../lib/store';
 import type { IssueViewDensity } from './inventory';
-import { StartAgentCta } from './StartAgentCta';
 
 interface IssueViewProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
   issueId: string;
@@ -16,19 +15,16 @@ interface IssueViewProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'
  * Shells retain routing and interaction glue; this component owns density
  * membership and the cross-density policy controls.
  *
- * PAN-2975: the StartAgentCta block renders ONLY at console density (the
- * drawer's own surface). At rail density FeatureItem mounts it inline in the
- * row's meta line (chip surface); at cockpit density the no-agent surface
- * comes from IssueDetail's DrawerAgentSession empty state. No detached CTA
- * blocks above rows anywhere.
+ * PAN-5244: `IssueView` renders no start surface of its own. At console
+ * density (the drawer) the start and resume surface is the Conversation tab's
+ * (`DrawerAgentSession`, conversation-header layout); at rail density
+ * `FeatureItem` mounts the chip inline; at cockpit density it is
+ * `DrawerAgentSession`'s empty state.
  */
-export function IssueView({ issueId, density, children, ...rootProps }: IssueViewProps) {
+export function IssueView({ issueId: _issueId, density, children, ...rootProps }: IssueViewProps) {
   const dataComponent = (rootProps as Record<string, unknown>)['data-component'];
   return (
     <div {...rootProps} data-component={typeof dataComponent === 'string' ? dataComponent : 'issue-view'} data-density={density}>
-      {density === 'console' && (
-        <div data-section="StartAgentCta"><StartAgentCta issueId={issueId} density={density} /></div>
-      )}
       {children}
     </div>
   );

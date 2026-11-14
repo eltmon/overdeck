@@ -39,11 +39,18 @@ import {
 import { getMergeBlockersPayload } from '../../../lib/cloister/merge-blockers.js';
 import { listNotScheduledAutoMerges, type NotScheduledAutoMerge } from '../services/auto-merge-skip-reasons.js';
 import {
+  getMergeTrainBatchSize,
+  getMergeTrainBatchWaitMinutes,
   isFlywheelAutoPickupBacklog,
   isFlywheelRequireUatBeforeMerge,
   isMergeTrainEnabled,
+  MERGE_TRAIN_BATCH_SIZE_BOUNDS,
+  MERGE_TRAIN_BATCH_WAIT_MINUTES_BOUNDS,
+  parseBoundedInteger,
   setFlywheelAutoPickupBacklog,
   setFlywheelRequireUatBeforeMerge,
+  setMergeTrainBatchSize,
+  setMergeTrainBatchWaitMinutes,
   setMergeTrainEnabled,
 } from '../../../lib/overdeck/control-settings.js';
 import {
@@ -491,6 +498,10 @@ export interface MergeTrainConfigBody {
   auto_pickup_backlog: boolean;
   require_uat_before_merge: boolean;
   merge_train_enabled: boolean;
+  /** PAN-4753 D4: `merge_train.batch_size`. */
+  batch_size: number;
+  /** PAN-4753 D4: `merge_train.batch_wait_minutes`. */
+  batch_wait_minutes: number;
 }
 
 export function getMergeTrainConfigPayload(): MergeTrainConfigBody {
@@ -498,6 +509,8 @@ export function getMergeTrainConfigPayload(): MergeTrainConfigBody {
     auto_pickup_backlog: isFlywheelAutoPickupBacklog(),
     require_uat_before_merge: isFlywheelRequireUatBeforeMerge(),
     merge_train_enabled: isMergeTrainEnabled(),
+    batch_size: getMergeTrainBatchSize(),
+    batch_wait_minutes: getMergeTrainBatchWaitMinutes(),
   };
 }
 
@@ -510,16 +523,30 @@ export async function postMergeTrainConfigPayload(payload: unknown): Promise<{ s
       return { status: 400, body: { error: `${key} must be a boolean` } };
     }
   }
+  const bounded = [
+    ['batch_size', MERGE_TRAIN_BATCH_SIZE_BOUNDS],
+    ['batch_wait_minutes', MERGE_TRAIN_BATCH_WAIT_MINUTES_BOUNDS],
+  ] as const;
+  for (const [key, bounds] of bounded) {
+    if (payload[key] !== undefined && (typeof payload[key] !== 'number' || parseBoundedInteger(payload[key], bounds) === null)) {
+      return { status: 400, body: { error: `${key} must be a whole number from ${bounds.min} to ${bounds.max}` } };
+    }
+  }
   if (payload['auto_pickup_backlog'] !== undefined) setFlywheelAutoPickupBacklog(payload['auto_pickup_backlog'] as boolean);
   if (payload['require_uat_before_merge'] !== undefined) setFlywheelRequireUatBeforeMerge(payload['require_uat_before_merge'] as boolean);
   if (payload['merge_train_enabled'] !== undefined) setMergeTrainEnabled(payload['merge_train_enabled'] as boolean);
+  if (payload['batch_size'] !== undefined) setMergeTrainBatchSize(payload['batch_size'] as number);
+  if (payload['batch_wait_minutes'] !== undefined) setMergeTrainBatchWaitMinutes(payload['batch_wait_minutes'] as number);
   return { status: 200, body: getMergeTrainConfigPayload() };
 }
 
 export interface AutoMergeScheduleDeps {
   now?: () => Date;
   isRequireUatBeforeMerge?: () => boolean;
-  isMergeTrainEnabled?: () => boolean;
+  /** PAN-4753: the issue's effective merge-train flag; see `autoMergePolicyRefusal`. */
+  isTrainOn?: (issueId: string) => boolean;
+  /** PAN-4753: dropped from a batch for a failed combined CI. */
+  droppedFromBatch?: (issueId: string) => boolean;
   isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
   /** The one merge gate (#4040); `evaluateIssueMergeGate` by default. */
   mergeGate?: (issueId: string) => Promise<MergeGateResult>;

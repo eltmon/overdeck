@@ -23,10 +23,13 @@ appropriate for team workflows.
 ## Enabling
 
 Auto-merge is gated by the global `require_uat_before_merge` setting in the
-dashboard's `app_settings` store. Set it to `false` to turn auto-merge on. The
-merge train must be on as well (`merge_train_enabled: true`): while it is off,
-`POST /api/merge-train/auto-merge/schedule` refuses with
-`412 Merge train is disabled` and the executor skips its tick.
+dashboard's `app_settings` store. Set it to `false` to turn auto-merge on.
+The merge train switch (`merge_train_enabled`) decides how ready PRs merge,
+not whether they do (PAN-4753): with the train off, every ready PR merges on
+its own through auto-merge; with it on, normal-priority PRs wait and merge
+together in batches, and only high-priority PRs are auto-merged one at a time
+(see the note below). `OVERDECK_DISABLE_AUTO_MERGE=1` is the switch that stops
+every automatic merge.
 
 There is no CLI for these settings. Change them in the dashboard or through
 `/api/merge-train/config`:
@@ -48,9 +51,11 @@ curl -X POST http://localhost:3011/api/merge-train/config \
   -d '{"require_uat_before_merge": true}'
 ```
 
-`GET` returns all three settings: `auto_pickup_backlog`,
-`require_uat_before_merge`, and `merge_train_enabled`. `POST` changes only the
-keys in the body, and each value must be a boolean.
+`GET` returns `auto_pickup_backlog`, `require_uat_before_merge`,
+`merge_train_enabled`, and the batch window settings `batch_size` (default 3,
+1 to 20) and `batch_wait_minutes` (default 30, 1 to 1440). `POST` changes only
+the keys in the body; the first three must be booleans, the last two whole
+numbers in range.
 
 The same toggle is exposed in the dashboard's Flywheel header as a checkbox.
 The default is `true` (auto-merge OFF — operator UAT required before merge).
@@ -58,13 +63,15 @@ The default is `true` (auto-merge OFF — operator UAT required before merge).
 When the toggle is `false`, the dashboard schedules auto-merge for any issue
 that satisfies the eligibility predicate. No flywheel run is needed: every
 60 seconds, on the UAT batch-train reconciler tick, the primary dashboard walks
-each project whose merge train is on and takes its open PRs with green checks
+each project and takes its open PRs with green checks
 on a `feature/<id>` branch. A strike PR (`strike/<id>`) is never scheduled: the
 operator merges it (PAN-3973). For each one it checks, in order:
 
 1. the issue is open in the tracker (the cached tracker row) and opted in to
    auto-merge: its `auto-merge` / `hold-for-uat` label, then the project
-   default, then this toggle (no forge read);
+   default, then this toggle (no forge read); and, while the merge train is
+   on, it is high priority or was dropped from a batch (a normal-priority PR
+   waits for the batch instead);
 2. the merge gate (`evaluateIssueMergeGate`) says the PR is ready. Approval is
    a trusted `overdeck-verdict` marker comment whose `sha=` is the PR head, or
    a trusted reviewer's standing GitHub review approving that exact commit, so
@@ -145,21 +152,34 @@ Changes are saved through `POST /api/projects/:key/auto-merge-default` and store
 in `~/.overdeck/projects.yaml`.
 
 <Note>
-**Auto-merge vs. UAT batch trains (PAN-4970).** This toggle controls *per-issue*
+**Auto-merge vs. batches (PAN-4970, PAN-4753).** This toggle controls *per-issue*
 scheduled auto-merge — Overdeck merging one eligible PR at a time without a
-human click. The separate `merge_train_enabled` setting enables [UAT batch
-trains](/features/merge-batches), where ready features are assembled into one
-tested batch you promote together. Each ready feature has exactly one of
-these two merge paths — a feature auto-merge will merge never also joins a
-batch. While auto-merge is on, a ready feature is batched only when
-auto-merge will not merge it: it is held for UAT (its label, else the project
-default, else the global setting), its Deft policy requires a human merge,
-its auto-merge was cancelled by the operator, or its last auto-merge failed
-at the PR head it still has. A GitLab project, a project spanning several
-repos, and any host with `OVERDECK_DISABLE_AUTO_MERGE=1` set batch every
-ready feature — auto-merge never schedules there. Auto-merge also needs the
-merge train on: with `merge_train_enabled` off, nothing is scheduled and
-nothing is merged.
+human click. The **Merge train** switch on the Flywheel header
+(`merge_train_enabled`) turns on [batches](/features/merge-batches). Each ready
+feature has exactly one of these two merge paths — a feature auto-merge will
+merge never also joins a batch.
+
+- **Merge train off:** every ready PR is auto-merged on its own. Nothing batches.
+- **Merge train on:** normal-priority PRs batch (this needs a workflow named
+  `CI` that runs on `uat/**` pushes; without one, a batch waits at most 10
+  minutes for CI, then dissolves and its PRs merge one at a time, and batching
+  pauses for a day with one activity-feed notice). A batch merges when
+  `batch_size` PRs are ready (default 3) or the oldest has waited
+  `batch_wait_minutes` (default 30), once the batch's own CI run is green. If
+  that run fails, one PR is dropped from the batch and merges on its own; the
+  rest merge without it. High-priority PRs are still auto-merged one at a time
+  with the 5-minute cancel window: strike branches, and issues labeled
+  `critical`, `blocks-main`, `P0`, `urgent`, or both `substrate-improvement`
+  and `bug`.
+
+A ready feature is also batched when it is held for UAT (its label, else the
+project default, else the global setting), its Deft policy requires a human
+merge, its auto-merge was cancelled by the operator, or its last auto-merge
+failed at the PR head it still has. These features get their own batch, which
+waits for you to test and promote it; they never join an automatic batch and
+never hold back the other PRs' batch. A GitLab project, a project spanning several repos, and any host
+with `OVERDECK_DISABLE_AUTO_MERGE=1` set batch every ready feature —
+auto-merge never schedules there, and only you promote their batches.
 Leave `require_uat_before_merge` at its default (`true`, auto-merge OFF) when you
 want a human to UAT each batch before promoting it.
 </Note>
@@ -302,8 +322,9 @@ failed entry to clear it.
 ## Related
 
 - `GET` / `POST /api/merge-train/config`: read and write
-  `require_uat_before_merge`, `merge_train_enabled`, and `auto_pickup_backlog`
-  (no CLI)
+  `require_uat_before_merge`, `merge_train_enabled`, `auto_pickup_backlog`,
+  `batch_size`, and `batch_wait_minutes` (no CLI; the dashboard has the
+  Flywheel header switches and **Settings → Merge Train**)
 - `pan merge cancel <id>` — cancel a pending auto-merge
 - `roles/flywheel.md` — the orchestrator's contract; references the toggle
   when deciding whether to call the scheduler vs. emitting a `merge`

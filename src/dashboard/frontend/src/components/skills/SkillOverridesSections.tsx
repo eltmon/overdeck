@@ -1,7 +1,9 @@
 /**
  * Collapsed-by-default hosts for the skill overrides panel (PAN-3942): the
  * project settings "Skills" subsection and the issue view "Skills for this
- * issue" section. Nothing is fetched until the operator opens one.
+ * issue" section. Nothing is fetched until the operator opens one. The issue
+ * drawer's Skills tab (PAN-5244) mounts the panel open, with no disclosure;
+ * it mounts only while that tab is selected.
  */
 import { useCallback, useState, type ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
@@ -46,6 +48,17 @@ export function IssueSkillsSection({ issueId }: { issueId: string }) {
       <Disclosure title="Skills for this issue" open={open} onToggle={() => setOpen(value => !value)}>
         <SkillOverridesPanel level="issue" issueId={issueId} enabled={open} onUnavailable={hide} liveAgents={liveAgents} />
       </Disclosure>
+    </div>
+  );
+}
+
+/** The issue drawer's Skills tab (PAN-5244): the panel, open, not inside a disclosure. */
+export function IssueSkillsTabPanel({ issueId, onUnavailable }: { issueId: string; onUnavailable: () => void }) {
+  const panes = useBackendPanes(issueId);
+  const liveAgents = panes.filter(pane => LIVE_PANE_STATES.has(pane.state)).map(pane => `${pane.role} agent`);
+  return (
+    <div data-section="SkillOverrides" data-testid="drawer-tab-panel-skills">
+      <SkillOverridesPanel level="issue" issueId={issueId} enabled onUnavailable={onUnavailable} liveAgents={liveAgents} />
     </div>
   );
 }

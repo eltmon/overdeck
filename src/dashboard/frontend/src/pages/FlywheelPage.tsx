@@ -38,6 +38,7 @@ const SPLIT_DEFAULT_LEFT = 560;
 
 const AUTO_PICKUP_TITLE = 'Off: the loop picks up only backlog items the operator released. On: every ready, planned backlog item is pickable.';
 const REQUIRE_UAT_TITLE = 'On: a PR may not merge until UAT has passed. Off: eligible merges may be scheduled through the auto-merge cooldown.';
+const MERGE_TRAIN_TITLE = 'On: normal-priority PRs batch and merge together once the batch CI is green; strikes, critical, blocks-main, P0, urgent and substrate bug fixes still merge on their own. Off: every ready PR merges on its own. Batch size and wait are in Settings.';
 
 function readStoredSplit(): number {
   try {
@@ -185,14 +186,14 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue, onOpenConversati
             title={REQUIRE_UAT_TITLE}
             onChange={(next) => configMutation.mutate({ require_uat_before_merge: next })}
           />
-          <a
-            href="/awaiting-merge"
-            className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-            title="The merge train is configured on the Awaiting Merge page"
-            data-testid="flywheel-merge-train-chip"
-          >
-            Merge train: {config ? (config.merge_train_enabled ? 'on' : 'off') : '—'}
-          </a>
+          <ToggleSwitch
+            label="Merge train"
+            checked={config?.merge_train_enabled ?? false}
+            disabled={!config || configMutation.isPending}
+            title={MERGE_TRAIN_TITLE}
+            testId="flywheel-merge-train-switch"
+            onChange={(next) => configMutation.mutate({ merge_train_enabled: next })}
+          />
         </div>
       </header>
       {configMutation.error && (

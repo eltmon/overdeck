@@ -24,6 +24,7 @@ import { TieredExecutionSection } from './sections/TieredExecutionSection';
 import { SwarmSettingsSection } from './sections/SwarmSettingsSection';
 import { CloisterSection } from './sections/CloisterSection';
 import { CloseOutSection } from './sections/CloseOutSection';
+import { MergeTrainBatchingSection } from './sections/MergeTrainBatchingSection';
 import { SessionVaultSection } from './sections/SessionVaultSection';
 import { AnywhereSection } from './sections/AnywhereSection';
 import { RemoteSection } from './sections/RemoteSection';
@@ -563,6 +564,8 @@ export function SettingsPage() {
         markSaved={markSaved}
         setSaveStatus={setSaveStatus}
       />
+
+      <MergeTrainBatchingSection />
 
       <SessionVaultSection />
 

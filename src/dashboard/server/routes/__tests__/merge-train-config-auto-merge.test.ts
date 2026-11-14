@@ -32,14 +32,27 @@ vi.mock('../../../../lib/overdeck/merge-sync.js', () => ({
   isMergeTrainEnabledForProject: vi.fn(() => true),
   getUatGeneration: vi.fn(() => null),
 }));
-vi.mock('../../../../lib/overdeck/control-settings.js', () => ({
-  isFlywheelAutoPickupBacklog: vi.fn(() => false),
-  isFlywheelRequireUatBeforeMerge: vi.fn(() => false),
-  isMergeTrainEnabled: vi.fn(() => true),
-  setFlywheelAutoPickupBacklog: vi.fn(),
-  setFlywheelRequireUatBeforeMerge: vi.fn(),
-  setMergeTrainEnabled: vi.fn(),
-}));
+// PAN-4753: a stateful stand-in for app_settings, so a POST then a GET shows
+// what the route persisted. The bounds and parser are the real ones.
+const settings = vi.hoisted(() => ({ mergeTrainEnabled: true, batchSize: 3, batchWaitMinutes: 30 }));
+vi.mock('../../../../lib/overdeck/control-settings.js', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../../../lib/overdeck/control-settings.js')>();
+  return {
+    isFlywheelAutoPickupBacklog: vi.fn(() => false),
+    isFlywheelRequireUatBeforeMerge: vi.fn(() => false),
+    isMergeTrainEnabled: vi.fn(() => settings.mergeTrainEnabled),
+    setFlywheelAutoPickupBacklog: vi.fn(),
+    setFlywheelRequireUatBeforeMerge: vi.fn(),
+    setMergeTrainEnabled: vi.fn((enabled: boolean) => { settings.mergeTrainEnabled = enabled; }),
+    getMergeTrainBatchSize: vi.fn(() => settings.batchSize),
+    getMergeTrainBatchWaitMinutes: vi.fn(() => settings.batchWaitMinutes),
+    setMergeTrainBatchSize: vi.fn((n: number) => { settings.batchSize = n; }),
+    setMergeTrainBatchWaitMinutes: vi.fn((n: number) => { settings.batchWaitMinutes = n; }),
+    parseBoundedInteger: real.parseBoundedInteger,
+    MERGE_TRAIN_BATCH_SIZE_BOUNDS: real.MERGE_TRAIN_BATCH_SIZE_BOUNDS,
+    MERGE_TRAIN_BATCH_WAIT_MINUTES_BOUNDS: real.MERGE_TRAIN_BATCH_WAIT_MINUTES_BOUNDS,
+  };
+});
 
 const {
   deleteAutoMergePayload,
@@ -83,7 +96,9 @@ function gate(facts: Partial<PrFacts> = {}, readiness: { ready: boolean; reason?
 const baseDeps = {
   now: () => new Date('2026-09-18T12:00:00Z'),
   isRequireUatBeforeMerge: () => false,
-  isMergeTrainEnabled: () => true,
+  // PAN-4753 D4: train off is the per-PR path these schedule tests exercise.
+  isTrainOn: () => false,
+  droppedFromBatch: () => false,
   isEligible: async () => ({ eligible: true }) as const,
   getProjectAutoMergeDefault: () => null,
   getIssueLabels: () => [],
@@ -183,15 +198,41 @@ describe('POST /api/merge-train/auto-merge/schedule', () => {
     expect(schedule).not.toHaveBeenCalled();
   });
 
-  it('refuses while the merge train is disabled', async () => {
+  it('schedules while the merge train is off: off means per-PR merges (PAN-4753 D4)', async () => {
+    const schedule = vi.fn(() => ({ created: true, entry: { id: 1 } }));
     const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917' }, {
       ...baseDeps,
-      isMergeTrainEnabled: () => false,
+      isTrainOn: () => false,
       mergeGate: async () => gate(),
-      schedule: vi.fn() as never,
+      schedule: schedule as never,
     });
-    expect(result.status).toBe(412);
-    expect(result.body).toEqual({ error: 'Merge train is disabled' });
+    expect(result.status).toBe(200);
+    expect(schedule).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a normal-priority PR while the merge train is on: it waits for the batch (PAN-4753 D4)', async () => {
+    const schedule = vi.fn();
+    const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917' }, {
+      ...baseDeps,
+      isTrainOn: () => true,
+      mergeGate: async () => gate(),
+      schedule: schedule as never,
+    });
+    expect(result).toEqual({ status: 412, body: { error: 'the merge train batches this PR; it merges with the next batch' } });
+    expect(schedule).not.toHaveBeenCalled();
+  });
+
+  it('schedules a critical PR at once while the merge train is on (PAN-4753 D4)', async () => {
+    const schedule = vi.fn(() => ({ created: true, entry: { id: 1 } }));
+    const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917' }, {
+      ...baseDeps,
+      isTrainOn: () => true,
+      getIssueLabels: () => ['critical'],
+      mergeGate: async () => gate(),
+      schedule: schedule as never,
+    });
+    expect(result.status).toBe(200);
+    expect(schedule).toHaveBeenCalledTimes(1);
   });
 
   it('surfaces the eligibility reason', async () => {
@@ -258,12 +299,36 @@ describe('DELETE /api/merge-train/auto-merge/:id', () => {
 });
 
 describe('GET/POST /api/merge-train/config', () => {
-  it('returns the three merge-train settings', () => {
+  it('returns the merge-train settings, including the batch window (PAN-4753)', () => {
     expect(getMergeTrainConfigPayload()).toEqual({
       auto_pickup_backlog: false,
       require_uat_before_merge: false,
       merge_train_enabled: true,
+      batch_size: 3,
+      batch_wait_minutes: 30,
     });
+  });
+
+  it('persists the merge train switch: POST off, then GET reads off (PAN-4753 WI-11)', async () => {
+    const off = await postMergeTrainConfigPayload({ merge_train_enabled: false });
+    expect(off.status).toBe(200);
+    expect(off.body).toMatchObject({ merge_train_enabled: false });
+    expect(getMergeTrainConfigPayload().merge_train_enabled).toBe(false);
+    const on = await postMergeTrainConfigPayload({ merge_train_enabled: true });
+    expect(on.body).toMatchObject({ merge_train_enabled: true });
+    expect(getMergeTrainConfigPayload().merge_train_enabled).toBe(true);
+  });
+
+  it('persists the batch window keys and rejects values outside their bounds (PAN-4753)', async () => {
+    const saved = await postMergeTrainConfigPayload({ batch_size: 5, batch_wait_minutes: 45 });
+    expect(saved.status).toBe(200);
+    expect(getMergeTrainConfigPayload()).toMatchObject({ batch_size: 5, batch_wait_minutes: 45 });
+    for (const body of [{ batch_size: 0 }, { batch_size: 21 }, { batch_size: 2.5 }, { batch_size: '3' }, { batch_wait_minutes: 0 }, { batch_wait_minutes: 1441 }]) {
+      const result = await postMergeTrainConfigPayload(body);
+      expect(result.status).toBe(400);
+    }
+    expect(getMergeTrainConfigPayload()).toMatchObject({ batch_size: 5, batch_wait_minutes: 45 });
+    await postMergeTrainConfigPayload({ batch_size: 3, batch_wait_minutes: 30 });
   });
 
   it('applies only the keys the body carries', async () => {

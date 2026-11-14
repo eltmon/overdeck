@@ -36,7 +36,8 @@ export interface GhPrRow {
   mergeable?: string;
   reviewDecision?: string | null;
   reviewRequests?: unknown[];
-  statusCheckRollup?: Array<{ status?: string; conclusion?: string | null; state?: string }>;
+  /** `completedAt` is present on check runs; the batch window (PAN-4753) reads it as ready-since. */
+  statusCheckRollup?: Array<{ status?: string; conclusion?: string | null; state?: string; completedAt?: string | null }>;
   title?: string;
   headRefName?: string;
   isDraft?: boolean;

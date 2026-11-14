@@ -1,0 +1,9 @@
+plan-digest: a20a82d2819c63d69f71d7d86ef13bf8f58ddf8b598e835cdf0012f66e3527e4
+
+## blocks-the-design: queued waiters can bypass low memory on timeout
+
+The PRD says only a timeout whose `lastWaitReason` is `memory` refuses to start; `queue` and `slots` timeouts run unadmitted (`.pan/drafts/PAN-5248.md`, lines 48, 75, 199 and 228). The admission loop checks whether a waiter is the head before scanning slots (`src/lib/cloister/quality-gate-admission.ts`, lines 382–395), and the proposed memory check comes after the full-slot branch (lines 423–426; PRD line 178). Thus a waiter behind a memory-blocked head records `queue`, and one behind full slots records `slots`, even when starting it would breach the memory reserve. After 30 minutes the wrapper starts either unadmitted. Recheck the memory rule on **every** timeout before deciding to fail open, and refuse to start if it fails. Add cases for a tail waiter behind a memory-blocked head and for a waiter behind full slots.
+
+## blocks-the-design: dashboard ratchet discards refusal exit code
+
+WI-8 replaces only the compiler command inside `output=$(... 2>&1 || true)` (`.pan/drafts/PAN-5248.md`, line 273). The existing script therefore discards the wrapper's exit 75 (`scripts/lint-dashboard-types.sh`, line 50) and judges only the `error TS` count (lines 51–77). A memory refusal contains no TypeScript diagnostic. With today's baseline of 12 (`scripts/dashboard-types-baseline.txt`), it reports a misleading stale baseline; when the baseline reaches zero, it reports `✓ dashboard-types guard passed` without running tsc. In `--update` mode it can write zero as the new baseline (lines 53–61). Preserve the command status and fail when it is nonzero with no TypeScript diagnostics, as `scripts/lint-frontend-types.sh` already does at lines 52–64. Test a wrapper exit 75 with no diagnostics in both check and update modes.

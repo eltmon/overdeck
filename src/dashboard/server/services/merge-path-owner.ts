@@ -15,8 +15,10 @@
  *   1. the executor's kill switch (`OVERDECK_DISABLE_AUTO_MERGE=1`) is set
  *      => batch (the scheduler never schedules the feature);
  *   2. {@link module:auto-merge-scheduler.policyRefusal}-shaped: the door's
- *      forge-free policy check (`autoMergePolicyRefusal`, held/closed/train
- *      off) refuses => batch;
+ *      forge-free policy check (`autoMergePolicyRefusal`: closed, held for
+ *      UAT, or batch-routed — train on and normal priority, PAN-4753 D4)
+ *      refuses => batch. With the train off it never refuses for the train,
+ *      so every normal feature falls through to the per-PR rules below;
  *   3. the Deft human-merge hold applies => batch;
  *   4. the issue's newest `pending_auto_merges` row is `pending` or
  *      `merging` => per-pr: the scheduler already owns this one;

@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const SCRIPT_SOURCE = new URL('../../../scripts/lint-effect-diagnostics.sh', import.meta.url);
+// PAN-5248: every lane runs through the admitted tsc wrapper.
+const WRAPPER_SOURCE = new URL('../../../scripts/tsc-admitted.mjs', import.meta.url);
 const BASELINE_HEADER = [
   '# Effect diagnostics baseline for lint-effect-diagnostics.sh (PAN-3568).',
   '# One finding ending in effect(<ruleName>) per row, sorted. Lower with: bash scripts/lint-effect-diagnostics.sh --update',
@@ -24,6 +26,7 @@ function makeTempGuard(baselineFindings: string[]): string {
     readFileSync(SCRIPT_SOURCE, 'utf-8'),
     { mode: 0o755 },
   );
+  writeFileSync(join(root, 'scripts', 'tsc-admitted.mjs'), readFileSync(WRAPPER_SOURCE, 'utf-8'));
   writeFileSync(
     join(root, 'scripts', 'effect-diagnostics-baseline.txt'),
     `${[...BASELINE_HEADER, ...baselineFindings.sort()].join('\n')}\n`,
@@ -56,6 +59,8 @@ function runGuard(root: string, args: string[] = [], tscExit = 0): GuardResult {
         ...process.env,
         FAKE_TSC_OUTPUT: join(root, 'tsc-output.txt'),
         FAKE_TSC_EXIT: String(tscExit),
+        // H5: take the wrapper's bypass path so the fake tsc runs without admission.
+        OVERDECK_GATE_ADMISSION: '0',
       },
     });
     return { ok: true, output };

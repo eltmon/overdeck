@@ -12,7 +12,6 @@ import {
 } from '../../../lib/overdeck/merge-sync.js';
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
 import { isPeerDashboardProcess } from '../../../lib/boot-gates.js';
-import { isMergeTrainEnabled } from '../../../lib/overdeck/control-settings.js';
 import { evaluateIssueMergeGate } from '../../../lib/cloister/merge-gate.js';
 import { deftAutoMergeHold } from '../../../lib/deft/policy.js';
 import type { MergeReadiness, PrFacts } from '../../../lib/cloister/pr-facts.js';
@@ -64,8 +63,6 @@ interface MergeResult {
 export interface AutoMergeExecutorDeps {
   now?: () => Date;
   listEntries?: () => PendingAutoMerge[];
-  /** The merge train must be on for auto-merge to act. */
-  isPaused?: () => boolean;
   isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
   /** PAN-4820: the Deft human-merge hold; `deftAutoMergeHold` by default. */
   deftHold?: (issueId: string) => Promise<string | null>;
@@ -172,12 +169,10 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
 
   if (entries.length === 0) return;
 
-  const isPaused = deps.isPaused ?? (() => !isMergeTrainEnabled());
+  // PAN-4753 D4: the merge train switch no longer pauses this executor — off
+  // means every ready PR merges on its own. `OVERDECK_DISABLE_AUTO_MERGE=1`
+  // (checked in startAutoMergeExecutor) is the switch that stops every merge.
   const log = deps.log ?? console.log;
-  if (isPaused()) {
-    log('[auto-merge] merge train disabled, skipping tick');
-    return;
-  }
   // PAN-3917 D1: there is no deploy queue to defer to — the post-merge deploy
   // patrol and its pending-deploy file are gone.
   if (deps.hasPendingDeploy && await deps.hasPendingDeploy()) {
@@ -186,11 +181,6 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
   }
 
   for (const entry of entries) {
-    if (isPaused()) {
-      log('[auto-merge] merge train disabled, skipping tick');
-      return;
-    }
-
     // #4066 review: an automatic merge is bound to the head it was scheduled
     // for. A row without one (written before heads were recorded) cannot be
     // pinned, so it never merges; the operator re-schedules it.
