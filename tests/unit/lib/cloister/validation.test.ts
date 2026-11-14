@@ -6,14 +6,21 @@ import { tmpdir } from 'os';
 
 const admissionMocks = vi.hoisted(() => ({
   release: vi.fn(async () => undefined),
-  acquire: vi.fn(async () => ({
+  recordPeak: vi.fn(async (_bytes: number) => undefined),
+  acquire: vi.fn(async (_request: Record<string, unknown>, _deps?: { onWaiting?: (reason: unknown) => void }) => ({
     admittedAt: '2026-07-19T00:00:00.000Z',
+    recordPeak: admissionMocks.recordPeak,
     release: async () => admissionMocks.release(),
   })),
 }));
 
 vi.mock('../../../../src/lib/cloister/quality-gate-admission.js', () => ({
   acquireQualityGateAdmission: admissionMocks.acquire,
+}));
+
+// PAN-5248: host gates sample their tree; a fixed 1 GiB peak keeps runs deterministic.
+vi.mock('../../../../src/lib/system-health/process-tree-rss.js', () => ({
+  startPeakRssSampler: vi.fn(() => ({ stop: async () => 1024 ** 3 })),
 }));
 
 vi.mock('../../../../src/lib/projects/launch-env.js', async (importOriginal) => {
@@ -145,6 +152,43 @@ echo "pass stderr diagnostic" >&2
 
       expect(results).toEqual([]);
       expect(admissionMocks.acquire).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('runQualityGates memory footprint (PAN-5248)', () => {
+    it('keys the footprint by the raw gate command and records the peak', async () => {
+      admissionMocks.acquire.mockClear();
+      admissionMocks.recordPeak.mockClear();
+      const [result] = await runQualityGates({
+        test: { command: 'true {{CHANGED_BASE}}' },
+      }, testDir, 'pre_push', { placeholders: { CHANGED_BASE: 'origin/main' } as never });
+
+      expect(result.passed).toBe(true);
+      const [request] = admissionMocks.acquire.mock.calls[0]!;
+      expect(request.footprintKey).toBe('gate:test:true {{CHANGED_BASE}}');
+      expect(request.fullReservation).toBeUndefined();
+      expect(admissionMocks.recordPeak).toHaveBeenCalledWith(1024 ** 3);
+    });
+
+    it('logs a memory wait reported by admission', async () => {
+      const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      const onLog = vi.fn();
+      admissionMocks.acquire.mockImplementationOnce(async (_request, deps) => {
+        deps?.onWaiting?.({ kind: 'cpu', sample: {} });
+        deps?.onWaiting?.({
+          kind: 'memory', memAvailableBytes: 13 * 1024 ** 3, reservationsBytes: 0, footprintBytes: 2.5 * 1024 ** 3, softReserveBytes: 12 * 1024 ** 3,
+        });
+        return { admittedAt: '2026-07-19T00:00:00.000Z', recordPeak: admissionMocks.recordPeak, release: async () => admissionMocks.release() };
+      });
+      try {
+        await runQualityGates({ lint: { command: 'true' } }, testDir, 'pre_push', { onLog });
+        const lines = log.mock.calls.map(([line]) => String(line)).filter((line) => line.startsWith('[quality-gate] Waiting for memory:'));
+        expect(lines).toHaveLength(1);
+        expect(lines[0]).toContain('available 13.0 GiB, reserved 0.0 GiB, needs 2.5 GiB, soft reserve 12.0 GiB');
+        expect(onLog).toHaveBeenCalledWith('Waiting for memory before lint…');
+      } finally {
+        log.mockRestore();
+      }
     });
   });
 

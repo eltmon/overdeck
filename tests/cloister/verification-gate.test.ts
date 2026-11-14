@@ -14,11 +14,21 @@ const execMock = vi.hoisted(() =>
 );
 const admissionMocks = vi.hoisted(() => ({
   release: vi.fn(async () => undefined),
+  recordPeak: vi.fn(async (_bytes: number) => undefined),
   acquire: vi.fn(),
 }));
 
 vi.mock('../../src/lib/cloister/quality-gate-admission.js', () => ({
   acquireQualityGateAdmission: admissionMocks.acquire,
+}));
+
+// PAN-5248: a fake sampler so host gates "measure" a 1 GiB peak.
+const samplerMocks = vi.hoisted(() => ({
+  start: vi.fn((_pid: number) => ({ stop: vi.fn(async () => 1024 ** 3) })),
+}));
+
+vi.mock('../../src/lib/system-health/process-tree-rss.js', () => ({
+  startPeakRssSampler: samplerMocks.start,
 }));
 
 vi.mock('child_process', () => {
@@ -46,9 +56,12 @@ const workspacePath = '/tmp/test-workspace';
 
 beforeEach(() => {
   admissionMocks.release.mockClear();
+  admissionMocks.recordPeak.mockClear();
+  samplerMocks.start.mockClear();
   admissionMocks.acquire.mockReset();
   admissionMocks.acquire.mockResolvedValue({
     admittedAt: '2026-07-19T00:00:00.000Z',
+    recordPeak: admissionMocks.recordPeak,
     release: admissionMocks.release,
   });
 });
@@ -464,5 +477,56 @@ describe('runQualityGates — PAN-5062 workspaceEnv merge', () => {
 
     const cmd = execMock.mock.calls[1][0] as string;
     expect(cmd).not.toContain('-e DBT_TARGET');
+  });
+});
+
+describe('runQualityGates — memory footprint (PAN-5248)', () => {
+  const GiB = 1024 ** 3;
+
+  beforeEach(() => {
+    execMock.mockReset();
+    execMock.mockResolvedValue({ stdout: '', stderr: '' });
+  });
+
+  it('records a passing host gate\'s peak before releasing', async () => {
+    const order: string[] = [];
+    admissionMocks.recordPeak.mockImplementationOnce(async (bytes: number) => { order.push(`recordPeak:${bytes}`); });
+    admissionMocks.release.mockImplementationOnce(async () => { order.push('release'); });
+
+    const results = await runQualityGates({ test: { command: 'npm test' } }, workspacePath);
+
+    expect(results[0]?.passed).toBe(true);
+    expect(samplerMocks.start).toHaveBeenCalledWith(12345);
+    expect(order).toEqual([`recordPeak:${GiB}`, 'release']);
+  });
+
+  it('records the peak of a gate that exited non-zero on its own', async () => {
+    execMock.mockRejectedValueOnce(Object.assign(new Error('failed'), { code: 1, stdout: '', stderr: '' }));
+    await runQualityGates({ test: { command: 'npm test' } }, workspacePath);
+    expect(admissionMocks.recordPeak).toHaveBeenCalledWith(GiB);
+  });
+
+  it('records nothing for a killed gate', async () => {
+    execMock.mockRejectedValueOnce(Object.assign(new Error('killed'), {
+      killed: true, signal: 'SIGTERM', code: null, stdout: '', stderr: '',
+    }));
+    const results = await runQualityGates({ test: { command: 'npm test' } }, workspacePath);
+    expect(results[0]?.passed).toBe(false);
+    expect(admissionMocks.recordPeak).not.toHaveBeenCalled();
+    expect(admissionMocks.release).toHaveBeenCalledOnce();
+  });
+
+  it('reserves a container gate fully and never samples it', async () => {
+    execMock.mockResolvedValueOnce({ stdout: 'proj-feature-pan-1-dbt\n', stderr: '' });
+    await runQualityGates({
+      dbt: { command: 'dbt build', container: true, container_name: 'proj-feature-pan-1-dbt' },
+    }, workspacePath);
+
+    expect(admissionMocks.acquire).toHaveBeenCalledWith(
+      expect.objectContaining({ footprintKey: 'gate:dbt:dbt build', fullReservation: true }),
+      expect.anything(),
+    );
+    expect(samplerMocks.start).not.toHaveBeenCalled();
+    expect(admissionMocks.recordPeak).not.toHaveBeenCalled();
   });
 });
