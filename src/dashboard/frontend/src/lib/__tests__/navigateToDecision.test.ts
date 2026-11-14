@@ -17,8 +17,13 @@ describe('decisionSubjectPath', () => {
     expect(decisionSubjectPath({ id: 'c1', source: 'conversation' })).toBe('/conv/c1');
   });
 
-  it('ignores view for an agent target', () => {
-    expect(decisionSubjectPath({ id: 'a1', source: 'agent', issueId: 'PAN-1', view: 'terminal' })).toBe('/issues/PAN-1');
+  it('returns the issue drawer terminal tab with the agent selected for an agent target with view terminal', () => {
+    expect(decisionSubjectPath({ id: 'agent-pan-1', source: 'agent', issueId: 'PAN-1', view: 'terminal' }))
+      .toBe('/issues/PAN-1?tab=terminal&agent=agent-pan-1');
+  });
+
+  it('returns /issues/<id> for an agent target without view', () => {
+    expect(decisionSubjectPath({ id: 'a1', source: 'agent', issueId: 'PAN-1' })).toBe('/issues/PAN-1');
   });
 });
 

@@ -14,6 +14,7 @@ import { useDashboardStore, hasDetectedToolPermission, selectAgentsWithPendingAs
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { fetchWithTimeout } from '../../lib/apiFetch';
+import { navigateToDecisionSubject } from '../../lib/navigateToDecision';
 import { buildPendingAnswerRequest, parseCodexOptionNumber, postPendingAnswer, type PendingAnswerTarget } from '../../lib/pendingInputAnswer';
 import type { Issue } from '../../types';
 import {
@@ -136,9 +137,20 @@ export function usePendingInputDialogs() {
         description: 'The agent stopped or already received an answer.',
       });
     } else if (knownAgent && agentEntry?.pendingAskUserQuestion == null && terminalDialogPending) {
-      toast.info('This agent is blocked on a terminal dialog', {
-        description: 'Open its terminal to answer (e.g. a tool-permission, rate-limit, or session-resume prompt) — it cannot be answered from here yet.',
-      });
+      // The prompt can only be answered in the terminal, so take the operator
+      // there: the issue drawer's Terminal tab with this agent selected.
+      if (agentEntry?.issueId) {
+        const openTerminal = () => navigateToDecisionSubject({ id: askUserQuestionReopenId, source: 'agent', issueId: agentEntry.issueId, view: 'terminal' });
+        openTerminal();
+        toast.info('This agent is blocked on a terminal dialog', {
+          description: 'Opened its terminal. Answer the prompt there (e.g. a tool-permission, rate-limit, or session-resume prompt).',
+          action: { label: 'Open terminal', onClick: openTerminal },
+        });
+      } else {
+        toast.info('This agent is blocked on a terminal dialog', {
+          description: 'Open its terminal to answer (e.g. a tool-permission, rate-limit, or session-resume prompt) — it cannot be answered from here yet.',
+        });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [askUserQuestionReopenNonce]);

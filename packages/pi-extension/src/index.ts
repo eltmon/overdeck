@@ -676,7 +676,8 @@ export async function handleSessionStart(env: HookEnv, event: SessionStartEvent,
     const transcriptPath = transcriptFile ?? await findPiSessionLogFile(paths.agentDir, event.sessionId)
     await appendSessionIndexEntry(paths.sessionsIndexPath, event.sessionId, ts, model, 'session-start', transcriptPath ?? undefined)
   }
-  await postEvent(env, { kind: 'model_set', model: 'pi', claudeSessionId: event.sessionId ?? undefined, timestamp: ts })
+  // sessionIndexed: the session-start row above is already in sessions.json (PAN-5223).
+  await postEvent(env, { kind: 'model_set', model: 'pi', claudeSessionId: event.sessionId ?? undefined, sessionIndexed: event.sessionId ? true : undefined, timestamp: ts })
   await postEvent(env, { kind: 'activity', activity: 'idle', timestamp: ts })
 }
 

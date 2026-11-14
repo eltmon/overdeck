@@ -23,7 +23,8 @@ export interface DecisionSubjectTarget {
   id: string;
   source: PendingInputSource;
   issueId?: string;
-  // PAN-4466: send a conversation straight to its terminal view. Ignored for an agent target.
+  // PAN-4466: send a conversation straight to its terminal view. For an agent,
+  // open its issue drawer on the Terminal tab with this agent selected.
   view?: 'terminal';
 }
 
@@ -35,7 +36,9 @@ export function decisionSubjectPath(target: DecisionSubjectTarget): string | nul
     const path = linked ? `/conv/@${encodeURIComponent(linked[1]!)}/${encodeURIComponent(linked[2]!)}` : `/conv/${encodeURIComponent(target.id)}`;
     return target.view === 'terminal' ? `${path}?view=terminal` : path;
   }
-  return target.issueId ? `/issues/${encodeURIComponent(target.issueId)}` : null;
+  if (!target.issueId) return null;
+  const path = `/issues/${encodeURIComponent(target.issueId)}`;
+  return target.view === 'terminal' ? `${path}?tab=terminal&agent=${encodeURIComponent(target.id)}` : path;
 }
 
 export function navigateToDecisionSubject(target: DecisionSubjectTarget): void {
