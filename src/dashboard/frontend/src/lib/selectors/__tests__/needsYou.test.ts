@@ -10,7 +10,7 @@ vi.mock('../../navigateToDecision', async (importOriginal) => ({
 import type { DerivedIssueState } from '@overdeck/contracts'
 import type { PendingInputSubject } from '../../store'
 import type { Decision } from '../../useDecisions'
-import type { NeedsYouRow } from '../../../components/flywheel/FlywheelStatusPane'
+import type { NeedsYouRow } from '../../../components/flywheel/needsYouRows'
 import { buildNeedsYouItems, isSubjectUnresolved, type NeedsYouSources } from '../needsYou'
 import { useAskUserQuestionUiStore } from '../../askUserQuestionUiStore'
 import { buildProjectResolver } from '../projectOf'

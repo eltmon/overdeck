@@ -6,8 +6,8 @@
  * needs-you items into the Status tab's action cards.
  */
 import type { FlywheelInFlightRow, FlywheelLastTick } from '@overdeck/contracts';
-import { needsYouItemKey, parseNeedsYouTarget, splitNeedsYouItems } from '@overdeck/contracts';
 
+import { needsYouRows } from '../components/flywheel/needsYouRows';
 import type { ConversationPendingInputRow } from './useDecisions';
 
 // Inlined to avoid a lint:circular cycle with ./flywheelApi, which exports
@@ -69,23 +69,12 @@ export function buildNeedsYouCards(
   }
   const claimed = new Set<string>();
   const cards: NeedsYouCard[] = [];
-  const items = tick ? tick.needsYouItems ?? splitNeedsYouItems(tick.needsYou).map((text) => ({ text })) : [];
-  for (const item of items) {
-    const { label, target } = parseNeedsYouTarget(item.text);
-    const named = (label.match(ISSUE_ID_RE) ?? []).map((id) => id.toUpperCase());
+  for (const row of tick ? needsYouRows(tick) : []) {
+    const named = (row.label.match(ISSUE_ID_RE) ?? []).map((id) => id.toUpperCase());
     const issueId = named.find((id) => actionRows.has(id) && !claimed.has(id));
     if (issueId) claimed.add(issueId);
     const action = issueId ? actionRows.get(issueId)?.blocker?.action : undefined;
-    cards.push({
-      key: needsYouItemKey(item.text),
-      text: item.text,
-      label,
-      ...(target ? { target } : {}),
-      ...('context' in item && item.context ? { context: item.context } : {}),
-      ...('firstRaisedTick' in item ? { firstRaisedTick: item.firstRaisedTick, firstRaisedAt: item.firstRaisedAt } : {}),
-      ...('firstRaisedMessageId' in item && item.firstRaisedMessageId ? { messageId: item.firstRaisedMessageId } : {}),
-      ...(issueId && action ? { issueId, action } : {}),
-    });
+    cards.push({ ...row, ...(issueId && action ? { issueId, action } : {}) });
   }
   for (const [issueId, row] of actionRows) {
     if (claimed.has(issueId) || !row.blocker?.action) continue;
