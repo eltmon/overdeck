@@ -49,7 +49,15 @@ import { IssueChecksChip } from '../issue-view/IssueChecksChip';
 import { PickupGateControls, pickupStageFor } from '../backlog/PickupGateControls';
 import { ChangedFilesView } from '../Stage/cockpit/ChangedFilesView';
 import { useDeftIssueSummary } from '../deft/queries';
+import { DeftDecisionsTab } from '../deft/DeftDecisionsTab';
 import { ISSUE_DETAIL_TABS, entryClickValue, resolveIssueTab, type IssueTabValue } from './issueTabs';
+import {
+  IssueActivityBody,
+  IssueChangesBody,
+  IssueDiscussionBody,
+  IssuePlanBody,
+  IssueTasksBody,
+} from './IssueDetailTabBodies';
 
 export type IssueDetailDensity = 'drawer' | 'page' | 'rail';
 
@@ -301,10 +309,15 @@ export function IssueDetail({ issueId, density, agents, derived, tab, onSelectTa
           </div>
         )}
         <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col', !sessionTab && 'overflow-auto px-[22px] py-[18px]')}>
-          {sessionTab ? sessionPane(tab === 'terminal' ? 'terminal' : 'conversation', onSelectTab, true)
-            : secondaryPanel ? secondaryPanel
-            : tab === 'skills' && !skillsUnavailable ? <IssueSkillsTabPanel issueId={issueId} onUnavailable={markSkillsUnavailable} />
-            : tab === 'overview' ? (
+          {entry === 'session' ? sessionPane(resolved?.view === 'terminal' ? 'terminal' : 'conversation', onSelectTab, true)
+            : entry === 'tasks' ? <IssueTasksBody issueId={issueId} />
+            : entry === 'plan' ? <IssuePlanBody issueId={issueId} value={resolved!.value} onSelect={onSelectTab} />
+            : entry === 'changes' ? <IssueChangesBody issueId={issueId} value={resolved!.value} onSelect={onSelectTab} />
+            : entry === 'activity' ? <IssueActivityBody issueId={issueId} value={resolved!.value} onSelect={onSelectTab} />
+            : entry === 'discussion' ? <IssueDiscussionBody issueId={issueId} />
+            : entry === 'decisions' ? <DeftDecisionsTab issueId={issueId} />
+            : entry === 'skills' && !skillsUnavailable ? <IssueSkillsTabPanel issueId={issueId} onUnavailable={markSkillsUnavailable} />
+            : entry === 'overview' ? (
               <IssueDrawerDetails
                 issueId={issueId}
                 agents={agents}

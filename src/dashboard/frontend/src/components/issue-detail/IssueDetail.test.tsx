@@ -75,8 +75,15 @@ vi.mock('../skills/SkillOverridesSections', () => ({
   ),
 }));
 vi.mock('../TasksPanel', () => ({ TasksPanel: () => <div data-testid="tasks-panel" /> }));
+const useDeftIssueSummaryMock = vi.hoisted(() => vi.fn(() => ({ isDeft: false, summary: null, isLoading: false })));
+vi.mock('../deft/queries', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../deft/queries')>()),
+  useDeftIssueSummary: (...args: unknown[]) => useDeftIssueSummaryMock(...args),
+}));
+vi.mock('../deft/DeftDecisionsTab', () => ({ DeftDecisionsTab: () => <div data-testid="deft-decisions" /> }));
 
 beforeEach(() => {
+  useDeftIssueSummaryMock.mockReturnValue({ isDeft: false, summary: null, isLoading: false });
   // Overview-tab panels query their domains; answer everything benignly.
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({})));
 });
@@ -333,5 +340,38 @@ describe('IssueDetail (C-DETAIL one component)', () => {
 
     expect(screen.getByTestId('mock-agent-session-conversation')).toHaveAttribute('data-agent-id', 'agent-review-1');
     expect(document.querySelectorAll('[data-section="SpecialistStrip"]')).toHaveLength(1);
+  });
+
+  it('adds a Decisions tab before Discussion for a Deft issue', () => {
+    useDeftIssueSummaryMock.mockReturnValue({ isDeft: true, summary: null, isLoading: false });
+    renderDetail(
+      <IssueDetail issueId="PAN-1" density="drawer" agents={AGENTS} tab="conversation" onSelectTab={() => {}} />,
+    );
+    const ids = screen.getAllByRole('tab').map((button) => button.getAttribute('data-testid'));
+    expect(ids.indexOf('drawer-tab-decisions')).toBe(ids.indexOf('drawer-tab-discussion') - 1);
+  });
+
+  it('hides the Decisions tab for a non-Deft issue', () => {
+    useDeftIssueSummaryMock.mockReturnValue({ isDeft: false, summary: null, isLoading: false });
+    renderDetail(
+      <IssueDetail issueId="PAN-1" density="drawer" agents={AGENTS} tab="conversation" onSelectTab={() => {}} />,
+    );
+    expect(screen.queryByTestId('drawer-tab-decisions')).not.toBeInTheDocument();
+  });
+
+  it('opens Decisions from tab="decisions"', () => {
+    useDeftIssueSummaryMock.mockReturnValue({ isDeft: true, summary: null, isLoading: false });
+    renderDetail(
+      <IssueDetail issueId="PAN-1" density="drawer" agents={AGENTS} tab="decisions" onSelectTab={() => {}} />,
+    );
+    expect(screen.getByTestId('deft-decisions')).toBeInTheDocument();
+  });
+
+  it('an unknown tab value renders the placeholder', () => {
+    renderDetail(
+      <IssueDetail issueId="PAN-1" density="drawer" agents={AGENTS} tab="no-such-tab" onSelectTab={() => {}} />,
+    );
+    expect(screen.getByTestId('drawer-tab-panel-no-such-tab')).toHaveTextContent('This drawer section will appear here as data streams in.');
+    expect(screen.getAllByRole('tab').every((button) => button.getAttribute('aria-selected') === 'false')).toBe(true);
   });
 });

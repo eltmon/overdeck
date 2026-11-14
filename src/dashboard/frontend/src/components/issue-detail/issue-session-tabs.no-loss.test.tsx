@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DialogProvider } from '../DialogProvider';
 import { ISSUE_DETAIL_TABS, IssueDetail } from './IssueDetail';
+import { resolveIssueTab } from './issueTabs';
 
 vi.mock('../drawer/DrawerAgentSession', () => ({
   DrawerAgentSession: ({ view }: { view: 'conversation' | 'terminal' }) => (
@@ -44,6 +45,20 @@ vi.mock('./IssueDetailShell', () => ({ IssueDetailShell: () => <div /> }));
 vi.mock('../Stage/cockpit/ChangedFilesView', () => ({
   ChangedFilesView: () => <div data-testid="changed-files-view" />,
 }));
+vi.mock('../issue-view/IssueChecksPanel', () => ({
+  IssueChecksPanel: () => <div data-testid="issue-checks-panel" />,
+}));
+vi.mock('../Stage/cockpit/HappenedFeed', () => ({ default: () => null }));
+vi.mock('../CommandDeck/ZoneCOverviewTabs/ActivityTab', () => ({ ActivityTab: () => <div /> }));
+vi.mock('../CommandDeck/ZoneCOverviewTabs/DiscussionsTab', () => ({ DiscussionsTab: () => <div /> }));
+vi.mock('../deft/DeftDecisionsTab', () => ({ DeftDecisionsTab: () => <div data-testid="deft-decisions" /> }));
+vi.mock('../deft/DeftScopeView', () => ({ DeftScopeView: () => null }));
+vi.mock('../deft/DeftScopeDag', () => ({ DeftScopeDag: () => null }));
+vi.mock('../PrdViewer', () => ({ PrdBody: () => <div /> }));
+vi.mock('../deft/queries', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../deft/queries')>()),
+  useDeftIssueSummary: () => ({ isDeft: true, summary: null, isLoading: false }),
+}));
 
 const OLD_ISSUE_DETAIL_TABS = [
   'overview',
@@ -67,11 +82,19 @@ const DESTINATION_TEST_IDS: Record<(typeof OLD_ISSUE_DETAIL_TABS)[number], strin
   artifacts: 'drawer-tab-panel-artifacts',
 };
 
-// PAN-5244: tabs added after the PAN-2908 audit, with their destinations.
-const NEW_ISSUE_DETAIL_TABS = ['skills'] as const;
+// PAN-5244/PAN-5253: tabs added after the PAN-2908 audit, with their destinations.
+const NEW_ISSUE_DETAIL_TABS = ['skills', 'checks', 'prd', 'history', 'discussion', 'decisions', 'changes', 'code', 'timeline'] as const;
 
 const NEW_DESTINATION_TEST_IDS: Record<(typeof NEW_ISSUE_DETAIL_TABS)[number], string> = {
   skills: 'drawer-tab-panel-skills',
+  checks: 'issue-checks-panel',
+  prd: 'issue-plan-prd',
+  history: 'issue-activity-history',
+  discussion: 'issue-tab-discussion',
+  decisions: 'deft-decisions',
+  changes: 'drawer-tab-panel-files',
+  code: 'issue-checks-panel',
+  timeline: 'drawer-tab-panel-activity',
 };
 
 const SELECTED_ENTRY: Record<(typeof OLD_ISSUE_DETAIL_TABS)[number], string> = {
@@ -118,7 +141,7 @@ describe('issue session tab no-loss audit', () => {
     renderLegacyTab(newTab);
 
     expect(screen.getByTestId(NEW_DESTINATION_TEST_IDS[newTab])).toBeInTheDocument();
-    expect(screen.getByTestId(`drawer-tab-${newTab}`)).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId(`drawer-tab-${resolveIssueTab(newTab)!.entry}`)).toHaveAttribute('aria-selected', 'true');
   });
 
   it('keeps every non-session section as a literal tab entry', () => {
