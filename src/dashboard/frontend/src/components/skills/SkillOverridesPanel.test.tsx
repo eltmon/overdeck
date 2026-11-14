@@ -28,13 +28,18 @@ const GRILLING = skill({ name: 'grilling', description: 'Grill the plan' });
 let putBodies: unknown[];
 let fetchImpl: ReturnType<typeof vi.fn>;
 
-function mockApi(getBody: unknown, putResponse: { ok?: boolean; status?: number; body?: unknown } = {}) {
+type PutResponse = { ok?: boolean; status?: number; body?: unknown };
+
+/** One response answers every PUT; an array answers PUTs in order, the last entry repeating. */
+function mockApi(getBody: unknown, putResponse: PutResponse | PutResponse[] = {}) {
   putBodies = [];
+  const responses = Array.isArray(putResponse) ? putResponse : [putResponse];
   fetchImpl = vi.fn(async (url: string, init?: RequestInit) => {
     if (init?.method === 'PUT') {
+      const response = responses[Math.min(putBodies.length, responses.length - 1)] ?? {};
       putBodies.push(JSON.parse(String(init.body)));
-      const ok = putResponse.ok ?? true;
-      return { ok, status: putResponse.status ?? (ok ? 200 : 500), json: async () => putResponse.body ?? { ok: true } };
+      const ok = response.ok ?? true;
+      return { ok, status: response.status ?? (ok ? 200 : 500), json: async () => response.body ?? { ok: true } };
     }
     return { ok: true, status: 200, json: async () => getBody, url };
   });
