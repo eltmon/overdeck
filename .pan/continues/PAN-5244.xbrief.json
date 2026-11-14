@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5244",
   "created": "2026-11-14T05:28:55.884Z",
-  "updated": "2026-11-14T05:33:34.122Z",
+  "updated": "2026-11-14T05:39:40.406Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,18 @@
       "doneAt": "2026-11-14T05:32:49.192Z"
     },
     "drawer-escape-guard": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5244",
-      "claimedAt": "2026-11-14T05:33:34.122Z"
+      "claimedAt": "2026-11-14T05:33:34.122Z",
+      "doneAt": "2026-11-14T05:39:40.405Z"
+    },
+    "drawer-escape-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:39:40.405Z"
+    },
+    "drawer-escape-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:39:40.405Z"
     }
   }
 }
