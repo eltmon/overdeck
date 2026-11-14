@@ -23,9 +23,13 @@ export function openConversationTab(
   store.ensureHome(projectKey);
   const panes = store.panesByWorkspace[projectKey] ?? [];
   const existing = panes.find((p) => p.paneType === 'agent' && p.conversationId === name);
-  const paneId = existing ? existing.paneId : store.addPane(projectKey, { paneType: 'agent', label, conversationId: name, ...(viewMode ? { viewMode } : {}) });
-  if (existing && viewMode) {
-    usePanesStore.getState().updatePane(projectKey, paneId, { viewMode });
+  // A message target means "show me the conversation" — an existing pane left
+  // in Terminal view from an earlier session must not swallow the jump
+  // (PAN-5239 review). An explicit viewMode request still wins.
+  const effectiveViewMode = viewMode ?? (target ? 'conversation' : undefined);
+  const paneId = existing ? existing.paneId : store.addPane(projectKey, { paneType: 'agent', label, conversationId: name, ...(effectiveViewMode ? { viewMode: effectiveViewMode } : {}) });
+  if (existing && effectiveViewMode) {
+    usePanesStore.getState().updatePane(projectKey, paneId, { viewMode: effectiveViewMode });
   }
   store.setActivePane(projectKey, paneId);
   if (target) {

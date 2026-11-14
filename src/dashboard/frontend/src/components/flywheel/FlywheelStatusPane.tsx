@@ -154,7 +154,7 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
               <ul>
                 {needsYouRows(tick).map((row) => (
                   <li key={row.key} data-testid="flywheel-needs-you-item" className="flex items-baseline gap-1.5">
-                    {row.messageId && (
+                    {row.messageId ? (
                       <button
                         type="button"
                         aria-label="Show where this was raised"
@@ -165,6 +165,9 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
                       >
                         <MessageSquare className="h-3 w-3" aria-hidden="true" />
                       </button>
+                    ) : (
+                      // Keeps rows without a jump button in the same text column (PAN-5239 review).
+                      <span className="h-3 w-3 shrink-0" aria-hidden="true" />
                     )}
                     <span className="min-w-0">
                       {row.target ? (
