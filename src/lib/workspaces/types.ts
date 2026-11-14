@@ -6,6 +6,8 @@
 
 export type WorkspaceKind = 'main' | 'issue' | 'scratch';
 
+export type WorkspaceOrigin = 'operator' | 'pipeline' | 'vault' | 'agent';
+
 export type PinScope = 'workspace' | 'project';
 
 export interface ProjectRow {
@@ -21,6 +23,8 @@ export interface WorkspaceRow {
   id: string;
   projectId: string;
   kind: WorkspaceKind;
+  /** Who caused the row to exist (PAN-5233). Issue rows are always `pipeline`, main rows always `operator`. */
+  origin: WorkspaceOrigin;
   name: string;
   path: string;
   branchName: string | null;

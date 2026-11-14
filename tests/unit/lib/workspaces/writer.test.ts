@@ -15,6 +15,7 @@ import {
   upsertProjectFromConfig,
 } from '../../../../src/lib/workspaces/writer.js';
 import { getMainWorkspace, getWorkspaceById, listPinnedDocs, listProjectTargets, listWorkspaces } from '../../../../src/lib/workspaces/resolver.js';
+import { readWorkspaceIdentity, resolveWorkspaceIdentityPath } from '../../../../src/lib/memory/identity-record.js';
 
 let odb: OverdeckTestDb;
 
@@ -63,6 +64,62 @@ describe('workspaces writer', () => {
     await createWorkspace({ projectId, kind: 'issue', name: 'pan-1', path: '/repo/workspaces/feature-pan-1', issueId: 'pan-1' });
 
     expect(listWorkspaces({ projectId })).toHaveLength(3);
+  });
+
+  it('createWorkspace resolves origin by kind regardless of the caller-requested value (PAN-5233)', async () => {
+    const projectId = seedProject();
+
+    const issueId = await createWorkspace({
+      projectId,
+      kind: 'issue',
+      origin: 'operator',
+      name: 'pan-1',
+      path: '/repo/workspaces/feature-pan-1',
+      issueId: 'pan-1',
+    });
+    expect(getWorkspaceById(issueId)?.origin).toBe('pipeline');
+
+    const mainId = await createWorkspace({
+      projectId,
+      kind: 'main',
+      origin: 'agent',
+      name: 'main',
+      path: '/repo/overdeck',
+    });
+    expect(getWorkspaceById(mainId)?.origin).toBe('operator');
+
+    const scratchDefaultId = await createWorkspace({
+      projectId,
+      kind: 'scratch',
+      name: 'scratch-default',
+      path: '/repo/overdeck-scratch-default',
+    });
+    expect(getWorkspaceById(scratchDefaultId)?.origin).toBe('operator');
+
+    const scratchVaultId = await createWorkspace({
+      projectId,
+      kind: 'scratch',
+      origin: 'vault',
+      name: 'vault-abcd1234',
+      path: '/repo/overdeck-scratch-vault',
+    });
+    expect(getWorkspaceById(scratchVaultId)?.origin).toBe('vault');
+  });
+
+  it('archiveWorkspace carries origin into the identity mirror (PAN-5233)', async () => {
+    const projectId = seedProject();
+    const id = await createWorkspace({
+      projectId,
+      kind: 'scratch',
+      origin: 'agent',
+      name: 'agent-made',
+      path: '/repo/overdeck-agent-made',
+    });
+
+    await archiveWorkspace(id);
+
+    const record = await readWorkspaceIdentity(resolveWorkspaceIdentityPath(projectId, id));
+    expect(record?.origin).toBe('agent');
   });
 
   it('touchWorkspaceAccessed, updateWorkspaceLayout, setWorkspaceFavorite, archive/unarchive round-trip', async () => {

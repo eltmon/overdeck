@@ -175,6 +175,28 @@ describe('rebuildMainAndScratchWorkspaces (PAN-1990)', () => {
     expect(odb.raw().prepare('SELECT COUNT(*) as c FROM workspaces').get()).toEqual({ c: 1 });
   });
 
+  it('recreates a scratch row with its origin preserved (ac4, PAN-5233)', async () => {
+    const id = await createWorkspace({
+      projectId: 'overdeck', kind: 'scratch', origin: 'vault', name: 'vault-abcd1234', path: join(projectRoot, 'vault-abcd1234'),
+    });
+    odb.raw().prepare('DELETE FROM workspaces WHERE id = ?').run(id);
+
+    await rebuildMainAndScratchWorkspaces();
+
+    expect(getWorkspaceById(id)?.origin).toBe('vault');
+  });
+
+  it('recreates a scratch row with no recorded origin as operator (PAN-5233)', async () => {
+    const id = await createWorkspace({
+      projectId: 'overdeck', kind: 'scratch', name: 'scratch-no-origin', path: join(projectRoot, 'scratch-no-origin'),
+    });
+    odb.raw().prepare('DELETE FROM workspaces WHERE id = ?').run(id);
+
+    await rebuildMainAndScratchWorkspaces();
+
+    expect(getWorkspaceById(id)?.origin).toBe('operator');
+  });
+
   it('does not touch issue-kind identity records (backfillIssueWorkspaces owns those)', async () => {
     const id = await createWorkspace({
       projectId: 'overdeck', kind: 'issue', name: 'feature-pan-1', path: join(projectRoot, 'workspaces', 'feature-pan-1'), issueId: 'PAN-1',

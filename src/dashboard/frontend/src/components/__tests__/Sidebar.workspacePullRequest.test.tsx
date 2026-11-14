@@ -19,6 +19,7 @@ interface WorkspaceFixture {
   id: string;
   projectId: string;
   kind: 'main' | 'issue' | 'scratch';
+  origin: 'operator' | 'pipeline' | 'vault' | 'agent';
   name: string;
   issueId: string | null;
   isFavorite: boolean;
@@ -28,9 +29,11 @@ interface WorkspaceFixture {
 }
 
 function ws(overrides: Partial<WorkspaceFixture> & { id: string }): WorkspaceFixture {
+  const kind = overrides.kind ?? 'scratch';
   return {
     projectId: 'overdeck',
-    kind: 'scratch',
+    kind,
+    origin: kind === 'issue' ? 'pipeline' : 'operator',
     name: overrides.id,
     issueId: null,
     isFavorite: false,

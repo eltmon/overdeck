@@ -154,6 +154,7 @@ export interface WorkspaceRegistryRow {
   id: string;
   projectId: string;
   kind: 'main' | 'issue' | 'scratch';
+  origin: 'operator' | 'pipeline' | 'vault' | 'agent';
   name: string;
   issueId: string | null;
   isFavorite: boolean;
@@ -177,23 +178,14 @@ const WORKSPACE_KIND_ICONS: Record<WorkspaceRegistryRow['kind'], LucideIcon> = {
 };
 
 const WORKSPACES_GROUPED_KEY = 'overdeck.ui.sidebarWorkspacesGrouped';
-/**
- * Shared by the sidebar rail and the Cmd-K workspaces scope so expanding
- * pipeline worktrees in either place reveals them in both — one operator intent,
- * not two drifting toggles (PAN-3286 FR-13).
- */
-export const WORKSPACES_PIPELINE_EXPANDED_KEY = 'overdeck.ui.sidebarWorkspacesPipelineExpanded';
 
 /**
- * A workspace the operator actually created, versus a worktree the pipeline
- * created for an issue. Boot seeding enrolls every `workspaces/feature-*`
- * worktree as a `kind='issue'` row, so a fresh install would otherwise list
- * dozens of them; they collapse behind a count row unless favorited
- * (PAN-3286 FR-13, D-13). The API still returns every kind — this is
- * presentation only.
+ * A workspace the operator created, or one they favorited (PAN-5233). Rows
+ * the pipeline, Session Vault or an agent created stay out of the rail and
+ * Cmd-K; the API still returns them.
  */
 export function isUserFacingWorkspace(workspace: WorkspaceRegistryRow): boolean {
-  return workspace.kind !== 'issue' || workspace.isFavorite;
+  return workspace.origin === 'operator' || workspace.isFavorite;
 }
 
 /**
@@ -299,16 +291,6 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
     });
   }, []);
   const [workspacesArchivedExpanded, setWorkspacesArchivedExpanded] = useState(false);
-  const [workspacesPipelineExpanded, setWorkspacesPipelineExpanded] = useState(
-    () => localStorage.getItem(WORKSPACES_PIPELINE_EXPANDED_KEY) === 'true',
-  );
-  const toggleWorkspacesPipelineExpanded = useCallback(() => {
-    setWorkspacesPipelineExpanded((prev) => {
-      const next = !prev;
-      try { localStorage.setItem(WORKSPACES_PIPELINE_EXPANDED_KEY, String(next)); } catch { /* ignore */ }
-      return next;
-    });
-  }, []);
 
   const projectNameByKey = useMemo(() => {
     const map = new Map<string, string>();
@@ -319,14 +301,9 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
   const activeWorkspaces = useMemo(() => sortWorkspaces(workspaces.filter((w) => !w.isArchived)), [workspaces]);
   const archivedWorkspaceCount = useMemo(() => workspaces.filter((w) => w.isArchived).length, [workspaces]);
   const archivedWorkspaces = useMemo(() => sortWorkspaces(workspaces.filter((w) => w.isArchived)), [workspaces]);
-  // The rail lists workspaces the operator created; pipeline worktrees collapse
-  // behind a count row (PAN-3286 FR-13), and main checkouts show only when
-  // favorited.
+  // The rail lists workspaces the operator created or favorited (PAN-5233);
+  // main checkouts show only when favorited.
   const visibleWorkspaces = useMemo(() => activeWorkspaces.filter(isRailWorkspace), [activeWorkspaces]);
-  const pipelineWorkspaces = useMemo(
-    () => activeWorkspaces.filter((w) => !isUserFacingWorkspace(w)),
-    [activeWorkspaces],
-  );
 
   const groupedWorkspaces = useMemo(() => {
     const groups = new Map<string, WorkspaceRegistryRow[]>();
@@ -633,24 +610,6 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                 ))
               ) : (
                 visibleWorkspaces.map(renderWorkspaceRow)
-              )}
-              {/* PAN-3286 FR-13: pipeline worktrees, collapsed by default — same
-                  count-row pattern as Archived below. */}
-              {pipelineWorkspaces.length > 0 && (
-                <div>
-                  <button
-                    data-testid="sidebar-workspaces-pipeline-toggle"
-                    onClick={toggleWorkspacesPipelineExpanded}
-                    aria-expanded={workspacesPipelineExpanded}
-                    title="Worktrees the pipeline created for issues"
-                    className="w-full flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {workspacesPipelineExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                    <span>{pipelineWorkspaces.length === 1 ? 'Pipeline worktree' : 'Pipeline worktrees'}</span>
-                    <span className="ml-auto text-[11px] text-muted-foreground">{pipelineWorkspaces.length}</span>
-                  </button>
-                  {workspacesPipelineExpanded && pipelineWorkspaces.map(renderWorkspaceRow)}
-                </div>
               )}
               {archivedWorkspaceCount > 0 && (
                 <div>

@@ -10,13 +10,15 @@
 import { readFile, rename, writeFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { randomUUID } from 'crypto';
-import type { WorkspaceKind } from '../workspaces/types.js';
+import type { WorkspaceKind, WorkspaceOrigin } from '../workspaces/types.js';
 import { ensureParentDir, resolveWorkspaceMemoryRoot } from './paths.js';
 
 export interface WorkspaceIdentitySource {
   id: string;
   projectId: string;
   kind: WorkspaceKind;
+  /** Who caused the row to exist (PAN-5233). Optional so records written before PAN-5233 still parse. */
+  origin?: WorkspaceOrigin;
   name: string;
   path: string;
   branchName: string | null;
@@ -48,6 +50,7 @@ export async function writeWorkspaceIdentity(row: WorkspaceIdentitySource): Prom
     parentBranch: row.parentBranch,
     issueId: row.issueId,
     createdAt: row.createdAt,
+    ...(row.origin ? { origin: row.origin } : {}),
   };
 
   const tempPath = join(dirname(path), `.${randomUUID()}.tmp`);

@@ -8,6 +8,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../helpers/overdeck-test-db.js';
+import { closeOverdeckDatabase } from '../../../../src/lib/overdeck/infra.js';
 
 let odb: OverdeckTestDb;
 
@@ -80,5 +81,55 @@ describe('workspace tables top-up (PAN-1990)', () => {
       WHERE type = 'table' AND name IN ('projects', 'workspaces', 'project_targets', 'pinned_docs')
     `).get() as { c: number };
     expect(tables.c).toBe(4);
+  });
+
+  it('adds an origin column to workspaces (PAN-5233)', () => {
+    const db = odb.raw();
+    const columns = db.prepare('PRAGMA table_info(workspaces)').all() as Array<{ name: string }>;
+    expect(columns.map((c) => c.name)).toContain('origin');
+  });
+
+  it('backfills origin for existing NULL-origin rows on reopen (PAN-5233)', () => {
+    const db = odb.raw();
+    db.prepare(`
+      INSERT INTO projects (id, name, primary_path, created_at, last_accessed_at)
+      VALUES ('proj-1', 'overdeck', '/repo/overdeck', 1, 1)
+    `).run();
+
+    const rows: Array<[string, string, string]> = [
+      ['ws-issue', 'issue', 'feature-pan-1'],
+      ['ws-main', 'main', 'main'],
+      ['ws-vault-1', 'scratch', 'vault-0978a29e'],
+      ['ws-vault-2', 'scratch', 'vault-0978a29e-2'],
+      ['ws-scratch-smoke', 'scratch', 'qwen-smoke'],
+      ['ws-scratch-notahex', 'scratch', 'vault-notahex1'],
+    ];
+    for (const [id, kind, name] of rows) {
+      db.prepare(`
+        INSERT INTO workspaces (id, project_id, kind, name, path, created_at, last_accessed_at)
+        VALUES (?, 'proj-1', ?, ?, '/repo/' || ?, 1, 1)
+      `).run(id, kind, name, name);
+    }
+
+    // Force the schema top-up to re-run, the way every real process does on
+    // its first open of an existing db.
+    closeOverdeckDatabase();
+    const reopened = odb.raw();
+
+    const origins = reopened.prepare(`
+      SELECT id, origin FROM workspaces WHERE id IN (?, ?, ?, ?, ?, ?)
+    `).all('ws-issue', 'ws-main', 'ws-vault-1', 'ws-vault-2', 'ws-scratch-smoke', 'ws-scratch-notahex') as Array<{ id: string; origin: string }>;
+    const byId = Object.fromEntries(origins.map((row) => [row.id, row.origin]));
+    expect(byId).toEqual({
+      'ws-issue': 'pipeline',
+      'ws-main': 'operator',
+      'ws-vault-1': 'vault',
+      'ws-vault-2': 'vault',
+      'ws-scratch-smoke': 'operator',
+      'ws-scratch-notahex': 'operator',
+    });
+
+    const nullCount = reopened.prepare('SELECT count(*) as c FROM workspaces WHERE origin IS NULL').get() as { c: number };
+    expect(nullCount.c).toBe(0);
   });
 });

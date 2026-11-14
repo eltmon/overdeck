@@ -37,6 +37,7 @@ import { listProjectsAsync, type ProjectConfig } from '../projects.js';
 import { getDefaultWorkspaceConfig } from '../workspace-config.js';
 import { validateFeatureName } from '../workspace-manager/worktree-ops.js';
 import { listProjectTargets, resolveWorkspaceForCwd } from './resolver.js';
+import type { WorkspaceOrigin } from './types.js';
 import { createWorkspace, upsertProjectFromConfig } from './writer.js';
 
 const execFileAsync = promisify(execFile);
@@ -414,7 +415,15 @@ export async function resolveWorkspaceCreateIntent(input: WorkspaceCreateInput):
  * before the project row is seeded, so a failed `git worktree add` leaves no
  * trace in the registry.
  */
-export async function performWorkspaceCreate(intent: ResolvedWorkspaceIntent): Promise<{ id: string }> {
+export interface PerformWorkspaceCreateOptions {
+  /** Who asked for the workspace (PAN-5233). Only scratch rows use it; see writer.resolveWorkspaceOrigin. */
+  origin?: WorkspaceOrigin;
+}
+
+export async function performWorkspaceCreate(
+  intent: ResolvedWorkspaceIntent,
+  options: PerformWorkspaceCreateOptions = {},
+): Promise<{ id: string }> {
   if (intent.findings.length > 0) throw new Error(intent.findings[0].message);
   if (!intent.projectId || !intent.path) {
     throw new Error(`Workspace intent did not resolve to a project and path.`);
@@ -459,6 +468,7 @@ export async function performWorkspaceCreate(intent: ResolvedWorkspaceIntent): P
     parentBranch: intent.parentBranch ?? undefined,
     parentBranchGuessed: intent.parentBranchGuessed,
     isGitRepository: intent.isGitRepository,
+    origin: options.origin,
   });
   return { id };
 }
