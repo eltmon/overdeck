@@ -681,6 +681,7 @@ CREATE TABLE `workspaces` (
 	`id` text PRIMARY KEY NOT NULL,
 	`project_id` text NOT NULL,
 	`kind` text NOT NULL,
+	`origin` text,
 	`name` text NOT NULL,
 	`path` text NOT NULL,
 	`branch_name` text,

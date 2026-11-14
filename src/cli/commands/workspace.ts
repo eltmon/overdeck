@@ -83,6 +83,7 @@ export function registerWorkspaceCommands(program: Command): void {
     .option('--isolated', 'Create an isolated git worktree instead of sharing the project directory')
     .option('--parent-branch <branch>', 'Parent branch for the isolated worktree (default: inferred from the project\'s current branch)')
     .option('--target-path <dir>', 'Target an existing directory as the workspace path (rejects --isolated)')
+    .option('--origin <origin>', 'Who the workspace is for: operator (listed in the sidebar) or agent (hidden). Default: agent inside an Overdeck agent or conversation, else operator. Pass --origin operator when the operator asked for the workspace.')
     .option('--dry-run', 'Print the resolved intent as JSON and create nothing')
     .action(workspaceNewCommand);
 

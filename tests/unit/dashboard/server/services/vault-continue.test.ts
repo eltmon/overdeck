@@ -169,6 +169,9 @@ describe('continueHere (PAN-4437 WI-4)', () => {
     const ws = `${CWD}/workspaces/scratch-vault-abcdef12-2`;
     expect(result).toMatchObject({ status: 200, body: { workspacePath: ws, conversation: { cwd: ws } } });
     expect(h.log).toEqual(['queue:continue', 'workspace:vault-abcdef12-2', `apply:${ws}`, 'adopt', 'row', 'remove-browse-row']);
+    // PAN-5233 FR-3: the only create call (the retry after path-exists) stamps origin 'vault'.
+    expect(h.mocks.performWorkspaceCreate).toHaveBeenCalledTimes(1);
+    expect(h.mocks.performWorkspaceCreate).toHaveBeenCalledWith(expect.anything(), { origin: 'vault' });
   });
 
   it('ac: a dirty unregistered checkout returns dirty-unregistered before adoption', async () => {

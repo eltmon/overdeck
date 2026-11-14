@@ -26,7 +26,7 @@ model.
 ## Commands
 
 ```bash
-pan workspace new <name> [--project <key>] [--isolated] [--parent-branch <branch>] [--target-path <dir>] [--dry-run]
+pan workspace new <name> [--project <key>] [--isolated] [--parent-branch <branch>] [--target-path <dir>] [--origin operator|agent] [--dry-run]
 pan workspace main [--project <key>]
 pan workspace get <ws>
 pan workspace activate <ws>
@@ -49,6 +49,8 @@ pan workspace list [--kind <main|issue|scratch>] [--archived] [--json] [--all]
   resolved directory isn't the project's primary path or a path registered via
   `pan project add-target`, the command still creates the row but prints an
   informational note suggesting `pan project add-target`.
+- Pass `--origin operator` when the operator asked you to create the
+  workspace; otherwise it is stamped `agent` and stays out of the sidebar.
 - `--dry-run` prints the resolved intent (`projectId`, `kind`, `name`, `path`,
   `branchName`, `parentBranch`, `parentBranchGuessed`, `isGitRepository`,
   `wouldCreateWorktree`) as JSON and returns before any worktree is created or

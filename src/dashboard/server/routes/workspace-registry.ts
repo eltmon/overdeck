@@ -13,7 +13,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
-import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
+import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest, resolveRequestCredential, type DashboardCredential } from './dashboard-auth.js';
 import { getProjectByKey, getWorkspaceById, listProjects, listProjectTargets, listWorkspaces } from '../../../lib/workspaces/resolver.js';
 import {
   archiveWorkspace,
@@ -210,6 +210,27 @@ function toCreateInput(body: Record<string, unknown>): WorkspaceCreateInput {
   };
 }
 
+/**
+ * PAN-5233 D-3: derive a create's origin from the request credential, never
+ * from the body — an operator-presence proxy, not a client-asserted claim.
+ */
+export function workspaceOriginForCredential(credential: DashboardCredential | null): 'operator' | 'agent' {
+  if (credential === null) return 'operator';
+  switch (credential.kind) {
+    case 'root-session':
+    case 'device':
+    case 'phone':
+      return 'operator';
+    case 'token':
+      return credential.agentId ? 'agent' : 'operator';
+    case 'machine':
+      return credential.actor === 'operator' ? 'operator' : 'agent';
+    case 'internal-token':
+    case 'connector':
+      return 'agent';
+  }
+}
+
 // ─── GET /api/workspace-registry/project-targets ────────────────────────────
 // Registered BEFORE the `/:id` detail route: `project-targets` is a literal
 // that would otherwise be captured as an id.
@@ -277,8 +298,9 @@ const postWorkspaceRegistryCreateRoute = HttpRouter.add(
     // A create can still be refused past validation — the main-singleton check
     // and `git worktree add` both throw. Surface the message as a conflict
     // rather than letting it escape as an opaque 500.
+    const origin = workspaceOriginForCredential(resolveRequestCredential(request));
     const created = yield* Effect.promise(() =>
-      performWorkspaceCreate(intent)
+      performWorkspaceCreate(intent, { origin })
         .then((result) => ({ ok: true as const, ...result }))
         .catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) })));
     if (!created.ok) return jsonResponse({ error: created.error }, { status: 409 });

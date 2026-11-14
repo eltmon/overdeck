@@ -17,7 +17,7 @@ import { join, resolve as resolvePath } from 'node:path';
 import { getOverdeckDatabase } from '../overdeck/infra.js';
 import { writeWorkspaceIdentity } from '../memory/identity-record.js';
 import type { ProjectConfig } from '../projects.js';
-import type { PinScope, WorkspaceKind } from './types.js';
+import type { PinScope, WorkspaceKind, WorkspaceOrigin } from './types.js';
 import { getMainWorkspace, getProjectByKey, getWorkspaceById } from './resolver.js';
 
 // ─── Projects ──────────────────────────────────────────────────────────────
@@ -66,10 +66,19 @@ export interface CreateWorkspaceOptions {
   isGitRepository?: boolean;
   issueId?: string | null;
   title?: string | null;
+  /** Who caused the row (PAN-5233). Ignored for issue (always pipeline) and main (always operator). */
+  origin?: WorkspaceOrigin;
   /** Preserve a specific id (rebuild only — otherwise a fresh UUID is generated). */
   id?: string;
   /** Preserve the original creation time (rebuild only — otherwise now is used). */
   createdAt?: number;
+}
+
+/** PAN-5233 D-1: issue rows are the pipeline's, main rows the operator's; scratch rows take the caller's origin. */
+export function resolveWorkspaceOrigin(kind: WorkspaceKind, requested: WorkspaceOrigin | undefined): WorkspaceOrigin {
+  if (kind === 'issue') return 'pipeline';
+  if (kind === 'main') return 'operator';
+  return requested ?? 'operator';
 }
 
 /** Create a workspace row. Generates a fresh UUID and enforces main-singleton per project. */
@@ -80,16 +89,18 @@ export async function createWorkspace(opts: CreateWorkspaceOptions): Promise<str
   }
   const id = opts.id ?? randomUUID();
   const now = opts.createdAt ?? Date.now();
+  const origin = resolveWorkspaceOrigin(opts.kind, opts.origin);
   db.prepare(`
     INSERT INTO workspaces (
-      id, project_id, kind, name, path, branch_name, parent_branch, parent_branch_guessed,
+      id, project_id, kind, origin, name, path, branch_name, parent_branch, parent_branch_guessed,
       is_git_repository, issue_id, layout_config, is_favorite, is_archived, title,
       created_at, last_accessed_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, ?, ?, ?)
   `).run(
     id,
     opts.projectId,
     opts.kind,
+    origin,
     opts.name,
     opts.path,
     opts.branchName ?? null,
@@ -105,6 +116,7 @@ export async function createWorkspace(opts: CreateWorkspaceOptions): Promise<str
     id,
     projectId: opts.projectId,
     kind: opts.kind,
+    origin,
     name: opts.name,
     path: opts.path,
     branchName: opts.branchName ?? null,
@@ -140,6 +152,7 @@ export async function archiveWorkspace(id: string): Promise<void> {
       id: workspace.id,
       projectId: workspace.projectId,
       kind: workspace.kind,
+      origin: workspace.origin,
       name: workspace.name,
       path: workspace.path,
       branchName: workspace.branchName,
@@ -196,6 +209,7 @@ export async function relocateWorkspace(id: string, path: string, options: Reloc
     id: workspace.id,
     projectId: workspace.projectId,
     kind: workspace.kind,
+    origin: workspace.origin,
     name: workspace.name,
     path: resolvedPath,
     branchName: workspace.branchName,

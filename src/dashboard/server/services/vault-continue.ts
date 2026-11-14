@@ -230,7 +230,7 @@ async function createScratchWorkspace(record: SessionRecord, projectKey: string,
       continue;
     }
     if (finding) throw new Error(finding.message);
-    await deps.performWorkspaceCreate(intent);
+    await deps.performWorkspaceCreate(intent, { origin: 'vault' });
     if (!intent.path) throw new Error('Workspace intent did not resolve to a path.');
     return intent.path;
   }

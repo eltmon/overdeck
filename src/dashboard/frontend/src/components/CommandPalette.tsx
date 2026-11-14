@@ -46,7 +46,6 @@ import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
 import {
   isUserFacingWorkspace,
   sortWorkspaces,
-  WORKSPACES_PIPELINE_EXPANDED_KEY,
   type WorkspaceRegistryRow,
 } from './Sidebar';
 import type { Issue, Agent } from '../types';
@@ -349,11 +348,6 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
 
   const [panCommands, setPanCommands] = useState<PanCommandEntry[]>([]);
   const [workspaceRows, setWorkspaceRows] = useState<WorkspaceRegistryRow[]>([]);
-  // Shares the sidebar rail's persisted flag (PAN-3286 FR-13); re-read on open
-  // so expanding in the rail is reflected here without a reload.
-  const [pipelineWorkspacesExpanded, setPipelineWorkspacesExpanded] = useState(
-    () => localStorage.getItem(WORKSPACES_PIPELINE_EXPANDED_KEY) === 'true',
-  );
   const [searchResults, setSearchResults] = useState<PaletteSearchResponse>(EMPTY_SEARCH);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
@@ -378,8 +372,6 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     setSearchResults(EMPTY_SEARCH);
     setSearchError(null);
     setScope(initialScope);
-    // Re-read the shared expansion flag so a rail toggle is picked up here.
-    setPipelineWorkspacesExpanded(localStorage.getItem(WORKSPACES_PIPELINE_EXPANDED_KEY) === 'true');
     if (panCommands.length === 0) {
       void fetchPanCommands().then(setPanCommands);
     }
@@ -613,21 +605,12 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
 
   // ─── Dynamic: workspaces (PAN-1990) ─────────────────────────────────────────
   // Favorites first, then most-recent-first (same ordering as the Sidebar rail).
-  // PAN-3286 FR-13: and the same default filter — non-favorited pipeline
-  // worktrees collapse behind a count row that expands them, mirroring the rail
-  // rather than hiding them outright (review fix). Expansion shares the rail's
-  // localStorage key, so it is one operator preference across both surfaces.
-
-  const hiddenPipelineWorkspaces = useMemo(
-    () => sortWorkspaces(workspaceRows.filter((ws) => !isUserFacingWorkspace(ws))),
-    [workspaceRows],
-  );
+  // PAN-5233: only operator-made or favorited rows are listed — rows the
+  // pipeline, Session Vault or an agent created stay out of Cmd-K entirely.
 
   const visibleWorkspaceRows = useMemo(
-    () => sortWorkspaces(
-      pipelineWorkspacesExpanded ? workspaceRows : workspaceRows.filter(isUserFacingWorkspace),
-    ),
-    [workspaceRows, pipelineWorkspacesExpanded],
+    () => sortWorkspaces(workspaceRows.filter(isUserFacingWorkspace)),
+    [workspaceRows],
   );
 
   // PAN-3331 FR-8: start the most recently used workspace's run command without
@@ -699,33 +682,8 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
       });
     }
 
-    if (!pipelineWorkspacesExpanded && hiddenPipelineWorkspaces.length > 0) {
-      actions.push({
-        id: 'workspace-pipeline-expand',
-        label: `${hiddenPipelineWorkspaces.length} pipeline ${hiddenPipelineWorkspaces.length === 1 ? 'worktree' : 'worktrees'}`,
-        description: 'Show worktrees Overdeck created for issues',
-        icon: ChevronRight,
-        group: 'Workspaces',
-        // The hidden rows' own names are keywords, so typing one surfaces this
-        // row — otherwise a hidden workspace would be undiscoverable by search.
-        keywords: [
-          'pipeline',
-          'worktrees',
-          'issue workspaces',
-          ...hiddenPipelineWorkspaces.flatMap((ws) => [ws.name, ws.issueId ?? '']),
-        ].filter(Boolean),
-        onSelect: () => {
-          setPipelineWorkspacesExpanded(true);
-          try { localStorage.setItem(WORKSPACES_PIPELINE_EXPANDED_KEY, 'true'); } catch { /* ignore */ }
-        },
-        // Expanding is not a navigation — keep the palette open so the revealed
-        // rows can be picked immediately.
-        keepOpen: true,
-      });
-    }
-
     return actions;
-  }, [visibleWorkspaceRows, hiddenPipelineWorkspaces, pipelineWorkspacesExpanded, onSelectWorkspace, runTargetWorkspace, runWorkspaceCommand, scope]);
+  }, [visibleWorkspaceRows, onSelectWorkspace, runTargetWorkspace, runWorkspaceCommand, scope]);
 
   // ─── Dynamic: pan commands ────────────────────────────────────────────────
 

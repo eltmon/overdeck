@@ -1,8 +1,9 @@
 /**
- * PAN-3286 WI-11 (FR-13, D-13): the WORKSPACES rail lists workspaces the
- * operator created and collapses pipeline worktrees (non-favorited
- * `kind='issue'` rows) behind an expandable count row, with the expanded state
- * persisted in localStorage. The Cmd-K workspaces scope applies the same filter.
+ * PAN-5233 (FR-8, FR-9): the WORKSPACES rail and the Cmd-K workspaces scope
+ * list only workspaces the operator created or favorited — rows the
+ * pipeline, Session Vault or an agent created stay out of both surfaces
+ * entirely. The "Pipeline worktrees" count row is gone; issues are reached
+ * through Projects, the Issues scope and the pipeline views instead.
  */
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -19,13 +20,13 @@ vi.mock('../hooks/useTheme', () => ({
   useTheme: () => ({ theme: 'dark', toggleTheme: vi.fn() }),
 }));
 
-const PIPELINE_EXPANDED_KEY = 'overdeck.ui.sidebarWorkspacesPipelineExpanded';
-
 function workspaceRow(overrides: Partial<WorkspaceRegistryRow> = {}): WorkspaceRegistryRow {
+  const kind = overrides.kind ?? 'issue';
   return {
     id: overrides.id ?? 'ws-1',
     projectId: overrides.projectId ?? 'overdeck',
-    kind: overrides.kind ?? 'issue',
+    kind,
+    origin: overrides.origin ?? (kind === 'issue' ? 'pipeline' : 'operator'),
     name: overrides.name ?? 'feature-pan-1',
     issueId: overrides.issueId ?? 'PAN-1',
     isFavorite: overrides.isFavorite ?? false,
@@ -37,12 +38,12 @@ function workspaceRow(overrides: Partial<WorkspaceRegistryRow> = {}): WorkspaceR
 }
 
 const REGISTRY: WorkspaceRegistryRow[] = [
-  workspaceRow({ id: 'ws-main', kind: 'main', name: 'main', issueId: null, lastAccessedAt: 50 }),
-  workspaceRow({ id: 'ws-scratch', kind: 'scratch', name: 'scratch-lens', issueId: null, lastAccessedAt: 40 }),
-  workspaceRow({ id: 'ws-fav', kind: 'issue', name: 'feature-pan-fav', issueId: 'PAN-FAV', isFavorite: true, lastAccessedAt: 30 }),
-  workspaceRow({ id: 'ws-p1', kind: 'issue', name: 'feature-pan-1001', issueId: 'PAN-1001', lastAccessedAt: 20 }),
-  workspaceRow({ id: 'ws-p2', kind: 'issue', name: 'feature-pan-1002', issueId: 'PAN-1002', lastAccessedAt: 10 }),
-  workspaceRow({ id: 'ws-p3', kind: 'issue', name: 'feature-pan-1003', issueId: 'PAN-1003', lastAccessedAt: 5 }),
+  workspaceRow({ id: 'ws-main', kind: 'main', origin: 'operator', name: 'main', issueId: null, lastAccessedAt: 60 }),
+  workspaceRow({ id: 'ws-operator-scratch', kind: 'scratch', origin: 'operator', name: 'scratch-lens', issueId: null, lastAccessedAt: 50 }),
+  workspaceRow({ id: 'ws-vault-scratch', kind: 'scratch', origin: 'vault', name: 'vault-abcd1234', issueId: null, lastAccessedAt: 40 }),
+  workspaceRow({ id: 'ws-agent-scratch', kind: 'scratch', origin: 'agent', name: 'scratch-agent', issueId: null, lastAccessedAt: 30 }),
+  workspaceRow({ id: 'ws-fav-agent-scratch', kind: 'scratch', origin: 'agent', name: 'scratch-agent-fav', issueId: null, isFavorite: true, lastAccessedAt: 20 }),
+  workspaceRow({ id: 'ws-pipeline-issue', kind: 'issue', origin: 'pipeline', name: 'feature-pan-1001', issueId: 'PAN-1001', lastAccessedAt: 10 }),
 ];
 
 function stubFetch(rows: WorkspaceRegistryRow[] = REGISTRY) {
@@ -86,88 +87,42 @@ beforeEach(() => {
 
 describe('isRailWorkspace', () => {
   it('drops a non-favorited main checkout from the rail and keeps a favorited one', () => {
-    expect(REGISTRY.filter(isRailWorkspace).map((w) => w.id)).toEqual(['ws-scratch', 'ws-fav']);
-    expect(isRailWorkspace(workspaceRow({ id: 'ws-main-fav', kind: 'main', name: 'main', issueId: null, isFavorite: true }))).toBe(true);
+    expect(REGISTRY.filter(isRailWorkspace).map((w) => w.id)).toEqual(['ws-operator-scratch', 'ws-fav-agent-scratch']);
+    expect(isRailWorkspace(workspaceRow({ id: 'ws-main-fav', kind: 'main', origin: 'operator', name: 'main', issueId: null, isFavorite: true }))).toBe(true);
   });
 });
 
-describe('isUserFacingWorkspace (PAN-3286 FR-13)', () => {
-  it('keeps main, scratch, and favorited issue rows and drops non-favorited issue rows', () => {
-    expect(REGISTRY.filter(isUserFacingWorkspace).map((w) => w.id)).toEqual(['ws-main', 'ws-scratch', 'ws-fav']);
+describe('isUserFacingWorkspace (PAN-5233)', () => {
+  it('keeps operator and favorited rows, and drops vault/agent/pipeline rows that are not favorited', () => {
+    expect(isUserFacingWorkspace(workspaceRow({ origin: 'operator', kind: 'scratch' }))).toBe(true);
+    expect(isUserFacingWorkspace(workspaceRow({ origin: 'vault', kind: 'scratch' }))).toBe(false);
+    expect(isUserFacingWorkspace(workspaceRow({ origin: 'agent', kind: 'scratch' }))).toBe(false);
+    expect(isUserFacingWorkspace(workspaceRow({ origin: 'pipeline', kind: 'issue' }))).toBe(false);
+    expect(isUserFacingWorkspace(workspaceRow({ origin: 'agent', kind: 'scratch', isFavorite: true }))).toBe(true);
+    expect(REGISTRY.filter(isUserFacingWorkspace).map((w) => w.id)).toEqual(['ws-main', 'ws-operator-scratch', 'ws-fav-agent-scratch']);
   });
 });
 
-describe('Sidebar workspaces rail filter (PAN-3286 FR-13)', () => {
-  it('renders only scratch/favorited rows plus a count row for the hidden pipeline worktrees', async () => {
+describe('Sidebar workspaces rail filter (PAN-5233)', () => {
+  it('lists exactly the operator scratch and favorited rows, with no pipeline count row', async () => {
     stubFetch();
     renderSidebar();
     const rail = await workspacesRail();
 
     await waitFor(() => expect(within(rail).getByText('scratch-lens')).toBeTruthy());
-    // A non-favorited main checkout is reached from its project, not the rail,
-    // and it is not counted as a pipeline worktree.
+    expect(within(rail).getByText('scratch-agent-fav')).toBeTruthy();
+    // A non-favorited main checkout is reached from its project, not the rail.
     expect(within(rail).queryByTestId('sidebar-workspace-ws-main')).toBeNull();
-    expect(within(rail).getByText('feature-pan-fav')).toBeTruthy();
+    // Non-operator, non-favorited rows stay off the rail entirely — no count row reveals them.
+    expect(within(rail).queryByText('vault-abcd1234')).toBeNull();
+    expect(within(rail).queryByText('scratch-agent')).toBeNull();
     expect(within(rail).queryByText('feature-pan-1001')).toBeNull();
-    expect(within(rail).queryByText('feature-pan-1002')).toBeNull();
-    expect(within(rail).queryByText('feature-pan-1003')).toBeNull();
-
-    const toggle = within(rail).getByTestId('sidebar-workspaces-pipeline-toggle');
-    expect(toggle.textContent).toContain('Pipeline worktrees');
-    // Count equals exactly the rows the filter hid.
-    expect(toggle.textContent).toContain('3');
-    expect(toggle.getAttribute('aria-expanded')).toBe('false');
-  });
-
-  it('reveals every pipeline worktree when expanded and persists that to localStorage', async () => {
-    stubFetch();
-    renderSidebar();
-    const rail = await workspacesRail();
-
-    const toggle = await waitFor(() => within(rail).getByTestId('sidebar-workspaces-pipeline-toggle'));
-    fireEvent.click(toggle);
-
-    await waitFor(() => expect(within(rail).getByText('feature-pan-1001')).toBeTruthy());
-    expect(within(rail).getByText('feature-pan-1002')).toBeTruthy();
-    expect(within(rail).getByText('feature-pan-1003')).toBeTruthy();
-    expect(toggle.getAttribute('aria-expanded')).toBe('true');
-    expect(localStorage.getItem(PIPELINE_EXPANDED_KEY)).toBe('true');
-  });
-
-  it('starts expanded when localStorage says so, surviving a reload', async () => {
-    localStorage.setItem(PIPELINE_EXPANDED_KEY, 'true');
-    stubFetch();
-    renderSidebar();
-    const rail = await workspacesRail();
-
-    await waitFor(() => expect(within(rail).getByText('feature-pan-1001')).toBeTruthy());
-    expect(within(rail).getByTestId('sidebar-workspaces-pipeline-toggle').getAttribute('aria-expanded')).toBe('true');
-  });
-
-  it('shows no count row when every workspace is user-facing', async () => {
-    stubFetch(REGISTRY.filter(isUserFacingWorkspace));
-    renderSidebar();
-    const rail = await workspacesRail();
-
-    await waitFor(() => expect(within(rail).getByText('scratch-lens')).toBeTruthy());
-    expect(within(rail).queryByTestId('sidebar-workspaces-pipeline-toggle')).toBeNull();
-  });
-
-  it('uses the singular label for exactly one hidden worktree', async () => {
-    stubFetch([
-      workspaceRow({ id: 'ws-main', kind: 'main', name: 'main', issueId: null, lastAccessedAt: 50 }),
-      workspaceRow({ id: 'ws-p1', kind: 'issue', name: 'feature-pan-1001', issueId: 'PAN-1001' }),
-    ]);
-    renderSidebar();
-    const rail = await workspacesRail();
-
-    const toggle = await waitFor(() => within(rail).getByTestId('sidebar-workspaces-pipeline-toggle'));
-    expect(toggle.textContent).toContain('Pipeline worktree');
-    expect(toggle.textContent).not.toContain('Pipeline worktrees');
+    expect(screen.queryByText(/Pipeline worktree/)).toBeNull();
+    expect(screen.queryByTestId('sidebar-workspaces-pipeline-toggle')).toBeNull();
   });
 });
 
-describe('Cmd-K workspaces scope filter (PAN-3286 FR-13)', () => {
+describe('Cmd-K workspaces scope filter (PAN-5233)', () => {
   function renderPalette() {
     return render(
       <QueryClientProvider client={newQueryClient()}>
@@ -176,112 +131,46 @@ describe('Cmd-K workspaces scope filter (PAN-3286 FR-13)', () => {
     );
   }
 
-  function paletteInput() {
-    return screen.getByPlaceholderText('Search commands, issues, conversations, memory…');
-  }
-
-  // Review fix: filtering alone left hidden workspaces unreachable from Cmd-K.
-  // The scope must carry the same count row and reveal path as the rail.
-  it('offers a count row for the hidden pipeline worktrees', async () => {
-    stubFetch();
-    const { container } = renderPalette();
-
-    await waitFor(() => expect(container.textContent).toContain('scratch-lens'));
-    expect(container.textContent).toContain('3 pipeline worktrees');
-    expect(container.textContent).toContain('Show worktrees Overdeck created for issues');
-  });
-
-  it('reveals every hidden worktree when the count row is selected, and persists that', async () => {
-    stubFetch();
-    const { container } = renderPalette();
-
-    const countRow = await waitFor(() => screen.getByText('3 pipeline worktrees'));
-    fireEvent.click(countRow);
-
-    await waitFor(() => expect(container.textContent).toContain('feature-pan-1001'));
-    expect(container.textContent).toContain('feature-pan-1002');
-    expect(container.textContent).toContain('feature-pan-1003');
-    // The count row is gone once expanded, and the choice is shared with the rail.
-    expect(container.textContent).not.toContain('3 pipeline worktrees');
-    expect(localStorage.getItem(PIPELINE_EXPANDED_KEY)).toBe('true');
-  });
-
-  it('starts expanded when the rail already expanded, showing no count row', async () => {
-    localStorage.setItem(PIPELINE_EXPANDED_KEY, 'true');
-    stubFetch();
-    const { container } = renderPalette();
-
-    await waitFor(() => expect(container.textContent).toContain('feature-pan-1001'));
-    expect(container.textContent).not.toContain('pipeline worktrees');
-  });
-
-  it('surfaces the count row when the operator types a hidden workspace name', async () => {
-    stubFetch();
-    const { container } = renderPalette();
-    await waitFor(() => expect(container.textContent).toContain('scratch-lens'));
-
-    fireEvent.change(paletteInput(), { target: { value: 'feature-pan-1002' } });
-
-    // The hidden row itself is still not listed, but the row that reveals it is —
-    // so a hidden workspace is discoverable rather than invisible.
-    await waitFor(() => expect(container.textContent).toContain('3 pipeline worktrees'));
-  });
-
-  it('uses the singular label for exactly one hidden worktree', async () => {
+  it('lists the operator scratch row, the favorited row and the main row under its project name', async () => {
     stubFetch([
-      workspaceRow({ id: 'ws-main', kind: 'main', name: 'main', issueId: null, lastAccessedAt: 50 }),
-      workspaceRow({ id: 'ws-p1', kind: 'issue', name: 'feature-pan-1001', issueId: 'PAN-1001' }),
+      { ...workspaceRow({ id: 'ws-main', projectId: 'okf', kind: 'main', origin: 'operator', name: 'main', issueId: null, lastAccessedAt: 60 }), projectName: 'OKF' },
+      workspaceRow({ id: 'ws-operator-scratch', kind: 'scratch', origin: 'operator', name: 'scratch-lens', issueId: null, lastAccessedAt: 50 }),
+      workspaceRow({ id: 'ws-vault-scratch', kind: 'scratch', origin: 'vault', name: 'vault-abcd1234', issueId: null, lastAccessedAt: 40 }),
+      workspaceRow({ id: 'ws-agent-scratch', kind: 'scratch', origin: 'agent', name: 'scratch-agent', issueId: null, lastAccessedAt: 30 }),
+      workspaceRow({ id: 'ws-fav-agent-scratch', kind: 'scratch', origin: 'agent', name: 'scratch-agent-fav', issueId: null, isFavorite: true, lastAccessedAt: 20 }),
+      workspaceRow({ id: 'ws-pipeline-issue', kind: 'issue', origin: 'pipeline', name: 'feature-pan-1001', issueId: 'PAN-1001', lastAccessedAt: 10 }),
     ]);
     const { container } = renderPalette();
 
-    await waitFor(() => expect(container.textContent).toContain('1 pipeline worktree'));
-    expect(container.textContent).not.toContain('1 pipeline worktrees');
-  });
-
-  it('lists a main checkout under its project name, not as "main"', async () => {
-    stubFetch([
-      { ...workspaceRow({ id: 'ws-main', projectId: 'okf', kind: 'main', name: 'main', issueId: null, lastAccessedAt: 50 }), projectName: 'OKF' },
-    ]);
-    const { container } = renderPalette();
-
-    await waitFor(() => expect(container.textContent).toContain('OKF'));
-  });
-
-  it('shows no count row when every workspace is user-facing', async () => {
-    stubFetch(REGISTRY.filter(isUserFacingWorkspace));
-    const { container } = renderPalette();
-
     await waitFor(() => expect(container.textContent).toContain('scratch-lens'));
-    expect(container.textContent).not.toContain('pipeline worktree');
+    expect(container.textContent).toContain('scratch-agent-fav');
+    expect(container.textContent).toContain('OKF');
+    expect(container.textContent).not.toContain('vault-abcd1234');
+    expect(container.textContent).not.toContain('feature-pan-1001');
+    expect(screen.queryByText(/pipeline worktree/i)).toBeNull();
   });
 
-  it('lists only user-facing workspaces, keeping the favorited issue workspace', async () => {
+  it('never surfaces a workspace-pipeline-expand action, even when the operator types a hidden workspace name', async () => {
     stubFetch();
-    const { container } = render(
-      <QueryClientProvider client={newQueryClient()}>
-        <CommandPalette isOpen onClose={vi.fn()} onNavigate={vi.fn()} onSelectWorkspace={vi.fn()} />
-      </QueryClientProvider>,
-    );
+    const { container } = renderPalette();
+    await waitFor(() => expect(container.textContent).toContain('scratch-lens'));
 
     fireEvent.change(
       screen.getByPlaceholderText('Search commands, issues, conversations, memory…'),
       { target: { value: 'feature-pan' } },
     );
 
-    // The palette wraps matched substrings in <mark>, so the label text is split
-    // across elements — assert against the rendered text content instead.
-    await waitFor(() => expect(container.textContent).toContain('feature-pan-fav'));
+    // The hidden pipeline row is not discoverable, and no row offers to reveal it.
+    await waitFor(() => expect(screen.queryByText(/pipeline worktree/i)).toBeNull());
     expect(container.textContent).not.toContain('feature-pan-1001');
-    expect(container.textContent).not.toContain('feature-pan-1002');
-    expect(container.textContent).not.toContain('feature-pan-1003');
   });
 });
 
 describe('Sidebar memory-phase badge (PAN-3286 FR-12)', () => {
   it('renders the memory phase for a main/scratch row that has one', async () => {
     stubFetch([
-      workspaceRow({ id: 'ws-main', kind: 'main', name: 'main', issueId: null, isFavorite: true, memoryPhase: 'shipping', lastAccessedAt: 50 }),
-      workspaceRow({ id: 'ws-scratch', kind: 'scratch', name: 'scratch-lens', issueId: null, memoryPhase: 'exploring', lastAccessedAt: 40 }),
+      workspaceRow({ id: 'ws-main', kind: 'main', origin: 'operator', name: 'main', issueId: null, isFavorite: true, memoryPhase: 'shipping', lastAccessedAt: 50 }),
+      workspaceRow({ id: 'ws-scratch', kind: 'scratch', origin: 'operator', name: 'scratch-lens', issueId: null, memoryPhase: 'exploring', lastAccessedAt: 40 }),
     ]);
     renderSidebar();
     const rail = await workspacesRail();
@@ -293,8 +182,8 @@ describe('Sidebar memory-phase badge (PAN-3286 FR-12)', () => {
 
   it('renders no badge for a non-issue row whose memoryPhase is null or absent', async () => {
     stubFetch([
-      workspaceRow({ id: 'ws-null', kind: 'scratch', name: 'null-phase', issueId: null, memoryPhase: null, lastAccessedAt: 50 }),
-      workspaceRow({ id: 'ws-absent', kind: 'scratch', name: 'absent-phase', issueId: null, lastAccessedAt: 40 }),
+      workspaceRow({ id: 'ws-null', kind: 'scratch', origin: 'operator', name: 'null-phase', issueId: null, memoryPhase: null, lastAccessedAt: 50 }),
+      workspaceRow({ id: 'ws-absent', kind: 'scratch', origin: 'operator', name: 'absent-phase', issueId: null, lastAccessedAt: 40 }),
     ]);
     renderSidebar();
     const rail = await workspacesRail();
@@ -309,7 +198,7 @@ describe('Sidebar memory-phase badge (PAN-3286 FR-12)', () => {
     // The API returns null for issue rows; this asserts the row also refuses to
     // render one defensively, so an issue row keeps only its pipeline badge (D-1).
     stubFetch([
-      workspaceRow({ id: 'ws-fav', kind: 'issue', name: 'feature-pan-fav', issueId: 'PAN-FAV', isFavorite: true, memoryPhase: 'building' }),
+      workspaceRow({ id: 'ws-fav', kind: 'issue', origin: 'pipeline', name: 'feature-pan-fav', issueId: 'PAN-FAV', isFavorite: true, memoryPhase: 'building' }),
     ]);
     renderSidebar();
     const rail = await workspacesRail();
