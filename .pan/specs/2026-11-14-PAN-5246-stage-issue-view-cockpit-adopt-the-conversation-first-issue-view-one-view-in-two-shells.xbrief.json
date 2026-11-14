@@ -4,17 +4,17 @@
     "created": "2026-11-14T12:31:21Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5246: Stage issue view (cockpit): adopt the conversation-first issue view, one view in two shells",
-    "updated": "2026-11-14T12:40:21.080Z"
+    "updated": "2026-11-14T12:41:20.996Z"
   },
   "plan": {
     "id": "pan-5246",
     "title": "Stage issue view (cockpit): adopt the conversation-first issue view, one view in two shells",
-    "status": "proposed",
+    "status": "running",
     "uid": "31abda32-9c1e-425f-84a7-b5e8ed4892ad",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T12:31:21Z",
-    "updated": "2026-11-14T12:40:21.080Z",
+    "updated": "2026-11-14T12:41:20.996Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5246",
@@ -1435,5 +1435,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
