@@ -1,0 +1,1439 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T12:31:21Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5246: Stage issue view (cockpit): adopt the conversation-first issue view, one view in two shells",
+    "updated": "2026-11-14T12:40:21.080Z"
+  },
+  "plan": {
+    "id": "pan-5246",
+    "title": "Stage issue view (cockpit): adopt the conversation-first issue view, one view in two shells",
+    "status": "proposed",
+    "uid": "31abda32-9c1e-425f-84a7-b5e8ed4892ad",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-14T12:31:21Z",
+    "updated": "2026-11-14T12:40:21.080Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5246",
+        "label": "PAN-5246",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5246/.pan/drafts/pan-5246.md",
+        "label": "PRD draft (.pan/drafts/pan-5246.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "issue-view",
+      "cockpit",
+      "stage",
+      "no-loss-inventory"
+    ],
+    "metadata": {
+      "sizeJustification": "This issue is already the third slice of an operator-made split (PAN-5244 drawer, PAN-5253 shared view, PAN-5246 Stage flip). The flip is inseparable: the frame rewrite, the deletion of the modules it orphans, the no-loss inventory re-homing and the docs describing the new single view must ship together, or the Stage tab shows two views or the no-loss gate loses sections. The file count is high mainly because eleven orphaned files are deleted and each docs file counts as its own subsystem; the code change itself spans one frontend subtree.",
+      "canonicalFilename": "2026-11-14-PAN-5246-stage-issue-view-cockpit-adopt-the-conversation-first-issue-view-one-view-in-two-shells.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The issue drawer and the Stage issue tab (the cockpit) are two different issue views. The cockpit (IssueMissionControl, 930 lines) has its own header, phase rail, six-tab band, crew spine and awareness rail, and uses the shared IssueDetail only for its Session tab. After PAN-5244 and PAN-5253 the shared view carries every cockpit surface in the drawer, so the cockpit's copies are duplicate code and a second layout to maintain.",
+      "Proposal": "Make IssueDetail density=page render the same composition as density=drawer and delete its legacy page return; extract the drawer's title row into IssueTitleRow; rewrite IssueMissionControl as a thin Stage frame (title row with breadcrumb and Open tracker, IssueDetail with local tab state, the launch composition as a Details footer). Add the Details next-step line and Create PR link in both shells, put the cockpit section markers on the shared elements and re-point the no-loss inventory homes before the flip, delete the orphaned cockpit modules, re-point the e2e pane test at the Details pipeline table, and update the docs. The corrected PRD at .pan/drafts/pan-5246.md is the implementation brief.",
+      "NonGoals": "- No change to the Command Deck left issue tree (components/CommandDeck/ProjectTree/) or what a click on a session row does, and no change to its Awareness column.\n- No change to ConversationPanel internals, its composer or its hidden header actions.\n- No change to the rail density (the project-tree row and IssueDetail's rail branch).\n- No change to the tab table in issueTabs.ts, the tab bodies, the banner slot's rule, the Checks view or the PAN-5253 Details blocks beyond the WI-3 additions and WI-4 markers.\n- No change to the skill row redesign (PAN-5245) or SkillOverridesSections.tsx.\n- No opening of a pane-only session's conversation from the issue view.\n- No deletion of cockpit modules that were already unmounted before this issue (IssueCockpitBody, OverviewTab, ShipTab, CrewStage, CostCard, CodeCard, IssueDigTabs, IssueBlockerSpotlight, WorkspaceCard, ReviewVerificationCard, AgentActivityCards, IssueMetricStrip, IssueStatusBand, spotlight.ts), nor of PlanMapCard.tsx, PickupGateCard.tsx or agentsLane.module.css.\n- No edit to IssueActionMenu/*, the action registry, NeedsYouSlot.tsx, IssueDetailShell.tsx, Stage/IssueOverview.tsx or Stage/cockpit/MissionConversationTab.tsx.\n- No server, route, contract, store-shape or query-hook change; no new HTTP route.\n- No reading of ?agent= in the Stage tab and no writing of the Stage tab value to the URL.\n- No row added to or removed from ISSUE_VIEW_INVENTORY or DENSITY_SECTIONS; no edit to densitySections.ts.\n- No .skip, skipIf or .only, no new test that reads a source file, no file-size allowlist raise."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Lowered the existing operator-reviewed PRD as is, correcting drifted references and two test defects in place instead of re-deciding its D-1..D-13.",
+        "rationale": "Auto mode chooses documented decisions; the PRD is detailed and every dependency row was verified on main at 97246171400."
+      },
+      {
+        "summary": "Split PRD WI-7 into inventory-homes (before the frame flip) and sections-test (after it).",
+        "rationale": "The root no-loss test scans cockpit files plus inventory homes, so re-pointing homes once the shared markers exist is green while the old cockpit is still mounted; this removes the PRD's red window between WI-5 and WI-7 and keeps every item commit green."
+      },
+      {
+        "summary": "Fixed the Tasks-chip test fixture to use status `closed` instead of `completed`.",
+        "rationale": "taskStatus in useDrawerData.ts maps only `closed` to done, so the PRD's fixture would yield 0/2 instead of the asserted 1/2."
+      },
+      {
+        "summary": "Named the third page-density test (`page density keeps its own DrawerPausedBanner wrapper and never the banner slot`) and rewrote it in page-composition.",
+        "rationale": "It exists on main and would go red once page density renders the banner slot; the PRD named only two."
+      },
+      {
+        "summary": "One item (ci-test-subset) owns all additions to scripts/frontend-test-subset.txt; delete-orphans owns the IssueTreeLane removal.",
+        "rationale": "Several otherwise parallel items would all edit that file; one owner avoids shared-mutation edges, and the removal must ship in the same commit as the deleted test."
+      },
+      {
+        "summary": "Set plan.metadata.sizeJustification instead of splitting into more sibling issues.",
+        "rationale": "The issue is already the third slice of an operator split, and the flip, deletions, inventory re-homing and docs are inseparable."
+      },
+      {
+        "summary": "requiresInspection is set only on page-composition and stage-frame.",
+        "rationale": "They are the two structural foundations every later item builds on; the marker, docs and deletion items are mechanical and checked by tests."
+      }
+    ],
+    "items": [
+      {
+        "id": "title-row",
+        "title": "Extract IssueTitleRow and render it in the drawer header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5246",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/IssueTitleRow.tsx",
+            "src/dashboard/frontend/src/components/issue-view/IssueTitleRow.test.tsx",
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-view/IssueTitleRow.test.tsx src/components/drawer/IssueDrawer.test.tsx src/components/drawer/IssueDrawer.tracker-fallback.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueTitleRow.test.tsx, IssueDrawer.test.tsx and IssueDrawer.tracker-fallback.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "NFR-6",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create components/issue-view/IssueTitleRow.tsx exactly as the WI-1 snippet (props issueId, title, titleStatus, agents, trackerStatus, heading h1|h2 default h2, wrap, leading, actions, trailing; renders id, Heading with IssueHeaderTitle, IssueStateBadge, a flex-1 spacer only when not wrapping, IssueCostChip, actions, trailing). Replace the children of the drawer's <header data-section=\"Header bar\"> in IssueDrawer.tsx with <IssueTitleRow>, passing <div data-section=\"DrawerActionBar\"><DrawerActionBar /></div> as actions and the existing tracker link plus close button, unchanged, as trailing; the header keeps no z-* class. Write IssueTitleRow.test.tsx with the four tests named in WI-1, mocking ./IssueHeaderFacts. Style guide: semantic tokens only, no rounded-full, font-semibold maximum."
+        },
+        "items": [
+          {
+            "id": "title-row.ac1",
+            "title": "Given IssueTitleRow.test.tsx, when it runs, then it renders the id, the title with its title attribute, the badge, the cost and the leading/actions/trailing slots in that DOM order, and uses an h2 by default and an h1 when heading=\"h1\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "title-row.ac2",
+            "title": "Given title={null} and titleStatus=\"loading\", when IssueTitleRow renders, then it shows issue-title-skeleton; and the root carries flex-wrap only when wrap is set and h-[46px] otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "title-row.ac3",
+            "title": "Given the drawer, when IssueDrawer.test.tsx and IssueDrawer.tracker-fallback.test.tsx run with no edit to either file, then both pass and the drawer's <header data-section=\"Header bar\"> contains [data-component=\"issue-title-row\"] holding [data-section=\"DrawerActionBar\"]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-composition",
+        "title": "Make IssueDetail page density render the drawer composition and delete the legacy page return",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5246",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDetail.test.tsx src/components/drawer/IssueDrawer.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueDetail.test.tsx and IssueDrawer.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-10",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "tasks-count",
+            "details-footer",
+            "markers-issue-detail",
+            "stage-frame",
+            "sections-test"
+          ],
+          "parallelSafeReason": "Touches only IssueDetail.tsx and its test; no other item in its wave edits them."
+        },
+        "narrative": {
+          "Action": "PRD WI-2 steps 1, 2, 5, 6 and 7. In IssueDetail.tsx remove the `if (density === 'drawer') {` condition so its body is the final return for both drawer and page, with root attributes data-density={density}, data-tab={entry ?? undefined}, data-view={resolved?.view ?? undefined}; delete the whole legacy page return and SESSION_TAB_IDS, secondaryPanel, PAGE_HIDDEN_TABS; drop the `density === 'drawer' &&` condition from the skills fallback effect; update the showTabs doc comment and the file header comment; remove the imports listed in WI-2 step 6 that become unused. The rail branch, `shell` and `conversationPane` stay. No @container class on the root. In IssueDetail.test.tsx rewrite the three page-density tests as WI-2 states and add `exposes the entry and view on the root` and `the tab strip scrolls instead of wrapping`."
+        },
+        "items": [
+          {
+            "id": "page-composition.ac1",
+            "title": "Given density=\"page\", when IssueDetail renders, then the root has data-density=\"page\", mock-pipeline-strip, mock-banner-slot and drawer-tabs with drawer-tab-skills and drawer-tab-discussion render, the session mock has data-layout=\"conversation-header\", and mock-detail-shell, mock-activity-rail and the .grid-cols-[minmax(0,1fr)_360px] grid are absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-composition.ac2",
+            "title": "Given tab=\"checks\", when IssueDetail renders at page or drawer density, then the root carries data-tab=\"changes\" and data-view=\"checks\", and the first child of drawer-tabs has the class overflow-x-auto",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-composition.ac3",
+            "title": "Given the edited file, when `git grep -n \"SESSION_TAB_IDS\\|secondaryPanel\\|PAGE_HIDDEN_TABS\" -- src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx` runs, then it prints nothing, and the rail-density test in IssueDetail.test.tsx passes with no edit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tasks-count",
+        "title": "Let the Tasks tab chip read the task count itself when no tasksBadge is passed",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5246",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/drawer/useDrawerData.ts",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDetail.test.tsx src/components/drawer/IssueDrawer.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueDetail.test.tsx including the new Tasks-chip test passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 step 4 (D-10). Add the exported hook useIssueTasksBadge(issueId) to components/drawer/useDrawerData.ts using the existing normalizeTasks and useTasksQuery (snippet in WI-2). In IssueDetail.tsx add the TasksCount component, give IssueDetailTabs an issueId prop, and change the chip content to {tasksBadge ?? <TasksCount issueId={issueId} />}. The drawer keeps passing tasksBadge. Add the test `the Tasks chip reads the count itself when no tasksBadge is passed` with a fetch stub whose tasks have status `closed` and `open` (taskStatus maps only `closed` to done)."
+        },
+        "items": [
+          {
+            "id": "tasks-count.ac1",
+            "title": "Given no tasksBadge prop and a stubbed /api/issues/PAN-1/tasks answering one closed and one open task, when IssueDetail renders, then drawer-tab-tasks-count shows 1/2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tasks-count.ac2",
+            "title": "Given tasksBadge=\"3/13\", when IssueDetail renders, then drawer-tab-tasks-count shows 3/13 and no request to /api/issues/PAN-1/tasks is needed for the chip; IssueDrawer.test.tsx passes with no edit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "details-footer",
+        "title": "Add the detailsFooter slot to IssueDetail and render it at the end of Details",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5246",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.test.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDetail.test.tsx src/components/issue-detail/IssueDrawerDetails.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueDetail.test.tsx and IssueDrawerDetails.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 step 3 and WI-3 step 1 (D-7). Add the prop detailsFooter?: ReactNode to IssueDetailProps with the doc comment from WI-2 and pass it as footer to IssueDrawerDetails. Add footer?: ReactNode to IssueDrawerDetailsProps and render <div data-testid=\"drawer-details-footer\" className=\"col-span-full\">{footer}</div> inside drawer-details-grid after the two column wrappers when footer is given. Tests: `passes detailsFooter to the Details body` (extend the IssueDrawerDetails mock in IssueDetail.test.tsx to render props.footer) and `renders the footer slot across both columns, and nothing without it` in IssueDrawerDetails.test.tsx."
+        },
+        "items": [
+          {
+            "id": "details-footer.ac1",
+            "title": "Given detailsFooter={<span data-testid=\"x-footer\" />} and tab=\"overview\", when IssueDetail renders, then x-footer appears inside the Details body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "details-footer.ac2",
+            "title": "Given footer on IssueDrawerDetails, when it renders, then drawer-details-footer has the class col-span-full and sits inside drawer-details-grid; given no footer, then drawer-details-footer is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "details-next-step",
+        "title": "Show the next step as visible text in Details Status",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5246",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/StatusNarrative.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDrawerDetails.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueDrawerDetails.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 step 2 (D-8). Add the optional prop showNext?: boolean to StatusNarrative.tsx exactly as the WI-3 before/after snippet: without it the output is unchanged; with it a second span data-testid=\"status-narrative-next\" renders model.next. In IssueDrawerDetails.tsx pass showNext to <StatusNarrative> in the drawer-details-status section. Add the test `the Status section shows the next step as text`."
+        },
+        "items": [
+          {
+            "id": "details-next-step.ac1",
+            "title": "Given the Details tab, when IssueDrawerDetails renders, then status-narrative-next renders inside drawer-details-status with non-empty text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "details-next-step.ac2",
+            "title": "Given StatusNarrative without showNext, when it renders, then only the status-narrative span renders and status-narrative-next is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "details-create-pr",
+        "title": "Offer a Create PR compare link in Details Ship when the issue has no pull request",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5246",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/issueLinks.ts",
+            "src/dashboard/frontend/src/lib/__tests__/issueLinks.test.ts",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueLinks.test.ts src/components/issue-detail/IssueDrawerDetails.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "issueLinks.test.ts and IssueDrawerDetails.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 step 3 (D-8). Add the exported githubCompareUrl(issueUrl, branch) to lib/issueLinks.ts (snippet in WI-3). In IssueDrawerDetails.tsx compute createPrHref from githubCompareUrl(trackerIssueUrl(issueId, issue?.url), derived?.branch?.name ?? `feature/${issueId.toLowerCase()}`), taking issue from the existing useIssueData(issueId) call, and render the drawer-details-create-pr link when there is no pr and createPrHref is non-null. Create lib/__tests__/issueLinks.test.ts with the two tests named in WI-3 and add the two Ship tests to IssueDrawerDetails.test.tsx."
+        },
+        "items": [
+          {
+            "id": "details-create-pr.ac1",
+            "title": "Given https://github.com/eltmon/overdeck/issues/1661 and feature/pan-1661, when githubCompareUrl runs, then it returns https://github.com/eltmon/overdeck/compare/main...feature%2Fpan-1661?expand=1; given a non-GitHub URL or null, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "details-create-pr.ac2",
+            "title": "Given no pull request and a GitHub tracker URL, when the Details Ship section renders, then drawer-details-create-pr links to the compare URL with target=_blank",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "details-create-pr.ac3",
+            "title": "Given a pull request exists, when the Ship section renders, then drawer-details-diff renders and drawer-details-create-pr is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "markers-issue-detail",
+        "title": "Add the cockpit section markers to IssueDetail's strip, tab strip and tab bodies",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5246",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDetail.test.tsx src/components/drawer/IssueDrawer.test.tsx"
+          ],
+          "expected_outputs": [
+            "IssueDetail.test.tsx and IssueDrawer.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4, IssueDetail.tsx rows. Wrap each anchor in <div data-section=\"<name>\" className=\"contents\">: Pipeline Band around the PhaseTimeline wrapper; Detail Tabs around the DrawerTabs wrapper; Session tab around the session branch's sessionPane(...) call; TasksRail / TasksTab around <IssueTasksBody>; Changes tab around <IssueChangesBody>; Plan / Activity / Discussion tabs around each of <IssuePlanBody>, <IssueActivityBody>, <IssueDiscussionBody>. D-11 rules: data-section is the first attribute and the tag has no `hidden` token. Add the test `carries the cockpit tab markers`."
+        },
+        "items": [
+          {
+            "id": "markers-issue-detail.ac1",
+            "title": "Given IssueDetail.test.tsx `carries the cockpit tab markers`, when it runs, then Pipeline Band and Detail Tabs render on any tab, Session tab on conversation, TasksRail / TasksTab on tasks, Changes tab on files, and Plan / Activity / Discussion tabs on plan, activity and discussion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "markers-issue-detail.ac2",
+            "title": "Given the edited file, when `git grep -n 'data-section=\"\\(Pipeline Band\\|Detail Tabs\\|Session tab\\|TasksRail / TasksTab\\|Changes tab\\|Plan / Activity / Discussion tabs\\)\"' -- src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx` runs, then every match reads `<div data-section=\"…\" className=\"contents\">`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "markers-issue-detail.ac3",
+            "title": "Given the drawer, when IssueDrawer.test.tsx runs with no edit, then its two console-marker tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "markers-tab-bodies",
+        "title": "Add the PlanMapCard and Artifacts cockpit markers to the shared tab bodies",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5246",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetailTabBodies.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetailTabBodies.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDetailTabBodies.test.tsx"
+          ],
+          "expected_outputs": [
+            "IssueDetailTabBodies.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4, IssueDetailTabBodies.tsx rows. Wrap <div data-section=\"DrawerPlanPanel / XBriefViewer\"> in <div data-section=\"PlanMapCard\" className=\"contents\">, and wrap <div data-testid=\"issue-changes-artifacts\" ...> in <div data-section=\"Cost / Artifacts / Ship homes\" className=\"contents\">. Add the two tests named in WI-4."
+        },
+        "items": [
+          {
+            "id": "markers-tab-bodies.ac1",
+            "title": "Given the Plan Map view, when IssuePlanBody renders, then an element [data-section=\"PlanMapCard\"] contains [data-section=\"DrawerPlanPanel / XBriefViewer\"]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "markers-tab-bodies.ac2",
+            "title": "Given the Changes Artifacts view, when IssueChangesBody renders, then an element [data-section=\"Cost / Artifacts / Ship homes\"] contains issue-changes-artifacts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "markers-details",
+        "title": "Add the cockpit section markers to the Details tab",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5246",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDrawerDetails.test.tsx src/components/drawer/IssueDrawer.test.tsx"
+          ],
+          "expected_outputs": [
+            "IssueDrawerDetails.test.tsx and IssueDrawer.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4, IssueDrawerDetails.tsx rows. Add data-section as the first attribute: NowPanel on <section data-testid=\"drawer-details-status\">, CrewStage on <section data-testid=\"drawer-details-pipeline\">, Cost / Artifacts / Ship homes on <section data-testid=\"drawer-details-ship\">, Awareness rail on the second (right) column wrapper <div className=\"min-w-0 space-y-[22px]\">. Wrap <div data-section=\"DrawerPickupSection / PickupGateControls\"> in <div data-section=\"PickupGateCard\" className=\"contents\">. Confirm the existing UatEnvironmentPanel tag obeys the two D-11 rules. Add the test `carries the cockpit markers`."
+        },
+        "items": [
+          {
+            "id": "markers-details.ac1",
+            "title": "Given IssueDrawerDetails.test.tsx `carries the cockpit markers`, when it runs, then NowPanel, CrewStage, Cost / Artifacts / Ship homes, PickupGateCard, Awareness rail and UatEnvironmentPanel each render on a visible element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "markers-details.ac2",
+            "title": "Given the edited file, when the cockpit-name tags are read, then data-section is the first attribute of each and no such tag contains the token hidden",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "markers-agent-session",
+        "title": "Add the AgentsLane and SessionPanel markers to the conversation header layout",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5246",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx",
+            "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/drawer/DrawerAgentSession.test.tsx"
+          ],
+          "expected_outputs": [
+            "DrawerAgentSession.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4, DrawerAgentSession.tsx rows. Add data-section=\"AgentsLane\" as the first attribute of the <div data-testid=\"drawer-agent-header\"> row, and wrap the conversation-header layout's transcript wrapper <div className=\"min-h-0 flex-1 overflow-hidden\"> in <div data-section=\"SessionPanel\" className=\"contents\"> (the marker cannot sit on the inner tag, whose classes contain `overflow-hidden`). Update the file header comment: the conversation-header layout is the per-agent conversation surface of both shells. Add the test `the conversation header carries the AgentsLane and SessionPanel markers`."
+        },
+        "items": [
+          {
+            "id": "markers-agent-session.ac1",
+            "title": "Given layout=\"conversation-header\" with an agent, when DrawerAgentSession renders, then drawer-agent-header carries data-section=\"AgentsLane\" and an element [data-section=\"SessionPanel\"] contains the transcript",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "markers-agent-session.ac2",
+            "title": "Given the edited file, when `git grep -n 'data-section=\"SessionPanel\"' -- src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx` runs, then the match reads `<div data-section=\"SessionPanel\" className=\"contents\">`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "inventory-homes",
+        "title": "Re-point the cockpit inventory homes at the shared view files",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-5246",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/inventory.ts",
+            "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/frontend/issue-view-no-loss.test.ts",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-view/IssueView.test.tsx"
+          ],
+          "expected_outputs": [
+            "issue-view-no-loss.test.ts passes",
+            "IssueView.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 part A. In components/issue-view/inventory.ts change `home` (and `actionRelocation.home` where present) for the cockpit rows per the WI-7 table: six rows to IssueDetail.tsx, six to IssueDrawerDetails.tsx, AgentsLane and SessionPanel to drawer/DrawerAgentSession.tsx, StackDrawer to issue-view/StackDrawer.tsx, PlanMapCard to issue-detail/IssueDetailTabBodies.tsx; leave Header bar, NeedsYouSlot, StatusNarrative, HappenedFeed and IssueBlockerSpotlight unchanged; change no section, view or actionRelocation.surface. Make the one authorised edit to the root test (`records the shared-view homes (PAN-5246) ...`). Do not edit densitySections.ts. This lands BEFORE stage-frame; the old cockpit is still mounted."
+        },
+        "items": [
+          {
+            "id": "inventory-homes.ac1",
+            "title": "Given the old cockpit still mounted, when `npx vitest run --configLoader runner tests/unit/dashboard/frontend/issue-view-no-loss.test.ts` runs, then every test passes, including the counts 16 / 21 / 15 / 52 and the visible-marker and homes-on-disk tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inventory-homes.ac2",
+            "title": "Given the diff, when `git diff origin/main -- src/dashboard/frontend/src/components/issue-view/densitySections.ts` runs, then it prints nothing, and in issue-view-no-loss.test.ts only the `records the ... homes` test body changed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inventory-homes.ac3",
+            "title": "Given IssueView.test.tsx, when it runs with no edit, then it passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stage-frame",
+        "title": "Rewrite IssueMissionControl as the Stage frame around IssueTitleRow and IssueDetail",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5246",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/issue-actions-surface-parity.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx src/components/Stage/cockpit/IssueMissionControl.header-title.test.tsx src/lib/__tests__/issue-actions-surface-parity.test.tsx src/lib/__tests__/conformance-gates.test.ts",
+            "npx vitest run --configLoader runner tests/unit/dashboard/frontend/issue-view-no-loss.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the five frontend test files pass",
+            "issue-view-no-loss.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-10",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "delete-orphans",
+            "sections-test",
+            "e2e-pane-rows",
+            "visual-evidence"
+          ],
+          "parallelSafeReason": "Owns IssueMissionControl.tsx, its main test and the parity test; delete-orphans, which also edits the parity test, is ordered after it."
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Replace the body of IssueMissionControl.tsx with the WI-5 snippet: stageTabFromUrl() reads ?tab= once and normalises it via resolveIssueTab (default conversation); IssueView density=cockpit with @container flex h-full min-h-0 flex-col bg-background; <header data-section=\"Header bar\" className=\"shrink-0\"> around IssueTitleRow (heading h1, wrap, breadcrumb leading, IssueActionMenu mode=primary-strip pinRight=['viewPr'] as actions, Open tracker link as trailing); IssueDetail density=page with tab state and detailsFooter={<MissionConversationTab ... />} (no sessions prop). IssueMissionControlProps is unchanged. Delete everything else in the file listed in WI-5; import nothing from drawer/useDrawerData, ./TasksRail, CommandDeck/ZoneCOverviewTabs/queries or ./cockpitBody.module.css. Rewrite IssueMissionControl.test.tsx with the tests listed in WI-5; its fetch stub must answer /api/issues/PAN-1661 with a bare issue row ({ id, identifier, title, status, url }) because on main all 48 tests fail the afterEach unanswered-request guard on that route; keep the guard. In issue-actions-surface-parity.test.tsx change line 330 to `surface === 'drawer' || surface === 'cockpit'`. Do not delete any other file here (delete-orphans does that)."
+        },
+        "items": [
+          {
+            "id": "stage-frame.ac1",
+            "title": "Given each of the 20 ?tab= values in the PRD Tab values table, when the frame mounts, then the IssueDetail mock receives that row's \"Stage passes\" value; given no ?tab= or an unknown value, then it receives conversation; and clicking the mock's Terminal button makes it receive terminal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-frame.ac2",
+            "title": "Given the Stage frame, when it renders, then there is one level-1 heading with the title, header-breadcrumb contains Issues, header-tracker-link has the tracker href, exactly one element shows the cost, and the IssueDetail mock has data-density=page and data-show-tabs=true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-frame.ac3",
+            "title": "Given the Stage frame, when it renders, then the Issue tree label, [data-section=\"Awareness rail\"] in the frame, the Issue cockpit tabs navigation, [data-spine-collapsed] and the Cost breakdown dialog are all absent, and the Details footer shows Launcher, Agent dock, Action dock and Timeline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-frame.ac4",
+            "title": "Given the unedited bodies of IssueMissionControl.render-count.test.tsx and IssueMissionControl.header-title.test.tsx, when they run, then both pass; issue-actions-surface-parity.test.tsx passes with the cockpit pinning viewPr; and the rewritten IssueMissionControl.test.tsx passes with its unanswered-request afterEach guard kept",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-frame.ac5",
+            "title": "Given the rewritten file, when `wc -l` runs on IssueMissionControl.tsx, then it prints a number below 200, and `git grep -nE \"useDrawerData|/TasksRail|ZoneCOverviewTabs/queries|cockpitBody.module.css\" -- src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delete-orphans",
+        "title": "Delete the cockpit modules the flip orphaned and fix references to them",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-5246",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.test.ts",
+            "src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/CockpitPhaseRail.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/CockpitPhaseRail.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueOverviewTab.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/useDeferredSessionSelection.ts",
+            "src/dashboard/frontend/src/components/Stage/cockpit/useDeferredSessionSelection.test.ts",
+            "src/dashboard/frontend/src/components/Stage/cockpit/useCockpitNeedsYouActions.ts",
+            "src/dashboard/frontend/src/components/issue-view/RunDetailsCard.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/cockpitBody.module.css",
+            "src/dashboard/frontend/src/components/issue-view/IssueView.tsx",
+            "src/dashboard/frontend/src/lib/issueActions.ts",
+            "src/dashboard/frontend/src/components/issue-view/StackDrawer.tsx",
+            "src/dashboard/frontend/src/components/issue-view/useNeedsYouActions.ts",
+            "scripts/frontend-test-subset.txt",
+            "src/dashboard/frontend/src/lib/__tests__/issue-actions-surface-parity.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.header-title.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner tests/unit/dashboard/frontend/issue-view-no-loss.test.ts",
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issue-actions-surface-parity.test.tsx src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx src/components/Stage/cockpit/IssueMissionControl.header-title.test.tsx src/components/issue-view/StackDrawer.test.tsx",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "issue-view-no-loss.test.ts passes",
+            "the four frontend test files pass",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-12",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Delete IssueTreeLane.tsx (+ .test.ts), AgentsLane.tsx (+ .test.tsx), CockpitPhaseRail.tsx (+ .test.tsx), IssueOverviewTab.tsx, useDeferredSessionSelection.ts (+ .test.ts), useCockpitNeedsYouActions.ts and components/issue-view/RunDetailsCard.tsx. Remove src/components/Stage/cockpit/IssueTreeLane.test.ts (line 117) from scripts/frontend-test-subset.txt in the same commit. Remove from cockpitBody.module.css the rules .missionWrap, .headerTop, .headerTitle, .headerMeta, .missionBody, .awarenessRail, .spineCollapsed and their @container blocks; keep .wrap and .scan. Update the comments in IssueView.tsx, lib/issueActions.ts:76, StackDrawer.tsx:10 and useNeedsYouActions.ts:7 as WI-6 steps 4-5 say. Remove the ./AgentsLane vi.mock lines from the parity, render-count and header-title tests (WI-6 step 5a). Keep agentsLane.module.css, PlanMapCard.tsx, PickupGateCard.tsx and every already-unmounted module."
+        },
+        "items": [
+          {
+            "id": "delete-orphans.ac1",
+            "title": "Given the commit, when `ls` runs on the seven deleted source files and four deleted test files, then each reports No such file or directory, and scripts/frontend-test-subset.txt no longer contains IssueTreeLane.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-orphans.ac2",
+            "title": "Given the tree, when `git grep -nE \"function (CheckRunList|GitHubCiPanel|StackDrawer)\" -- src/dashboard/frontend/src/components/Stage` runs, then it prints nothing; and `git grep -nE \"IssueTreeLane|cockpit/AgentsLane|CockpitPhaseRail|IssueOverviewTab|useDeferredSessionSelection|useCockpitNeedsYouActions|RunDetailsCard\" -- src/dashboard/frontend/src` prints no import line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-orphans.ac3",
+            "title": "Given the tree, when `npm run typecheck` and the root no-loss test run, then both pass, and the parity, render-count and header-title tests pass with only their mock lines removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sections-test",
+        "title": "Add the runtime test that every cockpit section renders in the Stage tab",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5246",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.sections.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.sections.test.tsx",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "IssueMissionControl.sections.test.tsx passes its four tests",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 part B. Create Stage/cockpit/IssueMissionControl.sections.test.tsx rendering the real frame with the real IssueDetail, IssueDrawerDetails, IssueDetailTabBodies, IssueBannerSlot, NeedsYouSlot, StatusNarrative, HappenedFeed, StackDrawer and DrawerAgentSession, mocking only the heavy leaves WI-7 lists, with the WI-7 fixture (one running work agent, changes-requested with red checks, an activity section, an existing workspace). Use the MARKERS_BY_TAB table from WI-7 and write the four tests named there. The test must not read a source file (lint:source-introspection)."
+        },
+        "items": [
+          {
+            "id": "sections-test.ac1",
+            "title": "Given MARKERS_BY_TAB, when `renders every cockpit inventory marker on a visible element` runs, then for each tab value every listed section matches an element in the document whose closest('[hidden]') is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sections-test.ac2",
+            "title": "Given MARKERS_BY_TAB, when `the marker table covers DENSITY_SECTIONS.cockpit exactly` runs, then the set of listed sections equals the set of DENSITY_SECTIONS.cockpit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sections-test.ac3",
+            "title": "Given the Stage frame, when `the Stage tab renders the drawer's tab entries` runs, then the drawer-tab-* test ids in DOM order are session, tasks, plan, changes, activity, discussion, skills, overview",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sections-test.ac4",
+            "title": "Given ?tab=overview, when the frame renders, then drawer-details-footer contains the launcher node passed to the frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e2e-pane-rows",
+        "title": "Re-point the issue-tree end-to-end test at the Details pipeline table and the strip",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5246",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/e2e/issue-tree.spec.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/e2e/issue-tree.spec.ts"
+          ],
+          "expected_outputs": [
+            "issue-tree.spec.ts passes both tests with no page error"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-11"
+          ],
+          "readinessReason": "Starts a Vite dev server and a browser; run it alone so it does not compete with other browser runs."
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Keep the harness, fixture and openCockpit route in tests/e2e/issue-tree.spec.ts. Rewrite the header comment and the two test bodies exactly as WI-8 steps 1-4 give: open Details by clicking [data-testid=\"drawer-tab-overview\"] after load, then assert the Review row (opus-5, Running now), the Work row (sonnet-5), one Review row, both strip phases data-kind=live, and no pane id on the page. If a component throws on the fixture's {} answers, fix the component to tolerate the missing field; never weaken or delete an assertion."
+        },
+        "items": [
+          {
+            "id": "e2e-pane-rows.ac1",
+            "title": "Given the fixture with two working panes and agents: [], when `renders a Herdr-spawned reviewer as the Review row with its model tag` runs, then tr[data-phase=review] in drawer-details-pipeline contains opus-5 and Running now, tr[data-phase=work] contains sonnet-5, and pageErrors is empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-pane-rows.ac2",
+            "title": "Given the same fixture, when `takes its rows from the pane inventory alone` runs, then there is exactly one Review row, the strip's work and review phases have data-kind=live, and the text pane-review-9101 appears nowhere on the page",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-test-subset",
+        "title": "Add the new must-run frontend tests to the CI test list",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-5246",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx src/components/Stage/cockpit/IssueMissionControl.sections.test.tsx src/components/issue-view/IssueTitleRow.test.tsx src/lib/__tests__/issueLinks.test.ts"
+          ],
+          "expected_outputs": [
+            "the four newly listed test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Repo rules, CI test list. Add in sorted position, one per line relative to src/dashboard/frontend: src/components/Stage/cockpit/IssueMissionControl.sections.test.tsx, src/components/issue-view/IssueTitleRow.test.tsx, src/lib/__tests__/issueLinks.test.ts. Also add src/components/Stage/cockpit/IssueMissionControl.test.tsx: planning found all 48 of its tests failing on main (unanswered GET /api/issues/PAN-1661), and stage-frame's rewrite answers that route, so the file is green after stage-frame. If it is not green on this branch, stop and fix the fetch stub in that test rather than leaving it out."
+        },
+        "items": [
+          {
+            "id": "ci-test-subset.ac1",
+            "title": "Given the edited list, when `grep -nE \"IssueMissionControl.sections.test.tsx|IssueMissionControl.test.tsx|IssueTitleRow.test.tsx|issueLinks.test.ts\" scripts/frontend-test-subset.txt` runs, then it prints four lines, each in sorted position relative to its neighbours",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-test-subset.ac2",
+            "title": "Given the list, when every listed path is checked with `ls` from src/dashboard/frontend, then each exists, and IssueTreeLane.test.ts is not listed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-issue-view",
+        "title": "Rewrite docs/ISSUE-VIEW.md for one issue view in two shells",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5246",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ISSUE-VIEW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-9",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 item 1. Edit docs/ISSUE-VIEW.md by heading: the opening paragraph, Shared components (add IssueTitleRow, remove RunDetailsCard, reword the crew-spine and NeedsYouSlot bullets), Density model, Header title, and replace `### Cockpit layout` (through the line before `### Ended session outcomes (PAN-4290)`) with `### One view, two shells (PAN-5246)`, folding in `### Drawer layout (PAN-5244)` and its strip-kind, checks-chip and pickup-stage tables, adding the Tab values table, the Section map table, the console table, the crew-spine/awareness-rail relocation paragraph and the pane-only-phase rule. Keep the conversation-panel loading paragraph; delete the crew-spine paragraph and the sentence `the Stage issue tab keeps this layout until PAN-5246`. Update the four-step section list, the contextual-action rows (AgentsLane → StackDrawer) and the retired `discussions` row."
+        },
+        "items": [
+          {
+            "id": "docs-issue-view.ac1",
+            "title": "Given the edited file, when `grep -n \"^### \" docs/ISSUE-VIEW.md` runs, then it lists `### One view, two shells (PAN-5246)` and neither `### Cockpit layout` nor `### Drawer layout (PAN-5244)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-issue-view.ac2",
+            "title": "Given the edited file, when `grep -nE \"RunDetailsCard|AgentsLane|crew spine|keeps this layout until PAN-5246\" docs/ISSUE-VIEW.md` runs, then the only matches are inside the new section's paragraph that says where the crew spine went",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-issue-view.ac3",
+            "title": "Given the new section, when it is read, then it contains the 21-row Section map table, the Tab values table with conversation as the Stage default, and the sentence that each shell owns routing and frame chrome only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-dev",
+        "title": "Update the developer docs that describe the cockpit's data sources and consumers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5246",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MISSION-CONTROL.md",
+            "docs/TERMINAL-BACKENDS.md",
+            "docs/XBRIEF.md",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 items 2-5. docs/MISSION-CONTROL.md: rewrite `## Issue cockpit data sources` (up to `### Lint node (PAN-2665)`): the Stage issue tab builds no session tree; the issue view reads store agents for conversations and the backend pane inventory for live phases and pane-only rows; the session tree is the Command Deck issue tree fed by /api/session-trees. docs/TERMINAL-BACKENDS.md: remove `IssueTreeLane.paneStatus` and its path from the presenceForPaneState consumers (search `Its consumers:`); add IssueDrawerDetails if missing. docs/XBRIEF.md: replace the bullet about the drawer Plan panel and cockpit PlanMapCard with the WI-9 sentence. docs/DASHBOARD-ARCHITECTURE.md: give the `**Issue views:**` paragraph the WI-9 first sentence."
+        },
+        "items": [
+          {
+            "id": "docs-dev.ac1",
+            "title": "Given the four files, when `grep -nE \"IssueTreeLane|PlanMapCard|builds its session tree\" docs/MISSION-CONTROL.md docs/TERMINAL-BACKENDS.md docs/XBRIEF.md docs/DASHBOARD-ARCHITECTURE.md` runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-dev.ac2",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when the `**Issue views:**` paragraph is read, then it states that the drawer and the Stage issue tab render one shared issue view and the rail row is the third issue surface",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "visual-evidence",
+        "title": "Capture the Stage and drawer screenshots and run the six layout checks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5246",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".tmp/pan-5246/*.png",
+            ".tmp/pan-5246/capture.mts",
+            ".tmp/pan-5246/checks.json",
+            "images/command-deck/issue-cockpit-light.png",
+            "images/command-deck/issue-cockpit-dark.png",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "build completes without errors",
+            "16 PNG files and checks.json with six true results exist under .tmp/pan-5246/"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-4",
+            "NFR-6",
+            "FR-10"
+          ],
+          "readinessReason": "Needs the built dashboard and a browser; may apply a layout fallback to IssueMissionControl.tsx or IssueDetail.tsx, so it runs after the code items and alone."
+        },
+        "narrative": {
+          "Action": "PRD WI-10 plus the WI-2 and WI-5 implementation checkpoints. Do NOT use, restart, reload or replace the live dashboard on :3011 (it runs main, not this branch). Write a throwaway capture script .tmp/pan-5246/capture.mts that copies the tests/e2e/issue-tree.spec.ts harness: Vite createServer on a free port with the wsTransport mock plugin, the snapshot seeded into pan-snapshot-cache-v1, fetch routes answered by page.route, and a fresh browser.newContext() (isolated profile, nothing shared with another agent). Use one fixture per state as the PRD WI-10 table says (working agent; needs-you via hasPendingQuestion: true plus a session node; paused agent; PR with checks red and two check runs). Capture the 16 screenshots into .tmp/pan-5246/ (gitignored) and write the six mechanical check results as JSON to .tmp/pan-5246/checks.json. The PR-body attachment happens at pan done (see continue.json). If a checkpoint fails, apply exactly the fallback the PRD names: frame root h-full → absolute inset-0 (pane height), the overflow-x-auto wrapper around the action strip (narrow pane), the max-w-[980px] session wrapper for page density (transcript measure). Copy the Stage 1100px Conversation shots (light and dark) to images/command-deck/issue-cockpit-light.png and issue-cockpit-dark.png for docs-user."
+        },
+        "items": [
+          {
+            "id": "visual-evidence.ac1",
+            "title": "Given the branch frontend served by the capture harness (never the live :3011 dashboard), when the Playwright run finishes, then .tmp/pan-5246/ contains the 16 screenshots of the WI-10 table and checks.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "visual-evidence.ac2",
+            "title": "Given the same issue, when the tab ids `[data-testid^=\"drawer-tab-\"][role=\"tab\"]` are listed in the Stage tab and the drawer, then the two lists are identical, and in every Stage shot the cockpit root has scrollWidth <= clientWidth",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "visual-evidence.ac3",
+            "title": "Given shots 1-4, when the .pane ancestor is measured, then scrollHeight <= clientHeight + 1 and the composer's bottom edge is within 24px of the pane's bottom; and at 750px the two Details columns share one left edge while at 1100px they differ",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "visual-evidence.ac4",
+            "title": "Given the Stage tab, when the pickup popover is opened from the strip and the issue title is clicked, then the popover closes, and the workspace Open in picker opens beside its trigger and closes on an outside click",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-user",
+        "title": "Rewrite the Mintlify issue-cockpit descriptions and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T12:31:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5246",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "concepts.mdx",
+            "introduction.mdx",
+            "features/skill-packs.mdx",
+            "features/skills.mdx",
+            "changelog.d/pan-5246.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 items 6-7. In concepts.mdx (lines 18 and 37) and introduction.mdx (line 47) replace the `blocker spotlight → ... scan cards → dig tabs` description with the real layout (title row with state, cost and next actions; pipeline strip; needs-you banner; tabs led by Conversation: Conversation, Tasks, Plan, Changes, Activity, Discussion, Skills, Details) and say it is the same view the issue drawer shows. Update the concepts.mdx image alt text for the new screenshots that visual-evidence placed at images/command-deck/issue-cockpit-light.png and -dark.png. features/skill-packs.mdx (search `**Decisions tab.**`) and features/skills.mdx (the `**Issue view → Skills for this issue**` bullet) get the WI-9 wording. Create changelog.d/pan-5246.md with the WI-9 text, in the changelog.d/README.md format; never edit the top of changelog.mdx."
+        },
+        "items": [
+          {
+            "id": "docs-user.ac1",
+            "title": "Given the repo, when `git grep -n \"scan cards\" -- '*.mdx'` runs, then it prints nothing, and concepts.mdx and introduction.mdx name the Conversation, Tasks, Plan, Changes, Activity, Discussion, Skills and Details tabs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-user.ac2",
+            "title": "Given changelog.d/pan-5246.md, when it is read, then it has an `#### Improved` heading and one bullet that links https://github.com/eltmon/overdeck/issues/5246",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-user.ac3",
+            "title": "Given features/skills.mdx, when the Skills bullet is read, then it says the Skills tab is in the issue drawer and the Stage issue tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "page-composition",
+        "to": "tasks-count",
+        "type": "blocks"
+      },
+      {
+        "from": "tasks-count",
+        "to": "details-footer",
+        "type": "blocks"
+      },
+      {
+        "from": "details-footer",
+        "to": "markers-issue-detail",
+        "type": "blocks"
+      },
+      {
+        "from": "details-footer",
+        "to": "details-next-step",
+        "type": "blocks"
+      },
+      {
+        "from": "details-next-step",
+        "to": "details-create-pr",
+        "type": "blocks"
+      },
+      {
+        "from": "details-create-pr",
+        "to": "markers-details",
+        "type": "blocks"
+      },
+      {
+        "from": "markers-issue-detail",
+        "to": "inventory-homes",
+        "type": "blocks"
+      },
+      {
+        "from": "markers-tab-bodies",
+        "to": "inventory-homes",
+        "type": "blocks"
+      },
+      {
+        "from": "markers-details",
+        "to": "inventory-homes",
+        "type": "blocks"
+      },
+      {
+        "from": "markers-agent-session",
+        "to": "inventory-homes",
+        "type": "blocks"
+      },
+      {
+        "from": "title-row",
+        "to": "stage-frame",
+        "type": "blocks"
+      },
+      {
+        "from": "inventory-homes",
+        "to": "stage-frame",
+        "type": "blocks"
+      },
+      {
+        "from": "markers-issue-detail",
+        "to": "stage-frame",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-frame",
+        "to": "delete-orphans",
+        "type": "blocks"
+      },
+      {
+        "from": "inventory-homes",
+        "to": "delete-orphans",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-frame",
+        "to": "sections-test",
+        "type": "blocks"
+      },
+      {
+        "from": "details-create-pr",
+        "to": "sections-test",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-frame",
+        "to": "e2e-pane-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "title-row",
+        "to": "ci-test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "details-create-pr",
+        "to": "ci-test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "sections-test",
+        "to": "ci-test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-orphans",
+        "to": "ci-test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-frame",
+        "to": "ci-test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-orphans",
+        "to": "visual-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "sections-test",
+        "to": "visual-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "visual-evidence",
+        "to": "docs-user",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
