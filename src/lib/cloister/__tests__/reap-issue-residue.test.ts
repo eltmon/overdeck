@@ -14,6 +14,16 @@ const mocks = vi.hoisted(() => ({
   ),
   agentsDir: '',
   reapWorkerWorktrees: vi.fn(async () => [] as string[]),
+  getWorkspaceForIssue: vi.fn((): { id: string; name: string } | null => null),
+  archiveWorkspace: vi.fn(async () => {}),
+}));
+
+vi.mock('../../workspaces/resolver.js', () => ({
+  getWorkspaceForIssue: mocks.getWorkspaceForIssue,
+}));
+
+vi.mock('../../workspaces/writer.js', () => ({
+  archiveWorkspace: mocks.archiveWorkspace,
 }));
 
 vi.mock('../../workspaces/worker-worktrees.js', () => ({
@@ -61,6 +71,7 @@ describe('reapIssueResidue', () => {
     mkdirSync(mocks.agentsDir, { recursive: true });
     vi.clearAllMocks();
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
+    mocks.getWorkspaceForIssue.mockReturnValue(null);
     mocks.isBranchMerged.mockResolvedValue({ status: 'merged', message: 'merged' });
     mocks.teardownWorkspaceDockerByName.mockResolvedValue({
       networkRemoved: true,
@@ -195,6 +206,36 @@ describe('reapIssueResidue', () => {
     mocks.isBranchMerged.mockResolvedValue({ status: 'unmerged', message: 'not merged' });
     await reapIssueResidue(projectPath, 'PAN-2054');
     expect(mocks.reapWorkerWorktrees).not.toHaveBeenCalled();
+  });
+
+  it('PAN-5233: archives the issue workspace row once the worktree directory is gone', async () => {
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-2054');
+    mkdirSync(workspacePath, { recursive: true });
+    mocks.getWorkspaceForIssue.mockReturnValue({ id: 'ws-1', name: 'feature-pan-2054' });
+
+    const actions = await reapIssueResidue(projectPath, 'pan-2054');
+
+    expect(mocks.getWorkspaceForIssue).toHaveBeenCalledWith('PAN-2054');
+    expect(mocks.archiveWorkspace).toHaveBeenCalledWith('ws-1');
+    expect(actions).toContain('archived workspace row feature-pan-2054');
+  });
+
+  it('PAN-5233: archives the row when the directory was already removed', async () => {
+    mocks.getWorkspaceForIssue.mockReturnValue({ id: 'ws-1', name: 'feature-pan-2054' });
+
+    await reapIssueResidue(projectPath, 'PAN-2054');
+
+    expect(mocks.archiveWorkspace).toHaveBeenCalledWith('ws-1');
+  });
+
+  it('PAN-5233: keeps the row when the branch is unmerged and the directory stays', async () => {
+    mkdirSync(join(projectPath, 'workspaces', 'feature-pan-2054'), { recursive: true });
+    mocks.getWorkspaceForIssue.mockReturnValue({ id: 'ws-1', name: 'feature-pan-2054' });
+    mocks.isBranchMerged.mockResolvedValue({ status: 'unmerged', message: 'not merged' });
+
+    await reapIssueResidue(projectPath, 'PAN-2054');
+
+    expect(mocks.archiveWorkspace).not.toHaveBeenCalled();
   });
 
   it('does not use execSync', () => {
