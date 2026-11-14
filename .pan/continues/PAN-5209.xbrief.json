@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5209",
   "created": "2026-11-14T01:28:12.101Z",
-  "updated": "2026-11-14T01:49:08.401Z",
+  "updated": "2026-11-14T01:49:21.793Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,11 @@
     "compare-origin-target.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T01:49:08.401Z"
+    },
+    "verify-merged-fixture-tests": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5209",
+      "claimedAt": "2026-11-14T01:49:21.793Z"
     }
   }
 }
