@@ -20,7 +20,7 @@ import { formatIssueRef } from '../issueLabel'
 import { requestRevealNeedsYou } from '../flywheelReveal'
 import { useFlywheelStatus } from '../flywheelApi'
 import { navigateToIssue } from '../../components/AgentPillPopoverRow'
-import { needsYouRows, type NeedsYouRow } from '../../components/flywheel/FlywheelStatusPane'
+import { needsYouRows, type NeedsYouRow } from '../../components/flywheel/needsYouRows'
 import { useProjectResolver, type ProjectResolver } from './projectOf'
 
 export type NeedsYouKind = 'pending-input' | 'issue' | 'flywheel' | 'decision'
