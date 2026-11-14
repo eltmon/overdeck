@@ -127,6 +127,7 @@ src/components/__tests__/GitHubQuotaPill.test.tsx
 src/components/__tests__/GitHubRateLimitBanner.test.tsx
 src/components/__tests__/HarnessUpdateCard.test.tsx
 src/components/__tests__/McpSignInCard.test.tsx
+src/components/__tests__/NewBuildBanner.test.tsx
 src/components/__tests__/PanOpenInPicker.remote.test.tsx
 src/components/__tests__/Sidebar.ownerGroups.test.tsx
 src/components/__tests__/Sidebar.workspacePullRequest.test.tsx
