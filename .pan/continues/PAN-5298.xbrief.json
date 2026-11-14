@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5298",
   "created": "2026-11-14T21:08:19.124Z",
-  "updated": "2026-11-14T21:54:29.646Z",
+  "updated": "2026-11-14T21:54:35.654Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,11 @@
     "issue-tree-diagnostics.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T21:54:29.646Z"
+    },
+    "merge-train-isolation": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5298",
+      "claimedAt": "2026-11-14T21:54:35.654Z"
     }
   }
 }
