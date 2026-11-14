@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5298",
   "created": "2026-11-14T21:08:19.124Z",
-  "updated": "2026-11-14T22:00:28.174Z",
+  "updated": "2026-11-14T22:00:33.104Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,11 @@
     "linked-title-bar-isolation.ac2": {
       "status": "completed",
       "doneAt": "2026-11-14T22:00:28.174Z"
+    },
+    "docs-e2e-harness": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5298",
+      "claimedAt": "2026-11-14T22:00:33.104Z"
     }
   }
 }
