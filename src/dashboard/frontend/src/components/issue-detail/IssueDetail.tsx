@@ -42,14 +42,16 @@ import { ChangedFilesView } from '../Stage/cockpit/ChangedFilesView';
 
 export type IssueDetailDensity = 'drawer' | 'page' | 'rail';
 
+// PAN-5244: conversation first. Ids are stable (?tab= links); labels and order are not.
 export const ISSUE_DETAIL_TABS = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'plan', label: 'Plan map' },
+  { id: 'session', label: 'Conversation' },
   { id: 'tasks', label: 'Tasks' },
-  { id: 'session', label: 'Session' },
-  { id: 'activity', label: 'Activity' },
+  { id: 'plan', label: 'Plan map' },
   { id: 'files', label: 'Files' },
+  { id: 'activity', label: 'Activity' },
   { id: 'artifacts', label: 'Artifacts' },
+  { id: 'skills', label: 'Skills' },
+  { id: 'overview', label: 'Details' },
 ] as const;
 
 export type IssueDetailTabId =
@@ -58,6 +60,8 @@ export type IssueDetailTabId =
   | 'terminal';
 
 const SESSION_TAB_IDS = new Set<string>(['session', 'conversation', 'terminal']);
+/** PAN-5244: tab ids no density shows yet (the Skills body lands with the drawer composition). */
+const HIDDEN_SKILLS: ReadonlySet<string> = new Set(['skills']);
 
 export interface IssueDetailProps {
   issueId: string;
@@ -96,15 +100,22 @@ function TabPlaceholder({ tab }: { tab: string }) {
   );
 }
 
-function IssueDetailTabs({ tab, onSelectTab, tasksBadge }: {
+/** Tab count chip: a squared mono chip, never a pill. */
+const TAB_COUNT_CHIP_CLASS = 'ml-[6px] rounded-[4px] border border-border px-[4px] font-mono-ui text-[10.5px] leading-[15px] text-muted-foreground';
+
+function IssueDetailTabs({ tab, onSelectTab, tasksBadge, skillsBadge, hiddenTabIds }: {
   tab: string;
   onSelectTab: (tab: IssueDetailTabId) => void;
   tasksBadge?: string | undefined;
+  /** Count of skill overrides for this issue; the chip shows only above zero. */
+  skillsBadge?: number | null | undefined;
+  /** Tab ids this density does not show. */
+  hiddenTabIds?: ReadonlySet<string> | undefined;
 }) {
   return (
-    <nav data-component="drawer-tabs" data-testid="drawer-tabs" className="border-b border-border bg-background/95 px-[14px]" role="tablist" aria-label="Issue drawer sections">
+    <nav data-component="drawer-tabs" data-testid="drawer-tabs" className="border-b border-border bg-background px-[12px]" role="tablist" aria-label="Issue drawer sections">
       <div className="flex min-w-0 items-center overflow-x-auto">
-        {ISSUE_DETAIL_TABS.map((entry) => {
+        {ISSUE_DETAIL_TABS.filter((entry) => !hiddenTabIds?.has(entry.id)).map((entry) => {
           const active = entry.id === 'session' ? SESSION_TAB_IDS.has(tab) : tab === entry.id;
           return (
             <button
@@ -114,7 +125,7 @@ function IssueDetailTabs({ tab, onSelectTab, tasksBadge }: {
               aria-selected={active}
               data-testid={`drawer-tab-${entry.id}`}
               className={cn(
-                'relative flex shrink-0 items-center px-[14px] py-[10px] text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground',
+                'relative flex shrink-0 items-center h-[34px] px-[10px] text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground',
                 active && 'text-foreground',
               )}
               onClick={() => onSelectTab(
@@ -125,11 +136,16 @@ function IssueDetailTabs({ tab, onSelectTab, tasksBadge }: {
             >
               {entry.label}
               {entry.id === 'tasks' ? (
-                <span data-testid="drawer-tab-tasks-count" className="ml-[6px] rounded-full bg-primary/15 px-[5px] py-[1px] font-mono text-[10px] leading-none text-primary">
+                <span data-testid="drawer-tab-tasks-count" className={TAB_COUNT_CHIP_CLASS}>
                   {tasksBadge ?? '0/0'}
                 </span>
               ) : null}
-              {active ? <span data-testid="drawer-tab-active-underline" className="absolute bottom-0 left-[14px] right-[14px] h-[2px] bg-primary" /> : null}
+              {entry.id === 'skills' && typeof skillsBadge === 'number' && skillsBadge > 0 ? (
+                <span data-testid="drawer-tab-skills-count" title="Skills changed for this issue" className={TAB_COUNT_CHIP_CLASS}>
+                  {skillsBadge}
+                </span>
+              ) : null}
+              {active ? <span data-testid="drawer-tab-active-underline" className="absolute bottom-0 left-[10px] right-[10px] h-[2px] bg-primary" /> : null}
             </button>
           );
         })}
@@ -206,7 +222,7 @@ export function IssueDetail({ issueId, density, agents, derived, tab, onSelectTa
     <div data-component="issue-detail" data-density={density} className={cn('flex min-h-0 flex-1 flex-col', className)}>
       <div data-section="DrawerPausedBanner"><PausedBanner agents={agents} /></div>
       {showTabs && (
-        <div data-section="DrawerTabs"><IssueDetailTabs tab={tab} onSelectTab={onSelectTab} tasksBadge={tasksBadge} /></div>
+        <div data-section="DrawerTabs"><IssueDetailTabs tab={tab} onSelectTab={onSelectTab} tasksBadge={tasksBadge} hiddenTabIds={HIDDEN_SKILLS} /></div>
       )}
       {/* PAN-2908 C-DETAIL: the ONE issue-detail anatomy (rail + strip as the
           per-agent conversation switcher), shared with the cockpit. */}

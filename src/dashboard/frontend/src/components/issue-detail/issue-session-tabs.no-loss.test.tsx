@@ -90,13 +90,14 @@ describe('issue session tab no-loss audit', () => {
 
   it('keeps every non-session section as a literal tab entry', () => {
     expect(ISSUE_DETAIL_TABS.map((entry) => entry.id)).toEqual([
-      'overview',
-      'plan',
-      'tasks',
       'session',
-      'activity',
+      'tasks',
+      'plan',
       'files',
+      'activity',
       'artifacts',
+      'skills',
+      'overview',
     ]);
   });
 });

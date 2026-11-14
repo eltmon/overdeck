@@ -190,12 +190,26 @@ describe('IssueDrawer', () => {
       { id: 'open', title: 'Open bead', status: 'open', createdAt: '2026-05-18T00:00:00.000Z' },
     ]);
 
-    expect(screen.getByTestId('drawer-tabs')).toHaveClass('px-[14px]');
-    expect(screen.getByTestId('drawer-tab-overview')).toHaveClass('py-[10px]', 'text-[13px]', 'font-medium', 'text-foreground');
-    expect(within(screen.getByTestId('drawer-tab-overview')).getByTestId('drawer-tab-active-underline')).toHaveClass('left-[14px]', 'right-[14px]', 'h-[2px]', 'bg-primary');
+    expect(screen.getByTestId('drawer-tabs')).toHaveClass('px-[12px]');
+    expect(screen.getByTestId('drawer-tab-overview')).toHaveClass('h-[34px]', 'text-[13px]', 'font-medium', 'text-foreground');
+    expect(within(screen.getByTestId('drawer-tab-overview')).getByTestId('drawer-tab-active-underline')).toHaveClass('left-[10px]', 'right-[10px]', 'h-[2px]', 'bg-primary');
     expect(screen.getByTestId('drawer-tab-plan')).toHaveClass('text-muted-foreground', 'hover:text-foreground');
     expect(within(screen.getByTestId('drawer-tab-tasks')).getByTestId('drawer-tab-tasks-count')).toHaveTextContent('1/2');
-    expect(screen.getByTestId('drawer-tab-tasks-count')).toHaveClass('font-mono', 'text-[10px]', 'px-[5px]');
+    expect(screen.getByTestId('drawer-tab-tasks-count')).toHaveClass('font-mono-ui', 'text-[10.5px]', 'px-[4px]', 'rounded-[4px]');
+    expect(screen.getByTestId('drawer-tab-tasks-count')).not.toHaveClass('rounded-full');
+    expect(screen.getByTestId('drawer-tab-session')).toHaveTextContent('Conversation');
+    expect(screen.getByTestId('drawer-tab-overview')).toHaveTextContent('Details');
+    expect(
+      within(screen.getByTestId('drawer-tabs')).getAllByRole('tab').map((button) => button.getAttribute('data-testid')),
+    ).toEqual([
+      'drawer-tab-session',
+      'drawer-tab-tasks',
+      'drawer-tab-plan',
+      'drawer-tab-files',
+      'drawer-tab-activity',
+      'drawer-tab-artifacts',
+      'drawer-tab-overview',
+    ]);
 
     fireEvent.click(screen.getByTestId('drawer-tab-files'));
 
