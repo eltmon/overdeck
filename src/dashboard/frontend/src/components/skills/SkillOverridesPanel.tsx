@@ -208,6 +208,9 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
   const resetGroups = () => setOpenGroups({});
   const packs = data?.packs;
   const packsOn = packs?.filter(pack => pack.enabled).length ?? 0;
+  // PAN-5245: skills with a stored value at this level, listed first below global.
+  const changedHere = level === 'global' ? [] : skills.filter(skill => !skill.core && levelValue(skill, level) !== null);
+  const showChanged = level !== 'global' && !narrowing;
 
   return (
     <div className="space-y-4" data-testid={`skill-overrides-${level}`}>
@@ -298,6 +301,44 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
               ))}
             </div>
           </div>
+
+          {showChanged && (
+            <section
+              data-skill-group="changed"
+              aria-label={`Changed for this ${level}`}
+              className="overflow-hidden rounded-lg border border-border bg-card"
+            >
+              <div className="list-group-bar px-3 py-2">
+                <div className="flex min-h-7 items-center gap-3">
+                  <h3 className="text-[13px] font-medium text-foreground">Changed for this {level}</h3>
+                  <span className="ml-auto flex shrink-0 items-center gap-3">
+                    <span className="font-mono-ui text-xs tabular-nums text-muted-foreground" data-testid="skills-changed-count">{changedHere.length}</span>
+                  </span>
+                </div>
+              </div>
+              {changedHere.length === 0 ? (
+                <p className="border-t border-border px-3 py-3 text-sm text-muted-foreground">
+                  {level === 'issue'
+                    ? "Nothing is changed. This issue's agents launch with the project's skills."
+                    : "Nothing is changed. This project's agents launch with the global skills."}
+                </p>
+              ) : (
+                <div className="divide-y divide-border border-t border-border">
+                  {changedHere.map(skill => (
+                    <SkillRow
+                      key={skill.name}
+                      skill={skill}
+                      level={level}
+                      below={null}
+                      saving={saving[skill.name] === true}
+                      error={rowErrors[skill.name]}
+                      onSave={value => void save(skill.name, value)}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
 
           <div className="overflow-hidden rounded-lg border border-border bg-card">
             {groups.length === 0 && (

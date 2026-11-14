@@ -105,6 +105,7 @@ describe('SkillOverridesPanel — global', () => {
     expect(screen.getByText(/Changes apply to Claude Code and Codex agents at their next launch\./)).toBeTruthy();
     expect(fetchImpl).toHaveBeenCalledWith('/api/skills/overrides');
     expect(screen.queryByRole('button', { name: /^Pin /})).toBeNull();
+    expect(document.querySelector('[data-skill-group="changed"]')).toBeNull();
   });
 
   it('collapses the Overdeck group until a search matches inside it', async () => {
@@ -189,6 +190,47 @@ describe('SkillOverridesPanel — issue', () => {
     expect(row('local')).toBeTruthy();
     expect(document.querySelector('[data-skill="okf"]')).toBeNull();
     expect(document.querySelector('[data-skill="codebase-design"]')).toBeNull();
+  });
+
+  it('lists changed skills first and keeps them in their home group', async () => {
+    mockApi(issueSkills);
+    renderPanel({ level: 'issue', issueId: 'TST-1' });
+    await waitFor(() => expect(row('okf')).toBeTruthy());
+
+    expect(document.querySelector('[data-skill-group]')?.getAttribute('data-skill-group')).toBe('changed');
+    expect(within(group('changed')).getByText('Changed for this issue')).toBeTruthy();
+    expect(within(group('changed')).getByText('grilling')).toBeTruthy();
+    expect(within(group('changed')).getByText('local')).toBeTruthy();
+    expect(within(group('changed')).queryByText('okf')).toBeNull();
+    expect(screen.getByTestId('skills-changed-count').textContent).toBe('2');
+    expect(rowIn('personal', 'grilling')).toBeTruthy();
+    expect(rowIn('project', 'local')).toBeTruthy();
+  });
+
+  it('says nothing is changed when no skill has a stored value', async () => {
+    mockApi({ project: 'tst', issue: 'TST-1', skills: [skill({ name: 'okf' })] });
+    renderPanel({ level: 'issue', issueId: 'TST-1' });
+    await waitFor(() => expect(row('okf')).toBeTruthy());
+
+    expect(within(group('changed')).getByText("Nothing is changed. This issue's agents launch with the project's skills.")).toBeTruthy();
+    expect(screen.getByTestId('skills-changed-count').textContent).toBe('0');
+    expect(screen.queryByRole('button', { name: 'Reset all' })).toBeNull();
+  });
+
+  it('hides the changed group while searching or filtering', async () => {
+    mockApi(issueSkills);
+    renderPanel({ level: 'issue', issueId: 'TST-1' });
+    await waitFor(() => expect(row('okf')).toBeTruthy());
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Filter skills' }), { target: { value: 'okf' } });
+    expect(document.querySelector('[data-skill-group="changed"]')).toBeNull();
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Filter skills' }), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Off/ }));
+    expect(document.querySelector('[data-skill-group="changed"]')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /^All/ }));
+    expect(document.querySelector('[data-skill-group="changed"]')).toBeTruthy();
   });
 
   it('shows one switch and a source per row, and no Inherit buttons', async () => {
@@ -305,6 +347,15 @@ describe('SkillOverridesPanel — project', () => {
     expect(screen.getByRole('button', { name: /^All/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /^Changed here/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /^Off at launch/ })).toBeTruthy();
+  });
+
+  it('shows the project wording when nothing is changed', async () => {
+    mockApi({ project: 'tst', issue: null, skills: [skill({ name: 'okf', project: null })] });
+    renderPanel({ level: 'project', projectKey: 'tst' });
+    await waitFor(() => expect(row('okf')).toBeTruthy());
+
+    expect(within(group('changed')).getByText('Changed for this project')).toBeTruthy();
+    expect(within(group('changed')).getByText("Nothing is changed. This project's agents launch with the global skills.")).toBeTruthy();
   });
 });
 
