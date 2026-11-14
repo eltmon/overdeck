@@ -57,6 +57,7 @@ function baseDeps(overrides: DeriveFlywheelStatusDeps = {}): DeriveFlywheelStatu
     listPanes: () => [],
     loadStates: async () => new Map(),
     lastJournal: () => null,
+    isAgentAlive: async () => true,
     policies: () => ({ auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: false }),
     runningBook: () => null,
     now: () => NOW,
@@ -397,6 +398,50 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
       });
       expect(status.agents.map((agent) => `${agent.issueId}/${agent.role}`))
         .toEqual(['PAN-1/work', 'PAN-2/review', 'PAN-2/work']);
+    });
+
+    it('a done pane whose agent is alive counts as a live agent', async () => {
+      const isAgentAlive = vi.fn(async () => true);
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [{ issueId: 'PAN-1', workspacePath: '/ws/feature-pan-1' }],
+          loadStates: async () => new Map<string, DerivedIssueState>([['PAN-1', { issueId: 'PAN-1', state: 'working' }]]),
+          listPanes: () => [{ ...pane('PAN-1', 'done'), agentId: 'agent-pan-1' }],
+          isAgentAlive,
+        }),
+      });
+      expect(isAgentAlive).toHaveBeenCalledWith('agent-pan-1');
+      expect(status.inFlight[0]?.liveAgents).toBe(1);
+      expect(status.agents).toEqual([
+        { issueId: 'PAN-1', role: 'work', harness: 'claude-code', model: 'claude-opus-5-5', state: 'done', agentId: 'agent-pan-1' },
+      ]);
+    });
+
+    it('a done pane whose agent is dead is excluded', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [{ issueId: 'PAN-1', workspacePath: '/ws/feature-pan-1' }],
+          loadStates: async () => new Map<string, DerivedIssueState>([['PAN-1', { issueId: 'PAN-1', state: 'working' }]]),
+          listPanes: () => [pane('PAN-1', 'done')],
+          isAgentAlive: async () => false,
+        }),
+      });
+      expect(status.inFlight[0]?.liveAgents).toBe(0);
+      expect(status.agents).toEqual([]);
+    });
+
+    it('an exited pane is excluded without a probe', async () => {
+      const isAgentAlive = vi.fn(async () => true);
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [{ issueId: 'PAN-1', workspacePath: '/ws/feature-pan-1' }],
+          loadStates: async () => new Map<string, DerivedIssueState>([['PAN-1', { issueId: 'PAN-1', state: 'working' }]]),
+          listPanes: () => [pane('PAN-1', 'exited'), pane('PAN-1', 'working', 'review')],
+          isAgentAlive,
+        }),
+      });
+      expect(isAgentAlive).not.toHaveBeenCalled();
+      expect(status.inFlight[0]?.liveAgents).toBe(1);
     });
   });
 

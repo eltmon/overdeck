@@ -21,6 +21,7 @@
 
 import { join } from 'node:path';
 
+import { paneAgentKey } from '@overdeck/contracts';
 import type {
   BackendPane,
   DerivedIssueState,
@@ -70,6 +71,12 @@ export interface DeriveFlywheelStatusDeps {
     opts: { issues: Readonly<Record<string, TrackerIssueFacts | null>>; panes: readonly BackendPane[] },
   ) => Promise<Map<string, DerivedIssueState>>;
   lastJournal?: (workspacePath: string) => PipelineJournalEntry | null | Promise<PipelineJournalEntry | null>;
+  /**
+   * Whether the agent behind a `done` or `unknown` pane is still alive
+   * (PAN-4666). Herdr `done` means the harness finished its turn and sits at
+   * its prompt, not that it exited.
+   */
+  isAgentAlive?: (agentKey: string) => Promise<boolean>;
   /** The issue's open `strike/<id>` PR; null when none is open (PAN-4752). */
   readStrikePr?: (projectPath: string, issueId: string) => DerivedPrState | null | Promise<DerivedPrState | null>;
   policies?: () => FlywheelPolicies | Promise<FlywheelPolicies>;
@@ -167,9 +174,43 @@ async function defaultLoadStates(
   return loadIssueStatesForProject(projectPath, issueIds, { issues: opts.issues, panes: opts.panes });
 }
 
-/** A pane that is still a running agent: not exited, and not finished. */
-function paneIsLive(pane: BackendPane): boolean {
-  return pane.state !== 'exited' && pane.state !== 'done';
+/**
+ * The one liveness module decides (`src/lib/agents/liveness.ts`). An
+ * indeterminate probe, or one that throws, counts as live: a possibly-live
+ * agent must never read as "no agent".
+ */
+async function defaultIsAgentAlive(agentKey: string): Promise<boolean> {
+  try {
+    const { isAlive } = await import('../agents/liveness.js');
+    const verdict = await isAlive(agentKey);
+    return verdict.alive || verdict.reason === 'runtime-indeterminate';
+  } catch {
+    return true;
+  }
+}
+
+const LIVENESS_PROBE_CONCURRENCY = 4;
+
+/**
+ * The panes that are still running agents (PAN-4666): `exited` is dead,
+ * `working|blocked|idle` are live, and `done|unknown` are confirmed through
+ * the liveness module, four probes at a time.
+ */
+async function livePanes(
+  panes: readonly BackendPane[],
+  isAgentAlive: (agentKey: string) => Promise<boolean>,
+): Promise<BackendPane[]> {
+  const { withConcurrencyLimit } = await import('../concurrency.js');
+  const verdicts = await withConcurrencyLimit(panes.map((pane) => async () => {
+    if (pane.state === 'exited') return false;
+    if (pane.state !== 'done' && pane.state !== 'unknown') return true;
+    try {
+      return await isAgentAlive(paneAgentKey(pane));
+    } catch {
+      return true;
+    }
+  }), LIVENESS_PROBE_CONCURRENCY);
+  return panes.filter((_pane, index) => verdicts[index] === true);
 }
 
 async function defaultLastJournal(workspacePath: string): Promise<PipelineJournalEntry | null> {
@@ -336,8 +377,9 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
     ? await (deps.loadStates ?? defaultLoadStates)(projectRoot, issueIds, { issues, panes })
     : new Map<string, DerivedIssueState>();
   const livePanesByIssue = new Map<string, BackendPane[]>();
-  for (const pane of panes) {
-    if (!pane.issue || !paneIsLive(pane)) continue;
+  const issuePanes = panes.filter((pane) => pane.issue);
+  for (const pane of await livePanes(issuePanes, deps.isAgentAlive ?? defaultIsAgentAlive)) {
+    if (!pane.issue) continue;
     const id = pane.issue.toUpperCase();
     const list = livePanesByIssue.get(id);
     if (list) list.push(pane); else livePanesByIssue.set(id, [pane]);
