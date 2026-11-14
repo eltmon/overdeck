@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5237",
   "created": "2026-11-14T04:16:13.968Z",
-  "updated": "2026-11-14T04:42:55.853Z",
+  "updated": "2026-11-14T04:42:58.270Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,11 @@
     "client-cancel-store.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T04:42:55.852Z"
+    },
+    "queued-send-cancel": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5237",
+      "claimedAt": "2026-11-14T04:42:58.270Z"
     }
   }
 }
