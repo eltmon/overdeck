@@ -9,6 +9,14 @@
  *     Body EditWorkspaceCreatePrInput. `direct` commits, pushes the edit
  *     branch and opens (or pushes to) its PR; 201 EditWorkspaceCreatePrResult.
  *
+ *   POST /api/explorer/edit-workspaces/:workspaceId/merge
+ *     Body {}. Squash-merges the PR pinned to its head, then removes the edit
+ *     workspace; 200 { merged: true }.
+ *
+ *   POST /api/explorer/edit-workspaces/:workspaceId/discard
+ *     Body { closePr: boolean }. Removes the edit workspace (force), closing
+ *     its open PR when asked; 200 { removed: true, prClosed }.
+ *
  * Every route accepts only an explorer edit workspace (edit branch, D-A4
  * root); any other workspace id answers 409 NOT_AN_EDIT_WORKSPACE (FR-14).
  * Errors are `{ error, code }`: an EditWorkspaceError carries its own status,
@@ -21,7 +29,13 @@ import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/u
 
 import { jsonResponse } from '../http-helpers.js';
 import { EditWorkspaceError } from '../services/explorer/edit-workspace-errors.js';
-import { createDirectPr, getEditWorkspaceStatus, type EditWorkspacePrDeps } from '../services/explorer/edit-workspace-pr.js';
+import {
+  createDirectPr,
+  discardEditWorkspace,
+  getEditWorkspaceStatus,
+  mergeEditWorkspace,
+  type EditWorkspacePrDeps,
+} from '../services/explorer/edit-workspace-pr.js';
 import { explorerErrorResponse } from '../services/explorer/http-errors.js';
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { httpHandler } from './http-handler.js';
@@ -101,6 +115,37 @@ export async function handleEditWorkspaceCreatePr(
   }
 }
 
+export async function handleEditWorkspaceMerge(
+  request: HttpServerRequest.HttpServerRequest,
+  workspaceId: string,
+  deps: EditWorkspacePrDeps = {},
+): Promise<HttpServerResponse.HttpServerResponse> {
+  const guardError = rejectUnsafeDashboardMutationRequest(request);
+  if (guardError) return guardError;
+  try {
+    return jsonResponse(await mergeEditWorkspace(workspaceId, deps));
+  } catch (error) {
+    return editWorkspaceErrorResponse(error);
+  }
+}
+
+export async function handleEditWorkspaceDiscard(
+  request: HttpServerRequest.HttpServerRequest,
+  workspaceId: string,
+  readBody: () => Promise<unknown>,
+  deps: EditWorkspacePrDeps = {},
+): Promise<HttpServerResponse.HttpServerResponse> {
+  const guardError = rejectUnsafeDashboardMutationRequest(request);
+  if (guardError) return guardError;
+  const body = await readBody();
+  if (!isRecord(body) || typeof body.closePr !== 'boolean') return invalidInput('closePr must be a boolean.');
+  try {
+    return jsonResponse(await discardEditWorkspace(workspaceId, { closePr: body.closePr }, deps));
+  } catch (error) {
+    return editWorkspaceErrorResponse(error);
+  }
+}
+
 // ─── GET /api/explorer/edit-workspaces/:workspaceId ───────────────────────────
 
 const statusRoute = HttpRouter.add(
@@ -127,6 +172,32 @@ const createPrRoute = HttpRouter.add(
   })),
 );
 
+// ─── POST /api/explorer/edit-workspaces/:workspaceId/merge ────────────────────
+
+const mergeRoute = HttpRouter.add(
+  'POST',
+  '/api/explorer/edit-workspaces/:workspaceId/merge',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const params = yield* HttpRouter.params;
+    const workspaceId = params['workspaceId'] ?? '';
+    return yield* Effect.promise(() => handleEditWorkspaceMerge(request, workspaceId));
+  })),
+);
+
+// ─── POST /api/explorer/edit-workspaces/:workspaceId/discard ──────────────────
+
+const discardRoute = HttpRouter.add(
+  'POST',
+  '/api/explorer/edit-workspaces/:workspaceId/discard',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const params = yield* HttpRouter.params;
+    const workspaceId = params['workspaceId'] ?? '';
+    return yield* Effect.promise(() => handleEditWorkspaceDiscard(request, workspaceId, bodyReader(request)));
+  })),
+);
+
 // ─── Layer composition ────────────────────────────────────────────────────────
 
-export const explorerEditWorkspacesRouteLayer = Layer.mergeAll(statusRoute, createPrRoute);
+export const explorerEditWorkspacesRouteLayer = Layer.mergeAll(statusRoute, createPrRoute, mergeRoute, discardRoute);

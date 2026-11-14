@@ -4,7 +4,13 @@ import type { WorkspaceRow } from '../../../../../lib/workspaces/types.js';
 import type { GhRunner } from '../edit-workspace-gh.js';
 import { PR_SUPPORT_REASON } from '../edit-workspace.js';
 import { EditWorkspaceError } from '../edit-workspace-errors.js';
-import { createDirectPr, getEditWorkspaceStatus, type EditWorkspacePrDeps } from '../edit-workspace-pr.js';
+import {
+  createDirectPr,
+  discardEditWorkspace,
+  getEditWorkspaceStatus,
+  mergeEditWorkspace,
+  type EditWorkspacePrDeps,
+} from '../edit-workspace-pr.js';
 import type { ExplorerRoot } from '../roots.js';
 
 const PATH = '/p/workspaces/scratch-edit-1113-1405';
@@ -137,5 +143,111 @@ describe('createDirectPr', () => {
       throw new Error('GraphQL: something broke');
     };
     await expect(createDirectPr('w1', input, { ...d, gh: failing })).rejects.toMatchObject({ code: 'PR_CREATE_FAILED', status: 502 });
+  });
+});
+
+describe('mergeEditWorkspace and discardEditWorkspace', () => {
+  function prGh(state: string, view: { mergeable: string; mergeStateStatus: string } = { mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN' }) {
+    const ghCalls: string[][] = [];
+    const gh: GhRunner = async (args) => {
+      ghCalls.push(args);
+      if (args[1] === 'list') return { stdout: JSON.stringify([{ number: 5, url: 'https://github.com/o/r/pull/5', state }]) };
+      if (args[1] === 'view') return { stdout: JSON.stringify({ ...view, headRefOid: 'head1', state, isDraft: false }) };
+      return { stdout: '' };
+    };
+    return { gh, ghCalls };
+  }
+
+  function mergeDeps(gh: GhRunner, extra: Partial<EditWorkspacePrDeps> = {}) {
+    const mergePr = vi.fn(async (..._args: unknown[]) => {});
+    const removeEditWorkspace = vi.fn(async (..._args: unknown[]) => {});
+    const d: EditWorkspacePrDeps = {
+      ...deps({ github_repo: 'o/r' }, gh),
+      isClean: async () => true,
+      headSha: async () => 'head1',
+      mergePr: mergePr as EditWorkspacePrDeps['mergePr'],
+      removeEditWorkspace: removeEditWorkspace as EditWorkspacePrDeps['removeEditWorkspace'],
+      ...extra,
+    };
+    return { d, mergePr, removeEditWorkspace };
+  }
+
+  it('refuses a DIRTY PR with NOT_MERGEABLE and never calls the adapter', async () => {
+    const { gh } = prGh('OPEN', { mergeable: 'CONFLICTING', mergeStateStatus: 'DIRTY' });
+    const { d, mergePr } = mergeDeps(gh);
+    await expect(mergeEditWorkspace('w1', d)).rejects.toMatchObject({
+      code: 'NOT_MERGEABLE',
+      status: 409,
+      message: 'Conflicts with the base branch',
+    });
+    expect(mergePr).not.toHaveBeenCalled();
+  });
+
+  it('refuses UNPUSHED_CHANGES when the worktree is dirty', async () => {
+    const { gh } = prGh('OPEN');
+    const { d, mergePr } = mergeDeps(gh, { isClean: async () => false });
+    await expect(mergeEditWorkspace('w1', d)).rejects.toMatchObject({ code: 'UNPUSHED_CHANGES', message: 'Commit and push your changes first.' });
+    expect(mergePr).not.toHaveBeenCalled();
+  });
+
+  it('refuses UNPUSHED_CHANGES when local HEAD differs from the PR head', async () => {
+    const { gh } = prGh('OPEN');
+    const { d, mergePr } = mergeDeps(gh, { headSha: async () => 'local2' });
+    await expect(mergeEditWorkspace('w1', d)).rejects.toMatchObject({ code: 'UNPUSHED_CHANGES' });
+    expect(mergePr).not.toHaveBeenCalled();
+  });
+
+  it('squash-merges pinned to the PR head, then removes with the remote branch', async () => {
+    const { gh } = prGh('OPEN');
+    const { d, mergePr, removeEditWorkspace } = mergeDeps(gh);
+    expect(await mergeEditWorkspace('w1', d)).toEqual({ merged: true });
+    expect(mergePr).toHaveBeenCalledWith(
+      expect.objectContaining({ forge: 'github', url: 'https://github.com/o/r/pull/5', method: 'squash', matchHeadCommit: 'head1', repository: 'o/r' }),
+    );
+    expect(removeEditWorkspace).toHaveBeenCalledWith(
+      expect.objectContaining({ primaryPath: '/p' }),
+      { force: false, deleteRemoteBranch: true },
+    );
+  });
+
+  it('answers NO_PR when the branch has no PR', async () => {
+    const gh: GhRunner = async () => ({ stdout: '[]' });
+    await expect(mergeEditWorkspace('w1', mergeDeps(gh).d)).rejects.toMatchObject({ code: 'NO_PR', status: 404 });
+  });
+
+  it('reports REMOVE_FAILED with status 500 when cleanup fails after the merge', async () => {
+    const { gh } = prGh('OPEN');
+    const { d } = mergeDeps(gh, {
+      removeEditWorkspace: (async () => {
+        throw new Error('worktree locked');
+      }) as EditWorkspacePrDeps['removeEditWorkspace'],
+    });
+    await expect(mergeEditWorkspace('w1', d)).rejects.toMatchObject({ code: 'REMOVE_FAILED', status: 500 });
+  });
+
+  it('discard with closePr closes an open PR, then removes with force and the remote branch', async () => {
+    const { gh, ghCalls } = prGh('OPEN');
+    const { d, removeEditWorkspace } = mergeDeps(gh);
+    expect(await discardEditWorkspace('w1', { closePr: true }, d)).toEqual({ removed: true, prClosed: true });
+    expect(ghCalls.some((args) => args[0] === 'pr' && args[1] === 'close' && args[2] === '5')).toBe(true);
+    expect(removeEditWorkspace).toHaveBeenCalledWith(expect.anything(), { force: true, deleteRemoteBranch: true });
+  });
+
+  it('discard without closePr keeps the open PR and its remote branch', async () => {
+    const { gh, ghCalls } = prGh('OPEN');
+    const { d, removeEditWorkspace } = mergeDeps(gh);
+    expect(await discardEditWorkspace('w1', { closePr: false }, d)).toEqual({ removed: true, prClosed: false });
+    expect(ghCalls.some((args) => args[1] === 'close')).toBe(false);
+    expect(removeEditWorkspace).toHaveBeenCalledWith(expect.anything(), { force: true, deleteRemoteBranch: false });
+  });
+
+  it('a PR_CLOSE_FAILED leaves the workspace in place', async () => {
+    const gh: GhRunner = async (args) => {
+      if (args[1] === 'list') return { stdout: JSON.stringify([{ number: 5, url: 'https://github.com/o/r/pull/5', state: 'OPEN' }]) };
+      throw new Error('HTTP 502');
+    };
+    const { d, removeEditWorkspace } = mergeDeps(gh);
+    await expect(discardEditWorkspace('w1', { closePr: true }, d)).rejects.toMatchObject({ code: 'PR_CLOSE_FAILED', status: 502 });
+    expect(removeEditWorkspace).not.toHaveBeenCalled();
   });
 });

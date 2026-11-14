@@ -14,7 +14,7 @@ import {
   _resetDashboardSessionTokenForTests,
   dashboardSessionCookieHeader,
 } from '../dashboard-auth.js';
-import { handleEditWorkspaceCreatePr, handleEditWorkspaceStatus } from '../explorer-edit-workspaces.js';
+import { handleEditWorkspaceCreatePr, handleEditWorkspaceDiscard, handleEditWorkspaceStatus } from '../explorer-edit-workspaces.js';
 
 const TOKEN = 'explorer-edit-workspaces-internal-token';
 const PATH = '/p/workspaces/scratch-edit-1';
@@ -142,5 +142,27 @@ describe('handleEditWorkspaceCreatePr', () => {
     const { status, body } = await post({ mode: 'direct', title: 'chore: edit a', body: 'b', draft: false });
     expect(status).toBe(201);
     expect(body).toEqual({ mode: 'direct', url: 'https://github.com/o/r/pull/12', number: 12, created: true });
+  });
+});
+
+describe('handleEditWorkspaceDiscard', () => {
+  it('answers 400 INVALID_INPUT for { closePr: "yes" }', async () => {
+    const request = {
+      method: 'POST',
+      url: '/api/explorer/edit-workspaces/w1/discard',
+      headers: { 'content-type': 'application/json', [INTERNAL_TOKEN_HEADER]: TOKEN },
+      remoteAddress: Option.none(),
+    } as unknown as Parameters<typeof handleEditWorkspaceDiscard>[0];
+    const removeEditWorkspace = async () => {
+      throw new Error('must not remove');
+    };
+    const response = HttpServerResponse.toWeb(
+      await handleEditWorkspaceDiscard(request, 'w1', async () => ({ closePr: 'yes' }), {
+        ...deps('scratch/edit-1'),
+        removeEditWorkspace,
+      }),
+    );
+    expect(response.status).toBe(400);
+    expect(((await response.json()) as { code?: string }).code).toBe('INVALID_INPUT');
   });
 });
