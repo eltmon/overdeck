@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5283",
   "created": "2026-11-14T19:04:13.506Z",
-  "updated": "2026-11-14T20:40:02.236Z",
+  "updated": "2026-11-14T20:40:20.061Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -348,9 +348,26 @@
       "doneAt": "2026-11-14T20:39:48.894Z"
     },
     "wi18-docs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5283",
-      "claimedAt": "2026-11-14T20:40:02.236Z"
+      "claimedAt": "2026-11-14T20:40:02.236Z",
+      "doneAt": "2026-11-14T20:40:20.061Z"
+    },
+    "wi18-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:40:20.061Z"
+    },
+    "wi18-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:40:20.061Z"
+    },
+    "wi18-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:40:20.061Z"
+    },
+    "wi18-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:40:20.061Z"
     }
   }
 }
