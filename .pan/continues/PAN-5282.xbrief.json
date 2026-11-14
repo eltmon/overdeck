@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5282",
   "created": "2026-11-14T19:03:45.838Z",
-  "updated": "2026-11-14T19:21:05.847Z",
+  "updated": "2026-11-14T19:21:07.483Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,11 @@
     "config-writer.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T19:21:05.847Z"
+    },
+    "lifecycle-wiring": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5282",
+      "claimedAt": "2026-11-14T19:21:07.482Z"
     }
   }
 }
