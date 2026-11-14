@@ -4,17 +4,17 @@
     "created": "2026-11-14T03:06:32Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5225: pan close still compares MYN repos against stale local main after PAN-5209 (fetch fails inside close-out)",
-    "updated": "2026-11-14T03:15:27.106Z"
+    "updated": "2026-11-14T03:17:21.232Z"
   },
   "plan": {
     "id": "pan-5225",
     "title": "pan close still compares MYN repos against stale local main after PAN-5209 (fetch fails inside close-out)",
-    "status": "proposed",
+    "status": "running",
     "uid": "88613ef3-c416-422f-b9cc-73bf0e3259a1",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T03:06:32Z",
-    "updated": "2026-11-14T03:15:27.106Z",
+    "updated": "2026-11-14T03:17:21.232Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5225",
@@ -575,5 +575,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
