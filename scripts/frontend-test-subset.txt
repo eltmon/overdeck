@@ -127,6 +127,7 @@ src/components/__tests__/GitHubQuotaPill.test.tsx
 src/components/__tests__/GitHubRateLimitBanner.test.tsx
 src/components/__tests__/HarnessUpdateCard.test.tsx
 src/components/__tests__/McpSignInCard.test.tsx
+src/components/__tests__/NewBuildBanner.test.tsx
 src/components/__tests__/PanOpenInPicker.remote.test.tsx
 src/components/__tests__/Sidebar.ownerGroups.test.tsx
 src/components/__tests__/Sidebar.workspacePullRequest.test.tsx
@@ -333,6 +334,7 @@ src/hooks/__tests__/useColorTheme.test.ts
 src/hooks/__tests__/useTheme.test.ts
 src/lib/__tests__/appearance.test.ts
 src/lib/__tests__/bootRequests.test.ts
+src/lib/__tests__/buildDrift.test.ts
 src/lib/__tests__/citationFormat.test.ts
 src/lib/__tests__/colorThemeEditor.test.ts
 src/lib/__tests__/composerCancel.test.ts
@@ -377,5 +379,6 @@ src/pages/__tests__/FlywheelPage.test.tsx
 src/pages/__tests__/NewProjectPage.no-loss.test.tsx
 src/pages/__tests__/NewWorkspacePage.test.tsx
 src/test-utils/renderCounter.test.tsx
+src/vite-build-commit.test.ts
 src/components/chat/messagesTimeline/__tests__/toolBodyLoader.test.tsx
 src/components/chat/__tests__/MessagesTimeline.test.tsx

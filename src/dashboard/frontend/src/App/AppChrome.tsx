@@ -1,6 +1,7 @@
 import { AlertTriangle, History, Search, StopCircle } from 'lucide-react';
 import { DeaconPauseToggle } from '../components/DeaconPauseToggle';
 import { DegradedModeBanner } from '../components/DegradedModeBanner';
+import { NewBuildBanner } from '../components/NewBuildBanner';
 import { LowCostModePill } from '../components/LowCostModePill';
 import { DecisionsIndicator } from '../components/DecisionsIndicator';
 import { NeedsYouIndicator } from '../components/flywheel/NeedsYouIndicator';
@@ -121,6 +122,9 @@ export function AppChrome({
         onRestartBackend={onRestartBackend}
         isRestartBackendPending={isRestartBackendPending}
       />
+
+      {/* PAN-5236: this tab runs older frontend code than the server — offer Reload. */}
+      <NewBuildBanner />
 
       {/* Missing Tracker API Key Banner */}
       {missingKeyTrackers.length > 0 && !trackerBannerDismissed && (
