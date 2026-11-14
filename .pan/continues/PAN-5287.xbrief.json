@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5287",
   "created": "2026-11-14T19:49:14.970Z",
-  "updated": "2026-11-14T20:15:09.729Z",
+  "updated": "2026-11-14T20:16:18.689Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,9 +50,10 @@
       "doneAt": "2026-11-14T20:13:00.871Z"
     },
     "stage-seams": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5287",
-      "claimedAt": "2026-11-14T20:13:20.990Z"
+      "claimedAt": "2026-11-14T20:13:20.990Z",
+      "doneAt": "2026-11-14T20:16:18.688Z"
     },
     "root-helper": {
       "status": "in_progress",
@@ -78,6 +79,26 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5287",
       "claimedAt": "2026-11-14T20:15:09.729Z"
+    },
+    "stage-seams.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:16:18.688Z"
+    },
+    "stage-seams.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:16:18.688Z"
+    },
+    "stage-seams.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:16:18.688Z"
+    },
+    "stage-seams.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:16:18.688Z"
+    },
+    "stage-seams.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:16:18.688Z"
     }
   }
 }
