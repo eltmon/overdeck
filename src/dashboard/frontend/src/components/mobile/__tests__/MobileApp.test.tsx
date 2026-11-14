@@ -23,6 +23,11 @@ vi.mock('../MobileIssueSheet', () => ({
   ),
 }));
 vi.mock('../../push/TurnOnNotificationsButton', () => ({ TurnOnNotificationsButton: () => null }));
+vi.mock('../../NewBuildBanner', () => ({
+  NewBuildBanner: ({ safeAreaTop }: { safeAreaTop?: boolean }) => (
+    <div data-component="new-build-banner" data-safe-area-top={safeAreaTop ? 'true' : 'false'} />
+  ),
+}));
 
 const decodeQr = vi.fn<(data: Uint8ClampedArray, width: number, height: number) => { data: string } | null>(() => null);
 vi.mock('jsqr', () => ({ default: (data: Uint8ClampedArray, width: number, height: number) => decodeQr(data, width, height) }));
@@ -427,5 +432,43 @@ describe('MobilePairScreen', () => {
     expect(replaceState).toHaveBeenCalledWith(null, '', `/m#pair=${CODE}`);
     expect(reload).toHaveBeenCalledTimes(1);
     expect(stopTrack).toHaveBeenCalled();
+  });
+});
+
+describe('MobileApp new-build banner (PAN-5236)', () => {
+  const native = globalThis as { __OVERDECK_NATIVE__?: boolean };
+
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/m');
+    useConnectionState.setState({ sessionAuthFailed: false });
+    sessionStorage.setItem('overdeck.logoSting.played', '1');
+  });
+
+  afterEach(() => {
+    delete native.__OVERDECK_NATIVE__;
+    window.history.replaceState(null, '', '/m');
+  });
+
+  function banner() {
+    return document.querySelector('[data-component="new-build-banner"]');
+  }
+
+  it('renders on the web shell list screen with safeAreaTop', () => {
+    const { container } = render(<MobileApp />);
+    const el = container.querySelector('[data-component="new-build-banner"]');
+    expect(el).not.toBeNull();
+    expect(el?.getAttribute('data-safe-area-top')).toBe('true');
+  });
+
+  it('renders on a full-screen conversation route', () => {
+    window.history.replaceState(null, '', '/m?conversation=x');
+    render(<MobileApp />);
+    expect(banner()).not.toBeNull();
+  });
+
+  it('renders none in the native phone app', () => {
+    native.__OVERDECK_NATIVE__ = true;
+    render(<MobileApp />);
+    expect(banner()).toBeNull();
   });
 });
