@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5248",
   "created": "2026-11-14T05:37:27.839Z",
-  "updated": "2026-11-14T05:48:58.896Z",
+  "updated": "2026-11-14T05:55:53.200Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,34 @@
       "doneAt": "2026-11-14T05:48:47.715Z"
     },
     "admission-memory-rule": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5248",
-      "claimedAt": "2026-11-14T05:48:58.896Z"
+      "claimedAt": "2026-11-14T05:48:58.896Z",
+      "doneAt": "2026-11-14T05:55:53.198Z"
+    },
+    "admission-memory-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:55:53.198Z"
+    },
+    "admission-memory-rule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:55:53.198Z"
+    },
+    "admission-memory-rule.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:55:53.198Z"
+    },
+    "admission-memory-rule.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:55:53.198Z"
+    },
+    "admission-memory-rule.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:55:53.198Z"
+    },
+    "admission-memory-rule.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:55:53.198Z"
     }
   }
 }
