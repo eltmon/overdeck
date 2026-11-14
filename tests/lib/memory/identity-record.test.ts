@@ -69,4 +69,14 @@ describe('writeWorkspaceIdentity / readWorkspaceIdentity (PAN-1990 ac2)', () => 
     const path = resolveWorkspaceIdentityPath('overdeck', 'never-written');
     expect(await readWorkspaceIdentity(path)).toBeNull();
   });
+
+  it('origin survives a rewrite from a source that omits it (PAN-5233)', async () => {
+    const path = resolveWorkspaceIdentityPath('overdeck', 'workspace-1');
+    await writeWorkspaceIdentity(row({ origin: 'vault' }));
+
+    await writeWorkspaceIdentity(row({ name: 'renamed-workspace' }));
+
+    const record = await readWorkspaceIdentity(path);
+    expect(record?.origin).toBe('vault');
+  });
 });

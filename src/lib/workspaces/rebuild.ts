@@ -33,6 +33,7 @@ import { ensureParentDir, resolveMemoryBase, resolveMemoryRoot } from '../memory
 import { listProjectsSync } from '../projects.js';
 import { getWorkspaceById, getWorkspaceForIssue, listProjects, listWorkspaces } from './resolver.js';
 import { archiveWorkspace, createWorkspace, upsertProjectFromConfig } from './writer.js';
+import type { WorkspaceOrigin } from './types.js';
 
 const FEATURE_DIR_PATTERN = /^feature-([a-z]+-\d+)$/i;
 
@@ -127,6 +128,7 @@ export async function rebuildMainAndScratchWorkspaces(
           id: record.id,
           projectId: record.projectId,
           kind: record.kind,
+          origin: typeof record.origin === 'string' ? (record.origin as WorkspaceOrigin) : undefined,
           name: record.name,
           path: record.path,
           branchName: record.branchName,
@@ -317,6 +319,7 @@ export async function migrateMemoryHomesToWorkspaces(): Promise<MigrateMemoryHom
         id: workspace.id,
         projectId: workspace.projectId,
         kind: workspace.kind,
+        origin: workspace.origin,
         name: workspace.name,
         path: workspace.path,
         branchName: workspace.branchName,

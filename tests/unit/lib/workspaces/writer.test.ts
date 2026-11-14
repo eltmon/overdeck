@@ -15,6 +15,7 @@ import {
   upsertProjectFromConfig,
 } from '../../../../src/lib/workspaces/writer.js';
 import { getMainWorkspace, getWorkspaceById, listPinnedDocs, listProjectTargets, listWorkspaces } from '../../../../src/lib/workspaces/resolver.js';
+import { readWorkspaceIdentity, resolveWorkspaceIdentityPath } from '../../../../src/lib/memory/identity-record.js';
 
 let odb: OverdeckTestDb;
 
@@ -103,6 +104,22 @@ describe('workspaces writer', () => {
       path: '/repo/overdeck-scratch-vault',
     });
     expect(getWorkspaceById(scratchVaultId)?.origin).toBe('vault');
+  });
+
+  it('archiveWorkspace carries origin into the identity mirror (PAN-5233)', async () => {
+    const projectId = seedProject();
+    const id = await createWorkspace({
+      projectId,
+      kind: 'scratch',
+      origin: 'agent',
+      name: 'agent-made',
+      path: '/repo/overdeck-agent-made',
+    });
+
+    await archiveWorkspace(id);
+
+    const record = await readWorkspaceIdentity(resolveWorkspaceIdentityPath(projectId, id));
+    expect(record?.origin).toBe('agent');
   });
 
   it('touchWorkspaceAccessed, updateWorkspaceLayout, setWorkspaceFavorite, archive/unarchive round-trip', async () => {
