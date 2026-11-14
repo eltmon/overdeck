@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5282",
   "created": "2026-11-14T19:03:45.838Z",
-  "updated": "2026-11-14T19:16:22.266Z",
+  "updated": "2026-11-14T19:16:24.258Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,11 @@
     "legacy-merge.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T19:16:22.266Z"
+    },
+    "claude-exclusion": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5282",
+      "claimedAt": "2026-11-14T19:16:24.258Z"
     }
   }
 }
