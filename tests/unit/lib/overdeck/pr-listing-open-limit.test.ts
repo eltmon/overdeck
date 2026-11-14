@@ -18,7 +18,11 @@ vi.mock('../../../../src/lib/overdeck/pr-cache-policy.js', async (importOriginal
   return { ...actual, shouldListPullRequests: async () => true };
 });
 
-import { PR_CACHE_TTL_MS, readOpenRepoPullRequests } from '../../../../src/lib/overdeck/pr-listing.js';
+import {
+  invalidateOpenRepoPullRequests,
+  PR_CACHE_TTL_MS,
+  readOpenRepoPullRequests,
+} from '../../../../src/lib/overdeck/pr-listing.js';
 
 function openRows(count: number) {
   return Array.from({ length: count }, (_, i) => ({ number: i + 1, state: 'OPEN', mergeable: 'MERGEABLE' }));
@@ -27,6 +31,17 @@ function openRows(count: number) {
 function limitArg(args: readonly string[]): string | undefined {
   const i = args.indexOf('--limit');
   return i === -1 ? undefined : args[i + 1];
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => { resolve = res; });
+  return { promise, resolve };
+}
+
+/** Drains the microtask queue without touching fake timers (no setTimeout is involved before a runGh call settles). */
+async function flushMicrotasks(): Promise<void> {
+  for (let i = 0; i < 10; i++) await Promise.resolve();
 }
 
 describe('PR open-read limit (PAN-5261)', () => {
@@ -115,5 +130,51 @@ describe('PR open-read limit (PAN-5261)', () => {
 
     await expect(readOpenRepoPullRequests(repo)).resolves.toBeNull();
     expect(mocks.runGh).toHaveBeenCalledTimes(2);
+  });
+
+  it('two concurrent loads for the same repo each independently escalate past 30 rows (CodeRabbit, PR #5266)', async () => {
+    const call1 = deferred<{ stdout: string }>();
+    const call2 = deferred<{ stdout: string }>();
+    const call3 = deferred<{ stdout: string }>();
+    const call4 = deferred<{ stdout: string }>();
+    mocks.runGh
+      .mockReturnValueOnce(call1.promise)
+      .mockReturnValueOnce(call2.promise)
+      .mockReturnValueOnce(call3.promise)
+      .mockReturnValueOnce(call4.promise);
+
+    // Load A starts, reaches its --limit 30 runGh call and parks there.
+    const a = readOpenRepoPullRequests(repo);
+    await flushMicrotasks();
+
+    // An in-flight invalidation (e.g. a webhook) drops the shared cache entry
+    // while load A is still pending, so this starts a second, independent
+    // load B for the same repo — also at --limit 30.
+    invalidateOpenRepoPullRequests(repo);
+    const b = readOpenRepoPullRequests(repo);
+    await flushMicrotasks();
+
+    expect(mocks.runGh).toHaveBeenCalledTimes(2);
+    expect(limitArg(mocks.runGh.mock.calls[0]![0] as string[])).toBe('30');
+    expect(limitArg(mocks.runGh.mock.calls[1]![0] as string[])).toBe('30');
+
+    // A settles first with 30 rows: it escalates and marks the repo full-read
+    // before B's own 30-row response comes back.
+    call1.resolve({ stdout: JSON.stringify(openRows(30)) });
+    await flushMicrotasks();
+    call2.resolve({ stdout: JSON.stringify(openRows(30)) });
+    await flushMicrotasks();
+
+    // B must still escalate on its own captured limit, not on the shared
+    // `fullOpenReadRepos` mark that A's escalation already flipped.
+    expect(mocks.runGh).toHaveBeenCalledTimes(4);
+    expect(limitArg(mocks.runGh.mock.calls[2]![0] as string[])).toBe('100');
+    expect(limitArg(mocks.runGh.mock.calls[3]![0] as string[])).toBe('100');
+
+    call3.resolve({ stdout: JSON.stringify(openRows(40)) });
+    call4.resolve({ stdout: JSON.stringify(openRows(50)) });
+
+    await expect(a).resolves.toHaveLength(40);
+    await expect(b).resolves.toHaveLength(50);
   });
 });

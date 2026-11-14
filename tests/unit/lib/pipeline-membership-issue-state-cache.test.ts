@@ -88,6 +88,23 @@ describe('listIssueStatesCached', () => {
       expect(list).toHaveBeenNthCalledWith(2, 'eac3b', 'r', [1]);
     });
 
+    it("a 'not an issue' (null) answer re-asks sooner than a confirmed answer (CodeRabbit, PR #5266)", async () => {
+      const list = vi.fn<(owner: string, repo: string, numbers: number[]) => Promise<IssueState[]>>()
+        .mockResolvedValueOnce([{ number: 1, state: 'open' }]); // 2 omitted: not an issue, or a transient error
+      await listIssueStatesCached('eac3c', 'r', [1, 2], list);
+
+      // Past the short null TTL but well inside the 30-minute main TTL: 1
+      // (confirmed) stays cached, 2 (null) is asked again — bounding how
+      // long a transient per-alias GraphQL error can hide a candidate.
+      await vi.advanceTimersByTimeAsync(3 * 60_000);
+      list.mockResolvedValueOnce([{ number: 2, state: 'open' }]);
+      const second = await listIssueStatesCached('eac3c', 'r', [1, 2], list);
+
+      expect(list).toHaveBeenCalledTimes(2);
+      expect(list).toHaveBeenNthCalledWith(2, 'eac3c', 'r', [2]);
+      expect(second).toEqual([{ number: 1, state: 'open' }, { number: 2, state: 'open' }]);
+    });
+
     it('an invalidation that lands mid-lookup is returned to this caller but never cached (ac4)', async () => {
       let resolveList!: (value: IssueState[]) => void;
       const pending = new Promise<IssueState[]>((resolve) => { resolveList = resolve; });

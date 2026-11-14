@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5261",
   "created": "2026-11-14T08:29:10.265Z",
-  "updated": "2026-11-14T09:05:32.972Z",
+  "updated": "2026-11-14T09:30:06.545Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-14T09:30Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-14T09:30:06.545Z"
+    }
+  ],
   "items": {
     "open-read-limit-30": {
       "status": "completed",
@@ -185,5 +191,14 @@
       "status": "completed",
       "doneAt": "2026-11-14T09:05:32.971Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-14T09:30:06Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5261 (PR #5266)\n\nCodeRabbit posted 2 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4572804944 · src/lib/overdeck/pr-listing.ts:197 [Major]: Use this load's requested limit to decide escalation.\n  https://github.com/eltmon/overdeck/pull/5266#discussion_r4572804944\n- Thread 4572804951 · src/lib/pipeline-membership-gather.ts:249 [Major]: Don't cache transient per-alias GraphQL errors as missing issues.\n  https://github.com/eltmon/overdeck/pull/5266#discussion_r4572804951\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5266/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5261 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5266 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
 }

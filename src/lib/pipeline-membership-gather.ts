@@ -177,8 +177,19 @@ export async function listIssueStatesBatched(
   return states;
 }
 
-/** PAN-5261: how long a GraphQL issue-state answer is reused across gathers. */
+/** PAN-5261: how long a confirmed open/closed GraphQL issue-state answer is reused across gathers. */
 export const ISSUE_STATE_CACHE_TTL_MS = 30 * 60_000;
+
+/**
+ * CodeRabbit (PAN-5261 PR #5266): `listIssueStatesBatched` cannot tell a
+ * genuinely nonexistent number (a PR, a deleted issue — the common case)
+ * from a transient per-alias GraphQL field error; both come back as an
+ * omitted alias. A "not an issue" (`null`) answer therefore gets a much
+ * shorter TTL than a confirmed open/closed one, so a rare transient error
+ * self-heals on the next gather instead of hiding a real membership
+ * candidate for the full 30 minutes.
+ */
+const ISSUE_STATE_NULL_CACHE_TTL_MS = 2 * 60_000;
 
 type CachedIssueState = { state: 'open' | 'closed' | null; at: number };
 const issueStateCache = new Map<string, CachedIssueState>();
@@ -228,7 +239,8 @@ export async function listIssueStatesCached(
   const missed: number[] = [];
   for (const number of numbers) {
     const cached = issueStateCache.get(issueStateKey(owner, repo, number));
-    if (cached && now - cached.at < ISSUE_STATE_CACHE_TTL_MS) {
+    const ttl = cached?.state ? ISSUE_STATE_CACHE_TTL_MS : ISSUE_STATE_NULL_CACHE_TTL_MS;
+    if (cached && now - cached.at < ttl) {
       if (cached.state) results.set(number, cached.state);
     } else {
       missed.push(number);

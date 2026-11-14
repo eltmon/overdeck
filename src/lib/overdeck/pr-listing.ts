@@ -193,12 +193,18 @@ async function loadOpenPullRequests(projectPath: string): Promise<SettledListing
     // PAN-4264: metered as caller pr-cache; a pause or refusal lands in the
     // catch below, is logged once per distinct reason, and reads as "failed"
     // (null), never as "no PRs".
-    let rows = await listOpenRows(projectPath, fullOpenReadRepos.has(projectPath) ? OPEN_READ_FULL_LIMIT : OPEN_READ_SMALL_LIMIT);
-    if (!fullOpenReadRepos.has(projectPath) && rows.length >= OPEN_READ_SMALL_LIMIT) {
+    // CodeRabbit (PAN-5261 PR #5266): capture the limit THIS load requested —
+    // an in-flight invalidation can start a second concurrent load for the
+    // same repo, which would otherwise flip `fullOpenReadRepos` out from
+    // under this load's escalation check and let a truncated 30-row read
+    // settle unescalated.
+    const requestedFullRead = fullOpenReadRepos.has(projectPath);
+    let rows = await listOpenRows(projectPath, requestedFullRead ? OPEN_READ_FULL_LIMIT : OPEN_READ_SMALL_LIMIT);
+    if (!requestedFullRead && rows.length >= OPEN_READ_SMALL_LIMIT) {
       // Possibly truncated: never settle a short listing.
       fullOpenReadRepos.add(projectPath);
       rows = await listOpenRows(projectPath, OPEN_READ_FULL_LIMIT);
-    } else if (fullOpenReadRepos.has(projectPath) && rows.length < OPEN_READ_SMALL_LIMIT) {
+    } else if (requestedFullRead && rows.length < OPEN_READ_SMALL_LIMIT) {
       fullOpenReadRepos.delete(projectPath);
     }
     const numbers = new Set(rows.map((row) => row.number).filter((n): n is number => typeof n === 'number'));
