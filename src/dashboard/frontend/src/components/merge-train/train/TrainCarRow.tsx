@@ -114,13 +114,13 @@ export function TrainCarRow({ car, order, projectKey, projectName, run, onNaviga
       data-state={car.state}
       className={`rounded-md border border-border border-l-2 bg-card ${ROW_BORDER[carTone(car.state)]}`}
     >
-      <div className="flex min-w-0 items-center gap-2 px-2 py-1.5">
+      <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1 px-2 py-1.5">
         <button
           type="button"
           aria-expanded={expanded}
           aria-label={`${expanded ? 'Collapse' : 'Expand'} ${car.issueId}`}
           onClick={() => setExpanded((v) => !v)}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          className="flex min-w-[11rem] flex-1 items-center gap-2 text-left"
         >
           {expanded
             ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />

@@ -69,14 +69,14 @@ function StrikeRow({ strike, run, onNavigateIssue }: {
       data-state={strike.state}
       className={`rounded-md border border-border border-l-2 bg-card ${ROW_BORDER[STRIKE_TONE[strike.state] === 'success' ? 'muted' : STRIKE_TONE[strike.state]]}`}
     >
-      <div className="flex min-w-0 items-center gap-2 px-2 py-1.5">
+      <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1 px-2 py-1.5">
         <button
           type="button"
           aria-expanded={expanded}
           aria-label={`${expanded ? 'Collapse' : 'Expand'} ${strike.issueId}`}
           disabled={!hasDetail}
           onClick={() => setExpanded((v) => !v)}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
+          className="flex min-w-[11rem] flex-1 items-center gap-2 text-left disabled:cursor-default"
         >
           {hasDetail
             ? (expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />)
