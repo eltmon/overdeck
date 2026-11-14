@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5298",
   "created": "2026-11-14T21:08:19.124Z",
-  "updated": "2026-11-14T21:58:50.727Z",
+  "updated": "2026-11-14T21:58:56.157Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,11 @@
     "styleguide-isolation.ac2": {
       "status": "completed",
       "doneAt": "2026-11-14T21:58:50.727Z"
+    },
+    "linked-title-bar-isolation": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5298",
+      "claimedAt": "2026-11-14T21:58:56.157Z"
     }
   }
 }
