@@ -306,7 +306,8 @@ export async function postMergeLifecycle(
 
     // PAN-5279: an open epic lands in slices. Stamping `merged` and
     // `verifying-on-main` on it would map the tracker state to done for one
-    // slice, so both steps are skipped and the epic stays open work.
+    // slice, so the stale workflow labels are still removed but neither of
+    // those is applied, and the epic stays open work.
     const epicSkip = await postMergeLabelSkipReason(issueId);
     if (epicSkip) {
       console.log(`[merge-agent] ${epicSkip}`);
@@ -315,27 +316,27 @@ export async function postMergeLifecycle(
 
     // 1. Clean up stale workflow labels and keep the legacy merged marker for history.
     // verifying-on-main is applied next and takes precedence in canonical state mapping.
-    if (!epicSkip) {
-      try {
-        const { cleanupMergedLabels } = await import('../lifecycle/label-cleanup.js');
-        const ghResolved = resolveGitHubIssue(issueId);
-        const labelCtx = ghResolved.isGitHub
-          ? { issueId, projectPath, github: { owner: ghResolved.owner, repo: ghResolved.repo, number: ghResolved.number } }
-          : { issueId, projectPath };
-        // PAN-1249: cleanupMergedLabels returns Effect<StepResult>; bridge to Promise.
-        const labelResult = await Effect.runPromise(cleanupMergedLabels(labelCtx));
-        if (labelResult.success && !labelResult.skipped) {
-          console.log(`[merge-agent] ✓ ${labelResult.details?.join('; ')}`);
-          logActivity('labels_cleaned', labelResult.details?.join('; ') || 'Labels cleaned');
-        } else if (labelResult.skipped) {
-          console.log(`[merge-agent] Label cleanup skipped: ${labelResult.details?.join('; ')}`);
-        } else {
-          console.warn(`[merge-agent] Label cleanup failed (non-fatal): ${labelResult.error}`);
-        }
-      } catch (err) {
-        console.warn(`[merge-agent] Could not clean labels: ${err}`);
+    try {
+      const { cleanupMergedLabels } = await import('../lifecycle/label-cleanup.js');
+      const ghResolved = resolveGitHubIssue(issueId);
+      const labelCtx = ghResolved.isGitHub
+        ? { issueId, projectPath, github: { owner: ghResolved.owner, repo: ghResolved.repo, number: ghResolved.number } }
+        : { issueId, projectPath };
+      // PAN-1249: cleanupMergedLabels returns Effect<StepResult>; bridge to Promise.
+      const labelResult = await Effect.runPromise(cleanupMergedLabels(labelCtx, { addMergedLabel: !epicSkip }));
+      if (labelResult.success && !labelResult.skipped) {
+        console.log(`[merge-agent] ✓ ${labelResult.details?.join('; ')}`);
+        logActivity('labels_cleaned', labelResult.details?.join('; ') || 'Labels cleaned');
+      } else if (labelResult.skipped) {
+        console.log(`[merge-agent] Label cleanup skipped: ${labelResult.details?.join('; ')}`);
+      } else {
+        console.warn(`[merge-agent] Label cleanup failed (non-fatal): ${labelResult.error}`);
       }
+    } catch (err) {
+      console.warn(`[merge-agent] Could not clean labels: ${err}`);
+    }
 
+    if (!epicSkip) {
       try {
         await transitionIssueToVerifyingOnMain(issueId, projectPath);
         void recordFeatureRegistryLifecycle({ issueId, status: 'merged' });

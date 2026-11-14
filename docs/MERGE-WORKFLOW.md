@@ -654,9 +654,10 @@ An epic lands in slices, so DoD row 4 is a miss for an open issue labeled `epic`
 merged: a merged PR is one slice, not the epic landing. `evaluateDodGate` flips the row after the
 other rows have read the landing evidence, with an observed text that names the epic. Only an operator
 can close the epic out, with `pan close <id> --accept-merged` after its last slice lands; the Flywheel
-cannot accept a DoD miss. The merge agent also skips the `merged` and `verifying-on-main` labels for an
-open epic (`postMergeLabelSkipReason` in `src/lib/cloister/merge-agent.ts`), because those labels map
-the tracker state to done (PAN-5279).
+cannot accept a DoD miss. For an open epic the merge agent still removes the stale workflow labels (`in-review`,
+`in-progress`, `merge-agent`), but it adds neither `merged` nor `verifying-on-main`
+(`postMergeLabelSkipReason` in `src/lib/cloister/merge-agent.ts`, `addMergedLabel: false` in
+`cleanupMergedLabels`), because those labels map the tracker state to done (PAN-5279).
 
 Close-out's DoD rows 1 (review) and 2 (tests) read the issue's PR from the forge, retrying once after
 1 s (`src/lib/lifecycle/dod-pr-read.ts`). A read that fails twice is a `MISS` whose observed text is
