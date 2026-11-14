@@ -8,7 +8,7 @@
  *
  * It must not import `drawer/DrawerAgentSession` or `IssueDetailShell`.
  */
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { presenceForPaneState, type BackendPane } from '@overdeck/contracts';
 
@@ -52,6 +52,8 @@ export interface IssueDrawerDetailsProps {
   /** False once the Skills panel reported the issue has no project. */
   skillsAvailable: boolean;
   skillsCount: number | null;
+  /** Shell-specific block after both columns, spanning the grid (PAN-5246 D-7). */
+  footer?: ReactNode;
 }
 
 const HEADING_CLASS = 'mb-[8px] text-[13px] font-semibold text-foreground';
@@ -177,6 +179,7 @@ export function IssueDrawerDetails({
   onOpenTab,
   skillsAvailable,
   skillsCount,
+  footer,
 }: IssueDrawerDetailsProps) {
   const { rail, derived } = usePipelineRail(issueId);
   const { activityRail } = useIssueData(issueId);
@@ -360,6 +363,7 @@ export function IssueDrawerDetails({
           </button>
         ) : null}
       </div>
+      {footer ? <div data-testid="drawer-details-footer" className="col-span-full">{footer}</div> : null}
       </div>
     </div>
   );

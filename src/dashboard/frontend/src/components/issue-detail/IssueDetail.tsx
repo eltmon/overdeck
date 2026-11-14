@@ -19,7 +19,7 @@
  *   one action strip. (Adoption in the deck tree's FeatureItem is tracked
  *   in #2962; the density is complete and tested here.)
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import type { Agent } from '../../types';
 import type { DerivedIssueState } from '../../types';
@@ -72,6 +72,8 @@ export interface IssueDetailProps {
   /** Render the tab strip? Default true. Both shells show the strip; no
    *  shell passes `false` any more (PAN-5246). */
   showTabs?: boolean | undefined;
+  /** Shell-specific block at the end of the Details tab. The Stage tab passes its launch composition. */
+  detailsFooter?: ReactNode;
   className?: string;
 }
 
@@ -148,7 +150,7 @@ function IssueDetailTabs({ issueId, tab, onSelectTab, tasksBadge, skillsBadge, h
   );
 }
 
-export function IssueDetail({ issueId, density, agents, derived, tab, onSelectTab, focusAgentId, tasksBadge, conversationHeight = 420, showTabs = true, className }: IssueDetailProps) {
+export function IssueDetail({ issueId, density, agents, derived, tab, onSelectTab, focusAgentId, tasksBadge, conversationHeight = 420, showTabs = true, detailsFooter, className }: IssueDetailProps) {
   // Selected agent for the Conversation/Terminal panes. Owned here so the
   // choice survives a Conversation ⇄ Terminal switch; falls back to the
   // default pick whenever the selection is cleared or no longer matches.
@@ -299,6 +301,7 @@ export function IssueDetail({ issueId, density, agents, derived, tab, onSelectTa
               onOpenTab={onSelectTab}
               skillsAvailable={!skillsUnavailable}
               skillsCount={skillsCount}
+              footer={detailsFooter}
             />
           ) : <TabPlaceholder tab={tab} />}
       </div>

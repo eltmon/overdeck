@@ -67,7 +67,9 @@ vi.mock('../backlog/PickupGateControls', async (importOriginal) => ({
     <div data-testid={`mock-pickup-${props.variant ?? 'full'}`} data-stage={props.stage ?? 'open'} />
   ),
 }));
-vi.mock('./IssueDrawerDetails', () => ({ IssueDrawerDetails: () => <div data-testid="drawer-tab-panel-overview" /> }));
+vi.mock('./IssueDrawerDetails', () => ({
+  IssueDrawerDetails: (props: { footer?: React.ReactNode }) => <div data-testid="drawer-tab-panel-overview">{props.footer}</div>,
+}));
 vi.mock('../skills/SkillOverridesSections', () => ({
   IssueSkillsSection: () => <div data-testid="mock-issue-skills-section" />,
   IssueSkillsTabPanel: (props: { onUnavailable: () => void }) => (
@@ -275,6 +277,13 @@ describe('IssueDetail (C-DETAIL one component)', () => {
     );
     expect(screen.getByTestId('drawer-tab-panel-overview')).toBeInTheDocument();
     expect(screen.queryByTestId('mock-issue-skills-section')).not.toBeInTheDocument();
+  });
+
+  it('passes detailsFooter to the Details body', () => {
+    renderDetail(
+      <IssueDetail issueId="PAN-1" density="page" agents={AGENTS} tab="overview" detailsFooter={<span data-testid="x-footer" />} onSelectTab={() => {}} />,
+    );
+    expect(screen.getByTestId('drawer-tab-panel-overview')).toContainElement(screen.getByTestId('x-footer'));
   });
 
   it.each(['page', 'drawer'] as const)('exposes the entry and view on the root (%s density)', (density) => {

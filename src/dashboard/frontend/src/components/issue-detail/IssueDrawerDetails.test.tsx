@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const wsTransportMock = vi.hoisted(() => ({
@@ -330,6 +330,18 @@ describe('IssueDrawerDetails', () => {
     renderDetails();
     expect(screen.queryByRole('button', { name: 'Skills for this issue', expanded: false })).toBeNull();
     expect(document.querySelector('[data-section="DrawerTasksList"]')).toBeNull();
+  });
+
+  it('renders the footer slot across both columns, and nothing without it', () => {
+    renderDetails({ footer: <span data-testid="x-footer" /> });
+    const footer = screen.getByTestId('drawer-details-footer');
+    expect(footer).toHaveClass('col-span-full');
+    expect(screen.getByTestId('drawer-details-grid')).toContainElement(footer);
+    expect(footer).toContainElement(screen.getByTestId('x-footer'));
+    cleanup();
+
+    renderDetails();
+    expect(screen.queryByTestId('drawer-details-footer')).toBeNull();
   });
 
   it('shows the no-workspace line when the workspace does not exist', async () => {
