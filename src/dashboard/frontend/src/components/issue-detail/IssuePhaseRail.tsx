@@ -12,7 +12,7 @@ import { useIssueData } from '../drawer/useDrawerData';
 import { useDashboardStore } from '../../lib/store';
 import type { Agent } from '../../types';
 
-const ROLE_TO_PHASE: Record<string, Phase> = {
+export const ROLE_TO_PHASE: Record<string, Phase> = {
   plan: 'plan',
   work: 'work',
   review: 'review',
@@ -20,7 +20,7 @@ const ROLE_TO_PHASE: Record<string, Phase> = {
   ship: 'ship',
 };
 
-function agentPhaseInfo(agents: Agent[]): Partial<Record<Phase, PhaseAgentInfo>> {
+export function agentPhaseInfo(agents: Agent[]): Partial<Record<Phase, PhaseAgentInfo>> {
   const out: Partial<Record<Phase, PhaseAgentInfo>> = {};
   for (const agent of agents) {
     const phase = ROLE_TO_PHASE[agent.role ?? ''];
@@ -42,7 +42,18 @@ function agentPhaseInfo(agents: Agent[]): Partial<Record<Phase, PhaseAgentInfo>>
   return out;
 }
 
-const LEGACY_WHEN_TO_PHASE: Record<string, Phase> = {
+export const ENDED_STATUSES = new Set(['stopped', 'dead', 'failed']);
+
+export function pickPhaseAgent(agents: Agent[], phase: Phase): Agent | undefined {
+  const candidates = agents.filter((agent) => agent.role === phase);
+  return (
+    candidates.find((agent) => !ENDED_STATUSES.has(agent.status))
+    ?? candidates.find((agent) => agent.id.endsWith('-review-supervisor'))
+    ?? candidates[0]
+  );
+}
+
+export const LEGACY_WHEN_TO_PHASE: Record<string, Phase> = {
   planned: 'plan',
   implemented: 'work',
   reviewed: 'review',

@@ -5,13 +5,15 @@
  * tab come from `GET /api/flywheel/status` (the same deriver `pan flywheel
  * status` prints), State and Stats from the loop's `.pan/flywheel/` files and
  * the tracker, and the right column is the `conv-flywheel` conversation
- * itself. A failed status fetch reads as "can't reach the server", never idle.
+ * itself. A failed status fetch reads as "can't reach the server", never
+ * idle. A Needs-you jump opens the conversation in its own Command Deck pane
+ * at the message (PAN-5239), not in this embedded column.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Activity } from 'lucide-react';
 
-import { FlywheelConversationPane, type FlywheelTickTarget } from '../components/flywheel/FlywheelConversationPane';
+import { FlywheelConversationPane } from '../components/flywheel/FlywheelConversationPane';
 import { FlywheelHeadlineStrip } from '../components/flywheel/FlywheelHeadlineStrip';
 import { FlywheelOrderBookCard } from '../components/flywheel/FlywheelOrderBookCard';
 import { FlywheelReportPane, FlywheelStatePane } from '../components/flywheel/FlywheelStatePane';
@@ -36,6 +38,7 @@ const SPLIT_DEFAULT_LEFT = 560;
 
 const AUTO_PICKUP_TITLE = 'Off: the loop picks up only backlog items the operator released. On: every ready, planned backlog item is pickable.';
 const REQUIRE_UAT_TITLE = 'On: a PR may not merge until UAT has passed. Off: eligible merges may be scheduled through the auto-merge cooldown.';
+const MERGE_TRAIN_TITLE = 'On: normal-priority PRs batch and merge together once the batch CI is green; strikes, critical, blocks-main, P0, urgent and substrate bug fixes still merge on their own. Off: every ready PR merges on its own. Batch size and wait are in Settings.';
 
 function readStoredSplit(): number {
   try {
@@ -49,9 +52,11 @@ function readStoredSplit(): number {
 interface FlywheelPageProps {
   onOpenSettings?: () => void;
   onNavigateIssue?: (issueId: string) => void;
+  /** PAN-5239: opens conv-flywheel's own Command Deck pane at a message. */
+  onOpenConversationMessage?: (conversationName: string, messageId: string) => void;
 }
 
-export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPageProps) {
+export function FlywheelPage({ onOpenSettings, onNavigateIssue, onOpenConversationMessage }: FlywheelPageProps) {
   const statusQuery = useFlywheelStatus();
   const status = statusQuery.data;
   const unreachable = statusQuery.isError;
@@ -62,7 +67,6 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
   const [tab, setTab] = useState<RailTab>('status');
   const [leftWidth, setLeftWidth] = useState<number>(readStoredSplit);
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const [tickJump, setTickJump] = useState<FlywheelTickTarget | null>(null);
   const leftWidthRef = useRef(leftWidth);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const pendingInputQuery = useQuery({
@@ -71,19 +75,15 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
     refetchInterval: 5_000,
   });
 
-  const handleNeedsYouClick = useCallback((messageId?: string) => {
+  const handleNeedsYouClick = useCallback((messageId: string) => {
     const ui = useAskUserQuestionUiStore.getState();
     const action = resolveNeedsYouAction(pendingInputQuery.data, ui.answeredToolUseIds);
     if (action.kind === 'reopen-question') {
       ui.requestReopen(FLYWHEEL_CONVERSATION_NAME);
       return;
     }
-    setTickJump((prev) => ({ messageId: messageId ?? status?.lastTick?.messageId, nonce: (prev?.nonce ?? 0) + 1 }));
-  }, [pendingInputQuery.data, status?.lastTick?.messageId]);
-
-  const handleTickTargetHandled = useCallback(() => {
-    setTickJump((prev) => (prev ? { nonce: prev.nonce, messageId: undefined } : prev));
-  }, []);
+    onOpenConversationMessage?.(FLYWHEEL_CONVERSATION_NAME, messageId);
+  }, [pendingInputQuery.data, onOpenConversationMessage]);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNowMs(Date.now()), 5_000);
@@ -186,14 +186,14 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
             title={REQUIRE_UAT_TITLE}
             onChange={(next) => configMutation.mutate({ require_uat_before_merge: next })}
           />
-          <a
-            href="/awaiting-merge"
-            className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-            title="The merge train is configured on the Awaiting Merge page"
-            data-testid="flywheel-merge-train-chip"
-          >
-            Merge train: {config ? (config.merge_train_enabled ? 'on' : 'off') : '—'}
-          </a>
+          <ToggleSwitch
+            label="Merge train"
+            checked={config?.merge_train_enabled ?? false}
+            disabled={!config || configMutation.isPending}
+            title={MERGE_TRAIN_TITLE}
+            testId="flywheel-merge-train-switch"
+            onChange={(next) => configMutation.mutate({ merge_train_enabled: next })}
+          />
         </div>
       </header>
       {configMutation.error && (
@@ -252,7 +252,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
         />
 
         <div className="min-w-0 flex-1 overflow-hidden" aria-label="Flywheel conversation column">
-          <FlywheelConversationPane onOpenSettings={onOpenSettings} tickTarget={tickJump} onTickTargetHandled={handleTickTargetHandled} />
+          <FlywheelConversationPane onOpenSettings={onOpenSettings} />
         </div>
       </div>
     </div>

@@ -19,6 +19,8 @@ import {
   acquireQualityGateAdmission,
   type QualityGateAdmissionHandle,
 } from './quality-gate-admission.js';
+import { describeMemoryWait } from './gate-admission-run.js';
+import { startPeakRssSampler, type PeakRssSampler } from '../system-health/process-tree-rss.js';
 
 const execAsync = promisify(exec);
 const DASHBOARD_RUNTIME_ENV_KEYS = ['API_PORT', 'PORT', 'DASHBOARD_URL'] as const;
@@ -456,6 +458,7 @@ export async function runQualityGates(
       }
       let gatePgid: number | undefined;
       let admission: QualityGateAdmissionHandle | null = null;
+      let sampler: PeakRssSampler | null = null;
       try {
         if (!isRemote) {
           const identity = `${opts.issueId ?? 'unscoped'} gate="${name}" attempt=${attempt}/${maxAttempts} workspace=${cwd}`;
@@ -467,6 +470,16 @@ export async function runQualityGates(
             workspacePath: cwd,
             gateName: name,
             attempt,
+            // PAN-5248 D13: the raw command, so per-run placeholders never fragment the key.
+            footprintKey: `gate:${name}:${gate.command}`,
+            // FR-12: a container gate's memory never shows in the host tree; reserve all of it.
+            ...(gate.container && gate.container_name ? { fullReservation: true } : {}),
+          }, {
+            onWaiting: (reason) => {
+              if (reason.kind !== 'memory') return;
+              console.log(`[quality-gate] Waiting for memory: ${identity} ${describeMemoryWait(reason)}`);
+              opts.onLog?.(`Waiting for memory before ${name}…`);
+            },
           });
           console.log(`[quality-gate] Admitted (slot ${admission.slot + 1}/${admission.slots}): ${identity}`);
           if (await opts.shouldStop?.()) {
@@ -503,6 +516,8 @@ export async function runQualityGates(
           ...(process.platform !== 'win32' ? { detached: true } : {}),
         });
         gatePgid = registerGateProcessGroup(execPromise.child.pid);
+        // PAN-5248 D6: host gates measure their tree's peak RSS for the next estimate.
+        if (useHostCwd && execPromise.child.pid !== undefined) sampler = startPeakRssSampler(execPromise.child.pid);
         // PAN-2665: tee the child's output to the live-progress sink without
         // altering the buffered result promisify(exec) collects.
         if (opts.onGateOutput) {
@@ -512,13 +527,21 @@ export async function runQualityGates(
         const { stdout, stderr } = await execPromise;
         passedGate = true;
         passOutput = formatGatePreview(stdout, stderr);
+        const peak = await sampler?.stop() ?? null;
+        if (admission && peak !== null) await admission.recordPeak(peak);
       } catch (error: any) {
         lastError = error;
+        // D7: only a gate that exited on its own records a peak; timeouts and signals do not.
+        const peak = await sampler?.stop() ?? null;
+        if (admission && peak !== null && typeof error?.code === 'number' && !error.killed && !error.signal) {
+          await admission.recordPeak(peak);
+        }
         if (attempt < maxAttempts) {
           console.log(`[quality-gate] ✗ "${name}" failed attempt ${attempt}/${maxAttempts} — retrying (gate declares retry: ${gate.retry})`);
           opts.onLog?.(`↻ ${name} failed attempt ${attempt}/${maxAttempts} — retrying`);
         }
       } finally {
+        await sampler?.stop();
         killGateProcessGroup(gatePgid);
         try { await admission?.release(); } catch (error) {
           console.warn(`[quality-gate] Failed to release CPU admission for ${opts.issueId ?? 'unscoped'} gate="${name}": ${error instanceof Error ? error.message : String(error)}`);

@@ -271,8 +271,15 @@ flywheel-tick: tick=3 pick=PAN-3964 phase=watch in-flight=PAN-3964,PAN-3920 need
   `; `; the Flywheel page shows one row per item and links each row to the
   tick that first raised it. Keep an item's wording identical from tick to
   tick until it is resolved: the page matches items by exact text, so a
-  reworded item looks newly raised. Write a pull request outside this
-  project as `owner/repo#<n>`, so the page can link it.
+  reworded item looks newly raised. Always write a pull request outside this
+  project as `owner/repo#<n>` (for example `PR eltmon/overdeck-landing#7
+  merge`); a bare `#<n>` from another repo stays unlinked. When an item has a
+  place to act — a console page, a settings page, a PR or issue URL — end the
+  item with its URL in angle brackets: `upload AAB
+  <https://play.google.com/console/…>`. The page renders the item text as a
+  link to it. Only `http` and `https` URLs work, and the URL must contain no
+  spaces and no `;`. Adding or changing the URL does not make the item look
+  newly raised.
 
 The Flywheel page and `pan flywheel status` parse this line from the
 transcript; it is the only status this loop reports. Never `curl` or POST a

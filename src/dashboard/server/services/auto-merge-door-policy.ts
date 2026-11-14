@@ -14,6 +14,12 @@
  * `routes/merge-train.ts` re-exports `autoMergePolicyRefusal` so existing
  * importers (the auto-merge scheduler, its tests) keep resolving it from
  * there unchanged.
+ *
+ * PAN-4753 D4: the check applies the merge route rule (`merge-route.ts`).
+ * The train being off is no longer a refusal: off means every ready PR merges
+ * on its own. With the train on, a normal-priority PR is refused here because
+ * it waits for the next batch; `mergePathOwner` rule 2 follows this refusal,
+ * so the batch reconciler keeps it.
  */
 import { getSharedIssueService } from './issue-service-singleton.js';
 import {
@@ -22,14 +28,24 @@ import {
   type ProjectAutoMergeDefault,
 } from '../../../lib/cloister/auto-merge-policy.js';
 import { autoMergeFromLabels } from '../../../lib/cloister/auto-merge-eligibility.js';
-import { isFlywheelRequireUatBeforeMerge, isMergeTrainEnabled } from '../../../lib/overdeck/control-settings.js';
+import { isFlywheelRequireUatBeforeMerge } from '../../../lib/overdeck/control-settings.js';
+import {
+  BATCH_ROUTE_REASON,
+  isHighPriorityMerge,
+  issueDroppedFromBatch,
+  issueTrainOn,
+  mergeRouteFor,
+} from '../../../lib/cloister/merge-route.js';
 
 export interface AutoMergePolicyDeps {
   getProjectAutoMergeDefault?: (issueId: string) => ProjectAutoMergeDefault;
   /** The issue's tracker labels; defaults to the dashboard's cached tracker row. */
   getIssueLabels?: (issueId: string) => readonly string[];
   isRequireUatBeforeMerge?: () => boolean;
-  isMergeTrainEnabled?: () => boolean;
+  /** PAN-4753: the merge train's effective flag for the issue's project; {@link issueTrainOn} by default. */
+  isTrainOn?: (issueId: string) => boolean;
+  /** PAN-4753: dropped from a batch for a failed combined CI; {@link issueDroppedFromBatch} by default. */
+  droppedFromBatch?: (issueId: string) => boolean;
   /** #3983: true when the cached tracker row says the issue is closed. */
   isIssueClosed?: (issueId: string) => boolean;
 }
@@ -61,11 +77,12 @@ export function cachedIssueClosed(issueId: string): boolean {
 }
 
 /**
- * The schedule door's policy check, which reads no forge: the issue's UAT hold
- * (its `auto-merge` / `hold-for-uat` label (PAN-3932), then the project
- * default, then global), the merge-train switch, and a closed tracker issue
- * (from the cached tracker row). The scheduler (#3983) asks it first, so a held
- * PR costs no forge read per tick.
+ * The schedule door's policy check, which reads no forge: a closed tracker
+ * issue (from the cached tracker row), the issue's UAT hold (its
+ * `auto-merge` / `hold-for-uat` label (PAN-3932), then the project default,
+ * then global), and the merge route (PAN-4753 D4: train on and normal
+ * priority means the PR waits for a batch). The scheduler (#3983) asks it
+ * first, so a held or batch-routed PR costs no forge read per tick.
  */
 export function autoMergePolicyRefusal(
   issueId: string,
@@ -80,8 +97,17 @@ export function autoMergePolicyRefusal(
   if (shouldHoldForUat(autoMergeFromLabels(labels), projectDefault, globalRequireUat)) {
     return { status: 412, body: { error: 'UAT is still required before merge' } };
   }
-  if (!(deps.isMergeTrainEnabled ?? isMergeTrainEnabled)()) {
-    return { status: 412, body: { error: 'Merge train is disabled' } };
+  const trainOn = (deps.isTrainOn ?? issueTrainOn)(issueId);
+  const highPriority = isHighPriorityMerge({ labels });
+  const route = mergeRouteFor({
+    heldForUat: false,
+    trainOn,
+    highPriority,
+    // The drop lookup reads stored generations; skip it when it cannot matter.
+    droppedFromBatch: trainOn && !highPriority && (deps.droppedFromBatch ?? issueDroppedFromBatch)(issueId),
+  });
+  if (route === 'batch') {
+    return { status: 412, body: { error: BATCH_ROUTE_REASON } };
   }
   return null;
 }

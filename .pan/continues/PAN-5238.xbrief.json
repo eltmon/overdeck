@@ -1,0 +1,128 @@
+{
+  "version": "1",
+  "issueId": "PAN-5238",
+  "created": "2026-11-14T04:52:40.022Z",
+  "updated": "2026-11-14T06:35:41.094Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-14T06:35Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-14T06:35:41.093Z"
+    }
+  ],
+  "items": {
+    "catalog-concurrent-reads": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5238",
+      "claimedAt": "2026-11-14T04:52:40.022Z",
+      "doneAt": "2026-11-14T04:59:21.752Z"
+    },
+    "catalog-concurrent-reads.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:59:21.752Z"
+    },
+    "catalog-concurrent-reads.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:59:21.752Z"
+    },
+    "catalog-concurrent-reads.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:59:21.752Z"
+    },
+    "pack-manifest-cache": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5238",
+      "claimedAt": "2026-11-14T04:59:31.900Z",
+      "doneAt": "2026-11-14T05:12:17.399Z"
+    },
+    "pack-manifest-cache.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:12:17.399Z"
+    },
+    "pack-manifest-cache.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:12:17.399Z"
+    },
+    "pack-manifest-cache.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:12:17.399Z"
+    },
+    "manifest-concurrent-walks": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5238",
+      "claimedAt": "2026-11-14T05:12:23.034Z",
+      "doneAt": "2026-11-14T05:33:18.652Z"
+    },
+    "manifest-concurrent-walks.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:33:18.652Z"
+    },
+    "manifest-concurrent-walks.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:33:18.652Z"
+    },
+    "manifest-concurrent-walks.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:33:18.652Z"
+    },
+    "async-issue-project-lookup": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5238",
+      "claimedAt": "2026-11-14T05:33:25.220Z",
+      "doneAt": "2026-11-14T05:39:32.388Z"
+    },
+    "async-issue-project-lookup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:39:32.388Z"
+    },
+    "async-issue-project-lookup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:39:32.388Z"
+    },
+    "route-slow-log": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5238",
+      "claimedAt": "2026-11-14T05:39:49.175Z",
+      "doneAt": "2026-11-14T05:48:42.049Z"
+    },
+    "route-slow-log.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:48:42.049Z"
+    },
+    "route-slow-log.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:48:42.049Z"
+    },
+    "docs-and-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5238",
+      "claimedAt": "2026-11-14T05:48:51.847Z",
+      "doneAt": "2026-11-14T05:54:57.636Z"
+    },
+    "docs-and-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:54:57.636Z"
+    },
+    "docs-and-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:54:57.636Z"
+    },
+    "docs-and-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:54:57.636Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-14T06:35:41Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5238\n\nPull request: https://github.com/eltmon/overdeck/pull/5255 (head `34c6e8c8`)\n\nSource: check_run:test-shard (4/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/132361761911/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43566616282/job/132361761911  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/cloister/__tests__/merge-gate.test.ts\u001b[2m > \u001b[22mevaluateIssueMergeGate — mergeability not yet computed (PAN-4540)\u001b[2m > \u001b[22mreports mergeability, not a missing approval, when the re-read is still unknown\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/cloister/__tests__/merge-gate.test.ts\u001b[2m > \u001b[22mevaluateIssueMergeGate — mergeability not yet computed (PAN-4540)\u001b[2m > \u001b[22mreports mergeability, not a missing approval, when the re-read is still unknown\n\u001b[31m\u001b[1mError\u001b[22m: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/lib/cloister/__tests__/merge-gate.test.ts:\u001b[2m165:3\u001b[22m\u001b[39m\n    \u001b[90m163|\u001b[39m   })\u001b[33m;\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m657 passed\u001b[39m\u001b[22m\u001b[90m (658)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
+}

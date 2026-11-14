@@ -34,11 +34,12 @@ export function StatusBadge({ tone, children, title, testId }: { tone: Tone; chi
 }
 
 /** On/off switch for the header policies; mirrors the Merge train section's switch. */
-export function ToggleSwitch({ label, checked, disabled, title, onChange }: {
+export function ToggleSwitch({ label, checked, disabled, title, testId, onChange }: {
   label: string;
   checked: boolean;
   disabled?: boolean;
   title?: string;
+  testId?: string;
   onChange: (next: boolean) => void;
 }) {
   return (
@@ -49,6 +50,7 @@ export function ToggleSwitch({ label, checked, disabled, title, onChange }: {
       aria-label={label}
       disabled={disabled}
       title={title}
+      data-testid={testId}
       onClick={() => onChange(!checked)}
       className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground disabled:opacity-50"
     >

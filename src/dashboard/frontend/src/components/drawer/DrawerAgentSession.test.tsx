@@ -1,10 +1,11 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Agent } from '../../types';
 import type { DerivedIssueState } from '@overdeck/contracts';
 import { useDashboardStore } from '../../lib/store';
 import { DrawerAgentSession, pickDefaultDrawerAgent, sortIssueAgents } from './DrawerAgentSession';
+import { agentDisplayName } from '../../lib/agentConversation';
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: () => ({ data: null }),
@@ -263,5 +264,168 @@ describe('DrawerAgentSession view selector', () => {
       'planning-pan-1',
       'strike-pan-1',
     ]);
+  });
+});
+
+describe('DrawerAgentSession conversation-header layout', () => {
+  afterEach(() => {
+    useDashboardStore.setState({ agentsById: {} } as Parameters<typeof useDashboardStore.setState>[0]);
+  });
+
+  it('agentDisplayName names slots, workers, reviewers and roles', () => {
+    expect(agentDisplayName(agent({ id: 'agent-pan-1-slot-2', role: 'work' }))).toBe('Slot 2');
+    expect(agentDisplayName(agent({ id: 'agent-pan-1-worker-3', role: 'worker' }))).toBe('Worker 3');
+    expect(agentDisplayName(agent({ id: 'agent-pan-1-review-security', role: 'review' }))).toBe('Security reviewer');
+    expect(agentDisplayName(agent({ id: 'agent-pan-1-review-supervisor', role: 'review' }))).toBe('Review');
+    expect(agentDisplayName(agent({ id: 'planning-pan-1', role: 'plan' }))).toBe('Planner');
+    expect(agentDisplayName(agent({ id: 'agent-pan-1', role: 'work' }))).toBe('Work agent');
+  });
+
+  it('renders the header and meta rows and no select', () => {
+    render(
+      <DrawerAgentSession
+        view="conversation"
+        layout="conversation-header"
+        agents={[agent({ id: 'agent-pan-1', role: 'work' }), agent({ id: 'agent-pan-1-review', role: 'review' })]}
+        agentId="agent-pan-1"
+        onSelectAgent={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('drawer-agent-header')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-agent-meta')).toHaveTextContent('agent-pan-1');
+    expect(screen.getByTestId('drawer-agent-status')).toHaveTextContent('active');
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.getByTestId('conversation-panel')).toHaveTextContent('agent-pan-1');
+  });
+
+  it('a single agent has a plain name and no menu button', () => {
+    render(
+      <DrawerAgentSession
+        view="conversation"
+        layout="conversation-header"
+        agents={[agent({ id: 'agent-pan-1', role: 'work' })]}
+        agentId="agent-pan-1"
+        onSelectAgent={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('drawer-agent-name')).toHaveTextContent('Work agent');
+    expect(screen.queryByTestId('drawer-agent-picker')).toBeNull();
+  });
+
+  it('the agent menu lists every agent in lifecycle order, workers included, and selects one', () => {
+    const agents = [
+      agent({ id: 'agent-pan-1-worker-1', role: 'worker' }),
+      agent({ id: 'agent-pan-1-review', role: 'review' }),
+      agent({ id: 'agent-pan-1', role: 'work' }),
+    ];
+    const onSelectAgent = vi.fn();
+    render(
+      <DrawerAgentSession
+        view="conversation"
+        layout="conversation-header"
+        agents={agents}
+        agentId="agent-pan-1"
+        onSelectAgent={onSelectAgent}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('drawer-agent-picker'));
+    const menu = screen.getByTestId('drawer-agent-menu');
+    expect(
+      Array.from(menu.querySelectorAll('[data-testid^="drawer-agent-option-"]')).map((row) => row.getAttribute('data-testid')),
+    ).toEqual(sortIssueAgents(agents).map((candidate) => `drawer-agent-option-${candidate.id}`));
+
+    fireEvent.click(screen.getByTestId('drawer-agent-option-agent-pan-1-worker-1'));
+    expect(onSelectAgent).toHaveBeenCalledWith('agent-pan-1-worker-1');
+    expect(screen.queryByTestId('drawer-agent-menu')).toBeNull();
+  });
+
+  it('shows the start surface when the issue has no agent', () => {
+    render(
+      <DrawerAgentSession
+        view="conversation"
+        layout="conversation-header"
+        agents={[]}
+        agentId={null}
+        issueId="PAN-1"
+        onSelectAgent={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('No agent has run on this issue yet')).toBeInTheDocument();
+    const surface = screen.getByTestId('drawer-start-surface');
+    expect(surface).toHaveAttribute('data-section', 'StartAgentCta');
+    expect(within(surface).getByRole('button', { name: 'Start agent' })).toBeInTheDocument();
+  });
+
+  it('shows the start or resume row under the meta row for an ended agent', () => {
+    render(
+      <DrawerAgentSession
+        view="conversation"
+        layout="conversation-header"
+        agents={[agent({ id: 'agent-pan-1', role: 'work', status: 'stopped' })]}
+        agentId="agent-pan-1"
+        issueId="PAN-1"
+        onSelectAgent={vi.fn()}
+      />,
+    );
+
+    const row = screen.getByTestId('drawer-agent-restart-row');
+    expect(within(row).getByRole('button', { name: 'Start agent' })).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-agent-meta').compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('shows none for a live agent', () => {
+    render(
+      <DrawerAgentSession
+        view="conversation"
+        layout="conversation-header"
+        agents={[agent({ id: 'agent-pan-1', role: 'work', status: 'running' })]}
+        agentId="agent-pan-1"
+        issueId="PAN-1"
+        onSelectAgent={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId('drawer-agent-restart-row')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Start agent' })).toBeNull();
+  });
+
+  it('renders belowHeader between the meta row and the transcript', () => {
+    render(
+      <DrawerAgentSession
+        view="conversation"
+        layout="conversation-header"
+        agents={[agent({ id: 'agent-pan-1', role: 'work' })]}
+        agentId="agent-pan-1"
+        onSelectAgent={vi.fn()}
+        belowHeader={<div data-testid="below-header">reviewers</div>}
+      />,
+    );
+
+    const meta = screen.getByTestId('drawer-agent-meta');
+    const below = screen.getByTestId('below-header');
+    const transcript = screen.getByTestId('conversation-panel');
+    expect(meta.compareDocumentPosition(below) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(below.compareDocumentPosition(transcript) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('the meta row shows the agent cost from the store snapshot', () => {
+    useDashboardStore.setState({
+      agentsById: { 'agent-pan-1': { id: 'agent-pan-1', status: 'running', costSoFar: 1.5 } },
+    } as unknown as Parameters<typeof useDashboardStore.setState>[0]);
+    render(
+      <DrawerAgentSession
+        view="conversation"
+        layout="conversation-header"
+        agents={[agent({ id: 'agent-pan-1', role: 'work' })]}
+        agentId="agent-pan-1"
+        onSelectAgent={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('drawer-agent-cost')).toHaveTextContent('$1.50');
   });
 });

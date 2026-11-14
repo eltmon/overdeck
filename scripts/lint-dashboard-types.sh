@@ -47,7 +47,8 @@ if [[ ! -x "$TSC_BIN" ]]; then
 fi
 
 # tsc exits non-zero when it reports errors; count them rather than trust status.
-output=$("$TSC_BIN" --noEmit -p "$TSCONFIG" 2>&1 || true)
+# PAN-5248: the lane takes gate admission (CPU and memory).
+output=$(node scripts/tsc-admitted.mjs --noEmit -p "$TSCONFIG" 2>&1 || true)
 count=$(printf '%s\n' "$output" | grep -cE 'error TS' || true)
 
 if [[ "$MODE" == "update" ]]; then
@@ -65,7 +66,7 @@ if (( count > baseline )); then
   echo "✖ dashboard server typecheck regressed: $count errors (baseline $baseline)." >&2
   echo "  New type errors in src/dashboard/server. Offending lines:" >&2
   printf '%s\n' "$output" | grep -E 'error TS' | head -20 >&2
-  echo "  Reproduce: node_modules/.bin/tsc --noEmit -p $TSCONFIG" >&2
+  echo "  Reproduce: node scripts/tsc-admitted.mjs --noEmit -p $TSCONFIG" >&2
   exit 1
 fi
 

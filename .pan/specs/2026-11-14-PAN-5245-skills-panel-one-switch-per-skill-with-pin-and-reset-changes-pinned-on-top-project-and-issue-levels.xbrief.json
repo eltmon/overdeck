@@ -1,0 +1,755 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T04:57:49Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5245: Skills panel: one switch per skill with pin and reset, changes pinned on top (project and issue levels)",
+    "updated": "2026-11-14T05:12:18.823Z"
+  },
+  "plan": {
+    "id": "pan-5245",
+    "title": "Skills panel: one switch per skill with pin and reset, changes pinned on top (project and issue levels)",
+    "status": "running",
+    "uid": "2db25949-7e81-4008-a963-cbf65c234342",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-14T04:57:49Z",
+    "updated": "2026-11-14T05:12:18.823Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5245",
+        "label": "PAN-5245",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5245/.pan/drafts/pan-5245.md",
+        "label": "PRD draft (.pan/drafts/pan-5245.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/design/issue-view-conversation-first.html",
+        "label": "Approved mockup (?scn=merged&tab=skills)",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "skills",
+      "ux"
+    ],
+    "narratives": {
+      "Problem": "Below global level the skills panel gives each skill a three-button Inherit | On | Off group and a separate state cell, and the issue view opens on a filter that hides every skill the issue has not touched. A fresh issue shows an almost empty list that reads as read-only and is slow to use.",
+      "Proposal": "At project and issue level, replace the Inherit | On | Off group with one switch showing the effective state, a mono source text (on · global, off · this issue, on · pinned here, ...) and one icon button: Pin when the row inherits, Reset when it has a stored value. A pure levelRowState function in SkillControls.tsx owns the six-row state table. Add a Changed for this <level> group listed first with a count, an empty-state line and Reset all (sequential PUTs, stop at first failure, one reload). Every level opens on All; filters become All | Changed here | Off (Off at launch for project); the summary gains `· N changed here`; the live-agent note becomes an amber notice. The three stored states, the server contract, the global level and skill packs are unchanged. The PRD .pan/drafts/pan-5245.md carries the exact code for every item.",
+      "NonGoals": "- No server, route or store change: no edit under src/dashboard/server/ or src/lib/ (including src/lib/skill-overrides/), no new endpoint, no batch write, no new polling.\n- No change to level=\"global\" rows or behavior (two-state switch stays).\n- No change to SkillPacksSection.tsx, SkillPacksSection.test.tsx or SkillOverridesSections.tsx; packs keep Inherit | On | Off and their two-line state cell.\n- No change to SkillOverridesPanelProps (PAN-5244 moves the mount point separately).\n- No stored 'pinned' flag: pinned is derived from stored value === inherited value.\n- No confirmation dialog for Reset all.\n- No line-through on off skill names, no 'Show all N' buttons, no neutral 'Saved…' notice, no new search placeholder, no 'Restart agent' button, no change to the launch note text.\n- No change to the New conversation dialog's Skills field (features/conversations.mdx, docs/CONTEXT-LAYERS.md).\n- No edit to the untracked src/dashboard/frontend/.impeccable/surfaces/ brief.\n- No fix for the slow per-issue GET (PAN-5238)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Kept the existing PRD as canonical after re-verifying it at dafeeaf8a7d; corrected the subset-file line numbers (326/327) in place.",
+        "rationale": "The PRD is operator-approved and detailed; only line drift was found, so a rewrite would add risk without value."
+      },
+      {
+        "summary": "Dropped PRD WI-7 item 3 (src/dashboard/frontend/.impeccable/surfaces/src-components-skillslist-tsx.md) from the doc targets.",
+        "rationale": "The path is excluded by .git/info/exclude line 78; it does not exist in issue worktrees and no PR can change it."
+      },
+      {
+        "summary": "Split PRD WI-4 into filters-open-on-all and summary-changed-count, and WI-5 into changed-group and reset-all, with an explicit partition of state, helpers and assertions.",
+        "rationale": "Smaller independently reviewable items; the partition keeps each item green under noUnusedLocals."
+      },
+      {
+        "summary": "Folded the panel docblock edits (PRD WI-7 item 4) into the code items that make each sentence true instead of a separate item.",
+        "rationale": "Comment-only edits are trivia that belong with the change they describe; a separate item would add an edge on the shared file."
+      },
+      {
+        "summary": "Encoded the PRD WI-3 visual width checkpoint as a browser-verifiable acceptance criterion with an isolated Playwright profile and the w-[10rem] fallback.",
+        "rationale": "Unit-test DOM has no layout, so only a real browser can check truncation."
+      }
+    ],
+    "items": [
+      {
+        "id": "ci-subset-test-harness",
+        "title": "Add the skills panel tests to the CI frontend subset and give mockApi per-call PUT responses",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:57:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5245",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/skills/SkillOverridesPanel.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/run-frontend-test-subset.mjs --dry-run",
+            "npx vitest run tests/unit/scripts/frontend-test-subset-list.test.ts",
+            "cd src/dashboard/frontend && npx vitest run src/components/skills/SkillOverridesPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "dry-run JSON args include src/components/skills/SkillOverridesPanel.test.tsx and src/components/skills/SkillPacksSection.test.tsx",
+            "frontend-test-subset-list.test.ts passes",
+            "SkillOverridesPanel.test.tsx passes with its existing tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/pan-5245.md). (1) In SkillOverridesPanel.test.tsx replace mockApi (search `function mockApi(`) with the PRD's `PutResponse | PutResponse[]` version: one response answers every PUT; an array answers PUTs in order and its last entry repeats. Do NOT add the group/rowIn/getCount helpers here (noUnusedLocals): they land in later items. (2) In scripts/frontend-test-subset.txt insert `src/components/skills/SkillOverridesPanel.test.tsx` and `src/components/skills/SkillPacksSection.test.tsx` after `src/components/simple/SimpleQuestionCard.test.tsx` (line 326) and before `src/components/terminal/TerminalDrawer.pending.test.tsx`. SkillControls.test.tsx is NOT listed here (the subset-list test fails on a listed file that does not exist); the level-switch-control item adds it."
+        },
+        "items": [
+          {
+            "id": "ci-subset-test-harness.ac1",
+            "title": "Given scripts/frontend-test-subset.txt, when `node scripts/run-frontend-test-subset.mjs --dry-run` runs, then its printed args include src/components/skills/SkillOverridesPanel.test.tsx and src/components/skills/SkillPacksSection.test.tsx, in sorted position between the simple/ and terminal/ entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-subset-test-harness.ac2",
+            "title": "Given the new list, when `npx vitest run tests/unit/scripts/frontend-test-subset-list.test.ts` runs, then it passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-subset-test-harness.ac3",
+            "title": "Given only this item's change, when `npx vitest run src/components/skills/` runs from src/dashboard/frontend, then all 24 existing tests in the 2 files pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-subset-test-harness.ac4",
+            "title": "Given mockApi called with an array of PUT responses, then the Nth PUT receives the Nth response and PUTs past the end receive the last entry (exercised later by the reset-all failure test; the single-object call form still answers every PUT)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "level-switch-control",
+        "title": "Add levelRowState and the LevelSwitch control (switch, source text, Pin or Reset) to SkillControls",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:57:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5245",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/skills/SkillControls.tsx",
+            "src/dashboard/frontend/src/components/skills/SkillControls.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/skills/SkillControls.test.tsx src/components/skills/SkillPacksSection.test.tsx",
+            "npm run typecheck:frontend",
+            "npm run lint:circular",
+            "npx vitest run tests/unit/scripts/frontend-test-subset-list.test.ts"
+          ],
+          "expected_outputs": [
+            "SkillControls.test.tsx and SkillPacksSection.test.tsx pass",
+            "typecheck:frontend completes without errors",
+            "lint:circular reports no cycle",
+            "subset-list test passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "skill-rows-level-switch"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In SkillControls.tsx: import `Pin, Undo2` from lucide-react (both exist in 0.400.0; fallback RotateCcw if Undo2 fails typecheck); add optional `title` to SkillSwitchProps and pass it to the button; after LevelChoice add exactly the PRD's `LevelRowState`, `levelRowState(current, inherited, level)`, `LevelSwitchProps`, `ICON_BUTTON` and `LevelSwitch` code. Implement the six-row state table literally (separator U+00B7 with one space each side). Accessible names: switch `<skill> for this <level>` (never changes with state; action goes in title); Pin `Pin <skill> <on|off> for this <level>`; Reset `Reset <skill> to the global default` or `... to the project setting` when inherited.from is 'project'. Keep LevelChoice exported and unchanged (SkillPacksSection uses it). Do not import anything from SkillOverridesPanel.tsx (type `level` inline as 'project' | 'issue'). Rewrite the file docblock as in the PRD. Create SkillControls.test.tsx with the six PRD tests (render LevelSwitch directly, no QueryClientProvider) and add `src/components/skills/SkillControls.test.tsx` to scripts/frontend-test-subset.txt directly above the SkillOverridesPanel.test.tsx line."
+        },
+        "items": [
+          {
+            "id": "level-switch-control.ac1",
+            "title": "Given levelRowState over the six state-table rows (level 'issue', from 'global'), then it returns exactly the table's effective, source, here and toggleTo values (e.g. (true,{on:true}) gives source `on · pinned here`, toggleTo false; (false,{on:true}) gives `off · this issue`, toggleTo null); and (null,{on:false,from:'project'},'issue') gives `off · project`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "level-switch-control.ac2",
+            "title": "Given LevelSwitch with current null, inherited on from global, skill 'okf', level 'issue', when it renders, then a switch named `okf for this issue` with aria-checked=\"true\", the text `on · global`, and a button named `Pin okf on for this issue` render, and no button whose name starts with `Reset` exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "level-switch-control.ac3",
+            "title": "Given LevelSwitch with a stored value, when it renders, then a button named `Reset okf to the global default` (or `Reset okf to the project setting` when inherited from project) renders and no button whose name starts with `Pin` exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "level-switch-control.ac4",
+            "title": "Given each table row, when the switch, Pin or Reset is clicked, then onSet receives the table value (row 1 switch false, row 4 switch null, row 6 switch true, row 1 Pin true, row 2 Pin false, row 3 Reset null); and with saving true both the switch and the icon button have disabled === true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "level-switch-control.ac5",
+            "title": "Given the change, when `npm run lint:circular` runs, then it reports no cycle, LevelChoice is still exported, and SkillPacksSection.test.tsx passes without edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-rows-level-switch",
+        "title": "Render project and issue skill rows with LevelSwitch instead of Inherit | On | Off",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:57:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5245",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/skills/SkillOverridesPanel.tsx",
+            "src/dashboard/frontend/src/components/skills/SkillOverridesPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/skills/SkillOverridesPanel.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "SkillOverridesPanel.test.tsx passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In SkillOverridesPanel.tsx: import `GroupHeader, LevelSwitch, RowError, SkillSwitch` (drop LevelChoice); in SkillRow use the single three-column grid class for every level (keep the literal `'list-row grid items-start gap-x-4 gap-y-1 px-3 py-2'` byte-identical); replace the LevelChoice cell with `<LevelSwitch skill={skill.name} level={level} current={current} inherited={inherit} saving={saving} onSet={onSave} />`; delete the `{level !== 'global' && (` state cell. Replace docblock line 6 (`- project / issue: Inherit | On | Off...`) with the PRD's three-line text (WI-7 step 4, first part). Tests: update existing issue tests per the PRD WI-3 fate table (Retry, pending-push and sections tests click `within(row('grilling')).getByRole('switch')` instead of `On`; Retry PUT bodies are `{ level: 'issue', skill: 'grilling', enabled: null, issueId: 'TST-1' }`); replace `sends enabled false for Off...` with the three new tests; add the project describe test; add the global `Pin ` null assertion. The issue panel still opens on the `relevant` filter in this item, so new tests click `screen.getByRole('button', { name: /^All/ })` first. Query row controls only through `within(row(name))`. Await `putBodies` length after each click before the next one."
+        },
+        "items": [
+          {
+            "id": "skill-rows-level-switch.ac1",
+            "title": "Given the issue panel with the issueSkills fixture (after clicking All), when it renders, then each non-core row contains exactly one role=\"switch\" element, okf/codebase-design/grilling/local show `on · global`, `off · project`, `off · this issue`, `on · pinned here`, and no button whose name starts with `Inherit` exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-rows-level-switch.ac2",
+            "title": "Given the issue panel, when the okf, grilling and codebase-design switches are clicked in turn, then putBodies equals three bodies with enabled false, null and true; and clicking Pin okf, Pin codebase-design and Reset local sends enabled true, false and null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-rows-level-switch.ac3",
+            "title": "Given the project panel (projectKey 'tst'), when it renders, then grilling shows `off · global`, okf shows `off · this project`, and clicking the switch named `grilling for this project` PUTs `{ level: 'project', skill: 'grilling', enabled: true, projectKey: 'tst' }`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-rows-level-switch.ac4",
+            "title": "Given a failed PUT, when the grilling switch is clicked and then Retry, then the row shows a role=alert `Save failed:` line and the second PUT body equals the first; and given the global panel, then no button whose name starts with `Pin ` renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-rows-level-switch.ac5",
+            "title": "Given the running dashboard in an isolated Playwright browser profile at a viewport 768 px wide or more, when Project settings → Skills renders a skill overridden off at project level, then the source text `off · this project` renders in full without truncation (fallback: widen w-[9rem] to w-[10rem] in LevelSwitch)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "filters-open-on-all",
+        "title": "Open every level on All and rename the project/issue filters to All, Changed here, Off",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:57:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5245",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/skills/SkillOverridesPanel.tsx",
+            "src/dashboard/frontend/src/components/skills/SkillOverridesPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/skills/SkillOverridesPanel.test.tsx",
+            "npm run typecheck:frontend",
+            "git grep -n relevant src/dashboard/frontend/src/components/skills"
+          ],
+          "expected_outputs": [
+            "SkillOverridesPanel.test.tsx passes",
+            "typecheck:frontend completes without errors",
+            "git grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 steps 1, 2 and 4 (NOT step 3; the summary count is the summary-changed-count item). Replace the Filter type and FILTERS exactly as the PRD's After block (`relevant` removed; project `All | Changed here | Off at launch`; issue `All | Changed here | Off`). Delete the `relevant:` counts entry and the `case 'relevant':` branch. In the panel docblock replace `the issue view opens filtered to what matters` with `every level opens on All` and `render above the skill list` with `render below the skill list`. Tests: add the `group` and `rowIn` helpers from PRD WI-1 step 2; rewrite the line-140 test as `opens on All, with core collapsed and every skill listed` but assert the summary as `'3 on·2 off·1 core'` here (the `changed here` part arrives in the next item); add `offers All, Changed here and Off, with counts` (chip textContent `All5`, `Changed here2`, `Off2`), `Changed here lists only skills with a stored value at this level`, and the project `labels the filters...` test; remove the `/^All/` clicks added by the skill-rows-level-switch item. Query chips with regexes (/^All/, /^Changed here/, /^Off/)."
+        },
+        "items": [
+          {
+            "id": "filters-open-on-all.ac1",
+            "title": "Given the issue panel, when it first renders with no click, then the All chip has aria-pressed=\"true\", row okf is visible, `[data-skill=\"pan-done\"]` is absent, and `1 core skills, always on` renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "filters-open-on-all.ac2",
+            "title": "Given the issue panel, then the three chips' textContent values are `All5`, `Changed here2`, `Off2` and no button named /Overridden here/ exists; and given the project panel, then buttons matching /^All/, /^Changed here/ and /^Off at launch/ render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "filters-open-on-all.ac3",
+            "title": "Given the issue panel, when the Changed here chip is clicked, then rows grilling and local render and rows okf and codebase-design do not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "filters-open-on-all.ac4",
+            "title": "Given the change, when `git grep -n relevant src/dashboard/frontend/src/components/skills` runs, then it prints nothing, and the panel docblock contains `every level opens on All` and `render below the skill list`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "summary-changed-count",
+        "title": "Add the N changed here count to the project and issue summary line",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:57:49Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5245",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/skills/SkillOverridesPanel.tsx",
+            "src/dashboard/frontend/src/components/skills/SkillOverridesPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/skills/SkillOverridesPanel.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "SkillOverridesPanel.test.tsx passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 step 3. After the `off` item in the summary line, add the PRD's `{level !== 'global' && (...)}` fragment rendering `· <counts.here> changed here` (count in text-foreground when > 0). Update the `opens on All...` test's summary assertion to `'3 on·2 off·2 changed here·1 core'`. The global assertion `'2 on·0 off·1 core'` stays unchanged."
+        },
+        "items": [
+          {
+            "id": "summary-changed-count.ac1",
+            "title": "Given the issue panel with the issueSkills fixture, when it renders, then `screen.getByTestId('skills-summary').textContent` equals `3 on·2 off·2 changed here·1 core`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summary-changed-count.ac2",
+            "title": "Given the global panel, when it renders, then the summary textContent equals `2 on·0 off·1 core` (no `changed here`)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changed-group",
+        "title": "Render a Changed for this <level> group above the skill list, with the empty-state line",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:57:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5245",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/skills/SkillOverridesPanel.tsx",
+            "src/dashboard/frontend/src/components/skills/SkillOverridesPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/skills/SkillOverridesPanel.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "SkillOverridesPanel.test.tsx passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 step 3 (only `changedHere` and `showChanged`; NOT `resetAll`) and step 4 WITHOUT the Reset all button. Partition rule (noUnusedLocals is on): this item adds no `resettingAll` state, no `save` signature change, no Reset all button and no `getCount` helper; rows in the group use `saving={saving[skill.name] === true}`. Render `<section data-skill-group=\"changed\" aria-label=\"Changed for this <level>\">` between the filter bar and the list box, only when level !== 'global' and not narrowing; header is static markup (`list-group-bar`, h3 `Changed for this {level}`, count span `data-testid=\"skills-changed-count\"`); rows are SkillRow with `below={null}`; empty state uses the two FR-9 strings exactly (double-quoted, ASCII apostrophe). A changed skill also stays in its home group. Tests: `lists changed skills first and keeps them in their home group`, `says nothing is changed when no skill has a stored value` (without the Reset all assertion), `hides the changed group while searching or filtering`, the project-wording empty test, and the global `[data-skill-group=\"changed\"]` null assertion."
+        },
+        "items": [
+          {
+            "id": "changed-group.ac1",
+            "title": "Given the issue panel with the issueSkills fixture, when it renders, then the first `[data-skill-group]` element is `changed`, it holds rows grilling and local and no okf, its heading reads `Changed for this issue`, `skills-changed-count` reads `2`, and rowIn('personal','grilling') and rowIn('project','local') also render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changed-group.ac2",
+            "title": "Given an issue panel whose only skill has no stored value, then the changed group renders `Nothing is changed. This issue's agents launch with the project's skills.` and the count `0`; given the same at project level, then it renders `Changed for this project` and `Nothing is changed. This project's agents launch with the global skills.`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changed-group.ac3",
+            "title": "Given the issue panel, when `okf` is typed into the Filter skills searchbox or the Off chip is selected, then `[data-skill-group=\"changed\"]` is absent; when the All chip is selected again with an empty search, then it renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changed-group.ac4",
+            "title": "Given the global panel, when it renders, then `[data-skill-group=\"changed\"]` is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reset-all",
+        "title": "Add Reset all to the Changed group: sequential PUTs, stop at first failure, one reload",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:57:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5245",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/skills/SkillOverridesPanel.tsx",
+            "src/dashboard/frontend/src/components/skills/SkillOverridesPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/skills/SkillOverridesPanel.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "SkillOverridesPanel.test.tsx passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 steps 1, 2, the `resetAll` part of step 3, the Reset all button from step 4, and step 5. Add `const [resettingAll, setResettingAll] = useState(false);` with the other hooks (above the early `return null`). Change `save` to `(skill, value, refresh = true): Promise<boolean>` exactly as the PRD (skip invalidation when refresh is false; return true/false). Add `resetAll` (snapshot names, loop `await save(name, null, false)`, break on false, finally invalidate once and clear resettingAll). Add the Reset all button in the group header only when changedHere.length > 0, disabled while resettingAll. In BOTH the Changed-group and home-group SkillRow calls use `saving={saving[skill.name] === true || resettingAll}`. No confirmation dialog. Tests: add the `getCount` helper; add `Reset all clears each changed skill in order and reloads once` (getCount() === 2), `Reset all stops at the first failure and shows that row's error` (mockApi with a one-element failing array), the no-Reset-all assertion in the empty test, and a test that every role=switch in the panel is disabled while a PUT is pending (stub fetch so the PUT promise resolves only when the test resolves it). Checkpoint fallback (PRD WI-5): if one reload after the loop is unreliable, drop the refresh parameter and expect getCount() === 3."
+        },
+        "items": [
+          {
+            "id": "reset-all.ac1",
+            "title": "Given the issue panel with grilling and local changed, when Reset all is clicked, then putBodies equals `[{ level: 'issue', skill: 'grilling', enabled: null, issueId: 'TST-1' }, { level: 'issue', skill: 'local', enabled: null, issueId: 'TST-1' }]` and exactly one GET follows the initial load (getCount() === 2)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reset-all.ac2",
+            "title": "Given the first PUT returns 500 `push rejected`, when Reset all is clicked, then exactly one PUT is sent, rowIn('changed','grilling') shows a role=alert containing `push rejected` with Retry, and the Reset all button is enabled again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reset-all.ac3",
+            "title": "Given a Reset all PUT that has not resolved, when the panel renders, then every role=switch element in the panel has disabled === true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reset-all.ac4",
+            "title": "Given no changed skill, when the panel renders, then no button named `Reset all` exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "amber-live-agent-notice",
+        "title": "Render the live-agent change note as an amber notice",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:57:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5245",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/skills/SkillOverridesPanel.tsx",
+            "src/dashboard/frontend/src/components/skills/SkillOverridesPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/skills/",
+            "npm run typecheck:frontend",
+            "git diff --name-only origin/main...HEAD"
+          ],
+          "expected_outputs": [
+            "all three skills test files pass",
+            "typecheck:frontend completes without errors",
+            "diff lists no src/dashboard/server/, src/lib/, SkillPacksSection.tsx, SkillPacksSection.test.tsx or SkillOverridesSections.tsx path"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Change the `skills-changed-since-launch` <p> className to `rounded-md border px-3 py-2 text-sm badge-bg-warning badge-border-warning text-warning-foreground`; keep text and data-testid. Do not add role=\"status\" (the push-pending notice owns it and its test uses a singular getByRole('status')); do not add a button. Extend the sections test `notes that a change applies at the next launch while an agent is running` with the two classList assertions. This is the last code item: also run the whole-branch scope check."
+        },
+        "items": [
+          {
+            "id": "amber-live-agent-notice.ac1",
+            "title": "Given a live work agent and one saved change, when the issue section renders, then `[data-testid=\"skills-changed-since-launch\"]` has classes `badge-bg-warning` and `badge-border-warning` and its text equals `Skills changed since launch; applies next launch (work agent running).`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "amber-live-agent-notice.ac2",
+            "title": "Given the push-pending case, when a save returns pushed false, then exactly one role=\"status\" element renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "amber-live-agent-notice.ac3",
+            "title": "Given the finished branch, when `git diff --name-only origin/main...HEAD` runs, then it prints no path starting with `src/dashboard/server/` or `src/lib/` and none of SkillPacksSection.tsx, SkillPacksSection.test.tsx, SkillOverridesSections.tsx; and `npx vitest run src/components/skills/` from src/dashboard/frontend passes all three test files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "user-docs-changelog",
+        "title": "Describe the new project and issue skill controls in features/skills.mdx and skill-packs.mdx, and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:57:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5245",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skills.mdx",
+            "features/skill-packs.mdx",
+            "changelog.d/pan-5245.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n \"one switch per skill\" features/skills.mdx",
+            "grep -n \"Inherit (off via global)\" features/skills.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "first grep prints the Project settings bullet",
+            "second grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 items 1, 2 and 5 (item 3 is dropped: the .impeccable/surfaces brief is untracked; item 4 is done inside the code items). features/skills.mdx: replace the line-240 sentence (search `Project and issue levels are three-state`), the line-278 bullet (search `**Project settings → Skills**`) and the line-279 bullet (search `**Issue view → Skills for this issue**`) with the PRD's exact texts; leave the CLI block (on|off|inherit) unchanged. features/skill-packs.mdx line 713 (search `packs appear above the skill list`): `above` becomes `below`, and append `At project and issue level a pack and its skills keep the **Inherit / On / Off** control.` Leave line 74 alone. Create changelog.d/pan-5245.md with the PRD's `#### Improved` entry. Never edit the top of changelog.mdx. No file overlap with the code items, so this runs in parallel."
+        },
+        "items": [
+          {
+            "id": "user-docs-changelog.ac1",
+            "title": "Given features/skills.mdx, then it contains `one switch per skill` and `on · pinned here` in the Project settings bullet, the Issue view bullet says it opens on every skill with **Changed here** and **Off** narrowing, and `grep -n \"Inherit (off via global)\" features/skills.mdx` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "user-docs-changelog.ac2",
+            "title": "Given features/skill-packs.mdx, then the dashboard sentence says packs appear `below the skill list` and states that packs keep the **Inherit / On / Off** control at project and issue level",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "user-docs-changelog.ac3",
+            "title": "Given changelog.d/pan-5245.md, then it exists with an `#### Improved` heading and a bullet linking https://github.com/eltmon/overdeck/issues/5245",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "user-docs-changelog.ac4",
+            "title": "Given the edited files, when `npm run lint:docs` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "ci-subset-test-harness",
+        "to": "level-switch-control",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-subset-test-harness",
+        "to": "skill-rows-level-switch",
+        "type": "blocks"
+      },
+      {
+        "from": "level-switch-control",
+        "to": "skill-rows-level-switch",
+        "type": "blocks"
+      },
+      {
+        "from": "skill-rows-level-switch",
+        "to": "filters-open-on-all",
+        "type": "blocks"
+      },
+      {
+        "from": "filters-open-on-all",
+        "to": "summary-changed-count",
+        "type": "blocks"
+      },
+      {
+        "from": "summary-changed-count",
+        "to": "changed-group",
+        "type": "blocks"
+      },
+      {
+        "from": "changed-group",
+        "to": "reset-all",
+        "type": "blocks"
+      },
+      {
+        "from": "reset-all",
+        "to": "amber-live-agent-notice",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-14-PAN-5245-skills-panel-one-switch-per-skill-with-pin-and-reset-changes-pinned-on-top-project-and-issue-levels.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

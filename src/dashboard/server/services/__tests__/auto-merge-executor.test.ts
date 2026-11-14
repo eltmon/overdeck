@@ -111,7 +111,6 @@ describe('auto-merge executor', () => {
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry({ scheduledMergeAt: '2026-05-25T10:00:01.000Z' })],
-      isPaused: () => false,
       mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       transition,
@@ -130,7 +129,6 @@ describe('auto-merge executor', () => {
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry()],
-      isPaused: () => false,
       isEligible: async () => ({ eligible: true as const }),
       deftHold: async (issueId) => `${issueId} runs on Deft and requires a human merge`,
       mergeGate: async () => gate(),
@@ -145,20 +143,29 @@ describe('auto-merge executor', () => {
     expect(mergeIssue).not.toHaveBeenCalled();
   });
 
-  it('skips the whole tick while the merge train is disabled', async () => {
-    const transition = vi.fn();
-    const log = vi.fn();
+  it('merges a due row while the merge train is off (PAN-4753: off means per-PR merges)', async () => {
+    const { isMergeTrainEnabled } = await import('../../../../lib/overdeck/control-settings.js');
+    vi.mocked(isMergeTrainEnabled).mockReturnValue(false);
+    const transition = vi.fn(() => true);
+    const mergeIssue = vi.fn(async () => ({ success: true, outcome: 'merged' }));
+    const markMerged = vi.fn();
 
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry()],
-      isPaused: () => true,
+      isEligible: async () => ({ eligible: true as const }),
+      deftHold: async () => null,
+      mergeGate: async () => gate(),
+      hasPendingDeploy: async () => false,
       transition,
-      log,
+      mergeIssue,
+      markMerged,
     });
 
-    expect(log).toHaveBeenCalledWith('[auto-merge] merge train disabled, skipping tick');
-    expect(transition).not.toHaveBeenCalled();
+    expect(transition).toHaveBeenCalled();
+    expect(mergeIssue).toHaveBeenCalledTimes(1);
+    expect(markMerged).toHaveBeenCalledTimes(1);
+    vi.mocked(isMergeTrainEnabled).mockReturnValue(true);
   });
 
   it('defers before merge preparation and retries on the first tick after the deploy clears', async () => {
@@ -171,7 +178,6 @@ describe('auto-merge executor', () => {
     const deps = {
       now: () => NOW,
       listEntries: () => [pendingEntry(), pendingEntry({ id: 2, issueId: 'PAN-1487' })],
-      isPaused: () => false,
       mergeGate: async () => gate(),
       hasPendingDeploy: async () => deployQueued,
       isEligible,
@@ -203,7 +209,6 @@ describe('auto-merge executor', () => {
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry()],
-      isPaused: () => false,
       mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: false, reason: 'CI checks failing on PR HEAD abc123' }),
@@ -222,7 +227,6 @@ describe('auto-merge executor', () => {
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry()],
-      isPaused: () => false,
       mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
@@ -243,7 +247,6 @@ describe('auto-merge executor', () => {
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry()],
-      isPaused: () => false,
       mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
@@ -268,7 +271,6 @@ describe('auto-merge executor', () => {
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry()],
-      isPaused: () => false,
       mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
@@ -302,7 +304,6 @@ describe('auto-merge executor', () => {
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry()],
-      isPaused: () => false,
       mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
@@ -339,7 +340,6 @@ describe('auto-merge executor', () => {
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry()],
-      isPaused: () => false,
       mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
@@ -370,7 +370,6 @@ describe('auto-merge executor', () => {
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry()],
-      isPaused: () => false,
       mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
@@ -399,7 +398,6 @@ describe('auto-merge executor', () => {
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry()],
-      isPaused: () => false,
       mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
@@ -425,7 +423,6 @@ describe('auto-merge executor', () => {
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry()],
-      isPaused: () => false,
       mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
@@ -449,7 +446,6 @@ describe('auto-merge executor', () => {
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry()],
-      isPaused: () => false,
       // The executor's own gate read passes; the one inside triggerMerge refuses.
       mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
@@ -515,7 +511,6 @@ describe('auto-merge executor', () => {
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry()],
-      isPaused: () => false,
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       // A push landed between scheduling and the cooldown expiring, so checks
@@ -539,7 +534,6 @@ describe('auto-merge executor', () => {
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry({ headSha: 'aaaaaaaaaaaaaaaa' })],
-      isPaused: () => false,
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       mergeGate: async () => gate(true, { headSha: 'bbbbbbbbbbbbbbbb' }),
@@ -562,7 +556,6 @@ describe('auto-merge executor', () => {
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry({ headSha: 'aaaaaaaaaaaaaaaa' })],
-      isPaused: () => false,
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       mergeGate: async () => gate(),
@@ -584,7 +577,6 @@ describe('auto-merge executor', () => {
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry({ headSha: 'aaaaaaaaaaaaaaaa' })],
-      isPaused: () => false,
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       mergeGate: async () => gate(),
@@ -605,7 +597,6 @@ describe('auto-merge executor', () => {
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry({ headSha: 'aaaaaaaaaaaaaaaa' })],
-      isPaused: () => false,
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       mergeGate: async () => gate(true, { headSha: 'aaaaaaaaaaaaaaaa' }),
@@ -628,7 +619,6 @@ describe('auto-merge executor', () => {
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry({ headSha: undefined })],
-      isPaused: () => false,
       hasPendingDeploy: async () => false,
       isEligible,
       mergeGate: async () => gate(),
@@ -648,7 +638,6 @@ describe('auto-merge executor', () => {
     const base = {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
-      isPaused: () => false,
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true as const }),
       mergeGate: async () => gate(),

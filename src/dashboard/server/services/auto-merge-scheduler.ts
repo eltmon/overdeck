@@ -12,12 +12,15 @@
  * auto-merge executor then merges it through `triggerMerge`, which consults the
  * merge gate again. An issue is scheduled only when all of these hold:
  *
- *   - its project's effective merge-train flag is on, and the executor's kill
- *     switch (`OVERDECK_DISABLE_AUTO_MERGE=1`) is off;
+ *   - the executor's kill switch (`OVERDECK_DISABLE_AUTO_MERGE=1`) is off.
+ *     The merge-train flag no longer skips a project (PAN-4753 D4): with the
+ *     train off every ready PR merges on its own, and with it on the door's
+ *     policy check below refuses only the normal-priority PRs that batch;
  *   - it has an open PR on its `feature/<id>` branch with green checks (a
  *     strike PR is the operator's to merge, PAN-3973);
- *   - the door's policy check passes, which reads no forge: the issue is opted
- *     in to auto-merge (not held for UAT) and the train is on globally;
+ *   - the door's policy check passes, which reads no forge: the issue is not
+ *     held for UAT, and its merge route is per-PR (train off, high priority,
+ *     or dropped from a batch; `merge-route.ts`);
  *   - the one merge gate, `evaluateIssueMergeGate`, says the PR is ready: its
  *     approval is a GitHub review of the exact head commit or a trusted
  *     verdict marker whose `sha=` names it;
@@ -80,7 +83,6 @@ export const PR_LISTING_UNAVAILABLE_REASON =
 
 export interface AutoMergeSchedulerDeps {
   listProjects?: () => Array<{ key: string; config: ProjectConfig }>;
-  isTrainEnabledForProject?: (config: ProjectConfig) => boolean;
   /** The project's forge; GitLab projects are skipped. */
   forgeOf?: (projectPath: string) => 'github' | 'gitlab';
   /**
@@ -244,8 +246,6 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
   if ((deps.env ?? process.env).OVERDECK_DISABLE_AUTO_MERGE === '1') return [];
   const log = deps.log ?? console.log;
   const listProjects = deps.listProjects ?? (await import('../../../lib/projects.js')).listProjectsSync;
-  const isTrainEnabledForProject = deps.isTrainEnabledForProject
-    ?? (await import('../../../lib/overdeck/merge-sync.js')).isMergeTrainEnabledForProject;
   const latestAutoMerge = deps.latestAutoMerge
     ?? (await import('../../../lib/overdeck/merge-sync.js')).getLatestAutoMerge;
   const forgeOf = deps.forgeOf ?? await defaultForgeOf();
@@ -260,7 +260,6 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
   const outcomes: AutoMergeScheduleOutcome[] = [];
   for (const { key, config } of listProjects()) {
     if (!isCurrent()) return outcomes;
-    if (!isTrainEnabledForProject(config)) continue;
     const projectPath = resolve(config.path);
 
     let listing: ScheduleCandidates | null;

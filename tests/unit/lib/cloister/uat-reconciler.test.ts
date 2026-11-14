@@ -15,6 +15,7 @@ import type { ReadyFeature } from '../../../../src/lib/cloister/uat-generation-e
 import type { UatGeneration, UatGenerationStatus } from '../../../../src/lib/database/uat-generations-db.js';
 import { makeUniqueUatCandidateName } from '../../../../src/lib/cloister/uat-candidate-name.js';
 import { generationFolderName } from '../../../../src/lib/cloister/uat-generation-engine.js';
+import { chooseBatch } from '../../../../src/lib/cloister/batch-window.js';
 import { safeBranchName, safeGenerationWorktreePath } from '../../../../src/lib/cloister/uat-generation-deps.js';
 
 const MAIN = 'main-sha-1';
@@ -695,5 +696,85 @@ describe('PAN-4970 per-PR partition', () => {
     expect(result.action).toBe('assembled');
     expect(deps.assembled[0]!.map((f) => f.issueId)).toEqual(['PAN-1', 'PAN-2']);
     expect(result.perPr).toEqual([]);
+  });
+});
+
+describe('batch window (PAN-4753 D4)', () => {
+  const ONE: ReadyFeature[] = [{ issueId: 'PAN-1', title: 'First', branch: 'feature/pan-1' }];
+
+  it('assembles nothing while the window says wait', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj);
+    deps.selectBatch = async () => ({ wait: '2 of 3 ready; oldest waited 4 of 30 min' });
+    const result = await reconcileUatGenerations(proj, deps);
+    expect(result).toMatchObject({ action: 'waiting', waitReason: '2 of 3 ready; oldest waited 4 of 30 min' });
+    expect(deps.assembled).toEqual([]);
+  });
+
+  it('assembles exactly the features the window chose', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj);
+    deps.selectBatch = async (features) => ({ features: [features[0]!] });
+    const result = await reconcileUatGenerations(proj, deps);
+    expect(result.action).toBe('assembled');
+    expect(deps.assembled).toEqual([[READY[0]]]);
+  });
+
+  it('makes a one-member batch the window chose, despite the single-feature rule', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj, { readySet: ONE, holdsForUat: false });
+    deps.selectBatch = async (features) => ({ features: [...features] });
+    const result = await reconcileUatGenerations(proj, deps);
+    expect(result.action).toBe('assembled');
+    expect(deps.assembled).toEqual([ONE]);
+  });
+
+  it('keeps today\'s single-feature rule when no window applies (null)', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj, { readySet: ONE, holdsForUat: false });
+    deps.selectBatch = async () => null;
+    const result = await reconcileUatGenerations(proj, deps);
+    expect(result.action).toBe('single-feature');
+    expect(deps.assembled).toEqual([]);
+  });
+
+  it('after a drop, re-assembles the rest without the dropped member (real chooseBatch)', async () => {
+    const proj = freshProject();
+    const THREE: ReadyFeature[] = [
+      ...READY,
+      { issueId: 'PAN-3', title: 'Third', branch: 'feature/pan-3' },
+    ];
+    // The failed batch is invalidated; PAN-3 now merges per-PR.
+    const failed = gen(proj, 'uat/pan-failed-0610', 'invalidated');
+    const deps = makeDeps(proj, {
+      rows: [failed],
+      readySet: THREE,
+      headShas: { 'feature/pan-1': 'h1', 'feature/pan-2': 'h2', 'feature/pan-3': 'h3' },
+      mergesPerPr: (feature) => feature.issueId === 'PAN-3',
+    });
+    // Both survivors became ready 40 minutes ago, past the 30-minute wait.
+    deps.selectBatch = async (features, live) => chooseBatch({
+      features, live, size: 3, waitMs: 30 * 60_000, now: T0,
+      readySince: new Map(features.map((f) => [f.issueId.toUpperCase(), T0 - 40 * 60_000])),
+    });
+    const result = await reconcileUatGenerations(proj, deps);
+    expect(result.action).toBe('assembled');
+    expect(result.perPr).toEqual(['PAN-3']);
+    expect(deps.assembled).toEqual([READY]);
+  });
+
+  it('passes the live generations so a frozen batch is not rebuilt', async () => {
+    const proj = freshProject();
+    const live = gen(proj, 'uat/pan-live-0610', 'ready');
+    const deps = makeDeps(proj, { rows: [live] });
+    const seen: string[][] = [];
+    deps.selectBatch = async (features, gens) => {
+      seen.push(gens.map((g) => g.name));
+      return { features: [...features] };
+    };
+    const result = await reconcileUatGenerations(proj, deps);
+    expect(seen).toEqual([['uat/pan-live-0610']]);
+    expect(result.action).toBe('idle');
+    expect(deps.assembled).toEqual([]);
   });
 });

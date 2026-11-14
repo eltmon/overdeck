@@ -100,6 +100,7 @@ src/components/Settings/sections/__tests__/AutoSettleIdleRow.test.tsx
 src/components/Settings/sections/__tests__/AutoSettleOnMergeRow.test.tsx
 src/components/Settings/sections/__tests__/CloseOutSection.test.tsx
 src/components/Settings/sections/__tests__/GitHubIdentitiesSection.test.tsx
+src/components/Settings/sections/__tests__/MergeTrainBatchingSection.test.tsx
 src/components/Settings/sections/__tests__/ProviderManagementSection.test.tsx
 src/components/Settings/sections/__tests__/HarnessesSection.test.tsx
 src/components/Settings/sections/__tests__/PermissionsSection.test.tsx
@@ -133,6 +134,7 @@ src/components/__tests__/Sidebar.ownerGroups.test.tsx
 src/components/__tests__/Sidebar.workspacePullRequest.test.tsx
 src/components/__tests__/palette-anywhere-actions.test.ts
 src/components/__tests__/palette-fleet-hits.test.tsx
+src/components/backlog/__tests__/PickupGateControls.test.tsx
 src/components/chat/__tests__/ChatMarkdown.issue-links.test.tsx
 src/components/chat/__tests__/ChatMarkdown.pull-request-links.test.tsx
 src/components/chat/__tests__/ComposerFooter.citations.test.tsx
@@ -199,6 +201,7 @@ src/components/deft/DeftScopeSummary.test.tsx
 src/components/deft/DeftScopeView.test.tsx
 src/components/deft/DeftSubagentRows.test.tsx
 src/components/deft/queries.test.ts
+src/components/drawer/DrawerAgentSession.test.tsx
 src/components/drawer/IssueDrawer.tracker-fallback.test.tsx
 src/components/drawer/useDrawerData.absent-issue.test.tsx
 src/components/explorer/__tests__/ExplorerPane.test.tsx
@@ -280,7 +283,14 @@ src/components/home/__tests__/HomeComposerProjectChip.test.tsx
 src/components/home/__tests__/homeComposerIntents.test.ts
 src/components/home/__tests__/pendingTerminal.test.ts
 src/components/home/__tests__/useTypeToFocus.test.tsx
+src/components/issue-detail/IssueDetail.test.tsx
+src/components/issue-detail/IssueDetailSections.test.tsx
+src/components/issue-detail/IssueDrawerDetails.test.tsx
+src/components/issue-detail/issue-session-tabs.no-loss.test.tsx
+src/components/issue-view/IssueChecksChip.test.tsx
+src/components/issue-view/IssueHeaderFacts.test.tsx
 src/components/issue-view/IssueHeaderTitle.test.tsx
+src/components/issue-view/IssuePipelineStrip.test.tsx
 src/components/issue-view/useIssueRecord.test.tsx
 src/components/merge-train/__tests__/MergeTrainView.test.tsx
 src/components/mobile/__tests__/AppearanceChoice.test.tsx
@@ -326,6 +336,10 @@ src/components/sidebar/__tests__/AddProjectToMachineDialog.test.tsx
 src/components/sidebar/__tests__/MachinesNavItem.test.tsx
 src/components/sidebar/__tests__/projectOwners.test.ts
 src/components/simple/SimpleQuestionCard.test.tsx
+src/components/skills/useIssueSkillOverrideCount.test.tsx
+src/components/skills/SkillControls.test.tsx
+src/components/skills/SkillOverridesPanel.test.tsx
+src/components/skills/SkillPacksSection.test.tsx
 src/components/terminal/TerminalDrawer.pending.test.tsx
 src/components/terminal/terminalControlFrames.test.ts
 src/components/workspace/new/__tests__/smartField.test.ts

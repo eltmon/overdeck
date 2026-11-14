@@ -60,6 +60,7 @@ function io(overrides: Partial<TrainIo> = {}): Partial<TrainIo> {
     workspacePathFor: () => WS,
     patchId: patchIds('p1', 'p2'),
     log: () => undefined,
+    waitsForBatch: async () => false,
     ...overrides,
   };
 }
@@ -85,6 +86,18 @@ describe('merge-train real deps: sibling set (PAN-4801)', () => {
     }));
 
     expect(await deps.getReadySiblings('PAN-1')).toEqual(['PAN-2', 'PAN-3', 'PAN-4']);
+  });
+
+  it('leaves a sibling that waits for the batch window alone (PAN-4753)', async () => {
+    const evaluateGate = vi.fn(async () => gate(true));
+    const deps = buildRealReconcileDeps(io({
+      listProjectIssuesWithPr: async () => ['PAN-1', 'PAN-2', 'PAN-3'],
+      evaluateGate,
+      waitsForBatch: async (issueId) => issueId === 'PAN-2',
+    }));
+
+    expect(await deps.getReadySiblings('PAN-1')).toEqual(['PAN-3']);
+    expect(evaluateGate).not.toHaveBeenCalledWith('PAN-2');
   });
 
   it('drops a sibling that is not approved at its head, is a draft, has red checks or requested changes', async () => {

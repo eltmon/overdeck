@@ -50,6 +50,28 @@ export function sortIssueAgents<T extends SessionAgent>(agents: readonly T[]): T
     || left.id.localeCompare(right.id));
 }
 
+/** A short human name for an agent: "Work agent", "Worker 2", "Security reviewer". */
+export function agentDisplayName(agent: SessionAgent): string {
+  const slot = /^agent-[a-z]+-\d+-slot-(\d+)$/i.exec(agent.id);
+  if (slot) return `Slot ${slot[1]}`;
+  const worker = /-worker-(\d+)$/i.exec(agent.id);
+  if (worker) return `Worker ${worker[1]}`;
+  const reviewer = /-review-([a-z]+)$/i.exec(agent.id);
+  if (reviewer && reviewer[1]!.toLowerCase() !== 'supervisor') {
+    const role = reviewer[1]!.toLowerCase();
+    return `${role[0]!.toUpperCase()}${role.slice(1)} reviewer`;
+  }
+  switch (agent.role) {
+    case 'plan': return 'Planner';
+    case 'work': return 'Work agent';
+    case 'review': return 'Review';
+    case 'test': return 'Test agent';
+    case 'ship': return 'Ship agent';
+    case 'strike': return 'Strike agent';
+    default: return 'Agent';
+  }
+}
+
 /** Synthesize a Conversation from an agent so ConversationPanel can render it. */
 export function agentToConversation(agent: SessionAgent): Conversation {
   const ended = isEndedAgent(agent);

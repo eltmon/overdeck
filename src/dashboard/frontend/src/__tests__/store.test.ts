@@ -152,6 +152,27 @@ describe('drawer store slice', () => {
     expect(window.location.search).toBe('?phase=ship')
   })
 
+  it('opens conversation-first from a URL that names an issue without a tab', () => {
+    window.history.replaceState(null, '', '/?issue=PAN-1')
+    useDashboardStore.getState().syncDrawerFromUrl()
+
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'conversation' })
+  })
+
+  it('keeps the closed drawer value when the URL names no issue', () => {
+    window.history.replaceState(null, '', '/')
+    useDashboardStore.getState().syncDrawerFromUrl()
+
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: null, tab: 'overview' })
+  })
+
+  it.each(['overview', 'terminal'])('keeps an explicit ?tab=%s from the URL', (tab) => {
+    window.history.replaceState(null, '', `/?issue=PAN-1&tab=${tab}`)
+    useDashboardStore.getState().syncDrawerFromUrl()
+
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab })
+  })
+
   it('handles rapid open-close-open bursts without creating stale state', () => {
     for (let i = 0; i < 50; i += 1) {
       useDashboardStore.getState().openIssue(`PAN-${i}`)

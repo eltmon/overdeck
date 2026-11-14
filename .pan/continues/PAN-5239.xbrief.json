@@ -1,0 +1,220 @@
+{
+  "version": "1",
+  "issueId": "PAN-5239",
+  "created": "2026-11-14T04:43:48.158Z",
+  "updated": "2026-11-14T06:39:02.700Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-14T06:39Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-11-14T06:39:02.700Z"
+    }
+  ],
+  "items": {
+    "contracts-target-key": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5239",
+      "claimedAt": "2026-11-14T04:43:48.158Z",
+      "doneAt": "2026-11-14T04:46:46.207Z"
+    },
+    "contracts-target-key.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:46:46.207Z"
+    },
+    "contracts-target-key.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:46:46.207Z"
+    },
+    "contracts-target-key.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:46:46.207Z"
+    },
+    "contracts-target-key.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:46:46.207Z"
+    },
+    "pr-ref-prefix": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5239",
+      "claimedAt": "2026-11-14T04:46:52.715Z",
+      "doneAt": "2026-11-14T04:56:27.526Z"
+    },
+    "pr-ref-prefix.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:56:27.526Z"
+    },
+    "pr-ref-prefix.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:56:27.526Z"
+    },
+    "pr-ref-prefix.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T04:56:27.526Z"
+    },
+    "needs-you-target-link": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5239",
+      "claimedAt": "2026-11-14T04:56:38.984Z",
+      "doneAt": "2026-11-14T05:02:29.490Z"
+    },
+    "needs-you-target-link.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:02:29.490Z"
+    },
+    "needs-you-target-link.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:02:29.490Z"
+    },
+    "needs-you-target-link.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:02:29.490Z"
+    },
+    "needs-you-target-link.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:02:29.490Z"
+    },
+    "needs-you-target-link.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:02:29.490Z"
+    },
+    "hide-jump-without-origin": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5239",
+      "claimedAt": "2026-11-14T05:02:41.139Z",
+      "doneAt": "2026-11-14T05:09:54.456Z"
+    },
+    "hide-jump-without-origin.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:09:54.456Z"
+    },
+    "hide-jump-without-origin.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:09:54.456Z"
+    },
+    "hide-jump-without-origin.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:09:54.456Z"
+    },
+    "timeline-target-flash": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5239",
+      "claimedAt": "2026-11-14T05:10:01.941Z",
+      "doneAt": "2026-11-14T05:17:28.310Z"
+    },
+    "timeline-target-flash.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:17:28.310Z"
+    },
+    "timeline-target-flash.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:17:28.310Z"
+    },
+    "timeline-target-flash.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:17:28.310Z"
+    },
+    "optional-message-index": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5239",
+      "claimedAt": "2026-11-14T05:17:38.107Z",
+      "doneAt": "2026-11-14T05:23:17.802Z"
+    },
+    "optional-message-index.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:23:17.802Z"
+    },
+    "optional-message-index.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:23:17.802Z"
+    },
+    "jump-opens-command-deck": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5239",
+      "claimedAt": "2026-11-14T05:23:28.274Z",
+      "doneAt": "2026-11-14T05:33:09.245Z"
+    },
+    "jump-opens-command-deck.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:33:09.245Z"
+    },
+    "jump-opens-command-deck.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:33:09.245Z"
+    },
+    "jump-opens-command-deck.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:33:09.245Z"
+    },
+    "jump-opens-command-deck.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:33:09.245Z"
+    },
+    "skill-tick-targets": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5239",
+      "claimedAt": "2026-11-14T05:33:22.812Z",
+      "doneAt": "2026-11-14T05:36:45.117Z"
+    },
+    "skill-tick-targets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:36:45.117Z"
+    },
+    "skill-tick-targets.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:36:45.117Z"
+    },
+    "skill-tick-targets.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:36:45.117Z"
+    },
+    "docs-flywheel-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5239",
+      "claimedAt": "2026-11-14T05:36:54.461Z",
+      "doneAt": "2026-11-14T05:38:27.043Z"
+    },
+    "docs-flywheel-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:38:27.043Z"
+    },
+    "docs-flywheel-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:38:27.043Z"
+    },
+    "docs-flywheel-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:38:27.043Z"
+    },
+    "uat-screenshots": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5239",
+      "claimedAt": "2026-11-14T05:38:39.536Z",
+      "doneAt": "2026-11-14T05:56:18.119Z"
+    },
+    "uat-screenshots.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:56:18.119Z"
+    },
+    "uat-screenshots.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:56:18.119Z"
+    },
+    "uat-screenshots.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:56:18.119Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-14T06:39:02Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-5239\n\n# Review — PAN-5239\n## Verdict: CHANGES REQUESTED — AC-10 unmet: the UAT screenshots are not linked in the PR #5256 body (xBRIEF uat-screenshots.ac3)\n\n## Context\n- Run ID: agent-pan-5239-review-d3de9387\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5239/.pan/review/agent-pan-5239-review-d3de9387/context.json\n- Branch / workspace: feature/pan-5239 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-5239\n- PR: https://github.com/eltmon/overdeck/pull/5256 (headRefOid d3de93875b4c48940f9692f9fc68539ef5765a4c)\n- HEAD reviewed: d3de93875b4c48940f9692f9fc68539ef5765a4c\n- Base: merge-base with origin/main fafa605cad835535355916b8ba4abe3e975f7463 (the local `main` ref b4999cab is stale; diffing against it wrongly pulls unrelated `cancelHeldOffline` changes into MessagesTimeline.tsx — those are not part of this branch). Prior cycle: none.\n\n## Blocking Findings\n\n### [requirements] AC-10 / `uat-screenshots.ac3` unmet: the PR body does not link the UAT screenshots — PR #5256 body\n- Severity: ! MUST\n- Classification / requirement scope: validation gap (the deliverable is incomplete), in_pr_scope.\n- Requirement: xBRIEF `uat-screenshots.ac3` says \"The branch commits docs/screenshots/pan-5239/01-needs-you-block.png and 02-jump-highlight.png, **and the PR body contains links to both under '## UAT screenshots'**\". PRD AC-10 says they are \"committed and linked in the PR body\". WI-10 step 7 gives the exact URL form `https://github.com/eltmon/overdeck/blob/<sha>/docs/screenshots/pan-5239/<file>.png?raw=true`.\n- Expected / observed / impact: `gh pr view 5256 --json body` shows only the checked AC checklist. There is no `## UAT screenshots` heading and no link to either PNG, yet the checklist marks the item `[x]`. The operator reviewing the PR cannot see the UAT evidence.\n- Evidence: `gh pr view 5256 --json body -q .body` (output quoted in the review session). Both PNGs are committed, and I inspected both: they show the expected states. Only the PR-body part of the criterion fails.\n- Fix: add a `## UAT screenshots` section to the PR body with both `?raw=true` blob links, for example with `gh pr edit 5256 --body-file <file>`. No code change is needed.\n\n## Non-blocking Findings\n\n### [requirements] Jump into an existing conv-flywheel deck pane that is in Terminal view does not switch to Conversation — `src/dashboard/frontend/src/App.tsx:554`\n- Severity: ~ SHOULD\n- Classification / scope: implementation defect (edge case), in_pr_scope (FR-8).\n- Trigger and changed-code connection: `handleOpenConversationMessage` sets the pending target and `/conv/conv-flywheel` with view `conversation`. CommandDeck's deep-link effect (`components/CommandDeck/index.tsx` ~line 597) passes `viewMode` to `openConversationTab` only when it is `terminal`, and `openConversationTab` only updates an existing pane's `viewMode` when one is passed. So if the operator's deck already has a `conv-flywheel` agent pane persisted in Terminal view, the pane opens in Terminal and `MessagesTimeline` is not mounted.\n- Expected / observed / impact: FR-8 expects the jump to show the first-raised message. Observed (static trace): the terminal shows. `ConversationPanel.tsx` line 1028 renders the timeline only when `effectiveViewMode === 'conversation' || !showTerminal`, so in Terminal view `MessagesTimeline` is unmounted and does not consume the target. The pane's `targetMessageId` stays pending and applies (with the 3 s flash) once the operator clicks Conversation. One extra click; no data loss. The deleted embedded-column code explicitly handled this (`if (tickTarget) setViewMode('conversation')`), and `handleOpenConversationHit` writes `viewMode: 'conversation'` onto the pane for the same reason.\n- Evidence: static trace of App.tsx → CommandDeck deep-link effect → openConversationTab.ts → AgentPane.tsx (`pane.viewMode === 'terminal'`) → ConversationPanel.tsx line 1028. Not reproduced in a browser.\n- Fix: in `handleOpenConversationMessage`, or in `openConversationTab` when a target is present, set the existing pane's `viewMode: 'conversation'`.\n\n### [ux] Rows without a jump button are not indented like rows with one\n- Severity: ? MAY\n- Observed in screenshot 01: `store fields` starts at the left edge while the other rows' text starts after the icon. A fixed-width spacer would keep the labels in one column. This is cosmetic, and the spec says only \"renders no jump button\".\n\n### [correctness] Pending target can go stale if the conversation never resolves\n- Severity: ? MAY, pre_existing pattern\n- If `conv-flywheel` never appears in the deck's conversation list, `pendingConversationTarget` is never consumed and a later open of that conversation would apply the old target. Search-hit opens already share this behavior. Planning verified that `/conv/conv-flywheel` resolves live, so this is not reachable today.\n\n### [validation] Contracts unit tests are not in the normal CI test command (pre-existing)\n- Severity: ? MAY, pre_existing\n- The root `vitest.config.ts` includes only `packages/**/src/__tests__/**`, and `packages/contracts/src/flywheel-derived.test.ts` sits outside that folder. CI runs the root suite and `test:frontend-subset`. I found no CI step that runs `packages/contracts`' own `test` script. So the new `parseNeedsYouTarget (PAN-5239)` cases run only when someone runs them by hand. They pass locally (18/18). The PAN-5198 tests in the same file have the same gap. The FR-3 behaviour is also covered by `tests/unit/lib/flywheel/tick-marker.test.ts`, which CI does run.\n\n### Spec notes (no action)\n- D7/FR-7 intentionally hides the jump button for items that have no first-raised id. When that happens, a pending AskUserQuestion can still be reached from the pending-input dialogs, the Decisions panel and the session feed.\n- FR-9 makes every handled target jump flash for 3 s, including search hits and the Conversation-hit open. This matches the requirement \"any conversation timeline\".\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n| --- | --- |\n| packages/contracts/src/flywheel-derived.ts | Reviewed. The regex accepts only `http(s)://` with no whitespace or angle brackets inside, and the match is anchored to the end of the item. An empty label means no target. The key strips the target. Both server (`tick-marker.ts` lines 124 and 127) and frontend use `needsYouItemKey`, so they stay in step. |\n| packages/contracts/src/flywheel-derived.test.ts | Reviewed; covers FR-1/2/3 and D4 |\n| tests/unit/lib/flywheel/tick-marker.test.ts | Reviewed; covers backtick-wrapped target and FR-3 first-raised continuity |\n| src/dashboard/frontend/src/lib/flywheelNeedsYouLinks.ts | Reviewed. The optional `(?:\\bPR )?` applies only to the qualified branch. `PR #7`, `PR PAN-1`, bare `#n` and issue IDs backtrack to their old branches, so there is no regression. |\n| src/dashboard/frontend/src/lib/__tests__/flywheelNeedsYouLinks.test.ts | Reviewed |\n| src/dashboard/frontend/src/components/flywheel/FlywheelStatusPane.tsx | Reviewed. The whole-item link wins (no nesting, FR-6). `rel=\"noreferrer noopener\"` is set. The jump renders only with `messageId`, and the `?? tick.messageId` fallback is gone. The link class is monochrome. |\n| src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx | Reviewed |\n| src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx | Reviewed. The flash state is `{rowId,durationMs}`. Bookmark keeps 1600 ms and target uses 3000 ms. The timer effect is keyed on the `flash` object. `data-flash` is on both the virtual and the tail row wrappers, and both outlines include `flashRowId`. |\n| src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx | Reviewed; uses fake timers (NFR-2) and a parent that clears the target as AgentPane does |\n| src/dashboard/frontend/src/App.tsx | Reviewed. The new callback mirrors `handleOpenConversationHit`'s route steps. CommandDeck is conditionally mounted per tab, so `appliedConvId` resets on each jump from the Flywheel tab and repeat jumps re-apply. See the Terminal-view advisory. |\n| src/dashboard/frontend/src/App/AppRoutes.tsx | Reviewed; optional `messageIndex`, new prop threaded to FlywheelPage |\n| src/dashboard/frontend/src/components/CommandDeck/index.tsx | Reviewed; only the two `messageIndex?` type lines (NFR-3) |\n| src/dashboard/frontend/src/components/CommandDeck/openConversationTab.ts | Reviewed. The type change is safe: MessagesTimeline resolves by id first, and the `targetMessageKey` handles an undefined index. |\n| src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx | Reviewed. The orphaned tick-target plumbing is removed, and a grep for `tickTarget\\|FlywheelTickTarget` across the frontend source prints nothing. |\n| src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx | Reviewed; three obsolete tests removed along with their feature |\n| src/dashboard/frontend/src/pages/FlywheelPage.tsx | Reviewed; reopen-question path preserved (PAN-4751), jump delegates to `onOpenConversationMessage` |\n| src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx | Reviewed |\n| sync-sources/skills/pan-flywheel/SKILL.md | Reviewed. Wording matches WI-8, and the CI `Prompt change trailer gate` passed. |\n| docs/FLYWHEEL.md | Reviewed; matches AC-9 strings |\n| changelog.d/pan-5239.md | Reviewed; `#### Improved`, target kept in backticks |\n| docs/screenshots/pan-5239/*.png | Inspected both images |\n| .pan/drafts/PAN-5239.md, .pan/specs/…xbrief.json, .pan/continues/PAN-5239.xbrief.json | Planning artifacts; I read the PRD in full as the requirements source. The xBRIEF JSON files are not applicable to code review. |\n\n### Dimensions\n- **Correctness:** I traced the item text from the transcript through `resolveNeedsYouItems` (newest tick text and a target-blind key), `needsYouRows`, the render, the jump, App, the CommandDeck deep link, `openConversationTab`, the pane store, AgentPane and the MessagesTimeline target effect and flash. I found no defects beyond the Terminal-view edge case.\n- **Security:** Item text comes from the trusted local flywheel transcript. Only `http(s)` targets become an `href`, so `javascript:` and other schemes stay text (tested). React escapes the attribute values. External links use `noopener noreferrer`. I found no new trust boundary.\n- **Performance:** Regex work is linear in practice on short tick lines (worst-case quadratic only on long whitespace runs; tick lines are a few hundred characters). Only one extra state object and one timer are added. Nothing new runs on the server.\n- **Requirements/UX:** See the AC matrix below. Loading, empty and error states are unchanged. The pending-question reopen path is kept.\n\n### AC-to-evidence matrix\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 (WI-1) | Met | contracts `flywheel-derived.test.ts` 18/18 pass; `tick-marker.test.ts` 21/21 pass (local focused runs) |\n| AC-2 (WI-2) | Met | `flywheelNeedsYouLinks.test.ts` passes, incl. `PR eltmon/overdeck-landing#7` segment |\n| AC-3 (WI-3) | Met | `FlywheelStatusPane.test.tsx` PAN-5239 describe passes (link, javascript:, styling classes, no nested issue button) |\n| AC-4 (WI-4) | Met | Jump-count tests pass; `?? tick.messageId` absent from FlywheelStatusPane.tsx |\n| AC-5 (WI-5) | Met | MessagesTimeline target-flash test (fake timers) passes at 2999/3000 ms; bookmark 1600 ms tests still pass |\n| AC-6 (WI-6) | Met | `messageIndex?` in all four places; `overdeck/test` verification gate (typecheck+lint) passed on this HEAD |\n| AC-7 (WI-7) | Met | `FlywheelPage.test.tsx` passes; grep for `tickTarget\\|FlywheelTickTarget` prints nothing |\n| AC-8 (WI-8) | Met | Skill bullet contains `<https://`, `owner/repo#<n>`, the no-`;` rule; CI `Prompt change trailer gate` pass |\n| AC-9 (WI-9) | Met | FLYWHEEL.md has `parseNeedsYouTarget()`, `/conv/conv-flywheel`, \"a row without one has no jump button\"; changelog present; CI `lint` and `lint-group (core)` pass |\n| AC-10 (WI-10) | **Unmet** | PNGs are committed and show the expected states, but the PR body has no `## UAT screenshots` links (blocking finding) |\n\n### Non-goals check\nNo schema, endpoint or stored-state change. The session feed and `NeedsYouIndicator` are untouched. `resolveNeedsYouItems` changes only through the key. The bookmark flash stays 1600 ms. There is no embedded-column jump, no `;` support in URLs, and no visible label on the jump button. `pan flywheel status` is untouched. NFR-3: App.tsx is 955 lines (allowlist row 1019), MessagesTimeline.tsx 870, FlywheelStatusPane.tsx 338, and ConversationPanel.tsx is untouched.\n\n## Verification\n- Focused frontend tests (`npx vitest run` on the five touched frontend test files): 5 files, 120 tests passed.\n- `npx vitest run tests/unit/lib/flywheel/tick-marker.test.ts`: 21 passed.\n- `packages/contracts` `src/flywheel-derived.test.ts`: 18 passed.\n- CI on PR head d3de9387 (`gh pr checks 5256`, re-checked at the end of the review): every check passed, including test-shard 1/4 to 4/4, test-e2e, bare-host-linux, build (22), lint, lint-group core/effect/skills/state, Prompt change trailer gate and `overdeck/test`. Only bare-host-macos, bare-host-macos-known-bad and Mintlify were skipped.\n- CI wiring: FlywheelStatusPane, FlywheelPage, flywheelNeedsYouLinks and MessagesTimeline tests are listed in `scripts/frontend-test-subset.txt`, so CI runs them. `FlywheelConversationPane.test.tsx` is not listed, but this branch only deletes tests from it. Contracts tests: see the advisory above.\n- Other callers: `needsYouItemKey`/`splitNeedsYouItems` are used only in `src/lib/flywheel/tick-marker.ts` and `FlywheelStatusPane.tsx`. The issue-view `needsYouItems` are an unrelated type (`OperatorNeedsYou`). No e2e spec references `flywheel-needs-you`. `pan flywheel status` prints the raw line, which is in Non-goals.\n- `lint:effect-diagnostics`: reused CI `lint-group (effect)` pass on this exact HEAD. The change is plain TS/React with no Effect usage.\n- No live browser run by the reviewer. I relied on the committed UAT screenshots.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5239/.pan/review/agent-pan-5239-review-d3de9387/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-5239 -m \"Fixed review issues\"`"
+    }
+  ]
+}

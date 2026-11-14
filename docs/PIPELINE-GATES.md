@@ -109,14 +109,22 @@ target-branch sync, skipped when CI is already green on the exact tip commit
   unavailable — when 1-minute load per core is at or above `1`. If not
   pressured, it writes the holder record, waits 1.5 seconds, and samples
   again; if the host is pressured on that second look, it gives the slot back
-  and keeps waiting.
+  and keeps waiting. A gate with a memory footprint also waits while starting
+  it would push MemAvailable below `resources.governor_soft_reserve_gb`; see
+  [CPU and memory admission](#cpu-and-memory-admission-pan-4311-pan-4546-pan-5248).
 - **Agent shells share the queue.** Both `vitest.config.ts` and
   `src/dashboard/frontend/vitest.config.ts` load
   `tests/vitest-cpu-admission.ts` as `globalSetup`, which calls
   `acquireQualityGateAdmission` for a gate named `vitest` unless the process
   already has `OVERDECK_GATE_ADMITTED=1` or `OVERDECK_GATE_ADMISSION=0`, or
   `CI` is set. An agent's own `npx vitest run <files>` therefore competes with
-  every verification run for the same single slot.
+  every verification run for the same single slot. Typechecks join the same
+  queue through `scripts/tsc-admitted.mjs`: every lane of the root `typecheck`
+  and `typecheck:*` scripts, and every `tsc` call in
+  `scripts/lint-effect-diagnostics.sh`, `scripts/lint-dashboard-types.sh` and
+  `scripts/lint-frontend-types.sh`, takes its own admission, one per `tsc`
+  process. A hand-typed `npx tsc …` or `node_modules/.bin/tsc …` is not
+  admitted; run `node scripts/tsc-admitted.mjs <tsc args…>` instead.
 - **Gates yield CPU.** Local host gates run as `nice -n 19`, and the whole
   verification worker runs under a systemd user scope with `CPUWeight=20`
   (default), so gates run slower when the dashboard or other agents are busy.
@@ -466,11 +474,11 @@ Work agents run only the tests they touched (the work prompt names
 CI" only in a CI-mode project); reviewers never run the suite — they read the
 CI result on the head (`gh pr checks <pr>`) where tests run on CI.
 
-### CPU admission (PAN-4311, PAN-4546)
+### CPU and memory admission (PAN-4311, PAN-4546, PAN-5248)
 
 Before each local gate starts, it waits in a machine-wide FIFO queue under
-`~/.overdeck/verification-workers/admission/`. Direct local Vitest runs join
-the same queue. Up to `resources.quality_gate_slots` gates hold admission at
+`~/.overdeck/verification-workers/admission/`. Direct local Vitest runs and
+every `tsc` lane run through `scripts/tsc-admitted.mjs` join the same queue. Up to `resources.quality_gate_slots` gates hold admission at
 once (default 2; set it in the global `~/.overdeck/config.yaml`, because a
 project `.pan.yaml` value is ignored). A gate is admitted only when its CPU
 sample is unpressured both before and 1.5 s after it takes its slot:
@@ -479,6 +487,49 @@ below 1 where PSI is unavailable. Under pressure, new gates wait while running
 gates keep their slots; nothing is preempted. The file layout and stale-owner
 reclaim are described in the CPU-pressure bullet of
 [Agent Auto-Resume Gates](#agent-auto-resume-gates).
+
+Admission also checks memory (PAN-5248). The head waiter starts only while
+`MemAvailable − reservations − footprint ≥ resources.governor_soft_reserve_gb`
+(the memory governor's "hold new agents" level, read from the global config):
+
+- **Footprint.** The gate's estimate is the largest of the last 5 peak RSS
+  values recorded for its footprint key, or 2.5 GiB when none exists. The
+  estimate is clamped to `memTotal − soft reserve`, so a gate larger than the
+  host can hold still starts once memory recovers. Peaks live one file per key
+  in `~/.overdeck/verification-workers/admission/footprints/`.
+- **Keys.** `tsc:<tsconfig path>` for a typecheck lane, `vitest:<cwd relative
+  to the repo root>` (or `vitest:.`) for a local Vitest run, and
+  `gate:<name>:<raw gate command>` for a verification gate. Placeholders such
+  as `{{CHANGED_BASE}}` stay literal in the key.
+- **Peaks.** A peak is the largest sum of `VmRSS` over the gate's process tree,
+  sampled every 2 s. It is recorded only when the gate exited on its own; a
+  timeout or a signal records nothing. macOS records no peaks and keeps the
+  default estimate.
+- **Reservations.** Every live owner reserves the part of its footprint it has
+  not allocated yet: `footprint − (current tree RSS − RSS baseline)`, floored
+  at 0. The baseline is the owner's tree RSS just before it took its slot, so
+  the acquiring process's own memory does not count as growth. Container gates
+  (`container: true` with `container_name`) reserve their whole footprint until
+  they release, because their memory never shows in the host process tree, and
+  they record no peak. Owners from older checkouts carry no footprint and
+  reserve 0.
+- **Re-check after settling.** After the 1.5 s settle, the waiter samples
+  memory again against the other live owners and gives its slot back if the
+  rule now fails, exactly as it does for CPU.
+- **Failure modes.** An unreadable MemAvailable skips the memory rule (slot and
+  CPU rules still apply). A memory-reason timeout fails closed:
+  `scripts/tsc-admitted.mjs` prints `[gate-admission] refusing to start <key>:
+  waited 30 minutes for memory (…)` and exits 75 without running `tsc`, and a
+  local Vitest run stops with the same line. Every other admission failure (a
+  CPU or queue timeout, a file-system error) runs the command unadmitted with
+  `[gate-admission] proceeding without admission: <reason>`.
+- **Logs.** A gate blocked on memory says so: the wrapper prints
+  `[gate-admission] <key> waiting for memory: available X GiB, reserved Y GiB,
+  needs Z GiB, soft reserve W GiB`, and the verification worker logs
+  `[quality-gate] Waiting for memory: <identity> available …`. A head waiter
+  blocked on memory also holds the waiters behind it, so FIFO order stays
+  strict. To relieve a stall, free memory or lower
+  `resources.governor_soft_reserve_gb`.
 
 ### Same head: joining or restarting a live worker (PAN-4527)
 

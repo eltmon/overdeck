@@ -481,11 +481,11 @@ export interface ProjectConfig {
    */
   auto_merge_default?: 'auto' | 'hold';
   /**
-   * PAN-1696: per-project merge-train enable/disable override. When set to
-   * 'enabled' or 'disabled', this value overrides the global merge_train.enabled
-   * flag for this project only. Unset/absent = fall through to the global setting
-   * (default OFF). Merge-train reconciles ready siblings after a merge by
-   * rebasing onto the new main.
+   * PAN-1696: per-project merge-train opt-out. The global merge_train.enabled
+   * flag is the master switch (PAN-4753 R6): 'disabled' turns the train off for
+   * this project only; 'enabled' and absent both follow the global flag. With
+   * the train on, normal-priority PRs batch and ready siblings are rebased after
+   * a merge; with it off, every ready PR merges on its own.
    */
   merge_train?: 'enabled' | 'disabled';
   /** Merge checks: pre-push quality gates and main-verification fallback requirements. */

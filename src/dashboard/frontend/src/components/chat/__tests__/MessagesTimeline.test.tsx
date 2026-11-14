@@ -10,7 +10,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MessagesTimeline, type RoundMarker } from '../MessagesTimeline';
 import type { ChatMessage, WorkLogEntry } from '../chat-types';
@@ -813,6 +813,56 @@ describe('MessagesTimeline — bookmark jump (PAN-4498 WI-7)', () => {
     const row = document.querySelector('[data-search-row-id="target"]') as HTMLElement;
     expect(outlineOf(row)).not.toBe(expectedOutline);
     expect(screen.getByTestId('missing')).toHaveTextContent('');
+  });
+});
+
+describe('MessagesTimeline — target jump flash (PAN-5239)', () => {
+  const outlineOf = (el: HTMLElement) => `${el.style.outlineWidth} ${el.style.outlineStyle} ${el.style.outlineColor}`;
+  const expectedOutline = (() => {
+    const div = document.createElement('div');
+    div.style.outline = '2px solid var(--color-primary)';
+    return `${div.style.outlineWidth} ${div.style.outlineStyle} ${div.style.outlineColor}`;
+  })();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Mirrors AgentPane.tsx: clears targetMessageId once the timeline reports the jump handled. */
+  function TargetWrapper({ messages }: { messages: ChatMessage[] }) {
+    const [target, setTarget] = useState<{ messageId: string; nonce: number } | undefined>({ messageId: 'a1', nonce: 1 });
+    return (
+      <MessagesTimeline
+        messages={messages}
+        workLog={[]}
+        streaming={false}
+        targetMessageId={target?.messageId}
+        targetMessageNonce={target?.nonce}
+        onTargetMessageHandled={() => setTarget(undefined)}
+      />
+    );
+  }
+
+  it('flashes the target row for 3000 ms after a handled target jump', async () => {
+    const messages: ChatMessage[] = [makeMessage('u1', 'user', 0, 'hi'), makeMessage('a1', 'assistant', 1000, 'hello')];
+    render(<TargetWrapper messages={messages} />);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    const row = document.querySelector('[data-search-row-id="a1"]') as HTMLElement;
+    expect(row).toBeTruthy();
+    expect(row).toHaveAttribute('data-flash', 'true');
+    expect(outlineOf(row)).toBe(expectedOutline);
+
+    await act(() => vi.advanceTimersByTimeAsync(2999));
+    expect(row).toHaveAttribute('data-flash', 'true');
+
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(row).not.toHaveAttribute('data-flash');
+    expect(outlineOf(row)).not.toBe(expectedOutline);
   });
 });
 

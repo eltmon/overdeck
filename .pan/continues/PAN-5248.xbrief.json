@@ -1,0 +1,279 @@
+{
+  "version": "1",
+  "issueId": "PAN-5248",
+  "created": "2026-11-14T05:37:27.839Z",
+  "updated": "2026-11-14T06:41:25.189Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "process-tree-rss": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T05:37:27.839Z",
+      "doneAt": "2026-11-14T05:43:03.864Z"
+    },
+    "process-tree-rss.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:43:03.864Z"
+    },
+    "process-tree-rss.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:43:03.864Z"
+    },
+    "process-tree-rss.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:43:03.864Z"
+    },
+    "process-tree-rss.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:43:03.864Z"
+    },
+    "quality-gate-memory": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T05:43:24.261Z",
+      "doneAt": "2026-11-14T05:48:47.715Z"
+    },
+    "quality-gate-memory.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:48:47.715Z"
+    },
+    "quality-gate-memory.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:48:47.715Z"
+    },
+    "quality-gate-memory.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:48:47.715Z"
+    },
+    "quality-gate-memory.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:48:47.715Z"
+    },
+    "quality-gate-memory.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:48:47.715Z"
+    },
+    "admission-memory-rule": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T05:48:58.896Z",
+      "doneAt": "2026-11-14T05:55:53.198Z"
+    },
+    "admission-memory-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:55:53.198Z"
+    },
+    "admission-memory-rule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:55:53.198Z"
+    },
+    "admission-memory-rule.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:55:53.198Z"
+    },
+    "admission-memory-rule.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:55:53.198Z"
+    },
+    "admission-memory-rule.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:55:53.198Z"
+    },
+    "admission-memory-rule.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:55:53.198Z"
+    },
+    "admission-settle-and-timeout": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T05:56:01.277Z",
+      "doneAt": "2026-11-14T06:01:08.451Z"
+    },
+    "admission-settle-and-timeout.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:01:08.451Z"
+    },
+    "admission-settle-and-timeout.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:01:08.451Z"
+    },
+    "admission-settle-and-timeout.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:01:08.451Z"
+    },
+    "admitted-command-runner": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T06:01:33.022Z",
+      "doneAt": "2026-11-14T06:05:07.136Z"
+    },
+    "admitted-command-runner.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:05:07.136Z"
+    },
+    "admitted-command-runner.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:05:07.136Z"
+    },
+    "admitted-command-runner.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:05:07.136Z"
+    },
+    "admitted-command-runner.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:05:07.136Z"
+    },
+    "admitted-command-runner.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:05:07.136Z"
+    },
+    "vitest-footprint": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T06:05:10.379Z",
+      "doneAt": "2026-11-14T06:17:24.677Z"
+    },
+    "vitest-footprint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:17:24.677Z"
+    },
+    "vitest-footprint.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:17:24.677Z"
+    },
+    "vitest-footprint.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:17:24.677Z"
+    },
+    "vitest-footprint.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:17:24.677Z"
+    },
+    "verification-gate-footprint": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T06:17:30.311Z",
+      "doneAt": "2026-11-14T06:19:33.519Z"
+    },
+    "verification-gate-footprint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:19:33.519Z"
+    },
+    "verification-gate-footprint.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:19:33.519Z"
+    },
+    "verification-gate-footprint.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:19:33.519Z"
+    },
+    "verification-gate-footprint.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:19:33.519Z"
+    },
+    "verification-gate-footprint.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:19:33.519Z"
+    },
+    "tsc-admitted-wrapper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T06:19:55.721Z",
+      "doneAt": "2026-11-14T06:21:17.320Z"
+    },
+    "tsc-admitted-wrapper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:21:17.320Z"
+    },
+    "tsc-admitted-wrapper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:21:17.320Z"
+    },
+    "tsc-admitted-wrapper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:21:17.320Z"
+    },
+    "package-json-lanes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T06:21:25.602Z",
+      "doneAt": "2026-11-14T06:39:44.883Z"
+    },
+    "effect-diag-lanes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T06:24:44.497Z",
+      "doneAt": "2026-11-14T06:25:19.344Z"
+    },
+    "effect-diag-lanes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:25:19.344Z"
+    },
+    "effect-diag-lanes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:25:19.344Z"
+    },
+    "package-json-lanes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:39:44.883Z"
+    },
+    "package-json-lanes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:39:44.883Z"
+    },
+    "dashboard-types-lane": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T06:39:52.367Z",
+      "doneAt": "2026-11-14T06:40:27.338Z"
+    },
+    "frontend-types-lane": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T06:39:54.962Z",
+      "doneAt": "2026-11-14T06:40:51.392Z"
+    },
+    "docs-admission": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5248",
+      "claimedAt": "2026-11-14T06:39:57.362Z",
+      "doneAt": "2026-11-14T06:41:25.189Z"
+    },
+    "dashboard-types-lane.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:40:27.338Z"
+    },
+    "dashboard-types-lane.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:40:27.338Z"
+    },
+    "frontend-types-lane.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:40:51.392Z"
+    },
+    "frontend-types-lane.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:40:51.392Z"
+    },
+    "docs-admission.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:41:25.189Z"
+    },
+    "docs-admission.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:41:25.189Z"
+    },
+    "docs-admission.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:41:25.189Z"
+    },
+    "docs-admission.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:41:25.189Z"
+    }
+  }
+}

@@ -1,0 +1,461 @@
+{
+  "version": "1",
+  "issueId": "PAN-5244",
+  "created": "2026-11-14T05:28:55.884Z",
+  "updated": "2026-11-14T07:30:57.206Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "sections-leaf-move": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:28:55.884Z"
+    },
+    "sections-leaf-move.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:28:55.884Z"
+    },
+    "sections-leaf-move.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:28:55.884Z"
+    },
+    "sections-leaf-move.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:28:55.884Z"
+    },
+    "sections-leaf-move.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:28:55.884Z"
+    },
+    "sections-icons-inline": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T05:29:12.575Z",
+      "doneAt": "2026-11-14T05:32:49.192Z"
+    },
+    "sections-icons-inline.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:32:49.192Z"
+    },
+    "sections-icons-inline.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:32:49.192Z"
+    },
+    "sections-icons-inline.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:32:49.192Z"
+    },
+    "sections-icons-inline.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:32:49.192Z"
+    },
+    "drawer-escape-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T05:33:34.122Z",
+      "doneAt": "2026-11-14T05:39:40.405Z"
+    },
+    "drawer-escape-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:39:40.405Z"
+    },
+    "drawer-escape-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:39:40.405Z"
+    },
+    "tabs-order-labels": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T05:39:49.953Z",
+      "doneAt": "2026-11-14T05:45:44.632Z"
+    },
+    "tabs-order-labels.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:45:44.632Z"
+    },
+    "tabs-order-labels.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:45:44.632Z"
+    },
+    "tabs-order-labels.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:45:44.632Z"
+    },
+    "tabs-order-labels.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:45:44.632Z"
+    },
+    "store-url-default": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T05:45:52.804Z",
+      "doneAt": "2026-11-14T05:50:49.067Z"
+    },
+    "store-url-default.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:50:49.067Z"
+    },
+    "store-url-default.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:50:49.067Z"
+    },
+    "store-url-default.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:50:49.067Z"
+    },
+    "pipeline-strip": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T05:50:59.978Z",
+      "doneAt": "2026-11-14T06:01:43.141Z"
+    },
+    "pipeline-strip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:01:43.141Z"
+    },
+    "pipeline-strip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:01:43.141Z"
+    },
+    "pipeline-strip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:01:43.141Z"
+    },
+    "pipeline-strip.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:01:43.141Z"
+    },
+    "pipeline-strip.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:01:43.141Z"
+    },
+    "pickup-strip-variant": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T06:02:02.220Z",
+      "doneAt": "2026-11-14T06:10:35.569Z"
+    },
+    "pickup-strip-variant.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:10:35.569Z"
+    },
+    "pickup-strip-variant.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:10:35.569Z"
+    },
+    "pickup-strip-variant.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:10:35.569Z"
+    },
+    "pickup-strip-variant.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:10:35.569Z"
+    },
+    "pickup-strip-variant.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:10:35.569Z"
+    },
+    "checks-chip": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T06:10:43.480Z",
+      "doneAt": "2026-11-14T06:14:54.678Z"
+    },
+    "checks-chip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:14:54.678Z"
+    },
+    "checks-chip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:14:54.678Z"
+    },
+    "checks-chip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:14:54.678Z"
+    },
+    "checks-chip.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:14:54.678Z"
+    },
+    "conversation-header-layout": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T06:15:02.961Z",
+      "doneAt": "2026-11-14T06:20:02.827Z"
+    },
+    "conversation-header-layout.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:20:02.827Z"
+    },
+    "conversation-header-layout.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:20:02.827Z"
+    },
+    "conversation-header-layout.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:20:02.827Z"
+    },
+    "conversation-header-layout.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:20:02.827Z"
+    },
+    "conversation-header-layout.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:20:02.827Z"
+    },
+    "conversation-start-surfaces": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T06:20:16.471Z",
+      "doneAt": "2026-11-14T06:23:19.082Z"
+    },
+    "conversation-start-surfaces.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:23:19.082Z"
+    },
+    "conversation-start-surfaces.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:23:19.082Z"
+    },
+    "conversation-start-surfaces.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:23:19.082Z"
+    },
+    "skills-count-hook": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T06:23:27.484Z",
+      "doneAt": "2026-11-14T06:26:08.398Z"
+    },
+    "skills-count-hook.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:26:08.398Z"
+    },
+    "skills-count-hook.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:26:08.398Z"
+    },
+    "skills-count-hook.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:26:08.398Z"
+    },
+    "skills-tab-panel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T06:26:11.760Z",
+      "doneAt": "2026-11-14T06:29:06.831Z"
+    },
+    "skills-tab-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:29:06.831Z"
+    },
+    "skills-tab-panel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:29:06.831Z"
+    },
+    "skills-tab-panel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:29:06.831Z"
+    },
+    "details-body": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T06:29:09.885Z",
+      "doneAt": "2026-11-14T06:32:51.691Z"
+    },
+    "details-body.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:32:51.691Z"
+    },
+    "details-body.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:32:51.691Z"
+    },
+    "details-body.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:32:51.691Z"
+    },
+    "details-body.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:32:51.691Z"
+    },
+    "compose-drawer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T06:33:00.934Z",
+      "doneAt": "2026-11-14T06:41:27.798Z"
+    },
+    "drawer-test-migration": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T06:38:43.529Z",
+      "doneAt": "2026-11-14T06:42:00.139Z"
+    },
+    "compose-drawer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:41:27.798Z"
+    },
+    "compose-drawer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:41:27.798Z"
+    },
+    "compose-drawer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:41:27.798Z"
+    },
+    "compose-drawer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:41:27.798Z"
+    },
+    "compose-drawer.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:41:27.798Z"
+    },
+    "drawer-test-migration.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:42:00.139Z"
+    },
+    "drawer-test-migration.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:42:00.139Z"
+    },
+    "drawer-test-migration.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:42:00.139Z"
+    },
+    "drawer-test-migration.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:42:00.139Z"
+    },
+    "drawer-test-migration.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:42:00.139Z"
+    },
+    "header-facts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T06:42:08.127Z",
+      "doneAt": "2026-11-14T06:46:43.985Z"
+    },
+    "header-facts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:46:43.985Z"
+    },
+    "header-facts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:46:43.985Z"
+    },
+    "header-facts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:46:43.985Z"
+    },
+    "drawer-header-row": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T06:47:14.664Z",
+      "doneAt": "2026-11-14T06:51:12.608Z"
+    },
+    "drawer-header-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:51:12.608Z"
+    },
+    "drawer-header-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:51:12.608Z"
+    },
+    "drawer-header-row.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:51:12.608Z"
+    },
+    "drawer-header-row.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:51:12.608Z"
+    },
+    "drawer-header-row.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:51:12.608Z"
+    },
+    "remove-console-start-block": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T06:51:44.637Z",
+      "doneAt": "2026-11-14T06:58:19.253Z"
+    },
+    "remove-console-start-block.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:58:19.253Z"
+    },
+    "remove-console-start-block.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:58:19.253Z"
+    },
+    "remove-console-start-block.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:58:19.253Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T06:58:51.689Z",
+      "doneAt": "2026-11-14T07:00:12.469Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:00:12.469Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:00:12.469Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:00:12.469Z"
+    },
+    "ci-test-subset": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T07:00:42.736Z",
+      "doneAt": "2026-11-14T07:30:08.962Z"
+    },
+    "ci-test-subset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:30:08.962Z"
+    },
+    "ci-test-subset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:30:08.962Z"
+    },
+    "ci-test-subset.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:30:08.962Z"
+    },
+    "ci-test-subset.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:30:08.962Z"
+    },
+    "visual-evidence": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T07:30:27.862Z",
+      "doneAt": "2026-11-14T07:30:57.205Z"
+    },
+    "visual-evidence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:30:57.205Z"
+    },
+    "visual-evidence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:30:57.205Z"
+    },
+    "visual-evidence.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:30:57.205Z"
+    },
+    "visual-evidence.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:30:57.205Z"
+    }
+  }
+}

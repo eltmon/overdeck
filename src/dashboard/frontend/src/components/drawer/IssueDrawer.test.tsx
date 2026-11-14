@@ -24,6 +24,7 @@ import type { Issue } from '../../types';
 import { DialogProvider } from '../DialogProvider';
 import { IssueDrawer } from './IssueDrawer';
 import { resetDrawerIssueSubscriptionForTest } from './useDrawerData';
+import { DENSITY_SECTIONS } from '../issue-view/densitySections';
 
 const issue: Issue = {
   id: 'PAN-1',
@@ -190,12 +191,27 @@ describe('IssueDrawer', () => {
       { id: 'open', title: 'Open bead', status: 'open', createdAt: '2026-05-18T00:00:00.000Z' },
     ]);
 
-    expect(screen.getByTestId('drawer-tabs')).toHaveClass('px-[14px]');
-    expect(screen.getByTestId('drawer-tab-overview')).toHaveClass('py-[10px]', 'text-[13px]', 'font-medium', 'text-foreground');
-    expect(within(screen.getByTestId('drawer-tab-overview')).getByTestId('drawer-tab-active-underline')).toHaveClass('left-[14px]', 'right-[14px]', 'h-[2px]', 'bg-primary');
+    expect(screen.getByTestId('drawer-tabs')).toHaveClass('px-[12px]');
+    expect(screen.getByTestId('drawer-tab-overview')).toHaveClass('h-[34px]', 'text-[13px]', 'font-medium', 'text-foreground');
+    expect(within(screen.getByTestId('drawer-tab-overview')).getByTestId('drawer-tab-active-underline')).toHaveClass('left-[10px]', 'right-[10px]', 'h-[2px]', 'bg-primary');
     expect(screen.getByTestId('drawer-tab-plan')).toHaveClass('text-muted-foreground', 'hover:text-foreground');
     expect(within(screen.getByTestId('drawer-tab-tasks')).getByTestId('drawer-tab-tasks-count')).toHaveTextContent('1/2');
-    expect(screen.getByTestId('drawer-tab-tasks-count')).toHaveClass('font-mono', 'text-[10px]', 'px-[5px]');
+    expect(screen.getByTestId('drawer-tab-tasks-count')).toHaveClass('font-mono-ui', 'text-[10.5px]', 'px-[4px]', 'rounded-[4px]');
+    expect(screen.getByTestId('drawer-tab-tasks-count')).not.toHaveClass('rounded-full');
+    expect(screen.getByTestId('drawer-tab-session')).toHaveTextContent('Conversation');
+    expect(screen.getByTestId('drawer-tab-overview')).toHaveTextContent('Details');
+    expect(
+      within(screen.getByTestId('drawer-tabs')).getAllByRole('tab').map((button) => button.getAttribute('data-testid')),
+    ).toEqual([
+      'drawer-tab-session',
+      'drawer-tab-tasks',
+      'drawer-tab-plan',
+      'drawer-tab-files',
+      'drawer-tab-activity',
+      'drawer-tab-artifacts',
+      'drawer-tab-skills',
+      'drawer-tab-overview',
+    ]);
 
     fireEvent.click(screen.getByTestId('drawer-tab-files'));
 
@@ -522,6 +538,19 @@ describe('IssueDrawer', () => {
     scroller.remove();
   });
 
+  it('stays open when an Escape keydown was already handled (defaultPrevented)', () => {
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
+    renderDrawer();
+
+    const event = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
+    event.preventDefault();
+    window.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(useDashboardStore.getState().drawer.issueId).toBe('PAN-1');
+    expect(screen.getByTestId('issue-drawer')).toBeTruthy();
+  });
+
   it('renders most-recent-first activity rail items with phase dots and scroll reset', async () => {
     useDashboardStore.setState({
       recentActivity: [
@@ -530,15 +559,14 @@ describe('IssueDrawer', () => {
         { id: 'other', timestamp: '2026-05-18T00:10:00.000Z', source: 'review', level: 'info', message: 'Other issue', issueId: 'PAN-2' },
       ],
     } as Parameters<typeof useDashboardStore.setState>[0]);
-    useDashboardStore.getState().openIssue('PAN-1', 'activity');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     const { queryClient, rerender } = renderDrawer();
     const rail = screen.getByTestId('drawer-activity-rail');
     const scrollArea = screen.getByTestId('drawer-activity-rail-scroll');
 
-    expect(rail).toHaveClass('w-[320px]', 'border-l', 'bg-card/70');
-    // Scope text + dot assertions to the rail; the Activity tab panel renders
-    // its own copy of these entries when drawer.tab === 'activity'.
+    // PAN-5244: the rail is the compact Live activity list in Details.
+    expect(rail).toHaveClass('w-full');
     expect(within(rail).getByText('Merged branch')).toBeInTheDocument();
     expect(within(rail).getByText('Work started')).toBeInTheDocument();
     expect(within(rail).queryByText('Other issue')).not.toBeInTheDocument();
@@ -593,10 +621,8 @@ describe('IssueDrawer', () => {
     useDashboardStore.getState().openIssue('PAN-1', 'activity');
 
     renderDrawer();
-    const rail = screen.getByTestId('drawer-activity-rail');
+    const rail = screen.getByTestId('drawer-tab-panel-activity');
 
-    // Scope to the rail; the Activity tab panel also renders these entries
-    // when drawer.tab === 'activity'.
     expect(within(rail).getByText('Security reviewer active')).toBeInTheDocument();
     expect(within(rail).queryByText('Other reviewer active')).not.toBeInTheDocument();
   });
@@ -616,24 +642,24 @@ describe('IssueDrawer', () => {
 
     renderDrawer();
 
-    // PAN-2908 C-VOCAB: the drawer renders the shared six-phase rail.
-    const timeline = screen.getByTestId('drawer-phase-timeline');
+    // PAN-5244: the drawer renders the compact six-phase pipeline strip.
+    const timeline = screen.getByTestId('drawer-pipeline-strip');
     expect(within(timeline).getByText('Plan')).toBeInTheDocument();
     expect(within(timeline).getByText('Work')).toBeInTheDocument();
     expect(within(timeline).getByText('Review')).toBeInTheDocument();
     expect(within(timeline).getByText('Test')).toBeInTheDocument();
     expect(within(timeline).getByText('Ship')).toBeInTheDocument();
     expect(within(timeline).getByText('Done')).toBeInTheDocument();
-    const steps = timeline.querySelectorAll('[data-component="phase-rail"] > button');
+    const steps = timeline.querySelectorAll('button[data-phase]');
     expect(steps).toHaveLength(6);
     // Fixture: review passed, ready to merge → plan..test done, ship current, done pending.
     expect(steps[0].getAttribute('data-state')).toBe('done');
     expect(steps[3].getAttribute('data-state')).toBe('done');
     expect(steps[4].getAttribute('data-state')).toBe('current');
     expect(steps[5].getAttribute('data-state')).toBe('pending');
-    // Legacy when-stamps are preserved as meta where the old timeline had them.
-    expect(within(steps[4] as HTMLElement).getByText('05/18')).toBeInTheDocument();
-    expect(within(steps[5] as HTMLElement).getByText('—')).toBeInTheDocument();
+    // Legacy when-stamps are preserved in the step title.
+    expect(steps[0].getAttribute('title')).toContain('05/18');
+    expect(steps[4].getAttribute('data-kind')).toBe('next');
   });
 
   it('renders the PR check-run gate from drawer data with PRD border tones', async () => {
@@ -685,7 +711,7 @@ describe('IssueDrawer', () => {
     renderDrawer();
 
     expect(screen.getByTestId('active-agent-panel')).toHaveClass('border-l-[3px]', 'border-l-signal-review');
-    expect(screen.getByText('agent-PAN-1')).toHaveClass('font-mono', 'text-[13px]');
+    expect(within(screen.getByTestId('active-agent-panel')).getByText('agent-PAN-1')).toHaveClass('font-mono', 'text-[13px]');
     expect(screen.getByText('WORK RUNNING').closest('[data-component="verb-badge"]')).toHaveClass('text-[9px]');
     expect(screen.getByText(/GPT-5\.5 · claude-code · spend loading/)).toHaveClass('text-right', 'font-mono');
     // PAN-2908 C-DETAIL: the stream-excerpt box and its "No recent stream
@@ -720,7 +746,9 @@ describe('IssueDrawer', () => {
 
     renderDrawer();
 
-    expect(screen.getByTestId('drawer-action-bar')).toHaveClass('px-[22px]', 'py-[12px]', 'border-t', 'bg-card/70');
+    // PAN-5244: the action strip sits in the one-row header; there is no footer.
+    expect(screen.getByTestId('issue-drawer').querySelector('header')).toContainElement(screen.getByTestId('drawer-action-bar'));
+    expect(screen.getByTestId('issue-drawer').querySelector('footer')).toBeNull();
     expect(screen.getByTestId('issue-action-menu')).toBeInTheDocument();
     expect(screen.getByTestId('issue-action-overflow-button')).toBeInTheDocument();
     expect(screen.getByTestId('issue-action-pin-spacer')).toBeInTheDocument();
@@ -734,6 +762,94 @@ describe('IssueDrawer', () => {
     });
     expect(screen.queryByTestId('drawer-action-reset')).toBeNull();
     expect(screen.queryByTestId('drawer-action-stop')).toBeNull();
+  });
+
+  it('renders the header as one row with the state badge and the cost', async () => {
+    const baseFetch = mockFetch();
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => (
+      String(input).endsWith('/costs')
+        ? Response.json({ totalCost: 18.9, totalTokens: 0, sessions: [], byModel: {} })
+        : baseFetch(input, init)
+    )));
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: { 'PAN-1': { issueId: 'PAN-1', state: 'working' } },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    const header = screen.getByTestId('issue-drawer').querySelector('header') as HTMLElement;
+    expect(within(header).getByTestId('drawer-state-badge')).toHaveTextContent('Working');
+    expect(await within(header).findByTestId('drawer-cost')).toHaveTextContent('$18.90');
+    expect(header.querySelector('h2')).toHaveAttribute('title', 'Drawer issue');
+  });
+
+  it('Escape with the pickup popover open closes the popover and keeps the drawer open', async () => {
+    useDashboardStore.setState({
+      issuesRaw: [{ ...issue, hasPlan: true }],
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    fireEvent.click(await screen.findByTestId('pickup-strip-more'));
+    fireEvent.keyDown(screen.getByTestId('pickup-strip-popover'), { key: 'Escape' });
+
+    expect(screen.queryByTestId('pickup-strip-popover')).toBeNull();
+    expect(useDashboardStore.getState().drawer.issueId).toBe('PAN-1');
+  });
+
+  it('Escape with the checks popover open closes the popover and keeps the drawer open', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: {
+        'PAN-1': {
+          issueId: 'PAN-1',
+          state: 'in-review',
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'review-requested', checks: 'green', mergeable: true },
+        },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    const chip = screen.getByTestId('drawer-checks-chip');
+    fireEvent.click(chip);
+    expect(screen.getByTestId('drawer-checks-popover')).toBeInTheDocument();
+    // The popover has nothing focusable, so focus stays on the chip.
+    fireEvent.keyDown(chip, { key: 'Escape' });
+
+    expect(screen.queryByTestId('drawer-checks-popover')).toBeNull();
+    expect(useDashboardStore.getState().drawer.issueId).toBe('PAN-1');
+  });
+
+  it('shows no pickup strip for a merged issue and shows the checks chip', async () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: {
+        'PAN-1': {
+          issueId: 'PAN-1',
+          state: 'merged',
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
+        },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    expect(screen.getByTestId('drawer-checks-chip')).toHaveAttribute('data-status', 'passed');
+    await waitFor(() => expect(screen.queryByTestId('drawer-pickup-strip')).toBeNull());
+  });
+
+  it('opening the drawer issues no skills request', async () => {
+    const fetchMock = mockFetch();
+    vi.stubGlobal('fetch', fetchMock);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    await screen.findByTestId('drawer-pickup-strip');
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/skills/overrides'))).toBe(false);
   });
 
   it('snapshots enabled drawer footer actions for work-running and ready-to-merge phases', () => {
@@ -902,12 +1018,32 @@ describe('IssueDrawer', () => {
     expect(screen.getByText('No active agent.')).toHaveClass('text-muted-foreground');
   });
 
-  it('renders console inventory markers on the real overview shell', () => {
-    useDashboardStore.getState().openIssue('PAN-1', 'overview');
-    const { container } = renderDrawer();
-    for (const section of ['DrawerActionBar', 'PhaseTimeline', 'DrawerTabs', 'DrawerPickupSection / PickupGateControls', 'DrawerWorkspaceSection', 'UatEnvironmentPanel', 'DrawerActiveAgent', 'DrawerPausedBanner', 'DrawerVerificationGates', 'SpecialistStrip', 'DrawerTasksList', 'DrawerActivityRail / DrawerActivityPanel', 'StartAgentCta']) {
-      expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
+  // PAN-5244 FR-18: every console inventory marker, on the tab that renders it.
+  const MARKERS_BY_TAB: Array<{ tab: string; sections: string[] }> = [
+    { tab: 'conversation', sections: ['DrawerActionBar', 'PhaseTimeline', 'DrawerTabs', 'DrawerPausedBanner', 'DrawerAgentSession', 'StartAgentCta'] },
+    { tab: 'overview', sections: ['DrawerPickupSection / PickupGateControls', 'DrawerWorkspaceSection', 'UatEnvironmentPanel', 'DrawerActiveAgent', 'DrawerVerificationGates', 'DrawerReviewSpecialists', 'DrawerActivityRail / DrawerActivityPanel'] },
+    { tab: 'tasks', sections: ['DrawerTasksList'] },
+    { tab: 'plan', sections: ['DrawerPlanPanel / XBriefViewer'] },
+    { tab: 'artifacts', sections: ['DrawerArtifactsPanel'] },
+    { tab: 'activity', sections: ['DrawerActivityRail / DrawerActivityPanel'] },
+  ];
+
+  it('renders every console inventory marker on a visible element', () => {
+    for (const { tab, sections } of MARKERS_BY_TAB) {
+      useDashboardStore.getState().openIssue('PAN-1', tab);
+      const { container, unmount } = renderDrawer();
+      for (const section of sections) {
+        const el = container.querySelector(`[data-section="${section}"]`);
+        expect(el, `${tab}: ${section}`).toBeInTheDocument();
+        expect(el?.closest('[hidden]'), `${tab}: ${section} is hidden`).toBeNull();
+      }
+      unmount();
+      resetDrawerIssueSubscriptionForTest();
     }
+  });
+
+  it('the marker table covers DENSITY_SECTIONS.console exactly', () => {
+    expect(new Set(MARKERS_BY_TAB.flatMap((row) => row.sections))).toEqual(new Set(DENSITY_SECTIONS.console));
   });
 
   it('renders four review specialist rows from drawer data with status dots', () => {
@@ -924,16 +1060,11 @@ describe('IssueDrawer', () => {
 
     renderDrawer();
 
-    // PAN-2908 C-DETAIL: specialists render via the shared SpecialistStrip
-    // (clickable — each chip opens that specialist's conversation).
-    const strip = document.querySelector('[data-component="specialist-strip"]');
-    expect(strip).not.toBeNull();
-    expect(strip!.querySelector('[data-specialist="security"]')).not.toBeNull();
-    expect(strip!.querySelector('[data-specialist="correctness"]')).not.toBeNull();
-    expect(strip!.querySelector('[data-specialist="performance"]')).not.toBeNull();
-    expect(strip!.querySelector('[data-specialist="requirements"]')).not.toBeNull();
-    expect(strip!.querySelector('[data-specialist="security"]')!.getAttribute('data-status')).toBe('running');
-    expect(strip!.querySelector('[data-specialist="correctness"]')!.getAttribute('data-status')).toBe('done');
+    // PAN-5244: the Details tab lists the four review specialists.
+    const review = screen.getByTestId('drawer-details-review');
+    expect(review.querySelectorAll('[data-reviewer]')).toHaveLength(4);
+    expect(review.querySelector('[data-reviewer="security"]')!.getAttribute('data-status')).toBe('running');
+    expect(review.querySelector('[data-reviewer="correctness"]')!.getAttribute('data-status')).toBe('done');
   });
 
   it('resolves a legacy Conversation URL to the consolidated Session surface', () => {
@@ -945,8 +1076,8 @@ describe('IssueDrawer', () => {
     expect(screen.queryByTestId('drawer-tab-conversation')).not.toBeInTheDocument();
     expect(screen.queryByTestId('drawer-tab-terminal')).not.toBeInTheDocument();
     const panel = screen.getByTestId('drawer-tab-panel-conversation');
-    expect(within(panel).getByText(/Nothing here yet — no agent has started/)).toBeInTheDocument();
-    expect(within(panel).getByText(/Start work and the live conversation appears here/)).toBeInTheDocument();
+    expect(within(panel).getByText('No agent has run on this issue yet')).toBeInTheDocument();
+    expect(within(panel).getByText(/each agent's conversation appears here/)).toBeInTheDocument();
   });
 
   it('resolves a legacy Terminal URL to the consolidated Session surface', () => {
@@ -1029,27 +1160,27 @@ describe('conversation switching (PAN-2908 C-DETAIL)', () => {
     useDashboardStore.getState().openIssue('PAN-1', 'overview');
     renderDrawer();
 
-    const reviewStep = document.querySelector('[data-component="phase-rail"] [data-phase="review"]') as HTMLButtonElement;
+    const reviewStep = document.querySelector('[data-component="pipeline-strip"] [data-phase="review"]') as HTMLButtonElement;
     expect(reviewStep.disabled).toBe(false);
     fireEvent.click(reviewStep);
 
     expect(useDashboardStore.getState().drawer.tab).toBe('conversation');
-    const select = screen.getByLabelText('Select agent session') as HTMLSelectElement;
-    expect(select.value).toBe('agent-pan-1-review');
+    expect(screen.getByTestId('drawer-agent-meta')).toHaveTextContent('agent-pan-1-review');
   });
 
   it('clicking a specialist chip opens THAT specialist conversation', () => {
     seedWithAgents();
-    useDashboardStore.getState().openIssue('PAN-1', 'overview');
+    useDashboardStore.getState().openIssue('PAN-1');
     renderDrawer();
 
+    // The reviewer chips render only while a review agent is selected.
+    fireEvent.click(document.querySelector('[data-component="pipeline-strip"] [data-phase="review"]') as HTMLButtonElement);
     const chip = document.querySelector('[data-specialist="security"]') as HTMLButtonElement;
     expect(chip.disabled).toBe(false);
     fireEvent.click(chip);
 
     expect(useDashboardStore.getState().drawer.tab).toBe('conversation');
-    const select = screen.getByLabelText('Select agent session') as HTMLSelectElement;
-    expect(select.value).toBe('agent-pan-1-review-security');
+    expect(screen.getByTestId('drawer-agent-meta')).toHaveTextContent('agent-pan-1-review-security');
   });
 });
 

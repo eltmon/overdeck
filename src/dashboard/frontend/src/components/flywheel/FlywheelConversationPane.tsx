@@ -26,8 +26,6 @@ import { XTerminal } from '../XTerminal';
 
 export const FLYWHEEL_POPOUT_PATH = '/popout/flywheel-conversation';
 
-export type FlywheelTickTarget = { messageId?: string; nonce: number };
-
 interface FlywheelRoleConfig {
   harness?: string;
   model?: string;
@@ -82,11 +80,9 @@ const ORPHAN_CODE = 'FlywheelOrphanSession';
 
 interface FlywheelConversationPaneProps {
   onOpenSettings?: () => void;
-  tickTarget?: FlywheelTickTarget | null;
-  onTickTargetHandled?: () => void;
 }
 
-export function FlywheelConversationPane({ onOpenSettings, tickTarget, onTickTargetHandled }: FlywheelConversationPaneProps) {
+export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversationPaneProps) {
   const [viewMode, setViewMode] = useState<'conversation' | 'terminal'>('conversation');
   const isPopout = typeof window !== 'undefined' && window.location.pathname === FLYWHEEL_POPOUT_PATH;
   const queryClient = useQueryClient();
@@ -119,11 +115,6 @@ export function FlywheelConversationPane({ onOpenSettings, tickTarget, onTickTar
     if (run && run !== 'idle') setOrphanDetected(false);
   }, [run]);
 
-  // A tick jump target always means "show me the conversation" — switch off
-  // the Terminal view even when it's the Conversation panel that handles it.
-  useEffect(() => {
-    if (tickTarget) setViewMode('conversation');
-  }, [tickTarget?.nonce]);
   const conversation = conversationQuery.data ?? null;
   const config = configQuery.data ?? {};
 
@@ -249,9 +240,6 @@ export function FlywheelConversationPane({ onOpenSettings, tickTarget, onTickTar
               onEmbeddedResume={run === 'paused' ? () => resume.run() : undefined}
               embeddedResumeLabel={resume.pending ? 'Resuming…' : 'Resume flywheel'}
               onSendFailed={() => void queryClient.invalidateQueries({ queryKey: FLYWHEEL_CONVERSATION_QUERY_KEY })}
-              targetMessageId={tickTarget?.messageId}
-              targetMessageNonce={tickTarget?.nonce}
-              onTargetMessageHandled={onTickTargetHandled}
             />
           )
         ) : (

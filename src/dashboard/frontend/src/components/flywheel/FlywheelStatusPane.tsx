@@ -7,7 +7,7 @@
 import { MessageSquare } from 'lucide-react';
 
 import type { FlywheelDerivedStatus, FlywheelFreshness, FlywheelLastTick } from '@overdeck/contracts';
-import { needsYouItemKey, splitNeedsYouItems } from '@overdeck/contracts';
+import { needsYouItemKey, parseNeedsYouTarget, splitNeedsYouItems } from '@overdeck/contracts';
 
 import { formatAge } from '../../lib/flywheelApi';
 import { needsYouSegments } from '../../lib/flywheelNeedsYouLinks';
@@ -41,6 +41,10 @@ const ATTENTION_TONE: Record<string, Tone> = { 'needs-you': 'warning', stuck: 'd
 /** A pane state is the machine's, not the operator's: only `blocked` is on them. */
 const PANE_STATE_TONE: Record<string, Tone> = { working: 'info', blocked: 'warning' };
 
+/** Shared link style for needs-you issue, PR and item-target links (PAN-5239 D6). */
+export const NEEDS_YOU_LINK_CLASS =
+  'cursor-pointer rounded-sm text-foreground underline decoration-muted-foreground/60 underline-offset-2 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+
 /**
  * What the board is counting. A running loop's own tick list is the authority
  * on what it picked up; with no tick, the rows are just the workspace census
@@ -55,15 +59,18 @@ export function inFlightCountLabel(status: FlywheelDerivedStatus): string {
 export interface NeedsYouRow {
   key: string;
   text: string;
+  label: string;
+  target?: string;
   messageId?: string;
 }
 
-/** One row per item; the server's first-raised id, else the newest tick's (PAN-5198). */
+/** One row per item; the server's first-raised id, when it sent one (PAN-5198, PAN-5239). */
 export function needsYouRows(tick: FlywheelLastTick): NeedsYouRow[] {
   const items = tick.needsYouItems ?? splitNeedsYouItems(tick.needsYou).map((text) => ({ text }));
   return items.map((item) => {
-    const messageId = ('firstRaisedMessageId' in item ? item.firstRaisedMessageId : undefined) ?? tick.messageId;
-    return { key: needsYouItemKey(item.text), text: item.text, ...(messageId ? { messageId } : {}) };
+    const messageId = 'firstRaisedMessageId' in item ? item.firstRaisedMessageId : undefined;
+    const { label, target } = parseNeedsYouTarget(item.text);
+    return { key: needsYouItemKey(item.text), text: item.text, label, ...(target ? { target } : {}), ...(messageId ? { messageId } : {}) };
   });
 }
 
@@ -72,7 +79,7 @@ interface FlywheelStatusPaneProps {
   unreachable: boolean;
   nowMs: number;
   onNavigateIssue?: (issueId: string) => void;
-  onNeedsYouClick?: (messageId: string | undefined) => void;
+  onNeedsYouClick?: (messageId: string) => void;
 }
 
 export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue, onNeedsYouClick }: FlywheelStatusPaneProps) {
@@ -147,47 +154,64 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
               <ul>
                 {needsYouRows(tick).map((row) => (
                   <li key={row.key} data-testid="flywheel-needs-you-item" className="flex items-baseline gap-1.5">
-                    <button
-                      type="button"
-                      aria-label="Show where this was raised"
-                      title="Show the message that first raised this, or the question the flywheel is waiting on"
-                      data-testid="flywheel-needs-you-jump"
-                      className="shrink-0 self-center rounded-sm text-muted-foreground hover:text-foreground"
-                      onClick={() => onNeedsYouClick?.(row.messageId)}
-                    >
-                      <MessageSquare className="h-3 w-3" aria-hidden="true" />
-                    </button>
+                    {row.messageId ? (
+                      <button
+                        type="button"
+                        aria-label="Show where this was raised"
+                        title="Open the conversation at the message that first raised this, or the question the flywheel is waiting on"
+                        data-testid="flywheel-needs-you-jump"
+                        className="shrink-0 self-center cursor-pointer rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={() => onNeedsYouClick?.(row.messageId!)}
+                      >
+                        <MessageSquare className="h-3 w-3" aria-hidden="true" />
+                      </button>
+                    ) : (
+                      // Keeps rows without a jump button in the same text column (PAN-5239 review).
+                      <span className="h-3 w-3 shrink-0" aria-hidden="true" />
+                    )}
                     <span className="min-w-0">
-                      {needsYouSegments(row.text, status.inFlight).map((segment, i) => {
-                        if (segment.kind === 'issue') {
-                          return (
-                            <button
-                              key={i}
-                              type="button"
-                              className="font-mono text-foreground hover:underline"
-                              data-testid="flywheel-needs-you-issue"
-                              onClick={() => onNavigateIssue?.(segment.issueId)}
-                            >
-                              {segment.text}
-                            </button>
-                          );
-                        }
-                        if (segment.kind === 'pr') {
-                          return (
-                            <a
-                              key={i}
-                              href={segment.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="font-mono hover:underline"
-                              data-testid="flywheel-needs-you-pr"
-                            >
-                              {segment.text}
-                            </a>
-                          );
-                        }
-                        return <span key={i}>{segment.text}</span>;
-                      })}
+                      {row.target ? (
+                        <a
+                          href={row.target}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className={NEEDS_YOU_LINK_CLASS}
+                          data-testid="flywheel-needs-you-link"
+                        >
+                          {row.label}
+                        </a>
+                      ) : (
+                        needsYouSegments(row.label, status.inFlight).map((segment, i) => {
+                          if (segment.kind === 'issue') {
+                            return (
+                              <button
+                                key={i}
+                                type="button"
+                                className={`font-mono ${NEEDS_YOU_LINK_CLASS}`}
+                                data-testid="flywheel-needs-you-issue"
+                                onClick={() => onNavigateIssue?.(segment.issueId)}
+                              >
+                                {segment.text}
+                              </button>
+                            );
+                          }
+                          if (segment.kind === 'pr') {
+                            return (
+                              <a
+                                key={i}
+                                href={segment.url}
+                                target="_blank"
+                                rel="noreferrer noopener"
+                                className={`font-mono ${NEEDS_YOU_LINK_CLASS}`}
+                                data-testid="flywheel-needs-you-pr"
+                              >
+                                {segment.text}
+                              </a>
+                            );
+                          }
+                          return <span key={i}>{segment.text}</span>;
+                        })
+                      )}
                     </span>
                   </li>
                 ))}

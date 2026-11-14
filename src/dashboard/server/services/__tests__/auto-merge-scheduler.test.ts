@@ -103,7 +103,8 @@ interface WorldOptions {
   getFacts?: (issueId: string) => Promise<PrFacts>;
   globalRequireUat?: boolean;
   projectDefault?: 'auto' | 'hold';
-  trainEnabled?: boolean;
+  /** PAN-4753 D4: the project's merge train; off (per-PR merges) by default. */
+  trainOn?: boolean;
   latest?: PendingAutoMerge | null;
   /** The latest row as the insert transaction sees it; `latest` by default. */
   latestAtInsert?: PendingAutoMerge | null;
@@ -131,14 +132,15 @@ function world(options: WorldOptions = {}) {
   });
   const listCandidates = vi.fn(async (_projectPath: string): Promise<ScheduleCandidates | null> => only('pan-42'));
   const globalRequireUat = options.globalRequireUat ?? true;
-  const trainEnabled = options.trainEnabled ?? true;
+  const trainOn = options.trainOn ?? false;
   const labels = options.labels ?? [];
   const projectDefault = () => options.projectDefault;
   const policy = {
     getIssueLabels: () => labels,
     getProjectAutoMergeDefault: projectDefault,
     isRequireUatBeforeMerge: () => globalRequireUat,
-    isMergeTrainEnabled: () => trainEnabled,
+    isTrainOn: () => trainOn,
+    droppedFromBatch: () => false,
     isIssueClosed: () => options.closed ?? false,
   };
   // As in production: every merge door needs an approval bound to the head.
@@ -152,7 +154,6 @@ function world(options: WorldOptions = {}) {
 
   const deps = {
     listProjects: () => [OVERDECK],
-    isTrainEnabledForProject: () => trainEnabled,
     forgeOf: (): 'github' | 'gitlab' => 'github',
     listCandidates,
     policyRefusal: (issueId: string) => autoMergePolicyRefusal(issueId, policy),
@@ -169,6 +170,8 @@ function world(options: WorldOptions = {}) {
         isGlobalUatRequired: () => globalRequireUat,
         ciTestsRequired: () => false,
         readReviews,
+        isTrainOn: () => trainOn,
+        droppedFromBatch: () => false,
       }),
       resolveProject: () => ({ projectKey: 'overdeck', projectName: 'Overdeck', projectPath: '/repos/overdeck' }),
       schedule: (input) => insert({ ...input, canSchedule }),
@@ -419,12 +422,30 @@ describe('scheduleReadyAutoMerges (#3983)', () => {
     expect(insert).not.toHaveBeenCalled();
   });
 
-  it('does nothing for a project whose merge train is off', async () => {
-    const { deps, insert, listCandidates } = world({ labels: ['auto-merge'], trainEnabled: false });
+  it('schedules a ready PR while the merge train is off: off means per-PR merges (PAN-4753 D4)', async () => {
+    const { deps, insert, listCandidates } = world({ labels: ['auto-merge'], trainOn: false });
+    await scheduleReadyAutoMerges(deps);
+    expect(listCandidates).toHaveBeenCalledTimes(1);
+    expect(insert).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a normal-priority PR to the batch while the merge train is on (PAN-4753 D4)', async () => {
+    const { deps, insert } = world({ labels: ['auto-merge'], trainOn: true });
     const outcomes = await scheduleReadyAutoMerges(deps);
-    expect(outcomes).toEqual([]);
-    expect(listCandidates).not.toHaveBeenCalled();
     expect(insert).not.toHaveBeenCalled();
+    expect(outcomes).toEqual([expect.objectContaining({
+      issueId: 'PAN-42', scheduled: false, reason: expect.stringContaining('the merge train batches this PR'),
+    })]);
+  });
+
+  it.each([
+    [['auto-merge', 'critical']],
+    [['auto-merge', 'blocks-main']],
+    [['auto-merge', 'substrate-improvement', 'bug']],
+  ])('schedules a high-priority PR at once while the merge train is on: %j (PAN-4753 D4)', async (labels) => {
+    const { deps, insert } = world({ labels, trainOn: true });
+    await scheduleReadyAutoMerges(deps);
+    expect(insert).toHaveBeenCalledTimes(1);
   });
 
   it('skips a GitLab project with one log line', async () => {
@@ -659,7 +680,6 @@ describe('runAutoMergeSchedulerTick (#3983)', () => {
       const listProjects = vi.fn(() => [OVERDECK]);
       const deps = {
         listProjects,
-        isTrainEnabledForProject: () => true,
         forgeOf: (): 'github' | 'gitlab' => 'github',
         policyRefusal: () => null,
         latestAutoMerge: () => null,
@@ -688,7 +708,6 @@ describe('runAutoMergeSchedulerTick (#3983)', () => {
     const listProjects = vi.fn(() => [OVERDECK]);
     const deps = {
       listProjects,
-      isTrainEnabledForProject: () => true,
       forgeOf: (): 'github' | 'gitlab' => 'github',
       policyRefusal: () => null,
       latestAutoMerge: () => null,
