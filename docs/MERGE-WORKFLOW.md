@@ -507,7 +507,10 @@ agent whose stored status still says `starting` or `running`. The stored status 
 spawn-time snapshot, so an agent that exited on its own (after `pan done`, or when planning
 finalized) keeps it. A stored `running` agent with no live pane does not block the row; a live
 pane does, and so does a probe that cannot answer (`runtime-indeterminate`). The row only
-reads; it never writes agent status (PAN-4324).
+reads; it never writes agent status (PAN-4324). For an issue not tracked on GitHub, the row has no
+canonical state and no PR `mergedAt` to read; complete forge landing evidence (the same memoized
+read rows 1/2 use, `src/lib/lifecycle/dod-forge-merge.ts`) stands in for `mergedAt`, so the row passes
+when no work/planning agent is live (PAN-5225, `src/lib/lifecycle/dod-post-merge-row.ts`).
 
 Close-out's DoD row 3 (verification) reads the workspace's `verification-latest.json`. A
 missing or non-terminal (`running`, `skipped`) artifact carries no verdict, so the row passes
@@ -526,9 +529,13 @@ origin +refs/heads/<target>:refs/remotes/origin/<target>` in each required repo'
 every ancestry, diff, and `git log` check with `origin/<target>`, never the local branch — primary
 checkouts never pull `main`, so the local branch goes stale and a merged feature branch reads as
 unmerged. The fetch only updates the remote-tracking ref; it never moves local `<target>`. A failed fetch
-falls back to the bare local `<target>` (when it exists) and the row's text says
-`Checked against local <target> because git fetch origin <target> failed: <reason>`; with no local
-`<target>` either, the row fails before any git comparison runs. A merged GitLab MR whose head differs
+falls back first to the last-fetched `origin/<target>` when `refs/remotes/origin/<target>` resolves (text
+`Checked against the last-fetched origin/<target> because git fetch origin <target> failed: <reason>`),
+then to the bare local `<target>` only when no remote-tracking ref exists (text `Checked against local
+<target> because git fetch origin <target> failed: <reason>`), and fails before any comparison when
+neither exists (PAN-5225). The fallback assumes the merge target is a protected branch that is never
+force-pushed or rewound — see D3a in `.pan/drafts/PAN-5225.md` for why that keeps the fallback
+conservative. A merged GitLab MR whose head differs
 from the branch tip passes under the same rule a squash-merged GitHub PR already does: when every later
 non-merge commit is on `origin/<target>`, or the branch-unique delta touches only `.pan/` paths
 (PAN-5209).
@@ -546,7 +553,13 @@ asked first for every required repo, with no ahead-count gate (unlike the Single
 `assessMergeCompleteness` in `src/lib/cloister/merge-completeness.ts`, which skips the forge once a repo
 counts zero commits ahead — the exact MYN polyrepo shape this fallback exists for). A repo with no merged
 artifact has no branch work of its own when its branch is missing on the forge or its tip sits on
-`origin/<target>`'s first-parent line; otherwise it is unlanded. Complete evidence (no unlanded or
+`origin/<target>`'s first-parent line; otherwise it is unlanded. A branch off that line whose three-dot
+diff against `origin/<target>` is empty (`git diff --quiet origin/<target>...<tip>`) adds no changes
+over `<ref>` either, so it is also no branch work rather than unlanded (`<source> adds no changes over
+<ref>`, PAN-5225) — a branch whose commits add then undo their own changes has nothing left to land. A
+failed fetch of the target still makes the repo unverifiable for rows 1/2: `assessRepoLanding()` never
+judges landing against an unrefreshed target, even though row 4 may fall back to the last-fetched
+`origin/<target>` (PAN-5209 FR-6, kept by PAN-5225 D3). Complete evidence (no unlanded or
 unverifiable repo, at least one merged) makes both rows `SKIP` — never `PASS`, since no review decision or
 check result was actually read — with observed text `forge merge complete: <repo list>`. A failed forge or
 git read on any repo is a hard `MISS` (`forge merge evidence unavailable: <reasons>`) that no strike or

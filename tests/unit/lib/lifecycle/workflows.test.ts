@@ -695,6 +695,10 @@ describe('workflows', () => {
         if (command === 'git fetch origin +refs/heads/main:refs/remotes/origin/main') {
           throw Object.assign(new Error('fetch failed'), { stderr: 'fatal: unable to access origin\n' });
         }
+        // PAN-5225: no remote-tracking ref, so the comparison falls through to local main.
+        if (command === 'git rev-parse --verify --quiet refs/remotes/origin/main^{commit}') {
+          throw new Error('no such ref');
+        }
         if (command === 'git rev-parse --verify --quiet refs/heads/main^{commit}') {
           return { stdout: 'deadbeef\n', stderr: '' };
         }
@@ -727,6 +731,10 @@ describe('workflows', () => {
       mockExecAsync.mockImplementation(async (command: string) => {
         if (command === 'git fetch origin +refs/heads/main:refs/remotes/origin/main') {
           throw Object.assign(new Error('fetch failed'), { stderr: 'fatal: unable to access origin\n' });
+        }
+        // PAN-5225: no remote-tracking ref, so the comparison falls through to local main.
+        if (command === 'git rev-parse --verify --quiet refs/remotes/origin/main^{commit}') {
+          throw new Error('no such ref');
         }
         if (command === 'git rev-parse --verify --quiet refs/heads/main^{commit}') {
           return { stdout: 'deadbeef\n', stderr: '' };
@@ -783,7 +791,7 @@ describe('workflows', () => {
 
       expect(verifyStep?.success).toBe(false);
       expect(verifyStep?.error).toBe(
-        'Cannot verify merge: git fetch origin main failed (fatal: unable to access origin) and no local main branch exists',
+        'Cannot verify merge: git fetch origin main failed (fatal: unable to access origin) and neither origin/main nor a local main branch exists',
       );
     });
 

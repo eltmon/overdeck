@@ -80,6 +80,17 @@ export const DOD_ROWS: readonly DodRowDef[] = [
   },
 ];
 
+export function dodRowDefinition(id: DodRowId): DodRowDef {
+  const row = DOD_ROWS.find(candidate => candidate.id === id);
+  if (!row) throw new Error(`Unknown DoD row: ${id}`);
+  return row;
+}
+
+export function dodRowResult(id: DodRowId, status: DodRowResult['status'], observed: string): DodRowResult {
+  const row = dodRowDefinition(id);
+  return { id, num: row.num, title: row.title, expected: row.expected, observed, status };
+}
+
 /**
  * Row 9's `observed` text. A kept workspace/branch is not a miss — the row stays
  * `pass` — but the text must say what actually happened, not imply removal always
