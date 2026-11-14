@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5245",
   "created": "2026-11-14T05:12:59.498Z",
-  "updated": "2026-11-14T05:43:42.094Z",
+  "updated": "2026-11-14T05:43:51.002Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,11 @@
     "filters-open-on-all.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T05:43:42.094Z"
+    },
+    "summary-changed-count": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5245",
+      "claimedAt": "2026-11-14T05:43:51.001Z"
     }
   }
 }
