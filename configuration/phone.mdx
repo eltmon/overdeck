@@ -92,9 +92,12 @@ question. To give an answer that is not an option, tap **Type an answer**.
 Tap **Pipeline** (or open `/m/pipeline`) to see the active issues grouped by
 phase: Ship, Review, Work, Plan and Ready. Each row shows the issue ID and
 title. **Needs you** marks an issue that waits for you. Tap a row to see the
-issue: its phase, state, pull request, agent, project, labels and a link to
-the tracker. The pipeline on the phone is read-only. To start, stop, merge or
-move an issue, use the desktop.
+issue: its phase, state, agent (live, idle or stopped, with its last
+activity), cost so far by stage, pull request with its review and checks,
+description (long ones collapsed behind **Show more**), project, labels and a
+link to the tracker. A value the machine cannot read says "not available".
+The pipeline on the phone is read-only. To start, stop, merge or move an
+issue, use the desktop.
 
 ## What the phone can and cannot do
 
@@ -121,9 +124,17 @@ change it: there are no issue actions, filters or drag and drop.
 ## Notifications
 
 In the phone app, tap **Turn on notifications** at the top of the screen and
-allow notifications. A notification opens the question it is about, or the
-Needs-you list. See [Push notifications](/configuration/push-notifications) for
-what is sent and how it is encrypted.
+allow notifications. A notification for a question or an approval opens its
+card in Needs you. A notification that an issue finished, failed or stopped
+opens that issue's sheet instead, with a **What happened** line naming the
+event and when it happened. See
+[Push notifications](/configuration/push-notifications) for what is sent and
+how it is encrypted.
+
+The browser phone view (`/m`) opens the issue sheet as soon as the machine
+runs the new version; the installed Overdeck app opens it after its next app
+update, because the app bundles its own copy of the screens. Before that
+update, tapping the notification on Android opens the machine list instead.
 
 A notification for a question that is no longer waiting opens Needs you with
 "This question was already answered." When this machine cannot read a linked
