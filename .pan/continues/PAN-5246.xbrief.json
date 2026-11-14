@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5246",
   "created": "2026-11-14T12:41:52.786Z",
-  "updated": "2026-11-14T12:45:16.727Z",
+  "updated": "2026-11-14T12:46:02.696Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
     "title-row.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T12:45:16.727Z"
+    },
+    "page-composition": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5246",
+      "claimedAt": "2026-11-14T12:46:02.696Z"
     }
   }
 }
