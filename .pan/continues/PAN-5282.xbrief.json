@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5282",
   "created": "2026-11-14T19:03:45.838Z",
-  "updated": "2026-11-14T20:44:31.988Z",
+  "updated": "2026-11-14T20:44:52.465Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -195,9 +195,18 @@
       "doneAt": "2026-11-14T20:44:30.712Z"
     },
     "docs-harnesses": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5282",
-      "claimedAt": "2026-11-14T20:44:31.988Z"
+      "claimedAt": "2026-11-14T20:44:31.988Z",
+      "doneAt": "2026-11-14T20:44:52.465Z"
+    },
+    "docs-harnesses.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:44:52.465Z"
+    },
+    "docs-harnesses.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:44:52.465Z"
     }
   }
 }
