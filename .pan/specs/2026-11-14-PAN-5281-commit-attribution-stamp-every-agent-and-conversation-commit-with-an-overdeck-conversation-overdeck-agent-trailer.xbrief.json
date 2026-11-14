@@ -4,17 +4,17 @@
     "created": "2026-11-14T18:28:51Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5281: Commit attribution: stamp every agent and conversation commit with an Overdeck-Conversation / Overdeck-Agent trailer",
-    "updated": "2026-11-14T18:35:22.965Z"
+    "updated": "2026-11-14T18:36:31.926Z"
   },
   "plan": {
     "id": "pan-5281",
     "title": "Commit attribution: stamp every agent and conversation commit with an Overdeck-Conversation / Overdeck-Agent trailer",
-    "status": "proposed",
+    "status": "running",
     "uid": "4c21d66a-b9c6-49ff-92c1-2f28cf7ac6e0",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T18:28:51Z",
-    "updated": "2026-11-14T18:35:22.965Z",
+    "updated": "2026-11-14T18:36:31.926Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5281",
@@ -383,5 +383,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
