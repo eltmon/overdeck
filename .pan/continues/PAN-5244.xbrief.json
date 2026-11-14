@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5244",
   "created": "2026-11-14T05:28:55.884Z",
-  "updated": "2026-11-14T06:41:27.798Z",
+  "updated": "2026-11-14T06:42:00.139Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -288,9 +288,10 @@
       "doneAt": "2026-11-14T06:41:27.798Z"
     },
     "drawer-test-migration": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5244",
-      "claimedAt": "2026-11-14T06:38:43.529Z"
+      "claimedAt": "2026-11-14T06:38:43.529Z",
+      "doneAt": "2026-11-14T06:42:00.139Z"
     },
     "compose-drawer.ac1": {
       "status": "completed",
@@ -311,6 +312,26 @@
     "compose-drawer.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T06:41:27.798Z"
+    },
+    "drawer-test-migration.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:42:00.139Z"
+    },
+    "drawer-test-migration.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:42:00.139Z"
+    },
+    "drawer-test-migration.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:42:00.139Z"
+    },
+    "drawer-test-migration.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:42:00.139Z"
+    },
+    "drawer-test-migration.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:42:00.139Z"
     }
   }
 }
