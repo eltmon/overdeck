@@ -11,6 +11,7 @@ import { getOllamaLaunchEnv } from './ollama-launch-env.js';
 import { CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, GPT56_LONG_CONTEXT_VARIANTS, OPENROUTER_MODEL_CONTEXT_WINDOWS, hasModelCapability, getModelCapability, resolveModelId } from '../model-capabilities.js';
 import type { Role } from './agent-state.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { getHarnessBehavior } from '../runtimes/behavior.js';
 
 /** Map abstract/future model names to CLIProxy-supported names.
  *  The CLIProxy registry has gpt-5.4 but not gpt-5.4-pro. */
@@ -62,6 +63,11 @@ export async function getProviderEnvForModel(model: string, harness?: RuntimeNam
   if (provider.name === 'google') {
     if (!apiKey) {
       throw new Error(`Google API key not configured. Add GOOGLE_API_KEY in Settings → Google or ~/.overdeck.env before using model "${model}".`);
+    }
+    // pi and omp call Gemini directly with GEMINI_API_KEY; the CLIProxy bridge
+    // below serves Claude Code's Anthropic-compatible endpoint (PAN-5212).
+    if (harness && getHarnessBehavior(harness).usesRpcFifo) {
+      return { GEMINI_API_KEY: apiKey };
     }
 
     if (!await bridgeGeminiAuthToCliproxy(apiKey)) {
@@ -123,7 +129,7 @@ const PROVIDER_ENV_KEYS = [
   'MINIMAX_API_KEY',
   'ZAI_API_KEY',
   'MIMO_API_KEY',
-  'XIAOMI_API_KEY',
+  'XIAOMI_TOKEN_PLAN_SGP_API_KEY',
   'OPENROUTER_API_KEY',
   'NOUS_API_KEY',
   'DASHSCOPE_API_KEY',

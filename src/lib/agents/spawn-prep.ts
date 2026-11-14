@@ -737,7 +737,7 @@ export async function buildAgentLaunchConfig(opts: {
   // the launcher; getOhmypiLauncherFields() resolves them from the agent state
   // and they're spread into generateLauncherScriptSync() below.
   // PAN-1574: codex harness needs its per-agent CODEX_HOME path.
-  const piLauncherFields = behavior.usesRpcFifo
+  const piLauncherFields = behavior.usesRpcFifo && opts.harness
     ? await getOhmypiLauncherFields(opts.agentId, model, opts.effort, opts.harness)
     : {};
   const codexLauncherFields = behavior.usesCodexHome

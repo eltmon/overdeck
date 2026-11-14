@@ -603,8 +603,8 @@ export function getProviderEnv(
     env.ZAI_API_KEY = apiKey;
   } else if (provider.name === 'mimo') {
     env.MIMO_API_KEY = apiKey;
-    // pi's `xiaomi` provider reads XIAOMI_API_KEY (PAN-5212).
-    env.XIAOMI_API_KEY = apiKey;
+    // MiMo keys are token-plan SGP keys; pi's xiaomi-token-plan-sgp provider reads this name (PAN-5212).
+    env.XIAOMI_TOKEN_PLAN_SGP_API_KEY = apiKey;
   } else if (provider.name === 'openrouter') {
     env.OPENROUTER_API_KEY = apiKey;
   } else if (provider.name === 'nous') {
@@ -775,35 +775,21 @@ export function piProviderForModel(modelId: string): string | undefined {
  * bare id unchanged when no Pi provider mapping exists.
  */
 export function qualifyPiModel(modelId: string, harness?: string): string {
-  if (isPiQualifiedModel(modelId)) return modelId;
-  const piProvider = piProviderForModel(modelId) ?? piFamilyCustomProvider(modelId, harness);
+  // The input is always an Overdeck model id, never a pi-qualified one. A
+  // slash does not mean qualified: OpenRouter (`vendor/model`), Groq
+  // (`openai/gpt-oss-120b`) and Nous (`qwen/qwen3.6-plus`) ids carry a vendor
+  // segment that pi and omp would read as the provider (verified: bare
+  // `openai/gpt-oss-20b` binds groq on both, PAN-5212), so every id gets its
+  // pi provider in front.
+  const piProvider = piFamilyProviderForModel(modelId, harness);
   return piProvider ? `${piProvider}/${modelId}` : modelId;
 }
 
 /**
- * True when `modelId` already starts with its own pi provider
- * (`kimi-coding/kimi-k2.6`, `anthropic/claude-opus-5-5`, or
- * `openrouter/<vendor>/<model>`). A slash alone does not mean qualified:
- * OpenRouter (`vendor/model`), Groq (`openai/gpt-oss-120b`) and Nous
- * (`qwen/qwen3.6-plus`) ids carry a vendor segment that pi and omp would
- * otherwise read as the provider (verified: bare `openai/gpt-oss-20b` binds
- * groq on both, PAN-5212).
+ * The pi-family provider id for an Overdeck model on `harness`: the harness
+ * profile's override first (pi: MiMo token-plan, Nous), else the shared map.
  */
-function isPiQualifiedModel(modelId: string): boolean {
-  const slash = modelId.indexOf('/');
-  if (slash <= 0) return false;
-  const head = modelId.slice(0, slash);
-  const rest = modelId.slice(slash + 1);
-  if (head === 'openrouter' && rest.includes('/')) return true;
-  try {
-    return (piProviderForModel(rest) ?? piFamilyCustomProvider(rest, 'pi')) === head;
-  } catch {
-    return false;
-  }
-}
-
-/** A provider the harness's own models.json provisioning adds under the Overdeck name (pi: nous). */
-function piFamilyCustomProvider(modelId: string, harness: string | undefined): string | undefined {
-  const provider = getProviderForModel(modelId).name;
-  return getPiFamilyProfile(harness).customProviders.includes(provider) ? provider : undefined;
+export function piFamilyProviderForModel(modelId: string, harness?: string): string | undefined {
+  const override = getPiFamilyProfile(harness).providerOverrides[getProviderForModel(modelId).name];
+  return override ?? piProviderForModel(modelId);
 }

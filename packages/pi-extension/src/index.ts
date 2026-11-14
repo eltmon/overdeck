@@ -698,7 +698,7 @@ export async function handleToolExecutionEnd(env: HookEnv, event: ToolExecutionE
 
 let lastRecordedSessionPath: string | undefined
 
-export async function handleTurnEnd(env: HookEnv, event: TurnEndEvent, options: { runCompletion?: boolean } = {}): Promise<void> {
+export async function handleTurnEnd(env: HookEnv, event: TurnEndEvent, options: { runCompletion?: boolean; postIdle?: boolean } = {}): Promise<void> {
   const { paths, pid, now } = envFor(env)
   const ts = now()
   await mkdir(paths.heartbeatsDir, { recursive: true })
@@ -709,7 +709,7 @@ export async function handleTurnEnd(env: HookEnv, event: TurnEndEvent, options: 
     last_action: 'turn_end',
     pid,
   })
-  await postEvent(env, { kind: 'activity', activity: 'idle', timestamp: ts })
+  if (options.postIdle !== false) await postEvent(env, { kind: 'activity', activity: 'idle', timestamp: ts })
   await recordCostEvent(env, event, 'turn_end', ts)
 
   if (event.sessionLogPath && event.sessionLogPath !== lastRecordedSessionPath) {
@@ -723,6 +723,17 @@ export async function handleTurnEnd(env: HookEnv, event: TurnEndEvent, options: 
   }
 
   if (options.runCompletion !== false) await handleTurnCompletion(env, event)
+}
+
+/**
+ * pi settled (no retry, compaction or queued follow-up left): report idle and
+ * run the completion checks on the last turn. pi fires turn_end once per LLM
+ * response, tool-call responses included, so idle is not posted there (PAN-5212).
+ */
+export async function handleAgentSettled(env: HookEnv, lastTurn: TurnEndEvent | undefined): Promise<void> {
+  const ts = envFor(env).now()
+  await postEvent(env, { kind: 'activity', activity: 'idle', timestamp: ts })
+  if (lastTurn) await handleTurnCompletion(env, lastTurn)
 }
 
 /**
@@ -1022,16 +1033,15 @@ export default function overdeckPiExtension(pi: PiExtensionAPI): void {
   pi.on('turn_end', async (event, ctx) => {
     try {
       lastTurn = normalizePiTurnEnd(event, ctx)
-      await handleTurnEnd(env, lastTurn, { runCompletion: false })
+      await handleTurnEnd(env, lastTurn, { runCompletion: false, postIdle: false })
     } catch {}
   })
 
   pi.on('agent_settled', async () => {
     const turn = lastTurn
     lastTurn = undefined
-    if (!turn) return
     try {
-      await handleTurnCompletion(env, turn)
+      await handleAgentSettled(env, turn)
     } catch {}
   })
 

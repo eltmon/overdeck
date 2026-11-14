@@ -38,11 +38,12 @@ export interface PiFamilyProfile {
   /** The launch checks omp's own openai-codex login before an OpenAI-model start. */
   readonly checksOmpCodexAuth: boolean
   /**
-   * Overdeck providers this harness's models.json provisioning adds as custom
-   * providers under the same name, so model ids are qualified with it. pi:
-   * nous (pi ships no Nous provider; see pi-models.ts).
+   * Overdeck provider → this harness's provider id, where it differs from the
+   * shared map in `piProviderForModel` (providers.ts). pi: MiMo keys are
+   * token-plan SGP keys, which pi serves as `xiaomi-token-plan-sgp`; Nous is a
+   * custom `nous` provider that pi-models.ts provisions.
    */
-  readonly customProviders: readonly string[]
+  readonly providerOverrides: Readonly<Record<string, string>>
 }
 
 const PROFILES: Record<PiFamilyHarness, PiFamilyProfile> = {
@@ -55,7 +56,7 @@ const PROFILES: Record<PiFamilyHarness, PiFamilyProfile> = {
     extensionCandidates: piExtensionCandidates,
     resolveExtensionPath: resolvePiExtensionPath,
     checksOmpCodexAuth: false,
-    customProviders: ['nous'],
+    providerOverrides: { mimo: 'xiaomi-token-plan-sgp', nous: 'nous' },
   },
   ohmypi: {
     harness: 'ohmypi',
@@ -66,7 +67,7 @@ const PROFILES: Record<PiFamilyHarness, PiFamilyProfile> = {
     extensionCandidates: ohmypiExtensionCandidates,
     resolveExtensionPath: resolveOhmypiExtensionPath,
     checksOmpCodexAuth: true,
-    customProviders: [],
+    providerOverrides: {},
   },
 }
 

@@ -97,11 +97,12 @@ function isNodeNotFound(error: unknown): boolean {
 }
 
 /**
- * Launcher fields for a pi-family work agent: oh-my-pi (default) or pi
- * (PAN-5212). Both use the same FIFO and agent dir; the extension bundle
- * comes from the harness's pi-family profile.
+ * Launcher fields for a pi-family work agent: pi (PAN-5212) or oh-my-pi.
+ * Both use the same FIFO and agent dir; the extension bundle comes from the
+ * harness's pi-family profile. `harness` is required: the returned `harness`
+ * field overrides the launcher config, so a missing one would launch omp.
  */
-export async function getOhmypiLauncherFields(agentId: string, model: string, effort?: string, harness?: string): Promise<{
+export async function getOhmypiLauncherFields(agentId: string, model: string, effort: string | undefined, harness: string): Promise<{
   harness: PiFamilyHarness;
   piEffort: string;
   piExtensionPath: string;

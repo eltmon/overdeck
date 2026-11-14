@@ -136,7 +136,7 @@ describe('providers', () => {
       ANTHROPIC_BASE_URL: 'https://token-plan-sgp.xiaomimimo.com/anthropic',
       ANTHROPIC_AUTH_TOKEN: 'sk-mimo-test',
       MIMO_API_KEY: 'sk-mimo-test',
-      XIAOMI_API_KEY: 'sk-mimo-test',
+      XIAOMI_TOKEN_PLAN_SGP_API_KEY: 'sk-mimo-test',
       API_TIMEOUT_MS: '300000',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'mimo-v2.6-pro',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'mimo-v2.6-pro',

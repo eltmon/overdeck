@@ -36,6 +36,7 @@ vi.mock('../../config-yaml.js', async (importOriginal) => ({
 vi.mock('../../paths.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   resolveOhmypiExtensionPath: vi.fn(() => '/fake/ohmypi-extension.js'),
+  resolvePiExtensionPath: vi.fn(() => '/fake/pi-extension.js'),
 }));
 
 vi.mock('../../runtimes/ohmypi-fifo.js', async (importOriginal) => ({
@@ -120,8 +121,20 @@ describe('getRoleRuntimeBaseCommand --effort (PAN-3077)', () => {
 
 describe('getOhmypiLauncherFields --effort', () => {
   it('clamps an unsupported explicit level to the highest ohmypi supports', async () => {
-    const fields = await getOhmypiLauncherFields('agent-pan-4249-ohmypi', 'claude-opus-5', 'max');
+    const fields = await getOhmypiLauncherFields('agent-pan-4249-ohmypi', 'claude-opus-5', 'max', 'ohmypi');
     expect(fields.piEffort).toBe('xhigh');
+  });
+
+  it('PAN-5212: a pi work agent gets the pi harness and the pi extension bundle', async () => {
+    const fields = await getOhmypiLauncherFields('agent-pan-5212', 'gemini-3.8-flash', undefined, 'pi');
+    expect(fields).toMatchObject({ harness: 'pi', piExtensionPath: '/fake/pi-extension.js', piFifoPath: '/tmp/fake-agent-dir/rpc.in' });
+    const ohmypi = await getOhmypiLauncherFields('agent-pan-5212', 'gemini-3.8-flash', undefined, 'ohmypi');
+    expect(ohmypi).toMatchObject({ harness: 'ohmypi', piExtensionPath: '/fake/ohmypi-extension.js' });
+  });
+
+  it('PAN-5212: the pi work-agent base command runs pi, not omp', async () => {
+    expect(await getRoleRuntimeBaseCommand('gemini-3.8-flash', 'agent-pan-5212', 'work', 'pi')).toMatch(/^pi --mode rpc --model /);
+    expect(await getRoleRuntimeBaseCommand('gemini-3.8-flash', 'agent-pan-5212', 'work', 'ohmypi')).toMatch(/^omp --mode rpc --model /);
   });
 });
 

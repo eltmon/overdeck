@@ -839,12 +839,16 @@ describe('default export — Pi extension wiring', () => {
     const toolTurn = { type: 'turn_end', turnIndex: 0, message: { role: 'assistant', content: [{ type: 'toolCall' }], provider: 'openrouter', model: 'openai/gpt-oss-20b' }, toolResults: [] }
     const finalTurn = { type: 'turn_end', turnIndex: 1, message: { role: 'assistant', content: [{ type: 'text', text: 'hi' }], provider: 'openrouter', model: 'openai/gpt-oss-20b' }, toolResults: [] }
 
+    const idlePosts = () => fetchCalls.filter(call => (call.body as Record<string, unknown> | undefined)?.['activity'] === 'idle').length
     await handlers['turn_end']!(toolTurn, {})
     await handlers['turn_end']!(finalTurn, {})
     expect(fetchCalls.some(call => call.url === checklistUrl)).toBe(false)
+    // No idle flap between tool calls: idle waits for agent_settled.
+    expect(idlePosts()).toBe(0)
 
     await handlers['agent_settled']!({ type: 'agent_settled' }, {})
     expect(fetchCalls.filter(call => call.url === checklistUrl)).toHaveLength(1)
+    expect(idlePosts()).toBe(1)
   })
 })
 
