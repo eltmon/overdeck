@@ -745,3 +745,12 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 1. PAN-5282 (CLIProxy v8.0.71, v8-layout config) started by the Flywheel. Drive to merge, deploy once main CI is green, then confirm `~/.overdeck/bin/cliproxy` reports 8.0.71 and the management `auth-files` endpoint on 127.0.0.1:8317 returns 200.
 2. Only after PAN-5282 merges: `pan unpause PAN-5278`, the agent runs `pan sync-main` and reads the revised .pan/drafts/pan-5278.md (item 1 retired: discard pre-pause cliproxy.ts config edits; keep bridge, pool, controller, route, panel). Drive PAN-5278 to merge.
 3. When PAN-5282 is deployed and live CLIProxy is v8: `pan tell 20261114-6808` so it can sign the operator's Claude Max account in. Never do that login from the Flywheel.
+
+## 2026-11-14 order book 2026-11-14-workflow-redesign-pan-5284 (epic PAN-5284, owner conv-20261113-6031)
+
+Order: PAN-5281 and PAN-5287 S (no prereqs) first; then PAN-5288 A <- S+5281, PAN-5292 E <- S; PAN-5289 B <- S+A, PAN-5293 F <- E+A; PAN-5291 D1 <- A+B, PAN-5290 C <- B; PAN-5295 D2 <- C+D1, PAN-5294 G <- A+B+F. laneAConcurrency 2.
+PRD D-15 rules (strict):
+1. Never start planning a child until every prereq has merged on main. One child's planning+work per slot.
+2. At most 2 of this book's work agents at once (PAN-5281 counts).
+3. After each UI child (5289, 5293, 5291, 5290, 5295, 5294) merges and is reloaded, `pan tell conv-20261113-6031` and wait for its live check before starting the next UI child's work.
+4. `pan start <id> --plan auto`; if finalize refuses "PRD draft too short", `pan plan finalize --no-prd`.
