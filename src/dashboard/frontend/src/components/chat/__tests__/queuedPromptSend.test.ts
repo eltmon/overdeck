@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { resetComposerStore, useComposerStore } from '../../../lib/composerStore';
+import { enqueueConversationSend } from '../../../lib/composerSendQueue';
 import { deliverQueuedPrompt } from '../queuedPromptSend';
 
 const { mockToastError, mockToastWarning } = vi.hoisted(() => ({
@@ -111,5 +112,57 @@ describe('deliverQueuedPrompt', () => {
     const bubbleB = useComposerStore.getState().byConversation[CONV]?.optimistic
       .find((m) => m.clientMessageId === 'client-b');
     expect(bubbleB?.deliveryState).toBe('held');
+  });
+  describe('cancel (PAN-5237)', () => {
+    function prompt(message: string, clientMessageId: string) {
+      useComposerStore.getState().addOptimistic(CONV, message, 0, { clientMessageId, sendPhase: 'queued' });
+      return enqueueConversationSend(CONV, () => deliverQueuedPrompt({
+        conversationName: CONV, message, clientMessageId, onAcknowledged, onFailed, onOpenUi,
+      }));
+    }
+    const bubbleId = (clientMessageId: string) => useComposerStore.getState().byConversation[CONV]!.optimistic
+      .find((m) => m.clientMessageId === clientMessageId)!.id;
+    const postedMessages = () => fetchMock.mock.calls.map(([, init]) => (JSON.parse(String((init as RequestInit).body)) as { message: string }).message);
+
+    it('a cancelled queued message is never posted and later messages still go out in order', async () => {
+      let releaseFirst!: (response: Response) => void;
+      fetchMock
+        .mockImplementationOnce(() => new Promise<Response>((resolve) => { releaseFirst = resolve; }))
+        .mockResolvedValue(new Response('', { status: 200 }));
+      const first = prompt('first', 'client-1');
+      const second = prompt('second', 'client-2');
+      const third = prompt('third', 'client-3');
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      await useComposerStore.getState().cancelSend(bubbleId('client-2'));
+      releaseFirst(new Response('', { status: 200 }));
+      await Promise.all([first, second, third]);
+      expect(postedMessages()).toEqual(['first', 'third']);
+      expect(onAcknowledged.mock.calls.map(([text]) => text)).toEqual(['first', 'third']);
+    });
+
+    it('a cancelled queued prompt calls neither fetch, onFailed, onAcknowledged nor toast.error', async () => {
+      let releaseBlocker!: () => void;
+      const blocker = enqueueConversationSend(CONV, () => new Promise<void>((resolve) => { releaseBlocker = resolve; }));
+      const queued = prompt('cancel me', 'client-1');
+      await useComposerStore.getState().cancelSend(bubbleId('client-1'));
+      releaseBlocker();
+      await Promise.all([blocker, queued]);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(onFailed).not.toHaveBeenCalled();
+      expect(onAcknowledged).not.toHaveBeenCalled();
+      expect(mockToastError).not.toHaveBeenCalled();
+    });
+
+    it('an in-flight prompt answered 409 code cancelled calls neither onFailed nor toast.error', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(409, {
+        error: 'Cancelled before delivery', code: 'cancelled', deliveryUnknown: false, retryable: false,
+      }));
+      await prompt('late', 'client-1');
+      expect(onFailed).not.toHaveBeenCalled();
+      expect(mockToastError).not.toHaveBeenCalled();
+      const slice = useComposerStore.getState().byConversation[CONV];
+      expect(slice?.optimistic ?? []).toEqual([]);
+      expect(slice?.failed).toEqual([expect.objectContaining({ code: 'cancelled', text: 'late' })]);
+    });
   });
 });

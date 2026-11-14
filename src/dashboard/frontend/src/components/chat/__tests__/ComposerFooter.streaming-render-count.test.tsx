@@ -172,6 +172,7 @@ describe('useStableComposerProps', () => {
     expect(addOptimistic).toHaveBeenCalledWith('test-conv', 'hello', 3, {
       clientMessageId: 'client-1',
       echoBaselineIds: ['m-1', 'm-2', 'm-3'],
+      sendPhase: 'queued',
     });
   });
 });
