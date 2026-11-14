@@ -84,6 +84,8 @@ describe('fileAdvisoryFollowups', () => {
     expect(deps.createIssue).toHaveBeenCalledWith('eltmon', 'overdeck', expect.objectContaining({
       title: 'CodeRabbit follow-up for PAN-1 (PR #42): 2 unsettled finding(s)',
     }));
+    // The Flywheel's assignee rule accepts a bot-authored issue assigned to the operator.
+    expect((deps.createIssue.mock.calls[0] as unknown as [string, string, { assignees?: string[] }])[2].assignees).toEqual(['eltmon']);
     const body = createdBody(deps);
     expect(body).toContain('- `src/a.ts:11` [Major] finding 11 (https://github.com/x/11)');
     expect(body).toContain('They were relayed to agent-pan-1 at 2026-11-13T21:00:37.000Z');

@@ -16,7 +16,8 @@
  *   body search for the key before creating. A failed search files nothing:
  *   creating blind could file the issue twice.
  * - Issues are created only through the GitHub App, so they are authored by its
- *   bot. Any failure raises Needs-you with every unsettled finding and journals
+ *   bot, and assigned to the operator so the Flywheel's assignee rule accepts
+ *   them (they still wait for the `released` label). Any failure raises Needs-you with every unsettled finding and journals
  *   `feedback.followup_failed`, which closes the key for both triggers.
  * - A delivery that is settled, or was journaled before PAN-5218 (`legacy`), is
  *   remembered in this process so the patrol never re-reads the forge for it.
@@ -45,6 +46,13 @@ import { resolveGitHubIssue } from '../tracker-utils.js';
 
 const SOURCE = 'advisory-followup';
 export const ADVISORY_FOLLOWUP_TITLE_PREFIX = 'CodeRabbit follow-up for';
+/**
+ * The follow-up's assignee. The Flywheel's author/assignee gate passes an issue
+ * whose assignees include the operator, so a bot-authored follow-up is eligible
+ * without widening the author allowlist. It still waits for the operator's
+ * `released` label before any pickup.
+ */
+export const ADVISORY_FOLLOWUP_ASSIGNEE = 'eltmon';
 
 export interface AdvisoryFollowupDeps {
   readJournal?: (workspacePath: string) => PipelineJournalEntry[];
@@ -52,7 +60,7 @@ export interface AdvisoryFollowupDeps {
   resolveTrackerRepo?: (issueId: string) => { owner: string; repo: string } | null;
   appConfigured?: () => boolean;
   findExisting?: (owner: string, repo: string, dedupKey: string) => Promise<{ number: number; url: string } | null>;
-  createIssue?: (owner: string, repo: string, input: { title: string; body: string }) => Promise<{ number: number; url: string }>;
+  createIssue?: (owner: string, repo: string, input: { title: string; body: string; assignees?: readonly string[] }) => Promise<{ number: number; url: string }>;
   appendEntry?: typeof appendPipelineEntry;
   surfaceNeedsYou?: (issueId: string, reason: string, details: Record<string, unknown>) => Promise<void>;
   log?: (line: string) => void;
@@ -258,6 +266,7 @@ async function fileOne(
     const issue = await (deps.createIssue ?? createIssueWithApp)(tracker.owner, tracker.repo, {
       title: advisoryFollowupTitle(issueId, data, threads.length),
       body: advisoryFollowupBody(issueId, settlement),
+      assignees: [ADVISORY_FOLLOWUP_ASSIGNEE],
     });
     return filed(issue, false);
   } catch (err) {

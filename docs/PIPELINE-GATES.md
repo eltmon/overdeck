@@ -892,7 +892,7 @@ it runs only after the forge said "merged".
   segment (ids match exactly). A failed forge read counts as no evidence, so
   the thread is filed. A commit to a file settles every thread on that file.
 - One issue per delivery key, created through the GitHub App, so its bot is the
-  author. Before creating, the filer searches the tracker repo for a
+  author, with `eltmon` as assignee. Before creating, the filer searches the tracker repo for a
   `CodeRabbit follow-up for` issue whose body holds the delivery key. A hit
   repairs the journal instead of filing again, and a failed search files
   nothing. Each filing is journaled as `feedback.followup_filed`. The body lists
@@ -905,8 +905,9 @@ it runs only after the forge said "merged".
   on the installation before any follow-up can be filed.
 - A delivery that was settled, or that was journaled before this change
   (no `threads`), is remembered in the process and never re-read.
-- The Flywheel's author gate does not yet accept these bot-authored issues, so
-  it will not pick them up on its own.
+- Each follow-up is assigned to `eltmon`. The Flywheel's author gate is
+  unchanged: it accepts the bot-authored issue through its assignee rule, and
+  the issue still waits for the operator's `released` label before any pickup.
 
 The UAT verdict comment ends with a machine marker carrying the outcome and
 the commit UAT exercised, `<!-- overdeck-uat: failed sha=<commit> -->` (the

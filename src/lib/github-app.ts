@@ -577,12 +577,16 @@ export async function listIssuesWithAnyLabel(
 export async function createIssueWithApp(
   owner: string,
   repo: string,
-  input: { title: string; body: string },
+  input: { title: string; body: string; assignees?: readonly string[] },
 ): Promise<{ number: number; url: string }> {
   const issue = await githubApi<{ number: number; html_url: string }>(`/repos/${owner}/${repo}/issues`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: input.title, body: input.body }),
+    body: JSON.stringify({
+      title: input.title,
+      body: input.body,
+      ...(input.assignees && input.assignees.length > 0 ? { assignees: [...input.assignees] } : {}),
+    }),
   });
   return { number: issue.number, url: issue.html_url };
 }

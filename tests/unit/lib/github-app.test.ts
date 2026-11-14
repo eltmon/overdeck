@@ -1021,6 +1021,15 @@ describe('createIssueWithApp (PAN-5218)', () => {
     expect(JSON.parse(String(init.body))).toEqual({ title: 'T', body: 'B' });
   });
 
+  it('sends the assignees when given, so the created issue carries them', async () => {
+    mintThen(new Response(JSON.stringify({ number: 78, html_url: 'https://github.com/o/r/issues/78' }), { status: 201 }));
+
+    await createIssueWithApp('o', 'r', { title: 'T', body: 'B', assignees: ['eltmon'] });
+
+    const call = fetchMock.mock.calls.find((c) => String(c[0]) === 'https://api.github.com/repos/o/r/issues')!;
+    expect(JSON.parse(String((call[1] as RequestInit).body))).toEqual({ title: 'T', body: 'B', assignees: ['eltmon'] });
+  });
+
   it('rejects a 403 with a message isIntegrationPermissionError recognises', async () => {
     mintThen(new Response('Resource not accessible by integration', { status: 403 }));
 
