@@ -12,7 +12,11 @@ import {
   readPidFile,
   CliproxyError,
 } from '../../../lib/cliproxy.js';
-import { startCliproxyRoutingController } from '../../../lib/cliproxy-routing.js';
+import {
+  getPoolSnapshot,
+  readPoolSnapshot,
+  startCliproxyRoutingController,
+} from '../../../lib/cliproxy-routing.js';
 
 /** Run one cliproxy lifecycle step in a route, keeping its message in a 500 body. */
 const cliproxyStep = (operation: string, run: () => Promise<void>) =>
@@ -121,6 +125,34 @@ const getCliproxyStatusRoute = HttpRouter.add(
   ),
 );
 
+/** The accounts route reads upstream usage at most once per this age (PAN-5278). */
+export const CLIPROXY_ACCOUNTS_MAX_AGE_MS = 5 * 60_000;
+
+/**
+ * GET /api/cliproxy/accounts — the CLIProxy pool snapshot (accounts, usage
+ * windows, priorities). Serves the in-memory snapshot while it is younger than
+ * 5 minutes; `?refresh=1`, no snapshot yet, or an older one reads a fresh one.
+ * Read-only: only the controller tick on a host dashboard writes priorities.
+ */
+const getCliproxyAccountsRoute = HttpRouter.add(
+  'GET',
+  '/api/cliproxy/accounts',
+  httpHandler(
+    Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const urlOpt = HttpServerRequest.toURL(request);
+      const refresh = Option.isSome(urlOpt) && urlOpt.value.searchParams.get('refresh') === '1';
+      const cached = getPoolSnapshot();
+      const fresh = cached !== null
+        && Date.now() - Date.parse(cached.checkedAt) < CLIPROXY_ACCOUNTS_MAX_AGE_MS;
+      const snapshot = refresh || !cached || !fresh
+        ? yield* Effect.promise(() => readPoolSnapshot())
+        : cached;
+      return jsonResponse(snapshot);
+    }),
+  ),
+);
+
 const postCliproxyRestartRoute = HttpRouter.add(
   'POST',
   '/api/cliproxy/restart',
@@ -157,5 +189,6 @@ const postCliproxyRestartRoute = HttpRouter.add(
 
 export const cliproxyRouteLayer = Layer.mergeAll(
   getCliproxyStatusRoute,
+  getCliproxyAccountsRoute,
   postCliproxyRestartRoute,
 );
