@@ -12,12 +12,10 @@ import { useMemo } from 'react';
 import type { Agent, WorkAgentLifecycle } from '../../types';
 import type { SessionNode } from '@overdeck/contracts';
 import type { DerivedIssueState } from '../../types';
-import IssuePhaseRail from './IssuePhaseRail';
+import IssuePhaseRail, { pickPhaseAgent } from './IssuePhaseRail';
 import { SpecialistStrip } from './SpecialistStrip';
 import { agentsToReviewerSessions, deriveSpecialistChips } from './deriveSpecialists';
 import type { Phase } from '../../lib/simple/phases';
-
-const ENDED_STATUSES = new Set(['stopped', 'dead', 'failed']);
 
 export interface IssueDetailShellProps {
   issueId?: string | null;
@@ -35,15 +33,6 @@ export interface IssueDetailShellProps {
   onSelectPhase?: (phase: Phase) => void;
   lifecycle?: WorkAgentLifecycle | null;
   className?: string;
-}
-
-function pickPhaseAgent(agents: Agent[], phase: Phase): Agent | undefined {
-  const candidates = agents.filter((agent) => agent.role === phase);
-  return (
-    candidates.find((agent) => !ENDED_STATUSES.has(agent.status))
-    ?? candidates.find((agent) => agent.id.endsWith('-review-supervisor'))
-    ?? candidates[0]
-  );
 }
 
 export function IssueDetailShell({
