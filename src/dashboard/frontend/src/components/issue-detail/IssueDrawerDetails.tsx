@@ -37,6 +37,7 @@ import { DeftReviewCyclePanel } from '../deft/DeftReviewCyclePanel';
 import { DeftDeliveryChip } from '../deft/DeftBadges';
 import { deriveShip } from '../issue-view/derivations';
 import { ShipProgress } from '../issue-view/ShipProgress';
+import { StackDrawer } from '../issue-view/StackDrawer';
 import { ROLE_TO_PHASE, pickPhaseAgent } from './IssuePhaseRail';
 import { agentsToReviewerSessions, deriveSpecialistChips } from './deriveSpecialists';
 import { PickupSection, ResourcesFacet, WorkspaceSection, useDrawerWorkspace } from './IssueDetailSections';
@@ -330,6 +331,7 @@ export function IssueDrawerDetails({
               No workspace yet. Overdeck creates it when the first agent starts.
             </p>
           ) : null}
+          <StackDrawer issueId={issueId} branch={derived?.branch?.name ?? `feature/${issueId.toLowerCase()}`} />
         </div>
         <div data-section="UatEnvironmentPanel"><UatEnvironmentPanel issueId={issueId} /></div>
         <div data-section="DrawerActiveAgent"><ActiveAgentPanel agentId={effectiveAgentId ?? ''} density="console" /></div>

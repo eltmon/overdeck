@@ -39,6 +39,9 @@ vi.mock('../deft/DeftBadges', () => ({ DeftDeliveryChip: () => null }));
 vi.mock('../Stage/cockpit/LinkedConversations', () => ({
   LinkedConversations: ({ prUrl }: { prUrl: string }) => <div data-testid="mock-linked-conversations">{prUrl}</div>,
 }));
+vi.mock('../issue-view/StackDrawer', () => ({
+  StackDrawer: ({ branch }: { branch: string }) => <div data-testid="mock-stack-drawer">{branch}</div>,
+}));
 
 import type { Agent } from '../../types';
 import { useDashboardStore } from '../../lib/store';
@@ -236,6 +239,20 @@ describe('IssueDrawerDetails', () => {
     } as Parameters<typeof useDashboardStore.setState>[0]);
     renderDetails();
     expect(screen.getByTestId('drawer-details-linked')).toHaveTextContent('https://example.test/pr/1');
+  });
+
+  it('the stack disclosure sits in the workspace section, receiving the derived branch name', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: { 'PAN-1': { issueId: 'PAN-1', branch: { name: 'feature/pan-1' } } },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderDetails();
+    const workspaceSection = document.querySelector('[data-section="DrawerWorkspaceSection"]') as HTMLElement;
+    expect(within(workspaceSection).getByTestId('mock-stack-drawer')).toHaveTextContent('feature/pan-1');
+  });
+
+  it("falls back to the issue's own branch name when there is no derived branch", () => {
+    renderDetails({ issueId: 'PAN-7' });
+    expect(screen.getByTestId('mock-stack-drawer')).toHaveTextContent('feature/pan-7');
   });
 
   it('a phase without an agent shows no Open conversation button', () => {
