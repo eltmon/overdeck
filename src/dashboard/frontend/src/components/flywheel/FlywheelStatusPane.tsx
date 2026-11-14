@@ -5,6 +5,7 @@
  * flywheel's project.
  */
 import { MessageSquare } from 'lucide-react';
+import type { MouseEvent } from 'react';
 
 import type { FlywheelDerivedStatus, FlywheelFreshness, FlywheelLastTick } from '@overdeck/contracts';
 import { needsYouItemKey, parseNeedsYouTarget, splitNeedsYouItems } from '@overdeck/contracts';
@@ -44,6 +45,12 @@ const PANE_STATE_TONE: Record<string, Tone> = { working: 'info', blocked: 'warni
 /** Shared link style for needs-you issue, PR and item-target links (PAN-5239 D6). */
 export const NEEDS_YOU_LINK_CLASS =
   'cursor-pointer rounded-sm text-foreground underline decoration-muted-foreground/60 underline-offset-2 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+
+/** True when the click ended a drag-selection inside the row, not a plain click (PAN-5275 FR-7). */
+function endsSelectionWithin(row: HTMLElement): boolean {
+  const selection = window.getSelection();
+  return !!selection && !selection.isCollapsed && !!selection.anchorNode && row.contains(selection.anchorNode);
+}
 
 /**
  * What the board is counting. A running loop's own tick list is the authority
@@ -152,69 +159,96 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
             >
               <span className="mr-2 text-[11px] font-medium uppercase tracking-wider text-warning-foreground">Needs you</span>
               <ul>
-                {needsYouRows(tick).map((row) => (
-                  <li key={row.key} data-testid="flywheel-needs-you-item" className="flex items-baseline gap-1.5">
-                    {row.messageId ? (
-                      <button
-                        type="button"
-                        aria-label="Show where this was raised"
-                        title="Open the conversation at the message that first raised this, or the question the flywheel is waiting on"
-                        data-testid="flywheel-needs-you-jump"
-                        className="shrink-0 self-center cursor-pointer rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        onClick={() => onNeedsYouClick?.(row.messageId!)}
-                      >
-                        <MessageSquare className="h-3 w-3" aria-hidden="true" />
-                      </button>
-                    ) : (
-                      // Keeps rows without a jump button in the same text column (PAN-5239 review).
-                      <span className="h-3 w-3 shrink-0" aria-hidden="true" />
-                    )}
-                    <span className="min-w-0">
-                      {row.target ? (
-                        <a
-                          href={row.target}
-                          target="_blank"
-                          rel="noreferrer noopener"
-                          className={NEEDS_YOU_LINK_CLASS}
-                          data-testid="flywheel-needs-you-link"
+                {needsYouRows(tick).map((row) => {
+                  const jumpId = row.messageId;
+                  return (
+                    <li
+                      key={row.key}
+                      data-testid="flywheel-needs-you-item"
+                      className={
+                        jumpId
+                          ? 'group -mx-1 flex cursor-pointer items-baseline gap-1.5 rounded-sm px-1 hover:bg-warning/[0.14]'
+                          : '-mx-1 flex items-baseline gap-1.5 px-1'
+                      }
+                      onClick={
+                        jumpId
+                          ? (e: MouseEvent<HTMLLIElement>) => {
+                              if (endsSelectionWithin(e.currentTarget)) return;
+                              onNeedsYouClick?.(jumpId);
+                            }
+                          : undefined
+                      }
+                    >
+                      {jumpId ? (
+                        <button
+                          type="button"
+                          aria-label="Show where this was raised"
+                          title="Open the conversation at the message that first raised this, or the question the flywheel is waiting on"
+                          data-testid="flywheel-needs-you-jump"
+                          className="shrink-0 self-center cursor-pointer rounded-sm text-muted-foreground hover:text-foreground group-hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onNeedsYouClick?.(jumpId);
+                          }}
                         >
-                          {row.label}
-                        </a>
+                          <MessageSquare className="h-3 w-3" aria-hidden="true" />
+                        </button>
                       ) : (
-                        needsYouSegments(row.label, status.inFlight).map((segment, i) => {
-                          if (segment.kind === 'issue') {
-                            return (
-                              <button
-                                key={i}
-                                type="button"
-                                className={`font-mono ${NEEDS_YOU_LINK_CLASS}`}
-                                data-testid="flywheel-needs-you-issue"
-                                onClick={() => onNavigateIssue?.(segment.issueId)}
-                              >
-                                {segment.text}
-                              </button>
-                            );
-                          }
-                          if (segment.kind === 'pr') {
-                            return (
-                              <a
-                                key={i}
-                                href={segment.url}
-                                target="_blank"
-                                rel="noreferrer noopener"
-                                className={`font-mono ${NEEDS_YOU_LINK_CLASS}`}
-                                data-testid="flywheel-needs-you-pr"
-                              >
-                                {segment.text}
-                              </a>
-                            );
-                          }
-                          return <span key={i}>{segment.text}</span>;
-                        })
+                        // Keeps rows without a jump button in the same text column (PAN-5239 review).
+                        <span className="h-3 w-3 shrink-0" aria-hidden="true" />
                       )}
-                    </span>
-                  </li>
-                ))}
+                      <span className="min-w-0">
+                        {row.target ? (
+                          <a
+                            href={row.target}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className={NEEDS_YOU_LINK_CLASS}
+                            data-testid="flywheel-needs-you-link"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {row.label}
+                          </a>
+                        ) : (
+                          needsYouSegments(row.label, status.inFlight).map((segment, i) => {
+                            if (segment.kind === 'issue') {
+                              return (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  className={`font-mono ${NEEDS_YOU_LINK_CLASS}`}
+                                  data-testid="flywheel-needs-you-issue"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onNavigateIssue?.(segment.issueId);
+                                  }}
+                                >
+                                  {segment.text}
+                                </button>
+                              );
+                            }
+                            if (segment.kind === 'pr') {
+                              return (
+                                <a
+                                  key={i}
+                                  href={segment.url}
+                                  target="_blank"
+                                  rel="noreferrer noopener"
+                                  className={`font-mono ${NEEDS_YOU_LINK_CLASS}`}
+                                  data-testid="flywheel-needs-you-pr"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {segment.text}
+                                </a>
+                              );
+                            }
+                            return <span key={i}>{segment.text}</span>;
+                          })
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}
