@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5242",
+  "created": "2026-11-14T05:32:10.178Z",
+  "updated": "2026-11-14T05:32:10.178Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "route-named-errors": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5242",
+      "claimedAt": "2026-11-14T05:32:10.178Z"
+    }
+  }
+}
