@@ -17,6 +17,12 @@
  *   the caller's credential kind (PAN-4455 D-3). Any dashboard credential may
  *   read it.
  *
+ * - `POST /api/anywhere/relay-check` (PAN-5242) gathers a TURN relay
+ *   candidate once and reports whether this machine can reach the relay
+ *   right now. No `route-scopes.ts` row, so only the internal token, the
+ *   root session or an `admin`-scoped credential may call it. Concurrent
+ *   calls share one in-flight probe.
+ *
  * No response is cacheable.
  */
 import { Effect, Layer, Result } from 'effect';
@@ -24,6 +30,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 
 import { isPairedDeviceRecord, listAccessTokens } from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
+import { probeRelayCandidate, type RelayCheckResponse } from '../../../lib/anywhere/channel/relay-probe.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import {
   computeAnywhereProblems,
@@ -37,6 +44,7 @@ import { isLoopbackOrigin } from '../../../lib/remote-access/loopback.js';
 import { invalidateRemoteAccessConfig, readRemoteAccessConfig } from '../../../lib/remote-access/config.js';
 import { addSavedTrustedOrigin } from '../../../lib/remote-access/trusted-origins.js';
 import { readTailscaleState } from '../../../lib/tailscale/state.js';
+import { currentDirectoryRtc, IceServersRefusedError } from '../services/directory-rtc.js';
 import { jsonResponse } from '../http-helpers.js';
 import {
   rejectUnauthorizedDashboardRequest,
@@ -154,4 +162,37 @@ const anywhereStatusRoute = HttpRouter.add(
   }),
 );
 
-export const anywhereRouteLayer = Layer.mergeAll(addTrustedOriginRoute, anywhereStatusRoute);
+let relayCheckInFlight: Promise<RelayCheckResponse> | null = null;
+
+async function runRelayCheck(): Promise<RelayCheckResponse> {
+  const directory = readDirectoryStatus();
+  const rtc = currentDirectoryRtc();
+  if (!rtc || directory?.state !== 'online') {
+    return { state: 'skipped', reason: 'directory-offline', detail: 'This machine is not online in the overdeck.ai directory' };
+  }
+  let servers;
+  try {
+    servers = await rtc.iceServers(true);
+  } catch (error) {
+    const detail = (error as Error).message;
+    return error instanceof IceServersRefusedError ? { state: 'refused', detail } : { state: 'unanswered', detail };
+  }
+  return probeRelayCandidate(servers);
+}
+
+const relayCheckRoute = HttpRouter.add(
+  'POST',
+  '/api/anywhere/relay-check',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return noStore(authError);
+    relayCheckInFlight ??= runRelayCheck().finally(() => {
+      relayCheckInFlight = null;
+    });
+    const pending = relayCheckInFlight;
+    return noStore(jsonResponse(yield* Effect.promise(() => pending)));
+  }),
+);
+
+export const anywhereRouteLayer = Layer.mergeAll(addTrustedOriginRoute, anywhereStatusRoute, relayCheckRoute);

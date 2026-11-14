@@ -275,4 +275,25 @@ describe('runConnectorConnect (PAN-5069 FR-1 to FR-7)', () => {
     expect(await run(h.deps)).toBe(1);
     expect(lastStatus()).toMatchObject({ status: 'error', code: 'relay-plan-needed' });
   });
+
+  it('exits 1 with no-webrtc-egress when an existing pairing gathers no relay candidate (PAN-5242)', async () => {
+    await signIn();
+    await writePairing(home, PAIRING);
+    const h = harness({
+      probe: async (url) => {
+        if (url.startsWith('rtc://')) throw new ChannelOpenError('timeout', 'timed out');
+        throw new ChannelOpenError('unreachable', 'gathered no TURN relay candidate', { cause: 'no-relay-candidate' });
+      },
+    });
+    expect(await run(h.deps)).toBe(1);
+    expect(lastStatus()).toMatchObject({ status: 'error', code: 'no-webrtc-egress' });
+    expect(h.pair).not.toHaveBeenCalled();
+  });
+
+  it('exits 1 with no-webrtc-egress when pairing reports it (PAN-5242)', async () => {
+    await signIn();
+    const h = harness({ pairOutcome: { ok: false, code: 'no-webrtc-egress', message: 'm' } });
+    expect(await run(h.deps)).toBe(1);
+    expect(lastStatus()).toMatchObject({ status: 'error', code: 'no-webrtc-egress', detail: 'm' });
+  });
 });

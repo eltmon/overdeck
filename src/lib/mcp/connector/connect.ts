@@ -123,6 +123,7 @@ async function verify(
       const detail = link.lastError() ?? `no route to ${pairing.machineLabel}`;
       if (code === 'unknown-peer' || code === 'identity-refused') return { ok: false, repair: true, detail };
       if (rtc.relayRefusal() !== null) return stopped(failureStatus('relay-plan-needed', detail));
+      if (link.noWebrtcEgress()) return stopped(failureStatus('no-webrtc-egress', detail));
       return stopped(failureStatus('verify-failed', detail));
     }
 

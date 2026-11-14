@@ -5,10 +5,19 @@
 import { randomBytes } from 'node:crypto';
 import type { Duplex } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ChannelOpenError } from '@overdeck/anywhere-channel';
 import type { SignalData } from '@overdeck/contracts';
-import { RTCPeerConnection } from 'werift';
+import { Candidate, RTCPeerConnection } from 'werift';
 
-import { RtcDialAbortedError, type RtcPurpose, type RtcSignalingPort, RtcTransport } from '../rtc-transport.js';
+import {
+  CandidateTally,
+  candidateKind,
+  isNoRelayCandidate,
+  RtcDialAbortedError,
+  type RtcPurpose,
+  type RtcSignalingPort,
+  RtcTransport,
+} from '../rtc-transport.js';
 
 const A = '00000000-0000-4000-8000-00000000000a';
 const B = '00000000-0000-4000-8000-00000000000b';
@@ -171,6 +180,19 @@ describe('RtcTransport (PAN-2356 WI-10)', () => {
     expect(a.peerConnectionCount()).toBe(0);
   }, 20_000);
 
+  it('names the route in an aborted dial', async () => {
+    const { a } = pair();
+    const direct = new AbortController();
+    const directDial = a.dial(B, { relay: false, purpose: 'link', signal: direct.signal });
+    direct.abort();
+    await expect(directDial).rejects.toMatchObject({ message: 'direct connection aborted' });
+
+    const relay = new AbortController();
+    const relayDial = a.dial(B, { relay: true, purpose: 'link', signal: relay.signal });
+    relay.abort();
+    await expect(relayDial).rejects.toMatchObject({ message: 'relay connection aborted' });
+  }, 20_000);
+
   it('ends the far side when one side destroys its stream', async () => {
     const { a, nextIncoming } = pair();
     const raw = await a.dial(B, { relay: false, purpose: 'link', signal: new AbortController().signal });
@@ -179,6 +201,36 @@ describe('RtcTransport (PAN-2356 WI-10)', () => {
     raw.destroy();
     await closed;
     expect(accepted.raw.destroyed).toBe(true);
+  }, 20_000);
+
+  it('names the relay route when a relay connection closes before it opens', async () => {
+    const h = hub();
+    const a = new RtcTransport(h.port(A), () => undefined);
+    transports.push(a);
+    const dial = a.dial(B, { relay: true, purpose: 'link', signal: new AbortController().signal }).catch((error: unknown) => error);
+    await vi.waitFor(() => expect(h.sent.some((frame) => frame.from === A && frame.data.sdp?.type === 'offer')).toBe(true));
+    const offer = h.sent.find((frame) => frame.from === A && frame.data.sdp?.type === 'offer')!;
+    a.abortSession(offer.session);
+    const error = await dial;
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/^relay /);
+    expect((error as Error).message.startsWith('direct')).toBe(false);
+  }, 20_000);
+
+  it('names the route when the ICE server request fails', async () => {
+    const h = hub();
+    const failingPort = { ...h.port(A), iceServers: async () => { throw new Error('the directory did not answer the ICE server request'); } };
+    const a = new RtcTransport(failingPort, () => undefined);
+    transports.push(a);
+    const dial = a.dial(B, { relay: true, purpose: 'link', signal: new AbortController().signal });
+    await expect(dial).rejects.toMatchObject({ message: 'relay connection: the directory did not answer the ICE server request' });
+
+    const channelOpenPort = { ...h.port(A), iceServers: async () => { throw new ChannelOpenError('unreachable', 'x', { cause: 'c' }); } };
+    const a2 = new RtcTransport(channelOpenPort, () => undefined);
+    transports.push(a2);
+    const dial2 = a2.dial(B, { relay: true, purpose: 'link', signal: new AbortController().signal });
+    await expect(dial2).rejects.toBeInstanceOf(ChannelOpenError);
+    await expect(dial2).rejects.toMatchObject({ code: 'unreachable', message: 'relay connection: x', detail: { cause: 'c' } });
   }, 20_000);
 });
 
@@ -248,6 +300,85 @@ describe('RtcTransport diagnostics (PAN-5018 FR-6)', () => {
       expect(line).not.toContain('candidate:');
     }
   }, 20_000);
+});
+
+describe('RtcTransport candidate tallies (PAN-5242 WI-2)', () => {
+  it('tallies candidates by kind and ignores duplicates', () => {
+    const tally = new CandidateTally();
+    const host = 'candidate:1 1 udp 1 127.0.0.1 9 typ host';
+    tally.add(host);
+    tally.add(host);
+    tally.addSdp(['v=0', 'a=candidate:2 1 udp 1 203.0.113.9 9 typ relay', ''].join('\r\n'));
+    tally.add('candidate:2 1 udp 1 203.0.113.9 9 typ relay');
+    expect(tally.format()).toBe('2 (host 1, srflx 0, relay 1)');
+  });
+
+  it('reads the kind of a relay candidate werift serializes itself', () => {
+    const candidate = new Candidate('f', 1, 'udp', 16777215, '203.0.113.9', 5000, 'relay', '198.51.100.2', 6000, undefined, 0, 'u');
+    expect(candidateKind(candidate.toSdp())).toBe('relay');
+    expect(candidateKind('candidate:' + candidate.toSdp())).toBe('relay');
+  });
+
+  it('logs gathered and received tallies on both sides of a direct dial', async () => {
+    const h = hub();
+    const aLogs = { log: vi.fn(), debug: vi.fn() };
+    const bLogs = { log: vi.fn(), debug: vi.fn() };
+    const incoming: Duplex[] = [];
+    const a = new RtcTransport(h.port(A), () => undefined, aLogs);
+    const b = new RtcTransport(h.port(B), (raw) => incoming.push(raw), bLogs);
+    transports.push(a, b);
+    await a.dial(B, { relay: false, purpose: 'link', signal: new AbortController().signal });
+    await vi.waitFor(() => expect(incoming).toHaveLength(1));
+    const aLines = aLogs.log.mock.calls.map(([line]) => line as string);
+    const bLines = bLogs.log.mock.calls.map(([line]) => line as string);
+    expect(aLines).toContainEqual(
+      expect.stringMatching(/^rtc session [0-9a-f]{8} offer to 00000000 \(direct\): gathered [1-9]\d* \(host [1-9]\d*, srflx \d+, relay 0\)$/),
+    );
+    expect(bLines).toContainEqual(
+      expect.stringMatching(
+        /^rtc session [0-9a-f]{8} answer to 00000000 \(direct\): received [1-9]\d* \(host [1-9]\d*, srflx \d+, relay 0\), gathered [1-9]\d* /,
+      ),
+    );
+    expect(bLines).toContainEqual(expect.stringMatching(/^rtc session [0-9a-f]{8} answered$/));
+    expect([...aLines, ...bLines]).toContainEqual(expect.stringMatching(/ connected \(direct; gathered \d+ \(host /));
+  }, 20_000);
+});
+
+describe('RtcTransport relay fail-fast (PAN-5242 WI-3)', () => {
+  it('fails a relay dial at once when it gathers no relay candidate', async () => {
+    const h = hub();
+    const a = new RtcTransport(h.port(A, async () => [{ urls: ['turn:127.0.0.1:1?transport=tcp'], username: 'u', credential: 'p' }]), () => undefined);
+    transports.push(a);
+    const error = await a
+      .dial(B, { relay: true, purpose: 'link', signal: new AbortController().signal })
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ChannelOpenError);
+    expect((error as ChannelOpenError).code).toBe('unreachable');
+    expect(isNoRelayCandidate(error)).toBe(true);
+    expect((error as Error).message).toContain('turn:127.0.0.1:1?transport=tcp');
+    expect(h.sent.some((frame) => frame.data.sdp)).toBe(false);
+    expect(a.peerConnectionCount()).toBe(0);
+  }, 5_000);
+
+  it('does not fail fast when the relay list has no TURN URL', async () => {
+    const h = hub();
+    const a = new RtcTransport(h.port(A), () => undefined);
+    transports.push(a);
+    const noAnswer = 'cccccccc-0000-4000-8000-00000000000c';
+    const controller = new AbortController();
+    const dial = a.dial(noAnswer, { relay: true, purpose: 'link', signal: controller.signal }).catch((error: unknown) => error);
+    await vi.waitFor(() => expect(h.sent.some((frame) => frame.data.sdp?.type === 'offer')).toBe(true));
+    controller.abort();
+    const error = await dial;
+    expect(error).toBeInstanceOf(RtcDialAbortedError);
+    expect(isNoRelayCandidate(error)).toBe(false);
+  }, 20_000);
+
+  it('recognizes only the no-relay-candidate cause', () => {
+    expect(isNoRelayCandidate(new Error('x'))).toBe(false);
+    expect(isNoRelayCandidate(new ChannelOpenError('unreachable', 'x'))).toBe(false);
+    expect(isNoRelayCandidate(new ChannelOpenError('unreachable', 'x', { cause: 'no-relay-candidate' }))).toBe(true);
+  });
 });
 
 describe('RtcTransport ICE restart (PAN-5046 FR-6)', () => {

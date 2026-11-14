@@ -28,6 +28,17 @@ export interface DirectoryPort {
   machine(environmentId: string): DirectoryMachine | null;
 }
 
+/** The directory answered an `ice-servers` request with an `error` frame (PAN-5242). */
+export class IceServersRefusedError extends Error {
+  constructor(
+    message: string,
+    readonly code: string,
+  ) {
+    super(message);
+    this.name = 'IceServersRefusedError';
+  }
+}
+
 /** Asks the directory for ICE servers and waits for the matching answer or refusal. */
 function requestIceServers(directory: DirectoryPort, relay: boolean): Promise<RTCIceServerLike[]> {
   const requestId = randomBytes(8).toString('hex');
@@ -45,7 +56,7 @@ function requestIceServers(directory: DirectoryPort, relay: boolean): Promise<RT
         if (frame.requestId === requestId) done(frame.iceServers.map((server) => ({ ...server, urls: [...server.urls] })));
       }),
       directory.on('error', (frame) => {
-        if (frame.requestId === requestId) done(new Error(frame.message));
+        if (frame.requestId === requestId) done(new IceServersRefusedError(frame.message, frame.code));
       }),
     );
     if (!directory.send({ type: 'ice-servers', requestId, relay })) done(new Error('not connected to the overdeck.ai directory'));
@@ -73,6 +84,7 @@ export interface RelayHooks {
 export interface DirectoryRtc {
   readonly transport: RtcTransport;
   readonly dialer: RtcDialer;
+  iceServers(relay: boolean): Promise<RTCIceServerLike[]>;
   stop(): void;
 }
 
@@ -108,6 +120,7 @@ export function createDirectoryRtc(
   return {
     transport,
     dialer,
+    iceServers: (relay) => requestIceServers(directory, relay),
     stop() {
       offError();
       transport.close();

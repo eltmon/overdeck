@@ -24,11 +24,12 @@
  */
 import { randomBytes } from 'node:crypto';
 import type { Duplex } from 'node:stream';
+import { ChannelOpenError } from '@overdeck/anywhere-channel';
 import type { SignalData } from '@overdeck/contracts';
 import { RTCPeerConnection, type RTCDataChannel } from 'werift';
 
 import { anywhereDebug, shortId } from '../debug-log.js';
-import { relayIceServers, type RTCIceServerLike } from './relay-ice-servers.js';
+import { relayIceServers, turnUrlRank, type RTCIceServerLike } from './relay-ice-servers.js';
 import { RtcDuplex } from './rtc-duplex.js';
 
 export type { RTCIceServerLike } from './relay-ice-servers.js';
@@ -55,11 +56,77 @@ export interface RtcTransportLogs {
 /** The step of handling a signal frame that failed, for the `failed at <step>` line. */
 type SignalStep = 'ice-servers' | 'peer-connection' | 'remote-description' | 'answer';
 
+export type RtcRoute = 'direct' | 'relay';
+
+export function routeOf(relay: boolean): RtcRoute {
+  return relay ? 'relay' : 'direct';
+}
+
 export class RtcDialAbortedError extends Error {
-  constructor() {
-    super('direct connection aborted');
+  constructor(readonly route: RtcRoute = 'direct') {
+    super(`${route} connection aborted`);
     this.name = 'AbortError';
   }
+}
+
+/** Prefixes `<route> connection: ` once, keeping a `ChannelOpenError`'s code and detail. */
+function withRoute(route: RtcRoute, error: unknown): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.startsWith(`${route} connection`)) return error as Error;
+  if (error instanceof ChannelOpenError) return new ChannelOpenError(error.code, `${route} connection: ${message}`, error.detail);
+  return new Error(`${route} connection: ${message}`, { cause: error });
+}
+
+export type CandidateKind = 'host' | 'srflx' | 'prflx' | 'relay' | 'other';
+
+/** The `typ` of one candidate string; never logs or returns the text. */
+export function candidateKind(candidate: string): CandidateKind {
+  const kind = / typ (host|srflx|prflx|relay)(?:\s|$)/.exec(candidate)?.[1];
+  return (kind as CandidateKind | undefined) ?? 'other';
+}
+
+/** Distinct candidates by kind (deduplicated by text without a leading `a=`). */
+export class CandidateTally {
+  private readonly seen = new Set<string>();
+  readonly counts: Record<CandidateKind, number> = { host: 0, srflx: 0, prflx: 0, relay: 0, other: 0 };
+
+  add(candidate: string | undefined | null): void {
+    const key = (candidate ?? '').trim().replace(/^a=/, '');
+    if (!key || this.seen.has(key)) return;
+    this.seen.add(key);
+    this.counts[candidateKind(key)] += 1;
+  }
+
+  addSdp(sdp: string): void {
+    for (const line of sdp.split(/\r?\n/)) if (line.startsWith('a=candidate:')) this.add(line);
+  }
+
+  get total(): number {
+    return this.seen.size;
+  }
+
+  /** `3 (host 2, srflx 0, relay 1)`. */
+  format(): string {
+    const { host, srflx, relay } = this.counts;
+    return `${this.total} (host ${host}, srflx ${srflx}, relay ${relay})`;
+  }
+}
+
+export const NO_RELAY_CANDIDATE_CAUSE = 'no-relay-candidate';
+
+/** The relay leg gathered no TURN relay candidate (PAN-5242). */
+export function isNoRelayCandidate(error: unknown): boolean {
+  return error instanceof ChannelOpenError && error.detail.cause === NO_RELAY_CANDIDATE_CAUSE;
+}
+
+/** The first TURN URL in an ICE list: the one werift uses after `relayIceServers` ordering. */
+export function firstTurnUrl(servers: readonly RTCIceServerLike[]): string | null {
+  for (const server of servers) {
+    for (const url of Array.isArray(server.urls) ? server.urls : [server.urls]) {
+      if (turnUrlRank(url) !== null) return url;
+    }
+  }
+  return null;
 }
 
 interface PeerEntry {
@@ -78,6 +145,8 @@ interface PeerEntry {
   closed: boolean;
   /** A data channel on this connection has opened at least once. */
   everOpen: boolean;
+  readonly gathered: CandidateTally;
+  readonly received: CandidateTally;
 }
 
 function entryKey(peer: string, relay: boolean, purpose: RtcPurpose): string {
@@ -111,7 +180,7 @@ export class RtcTransport {
   }
 
   async dial(peerEnvironmentId: string, opts: { relay: boolean; purpose: RtcPurpose; signal: AbortSignal }): Promise<Duplex> {
-    if (opts.signal.aborted) throw new RtcDialAbortedError();
+    if (opts.signal.aborted) throw new RtcDialAbortedError(routeOf(opts.relay));
     const key = entryKey(peerEnvironmentId, opts.relay, opts.purpose);
     let entry = this.byKey.get(key);
     if (entry && (entry.closed || ['failed', 'closed', 'disconnected'].includes(entry.pc.connectionState))) {
@@ -134,7 +203,7 @@ export class RtcTransport {
         return this.awaitOpen(first.entry, first.channel, opts.signal, true);
       }
     }
-    if (opts.signal.aborted) throw new RtcDialAbortedError();
+    if (opts.signal.aborted) throw new RtcDialAbortedError(routeOf(opts.relay));
     return this.awaitOpen(entry, entry.pc.createDataChannel(RTC_DATA_CHANNEL_LABEL, { ordered: true }), opts.signal, false);
   }
 
@@ -146,20 +215,34 @@ export class RtcTransport {
 
   /** Initiator: a new peer connection, its first data channel and the offer. */
   private async create(key: string, peer: string, relay: boolean, purpose: RtcPurpose): Promise<{ entry: PeerEntry; channel: RTCDataChannel }> {
-    const iceServers = await this.peerIceServers(relay);
-    const pc = new RTCPeerConnection({ iceServers, iceTransportPolicy: relay ? 'relay' : 'all' });
-    const entry = this.register(pc, key, peer, randomBytes(16).toString('hex'), purpose, relay);
-    // The first channel must exist before the offer so the SDP carries the SCTP section.
-    const channel = pc.createDataChannel(RTC_DATA_CHANNEL_LABEL, { ordered: true });
     try {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
+      const iceServers = await this.peerIceServers(relay);
+      const pc = new RTCPeerConnection({ iceServers, iceTransportPolicy: relay ? 'relay' : 'all' });
+      const entry = this.register(pc, key, peer, randomBytes(16).toString('hex'), purpose, relay);
+      // The first channel must exist before the offer so the SDP carries the SCTP section.
+      const channel = pc.createDataChannel(RTC_DATA_CHANNEL_LABEL, { ordered: true });
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+      } catch (error) {
+        this.closeEntry(entry);
+        throw error;
+      }
+      this.log(`rtc session ${shortId(entry.session)} offer to ${shortId(peer)} (${routeOf(relay)}): gathered ${entry.gathered.format()}`);
+      const turnUrl = relay ? firstTurnUrl(iceServers) : null;
+      if (turnUrl !== null && entry.gathered.counts.relay === 0) {
+        this.closeEntry(entry);
+        throw new ChannelOpenError(
+          'unreachable',
+          `relay connection: gathered no TURN relay candidate from ${turnUrl}; the TURN server could not be reached from this host or refused the allocation`,
+          { cause: NO_RELAY_CANDIDATE_CAUSE },
+        );
+      }
+      this.sendLocalDescription(entry, 'offer');
+      return { entry, channel };
     } catch (error) {
-      this.closeEntry(entry);
-      throw error;
+      throw withRoute(routeOf(relay), error);
     }
-    this.sendLocalDescription(entry, 'offer');
-    return { entry, channel };
   }
 
   /** Fails the connection behind one signalling session (the directory said the peer is offline). */
@@ -190,12 +273,15 @@ export class RtcTransport {
       localSent: false,
       closed: false,
       everOpen: false,
+      gathered: new CandidateTally(),
+      received: new CandidateTally(),
     };
     this.byKey.set(key, entry);
     this.bySession.set(session, entry);
     pc.onIceCandidate.subscribe((candidate) => {
       if (!candidate || entry.closed) return;
       const json = candidate.toJSON();
+      entry.gathered.add(json.candidate);
       const out: NonNullable<SignalData['candidate']> = {
         candidate: json.candidate,
         sdpMid: json.sdpMid ?? null,
@@ -205,7 +291,11 @@ export class RtcTransport {
       else entry.pendingLocal.push(out);
     });
     pc.connectionStateChange.subscribe((state) => {
-      if (state === 'connected' || state === 'failed' || state === 'closed') this.log(`rtc session ${shortId(session)} ${shortId(peer)} ${state}`);
+      if (state === 'connected' || state === 'failed' || state === 'closed') {
+        this.log(
+          `rtc session ${shortId(session)} ${shortId(peer)} ${state} (${routeOf(relay)}; gathered ${entry.gathered.format()}, received ${entry.received.format()})`,
+        );
+      }
       if (state === 'failed' || state === 'closed') this.closeEntry(entry);
     });
     // Either side may open data channels on a connected peer connection (dial reuses whichever
@@ -239,6 +329,7 @@ export class RtcTransport {
 
   private async addRemoteCandidate(entry: PeerEntry, candidate: SignalData['candidate']): Promise<void> {
     if (!candidate) return;
+    entry.received.add(candidate.candidate);
     if (!entry.remoteSet) {
       entry.pendingRemote.push(candidate);
       return;
@@ -255,6 +346,7 @@ export class RtcTransport {
   }
 
   private async setRemote(entry: PeerEntry, type: 'offer' | 'answer', sdp: string): Promise<void> {
+    entry.received.addSdp(sdp);
     await entry.pc.setRemoteDescription({ type, sdp });
     entry.remoteSet = true;
     for (const candidate of entry.pendingRemote.splice(0)) await this.addRemoteCandidate(entry, candidate);
@@ -295,6 +387,9 @@ export class RtcTransport {
           progress.step = 'answer';
           const answer = await known.pc.createAnswer();
           await known.pc.setLocalDescription(answer);
+          this.log(
+            `rtc session ${shortId(session)} answer to ${shortId(from)} (${routeOf(relay)}): received ${known.received.format()}, gathered ${known.gathered.format()}`,
+          );
           this.sendLocalDescription(known, 'answer');
           this.log(`rtc session ${shortId(session)} answered`);
         }
@@ -348,11 +443,15 @@ export class RtcTransport {
     progress.step = 'answer';
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
+    this.log(
+      `rtc session ${shortId(session)} answer to ${shortId(from)} (${routeOf(relay)}): received ${entry.received.format()}, gathered ${entry.gathered.format()}`,
+    );
     this.sendLocalDescription(entry, 'answer');
   }
 
   /** `ownsEntry`: this dial created the connection, so a failure before any channel opened closes it. */
   private awaitOpen(entry: PeerEntry, channel: RTCDataChannel, signal: AbortSignal, ownsEntry: boolean): Promise<Duplex> {
+    const route = routeOf(entry.relay);
     return new Promise<Duplex>((resolve, reject) => {
       let settled = false;
       const subscriptions: Array<{ unSubscribe: () => void }> = [];
@@ -374,7 +473,7 @@ export class RtcTransport {
         entry.everOpen = true;
         resolve(new RtcDuplex(channel, entry.peer));
       };
-      const onAbort = (): void => finish(new RtcDialAbortedError());
+      const onAbort = (): void => finish(new RtcDialAbortedError(route));
       if (signal.aborted) {
         onAbort();
         return;
@@ -383,10 +482,10 @@ export class RtcTransport {
       subscriptions.push(
         channel.stateChanged.subscribe((state) => {
           if (state === 'open') finish(null);
-          else if (state === 'closed') finish(new Error('data channel closed before it opened'));
+          else if (state === 'closed') finish(new Error(`${route} data channel closed before it opened`));
         }),
         entry.pc.connectionStateChange.subscribe((state) => {
-          if (state === 'failed' || state === 'closed') finish(new Error(`direct connection ${state}`));
+          if (state === 'failed' || state === 'closed') finish(new Error(`${route} connection ${state}`));
         }),
       );
       if (channel.readyState === 'open') finish(null);

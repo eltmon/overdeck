@@ -274,6 +274,7 @@ the same command again.
 | `machine-not-in-account` | error | You signed in with an account that does not own this machine. Log out and rerun, and ask the user to authorize with the account their Overdeck uses. |
 | `machine-offline` | retry | The machine is offline. Ask the user to start Overdeck there, then run the same command again. |
 | `relay-plan-needed` | error | This network blocks direct connections and the account has no relay plan. Tell the user. |
+| `no-webrtc-egress` | error | This computer got no TURN relay connection, usually because it cannot reach TLS 443 or send UDP; running again will not help then. Tell the user to run `pan doctor` on their machine: if its TURN relay row is ok, use Public MCP or a host with WebRTC egress. |
 | `machine-unreachable` | retry | The machine could not be reached. Run the same command again in a minute. |
 | `pairing-code-refused` | error | The pairing code expired, was cancelled or was already used. Copy again. |
 | `key-mismatch` | error | The machine's key does not match the message. Copy again. |

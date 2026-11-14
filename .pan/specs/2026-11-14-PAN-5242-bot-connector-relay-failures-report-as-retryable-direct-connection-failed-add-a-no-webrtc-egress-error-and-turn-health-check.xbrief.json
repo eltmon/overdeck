@@ -1,0 +1,934 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T04:41:40Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5242: Bot connector: relay failures report as retryable 'direct connection failed'; add a no-webrtc-egress error and TURN health check",
+    "updated": "2026-11-14T05:30:52.011Z"
+  },
+  "plan": {
+    "id": "pan-5242",
+    "title": "Bot connector: relay failures report as retryable 'direct connection failed'; add a no-webrtc-egress error and TURN health check",
+    "status": "running",
+    "uid": "7b3041bd-30e0-4ac2-a9ad-703547af9ae1",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-14T04:41:40Z",
+    "updated": "2026-11-14T05:30:52.011Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5242",
+        "label": "PAN-5242",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "webrtc",
+      "turn",
+      "connector",
+      "doctor",
+      "diagnostics"
+    ],
+    "metadata": {
+      "sizeJustification": "One incident fix with five linked requirements. The code spans three source subsystems (src/lib for the transport and connector, src/dashboard for one route, src/cli for one doctor row); the rest of the 25 files are their tests and five doc files, and each top-level doc file counts as its own subsystem. The TURN health check is not a separate feature: the no-webrtc-egress next text and docs point to it as the only way to tell a relay outage from a blocked bot, so shipping either half alone leaves the operator guidance wrong.",
+      "canonicalFilename": "2026-11-14-PAN-5242-bot-connector-relay-failures-report-as-retryable-direct-connection-failed-add-a-no-webrtc-egress-error-and-turn-health-check.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "A bot connector that cannot open a WebRTC channel reports status retry, code machine-unreachable, with the text 'direct connection failed', even when the relay (TURN) leg failed and a retry cannot help. RtcTransport labels every route's failure 'direct connection' (rtc-transport.ts:389), pair.ts:239-242 maps every relay failure to machine-unreachable, connect-output.ts:40 makes that retryable, and neither side logs how many ICE candidates it gathered, so 'no TURN candidate' cannot be told apart from 'TURN down'. The last successful relay connection was weeks ago, so TURN health is unproven.",
+      "Proposal": "Name the route in every RtcTransport error. Tally candidates by kind on both sides and log the tallies on the offer, the answer and every state line. On a relay dial whose ICE list names a TURN URL but which gathered zero 'typ relay' candidates, fail at once with ChannelOpenError('unreachable', ..., { cause: 'no-relay-candidate' }) and send no offer. Map that cause to a new non-retryable status code no-webrtc-egress in both the pairing path (pair.ts) and the existing-pairing verify path (ConnectorLink + connect.ts). Add an on-demand relay check: a lib probe that gathers relay candidates once, a dashboard route POST /api/anywhere/relay-check that fetches TURN credentials through the live directory client, and a pan doctor 'TURN relay' row that calls it. Document the code, the log lines, the route and the doctor row, and add a changelog entry. Full detail: .pan/drafts/PAN-5242.md.",
+      "NonGoals": "- No change to the phone dialer (packages/anywhere-channel/src/dial-machine.ts) or its error messages.\n- No new ChannelOpenErrorCode value; the cause rides detail.cause.\n- No relay check inside GET /api/anywhere/status, no background or periodic TURN check, and no Settings UI for it.\n- No change to werift, to relayIceServers ordering, or to the one-TURN-URL limit.\n- No change to which existing connect codes are retry (network, machine-offline, machine-unreachable, verify-failed stay retry).\n- No fix for the responder dropping candidates that arrive before the session is registered.\n- No change to pan mcp connector serve beyond the route-labelled lastError text.\n- The CLI never opens its own directory socket for the relay check.\n- No log line, error or doctor row carries SDP, candidate text, TURN credentials, keys or tokens."
+    },
+    "autoDecisions": [
+      {
+        "summary": "The no-relay-candidate cause is carried in ChannelOpenError.detail.cause with code 'unreachable'; no new ChannelOpenErrorCode.",
+        "rationale": "Every existing consumer (link supervisor, LinkAgent, phone) switches on the code; keeping 'unreachable' leaves them unchanged while the connector reads the cause."
+      },
+      {
+        "summary": "RtcTransport fails a relay dial at once when it gathered zero relay candidates, and sends no offer; this applies to the dashboard's machine-to-machine and approval relay dials too.",
+        "rationale": "werift finishes gathering inside setLocalDescription (measured: 0 candidates, 4 ms to 8.0 s), so the count is final; failing there is faster and deterministic, and gathering ends before the 10 s and 15 s relay open budgets."
+      },
+      {
+        "summary": "Count 'typ relay' candidates, not the total.",
+        "rationale": "Measured: werift gathers host candidates in relay mode when its list has no usable TURN server (34 candidates, 0 relay), so a total would hide the failure."
+      },
+      {
+        "summary": "The health check is on demand: POST /api/anywhere/relay-check plus a pan doctor 'TURN relay' row, silent unless signed in with the relay plan; warn, never error.",
+        "rationale": "The issue allows pan doctor or the Anywhere status; the status route is polled, so a TURN allocation per poll is wasteful, and the relay is optional reachability."
+      },
+      {
+        "summary": "The phone dialer's 'direct connection' strings are out of scope; FR-1 is read as every error RtcTransport and the connector produce.",
+        "rationale": "The incident, the bot connector and every line the issue cites are the Node RtcTransport; dial-machine.ts is a separate browser package shipped inside the mobile app, with pinned messages, and no phone report is involved."
+      },
+      {
+        "summary": "callDashboard gains an optional signal so the doctor row can bound its two calls (3 s and 25 s).",
+        "rationale": "Without it a hung relay check would keep pan doctor waiting; the change is additive."
+      },
+      {
+        "summary": "The responder keeps its exact 'rtc session <s> answered' line and adds a separate 'answer to' tally line.",
+        "rationale": "Existing tests pin the answered line (rtc-transport.test.ts:207,337)."
+      },
+      {
+        "summary": "Critique response: no-webrtc-egress stays a non-retryable error, but its next text says 'the usual cause is …' and sends the user to pan doctor on the machine to rule out a relay outage before switching to Public MCP.",
+        "rationale": "The dialer cannot tell blocked egress from a TURN outage or refused allocation; the issue requires a distinct non-retryable code, and status error makes the bot hand the decision to the user instead of looping."
+      },
+      {
+        "summary": "Critique response: requestIceServers rejects with a typed IceServersRefusedError only for a directory error frame; timeouts become the relay check state 'unanswered'.",
+        "rationale": "A timeout is not a refusal; the doctor must not tell the operator overdeck.ai refused credentials when it never answered."
+      }
+    ],
+    "items": [
+      {
+        "id": "route-named-errors",
+        "title": "Name the route in every RtcTransport dial error",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T04:41:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/channel/rtc-transport.ts",
+            "src/lib/anywhere/channel/__tests__/rtc-transport.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/anywhere/channel/__tests__/rtc-transport.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "rtc-transport.test.ts passes, including the new route-naming test"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ],
+          "acJustification": "Five ACs: the abort, close and setup-error paths each need their own observable message check."
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/anywhere/channel/rtc-transport.ts add `export type RtcRoute = 'direct' | 'relay'` and `routeOf(relay)`. RtcDialAbortedError takes `route: RtcRoute = 'direct'` and its message becomes `${route} connection aborted`; pass routeOf(opts.relay) at the two throws in dial() and routeOf(entry.relay) in awaitOpen. awaitOpen's two errors become `${route} data channel closed before it opened` and `${route} connection ${state}`. Add the test described in WI-1; keep the existing toBeInstanceOf(RtcDialAbortedError) checks. Also (critique response) wrap the whole body of create() in try/catch and rethrow withRoute(routeOf(relay), error): a module helper that prefixes '<route> connection: ' once (skipping messages that already start with '<route> connection'), rebuilds a ChannelOpenError with the same code and detail, and wraps anything else in a plain Error with { cause }. Import ChannelOpenError from '@overdeck/anywhere-channel' here. Keep the existing closeEntry(entry) on an offer failure."
+        },
+        "items": [
+          {
+            "id": "route-named-errors.ac1",
+            "title": "Given a relay dial whose signal is already aborted, when dial() runs, then it rejects with an RtcDialAbortedError whose message is 'relay connection aborted'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-named-errors.ac2",
+            "title": "Given a direct dial whose signal is already aborted, when dial() runs, then it rejects with message 'direct connection aborted'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-named-errors.ac3",
+            "title": "Given a relay dial with iceServers [] to a peer that never answers, when the hub has recorded its offer and abortSession(offer.session) is called, then the dial rejects with a message that starts with 'relay ' and not with 'direct'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-named-errors.ac4",
+            "title": "Given the dialer's iceServers rejects with Error('the directory did not answer the ICE server request'), when a relay dial runs, then it rejects with message exactly 'relay connection: the directory did not answer the ICE server request'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-named-errors.ac5",
+            "title": "Given iceServers rejects with ChannelOpenError('unreachable', 'x', { cause: 'c' }), when a relay dial runs, then it rejects with a ChannelOpenError whose code is 'unreachable', detail.cause is 'c' and message is 'relay connection: x'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "candidate-tallies",
+        "title": "Tally ICE candidates by kind and log the tallies on both sides",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T04:41:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/channel/rtc-transport.ts",
+            "src/lib/anywhere/channel/__tests__/rtc-transport.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/anywhere/channel/__tests__/rtc-transport.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "rtc-transport.test.ts passes, including the tally and log-line tests and the unchanged 'never logs SDP or candidate text' test"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add exported candidateKind() and CandidateTally (dedupe by text without a leading 'a=', counts host/srflx/prflx/relay/other, format() = '<total> (host <h>, srflx <s>, relay <r>)') to rtc-transport.ts. PeerEntry gets gathered and received tallies. Count in the onIceCandidate handler (gathered), in setRemote via addSdp (received) and at the top of addRemoteCandidate (received). Log `rtc session <s8> offer to <p8> (<route>): gathered <tally>` after the dialer's setLocalDescription; log `rtc session <s8> answer to <f8> (<route>): received <tally>, gathered <tally>` on the responder after setLocalDescription(answer) in accept() and in the ICE-restart branch, keeping the existing 'answered' lines byte-for-byte; extend the state line to `rtc session <s8> <p8> <state> (<route>; gathered <tally>, received <tally>)`. No new line may contain 'v=0', 'a=' or 'candidate:'."
+        },
+        "items": [
+          {
+            "id": "candidate-tallies.ac1",
+            "title": "Given two identical host candidate strings and one relay candidate added once via addSdp ('a=candidate:…') and once via add (same text without 'a='), when format() is called, then it returns '2 (host 1, srflx 0, relay 1)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-tallies.ac2",
+            "title": "Given a direct loopback dial between two RtcTransports, when it opens, then the dialer's log contains a line matching /^rtc session [0-9a-f]{8} offer to 00000000 \\(direct\\): gathered [1-9]\\d* \\(host [1-9]\\d*, srflx \\d+, relay 0\\)$/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-tallies.ac3",
+            "title": "Given the same dial, then the responder's log contains a line starting 'rtc session <8 hex> answer to 00000000 (direct): received ' with a non-zero received total, and still contains the exact line 'rtc session <8 hex> answered'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-tallies.ac4",
+            "title": "Given the same dial, then some log line matches / connected \\(direct; gathered \\d+ \\(host / and the existing 'never logs SDP or candidate text' test passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-tallies.ac5",
+            "title": "Given a relay candidate built with werift's exported Candidate class, when candidateKind() reads candidate.toSdp() and 'candidate:' + candidate.toSdp(), then it returns 'relay' for both",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relay-fail-fast",
+        "title": "Fail a relay dial at once with cause no-relay-candidate when it gathered no relay candidate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T04:41:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5242",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "pair-relay-classification",
+            "verify-egress-classification",
+            "relay-probe"
+          ],
+          "files_scope": [
+            "src/lib/anywhere/channel/rtc-transport.ts",
+            "src/lib/anywhere/channel/__tests__/rtc-transport.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/anywhere/channel/__tests__/rtc-transport.test.ts src/dashboard/server/__tests__/channel-rtc.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "rtc-transport.test.ts passes, including the fail-fast, no-TURN-URL and isNoRelayCandidate tests",
+            "channel-rtc.test.ts (dashboard RtcTransport over a fake directory) passes unchanged"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Import ChannelOpenError from '@overdeck/anywhere-channel' and turnUrlRank from './relay-ice-servers.js'. Export NO_RELAY_CANDIDATE_CAUSE = 'no-relay-candidate', isNoRelayCandidate(error) (ChannelOpenError with detail.cause equal to it) and firstTurnUrl(servers). In create(), after the offer tally log line and before sendLocalDescription: when relay is true, firstTurnUrl(iceServers) is not null and entry.gathered.counts.relay === 0, closeEntry(entry) and throw new ChannelOpenError('unreachable', `relay connection: gathered no TURN relay candidate from ${turnUrl}; the TURN server could not be reached from this host or refused the allocation`, { cause: NO_RELAY_CANDIDATE_CAUSE }). A relay list with no TURN URL does not fail fast. Tests use the closed loopback port turn:127.0.0.1:1?transport=tcp (real timers, about 4 ms). withRoute (from route-named-errors) leaves this error and its cause unchanged because its message already starts with 'relay connection'."
+        },
+        "items": [
+          {
+            "id": "relay-fail-fast.ac1",
+            "title": "Given iceServers returning [{ urls: ['turn:127.0.0.1:1?transport=tcp'], username: 'u', credential: 'p' }], when a relay dial runs, then it rejects within 5 s with a ChannelOpenError whose code is 'unreachable', for which isNoRelayCandidate() returns true, and whose message contains 'turn:127.0.0.1:1?transport=tcp'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-fail-fast.ac2",
+            "title": "Given the same dial, then the hub's sent frames contain no frame with data.sdp and peerConnectionCount() returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-fail-fast.ac3",
+            "title": "Given iceServers returning [] for a relay dial to a peer id with no transport on the hub (nobody answers), when the hub has recorded an offer frame and the dial is then aborted, then the dial rejects with RtcDialAbortedError and isNoRelayCandidate() returns false for it (no fail-fast without a TURN URL)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-fail-fast.ac4",
+            "title": "isNoRelayCandidate returns false for a plain Error and for ChannelOpenError('unreachable', 'x'), and true for ChannelOpenError('unreachable', 'x', { cause: 'no-relay-candidate' })",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "egress-status-code",
+        "title": "Add the non-retryable no-webrtc-egress connect status code",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T04:41:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/connector/connect-output.ts",
+            "tests/unit/lib/mcp/connector/connect-output.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/connector/connect-output.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "connect-output.test.ts passes, including the new no-webrtc-egress test and the unchanged retries list"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add 'no-webrtc-egress' to CONNECT_CODES right after 'relay-plan-needed'; do not add it to RETRY_CODES. Add its CONNECT_NEXT text exactly as in the PRD: it says the usual cause is an environment that blocks TLS to turn.cloudflare.com:443 and UDP, that running again will not help then, tells the bot to have the user run pan doctor on their machine (TURN relay row ok → Public MCP or a host with WebRTC egress; row warns → relay down, run again once it passes), and links https://overdeck.ai/configuration/bots#no-webrtc-egress. Add the test from WI-4."
+        },
+        "items": [
+          {
+            "id": "egress-status-code.ac1",
+            "title": "failureStatus('no-webrtc-egress') returns status 'error' and exitCodeFor() of it returns 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "egress-status-code.ac2",
+            "title": "CONNECT_NEXT['no-webrtc-egress'] contains 'turn.cloudflare.com:443', 'Public MCP', 'pan doctor', 'will not help' and 'https://overdeck.ai/configuration/bots#no-webrtc-egress'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "egress-status-code.ac3",
+            "title": "The codes for which failureStatus returns status 'retry' remain exactly machine-offline, machine-unreachable, network and verify-failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pair-relay-classification",
+        "title": "Classify the pairing relay failure as no-webrtc-egress and label both legs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T04:41:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/connector/pair.ts",
+            "tests/unit/lib/mcp/connector/pair.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/connector/pair.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "pair.test.ts passes, including the no-webrtc-egress case and the labelled machine-unreachable message"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add 'no-webrtc-egress' to PairFailureCode. Import isNoRelayCandidate from '../../anywhere/channel/rtc-transport.js'. In pairWithMachine's relay catch build detail = `Could not reach ${found.machine.label}. relay: ${errorText(relayError)}; direct: ${errorText(directError)}`; return 'pairing-code-refused' when pairingRefused(relayError), else 'no-webrtc-egress' when isNoRelayCandidate(relayError), else 'machine-unreachable', all with that detail. connect.ts needs no change for this path (line 201 passes paired.code through)."
+        },
+        "items": [
+          {
+            "id": "pair-relay-classification.ac1",
+            "title": "Given open() rejects rtc:// with a timeout ChannelOpenError and rtc+turn:// with a ChannelOpenError carrying { cause: 'no-relay-candidate' }, when pairWithMachine runs, then it returns { ok: false, code: 'no-webrtc-egress' } and writes no pairing.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pair-relay-classification.ac2",
+            "title": "Given both legs reject with ChannelOpenError('unreachable', 'ICE failed'), when pairWithMachine runs, then it returns code 'machine-unreachable' with message exactly 'Could not reach studio. relay: ICE failed; direct: ICE failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pair-relay-classification.ac3",
+            "title": "Given the relay leg rejects with a pairing-refused ChannelOpenError, when pairWithMachine runs, then it still returns code 'pairing-code-refused'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verify-egress-classification",
+        "title": "Return no-webrtc-egress from the existing-pairing verify path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T04:41:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/connector/channel-api.ts",
+            "src/lib/mcp/connector/connect.ts",
+            "tests/unit/lib/mcp/connector/channel-api.test.ts",
+            "tests/unit/lib/mcp/connector/connect.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/connector/channel-api.test.ts tests/unit/lib/mcp/connector/connect.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "channel-api.test.ts and connect.test.ts pass, including the new no-webrtc-egress cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In ConnectorLink (channel-api.ts) add private relayNoCandidate and noWebrtcEgress(); reset it at the start of every probe round and on probe success; on the direct failure set error to `direct: <text>`; on the relay failure set error to `relay: <text>; direct: <text>` and relayNoCandidate = isNoRelayCandidate(error). Keep the relay-plan branch's noDirectPathMessage exactly. In connect.ts verify(), after the unknown-peer/identity-refused check and the relayRefusal() check, return stopped(failureStatus('no-webrtc-egress', detail)) when link.noWebrtcEgress() is true. Update any existing lastError() assertions after failed probes to the labelled text."
+        },
+        "items": [
+          {
+            "id": "verify-egress-classification.ac1",
+            "title": "Given the direct probe rejects with ChannelOpenError('timeout', 'D') and the relay probe with ChannelOpenError('unreachable', 'R', { cause: 'no-relay-candidate' }), when ConnectorLink.connect() finishes, then noWebrtcEgress() returns true and lastError() returns 'relay: R; direct: D'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-egress-classification.ac2",
+            "title": "Given a later round where the direct probe succeeds, when connect() finishes, then noWebrtcEgress() returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-egress-classification.ac3",
+            "title": "Given an existing pairing whose relay probe rejects with the no-relay-candidate cause, when runConnectorConnect runs, then it returns 1, the status line has status 'error' and code 'no-webrtc-egress', and pairWithMachine is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-egress-classification.ac4",
+            "title": "Given pairWithMachine returns { ok: false, code: 'no-webrtc-egress' }, when runConnectorConnect runs, then it returns 1 with status 'error' and code 'no-webrtc-egress'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relay-probe",
+        "title": "Add the relay probe that gathers TURN relay candidates once",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:41:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/channel/relay-probe.ts",
+            "src/lib/anywhere/channel/__tests__/relay-probe.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/anywhere/channel/__tests__/relay-probe.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "relay-probe.test.ts passes all four cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. New src/lib/anywhere/channel/relay-probe.ts exporting RELAY_CHECK_TIMEOUT_MS = 12_000, the RelayCheckResponse union (skipped / refused / unanswered / ok / failed), RelayProbeResult, RelayProbePeer and probeRelayCandidate(servers, deps). Order the list with relayIceServers, pick turnUrl with firstTurnUrl (from rtc-transport.ts); no TURN URL returns failed with detail 'the relay list has no TURN server' and creates no peer. Otherwise create a relay-policy peer (default werift RTCPeerConnection), count 'typ relay' candidates with candidateKind, createDataChannel('ovdl-check'), createOffer, setLocalDescription raced against a setTimeout deadline that is cleared in finally; always close the peer. Map relay > 0 to ok, timeout to failed 'gathering did not finish within 12 s', an error to failed with its first line (max 200 chars), zero to failed 'gathered no TURN relay candidate from <turnUrl>'. Fake timers for the timeout test; the real-werift case uses the closed loopback TCP port."
+        },
+        "items": [
+          {
+            "id": "relay-probe.ac1",
+            "title": "Given servers [], when probeRelayCandidate runs, then it returns state 'failed' with turnUrl null and createPeer is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-probe.ac2",
+            "title": "Given a fake peer that emits one 'typ relay' candidate during setLocalDescription and servers [{ urls: ['turns:turn.example:443'], username: 'u', credential: 'p' }], when probeRelayCandidate runs, then it returns { state: 'ok', relayCandidates: 1, turnUrl: 'turns:turn.example:443' } and the peer was closed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-probe.ac3",
+            "title": "Given a fake peer whose setLocalDescription never resolves, when fake timers advance 12000 ms, then probeRelayCandidate returns state 'failed' with a detail containing '12 s' and the peer was closed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-probe.ac4",
+            "title": "Given real werift and [{ urls: ['turn:127.0.0.1:1?transport=tcp'], username: 'u', credential: 'p' }], when probeRelayCandidate runs, then it returns state 'failed', relayCandidates 0 and that turnUrl within 5 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relay-check-route",
+        "title": "Add POST /api/anywhere/relay-check backed by the live directory client",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:41:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/directory-rtc.ts",
+            "src/dashboard/server/routes/anywhere.ts",
+            "src/dashboard/server/__tests__/anywhere-relay-check-route.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/channel-rtc.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/anywhere-relay-check-route.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/channel-rtc.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "anywhere-relay-check-route.test.ts, no-loss-matrix.test.ts and channel-rtc.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "acJustification": "Six ACs: auth, each response state, single-flight, the matrix row and the typed refusal error are separate observable behaviors."
+        },
+        "narrative": {
+          "Action": "PRD WI-8. DirectoryRtc gains iceServers(relay) returning requestIceServers(directory, relay). In routes/anywhere.ts add POST /api/anywhere/relay-check whose first statement is `const authError = rejectUnauthorizedDashboardRequest(request); if (authError) return noStore(authError);`; add no route-scopes.ts row, so requiredScopeFor returns 'admin' (route-scopes.ts:310-319) and only the internal token, the root session or an admin-scoped credential pass (dashboard-auth.ts:166-168, 491-513). runRelayCheck(): directory not online or no currentDirectoryRtc() → { state: 'skipped', reason: 'directory-offline', detail }; iceServers(true) rejects with IceServersRefusedError → { state: 'refused', detail }, any other rejection (10 s timeout, socket not connected) → { state: 'unanswered', detail }; else probeRelayCandidate(servers). Single-flight through a module-level in-flight promise cleared in finally. Answer 200 via noStore(jsonResponse(...)); add the route to anywhereRouteLayer and to the file header comment. Add the no-loss row next to GET /api/anywhere/status. Never call the probe from GET /api/anywhere/status. In directory-rtc.ts add export class IceServersRefusedError(message, code) and use it in requestIceServers' error-frame handler only; test it in channel-rtc.test.ts."
+        },
+        "items": [
+          {
+            "id": "relay-check-route.ac1",
+            "title": "Given the directory status is not 'online', when POST /api/anywhere/relay-check is called, then it returns 200 with { state: 'skipped', reason: 'directory-offline' } and the probe is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-check-route.ac2",
+            "title": "Given iceServers(true) rejects with IceServersRefusedError('the relay needs the relay plan', 'relay_not_allowed'), when the route is called, then it returns { state: 'refused', detail: 'the relay needs the relay plan' }; given it rejects with Error('the directory did not answer the ICE server request'), then it returns state 'unanswered'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-check-route.ac3",
+            "title": "Given the probe returns an ok or a failed result, when the route is called, then the response body equals that result, and two concurrent POSTs call the probe once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-check-route.ac4",
+            "title": "no-loss-matrix.test.ts passes with a 'POST /api/anywhere/relay-check' row whose disposition is 'READ'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-check-route.ac5",
+            "title": "Given a scoped access token holding only read:state, when it calls POST /api/anywhere/relay-check, then the route returns 403 with error 'insufficient_scope' and the probe is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-check-route.ac6",
+            "title": "Given a fake directory port that answers the ice-servers request with an error frame { code: 'relay_not_allowed' }, when createDirectoryRtc(port).iceServers(true) runs, then it rejects with an IceServersRefusedError whose code is 'relay_not_allowed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-relay-row",
+        "title": "Add the pan doctor TURN relay row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:41:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-anywhere-relay.ts",
+            "src/cli/commands/__tests__/doctor-anywhere-relay.test.ts",
+            "src/cli/commands/doctor.ts",
+            "src/cli/commands/dashboard-call.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/cli/commands/__tests__/doctor-anywhere-relay.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "doctor-anywhere-relay.test.ts passes all cases",
+            "file-size guard passes (doctor.ts grows by 2 lines at most)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. callDashboard accepts an optional signal and passes it to fetch. New doctor-anywhere-relay.ts re-declares CheckResult structurally (like doctor-fly.ts) and exports checkAnywhereRelay({ call }): GET /api/anywhere/status with a 3 s AbortController deadline (unreachable, aborted or non-200 → []); if directory.state is not 'online' or relay is null → []; POST /api/anywhere/relay-check with a 25 s deadline; map ok → ok row 'Gathered <n> relay candidate(s) via <turnUrl> in <ms> ms', failed with turnUrl → warn with the fix naming the TURN host:port (parse: drop the turns:/turn: scheme and any ?query; no port means 5349 for turns:, 3478 for turn:), failed with turnUrl null → warn 'overdeck.ai sent relay credentials with no TURN server: <detail>' with fix 'This is an overdeck.ai service problem, not this machine's network. Report it.', refused → warn 'overdeck.ai refused relay credentials: <detail>', unanswered → warn 'overdeck.ai did not send relay credentials: <detail>', skipped → [], deadline → warn 'The relay check did not answer within 25 s', POST throws before the deadline → warn 'The relay check failed: <message>', other status → warn 'The relay check answered HTTP <n>'. callDashboard wraps every fetch failure (an abort included) in DashboardUnreachableError, so decide the deadline row from the item's own controller.signal.aborted, never from the error type. Row name 'TURN relay', never 'error'. Register it in doctor.ts after the checkFlyToken line with one import and one line."
+        },
+        "items": [
+          {
+            "id": "doctor-relay-row.ac1",
+            "title": "Given the dashboard is unreachable, or the status has relay null, or the relay check answers skipped, when checkAnywhereRelay runs, then it returns []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-relay-row.ac2",
+            "title": "Given the relay check answers { state: 'ok', relayCandidates: 2, turnUrl: 'turns:turn.example:443', elapsedMs: 300 }, when checkAnywhereRelay runs, then it returns one row named 'TURN relay' with status 'ok' whose message contains '2' and 'turns:turn.example:443'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-relay-row.ac3",
+            "title": "Given the relay check answers failed with turnUrl 'turns:turn.example:443?transport=tcp', when checkAnywhereRelay runs, then it returns one 'warn' row whose fix contains 'turn.example:443'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-relay-row.ac4",
+            "title": "Given a relay-check call that only settles when its signal aborts, when fake timers advance 25000 ms, then checkAnywhereRelay returns a 'warn' row with message 'The relay check did not answer within 25 s'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-relay-row.ac5",
+            "title": "Given the relay check answers failed with turnUrl null, when checkAnywhereRelay runs, then it returns one 'warn' row whose fix says it is an overdeck.ai service problem and names no host",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "connector-docs",
+        "title": "Document no-webrtc-egress for bots and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:41:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/bots.mdx",
+            "cli/mcp.mdx",
+            "changelog.d/pan-5242.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. In configuration/bots.mdx add '## Troubleshooting' before '## Remove a bot' with a '### no-webrtc-egress' subsection: what it means (the bot's computer got no TURN relay connection; the usual cause is no TLS to turn.cloudflare.com:443 and no UDP, when a retry will not help; a relay outage gives the same result), what to do (Public MCP link /configuration/mcp#public-mcp-for-hosted-bots, a host with WebRTC egress, or Tailscale), and how to tell a relay outage from a blocked bot (pan doctor's TURN relay row on the machine). Add one sentence under 'Routes and reconnects' that connector errors name each leg (relay: …; direct: …). Add the no-webrtc-egress row to the code table in cli/mcp.mdx after relay-plan-needed. Create changelog.d/pan-5242.md with the #### Fixed bullet from the PRD."
+        },
+        "items": [
+          {
+            "id": "connector-docs.ac1",
+            "title": "configuration/bots.mdx contains a '### no-webrtc-egress' heading whose section names 'turn.cloudflare.com:443', links /configuration/mcp#public-mcp-for-hosted-bots and tells the reader to run 'pan doctor' on the machine and read its TURN relay row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connector-docs.ac2",
+            "title": "cli/mcp.mdx's connect code table contains a row for `no-webrtc-egress` with status 'error', placed after the `relay-plan-needed` row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connector-docs.ac3",
+            "title": "changelog.d/pan-5242.md exists with a '#### Fixed' heading and a bullet linking issue #5242, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relay-docs",
+        "title": "Document the candidate tally log lines, the relay check route and the doctor row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T04:41:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/remote-access.mdx",
+            "docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. In configuration/remote-access.mdx's 'The relay plan' bullet add that pan doctor shows a TURN relay row on a signed-in machine with the relay plan (ok when it can gather a TURN relay candidate, warn with the reason otherwise). In docs/ANYWHERE-ARCHITECTURE.md 'Diagnosing a link that does not open (PAN-5018)' document the 'offer to <peer> (<route>): gathered <tally>' and 'answer to <peer> (<route>): received <tally>, gathered <tally>' lines, the tally format, the new suffix on the connected|failed|closed state line, and the fail-fast 'relay connection: gathered no TURN relay candidate from <url>' error with cause no-relay-candidate. In 'Relay and metering (D-2356-12)' describe POST /api/anywhere/relay-check, its five states (skipped, refused, unanswered, ok, failed) and the doctor row. Copy the exact strings from the merged code."
+        },
+        "items": [
+          {
+            "id": "relay-docs.ac1",
+            "title": "docs/ANYWHERE-ARCHITECTURE.md's 'Diagnosing a link that does not open' section contains the strings 'offer to', 'answer to', 'gathered', 'received' and 'no-relay-candidate', matching the log text the code emits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-docs.ac2",
+            "title": "docs/ANYWHERE-ARCHITECTURE.md's relay section contains 'POST /api/anywhere/relay-check' and names the states skipped, refused, unanswered, ok and failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-docs.ac3",
+            "title": "configuration/remote-access.mdx's relay plan bullet names the 'TURN relay' row of pan doctor and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "route-named-errors",
+        "to": "candidate-tallies",
+        "type": "blocks"
+      },
+      {
+        "from": "candidate-tallies",
+        "to": "relay-fail-fast",
+        "type": "blocks"
+      },
+      {
+        "from": "relay-fail-fast",
+        "to": "pair-relay-classification",
+        "type": "blocks"
+      },
+      {
+        "from": "egress-status-code",
+        "to": "pair-relay-classification",
+        "type": "blocks"
+      },
+      {
+        "from": "relay-fail-fast",
+        "to": "verify-egress-classification",
+        "type": "blocks"
+      },
+      {
+        "from": "egress-status-code",
+        "to": "verify-egress-classification",
+        "type": "blocks"
+      },
+      {
+        "from": "pair-relay-classification",
+        "to": "verify-egress-classification",
+        "type": "blocks"
+      },
+      {
+        "from": "relay-fail-fast",
+        "to": "relay-probe",
+        "type": "blocks"
+      },
+      {
+        "from": "relay-probe",
+        "to": "relay-check-route",
+        "type": "blocks"
+      },
+      {
+        "from": "relay-probe",
+        "to": "doctor-relay-row",
+        "type": "blocks"
+      },
+      {
+        "from": "egress-status-code",
+        "to": "connector-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "candidate-tallies",
+        "to": "relay-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "relay-check-route",
+        "to": "relay-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "doctor-relay-row",
+        "to": "relay-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

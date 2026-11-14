@@ -1,0 +1,259 @@
+{
+  "version": "1",
+  "issueId": "PAN-5242",
+  "created": "2026-11-14T05:32:10.178Z",
+  "updated": "2026-11-14T08:41:58.130Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "route-named-errors": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5242",
+      "claimedAt": "2026-11-14T05:32:10.178Z",
+      "doneAt": "2026-11-14T05:59:04.863Z"
+    },
+    "route-named-errors.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:59:04.863Z"
+    },
+    "route-named-errors.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:59:04.863Z"
+    },
+    "route-named-errors.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:59:04.863Z"
+    },
+    "route-named-errors.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:59:04.863Z"
+    },
+    "route-named-errors.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:59:04.863Z"
+    },
+    "candidate-tallies": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5242",
+      "claimedAt": "2026-11-14T05:59:17.837Z",
+      "doneAt": "2026-11-14T06:24:23.094Z"
+    },
+    "candidate-tallies.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:24:23.094Z"
+    },
+    "candidate-tallies.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:24:23.094Z"
+    },
+    "candidate-tallies.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:24:23.094Z"
+    },
+    "candidate-tallies.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:24:23.094Z"
+    },
+    "candidate-tallies.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:24:23.094Z"
+    },
+    "relay-fail-fast": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5242",
+      "claimedAt": "2026-11-14T06:24:32.673Z",
+      "doneAt": "2026-11-14T06:44:40.934Z"
+    },
+    "relay-fail-fast.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:44:40.934Z"
+    },
+    "relay-fail-fast.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:44:40.934Z"
+    },
+    "relay-fail-fast.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:44:40.934Z"
+    },
+    "relay-fail-fast.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:44:40.934Z"
+    },
+    "egress-status-code": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5242",
+      "claimedAt": "2026-11-14T06:44:50.017Z",
+      "doneAt": "2026-11-14T07:02:49.275Z"
+    },
+    "egress-status-code.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:02:49.275Z"
+    },
+    "egress-status-code.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:02:49.275Z"
+    },
+    "egress-status-code.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:02:49.275Z"
+    },
+    "pair-relay-classification": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5242",
+      "claimedAt": "2026-11-14T07:03:03.487Z",
+      "doneAt": "2026-11-14T07:23:58.013Z"
+    },
+    "pair-relay-classification.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:23:58.013Z"
+    },
+    "pair-relay-classification.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:23:58.013Z"
+    },
+    "pair-relay-classification.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:23:58.013Z"
+    },
+    "verify-egress-classification": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5242",
+      "claimedAt": "2026-11-14T07:24:06.090Z",
+      "doneAt": "2026-11-14T07:44:24.694Z"
+    },
+    "verify-egress-classification.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:44:24.694Z"
+    },
+    "verify-egress-classification.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:44:24.694Z"
+    },
+    "verify-egress-classification.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:44:24.694Z"
+    },
+    "verify-egress-classification.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:44:24.694Z"
+    },
+    "relay-probe": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5242",
+      "claimedAt": "2026-11-14T07:44:32.269Z",
+      "doneAt": "2026-11-14T07:59:57.808Z"
+    },
+    "relay-probe.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:59:57.808Z"
+    },
+    "relay-probe.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:59:57.808Z"
+    },
+    "relay-probe.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:59:57.808Z"
+    },
+    "relay-probe.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T07:59:57.808Z"
+    },
+    "connector-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5242",
+      "claimedAt": "2026-11-14T08:00:07.791Z",
+      "doneAt": "2026-11-14T08:05:03.155Z"
+    },
+    "connector-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:05:03.155Z"
+    },
+    "connector-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:05:03.155Z"
+    },
+    "connector-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:05:03.155Z"
+    },
+    "relay-check-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5242",
+      "claimedAt": "2026-11-14T08:05:11.021Z",
+      "doneAt": "2026-11-14T08:21:57.935Z"
+    },
+    "relay-check-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:21:57.935Z"
+    },
+    "relay-check-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:21:57.935Z"
+    },
+    "relay-check-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:21:57.935Z"
+    },
+    "relay-check-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:21:57.935Z"
+    },
+    "relay-check-route.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:21:57.935Z"
+    },
+    "relay-check-route.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:21:57.935Z"
+    },
+    "doctor-relay-row": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5242",
+      "claimedAt": "2026-11-14T08:22:05.283Z",
+      "doneAt": "2026-11-14T08:37:33.116Z"
+    },
+    "doctor-relay-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:37:33.116Z"
+    },
+    "doctor-relay-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:37:33.116Z"
+    },
+    "doctor-relay-row.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:37:33.116Z"
+    },
+    "doctor-relay-row.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:37:33.116Z"
+    },
+    "doctor-relay-row.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:37:33.116Z"
+    },
+    "relay-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5242",
+      "claimedAt": "2026-11-14T08:37:42.353Z",
+      "doneAt": "2026-11-14T08:41:58.130Z"
+    },
+    "relay-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:41:58.130Z"
+    },
+    "relay-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:41:58.130Z"
+    },
+    "relay-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:41:58.130Z"
+    }
+  }
+}

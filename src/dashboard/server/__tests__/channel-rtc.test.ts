@@ -15,7 +15,7 @@ import type { ChannelSocket } from '../../../lib/anywhere/channel/channel-socket
 import { ChannelOpenError, openChannel, setRtcDialer } from '../../../lib/anywhere/channel/open.js';
 import type { MachineKeyPair } from '../../../lib/anywhere/machine-key.js';
 import { _resetChannelListenerForTests, installChannelListener } from '../channel-listener.js';
-import { createDirectoryRtc, type DirectoryPort, type DirectoryRtc } from '../services/directory-rtc.js';
+import { createDirectoryRtc, IceServersRefusedError, type DirectoryPort, type DirectoryRtc } from '../services/directory-rtc.js';
 
 const _require = createRequire(import.meta.url);
 const dh = _require('noise-handshake/dh') as { generateKeyPair(): MachineKeyPair };
@@ -166,5 +166,41 @@ describe('rtc:// routes on the secure channel (PAN-2356 WI-11)', () => {
   it('fails with unreachable when the directory does not list the machine', async () => {
     const opened = openChannel('rtc://00000000-0000-4000-8000-0000000000cc', { mode: 'link', localKey: keyA, remoteKeyHex: hex(keyB) });
     await expect(opened).rejects.toMatchObject({ code: 'unreachable' });
+  });
+});
+
+describe('DirectoryRtc.iceServers (PAN-5242)', () => {
+  it('rejects with IceServersRefusedError when the directory answers an error frame', async () => {
+    const handlers: Handlers = new Map();
+    const port: DirectoryPort = {
+      send(frame: MachineToDirectoryFrame) {
+        if (frame.type === 'ice-servers') {
+          setImmediate(() => {
+            for (const handler of handlers.get('error') ?? []) {
+              handler({ type: 'error', code: 'relay_not_allowed', message: 'the relay needs the relay plan', requestId: frame.requestId });
+            }
+          });
+        }
+        return true;
+      },
+      on(type, handler) {
+        let set = handlers.get(type);
+        if (!set) handlers.set(type, (set = new Set()));
+        set.add(handler as (frame: DirectoryToMachineFrame) => void);
+        return () => set.delete(handler as (frame: DirectoryToMachineFrame) => void);
+      },
+      isOnline: () => true,
+      machine: () => null,
+    };
+    const rtc = createDirectoryRtc(port);
+    try {
+      const rejected = rtc.iceServers(true).catch((error: unknown) => error);
+      const error = await rejected;
+      expect(error).toBeInstanceOf(IceServersRefusedError);
+      expect((error as IceServersRefusedError).code).toBe('relay_not_allowed');
+      expect((error as Error).message).toBe('the relay needs the relay plan');
+    } finally {
+      rtc.stop();
+    }
   });
 });

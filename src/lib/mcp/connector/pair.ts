@@ -31,6 +31,7 @@ import { parseConnectorPairLink } from '@overdeck/contracts';
 import { channelAgent } from '../../anywhere/channel/channel-agent.js';
 import type { ChannelSocket } from '../../anywhere/channel/channel-socket.js';
 import { openChannel, setRtcDialer } from '../../anywhere/channel/open.js';
+import { isNoRelayCandidate } from '../../anywhere/channel/rtc-transport.js';
 import type { ConnectorIo } from './account.js';
 import type { linkFetch } from '../../anywhere/link-client.js';
 import { ConnectorLink, createConnectorDashboardApi, noDirectPathMessage } from './channel-api.js';
@@ -62,7 +63,7 @@ const PAIRING_CODE_REFUSED_MESSAGE = 'The machine refused the pairing code (it m
 
 export type PairFailureCode =
   | 'bad-pairing-string' | 'not-signed-in' | 'home-unreadable' | 'directory-refused' | 'network'
-  | 'machine-not-in-account' | 'machine-offline' | 'relay-plan-needed'
+  | 'machine-not-in-account' | 'machine-offline' | 'relay-plan-needed' | 'no-webrtc-egress'
   | 'machine-unreachable' | 'pairing-code-refused' | 'key-mismatch' | 'pairing-failed';
 
 export type PairOutcome =
@@ -236,10 +237,9 @@ export async function pairWithMachine(
       try {
         channel = await deps.openPairingChannel(`rtc+turn://${link.environmentId}`, pairingOpts);
       } catch (relayError) {
-        return failed(
-          pairingRefused(relayError) ? 'pairing-code-refused' : 'machine-unreachable',
-          `Could not reach ${found.machine.label}: ${errorText(relayError)} (direct: ${errorText(directError)})`,
-        );
+        const detail = `Could not reach ${found.machine.label}. relay: ${errorText(relayError)}; direct: ${errorText(directError)}`;
+        const code = pairingRefused(relayError) ? 'pairing-code-refused' : isNoRelayCandidate(relayError) ? 'no-webrtc-egress' : 'machine-unreachable';
+        return failed(code, detail);
       }
     }
 
