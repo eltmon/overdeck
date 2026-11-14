@@ -196,6 +196,13 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   (`workspaces/git-state.ts`, `xbrief/continue-state.ts`, `lanes/*`) assume it.
   A planned issue's spec lives on that branch, not on the primary checkout, so
   "is it planned?" must check the workspace or the branch ref (PAN-4683).
+- **Primary checkouts have a stale local `main`** — nobody pulls `main` in a project's
+  primary repo checkouts (MYN sub-repos were weeks behind), so any merge check that compares
+  with the bare local branch reports merged work as unmerged. Compare with a fetched
+  `origin/<target>`. Known local-`main` readers: close-out row 4
+  (`lifecycle/workflows.ts verifyConventionBranchMerged`, PAN-5209), `close-out.ts
+  isBranchMerged` (reaper) and `pipeline-membership-gather.ts
+  resolveRepositoryDefaultBranch` (prefers local over `origin/`).
 - **Close-out ceremony lives in `lifecycle/workflows.ts closeOut()`** — `pan close` and
   `POST /api/issues/:id/close-out` both call it. `src/lib/close-out.ts` now holds only
   merge detection (`isBranchMerged`, squash-aware via the merged PR). `closeOut()` reads
