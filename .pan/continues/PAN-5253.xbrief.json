@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5253",
   "created": "2026-11-14T08:19:14.576Z",
-  "updated": "2026-11-14T10:02:43.045Z",
+  "updated": "2026-11-14T10:15:28.302Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -394,9 +394,26 @@
       "doneAt": "2026-11-14T10:02:36.177Z"
     },
     "regression-sweep": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5253",
-      "claimedAt": "2026-11-14T10:02:43.045Z"
+      "claimedAt": "2026-11-14T10:02:43.045Z",
+      "doneAt": "2026-11-14T10:15:28.302Z"
+    },
+    "regression-sweep.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T10:15:28.302Z"
+    },
+    "regression-sweep.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T10:15:28.302Z"
+    },
+    "regression-sweep.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T10:15:28.302Z"
+    },
+    "regression-sweep.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T10:15:28.302Z"
     }
   }
 }
