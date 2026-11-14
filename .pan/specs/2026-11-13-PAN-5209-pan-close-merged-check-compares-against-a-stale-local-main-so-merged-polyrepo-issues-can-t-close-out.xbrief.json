@@ -1,0 +1,639 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-13T21:49:04Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5209: pan close: merged check compares against a stale local main, so merged polyrepo issues can't close out",
+    "updated": "2026-11-14T01:26:55.795Z"
+  },
+  "plan": {
+    "id": "pan-5209",
+    "title": "pan close: merged check compares against a stale local main, so merged polyrepo issues can't close out",
+    "status": "running",
+    "uid": "5a75040e-0842-44a6-afd2-ba22acb27113",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-11-13T21:49:04Z",
+    "updated": "2026-11-14T01:26:55.795Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5209",
+        "label": "PAN-5209",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5209.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "close-out",
+      "dod-gate",
+      "polyrepo",
+      "gitlab",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "Close-out's merged check (DoD row 4) compares each repo's feature branch with the bare local target branch. Primary checkouts never pull main, so MIN-1139/MIN-1140 fail with '10 unmerged commit(s)' (myn-skills) and '29 unmerged commit(s)' (openclaw-plugin) although both feature branches equal origin/main. Rows 1 and 2 also fail with 'no pull request found on the forge' because they read only a GitHub PR, and MYN is a Linear-tracked GitLab/polyrepo project.",
+      "Proposal": "Extract the merge verifier from workflows.ts (at its file-size cap) into src/lib/lifecycle/verify-merged.ts; resolve a comparison ref per repo by fetching origin/<target> (falling back to the local ref with a stated note) and use it at all eight comparison sites; give GitLab MRs the same post-merge-delta tolerance GitHub PRs have; and, for non-GitHub-tracked issues with no GitHub PR, let rows 1 and 2 record a skip (not a pass: no verdict is observed) on read-only repo landing evidence (forge asked first for a merged PR/MR in every required repo; repos without one must have no branch work), read once per gate evaluation. Document it in docs/MERGE-WORKFLOW.md and changelog.d/pan-5209.md.",
+      "NonGoals": "- Changing src/lib/close-out.ts isBranchMerged (closed-issue reaper) — it also compares with local main, but changing it alters what the reaper deletes\n- Changing resolveRepositoryDefaultBranch in src/lib/pipeline-membership-gather.ts (pipeline membership and row 4's containment fallback)\n- Reading GitLab MR approvals or pipeline status for rows 1 and 2\n- Recording review verdicts in polyrepo GitLab workspaces (PAN-5097)\n- Any change to rows 3, 5, 6, 7 or 8\n- Pulling, resetting or checking out local main in primary checkouts\n- Changing GitHub-tracked issues' row 1/2 behavior\n- Raising any file-size allowlist cap\n- Changing assessMergeCompleteness or the merge flow's Single Merge Oracle"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Cover the rows 1/2 GitLab gap in this issue rather than naming another owner",
+        "rationale": "PAN-5097 owns recording verdicts, not the DoD read; no other open issue owns it, and the issue's goal (MIN-1139/1140 close out) needs both fixes."
+      },
+      {
+        "summary": "A failed fetch falls back to the local target ref even if a cached origin/<target> exists",
+        "rationale": "The issue states this fallback explicitly; the step details say so."
+      },
+      {
+        "summary": "Rows 1 and 2 accept merged forge artifacts as landing evidence without reading GitLab approvals or pipelines",
+        "rationale": "The issue asks for merged MRs as landing evidence; MR !121 showed approvals carry no signal (approved with zero approvers) and glab mr list has no pipeline field."
+      },
+      {
+        "summary": "Rows 1/2 use a new read-only, forge-first repo landing evidence module instead of assessMergeCompleteness",
+        "rationale": "assessMergeCompleteness returns no-changes for zero-ahead repos before asking the forge; every MIN-1139/1140 repo is zero-ahead (merge-commit MRs), so it would find no positive evidence. It also upserts a merge-set row, and the DoD gate only reads."
+      },
+      {
+        "summary": "Use an explicit refspec fetch (+refs/heads/<t>:refs/remotes/origin/<t>)",
+        "rationale": "Updates the remote-tracking ref even under a narrowed remote.origin.fetch and never touches local main."
+      },
+      {
+        "summary": "Extract the verifier before changing it",
+        "rationale": "workflows.ts is 1153 lines against a 1160 cap; agents may not raise caps."
+      },
+      {
+        "summary": "Keep the existing unmerged-commit message text unchanged",
+        "rationale": "Minimizes test churn; the fallback note covers the one case where the compared ref is not origin/<target>."
+      },
+      {
+        "summary": "Rows 1/2 record skip, not pass, on complete forge merge evidence",
+        "rationale": "Plan critic round 1: no review decision or check result is observed, so pass would be false; skip matches terminalVerdictSettlement's outcome for an unknown verdict on landed work and still unblocks close-out as the issue requires."
+      }
+    ],
+    "items": [
+      {
+        "id": "extract-verify-merged",
+        "title": "Move the close-out merge verifier into src/lib/lifecycle/verify-merged.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T21:49:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-5209",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/verify-merged.ts",
+            "src/lib/lifecycle/workflows.ts",
+            "tests/unit/lib/lifecycle/workflows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/lifecycle/workflows.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "workflows.test.ts passes with only its import line changed",
+            "file-size guard prints its passed line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Move workflows.ts lines 595-991 (line 991 is the closing brace of verifySquashMergedPrByBranch) (export interface MergeVerificationRoot through the end of verifySquashMergedPrByBranch) verbatim into a new src/lib/lifecycle/verify-merged.ts with its own imports: exec from 'child_process' and promisify from 'util' (bare specifiers, so the vi.mock calls in workflows.test.ts still intercept), stepOk/stepSkipped/stepFailed and types from ./types.js, getForgeAdapter from ../forge.js, resolveProjectReposForIssue from ../project-repos.js, BRANCH_ABSENT_MERGE_ERROR from ./dod.js. Keep the unexported Effect wrapper verifyBranchMerged and __testInternals in workflows.ts, importing verifyBranchMergedImpl from ./verify-merged.js. Do not re-export the moved names from workflows.ts. Remove imports workflows.ts no longer uses. Change only the import line in tests/unit/lib/lifecycle/workflows.test.ts so verifyBranchMergedImpl and verifyConventionBranchMerged come from verify-merged.js. No behavior change."
+        },
+        "items": [
+          {
+            "id": "extract-verify-merged.ac1",
+            "title": "Given the move, when grep -n 'async function verifySquashMergedPrByBranch' runs on src/lib/lifecycle/workflows.ts, then it returns no match and src/lib/lifecycle/verify-merged.ts exports verifyBranchMergedImpl and verifyConventionBranchMerged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-verify-merged.ac2",
+            "title": "Given only the import line of tests/unit/lib/lifecycle/workflows.test.ts changed, when npx vitest run tests/unit/lib/lifecycle/workflows.test.ts runs, then every existing case passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-verify-merged.ac3",
+            "title": "When bash scripts/lint-file-size.sh runs, then it exits 0 and scripts/file-size-allowlist.txt is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "compare-origin-target",
+        "title": "Compare the merged check against a fetched origin/<target>, with a local-ref fallback note",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T21:49:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5209",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/verify-merged.ts",
+            "tests/unit/lib/lifecycle/workflows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/lifecycle/workflows.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "workflows.test.ts passes including the two new fetch-failure cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "verify-merged-fixture-tests",
+            "gitlab-mr-head-tolerance",
+            "dod-forge-merge-verdict"
+          ],
+          "acJustification": "Five ACs: grep sweep, success path, fallback-pass note, fallback-fail note, and the no-ref failure."
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add TargetComparison { ref; note? } and resolveTargetComparison(dir, targetBranch), which runs `git fetch origin +refs/heads/<t>:refs/remotes/origin/<t>` (cwd dir, encoding utf-8, timeout 30000) and returns origin/<t>; on failure, when `git rev-parse --verify --quiet refs/heads/<t>^{commit}` resolves, the bare <t> with note `Checked against local <t> because git fetch origin <t> failed: <reason>` (reason = first non-empty line of stderr, else message, max 200 chars); otherwise { ref: null, error: 'Cannot verify merge: git fetch origin <t> failed (<reason>) and no local <t> branch exists' }, and verifyConventionBranchMerged returns stepFailed with that error before any git comparison runs (the diff commands swallow errors, so an empty diff must never be reached without a ref). Add optional comparison to MergeVerificationRoot. Split verifyConventionBranchMerged into an internal verifyConventionBranchAgainst(ctx, root, comparison) plus the exported wrapper that resolves the comparison (unless root.comparison is set) and applies withComparisonNote: note appended to details on success/skip, appended to error as ` (<note>)` on failure. Replace root.targetBranch with comparison.ref at the is-ancestor, three-dot diff and git log commands in verifyConventionBranchAgainst and verifyRemoteBranchIfPresent, and set remoteTargetRef = comparison.ref in verifySquashMergedPrByBranch. Keep targetBranch: root.targetBranch (bare) in the findMergedArtifact call. verifyRootConventionBranches resolves once and passes the comparison to both the feature/ and strike/ calls. Rewrite the ~47 mocked command strings in workflows.test.ts from bare main/master to origin/main/origin/master in the same commit, and add the two fetch-failure cases from PRD WI-2 step 7. Detail strings such as 'All commits merged to main' stay byte-identical."
+        },
+        "items": [
+          {
+            "id": "compare-origin-target.ac1",
+            "title": "Given the change, when grep -nE '(is-ancestor|git diff|git log).*root\\.targetBranch' runs on src/lib/lifecycle/verify-merged.ts, then it returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compare-origin-target.ac2",
+            "title": "Given the fetch mock succeeds, when verifyConventionBranchMerged checks feature/pan-100 against main, then it runs `git merge-base --is-ancestor feature/pan-100 origin/main` and returns the unchanged detail 'All commits merged to main'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compare-origin-target.ac3",
+            "title": "Given the fetch throws with stderr 'fatal: unable to access origin' and the local ancestry check passes, when the check runs, then details ends with 'Checked against local main because git fetch origin main failed: fatal: unable to access origin'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compare-origin-target.ac4",
+            "title": "Given the fetch throws and one commit is unmerged against local main, when the check runs, then error equals '1 unmerged commit(s) on feature/pan-100. Merge before closing out. (Checked against local main because git fetch origin main failed: fatal: unable to access origin)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compare-origin-target.ac5",
+            "title": "Given the fetch fails and no local main branch exists, when verifyConventionBranchMerged runs, then it returns a failed step with error 'Cannot verify merge: git fetch origin main failed (<reason>) and no local main branch exists' and runs no git diff command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verify-merged-fixture-tests",
+        "title": "Real-git fixture tests for a stale local main",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T21:49:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5209",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/lifecycle/verify-merged-remote-target.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/verify-merged-remote-target.test.ts"
+          ],
+          "expected_outputs": [
+            "verify-merged-remote-target.test.ts passes all 4 cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4"
+          ],
+          "acJustification": "Five ACs: one per real-git scenario plus the local-main-unchanged check."
+        },
+        "narrative": {
+          "Action": "PRD WI-3. New test file that does NOT mock child_process or util. Real git under os.tmpdir(), removed in afterEach; every commit uses -c user.email=t@example.com -c user.name=T -c commit.gpgsign=false. Fixture (pin branch names so init.defaultBranch cannot change them): `git init --bare --initial-branch=main origin.git`; `git clone origin.git primary` then `git checkout -B main` in primary; c1 on main pushed; clone other; c2, c3 on main pushed; `git push origin main:feature/pan-900`; in primary `git fetch origin feature/pan-900:feature/pan-900` so local main stays at c1. Call verifyConventionBranchMerged({ issueId: 'PAN-900', projectPath: primary }, { repoKey: 'myn-skills', dir: primary, sourceBranch: 'feature/pan-900', targetBranch: 'main', forge: 'github' }). Cases: (1) passes with details ['All commits merged to main', 'Remote branch fully merged'] and `git rev-parse main` in primary still equals c1; (2) with an extra unpushed commit c4 on feature/pan-900 it fails with error '1 unmerged commit(s) on feature/pan-900. Merge before closing out.'; (3) after `git remote set-url origin <tmp>/missing.git` it fails with error matching /\\(Checked against local main because git fetch origin main failed: .+\\)$/. (4) In a clone where local main is deleted (`git checkout --detach && git branch -D main`) and origin points at a missing path, it fails with error matching /^Cannot verify merge: git fetch origin main failed \\(.+\\) and no local main branch exists$/."
+        },
+        "items": [
+          {
+            "id": "verify-merged-fixture-tests.ac1",
+            "title": "Given local main is two commits behind origin/main and feature/pan-900 equals origin/main, when verifyConventionBranchMerged runs, then it returns success with details ['All commits merged to main', 'Remote branch fully merged']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-merged-fixture-tests.ac2",
+            "title": "Given the same fixture, when the check finishes, then `git rev-parse main` in the primary clone still returns c1 (the fetch preserves the local branch)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-merged-fixture-tests.ac3",
+            "title": "Given feature/pan-900 has one commit not on origin/main, when the check runs, then it rejects with error '1 unmerged commit(s) on feature/pan-900. Merge before closing out.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-merged-fixture-tests.ac4",
+            "title": "Given origin points at a missing path, when the check runs, then the error ends with '(Checked against local main because git fetch origin main failed: <reason>)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-merged-fixture-tests.ac5",
+            "title": "Given local main is deleted and origin is unreachable, when the check runs, then it rejects with error 'Cannot verify merge: git fetch origin main failed (<reason>) and no local main branch exists'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gitlab-mr-head-tolerance",
+        "title": "Accept a merged GitLab MR whose head differs from the branch tip when later commits are on origin/<target> or .pan-only",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T21:49:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5209",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/forge.ts",
+            "src/lib/lifecycle/verify-merged.ts",
+            "tests/unit/lib/lifecycle/workflows.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/lifecycle/workflows.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "workflows.test.ts passes including the rewritten and two new GitLab cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ],
+          "acJustification": "Five ACs: mismatch failure, containment pass, .pan pass, empty-delta failure, and GitHub/lookup regression."
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/lib/forge.ts add optional headSha?: string to CreateReviewArtifactResult and return headSha: merged.sha from findMergedGitLabArtifact (GitHub adapter unchanged). In verify-merged.ts extract the post-merge delta block of verifySquashMergedPrByBranch into judgePostMergeDelta({ root, branchRef, mergedHead, tipSha, targetRef, label, kind: 'PR'|'MR', fallbackLabel }) so GitHub strings stay byte-identical and GitLab gets post-MR wording. verifySquashMergedMrByBranch looks the MR up without headSha (bare targetBranch), caches the artifact once per lookup, returns today's success when tip == artifact.headSha, calls judgePostMergeDelta with targetRef = comparison.ref when they differ, and returns null when headSha is missing. In verifyConventionBranchAgainst, only a successful GitLab result takes the early pass; after the diff-empty fallback add `if (gitlabMerged && !gitlabMerged.result.success) return gitlabMerged.result;`. Rewrite the 'falls through when a merged GitLab MR head does not match the branch tip' test and add the two acceptance tests named in PRD WI-4 step 5; the 'reuses one GitLab MR lookup' test must still see exactly one glab mr list call. Test-mock note: the default mock answers unknown commands with '' and [].every() is true, so every GitLab mismatch case must mock both `git diff --name-only merged-head..newer-tip` and `git diff --name-only origin/main...newer-tip` (copy the GitHub tests near workflows.test.ts lines 1060-1090); the .pan-only case must make `git merge-base --is-ancestor post-commit origin/main` throw so it does not pass at the containment step. In the shared helper's three-dot fallback change `statePlaneOnly = deltaFiles.every(...)` to `statePlaneOnly = deltaFiles.length > 0 && deltaFiles.every(...)` (both forges; GitHub strings unchanged). Add the test 'rejects a merged GitLab MR when post-MR commits leave an empty delta' (both name-only diffs return '' -> failure 'feature/pan-100 has 1 commit(s) after merged MR !75 that are not on origin/main: post-commit')."
+        },
+        "items": [
+          {
+            "id": "gitlab-mr-head-tolerance.ac1",
+            "title": "Given a merged MR !75 with head merged-head, tip newer-tip and post-commit not on origin/main, when the check runs, then error equals 'feature/pan-100 has 1 commit(s) after merged MR !75 that are not on origin/main: post-commit'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitlab-mr-head-tolerance.ac2",
+            "title": "Given the post-MR commit is an ancestor of origin/main, when the check runs, then it returns success with details ['MR !75 is squash-merged; all 1 post-MR non-merge commit(s) on feature/pan-100 are already on origin/main']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitlab-mr-head-tolerance.ac3",
+            "title": "Given only .pan/ files differ after the MR head, when the check runs, then it returns success with a detail containing 'ahead only by state-plane commits'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitlab-mr-head-tolerance.ac4",
+            "title": "Given the existing GitHub squash-merge tests, when workflows.test.ts runs, then they pass with their expected strings unchanged and the GitLab lookup test still records exactly one `glab mr list` call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitlab-mr-head-tolerance.ac5",
+            "title": "Given post-commit is not on origin/main and both name-only diffs return an empty list, when the check runs, then it rejects with error 'feature/pan-100 has 1 commit(s) after merged MR !75 that are not on origin/main: post-commit' (an empty delta is never state-plane-only)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dod-forge-merge-verdict",
+        "title": "Read-only repo landing evidence module for DoD rows 1 and 2",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T21:49:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5209",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-forge-merge.ts",
+            "tests/unit/lib/lifecycle/dod-forge-merge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/lifecycle/dod-forge-merge.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "dod-forge-merge.test.ts passes the six verdict-rule cases, the memoization case and the four real-git assessRepoLanding cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10"
+          ],
+          "acJustification": "Five ACs: one per landing state plus the verdict/memo pair; the remaining verdict rules are pinned by exact texts in the narrative and PRD."
+        },
+        "narrative": {
+          "Action": "PRD WI-5 (and FR-6..FR-10). New src/lib/lifecycle/dod-forge-merge.ts (<=200 lines, read-only, writes nothing) exporting RepoLanding/RepoLandingEvidence/ForgeMergeVerdict types, assessRepoLanding(repo), readRepoLandingEvidence(issueId), readForgeMergeVerdict(read) and memoizeOnce(read). Do NOT reuse assessMergeCompleteness: it returns no-changes for zero-ahead repos before asking the forge, and every MIN-1139/1140 repo is zero-ahead. assessRepoLanding per required repo: (1) getForgeAdapter(repo.forge).findMergedArtifact({ sourceBranch, targetBranch (bare), cwd: repoPath }) - throw -> unverifiable '<repoKey>: merged-artifact lookup failed: <message>', artifact -> merged (url); (2) resolveTargetComparison(repoPath, targetBranch) from ./verify-merged.js - a result with a note (local fallback) or ref null -> unverifiable '<repoKey>: git read failed: <note or error>'; then `git ls-remote --heads origin <source>` (non-zero exit -> unverifiable); non-empty output -> `git fetch origin +refs/heads/<source>:refs/remotes/origin/<source>` (failure -> unverifiable) and tip = origin/<source>; empty output -> tip = refs/heads/<source> when `git rev-parse --verify --quiet refs/heads/<source>^{commit}` resolves, else no-branch-work '<repoKey>: no <source> branch'; never use a cached origin/<source> without a successful refresh; (3) `git merge-base --is-ancestor <tip> <ref>` fails -> unlanded '<repoKey>: <source> is not on <ref> and has no merged review artifact'; (4) tip in `git rev-list --first-parent <ref>` -> no-branch-work '<repoKey>: <source> points at <ref> history', else unlanded '<repoKey>: <source> work reached <ref> without a merged review artifact'; (5) any other git failure -> unverifiable '<repoKey>: git read failed: <message>'. Verdict rules in order: read throws -> unverifiable 'forge merge state read failed: <msg>'; any unverifiable -> unverifiable 'forge merge evidence unavailable: <reasons joined ; >'; no repos -> incomplete 'forge merge incomplete: no repositories resolved'; any unlanded -> incomplete 'forge merge incomplete: <unlanded reasons joined ; >'; no merged -> incomplete 'forge merge incomplete: no repository has a merged review artifact'; else complete 'forge merge complete: <list>' with '<repoKey> merged (<url>)' / '<repoKey> merged' / '<repoKey> no branch work' joined by ', '. Imports use bare 'child_process'/'util'. Tests in tests/unit/lib/lifecycle/dod-forge-merge.test.ts: stubbed verdict cases, memoizeOnce, and real-git assessRepoLanding cases with forge.js mocked (fixture branches pinned with --initial-branch=main). Also test (e): lookup null and origin pointing at a missing path -> unverifiable with reason starting 'fe: git read failed:', and a verdict case with api merged plus fe unverifiable -> kind unverifiable."
+        },
+        "items": [
+          {
+            "id": "dod-forge-merge-verdict.ac1",
+            "title": "Given a real-git repo whose feature/pan-900 was merged into main with --no-ff (zero commits ahead) and a stubbed lookup returning MR !121, when assessRepoLanding runs, then it returns state merged with url https://gitlab.com/x/-/merge_requests/121",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-forge-merge-verdict.ac2",
+            "title": "Given a repo whose feature/pan-900 equals origin/main and a lookup returning null, when assessRepoLanding runs for repoKey myn-skills, then it returns no-branch-work with reason 'myn-skills: feature/pan-900 points at origin/main history'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-forge-merge-verdict.ac3",
+            "title": "Given the --no-ff repo with a lookup returning null, when assessRepoLanding runs for repoKey fe, then it returns unlanded with reason 'fe: feature/pan-900 work reached origin/main without a merged review artifact'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-forge-merge-verdict.ac4",
+            "title": "Given a lookup that throws Error('glab mr list failed: 401'), or a null lookup with origin unreachable, when assessRepoLanding runs for repoKey fe, then it returns unverifiable (reason 'fe: merged-artifact lookup failed: glab mr list failed: 401' or starting 'fe: git read failed:'), never no-branch-work",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-forge-merge-verdict.ac5",
+            "title": "Given evidence [fe merged with URL, myn-skills no-branch-work], when readForgeMergeVerdict runs, then it returns kind complete with text 'forge merge complete: fe merged (https://gitlab.com/x/-/merge_requests/121), myn-skills no branch work', and given memoizeOnce wraps a spy awaited twice, then the spy is called once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dod-rows-forge-merge-wiring",
+        "title": "Rows 1 and 2 skip on complete forge merge evidence for non-GitHub issues",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T21:49:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5209",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "tests/unit/lib/lifecycle/dod-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts tests/unit/lib/lifecycle/dod-gate-pr-read.test.ts",
+            "wc -l src/lib/lifecycle/dod-gate.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both dod-gate test files pass including the four new cases",
+            "dod-gate.ts is 1000 lines or fewer"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In src/lib/lifecycle/dod-gate.ts add forgeMerge?: () => Promise<RepoLandingEvidence> to LandingEvidence and optional forgeMerge?: (issueId) => Promise<RepoLandingEvidence> to EvaluateDodGateDeps (default readRepoLandingEvidence from ./dod-forge-merge.js). In evaluateDodGate build landing with forgeMerge: memoizeOnce(() => readForgeMerge(ctx.issueId)) only when ctx.github is undefined (ctx.github is set for GitHub-tracked close-outs by src/cli/commands/close.ts and src/lib/overdeck/issue-close-out.ts). In checkVerdict's `if (!pr)` block, when landing.forgeMerge is set: complete -> result(id, 'skip', '<observed>; <text>; skipped — merged forge artifacts are landing evidence; <not-read note>') where the not-read note is 'the forge review decision is not read' for review and 'forge check results are not read' for tests (a FORGE_LANDING_NOT_READ map next to STRIKE_BYPASS_NOTE); never 'pass', because no verdict was observed; unverifiable -> result(id, 'miss', '<observed>; <text>') with no strike or settlement waiver; incomplete -> append '; <text>' to observed and continue to the existing strike/settlement/miss logic. observed starts as 'no pull request found on the forge for this issue'. A thrown PullRequestReadError is unchanged. Keep dod-gate.ts at or under 1000 lines. Add the four dod-gate.test.ts cases named in PRD WI-6 step 5."
+        },
+        "items": [
+          {
+            "id": "dod-rows-forge-merge-wiring.ac1",
+            "title": "Given a null PR read and landing.forgeMerge returning fe merged (URL https://gitlab.com/x/-/merge_requests/121) and myn-skills no-branch-work, when checkReviewRow runs, then it returns status skip with observed 'no pull request found on the forge for this issue; forge merge complete: fe merged (https://gitlab.com/x/-/merge_requests/121), myn-skills no branch work; skipped — merged forge artifacts are landing evidence; the forge review decision is not read', and checkTestsRow returns skip with the same text ending 'forge check results are not read'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-rows-forge-merge-wiring.ac2",
+            "title": "Given a null PR read, strikeLanded true and an unverifiable repo, when both rows run, then both return status miss with observed containing 'forge merge evidence unavailable:' (the strike skip does not apply)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-rows-forge-merge-wiring.ac3",
+            "title": "Given a null PR read and an unlanded repo, when both rows run, then both return status miss with observed ending '; forge merge incomplete: fe: feature/min-1 is not on origin/main and has no merged review artifact'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-rows-forge-merge-wiring.ac4",
+            "title": "Given evaluateDodGate with an injected forgeMerge spy, when ctx has no github coordinates then the spy is called exactly once, and when ctx.github is set then the spy is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-close-out-merge-check",
+        "title": "Document the origin/<target> merged check and the rows 1-2 forge merge fallback",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-13T21:49:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5209",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MERGE-WORKFLOW.md",
+            "changelog.d/pan-5209.md",
+            ".overdeck/context/codebase/concerns.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'Checked against local' docs/MERGE-WORKFLOW.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints a count of 1 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "FR-6",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In docs/MERGE-WORKFLOW.md, next to the paragraph beginning 'Close-out's DoD rows 1 (review) and 2 (tests) read the issue's PR from the forge', add a 'Close-out's DoD row 4 (merged)' paragraph: the check lives in src/lib/lifecycle/verify-merged.ts; it runs `git fetch origin +refs/heads/<target>:refs/remotes/origin/<target>` in each required repo's checkout and compares with origin/<target>, never the local branch; the fetch never moves local main; a failed fetch falls back to local <target> and the row says 'Checked against local <target> because git fetch origin <target> failed: <reason>'; a merged GitLab MR whose head differs from the branch tip passes when later commits are on origin/<target> or touch only .pan/. Extend the rows 1/2 paragraph per PRD WI-7: for an issue not tracked on GitHub with no GitHub PR, rows 1 and 2 read repo landing evidence from src/lib/lifecycle/dod-forge-merge.ts (forge asked first for every repo, no ahead-count gate; a repo without an artifact has no branch work when its branch is missing or on origin/<target>'s first-parent line), are SKIP (no review decision or check result is read) with 'forge merge complete: …', and a failed forge or git read is a MISS ('forge merge evidence unavailable: …') no waiver covers; note that this differs from the Single Merge Oracle (assessMergeCompleteness). Add changelog.d/pan-5209.md with the exact Fixed entry from PRD WI-7 step 2. In .overdeck/context/codebase/concerns.md, extend the 'Close-out ceremony lives in lifecycle/workflows.ts closeOut()' bullet to say row 4's merge verification lives in lifecycle/verify-merged.ts and compares against fetched origin/<target>; leave the last-verified line unchanged."
+        },
+        "items": [
+          {
+            "id": "docs-close-out-merge-check.ac1",
+            "title": "Given docs/MERGE-WORKFLOW.md after the change, when a reader opens the close-out DoD paragraphs, then the text names src/lib/lifecycle/verify-merged.ts, src/lib/lifecycle/dod-forge-merge.ts, origin/<target> and the exact note 'Checked against local <target> because git fetch origin <target> failed: <reason>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-close-out-merge-check.ac2",
+            "title": "Given changelog.d/pan-5209.md, when npm run lint:docs runs, then it exits 0 and the file has exactly one '#### Fixed' heading with a bullet linking issue #5209",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-close-out-merge-check.ac3",
+            "title": "Given .overdeck/context/codebase/concerns.md, when grep -n 'verify-merged.ts' runs on it, then it returns the close-out bullet and the file still ends with exactly one last-verified line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-verify-merged",
+        "to": "compare-origin-target",
+        "type": "blocks"
+      },
+      {
+        "from": "compare-origin-target",
+        "to": "verify-merged-fixture-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "compare-origin-target",
+        "to": "gitlab-mr-head-tolerance",
+        "type": "blocks"
+      },
+      {
+        "from": "compare-origin-target",
+        "to": "dod-forge-merge-verdict",
+        "type": "blocks"
+      },
+      {
+        "from": "dod-forge-merge-verdict",
+        "to": "dod-rows-forge-merge-wiring",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-13-PAN-5209-pan-close-merged-check-compares-against-a-stale-local-main-so-merged-polyrepo-issues-can-t-close-out.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}
