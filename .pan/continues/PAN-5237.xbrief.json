@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5237",
   "created": "2026-11-14T04:16:13.968Z",
-  "updated": "2026-11-14T04:57:47.295Z",
+  "updated": "2026-11-14T05:00:10.634Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,9 +130,10 @@
       "doneAt": "2026-11-14T04:57:47.294Z"
     },
     "outbox-cancel-controls": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5237",
-      "claimedAt": "2026-11-14T04:57:08.365Z"
+      "claimedAt": "2026-11-14T04:57:08.365Z",
+      "doneAt": "2026-11-14T05:00:10.633Z"
     },
     "bubble-cancel-controls.ac1": {
       "status": "completed",
@@ -149,6 +150,14 @@
     "bubble-cancel-controls.ac4": {
       "status": "completed",
       "doneAt": "2026-11-14T04:57:47.294Z"
+    },
+    "outbox-cancel-controls.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:00:10.633Z"
+    },
+    "outbox-cancel-controls.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T05:00:10.633Z"
     }
   }
 }
