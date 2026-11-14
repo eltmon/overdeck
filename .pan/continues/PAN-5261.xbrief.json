@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5261",
   "created": "2026-11-14T08:29:10.265Z",
-  "updated": "2026-11-14T08:46:47.153Z",
+  "updated": "2026-11-14T08:46:51.978Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
     "unknown-pin-issue-branch.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T08:46:47.153Z"
+    },
+    "coalescer-change-kinds": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5261",
+      "claimedAt": "2026-11-14T08:46:51.978Z"
     }
   }
 }
