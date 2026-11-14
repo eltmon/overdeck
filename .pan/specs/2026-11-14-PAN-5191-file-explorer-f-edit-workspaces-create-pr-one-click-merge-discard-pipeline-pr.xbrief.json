@@ -1,0 +1,1416 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T01:32:40.547Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5191: File explorer F: edit workspaces, Create PR, one-click merge, discard, pipeline PR",
+    "updated": "2026-11-14T01:33:51.001Z"
+  },
+  "plan": {
+    "id": "pan-5191",
+    "title": "File explorer F: edit workspaces, Create PR, one-click merge, discard, pipeline PR",
+    "status": "proposed",
+    "uid": "c0faec16-5396-4432-b94a-af30074a8652",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-14T01:32:40.547Z",
+    "updated": "2026-11-14T01:33:51.001Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5191",
+        "label": "PAN-5191",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5191/.pan/drafts/pan-5191.md",
+        "label": "PRD draft (.pan/drafts/pan-5191.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5191/.pan/drafts/pan-5183.md",
+        "label": "Parent PRD (.pan/drafts/pan-5183.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "explorer",
+      "edit-workspace",
+      "pull-request",
+      "pan-5183"
+    ],
+    "narratives": {
+      "Problem": "A project root in the file explorer is read-only: the main checkout must never be written, so nothing opened from a project home can be edited, and there is no way to turn a hand edit into a PR.",
+      "Proposal": "The first save or file action on a project root creates or reuses an edit workspace (scratch/edit-<slug> worktree) through pan.explorerBeginEdit and moves the edit and every pane there. A banner on the edit workspace offers Create PR (direct PR with a one-click squash merge when GitHub reports it can merge, or Send through pipeline: GitHub issue, feature/<issue> push, ensurePRExists and PAN-4605 adoption into review) and Discard. A user page documents the whole explorer. The executable spec is .pan/drafts/pan-5191.md.",
+      "NonGoals": "- Send through pipeline for trackers other than GitHub Issues, or Create PR for forges other than GitHub.\n- Carrying files that exist only in the main checkout (untracked, ignored, local-only commits) into an edit workspace.\n- Renaming or moving the scratch worktree into a pipeline workspace (adoption replaces it).\n- Polling PR state, AI-generated PR titles or bodies, stacked PRs.\n- Git actions (stage, unstage, discard changes) or undo history on project roots.\n- Automatic reaping of abandoned edit workspaces.\n- Automated roles creating real GitHub PRs, issues or merges.\n- Any write to the primary checkout working tree or index, any --no-verify, git stash, deep-wipe or --admin merge.\n- Changes to pan workspace CLI behavior or to scratch workspaces that are not on a scratch/edit-* branch."
+    },
+    "metadata": {
+      "sizeJustification": "This is child F (WI-14, WI-15, WI-16, WI-18 user page) of an epic the parent PRD already split into seven issues. Edit workspaces, Create PR, merge, discard and the pipeline send form one user flow over one route module and one banner: splitting them into sibling issues would ship a banner whose buttons lead nowhere, or routes no UI calls. About half the files are co-located tests, and the subsystem count is inflated because each top-level doc file (docs/*.md, features/*.mdx, docs.json, changelog.d) counts as its own subsystem.",
+      "canonicalFilename": "2026-11-14-PAN-5191-file-explorer-f-edit-workspaces-create-pr-one-click-merge-discard-pipeline-pr.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "PR, merge, discard and status are HTTP routes under /api/explorer/edit-workspaces/:workspaceId; begin-edit stays the existing RPC (D-F1).",
+        "rationale": "Parent WI-15 specifies these routes; the calls are long one-shot request/response, and no new RPC contract is needed."
+      },
+      {
+        "summary": "Send through pipeline uses PAN-4605 PR adoption instead of renaming and moving the scratch worktree (D-F2).",
+        "rationale": "A moved scratch worktree has no pipeline setup or proper registry row; adoption is the tested door that builds the pipeline workspace from a pushed feature/<issue> PR and starts review."
+      },
+      {
+        "summary": "Send through pipeline is available only for projects whose tracker is GitHub Issues with an issue_prefix (D-F3).",
+        "rationale": "No dashboard route creates tracker issues today, per-project tracker construction uses loadConfigSync (forbidden in server code), and the explorer PR flow is GitHub-only anyway."
+      },
+      {
+        "summary": "Direct PR creation uses argv gh pr create through runGh rather than the forge adapter (D-F4).",
+        "rationale": "The adapter builds a shell string with the title in double quotes, which an operator-typed title can break or inject into."
+      },
+      {
+        "summary": "Pushes use the explorer git runner with git push [--set-upstream] origin HEAD:refs/heads/<branch>, not gitPush (D-F5).",
+        "rationale": "gitPush fetches the branch from the remote first, which fails for a never-pushed branch, and it does not set upstream."
+      },
+      {
+        "summary": "Repository commit and push hooks run; failures are returned verbatim and the default title is a conventional-commit subject (D-F6).",
+        "rationale": "Repo policy forbids --no-verify; a 2026-11-13 commitlint dry run rejected Fix typo in README and accepted chore: edit README.md."
+      },
+      {
+        "summary": "Merge refuses unpushed work (409 UNPUSHED_CHANGES) instead of keeping a dirty workspace after merge (D-F8).",
+        "rationale": "A merge then never lands without the latest edits, and Push changes covers follow-up edits."
+      },
+      {
+        "summary": "Code panes on an edit root show a one-line note; only the explorer pane shows the banner buttons (D-F16).",
+        "rationale": "Create PR and Discard in every code tab would be clutter; the explorer pane is the one control surface per root."
+      },
+      {
+        "summary": "Automated roles do not create real GitHub PRs, issues or merges; those paths are verified with fakes and a local bare remote, plus an operator check (D-F17).",
+        "rationale": "They are outward-facing actions and a merge lands a commit on main."
+      },
+      {
+        "summary": "Files that exist only in the main checkout are not carried into an edit workspace (D-F15).",
+        "rationale": "Edit workspaces are cut from origin/<default branch>; carrying untracked state is a separate feature."
+      }
+    ],
+    "items": [
+      {
+        "id": "edit-gh",
+        "title": "Edit-workspace error type and argv gh helpers with the merge verdict (WI-F1)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:32:40.547Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/edit-workspace-errors.ts",
+            "src/dashboard/server/services/explorer/edit-workspace-gh.ts",
+            "src/dashboard/server/services/explorer/__tests__/edit-workspace-gh.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/edit-workspace-gh.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "edit-workspace-gh.test.ts reports all cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "FR-12",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-F1: add EditWorkspaceError (code, status, message) and edit-workspace-gh.ts with findBranchPr, readPrMergeState, createPullRequest, closePullRequest, createGitHubIssue, the pure mergeVerdict table of D-F7 and readPrWithVerdict (one 2,000 ms re-read on UNKNOWN through an injected sleep). Every gh call is an argument vector through an injected GhRunner that defaults to runGh with caller \"other\"; never a shell string."
+        },
+        "items": [
+          {
+            "id": "edit-gh.ac1",
+            "title": "Given mergeable MERGEABLE, mergeVerdict returns canMerge true for CLEAN, UNSTABLE and HAS_HOOKS, and returns the exact D-F7 reason text for MERGED, CLOSED, draft, DIRTY, CONFLICTING, BLOCKED, BEHIND, UNKNOWN and \"GitHub reports FOO\" for an unlisted value FOO",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-gh.ac2",
+            "title": "When the first gh pr view read reports UNKNOWN, readPrWithVerdict calls sleep(2000) once and calls gh pr view a second time (fake gh and fake sleep)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-gh.ac3",
+            "title": "createPullRequest passes the title a \"quoted\" $(title) to gh as one argv element, adds --draft only when draft is true, and returns the number parsed from the /pull/<n> URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-gh.ac4",
+            "title": "createGitHubIssue returns number 42 when gh prints https://github.com/o/r/issues/42",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "begin-edit",
+        "title": "Server beginEdit with reuse rule, resolveEditWorkspace and editSupport; replace the RPC stub (WI-F2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:32:40.547Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5191",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/edit-workspace.ts",
+            "src/dashboard/server/services/explorer/__tests__/edit-workspace.test.ts",
+            "src/dashboard/server/ws-rpc-explorer.ts",
+            "src/dashboard/server/__tests__/ws-rpc-explorer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/edit-workspace.test.ts src/dashboard/server/__tests__/ws-rpc-explorer.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "edit-workspace.test.ts reports all cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-14",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "edit-remove",
+            "status-route",
+            "direct-pr",
+            "merge-discard",
+            "pipeline-pr"
+          ],
+          "readinessReason": "Touches only its new service file, its test and one handler line in ws-rpc-explorer.ts; no other item edits those files."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-F2: add edit-workspace.ts exporting EDIT_BRANCH, editSupport, resolveEditWorkspace and beginEdit. beginEdit serializes per project key, refuses a non-git primary checkout with NOT_A_GIT_REPO, applies the D-F13 reuse rule over listWorkspaces scratch rows on an edit branch, and otherwise creates edit-<MMDD-HHMM>[-n] through resolveWorkspaceCreateIntent plus performWorkspaceCreate with parentBranch = the default branch. Replace the explorerBeginEdit NOT_IMPLEMENTED stub in ws-rpc-explorer.ts with a run(() => beginEdit(...)) handler and drop the now-unused stub helpers."
+        },
+        "items": [
+          {
+            "id": "begin-edit.ac1",
+            "title": "Given a project with an edit row whose PR is OPEN, beginEdit returns that row with created false and never calls performWorkspaceCreate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "begin-edit.ac2",
+            "title": "Given only a row whose PR is MERGED and a clock at 2026-11-13 14:05, beginEdit creates edit-1113-1405 on branch scratch/edit-1113-1405; a path-exists finding or an existing local branch for that name produces edit-1113-1405-2 instead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "begin-edit.ac3",
+            "title": "When two beginEdit calls for one project run concurrently, performWorkspaceCreate runs once and both calls resolve to the same workspaceId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "begin-edit.ac4",
+            "title": "beginEdit rejects with code NOT_A_GIT_REPO when the primary checkout is not a git top level, and resolveEditWorkspace rejects a row on branch scratch/notes with code NOT_AN_EDIT_WORKSPACE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "begin-edit.ac5",
+            "title": "Calling pan.explorerBeginEdit through explorerRpcHandlers no longer returns NOT_IMPLEMENTED; ws-rpc-explorer.test.ts asserts the handler forwards projectKey and forceNew to beginEdit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "edit-git",
+        "title": "Commit-all, push-head and operator identity helpers with real-git tests (WI-F3)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:32:40.547Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/edit-workspace-git.ts",
+            "src/dashboard/server/services/explorer/__tests__/edit-workspace-git.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/edit-workspace-git.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "edit-workspace-git.test.ts reports all cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-F3: add edit-workspace-git.ts with operatorIdentity (git config --global), commitAll (add -A, staged check, NOTHING_TO_COMMIT when nothing staged and no commits ahead of the base ref, commit as the operator identity with repository hooks running and a 120 s timeout, COMMIT_REFUSED with the stderr tail), pushHead (git push [--set-upstream] origin HEAD:refs/heads/<branch>, 180 s, PUSH_FAILED), headSha and isClean, all through the explorer runGit. Never --no-verify."
+        },
+        "items": [
+          {
+            "id": "edit-git.ac1",
+            "title": "Given a fixture repo with one modified file and a fake identity Op <op@example.com>, commitAll creates one commit whose message is the title and whose author is Op <op@example.com>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-git.ac2",
+            "title": "Given no changes and no commits ahead of origin/main, commitAll rejects with code NOTHING_TO_COMMIT; with one commit ahead and no changes it resolves { committed: false }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-git.ac3",
+            "title": "Given a commit-msg hook that prints nope to stderr and exits 1, commitAll rejects with code COMMIT_REFUSED and a message that contains nope",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-git.ac4",
+            "title": "pushHead with setUpstream true creates refs/heads/scratch/edit-x in a local bare remote and sets the upstream to origin/scratch/edit-x",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "edit-remove",
+        "title": "Remove an edit workspace: worktree, local branch, optional remote branch, registry row (WI-F4)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:32:40.547Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/edit-workspace-remove.ts",
+            "src/dashboard/server/services/explorer/__tests__/edit-workspace-remove.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/edit-workspace-remove.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "edit-workspace-remove.test.ts reports all cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-11",
+            "FR-14",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-F4: add removeEditWorkspace({ row, primaryPath }, { force, deleteRemoteBranch }) that asserts EDIT_BRANCH, runs git worktree remove [--force] -- <path> from the primary checkout (REMOVE_FAILED on failure), git branch -D <branch> (logged on failure), best-effort git push origin --delete <branch> when asked, and deleteWorkspace(row.id) through the writer door. Resolve the implementation checkpoint about -- in the fixture test."
+        },
+        "items": [
+          {
+            "id": "edit-remove.ac1",
+            "title": "Given a real worktree on scratch/edit-1, removeEditWorkspace deletes the worktree directory and the local branch and calls deleteWorkspace with the row id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-remove.ac2",
+            "title": "Given an uncommitted file, removal with force false rejects with code REMOVE_FAILED and the directory survives; with force true the directory is removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-remove.ac3",
+            "title": "With deleteRemoteBranch true after a push, the bare remote no longer contains refs/heads/scratch/edit-1; when the branch was never pushed the removal resolves and the fake runGit records no git push call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-remove.ac4",
+            "title": "Given a row on branch scratch/notes, removeEditWorkspace rejects with code NOT_AN_EDIT_WORKSPACE and the fake runGit records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "status-route",
+        "title": "Edit-workspace status service, GET route, shared types and the four routes' registry rows (WI-F5)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:32:40.547Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-5191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/explorer.ts",
+            "src/dashboard/server/services/explorer/edit-workspace-pr.ts",
+            "src/dashboard/server/services/explorer/__tests__/edit-workspace-pr.test.ts",
+            "src/dashboard/server/routes/explorer-edit-workspaces.ts",
+            "src/dashboard/server/routes/__tests__/explorer-edit-workspaces.test.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "packages/contracts/src/telemetry.ts",
+            "docs/TELEMETRY.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/edit-workspace-pr.test.ts src/dashboard/server/routes/__tests__/explorer-edit-workspaces.test.ts src/dashboard/server/__tests__/route-scopes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts tests/unit/telemetry-docs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the five listed test files report all cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-9",
+            "FR-14",
+            "NFR-3"
+          ],
+          "readinessReason": "First item of the serialized server route chain; no parallel item edits its files."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-F5: add the section 6.1 interfaces to packages/contracts/src/explorer.ts; add getEditWorkspaceStatus in edit-workspace-pr.ts; create routes/explorer-edit-workspaces.ts with the GET /api/explorer/edit-workspaces/:workspaceId handler behind rejectUnauthorizedDashboardRequest and an error mapper for EditWorkspaceError and ROOT_NOT_FOUND; register its layer in server.ts; and add rows for all four routes to ROUTE_SCOPES (admin), TELEMETRY_CLIENT_ROUTES (sorted), the docs/TELEMETRY.md client_route row and the no-loss matrix."
+        },
+        "items": [
+          {
+            "id": "status-route.ac1",
+            "title": "Given a project without github_repo, the status returns prSupport.available false with the exact section 6.1 reason and the fake gh records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-route.ac2",
+            "title": "Given an open CLEAN mergeable PR on the edit branch, the GET route returns 200 with pr.canMerge true; a failing gh lookup returns pr null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-route.ac3",
+            "title": "The GET route returns 401 without a credential and 409 with code NOT_AN_EDIT_WORKSPACE for a scratch/notes row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-route.ac4",
+            "title": "route-scopes.test.ts, no-loss-matrix.test.ts and telemetry-docs.test.ts pass with all four /api/explorer/edit-workspaces paths present as admin rows and telemetry client routes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "direct-pr",
+        "title": "Direct PR: commit, push the edit branch, open or reuse the PR; POST /pr direct mode (WI-F6)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:32:40.547Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/edit-workspace-pr.ts",
+            "src/dashboard/server/services/explorer/__tests__/edit-workspace-pr.test.ts",
+            "src/dashboard/server/routes/explorer-edit-workspaces.ts",
+            "src/dashboard/server/routes/__tests__/explorer-edit-workspaces.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/edit-workspace-pr.test.ts src/dashboard/server/routes/__tests__/explorer-edit-workspaces.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files report all cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-F6: add createDirectPr (PR_UNSUPPORTED without PR support, commitAll, pushHead with setUpstream, reuse an OPEN PR as Commit and push, otherwise createPullRequest) and the POST /api/explorer/edit-workspaces/:workspaceId/pr route behind rejectUnsafeDashboardMutationRequest, validating title and mode (400 INVALID_INPUT); pipeline mode answers 501 NOT_IMPLEMENTED until pipeline-pr."
+        },
+        "items": [
+          {
+            "id": "direct-pr.ac1",
+            "title": "createDirectPr commits with the title, pushes with setUpstream true and calls gh pr create with --draft when draft is true, returning created true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "direct-pr.ac2",
+            "title": "Given an OPEN PR on the edit branch, createDirectPr pushes and returns created false without calling gh pr create",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "direct-pr.ac3",
+            "title": "createDirectPr rejects with code NOTHING_TO_COMMIT when commitAll rejects with it, and the fake pushHead records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "direct-pr.ac4",
+            "title": "The POST /pr route returns 400 INVALID_INPUT for an empty title, 403 without the CSRF header on a cookie request, and 201 with the result body otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-discard",
+        "title": "Merge (verdict, unpushed-work refusal, squash pinned to head) and discard; POST /merge and /discard (WI-F7)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:32:40.547Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-5191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/edit-workspace-pr.ts",
+            "src/dashboard/server/services/explorer/__tests__/edit-workspace-pr.test.ts",
+            "src/dashboard/server/routes/explorer-edit-workspaces.ts",
+            "src/dashboard/server/routes/__tests__/explorer-edit-workspaces.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/edit-workspace-pr.test.ts src/dashboard/server/routes/__tests__/explorer-edit-workspaces.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files report all cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-11",
+            "FR-14",
+            "NFR-5"
+          ],
+          "readinessReason": "Serialized after direct-pr by a blocks edge because both edit edit-workspace-pr.ts and the route module."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-F7: add mergeEditWorkspace (NO_PR, NOT_MERGEABLE with the verdict reason, UNPUSHED_CHANGES when dirty or local HEAD differs from the PR head, mergeReviewArtifact squash with matchHeadCommit, then removeEditWorkspace with deleteRemoteBranch true) and discardEditWorkspace (optional gh pr close, then forced removal, remote branch deleted unless the PR stays open), plus their POST routes behind the mutation guard."
+        },
+        "items": [
+          {
+            "id": "merge-discard.ac1",
+            "title": "Given a DIRTY PR, mergeEditWorkspace rejects with code NOT_MERGEABLE and message Conflicts with the base branch, and mergeReviewArtifact is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-discard.ac2",
+            "title": "mergeEditWorkspace rejects with code UNPUSHED_CHANGES when isClean returns false and when local HEAD differs from the PR headSha",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-discard.ac3",
+            "title": "A mergeable clean PR calls mergeReviewArtifact with method squash and matchHeadCommit equal to the PR head, then removeEditWorkspace with deleteRemoteBranch true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-discard.ac4",
+            "title": "discard with closePr true and an OPEN PR closes the PR then removes with force true and deleteRemoteBranch true; with closePr false it never calls gh pr close and removes with deleteRemoteBranch false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-discard.ac5",
+            "title": "A PR_CLOSE_FAILED leaves removeEditWorkspace uncalled, and the discard route returns 400 INVALID_INPUT for { closePr: \"yes\" }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipeline-pr",
+        "title": "Send through pipeline: commit, GitHub issue, push feature branch, ensurePRExists, remove, adopt (WI-F8)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:32:40.547Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-5191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/edit-workspace-pipeline.ts",
+            "src/dashboard/server/services/explorer/__tests__/edit-workspace-pipeline.test.ts",
+            "src/dashboard/server/routes/explorer-edit-workspaces.ts",
+            "src/dashboard/server/routes/__tests__/explorer-edit-workspaces.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/edit-workspace-pipeline.test.ts src/dashboard/server/routes/__tests__/explorer-edit-workspaces.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "both test files report all cases green",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-1"
+          ],
+          "readinessReason": "Serialized after merge-discard by a blocks edge because it edits the same route module."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-F8: add sendThroughPipeline in edit-workspace-pipeline.ts (PIPELINE_UNSUPPORTED, PR_EXISTS, commitAll, gh issue create with the explorer footer line, push HEAD:refs/heads/feature/<issue-lower>, injected ensurePr, headSha, removeEditWorkspace without remote deletion, then adoptPrAndStartReview with source api in the background) and wire pipeline mode of POST /pr, passing ensurePRExists from the route module so the service never imports a route."
+        },
+        "items": [
+          {
+            "id": "pipeline-pr.ac1",
+            "title": "For a project with issue_prefix PAN and issue number 77, sendThroughPipeline produces the call order commit, gh issue create, push feature/pan-77, ensurePr(PAN-77) with branchName feature/pan-77 and targetBranch main, remove, adopt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-pr.ac2",
+            "title": "The issue body ends with Created from the Overdeck file explorer. and adopt receives issueId PAN-77, headRef feature/pan-77, the head sha, repo o/r and source api, while sendThroughPipeline resolves before the adopt promise settles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-pr.ac3",
+            "title": "A project with tracker linear rejects with code PIPELINE_UNSUPPORTED and gh issue create is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-pr.ac4",
+            "title": "A failed push rejects with code PUSH_FAILED whose message starts with Created PAN-77, and ensurePr, remove and adopt are never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-pr.ac5",
+            "title": "An OPEN PR on the edit branch rejects with code PR_EXISTS before commitAll runs, a CLOSED PR does not block, and when workspaces/feature-pan-77 already exists the fake adopt records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "client-switch",
+        "title": "Client beginEdit RPC, edit store, root switch, ensureEditRoot and leaveEditWorkspace (WI-F9)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:32:40.547Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5191",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/explorer-rpc.ts",
+            "src/dashboard/frontend/src/components/explorer/edit/edit-workspace-store.ts",
+            "src/dashboard/frontend/src/components/explorer/edit/edit-workspace-switch.ts",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/edit-workspace-switch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/edit/__tests__/edit-workspace-switch.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "edit-workspace-switch.test.ts reports all cases green",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-13"
+          ],
+          "foundationFor": [
+            "code-pane-project",
+            "tree-project",
+            "banner"
+          ],
+          "readinessReason": "Only new files plus one added function in explorer-rpc.ts; no other item edits them."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-F9: add beginEdit to explorer-rpc.ts; add edit-workspace-store.ts (creating, active, and pending saves as subscribed store state); add edit-workspace-switch.ts with switchRoot (re-key drafts and mark pending saves first, then retarget or close duplicate panes, then copy the expanded set), ensureEditRoot (one in-flight call per project, toast and rethrow on failure), openNewEditWorkspace and leaveEditWorkspace."
+        },
+        "items": [
+          {
+            "id": "client-switch.ac1",
+            "title": "switchRoot re-keys a dirty project draft to the edit root, marks a pending save for the new key, and retargets both the explorer pane and the code pane to the edit root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-switch.ac2",
+            "title": "Given a deck that already has an explorer pane on the edit root, switchRoot closes the switching pane and keeps the existing one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-switch.ac3",
+            "title": "Two concurrent ensureEditRoot(project:p) calls produce one beginEdit call, and each returns workspace:w1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-switch.ac4",
+            "title": "When beginEdit rejects, the draft stays dirty under the project key, creating.p returns to false and the error rethrows; when a dirty draft already sits at the target key, the source text replaces it and a warning toast names the path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-switch.ac5",
+            "title": "leaveEditWorkspace deletes the edit root drafts and updates every pane on that root to project:p",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "code-pane-project",
+        "title": "Code pane editable on project roots; first save goes through ensureEditRoot; pending save on mount (WI-F10)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:32:40.547Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/CodePane.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/useCodePaneSave.ts",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/CodePane.test.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/CodePane.save.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/code/__tests__/CodePane.test.tsx src/components/explorer/code/__tests__/CodePane.save.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "both CodePane test files report all cases green",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-F10: make CodePane writable for project-root text files and pass that to Monaco readOnly; replace READ_ONLY_NOTE with the project note or Creating edit workspace…; in useCodePaneSave route project-root autosave to ensureEditRoot instead of the save queue, and after registering the error listener consume a pending save and enqueue it with allowMissing false."
+        },
+        "items": [
+          {
+            "id": "code-pane-project.ac1",
+            "title": "A project-root text file renders Monaco without readOnly and shows the note Edits here are saved to an edit workspace. The main checkout is never changed.; while creating is set the note reads Creating edit workspace…",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "code-pane-project.ac2",
+            "title": "Given fake timers, when a project-root pane is typed into and 1,000 ms pass, then ensureEditRoot receives project:p and the pane sends no writeFile call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "code-pane-project.ac3",
+            "title": "A pane mounted on workspace:w1 with a pending save for its dirty draft sends exactly one writeFile call with allowMissing false, and a pane already mounted there sends one writeFile call when markPendingSave runs for its key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tree-project",
+        "title": "Tree write actions on project roots switch to the edit root and replay; ExplorerPane writable gate (WI-F11)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:32:40.547Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/actions/useExplorerActions.ts",
+            "src/dashboard/frontend/src/components/explorer/actions/__tests__/useExplorerActions.test.ts",
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "src/dashboard/frontend/src/components/explorer/__tests__/ExplorerPane.test.tsx",
+            "src/dashboard/frontend/src/components/explorer/menu/ExplorerContextMenu.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/actions/__tests__/useExplorerActions.test.ts src/components/explorer/__tests__/ExplorerPane.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "both test files report all cases green",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-F11: change openFile to (path, rootId); on a project root make runWrite resolve the edit root first and make create, rename, duplicate, remove and move replay on a factory for the edit root, with recordCreated using the store active root; set ExplorerPane writable to !changedOnly, delete the project-root drop toast, and keep git actions hidden on project roots."
+        },
+        "items": [
+          {
+            "id": "tree-project.ac1",
+            "title": "On project:p, create of a.txt calls ensureEditRoot(project:p), then createEntry(workspace:w1, a.txt, file) and openFile(a.txt, workspace:w1)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-project.ac2",
+            "title": "On project:p, runWrite passes workspace:w1 to its op, and recordCreated after an upload commits undo history under workspace:w1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-project.ac3",
+            "title": "On a project root the explorer header renders New file and New folder, and the context menu shows Rename and Delete but no Stage item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "edit-http",
+        "title": "Client HTTP calls for the four edit-workspace routes and the useEditWorkspaceStatus hook (WI-F12)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:32:40.547Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/edit/edit-workspace-http.ts",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/edit-workspace-http.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/edit/__tests__/edit-workspace-http.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "edit-workspace-http.test.ts reports all cases green",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-F12: add fetchEditWorkspaceStatus, createEditWorkspacePr, mergeEditWorkspace and discardEditWorkspace (POSTs send dashboardMutationJsonHeaders and JSON), throwing ExplorerHttpError with the body code on non-2xx; add useEditWorkspaceStatus (react-query, staleTime Infinity, no refetch interval, no window-focus refetch), refreshEditWorkspaceStatus and workspaceIdOf."
+        },
+        "items": [
+          {
+            "id": "edit-http.ac1",
+            "title": "Each call sends the expected URL and method, and every POST sends the CSRF headers and Content-Type application/json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-http.ac2",
+            "title": "A 409 answer with code NOT_MERGEABLE throws an ExplorerHttpError whose code is NOT_MERGEABLE and whose message is the body error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-http.ac3",
+            "title": "workspaceIdOf returns w1 for workspace:w1 and null for project:p",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "create-pr-dialog",
+        "title": "Create PR dialog with Open PR, Send through pipeline, Commit and push, and the default title (WI-F13)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:32:40.547Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/edit/default-pr-title.ts",
+            "src/dashboard/frontend/src/components/explorer/edit/CreatePrDialog.tsx",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/default-pr-title.test.ts",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/CreatePrDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/edit/__tests__/default-pr-title.test.ts src/components/explorer/edit/__tests__/CreatePrDialog.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "both test files report all cases green",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-F13: add defaultPrTitle (D-F12) and CreatePrDialog on the shared Modal with Title, Body, Draft, Open PR and Send through pipeline (each disabled with its support reason and carrying its FR-6 footnote), a Commit and push mode while a PR is open, Working… while a request runs, and the error message shown verbatim in the pinned region. Load the pan-style-guide skill before writing the UI."
+        },
+        "items": [
+          {
+            "id": "create-pr-dialog.ac1",
+            "title": "defaultPrTitle returns chore: edit files for no paths, chore: edit README.md for one, chore: edit a.ts and 2 more files for three, and never more than 100 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-pr-dialog.ac2",
+            "title": "Open PR sends mode direct with draft true when Draft is checked, and Send through pipeline sends mode pipeline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-pr-dialog.ac3",
+            "title": "Given pipelineSupport unavailable, the Send through pipeline button renders disabled with the support reason text under it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-pr-dialog.ac4",
+            "title": "A COMMIT_REFUSED error keeps the dialog open and shows its message in the pinned region",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pr-row-discard",
+        "title": "PR status row (Merge, Refresh, Push changes) and the Discard dialog (WI-F14)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:32:40.547Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/edit/PrStatusRow.tsx",
+            "src/dashboard/frontend/src/components/explorer/edit/DiscardDialog.tsx",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/PrStatusRow.test.tsx",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/DiscardDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/edit/__tests__/PrStatusRow.test.tsx src/components/explorer/edit/__tests__/DiscardDialog.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "both test files report all cases green",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-F14: add PrStatusRow (link, plain-text state, Merge disabled with the inline verdict reason or Commit and push your changes first., Refresh, Push changes when there are changes) and DiscardDialog on Modal (lists uncommitted and unsaved paths, Also close PR #n checked by default only for an open PR, calls discardEditWorkspace then onDiscarded). Load the pan-style-guide skill before writing the UI."
+        },
+        "items": [
+          {
+            "id": "pr-row-discard.ac1",
+            "title": "Given a DIRTY PR, PrStatusRow renders Merge disabled with the inline text Conflicts with the base branch; with hasChanges it renders Commit and push your changes first.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-row-discard.ac2",
+            "title": "An enabled Merge button calls onMerge when clicked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-row-discard.ac3",
+            "title": "DiscardDialog lists both the uncommitted and the unsaved paths, hides the Also close PR checkbox without an open PR, and sends closePr false when the checkbox is unchecked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "banner",
+        "title": "Edit-workspace banner in the explorer pane, note line in code panes, merge/pipeline/discard wiring (WI-F15)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:32:40.547Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/edit/EditWorkspaceBanner.tsx",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/EditWorkspaceBanner.test.tsx",
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/CodePane.tsx",
+            "src/dashboard/frontend/src/components/explorer/__tests__/ExplorerPane.test.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/CodePane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/edit/__tests__/EditWorkspaceBanner.test.tsx src/components/explorer/__tests__/ExplorerPane.test.tsx src/components/explorer/code/__tests__/CodePane.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "the three listed test files report all cases green",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "FR-12",
+            "FR-13"
+          ],
+          "readinessReason": "Integration item; its blocks edges serialize it after every item that edits ExplorerPane.tsx and CodePane.tsx."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-F15: add EditWorkspaceBanner (status sentence, Create PR, Discard, New edit workspace, PrStatusRow, merge, pipeline and discard outcomes that call leaveEditWorkspace and toast), render it at the ExplorerPane banner slot for workspace roots plus Creating edit workspace… for project roots, and render the edit note line in CodePane for edit roots. Then run the browser UAT of AC-F15 in an isolated Playwright profile."
+        },
+        "items": [
+          {
+            "id": "banner.ac1",
+            "title": "The banner renders Editing in edit workspace edit-1113-1405 (branch scratch/edit-1113-1405). The main checkout is not changed. with Create PR, Discard and New edit workspace buttons, and renders nothing for a NOT_AN_EDIT_WORKSPACE status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner.ac2",
+            "title": "A successful merge shows the toast Merged PR #<n>. The edit workspace was removed. and calls leaveEditWorkspace(workspace:w1, p); a successful discard and a pipeline result also call leaveEditWorkspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner.ac3",
+            "title": "A pipeline result shows a toast that contains the created issue id and the PR number",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner.ac4",
+            "title": "Given the explorer on project:overdeck in an isolated Playwright profile, when a line is typed into README.md and 1 s passes, then git status --porcelain of the primary checkout prints nothing, a workspaces/scratch-edit-* directory on a scratch/edit-* branch contains the line, and the explorer pane shows Editing in edit workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner.ac5",
+            "title": "In the same UAT session, Discard removes the scratch-edit directory and the explorer pane shows project:overdeck again; screenshots of the banner and the Create PR dialog are attached to the PR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Explorer user page, docs.json nav, conversations pointer, architecture and workspaces docs, changelog (WI-F16)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T01:32:40.547Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/file-explorer.mdx",
+            "docs.json",
+            "features/conversations.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "changelog.d/pan-5191.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npx vitest run tests/unit/telemetry-docs.test.ts"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "telemetry-docs.test.ts reports all cases green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-F16: write features/file-explorer.mdx with the nine sections in order (opening, tree, search, editing, disk changes, viewers, file actions, edit workspaces, Create PR and merge) using facts from the code and sibling drafts; add it to docs.json after features/workspaces; add the pointer sentence to features/conversations.mdx; replace the explorerBeginEdit stub row and add the Edit workspaces and PR routes subsection in docs/DASHBOARD-ARCHITECTURE.md; add the Edit workspaces section to docs/WORKSPACES-AND-PROJECTS.md; add changelog.d/pan-5191.md with the PRD text."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "features/file-explorer.mdx contains the nine section headings of WI-F16 step 1 in order, and docs.json lists features/file-explorer directly after features/workspaces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md no longer contains Stub: `NOT_IMPLEMENTED` for pan.explorerBeginEdit or the sentences It is read-only: a write and The main checkout is read-only., and contains the section 6.2 route table under Edit workspaces and PR routes (PAN-5191)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "docs/WORKSPACES-AND-PROJECTS.md contains an Edit workspaces (PAN-5191) section that states the reuse rule and the three ways an edit workspace ends",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "changelog.d/pan-5191.md exists with a #### New entry linking #5191, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "edit-gh",
+        "to": "begin-edit",
+        "type": "blocks"
+      },
+      {
+        "from": "begin-edit",
+        "to": "edit-remove",
+        "type": "blocks"
+      },
+      {
+        "from": "begin-edit",
+        "to": "status-route",
+        "type": "blocks"
+      },
+      {
+        "from": "edit-gh",
+        "to": "status-route",
+        "type": "blocks"
+      },
+      {
+        "from": "status-route",
+        "to": "direct-pr",
+        "type": "blocks"
+      },
+      {
+        "from": "edit-git",
+        "to": "direct-pr",
+        "type": "blocks"
+      },
+      {
+        "from": "direct-pr",
+        "to": "merge-discard",
+        "type": "blocks"
+      },
+      {
+        "from": "edit-remove",
+        "to": "merge-discard",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-discard",
+        "to": "pipeline-pr",
+        "type": "blocks"
+      },
+      {
+        "from": "status-route",
+        "to": "merge-discard",
+        "type": "blocks"
+      },
+      {
+        "from": "status-route",
+        "to": "pipeline-pr",
+        "type": "blocks"
+      },
+      {
+        "from": "direct-pr",
+        "to": "pipeline-pr",
+        "type": "blocks"
+      },
+      {
+        "from": "status-route",
+        "to": "edit-http",
+        "type": "blocks"
+      },
+      {
+        "from": "client-switch",
+        "to": "code-pane-project",
+        "type": "blocks"
+      },
+      {
+        "from": "client-switch",
+        "to": "tree-project",
+        "type": "blocks"
+      },
+      {
+        "from": "edit-http",
+        "to": "create-pr-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "edit-http",
+        "to": "pr-row-discard",
+        "type": "blocks"
+      },
+      {
+        "from": "client-switch",
+        "to": "banner",
+        "type": "blocks"
+      },
+      {
+        "from": "edit-http",
+        "to": "banner",
+        "type": "blocks"
+      },
+      {
+        "from": "create-pr-dialog",
+        "to": "banner",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-row-discard",
+        "to": "banner",
+        "type": "blocks"
+      },
+      {
+        "from": "code-pane-project",
+        "to": "banner",
+        "type": "blocks"
+      },
+      {
+        "from": "tree-project",
+        "to": "banner",
+        "type": "blocks"
+      },
+      {
+        "from": "banner",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "pipeline-pr",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
