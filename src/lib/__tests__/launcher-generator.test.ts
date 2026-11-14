@@ -268,7 +268,7 @@ describe('generateLauncherScript', () => {
     expect(workScript).not.toContain('--conversation');
   });
 
-  it('gives conversations a gh-only shim when ghShim is set (PAN-4343)', () => {
+  it('gives conversations a gh shim and a trailer-only git shim when ghShim is set (PAN-4343, PAN-5281)', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       spawnMode: 'conversation',
@@ -278,8 +278,8 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toContain("conversations/conv-123/git-guard/gh' <<EOF");
     expect(script).toContain('git-guard:$PATH"');
-    expect(script).not.toContain('_OVERDECK_REAL_GIT');
-    expect(script).not.toContain("/git-guard/git'");
+    expect(script).toContain("conversations/conv-123/git-guard/git' <<EOF");
+    expect(script).not.toContain('_OVERDECK_GUARD_ROOT');
   });
 
   it('blocks history operations and passes permitted git commands to real git', () => {

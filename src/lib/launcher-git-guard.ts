@@ -615,18 +615,40 @@ function dropInheritedGuardDirLines(): string[] {
 }
 
 /**
- * PAN-4343: the `gh` shim alone, for conversation launchers. Conversations get
- * no git guard (they are operator sessions), but the Flywheel runs as one, so
- * it needs the grant-label deny. The directory is named `git-guard` so the
- * launcher prelude and `pan restart` strip it from inherited PATHs.
+ * PAN-4343 / PAN-5281: the conversation shims — the `gh` shim and a
+ * trailer-only `git` shim. Conversations get no git guard (they are operator
+ * sessions), so the git shim refuses nothing: it adds
+ * `Overdeck-Conversation: <id>` to `git commit` and execs the real git. The
+ * Flywheel runs as a conversation, so its `gh` shim needs the grant-label
+ * deny. The directory is named `git-guard` so the launcher prelude and
+ * `pan restart` strip it from inherited PATHs.
  */
-export function buildConversationGhShimLines(conversationId: string, denyGrantLabels: boolean): string[] {
+export function buildConversationShimLines(conversationId: string, denyGrantLabels: boolean): string[] {
   const guardDir = join(getOverdeckHome(), 'conversations', conversationId, 'git-guard');
+  const gitPath = join(guardDir, 'git');
   const pathForDoubleQuotes = guardDir.replace(/([\\"$`])/g, '\\$1');
   return [
-    // Drop inherited guard dirs first, so "real gh" is never a foreign shim.
+    // Drop inherited guard dirs first, so "real git"/"real gh" is never a foreign shim.
     ...dropInheritedGuardDirLines(),
     `mkdir -p ${shellQuote(guardDir)}`,
+    '_OVERDECK_REAL_GIT="$(command -v git 2>/dev/null || true)"',
+    'if [ -n "$_OVERDECK_REAL_GIT" ]; then',
+    '_OVERDECK_GIT_TRAILERS=0',
+    'case "$("$_OVERDECK_REAL_GIT" commit -h 2>&1)" in *--trailer*) _OVERDECK_GIT_TRAILERS=1 ;; esac',
+    `cat > ${shellQuote(gitPath)} <<EOF`,
+    '#!/bin/sh',
+    '_OVERDECK_REAL_GIT="$_OVERDECK_REAL_GIT"',
+    '_OVERDECK_GIT_TRAILERS="$_OVERDECK_GIT_TRAILERS"',
+    'if [ "\\$OVERDECK_PAN_GIT_OP" = "1" ]; then',
+    '  exec "\\$_OVERDECK_REAL_GIT" "\\$@"',
+    'fi',
+    ...FIND_COMMAND_SHIM_LINES,
+    '_overdeck_git_command="\\$(_overdeck_git_find_command "\\$@")"',
+    ...trailerShimLines('Overdeck-Conversation', conversationId),
+    'exec "\\$_OVERDECK_REAL_GIT" "\\$@"',
+    'EOF',
+    `chmod 0755 ${shellQuote(gitPath)}`,
+    'fi',
     ...buildGhShimLines(conversationId, guardDir, denyGrantLabels),
     `export PATH="${pathForDoubleQuotes}:$PATH"`,
   ];
