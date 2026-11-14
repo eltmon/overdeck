@@ -301,16 +301,19 @@ export function createCodexConversationAccumulator(sessionFile: string, options:
           toolCallsByCallId.delete(callId);
         } else if (output) {
           // Output with no matching call (truncated/rotated) — stand-alone entry.
+          // PAN-5211: a located row gets its own offset id, so a disk page that later shows the call under
+          // its call_id does not collapse the two rows into one.
           sequence += 1;
+          const id = location ? `codex-tool-out-@${location.offset}` : callId || `codex-tool-out-${sequence}`;
           addWork({
-            id: callId || `codex-tool-out-${rowSuffix(location)}`,
+            id,
             createdAt,
             label: 'Tool result',
             result: output,
             tone: 'tool',
             sequence: nextRowSequence(location),
           });
-          if (callId && location) resultLocations.set(callId, location);
+          if (callId && location) resultLocations.set(id, location);
         }
       }
       // response_item 'message' (injected context) and 'reasoning' (encrypted)
@@ -384,4 +387,9 @@ export function createCodexConversationAccumulator(sessionFile: string, options:
   return { push, pushOversized, result, retainedChars: (): number => retained };
 }
 
-export const parseCodexConversationMessages = createIncrementalTranscriptReader(createCodexConversationAccumulator);
+/** PAN-5211: a tail read keeps the newest `turn_context` before the tail, so cost keeps its pricing model. */
+export const CODEX_TAIL_CONTEXT_MARKER = '"type":"turn_context"';
+
+export const parseCodexConversationMessages = createIncrementalTranscriptReader(createCodexConversationAccumulator, {
+  tailContextMarker: CODEX_TAIL_CONTEXT_MARKER,
+});

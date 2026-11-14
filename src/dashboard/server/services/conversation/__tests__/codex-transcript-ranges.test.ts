@@ -9,7 +9,13 @@ import { decodeTimelineCursor } from '@overdeck/contracts';
 
 import { createCodexConversationAccumulator } from '../../codex-conversation-parser.js';
 import { createIncrementalTranscriptReader } from '../../incremental-transcript-reader.js';
-import { resolveToolBodyEntry, selectHistoryPageBefore, withFullToolResult } from '../codex-transcript-ranges.js';
+import {
+  findCodexToolEntryFrom,
+  readCodexRowsBefore,
+  resolveToolBodyEntry,
+  selectHistoryPageBefore,
+  withFullToolResult,
+} from '../codex-transcript-ranges.js';
 import { selectInitialWindow, selectPageBefore } from '../window.js';
 import { RECORD_FULL_READ_MAX_BYTES } from '../tool-result-bounds.js';
 import type { RecordLocation } from '../types.js';
@@ -152,6 +158,69 @@ describe('resolveToolBodyEntry for a row from a disk page (PAN-5211)', () => {
 
     expect(await resolveToolBodyEntry(file, parsed, 'call_old')).toBeUndefined();
     expect(await resolveToolBodyEntry(file, parsed, 'call_old', callOffset + 1)).toBeUndefined();
+  });
+});
+
+describe('disk-page edge cases (PAN-5211 review)', () => {
+  const userEvent = (i: number) => JSON.stringify({
+    type: 'event_msg', timestamp: '2026-11-13T00:00:01.000Z', payload: { type: 'user_message', message: `m${i} ${'u'.repeat(100)}` },
+  });
+
+  it('finds an output in a final record that has no newline yet', async () => {
+    const call = record({ type: 'function_call', name: 'exec_command', arguments: '{}', call_id: 'call_tail' });
+    const output = record({ type: 'function_call_output', call_id: 'call_tail', output: 'tail output' });
+    await writeFile(file, `${call}\n${output}`);
+
+    const entry = await findCodexToolEntryFrom(file, 0, 'call_tail');
+
+    expect(entry?.result).toBe('tail output');
+  });
+
+  it('skips a record longer than the scan limit so paging moves past it', async () => {
+    const huge = record({ type: 'function_call_output', call_id: 'huge', output: 'h'.repeat(20_000) });
+    const [, hugeAt, after] = await writeLines([userEvent(0), huge, userEvent(2)]);
+
+    const skipped = await readCodexRowsBefore(file, after!.offset, 5, { stepBytes: 1024, maxBytes: 4096 });
+    expect(skipped).toEqual({ messages: [], workLog: [], rangeStart: hugeAt!.offset });
+
+    const earlier = await readCodexRowsBefore(file, skipped.rangeStart, 5, { stepBytes: 1024, maxBytes: 4096 });
+    expect(earlier.messages.map((m) => m.text.slice(0, 2))).toEqual(['m0']);
+    expect(earlier.rangeStart).toBe(0);
+  });
+
+  it('reports where the kept rows begin when a range drops its oldest rows', async () => {
+    const locations = await writeLines(Array.from({ length: 40 }, (_, i) => userEvent(i)));
+    const end = locations[39]!.offset;
+
+    const rows = await readCodexRowsBefore(file, end, 5, { maxRetainedChars: 1_000, windowTargetChars: 800 });
+
+    expect(rows.rangeStart).toBeGreaterThan(0);
+    expect(rows.rangeStart).toBe(rows.messages[0]!.sequence);
+  });
+
+  it('marks a disk-page call without its output as an omitted body', async () => {
+    const lines = [
+      record({ type: 'function_call', name: 'exec_command', arguments: '{"cmd":"sleep"}', call_id: 'call_open' }),
+      ...Array.from({ length: 60 }, (_, i) => userEvent(i)),
+      record({ type: 'function_call_output', call_id: 'call_open', output: 'finally' }),
+    ];
+    const [call] = await writeLines(lines);
+    const lineBytes = Buffer.byteLength(lines[1]!) + 1;
+    const parsed = await createIncrementalTranscriptReader(createCodexConversationAccumulator, { tailReadBytes: 20 * lineBytes })(file);
+    const before = decodeTimelineCursor(selectInitialWindow(parsed).window.cursor!)!;
+
+    let page = await selectHistoryPageBefore(parsed, file, before, 200);
+    for (let guard = 0; guard < 20 && !page.workLog.some((w) => w.id === 'call_open') && page.window.hasOlder; guard++) {
+      page = await selectHistoryPageBefore(parsed, file, decodeTimelineCursor(page.window.cursor!)!, 200);
+    }
+
+    const row = page.workLog.find((w) => w.id === 'call_open');
+    expect(row).toMatchObject({ bodyOmitted: true, sequence: call!.offset });
+    expect((await resolveToolBodyEntry(file, parsed, 'call_open', row!.sequence))?.result).toBe('finally');
+    // The in-memory stand-alone output keeps its own id, so the call row above is not deduplicated away.
+    const standAlone = parsed.workLog.find((w) => w.label === 'Tool result')!;
+    expect(standAlone.id).toMatch(/^codex-tool-out-@\d+$/);
+    expect((await resolveToolBodyEntry(file, parsed, standAlone.id))?.result).toBe('finally');
   });
 });
 

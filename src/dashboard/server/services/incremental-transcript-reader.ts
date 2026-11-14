@@ -1,5 +1,5 @@
 /** Bounded worker-local parser state: append reads avoid decoding the history again. */
-import { open } from 'node:fs/promises';
+import { open, type FileHandle } from 'node:fs/promises';
 import type { ParseResult, RecordLocation } from './conversation/types.js';
 import {
   RECORD_PARSE_MAX_BYTES,
@@ -33,6 +33,11 @@ export interface IncrementalTranscriptReaderOptions {
   readonly maxCacheRetainedChars?: number;
   readonly tailReadBytes?: number;
   readonly recordParseMaxBytes?: number;
+  /**
+   * PAN-5211: on a tail read, the newest line before the tail that holds these bytes is pushed first,
+   * without a location, so context records (Codex `turn_context` carries the pricing model) survive.
+   */
+  readonly tailContextMarker?: string;
 }
 
 export interface TranscriptLineSplitter {
@@ -119,6 +124,40 @@ export function pushTranscriptLine(
   }
 }
 
+/** Most bytes of a context line that `findLineBefore` reads. */
+const CONTEXT_LINE_MAX_BYTES = 1024 * 1024;
+
+/**
+ * The newest complete line that ends before `end` and holds `marker`, scanning back at most `maxScan`
+ * bytes. Lines longer than CONTEXT_LINE_MAX_BYTES are not returned.
+ */
+async function findLineBefore(handle: FileHandle, end: number, marker: Buffer, maxScan: number): Promise<Buffer | undefined> {
+  const floor = Math.max(0, end - maxScan);
+  const block = Buffer.alloc(TAIL_SCAN_BLOCK_BYTES + marker.length);
+  for (let blockEnd = end; blockEnd > floor;) {
+    const blockStart = Math.max(floor, blockEnd - TAIL_SCAN_BLOCK_BYTES);
+    // Overlap by the marker length so a marker that straddles two blocks is still found.
+    const readEnd = Math.min(end, blockEnd + marker.length);
+    const { bytesRead } = await handle.read(block, 0, readEnd - blockStart, blockStart);
+    const hit = block.subarray(0, bytesRead).lastIndexOf(marker);
+    if (hit !== -1) {
+      const at = blockStart + hit;
+      const windowStart = Math.max(0, at - CONTEXT_LINE_MAX_BYTES / 2);
+      const windowEnd = Math.min(end, at + CONTEXT_LINE_MAX_BYTES / 2);
+      const window = Buffer.alloc(windowEnd - windowStart);
+      const { bytesRead: windowRead } = await handle.read(window, 0, window.length, windowStart);
+      const bytes = window.subarray(0, windowRead);
+      const rel = at - windowStart;
+      const lineStart = bytes.lastIndexOf(10, rel) + 1;
+      const lineEnd = bytes.indexOf(10, rel);
+      if ((lineStart > 0 || windowStart === 0) && lineEnd !== -1) return Buffer.from(bytes.subarray(lineStart, lineEnd));
+      return undefined;
+    }
+    blockEnd = blockStart;
+  }
+  return undefined;
+}
+
 interface Entry {
   generation: number;
   head: Buffer;
@@ -140,6 +179,7 @@ export function createIncrementalTranscriptReader(
   const maxEntryRetainedChars = options.maxEntryRetainedChars ?? TRANSCRIPT_ENTRY_MAX_RETAINED_CHARS;
   const maxCacheRetainedChars = options.maxCacheRetainedChars ?? TRANSCRIPT_CACHE_MAX_RETAINED_CHARS;
   const tailReadBytes = options.tailReadBytes ?? TRANSCRIPT_TAIL_READ_BYTES;
+  const contextMarker = options.tailContextMarker ? Buffer.from(options.tailContextMarker, 'utf8') : undefined;
   const cache = new Map<string, Entry>();
   const pending = new Map<string, Promise<ParseResult>>();
   let generation = 0;
@@ -187,6 +227,12 @@ export function createIncrementalTranscriptReader(
         // PAN-5211: a cold open of a large transcript reads only its last tailReadBytes.
         const start = stats.size > tailReadBytes ? await firstLineStartAtOrAfter(stats.size - tailReadBytes, stats.size) : 0;
         entry = newEntry(file, stats, start);
+        if (start > 0 && contextMarker) {
+          // The newest context before the tail, else the newest one in the file's head.
+          const context = await findLineBefore(handle, start, contextMarker, tailReadBytes)
+            ?? await findLineBefore(handle, Math.min(start, tailReadBytes), contextMarker, tailReadBytes);
+          if (context) entry.parser.push(scrubImageDataUrls(context).toString('utf8'));
+        }
       }
       if (stats.size !== entry.size || !entry.result) {
         const buffer = Buffer.alloc(Math.min(1024 * 1024, Math.max(1, stats.size - entry.size)));

@@ -57,7 +57,8 @@ export async function withFullToolResult(
       record.type !== 'response_item'
       || typeof payload?.type !== 'string'
       || !payload.type.endsWith('_output')
-      || payload.call_id !== entry.id
+      // A call row's id is its call_id; a stand-alone output row's id is its record offset.
+      || (payload.call_id !== entry.id && entry.id !== `codex-tool-out-@${location.offset}`)
     ) {
       return entry;
     }
@@ -130,6 +131,11 @@ export async function findCodexToolEntryFrom(
       found = parser.result(offset, 0).workLog.find((candidate) => candidate.id === toolUseId);
       if (found && (found.result !== undefined || found.bodyOmitted)) break;
     }
+    if (!found || (found.result === undefined && !found.bodyOmitted)) {
+      // A final output record without its newline yet is still complete JSON.
+      splitter.flushComplete();
+      found = parser.result(end, 0).workLog.find((candidate) => candidate.id === toolUseId);
+    }
     if (!found) return undefined;
     return await withFullToolResult(sessionFile, parser.result(end, 0).toolResultLocations, found);
   } catch {
@@ -156,6 +162,9 @@ export function toolBodyQuery(url: string): { agentId?: string; subagentId?: str
 export interface DiskPageOptions {
   readonly stepBytes?: number;
   readonly maxBytes?: number;
+  /** The range accumulator's window limits (defaults: the in-memory window's). */
+  readonly maxRetainedChars?: number;
+  readonly windowTargetChars?: number;
 }
 
 export interface CodexRowsBefore {
@@ -179,9 +188,34 @@ async function lineStartAtOrAfter(handle: FileHandle, from: number, end: number)
   return end;
 }
 
+/** The start of the line that ends just before the line start `lineStart`, scanning back in fixed blocks. */
+async function previousLineStart(handle: FileHandle, lineStart: number): Promise<number> {
+  if (lineStart <= 1) return 0;
+  const block = Buffer.alloc(LINE_SCAN_BLOCK_BYTES);
+  // Byte lineStart - 1 is the newline that ends the previous line; search before it.
+  for (let blockEnd = lineStart - 1; blockEnd > 0;) {
+    const blockStart = Math.max(0, blockEnd - LINE_SCAN_BLOCK_BYTES);
+    const { bytesRead } = await handle.read(block, 0, blockEnd - blockStart, blockStart);
+    const newline = block.subarray(0, bytesRead).lastIndexOf(10);
+    if (newline !== -1) return blockStart + newline + 1;
+    blockEnd = blockStart;
+  }
+  return 0;
+}
+
 /** Parse the records in `[start, end)` with a fresh located accumulator. */
-async function parseRange(handle: FileHandle, sessionFile: string, start: number, end: number) {
-  const parser = createCodexConversationAccumulator(sessionFile, { historyStartOffset: start });
+async function parseRange(
+  handle: FileHandle,
+  sessionFile: string,
+  start: number,
+  end: number,
+  limits: Pick<DiskPageOptions, 'maxRetainedChars' | 'windowTargetChars'> = {},
+) {
+  const parser = createCodexConversationAccumulator(sessionFile, {
+    historyStartOffset: start,
+    ...(limits.maxRetainedChars !== undefined ? { maxRetainedChars: limits.maxRetainedChars } : {}),
+    ...(limits.windowTargetChars !== undefined ? { windowTargetChars: limits.windowTargetChars } : {}),
+  });
   const splitter = createTranscriptLineSplitter(start, (line, location) => pushTranscriptLine(parser, line, location));
   const chunk = Buffer.alloc(Math.max(1, Math.min(RANGE_READ_CHUNK_BYTES, end - start)));
   for (let offset = start; offset < end;) {
@@ -209,8 +243,16 @@ export async function readCodexRowsBefore(
   const handle = await open(sessionFile, 'r');
   try {
     for (let span = Math.min(step, max); ; span = Math.min(span * 2, max)) {
-      const rangeStart = await lineStartAtOrAfter(handle, beforeOffset - span, beforeOffset);
-      const parsed = await parseRange(handle, sessionFile, rangeStart, beforeOffset);
+      const scanStart = await lineStartAtOrAfter(handle, beforeOffset - span, beforeOffset);
+      if (scanStart === beforeOffset && span >= max) {
+        // The record just before `beforeOffset` is longer than `maxBytes`. Skip it: the page holds no rows,
+        // and its range starts at that record, so the next page reads before it.
+        return { messages: [], workLog: [], rangeStart: await previousLineStart(handle, beforeOffset) };
+      }
+      const parsed = await parseRange(handle, sessionFile, scanStart, beforeOffset, options);
+      // A range over the accumulator's retained cap drops its oldest rows; report where the kept rows begin,
+      // so paging later reads the dropped ones.
+      const rangeStart = parsed.historyStartOffset ?? scanStart;
       const rows = parsed.messages.length + parsed.workLog.length;
       if (rows >= minRows || rangeStart === 0 || span >= max) {
         return { messages: parsed.messages, workLog: parsed.workLog, rangeStart };
@@ -240,7 +282,14 @@ export async function selectHistoryPageBefore(
     return { ...page, window: { ...page.window, hasOlder: true, bounded: true } };
   }
   const older = await readCodexRowsBefore(sessionFile, Math.min(before[1], historyStart), limit, options);
-  const diskPage = selectPageBefore(older, before, limit, transcript);
+  const selected = selectPageBefore(older, before, limit, transcript);
+  // A disk-page call whose output lies after the range has no result here. Mark its body as omitted so
+  // expanding it asks the server, which reads forward from the call's offset (`?seq=`) to its output.
+  const diskPage = {
+    ...selected,
+    workLog: selected.workLog.map((entry) => (entry.tone === 'tool' && entry.result === undefined && !entry.bodyOmitted
+      ? { ...entry, bodyOmitted: true } : entry)),
+  };
   const empty = diskPage.messages.length + diskPage.workLog.length === 0;
   return {
     ...diskPage,

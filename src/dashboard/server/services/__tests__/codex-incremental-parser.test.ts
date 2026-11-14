@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { appendFile, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createCodexConversationAccumulator } from '../codex-conversation-parser.js';
+import { CODEX_TAIL_CONTEXT_MARKER, createCodexConversationAccumulator } from '../codex-conversation-parser.js';
 import { createIncrementalTranscriptReader, type Accumulator } from '../incremental-transcript-reader.js';
 import type { ParseResult, RecordLocation } from '../conversation/types.js';
 import { estimateParseResultChars } from '../conversation/tool-result-bounds.js';
@@ -234,10 +234,13 @@ describe('incremental Codex history', () => {
     const offsets: number[] = [];
     const read = createIncrementalTranscriptReader((path, options) => {
       const parser = createCodexConversationAccumulator(path, options);
-      return { ...parser, push: (text, location) => { offsets.push(location!.offset); parser.push(text); } };
-    }, { tailReadBytes: 64 * 1024 });
+      return { ...parser, push: (text, location) => { if (location) offsets.push(location.offset); parser.push(text); } };
+    }, { tailReadBytes: 64 * 1024, tailContextMarker: CODEX_TAIL_CONTEXT_MARKER });
     const result = await read(file);
 
+    // The only turn_context is at byte 0, outside the tail; cost still uses its model.
+    expect(result.totalCost).toBeGreaterThan(0);
+    expect(result.totalCost).toBe(parseCodexSession(file)?.cost_v2);
     expect(offsets.length).toBeGreaterThan(0);
     expect(Math.min(...offsets)).toBeGreaterThanOrEqual(size - 65_536);
     expect(result.historyStartOffset).toBe(Math.min(...offsets));
@@ -293,8 +296,11 @@ describe('incremental Codex history', () => {
     const result = await createIncrementalTranscriptReader(createCodexConversationAccumulator)(file);
     const bytes = await readFile(file);
 
-    for (const callId of ['c1', 'orphan']) {
-      const location = result.toolResultLocations?.get(callId);
+    // A stand-alone output row's id is its record offset; its record still carries the call_id.
+    const orphanRow = result.workLog.find((w) => w.label === 'Tool result')!;
+    expect(orphanRow.id).toBe(`codex-tool-out-@${orphanRow.sequence}`);
+    for (const [rowId, callId] of [['c1', 'c1'], [orphanRow.id, 'orphan']] as const) {
+      const location = result.toolResultLocations?.get(rowId);
       expect(location).toBeDefined();
       const record = JSON.parse(bytes.subarray(location!.offset, location!.offset + location!.length).toString('utf8')) as {
         payload: { call_id: string; type: string };

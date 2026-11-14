@@ -16,7 +16,8 @@ import vm from 'node:vm';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createCodexConversationAccumulator } from '../codex-conversation-parser.js';
+import { createCodexSessionParser } from '../../../../lib/cost-parsers/codex-parser.js';
+import { CODEX_TAIL_CONTEXT_MARKER, createCodexConversationAccumulator } from '../codex-conversation-parser.js';
 import { createIncrementalTranscriptReader } from '../incremental-transcript-reader.js';
 
 v8.setFlagsFromString('--expose-gc');
@@ -30,6 +31,9 @@ const IMAGE_BASE64_BYTES = 1_200_000;
 let dir: string;
 let file: string;
 let finalTotalTokens = 0;
+/** The two records whole-file pricing depends on: the model and the last cumulative usage. */
+let turnContextLine = '';
+let finalTokenCountLine = '';
 
 /** Stream the rollout to disk so generation never holds more than one shared payload. */
 async function writeRollout(path: string): Promise<void> {
@@ -40,7 +44,8 @@ async function writeRollout(path: string): Promise<void> {
   const payload = Buffer.from('A'.repeat(IMAGE_BASE64_BYTES), 'latin1');
   const text = 't'.repeat(TEXT_CHARS);
   const timestamp = '2026-11-10T12:00:00.000Z';
-  await write(`${JSON.stringify({ timestamp, type: 'turn_context', payload: { turn_id: 't1', model: 'gpt-5.5' } })}\n`);
+  turnContextLine = JSON.stringify({ timestamp, type: 'turn_context', payload: { turn_id: 't1', model: 'gpt-5.5' } });
+  await write(`${turnContextLine}\n`);
   for (let i = 0; i < PAIRS; i++) {
     const callId = `call_${i}`;
     await write(`${JSON.stringify({ timestamp, type: 'response_item', payload: { type: 'custom_tool_call', name: 'screenshot', input: 'take', call_id: callId } })}\n`);
@@ -52,7 +57,8 @@ async function writeRollout(path: string): Promise<void> {
     await write('","detail":"high"}]}}\n');
     if ((i + 1) % 10 === 0) {
       finalTotalTokens = (i + 1) * 1000;
-      await write(`${JSON.stringify({ timestamp, type: 'event_msg', payload: { type: 'token_count', info: { total_token_usage: { input_tokens: finalTotalTokens - 100, output_tokens: 100, total_tokens: finalTotalTokens } } } })}\n`);
+      finalTokenCountLine = JSON.stringify({ timestamp, type: 'event_msg', payload: { type: 'token_count', info: { total_token_usage: { input_tokens: finalTotalTokens - 100, output_tokens: 100, total_tokens: finalTotalTokens } } } });
+      await write(`${finalTokenCountLine}\n`);
     }
   }
   out.end();
@@ -77,7 +83,7 @@ describe('Codex transcript memory bounds (PAN-5211)', () => {
     const rssBefore = process.memoryUsage().rss;
     const t0 = performance.now();
 
-    const result = await createIncrementalTranscriptReader(createCodexConversationAccumulator)(file);
+    const result = await createIncrementalTranscriptReader(createCodexConversationAccumulator, { tailContextMarker: CODEX_TAIL_CONTEXT_MARKER })(file);
 
     const elapsed = performance.now() - t0;
     const peakRssGrowth = process.resourceUsage().maxRSS * 1024 - rssBefore;
@@ -94,6 +100,12 @@ describe('Codex transcript memory bounds (PAN-5211)', () => {
     }
     expect(result.historyStartOffset).toBeGreaterThan(0);
     expect(result.totalTokens).toBe(finalTotalTokens);
+    // The only turn_context is at byte 0, far outside the tail; the cost still uses its model.
+    const whole = createCodexSessionParser(file);
+    whole.push(turnContextLine);
+    whole.push(finalTokenCountLine);
+    expect(result.totalCost).toBeGreaterThan(0);
+    expect(result.totalCost).toBe(whole.result()?.cost_v2);
   }, 60_000);
 
   it('keeps a capped window under its retained-character limit', async () => {
