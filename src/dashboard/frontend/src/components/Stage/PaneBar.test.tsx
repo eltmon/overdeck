@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { PaneBar } from './PaneBar'
 import type { WorkspacePane } from '../../lib/panesStore'
@@ -16,7 +16,12 @@ function makeAgentPane(conversationId: string): WorkspacePane {
 }
 
 describe('PaneBar', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('renders a tab per pane in order, HOME first with a ⌘1 hint', () => {
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
     render(
       <PaneBar
         panes={makePanes()}
@@ -32,6 +37,23 @@ describe('PaneBar', () => {
     expect(tabs[0]).toHaveTextContent('⌘1')
     expect(tabs[1]).toHaveTextContent('Terminal')
     expect(tabs[1]).toHaveTextContent('⌘2')
+  })
+
+  it('shows no ⌘N hint on Linux (PAN-5287 S-D9)', () => {
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue('Linux x86_64')
+    render(
+      <PaneBar
+        panes={makePanes()}
+        activePaneId="h"
+        onSelect={() => {}}
+        onClose={() => {}}
+        onAdd={() => {}}
+      />,
+    )
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs[0]).toHaveTextContent('Home')
+    expect(tabs[0]).not.toHaveTextContent('⌘1')
+    expect(screen.queryByText('⌘2')).toBeNull()
   })
 
   it('marks the active tab with aria-selected', () => {
