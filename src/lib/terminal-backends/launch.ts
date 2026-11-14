@@ -32,6 +32,7 @@ import './tmux.js';
 import { resolveTerminalBackend } from './registry.js';
 import { hostTerminalBackendName, probeHerdrAvailability } from './select.js';
 import {
+  AgentNameTakenError,
   isUnsupported,
   TerminalBackendUnavailableError,
   type AgentDetectionPolicy,
@@ -200,11 +201,31 @@ export async function launchAgentPane(
       cwd: request.cwd,
       detection: detectionPolicyFor(request.tokens.harness),
     }),
-  );
+  ).catch((error: unknown) => {
+    const taken = nameTakenDetail(error); // PAN-5243: the name belongs to another live pane
+    throw taken === null ? error : new AgentNameTakenError(request.agentId, taken);
+  });
   if (isUnsupported(pane)) {
     throw new Error(`${resolved.name} could not start ${request.agentId}: ${pane.reason}`);
   }
   return pane;
+}
+
+/**
+ * The failure detail when a backend refused a launch because the agent name is
+ * already held by a live pane (PAN-5243): Herdr answers `agent.rename` with the
+ * `agent_name_taken` code, tmux `new-session` with "duplicate session". `null`
+ * for every other failure. Walks the `cause` chain: the backend error wraps the
+ * Herdr or tmux error that carries the code.
+ */
+export function nameTakenDetail(error: unknown): string | null {
+  for (let current: unknown = error, depth = 0; current && depth < 5; depth++) {
+    const record = current as { code?: unknown; message?: unknown; cause?: unknown };
+    const message = typeof record.message === 'string' ? record.message : '';
+    if (record.code === 'agent_name_taken' || /agent_name_taken|duplicate session/.test(message)) return message || 'agent_name_taken';
+    current = record.cause;
+  }
+  return null;
 }
 
 /**

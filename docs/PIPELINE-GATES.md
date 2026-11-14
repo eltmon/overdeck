@@ -1960,6 +1960,11 @@ journal entry still carries `data.deaconPaused: true`, which `deriveWorkStart`
 surfaces as `held: true` on a `retrying` read — the badge and subline say
 "held", not "retrying", since nothing is actually being retried.
 
+A second `pan start <id>` is the standard recovery for a work agent that never started. It is
+safe to run while the first start is still launching: the second start finds the agent's start
+claim or its live pane, prints "already running" and exits 0, and it never stops the first agent
+(PAN-5243; see "One start per agent at a time" in [TERMINAL-BACKENDS.md](TERMINAL-BACKENDS.md)).
+
 Command Deck's state badge renders "Work agent not started" (a `not-started`
 workStart), "Work start retrying" (a `retrying`, unheld one), or "Work start
 held" (a `retrying`, `held` one) in place of the ordinary state badge

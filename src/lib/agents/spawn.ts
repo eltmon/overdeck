@@ -29,6 +29,8 @@ import { hostDisplayName, hostTransportFor } from '../runtimes/host-transport.js
 import { writeBridgeToken } from '../bridge-token.js';
 import { exactPaneTarget, sessionExists, setOption } from '../tmux.js';
 import { agentPaneExists, closeBackendPane, launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
+import { AgentNameTakenError } from '../terminal-backends/types.js';
+import { AgentAlreadyRunningError, claimAgentStart, type StartClaim } from './start-claim.js';
 import { toPaneRole } from '../terminal-backends/tmux.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 import {
@@ -652,11 +654,13 @@ async function spawnAgentWithoutConsentClaim(
   const role: 'work' | 'strike' | 'knowledge' = options.role ?? 'work';
   const sessionPrefix = role === 'strike' ? 'strike' : 'agent';
   const agentId = options.agentId ?? `${sessionPrefix}-${options.issueId.toLowerCase()}`;
+  // PAN-5243: claim first, before any write to the agent dir; held through kickoff. Every process's start shares it.
+  const startClaim = await claimAgentStart(agentId);
+  try { return await spawnClaimedAgent(options, role, agentId, startClaim, acceptConsent); } finally { await startClaim.release(); }
+}
 
-  // Check if already running (scoped to the exact session/pane name, including slot suffix)
-  if (await agentPaneExists(agentId)) {
-    throw new Error(`Agent ${agentId} already running. Use 'pan tell' to message it.`);
-  }
+async function spawnClaimedAgent(options: SpawnOptions, role: 'work' | 'strike' | 'knowledge', agentId: string, startClaim: StartClaim, acceptConsent?: AcceptAutoSpawnConsent): Promise<AgentState> {
+  if (await agentPaneExists(agentId)) throw new AgentAlreadyRunningError(agentId, 'running'); // exact pane name, slot suffix included
 
   await prepareWorkspaceForAgentSpawn(options.issueId, role, options.allowHost, options.workspace);
 
@@ -879,14 +883,17 @@ async function spawnAgentWithoutConsentClaim(
   // W12: the launch itself can fail — PAN-3705: the backend created the pane and
   // never detected the harness. Uncaught, that left the state at `starting`.
   try {
+    await startClaim.assertHeld();
     if (resolvedHarness === 'kimi-code') {
       await launchAndCaptureManagedKimiSession({ agentId, workspace: options.workspace, launch: launchWorkSession });
     } else {
       await launchWorkSession();
     }
   } catch (err) {
-    await closeBackendPane(launchedPane);
-    await Effect.runPromise(stopAgent(agentId)).catch(() => undefined);
+    // PAN-5243: stop by name only once this attempt's pane holds the name; else the name is another agent's.
+    if (launchedPane) await closeBackendPane(launchedPane).then(() => Effect.runPromise(stopAgent(agentId))).catch(() => undefined);
+    if (err instanceof AgentAlreadyRunningError) throw err;
+    if (err instanceof AgentNameTakenError) throw new AgentAlreadyRunningError(agentId, 'running', err.message);
     await markSpawnFailed(agentId, `launch failed: ${err instanceof Error ? err.message : String(err)}`);
     throw err;
   }
