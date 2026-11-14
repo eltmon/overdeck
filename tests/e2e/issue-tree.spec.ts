@@ -1,12 +1,15 @@
 /**
- * The issue tree is the issue workspace (PAN-3917 FR-5 / AC-7).
+ * The issue's pipeline rows are the issue workspace (PAN-3917 FR-5 / AC-7,
+ * PAN-5246 FR-11).
  *
- * Rows in an issue's tree ARE the terminal backend's panes in that issue's
- * workspace, rendered from their `role`, `harness` and `model` metadata tokens.
- * A reviewer spawned by `pan handoff --issue` carries `role: 'review'`, so it
- * renders as that issue's Review row — never as a loose conversation.
+ * The issue view's pipeline rows ARE the terminal backend's panes in that
+ * issue's workspace, rendered from their `role`, `harness` and `model`
+ * metadata tokens. A reviewer spawned by `pan handoff --issue` carries
+ * `role: 'review'`, so it renders as the issue's Review row in the Details
+ * pipeline table and as a live Review phase in the strip — never as a loose
+ * conversation.
  *
- * Drives the real cockpit route against route mocks; no live server.
+ * Drives the real Stage issue route against route mocks; no live server.
  */
 import { existsSync } from 'node:fs';
 import { lstat, mkdir, readFile, symlink, unlink } from 'node:fs/promises';
@@ -299,20 +302,22 @@ describe('the issue tree is the issue workspace', () => {
   it('renders a Herdr-spawned reviewer as the Review row with its model tag', async () => {
     const { context, page, pageErrors } = await openCockpit();
 
-    const tree = page.locator('[aria-label="Issue tree"]');
-    await expect.poll(() => tree.count(), renderPoll).toBe(1);
-    await expect.poll(() => tree.innerText(), renderPoll).toMatch(/Review/);
-
-    const rows = (await tree.innerText()).split('\n').map((line) => line.trim());
+    // Open Details by clicking its tab: nothing verifies that the Command
+    // Deck's routing keeps a ?tab= query string until the frame mounts.
+    const detailsTab = page.locator('[data-testid="drawer-tab-overview"]');
+    await expect.poll(() => detailsTab.count(), renderPoll).toBe(1);
+    await detailsTab.click();
+    const table = page.locator('[data-testid="drawer-details-pipeline"]');
+    await expect.poll(() => table.count(), renderPoll).toBe(1);
 
     // The reviewer pane is the issue's Review row, tagged with the model the
     // backend reported for it — not a loose conversation somewhere else.
-    expect(rows.indexOf('Review')).toBeGreaterThan(-1);
-    expect(rows.slice(rows.indexOf('Review'))).toContain('opus-5');
+    const review = table.locator('tr[data-phase="review"]');
+    await expect.poll(() => review.innerText(), renderPoll).toMatch(/opus-5/);
+    expect(await review.innerText()).toMatch(/Running now/);
 
     // Its work pane sits alongside it, tagged with its own model.
-    expect(rows.indexOf('Work')).toBeGreaterThan(-1);
-    expect(rows.slice(rows.indexOf('Work'), rows.indexOf('Review'))).toContain('sonnet-5');
+    expect(await table.locator('tr[data-phase="work"]').innerText()).toMatch(/sonnet-5/);
 
     expect(pageErrors).toEqual([]);
     await context.close();
@@ -321,19 +326,23 @@ describe('the issue tree is the issue workspace', () => {
   it('takes its rows from the pane inventory alone', async () => {
     const { context, page } = await openCockpit();
 
-    const tree = page.locator('[aria-label="Issue tree"]');
-    await expect.poll(() => tree.count(), renderPoll).toBe(1);
-    await expect.poll(() => tree.innerText(), renderPoll).toMatch(/Review/);
-    const rows = (await tree.innerText()).split('\n').map((line) => line.trim());
+    const detailsTab = page.locator('[data-testid="drawer-tab-overview"]');
+    await expect.poll(() => detailsTab.count(), renderPoll).toBe(1);
+    await detailsTab.click();
+    const table = page.locator('[data-testid="drawer-details-pipeline"]');
+    await expect.poll(() => table.count(), renderPoll).toBe(1);
+    await expect.poll(() => table.locator('tr[data-phase="review"]').innerText(), renderPoll).toMatch(/opus-5/);
 
     // Exactly one Review row: the pane, with no session-tree ghost beside it
     // (/api/session-trees answers empty in this fixture).
-    expect(rows.filter((line) => line === 'Review')).toHaveLength(1);
+    expect(await table.locator('tr[data-phase="review"]').count()).toBe(1);
 
-    // Both panes report `working`, and the crew header counts them as such.
-    expect(rows).toContain('2 working');
+    // Both panes report `working`, so the strip shows both phases live.
+    const strip = page.locator('[data-testid="drawer-pipeline-strip"]');
+    expect(await strip.locator('[data-phase="work"]').getAttribute('data-kind')).toBe('live');
+    expect(await strip.locator('[data-phase="review"]').getAttribute('data-kind')).toBe('live');
 
-    // The pane id is backend bookkeeping — it never surfaces as a conversation.
+    // The pane id is backend bookkeeping; it never surfaces.
     expect(await page.getByText('pane-review-9101', { exact: false }).count()).toBe(0);
 
     await context.close();
