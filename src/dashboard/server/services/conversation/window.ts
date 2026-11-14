@@ -181,9 +181,16 @@ export function selectResumeDelta(
   if (!input.messages.every(hasNumericSequence) || !input.workLog.every(hasNumericSequence)) return null;
 
   let maxSequence = Number.NEGATIVE_INFINITY;
-  for (const entry of input.messages) maxSequence = Math.max(maxSequence, entry.sequence!);
-  for (const entry of input.workLog) maxSequence = Math.max(maxSequence, entry.sequence!);
+  let holdsAfterRow = false;
+  for (const entry of [...input.messages, ...input.workLog]) {
+    maxSequence = Math.max(maxSequence, entry.sequence!);
+    if (entry.sequence === resume.afterSequence) holdsAfterRow = true;
+  }
   if (resume.afterSequence > maxSequence) return null;
+  // PAN-5211 D7: the client's newest sequence names a row it got from the server. When no row has it,
+  // the client holds another numbering (counter-form Codex sequences before record offsets), and a
+  // delta would add every row again under new ids, so it gets a windowed reset instead.
+  if (!holdsAfterRow) return null;
 
   const openIds = new Set(resume.openIds.slice(0, RESUME_OPEN_IDS_MAX));
   const wanted = (entry: { id: string; sequence?: number }) => entry.sequence! > resume.afterSequence || openIds.has(entry.id);

@@ -304,3 +304,15 @@ describe('bounded windows (PAN-5211)', () => {
   });
 });
 
+describe('resume across a sequence renumbering (PAN-5211 D7)', () => {
+  it('returns null when afterSequence names no row the server holds', () => {
+    // Offset-sequenced rows; the client still holds counter sequences from before the change.
+    const messages = [message(0, { sequence: 1200 }), message(2, { sequence: 5400 })];
+    const workLog = [tool(1, { sequence: 3100 })];
+
+    expect(selectResumeDelta({ messages, workLog }, { afterSequence: 3, openIds: [], transcript: '1:2' }, '1:2')).toBeNull();
+    expect(selectResumeDelta({ messages, workLog }, { afterSequence: 3100, openIds: [], transcript: '1:2' }, '1:2'))
+      .toEqual({ messages: [message(2, { sequence: 5400 })], workLog: [] });
+  });
+});
+
