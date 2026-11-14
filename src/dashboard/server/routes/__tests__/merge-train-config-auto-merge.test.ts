@@ -285,6 +285,17 @@ describe('POST /api/merge-train/auto-merge/schedule with kind strike (PAN-4753 W
     }));
   });
 
+  it('refuses a strike request whose lookup fell back to the feature PR', async () => {
+    const schedule = vi.fn();
+    const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917', kind: 'strike' }, {
+      ...baseDeps,
+      mergeGate: async () => gate({ headBranch: 'feature/pan-3917' }),
+      schedule: schedule as never,
+    });
+    expect(result).toEqual({ status: 422, body: { error: 'PAN-3917 has no open strike PR: the open PR is on feature/pan-3917' } });
+    expect(schedule).not.toHaveBeenCalled();
+  });
+
   it('refuses a strike held for UAT like a feature (R4)', async () => {
     const schedule = vi.fn();
     const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917', kind: 'strike' }, {

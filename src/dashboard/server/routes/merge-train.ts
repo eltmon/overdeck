@@ -626,6 +626,10 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
   if (!gate.ready) {
     return { status: 422, body: { error: `${issueId} is not ready to merge: ${gate.reason ?? 'the merge gate refused it'}` } };
   }
+  // With no open strike PR the lookup falls back to the feature PR; never schedule that as a strike.
+  if (branchOptions.preferBranch && (gate.facts.headBranch ?? '').toLowerCase() !== branchOptions.preferBranch) {
+    return { status: 422, body: { error: `${issueId} has no open strike PR: the open PR is on ${gate.facts.headBranch ?? 'no branch'}` } };
+  }
 
   const eligibility = await (deps.isEligible ?? ((id: string, options?: { preferBranch?: string }) => isAutoMergeEligible(id, {}, options)))(issueId, branchOptions);
   if (!eligibility.eligible) {

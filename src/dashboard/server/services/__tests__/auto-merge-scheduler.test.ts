@@ -108,7 +108,7 @@ function facts(overrides: Partial<PrFacts> = {}): PrFacts {
 
 interface WorldOptions {
   labels?: string[];
-  getFacts?: (issueId: string) => Promise<PrFacts>;
+  getFacts?: (issueId: string, options?: { preferBranch?: string }) => Promise<PrFacts>;
   globalRequireUat?: boolean;
   projectDefault?: 'auto' | 'hold';
   /** PAN-4753 D4: the project's merge train; off (per-PR merges) by default. */
@@ -997,7 +997,11 @@ describe('strike candidates (PAN-4753 WI-6)', () => {
   });
 
   it('schedules strikes before features in the same pass', async () => {
-    const { deps, insert } = world({ labels: ['auto-merge'] });
+    // Each read answers the PR on the branch it asked for.
+    const { deps, insert } = world({
+      labels: ['auto-merge'],
+      getFacts: async (issueId, options) => facts({ headBranch: options?.preferBranch ?? `feature/${issueId.toLowerCase()}` }),
+    });
     deps.listCandidates = vi.fn(async (): Promise<ScheduleCandidates | null> => ({
       candidates: [feature('pan-41'), strikeCandidate('pan-42')],
       dropped: [],

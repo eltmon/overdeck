@@ -330,11 +330,25 @@ export async function doneCommand(
     if (refusal) return refuseReviewVerdict(refusal, artifact.url);
     const reviewedHead = reviewedHeadFromRunId(runId, normalizedIssueId);
     const verdictFacts = facts ?? (strike ? await getPrFacts(normalizedIssueId, {}, prRead) : undefined);
+    // A strike approval is what lets the strike auto-merge, so it must land on
+    // the commit this run reviewed. A push since then gets its own review.
+    let pinHead: string | undefined;
+    if (strike) {
+      const live = verdictFacts?.headSha?.toLowerCase();
+      if (!reviewedHead || !live?.startsWith(reviewedHead)) {
+        return refuseReviewVerdict(
+          `the strike PR is at ${live?.slice(0, 12) ?? 'an unknown head'}, not the commit this review read (${reviewedHead ?? 'no run head'}); the new head gets its own review`,
+          artifact.url,
+        );
+      }
+      pinHead = live;
+    }
     const result = await postReviewVerdict({
       issueId: normalizedIssueId,
       verdict: options.status === 'passed' ? 'approve' : 'request-changes',
       body,
       ...(verdictFacts ? { facts: verdictFacts } : {}),
+      ...(pinHead ? { pinHead } : {}),
       ...(reviewedHead ? { reviewedHead } : {}),
     });
     if (!result.posted) {

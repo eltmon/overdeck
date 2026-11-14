@@ -150,7 +150,14 @@ async function defaultMergeIssue(issueId: string, headSha: string, kind: Pending
     // `expectedHeadSha` keeps the head-approval rule (PAN-4750).
     const { buildStrikeMergeRequest } = await import('./strike-merge.js');
     const built = await buildStrikeMergeRequest(issueId, { expectedHeadSha: headSha });
-    if (!built.ok) return { success: false, error: built.error, statusCode: built.status, refused: built.status !== 409 };
+    // 404: no strike workspace, nothing ran (blocked, re-armable). 409: the
+    // fetch of the strike branch failed, which is usually transient: retry it
+    // under the circuit breaker instead of failing the head for good.
+    if (!built.ok) {
+      return built.status === 404
+        ? { success: false, error: built.error, statusCode: 404, refused: true }
+        : { success: false, error: built.error, statusCode: built.status, retryable: true };
+    }
     return triggerMerge(issueId, built.request);
   }
   // #3983: pin the merge to the head this row was scheduled for.

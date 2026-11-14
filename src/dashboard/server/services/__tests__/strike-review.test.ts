@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// The default reviewer-busy check reads the reviewer's state and liveness.
+const reviewer = vi.hoisted(() => ({ runId: undefined as string | undefined, alive: true }));
+vi.mock('../../../../lib/agents/agent-state-read.js', () => ({
+  getAgentState: () => (reviewer.runId ? { reviewRunId: reviewer.runId } : null),
+}));
+vi.mock('../../../../lib/agents/liveness.js', () => ({ isAlive: async () => ({ alive: reviewer.alive }) }));
+
 import type { PipelineJournalEntry } from '../../../../lib/cloister/pipeline-journal.js';
 import type { PrFacts } from '../../../../lib/cloister/pr-facts.js';
 import type { GhPrRow } from '../../../../lib/overdeck/pr-listing.js';
@@ -7,6 +14,8 @@ import {
   dispatchStrikeReviews,
   runStrikeReviewTick,
   startStrikeReview,
+  STRIKE_REVIEW_RETRY_MS,
+  STRIKE_REVIEW_STALL_MS,
   STRIKE_REVIEWS_PER_TICK,
   strikeReviewRequestAnswer,
   type StrikeReviewDeps,
@@ -36,7 +45,7 @@ function world(options: Omit<Partial<StrikeReviewDeps>, 'facts'> & { facts?: PrF
     workspaceHead: async () => (head !== undefined ? head : HEAD),
     journal: () => journal,
     append: (_path, entry) => { journal.push({ at: new Date().toISOString(), ...entry }); },
-    reviewerAlive: async () => false,
+    reviewerBusy: async () => false,
     dispatch,
     ...overrides,
   };
@@ -66,12 +75,39 @@ describe('startStrikeReview (PAN-4753 WI-5)', () => {
     expect(journal.filter((entry) => entry.type === 'review.requested')).toHaveLength(2);
   });
 
-  it('asks again on the next call when the dispatch failed at this head', async () => {
-    const { deps, journal, dispatch } = world();
+  it('retries a failed dispatch at this head after the backoff, not on every tick', async () => {
+    let clock = Date.now();
+    const { deps, journal, dispatch } = world({ now: () => clock });
     dispatch.mockResolvedValueOnce({ success: false, message: 'Review dispatch deferred: merge conflict' });
     await expect(startStrikeReview('PAN-9', {}, deps)).resolves.toMatchObject({ started: false, reason: 'dispatch-failed' });
-    expect(journal.map((entry) => entry.type)).toEqual(['review.requested', 'review.dispatch-failed']);
+    expect(journal.map((entry) => entry.type)).toEqual(['review.dispatch-failed']);
+    await expect(startStrikeReview('PAN-9', {}, deps)).resolves.toEqual({ started: false, reason: 'retry-later' });
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    clock += STRIKE_REVIEW_RETRY_MS + 1;
     await expect(startStrikeReview('PAN-9', {}, deps)).resolves.toEqual({ started: true, headSha: HEAD });
+  });
+
+  it('asks again after the stall window when the reviewer of this head is gone', async () => {
+    let clock = Date.now();
+    let busy = true;
+    const { deps, dispatch } = world({ now: () => clock, reviewerBusy: async () => busy });
+    deps.reviewerBusy = async () => false;
+    await startStrikeReview('PAN-9', {}, deps);
+    deps.reviewerBusy = async () => busy;
+    clock += STRIKE_REVIEW_STALL_MS + 1;
+    await expect(startStrikeReview('PAN-9', {}, deps)).resolves.toEqual({ started: false, reason: 'review-in-flight' });
+    busy = false;
+    await expect(startStrikeReview('PAN-9', {}, deps)).resolves.toEqual({ started: true, headSha: HEAD });
+    expect(dispatch).toHaveBeenCalledTimes(2);
+  });
+
+  it('answers from the journal at the listed head without reading the forge', async () => {
+    const facts = vi.fn(async () => prFacts());
+    const { deps, journal } = world();
+    deps.facts = facts;
+    journal.push({ at: new Date().toISOString(), type: 'review.verdict', issueId: 'PAN-9', data: { verdict: 'APPROVED', headSha: HEAD.slice(0, 8) } });
+    await expect(startStrikeReview('PAN-9', { listedHead: HEAD }, deps)).resolves.toEqual({ started: false, reason: 'already-reviewed-at-head' });
+    expect(facts).not.toHaveBeenCalled();
   });
 
   it('treats a verdict journaled at this head as reviewed', async () => {
@@ -88,7 +124,8 @@ describe('startStrikeReview (PAN-4753 WI-5)', () => {
     ['checks pending', { facts: prFacts({ checks: 'pending' }) }, 'checks-not-green'],
     ['a workspace at another commit', { head: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef' }, 'workspace-head-mismatch'],
     ['an approval proven at head', { facts: prFacts({ approved: true, approvedAtHead: true }) }, 'already-reviewed-at-head'],
-    ['a live reviewer', { reviewerAlive: async () => true }, 'review-in-flight'],
+    ['a live reviewer on this head', { reviewerBusy: async () => true }, 'review-in-flight'],
+    ['a feature PR the strike lookup fell back to', { facts: prFacts({ headBranch: 'feature/pan-9' }) }, 'no-pr'],
   ])('skips %s', async (_label, overrides, reason) => {
     const { deps, dispatch } = world(overrides as Parameters<typeof world>[0]);
     await expect(startStrikeReview('PAN-9', {}, deps)).resolves.toMatchObject({ started: false, reason });
@@ -96,9 +133,56 @@ describe('startStrikeReview (PAN-4753 WI-5)', () => {
   });
 
   it('force dispatches over an earlier review at the same head and a live reviewer', async () => {
-    const { deps, dispatch } = world({ reviewerAlive: async () => true });
+    const { deps, dispatch } = world({ reviewerBusy: async () => true });
     deps.journal = () => [{ at: '2026-11-14T00:00:00Z', type: 'review.requested', issueId: 'PAN-9', data: { headSha: HEAD } }];
     await expect(startStrikeReview('PAN-9', { force: true }, deps)).resolves.toEqual({ started: true, headSha: HEAD });
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    // The operator asked, so the verdict may block an approved head.
+    expect(dispatch.mock.calls[0]![0]).toMatchObject({ operatorRequested: true });
+  });
+
+  it('marks a non-forced dispatch as not operator-requested', async () => {
+    const { deps, dispatch } = world();
+    await startStrikeReview('PAN-9', {}, deps);
+    expect(dispatch.mock.calls[0]![0]).not.toHaveProperty('operatorRequested');
+  });
+
+  it('journals nothing for a dispatch that never answers, so a later call retries', async () => {
+    const { deps, journal, dispatch } = world();
+    dispatch.mockImplementationOnce(() => new Promise(() => {}));
+    void startStrikeReview('PAN-9', {}, deps);
+    await vi.waitFor(() => expect(dispatch).toHaveBeenCalledTimes(1));
+    expect(journal).toEqual([]);
+    await expect(startStrikeReview('PAN-9', {}, deps)).resolves.toEqual({ started: true, headSha: HEAD });
+    expect(dispatch).toHaveBeenCalledTimes(2);
+  });
+
+  it('never dispatches from a pass the tick abandoned', async () => {
+    const { deps, journal, dispatch } = world();
+    await expect(startStrikeReview('PAN-9', { isCurrent: () => false }, deps)).resolves.toEqual({ started: false, reason: 'pass-abandoned' });
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(journal).toEqual([]);
+  });
+});
+
+describe('the default reviewer-busy check', () => {
+  afterEach(() => { reviewer.runId = undefined; reviewer.alive = true; });
+
+  it('holds only a live reviewer whose run is for this head', async () => {
+    const { deps, dispatch } = world();
+    delete deps.reviewerBusy;
+    reviewer.runId = `agent-pan-9-review-${HEAD.slice(0, 8)}`;
+    await expect(startStrikeReview('PAN-9', {}, deps)).resolves.toEqual({ started: false, reason: 'review-in-flight' });
+    reviewer.alive = false;
+    await expect(startStrikeReview('PAN-9', {}, deps)).resolves.toEqual({ started: true, headSha: HEAD });
+    expect(dispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('replaces a warm reviewer left from an older head', async () => {
+    const { deps, dispatch } = world();
+    delete deps.reviewerBusy;
+    reviewer.runId = 'agent-pan-9-review-0ld0ld00';
+    await expect(startStrikeReview('PAN-9', {}, deps)).resolves.toEqual({ started: true, headSha: HEAD });
     expect(dispatch).toHaveBeenCalledTimes(1);
   });
 });
@@ -133,6 +217,15 @@ function strikeRow(number: number, overrides: Partial<GhPrRow> = {}): GhPrRow {
 
 describe('dispatchStrikeReviews', () => {
   const project = { key: 'overdeck', config: { name: 'Overdeck', path: '/repos/overdeck' } };
+
+  it('passes the listed head, and skips a conflicting strike PR', async () => {
+    const start = vi.fn(async () => ({ started: false as const, reason: 'already-reviewed-at-head' as const }));
+    await dispatchStrikeReviews({
+      listProjects: () => [project], forgeOf: () => 'github', start, env: {}, log: () => {},
+      listPullRequests: async () => [strikeRow(1, { headRefOid: 'abc' }), strikeRow(2, { mergeable: 'CONFLICTING' })],
+    });
+    expect(start.mock.calls).toEqual([['PAN-1', 'abc']]);
+  });
 
   it('starts at most STRIKE_REVIEWS_PER_TICK reviews, oldest PR first, skipping drafts, red checks and feature PRs', async () => {
     const start = vi.fn(async (issueId: string) => ({ started: true as const, headSha: `${issueId}-head` }));

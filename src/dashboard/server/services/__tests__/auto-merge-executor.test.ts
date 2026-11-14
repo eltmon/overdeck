@@ -737,6 +737,20 @@ describe('auto-merge executor strike rows (PAN-4753 WI-6)', () => {
     expect(markRefused).toHaveBeenCalledWith(2, 'PAN-2 is not ready to merge: No strike workspace for PAN-2');
   });
 
+  it('retries, never fails, a strike row whose branch fetch failed (409)', async () => {
+    mergeDoors.buildStrikeMergeRequest.mockResolvedValue({ ok: false, status: 409, error: 'Could not read origin/strike/pan-2: network down' });
+    const markFailed = vi.fn(() => true);
+    const requeueToPending = vi.fn(() => true);
+    const setMergeRetryCount = vi.fn();
+    await tickAutoMergeExecutor(deps({
+      listEntries: () => [strikeRow()], markFailed, requeueToPending, getMergeRetryCount: () => 0, setMergeRetryCount,
+    }));
+    expect(mergeDoors.triggerMerge).not.toHaveBeenCalled();
+    expect(markFailed).not.toHaveBeenCalled();
+    expect(setMergeRetryCount).toHaveBeenCalledWith('PAN-2', 1);
+    expect(requeueToPending).toHaveBeenCalledWith(2, '2026-05-25T10:01:00.000Z');
+  });
+
   it('blocks, never merges, a strike row whose gate reports no head approval (FR-2)', async () => {
     const mergeIssue = vi.fn();
     const markBlocked = vi.fn(() => true);

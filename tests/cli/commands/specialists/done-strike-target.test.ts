@@ -94,6 +94,23 @@ describe('specialists done review for a strike-only issue (PAN-4753 WI-5)', () =
     expect(mocks.postReviewVerdict.mock.calls[0]![0]).toMatchObject({ issueId: 'PAN-9', verdict: 'approve', facts: { url: STRIKE_PR } });
   });
 
+  it('pins the approval to the full commit this run reviewed', async () => {
+    await record('passed', 'lgtm');
+    expect(mocks.postReviewVerdict.mock.calls[0]![0]).toMatchObject({ pinHead: HEAD, reviewedHead: 'abcdef12' });
+  });
+
+  it('refuses a verdict when the strike PR moved past the reviewed commit', async () => {
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+    mocks.getPrFacts.mockResolvedValue({
+      issueId: 'PAN-9', forge: 'github', url: STRIKE_PR, exists: true, open: true,
+      approved: false, changesRequested: false, headSha: '99999999aaaaaaaabbbbbbbbccccccccdddddddd',
+    });
+    await record('passed', 'lgtm');
+    expect(mocks.postReviewVerdict).not.toHaveBeenCalled();
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(mocks.appendPipelineEntry.mock.calls.find(([, entry]) => entry.type === 'review.verdict-refused')?.[0]).toBe(STRIKE);
+  });
+
   it('journals the reviewed head and the summary in the strike workspace', async () => {
     await record('blocked', 'the fix drops the retry guard');
     const verdict = mocks.appendPipelineEntry.mock.calls.find(([, entry]) => entry.type === 'review.verdict');

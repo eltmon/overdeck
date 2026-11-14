@@ -16,10 +16,25 @@
  * so the verdict caller guard accepts it.
  *
  * "Once per head" is the strike workspace's pipeline journal: a
- * `review.requested` entry naming the head, unless a later
- * `review.dispatch-failed` entry names the same head (a dispatch the conflict
- * gate or a liveness probe held started no review, so the next tick asks
- * again). Nothing else is stored.
+ * `review.requested` entry naming the head, written once the dispatch
+ * succeeded, unless a later `review.dispatch-failed` entry names the same head
+ * (a dispatch the conflict gate or a liveness probe held started no review, so
+ * the next tick asks again). A dispatch that hangs leaves no entry, so a later
+ * tick retries; the dispatcher coalesces concurrent dispatches per issue, so
+ * the retry joins the hung one instead of starting a second reviewer. Nothing
+ * else is stored.
+ *
+ * A reviewer session stays alive after its verdict (warm reuse), so only a
+ * live reviewer whose run is for this head holds a new review; one left from
+ * an older head is replaced by the dispatch.
+ *
+ * Nothing else recovers a strike review (deacon-lite walks registered feature
+ * workspaces only), so the journal answer is time-bounded: a request with no
+ * verdict after {@link STRIKE_REVIEW_STALL_MS} is asked again when no reviewer
+ * for the head is alive (it died, or its verdict never posted), and a failed
+ * dispatch (the conflict gate, the merged guard) waits
+ * {@link STRIKE_REVIEW_RETRY_MS} before the next try, so a stuck strike costs
+ * one attempt per window, not one per tick.
  *
  * The tick runs on the UAT-train reconciler tick for every GitHub project,
  * whatever its merge-train flag: since D4 that flag decides batching only, and
@@ -38,6 +53,7 @@ import {
   readPipelineJournal,
   type PipelineJournalEntry,
 } from '../../../lib/cloister/pipeline-journal.js';
+import { getAgentState } from '../../../lib/agents/agent-state-read.js';
 import type { PrFacts } from '../../../lib/cloister/pr-facts.js';
 import type { GhPrRow } from '../../../lib/overdeck/pr-listing.js';
 import type { ProjectConfig } from '../../../lib/projects.js';
@@ -48,6 +64,10 @@ const execFileAsync = promisify(execFile);
 export const STRIKE_REVIEWS_PER_TICK = 2;
 /** A tick still running after this is abandoned, so a hung forge read cannot stop strike reviews. */
 export const STRIKE_REVIEW_PASS_TIMEOUT_MS = 5 * 60_000;
+/** A dispatched review with no verdict after this is asked again, unless its reviewer is alive. */
+export const STRIKE_REVIEW_STALL_MS = 30 * 60_000;
+/** A failed dispatch waits this long before the same head is tried again. */
+export const STRIKE_REVIEW_RETRY_MS = 10 * 60_000;
 
 const STRIKE_BRANCH = /^strike\/([a-z][a-z0-9]*-\d+)$/i;
 const SOURCE = 'strike-review';
@@ -62,13 +82,24 @@ export interface StrikeReviewDeps {
   workspaceHead?: (workspacePath: string) => Promise<string | null>;
   journal?: (workspacePath: string) => PipelineJournalEntry[];
   append?: (workspacePath: string, entry: Omit<PipelineJournalEntry, 'at'>) => void;
-  reviewerAlive?: (issueId: string) => Promise<boolean>;
-  dispatch?: (opts: { issueId: string; workspace: string; branch: string; prUrl?: string; force?: boolean }) => Promise<DispatchResult>;
+  /** A live reviewer whose run is for `head`; one left from another head does not hold the review. */
+  reviewerBusy?: (issueId: string, head: string) => Promise<boolean>;
+  dispatch?: (opts: DispatchOptions) => Promise<DispatchResult>;
+  now?: () => number;
+}
+
+interface DispatchOptions {
+  issueId: string;
+  workspace: string;
+  branch: string;
+  prUrl?: string;
+  /** The operator forced this review, so its verdict may block an approved head. */
+  operatorRequested?: boolean;
 }
 
 export type StrikeReviewSkipReason =
   | 'not-strike' | 'no-pr' | 'checks-not-green' | 'draft' | 'workspace-head-mismatch'
-  | 'already-reviewed-at-head' | 'review-in-flight' | 'dispatch-failed';
+  | 'already-reviewed-at-head' | 'review-in-flight' | 'dispatch-failed' | 'retry-later' | 'pass-abandoned';
 
 export type StrikeReviewOutcome =
   | { started: true; headSha: string }
@@ -88,17 +119,21 @@ async function defaultWorkspaceHead(workspacePath: string): Promise<string | nul
   }
 }
 
-async function defaultReviewerAlive(issueId: string): Promise<boolean> {
+async function defaultReviewerBusy(issueId: string, head: string): Promise<boolean> {
+  const reviewer = `agent-${issueId.toLowerCase()}-review`;
+  const runId = getAgentState(reviewer)?.reviewRunId;
+  // A run for another head (or an unknown one) is a warm leftover the dispatch replaces.
+  if (!runId || runId !== `${reviewer}-${head.slice(0, 8).toLowerCase()}`) return false;
   const { isAlive } = await import('../../../lib/agents/liveness.js');
   try {
-    return (await isAlive(`agent-${issueId.toLowerCase()}-review`)).alive;
+    return (await isAlive(reviewer)).alive;
   } catch {
     // An unanswerable probe is not proof of a dead reviewer; hold this tick.
     return true;
   }
 }
 
-async function defaultDispatch(opts: { issueId: string; workspace: string; branch: string; prUrl?: string; force?: boolean }): Promise<DispatchResult> {
+async function defaultDispatch(opts: DispatchOptions): Promise<DispatchResult> {
   const { spawnReviewRoleForIssue } = await import('../../../lib/cloister/review-agent.js');
   return Effect.runPromise(spawnReviewRoleForIssue({ ...opts, reviewMode: 'quick', reviewKind: 'strike', force: true }));
 }
@@ -115,34 +150,56 @@ function headOf(entry: PipelineJournalEntry): string | null {
 }
 
 /**
- * Whether this head already has a strike review (requested, or a verdict
- * journaled for it). A `review.dispatch-failed` for the head after its last
- * request means no review started.
+ * Why the journal holds a new review of `head` back, or null when nothing
+ * does. The last strike entry for the head decides: a verdict holds for good;
+ * a request holds for {@link STRIKE_REVIEW_STALL_MS}; a failed dispatch holds
+ * for {@link STRIKE_REVIEW_RETRY_MS}.
  */
-function reviewedAtHead(entries: readonly PipelineJournalEntry[], head: string): boolean {
-  let requested = false;
+function journalHold(entries: readonly PipelineJournalEntry[], head: string, now: number): StrikeReviewSkipReason | null {
+  let last: PipelineJournalEntry | null = null;
+  let verdict = false;
   for (const entry of entries) {
     const entryHead = headOf(entry);
     if (!entryHead || !sameCommit(entryHead, head)) continue;
-    if (entry.type === 'review.requested' || entry.type === 'review.verdict') requested = true;
-    else if (entry.type === 'review.dispatch-failed') requested = false;
+    if (entry.type === 'review.verdict') verdict = true;
+    if (entry.type === 'review.requested' || entry.type === 'review.dispatch-failed') last = entry;
   }
-  return requested;
+  if (verdict) return 'already-reviewed-at-head';
+  const age = last ? now - Date.parse(last.at) : Number.POSITIVE_INFINITY;
+  if (last?.type === 'review.requested' && age < STRIKE_REVIEW_STALL_MS) return 'already-reviewed-at-head';
+  if (last?.type === 'review.dispatch-failed' && age < STRIKE_REVIEW_RETRY_MS) return 'retry-later';
+  return null;
 }
 
 /** Start the expedited review of `issueId`'s strike PR at its current head, unless it already has one. */
 export async function startStrikeReview(
   issueId: string,
-  opts: { force?: boolean } = {},
+  /**
+   * `isCurrent`: false once the tick abandoned the pass that asked; checked
+   * after every await. `listedHead`: the head the PR listing showed, checked
+   * against the journal before the uncached forge read.
+   */
+  opts: { force?: boolean; isCurrent?: () => boolean; listedHead?: string } = {},
   deps: StrikeReviewDeps = {},
 ): Promise<StrikeReviewOutcome> {
+  const isCurrent = opts.isCurrent ?? (() => true);
+  const now = deps.now ?? Date.now;
   const id = issueId.toUpperCase();
   const target = (deps.target ?? resolveReviewTarget)(id);
   if (target?.kind !== 'strike') return { started: false, reason: 'not-strike' };
+  const journal = () => (deps.journal ?? readPipelineJournal)(target.workspacePath);
+  if (!opts.force && opts.listedHead) {
+    const held = journalHold(journal(), opts.listedHead, now());
+    if (held) return { started: false, reason: held };
+  }
 
   const facts = await (deps.facts ?? defaultFacts)(id, target.branch);
   if (facts.error || !facts.exists || !facts.open || !facts.headSha) {
     return { started: false, reason: 'no-pr', ...(facts.error ? { detail: facts.error } : {}) };
+  }
+  // With no open strike PR the lookup falls back to the feature PR; never review that as a strike.
+  if ((facts.headBranch ?? '').toLowerCase() !== target.branch.toLowerCase()) {
+    return { started: false, reason: 'no-pr', detail: `the open PR is on ${facts.headBranch ?? 'no branch'}, not ${target.branch}` };
   }
   if (facts.draft) return { started: false, reason: 'draft' };
   if (facts.checks !== 'green') return { started: false, reason: 'checks-not-green', detail: `checks ${facts.checks}` };
@@ -161,14 +218,14 @@ export async function startStrikeReview(
 
   if (!opts.force) {
     if (facts.approvedAtHead === true) return { started: false, reason: 'already-reviewed-at-head' };
-    if (reviewedAtHead((deps.journal ?? readPipelineJournal)(target.workspacePath), head)) {
-      return { started: false, reason: 'already-reviewed-at-head' };
-    }
-    if (await (deps.reviewerAlive ?? defaultReviewerAlive)(id)) return { started: false, reason: 'review-in-flight' };
+    const held = journalHold(journal(), head, now());
+    if (held) return { started: false, reason: held };
+    if (await (deps.reviewerBusy ?? defaultReviewerBusy)(id, head)) return { started: false, reason: 'review-in-flight' };
   }
+  // A newer pass may own this head now; an abandoned one must not dispatch over it.
+  if (!isCurrent()) return { started: false, reason: 'pass-abandoned' };
 
   const append = deps.append ?? appendPipelineEntry;
-  append(target.workspacePath, { type: 'review.requested', issueId: id, source: SOURCE, data: { headSha: head, kind: 'strike' } });
   let result: DispatchResult;
   try {
     result = await (deps.dispatch ?? defaultDispatch)({
@@ -176,6 +233,7 @@ export async function startStrikeReview(
       workspace: target.workspacePath,
       branch: target.branch,
       ...(facts.url ? { prUrl: facts.url } : {}),
+      ...(opts.force ? { operatorRequested: true } : {}),
     });
   } catch (error) {
     result = { success: false, message: error instanceof Error ? error.message : String(error) };
@@ -185,6 +243,7 @@ export async function startStrikeReview(
     append(target.workspacePath, { type: 'review.dispatch-failed', issueId: id, source: SOURCE, data: { headSha: head, kind: 'strike', error: detail } });
     return { started: false, reason: 'dispatch-failed', detail };
   }
+  append(target.workspacePath, { type: 'review.requested', issueId: id, source: SOURCE, data: { headSha: head, kind: 'strike' } });
   return { started: true, headSha: head };
 }
 
@@ -220,7 +279,7 @@ export interface DispatchStrikeReviewsDeps extends StrikeReviewDeps {
   listProjects?: () => Array<{ key: string; config: ProjectConfig }>;
   forgeOf?: (projectPath: string) => 'github' | 'gitlab';
   listPullRequests?: (projectPath: string) => Promise<readonly GhPrRow[] | null>;
-  start?: (issueId: string) => Promise<StrikeReviewOutcome>;
+  start?: (issueId: string, listedHead?: string) => Promise<StrikeReviewOutcome>;
   env?: NodeJS.ProcessEnv;
   log?: (message: string) => void;
   /** False once the tick abandoned this pass; set by {@link runStrikeReviewTick}. */
@@ -243,7 +302,8 @@ export async function dispatchStrikeReviews(deps: DispatchStrikeReviewsDeps = {}
   const listing = await import('./derived-issue-state.js');
   const forgeOf = deps.forgeOf ?? listing.forgeForProject;
   const listPullRequests = deps.listPullRequests ?? listing.readOpenRepoPullRequests;
-  const start = deps.start ?? ((issueId: string) => startStrikeReview(issueId, {}, deps));
+  const start = deps.start ?? ((issueId: string, listedHead?: string) =>
+    startStrikeReview(issueId, { isCurrent, ...(listedHead ? { listedHead } : {}) }, deps));
 
   const outcomes: Array<{ issueId: string; outcome: StrikeReviewOutcome }> = [];
   let started = 0;
@@ -265,14 +325,15 @@ export async function dispatchStrikeReviews(deps: DispatchStrikeReviewsDeps = {}
       continue;
     }
     const strikes = (rows ?? [])
-      .filter((row) => (row.state ?? 'OPEN').toUpperCase() === 'OPEN' && !row.mergedAt && !row.isDraft)
+      // A conflicting PR would only be held by the dispatcher's conflict gate; the scheduler skips it too.
+      .filter((row) => (row.state ?? 'OPEN').toUpperCase() === 'OPEN' && !row.mergedAt && !row.isDraft && row.mergeable !== 'CONFLICTING')
       .filter((row) => STRIKE_BRANCH.test(row.headRefName ?? '') && listing.toChecksState(row.statusCheckRollup) === 'green')
       .sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
     for (const row of strikes) {
       if (!isCurrent() || started >= STRIKE_REVIEWS_PER_TICK) break;
       const issueId = STRIKE_BRANCH.exec(row.headRefName ?? '')![1]!.toUpperCase();
       try {
-        const outcome = await start(issueId);
+        const outcome = await start(issueId, row.headRefOid ?? undefined);
         outcomes.push({ issueId, outcome });
         if (outcome.started) {
           started += 1;
