@@ -68,10 +68,12 @@ export function deriveNarrative(args: {
 }
 
 
-export function StatusNarrative({ issueId, workRunning, hasPlan }: {
+export function StatusNarrative({ issueId, workRunning, hasPlan, showNext = false }: {
   issueId: string
   workRunning: boolean
   hasPlan: boolean
+  /** Also render the next step as text under the headline (the Details Status section). */
+  showNext?: boolean
 }) {
   const issue = useDerivedIssueState(issueId)
   const ci = useIssueCheckRunsQuery(issueId)
@@ -91,7 +93,7 @@ export function StatusNarrative({ issueId, workRunning, hasPlan }: {
 
   const model = deriveNarrative({ hasPlan, issue, ci: ci.data, plan: counts, workRunning })
 
-  return (
+  const headline = (
     <span
       data-testid="status-narrative"
       data-section="StatusNarrative"
@@ -100,6 +102,13 @@ export function StatusNarrative({ issueId, workRunning, hasPlan }: {
     >
       {model.headline}
     </span>
+  )
+  if (!showNext) return headline
+  return (
+    <>
+      {headline}
+      <span data-testid="status-narrative-next" className="mt-[2px] block text-[12px] text-muted-foreground">{model.next}</span>
+    </>
   )
 }
 

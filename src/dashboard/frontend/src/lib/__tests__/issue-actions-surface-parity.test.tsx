@@ -80,7 +80,6 @@ vi.mock('../../components/CommandDeck/ZoneCOverviewTabs/PrDiffTab', () => ({
   statusColor: () => ({ bg: 'transparent', fg: 'currentColor', label: 'pass' }),
 }));
 vi.mock('../../components/CommandDeck/SessionView/SessionPanel', () => ({ SessionPanel: () => <div>Session</div> }));
-vi.mock('../../components/Stage/cockpit/AgentsLane', () => ({ AgentsLane: () => <div>Agents</div> }));
 vi.mock('../../components/Stage/cockpit/ChangedFilesView', () => ({ ChangedFilesView: () => <div>Changed files</div> }));
 vi.mock('../../components/Stage/cockpit/IssueBlockerSpotlight', () => ({ IssueBlockerSpotlight: () => <div>Blocker</div> }));
 vi.mock('../../components/Stage/cockpit/PickupGateCard', () => ({ PickupGateCard: () => <div>Pickup gate</div> }));
@@ -327,7 +326,7 @@ export function expectedActions(
   }
 
   const layout = layoutForState(registry.issue, state);
-  const enabledPinKeys = surface === 'drawer'
+  const enabledPinKeys = surface === 'drawer' || surface === 'cockpit'
     ? new Set(layout.all.filter((view) => view.action.key === 'viewPr' && view.enabled).map((view) => view.action.key))
     : new Set<string>();
   // PAN-4198 (FR-1): the grouped body lists the enabled, menu-placed entries.

@@ -917,6 +917,7 @@ describe('IssueDrawer', () => {
         "READY_TO_MERGE": [
           "issue-action-merge",
           "issue-action-syncMain",
+          "issue-action-runOnDeft",
           "issue-action-open",
           "issue-action-tasks",
           "issue-action-resetIssue",
@@ -928,6 +929,7 @@ describe('IssueDrawer', () => {
           "issue-action-doneWork",
           "issue-action-stopAgent",
           "issue-action-restartAgent",
+          "issue-action-runOnDeft",
           "issue-action-open",
           "issue-action-tasks",
           "issue-action-resetIssue",

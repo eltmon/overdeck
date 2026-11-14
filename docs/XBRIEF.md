@@ -414,7 +414,7 @@ The dashboard exposes the same xBRIEF through three entry points:
 
 - The kanban issue-card and InspectorPanel xBRIEF buttons open `XBriefDialog`.
 - The project-tree issue row's xBRIEF resource chip opens `XBriefFullscreen`.
-- The drawer Plan panel and cockpit `PlanMapCard` expand buttons open the same `XBriefFullscreen` instance.
+- The Plan tab's Map view (`DrawerPlanPanel`), in the drawer and the Stage tab, opens the `XBriefFullscreen` instance.
 
 `XBriefFullscreen` is mounted once in `App.tsx` and selected through `xbriefViewerIssueId` in the dashboard store. It reads the merged plan through `useWorkspacePlanQuery` and keeps the List, DAG, and Raw view switcher in the full-screen header. Entry points set the issue ID; they do not create new query keys, routes, or issue-view inventory sections.
 

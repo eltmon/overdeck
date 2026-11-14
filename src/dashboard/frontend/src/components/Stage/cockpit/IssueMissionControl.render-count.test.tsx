@@ -64,7 +64,6 @@ vi.mock('../../PrdViewer', () => ({ PrdViewer: () => <div /> }))
 vi.mock('../../CommandDeck/SessionView/SessionPanel', () => ({ SessionPanel: () => <div /> }))
 vi.mock('./ReviewVerificationCard', () => ({ ReviewVerificationCard: () => <div /> }))
 vi.mock('./IssueBlockerSpotlight', () => ({ IssueBlockerSpotlight: () => <div /> }))
-vi.mock('./AgentsLane', () => ({ AgentsLane: () => <div /> }))
 vi.mock('./TasksRail', async () => {
   const actual = await vi.importActual<typeof import('./TasksRail')>('./TasksRail')
   return { ...actual, TasksRail: () => <div /> }

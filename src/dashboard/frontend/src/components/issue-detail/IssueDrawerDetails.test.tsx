@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const wsTransportMock = vi.hoisted(() => ({
@@ -47,6 +47,7 @@ import type { Agent } from '../../types';
 import { useDashboardStore } from '../../lib/store';
 import { resetDrawerIssueSubscriptionForTest } from '../drawer/useDrawerData';
 import { IssueDrawerDetails, type IssueDrawerDetailsProps } from './IssueDrawerDetails';
+import { StatusNarrative } from '../Stage/cockpit/StatusNarrative';
 
 function agent(overrides: Partial<Agent> & { id: string }): Agent {
   return {
@@ -112,6 +113,23 @@ describe('IssueDrawerDetails', () => {
     } as Parameters<typeof useDashboardStore.setState>[0]);
     renderDetails();
     expect(screen.getByTestId('drawer-details-status')).toHaveTextContent('The reviewer asked for changes');
+  });
+
+  it('the Status section shows the next step as text', () => {
+    renderDetails();
+    const next = within(screen.getByTestId('drawer-details-status')).getByTestId('status-narrative-next');
+    expect(next.textContent?.trim()).not.toBe('');
+  });
+
+  it('StatusNarrative without showNext renders only the headline', () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <StatusNarrative issueId="PAN-1" hasPlan={false} workRunning={false} />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByTestId('status-narrative')).toBeInTheDocument();
+    expect(screen.queryByTestId('status-narrative-next')).toBeNull();
   });
 
   it('the Status section reads as running for a pane-only work phase (no work agent)', () => {
@@ -247,6 +265,22 @@ describe('IssueDrawerDetails', () => {
     expect(screen.getByTestId('drawer-details-diff')).toHaveTextContent('+12 −3 · 1 file · merged as abc1234');
   });
 
+  it('the Ship section offers Create PR when there is no pull request', () => {
+    renderDetails();
+    const link = within(screen.getByTestId('drawer-details-ship')).getByTestId('drawer-details-create-pr');
+    expect(link).toHaveAttribute('href', 'https://github.com/eltmon/overdeck/compare/main...feature%2Fpan-1?expand=1');
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+
+  it('the Ship section shows no Create PR link once a pull request exists', () => {
+    usePrQueryMock.mockReturnValue({
+      data: { issueId: 'PAN-1', pr: { additions: 1, deletions: 0, changedFiles: 1 } },
+    });
+    renderDetails();
+    expect(screen.getByTestId('drawer-details-diff')).toBeInTheDocument();
+    expect(screen.queryByTestId('drawer-details-create-pr')).toBeNull();
+  });
+
   it('renders no linked conversations without a pull request', () => {
     renderDetails();
     expect(screen.queryByTestId('drawer-details-linked')).not.toBeInTheDocument();
@@ -330,6 +364,29 @@ describe('IssueDrawerDetails', () => {
     renderDetails();
     expect(screen.queryByRole('button', { name: 'Skills for this issue', expanded: false })).toBeNull();
     expect(document.querySelector('[data-section="DrawerTasksList"]')).toBeNull();
+  });
+
+  it('renders the footer slot across both columns, and nothing without it', () => {
+    renderDetails({ footer: <span data-testid="x-footer" /> });
+    const footer = screen.getByTestId('drawer-details-footer');
+    expect(footer).toHaveClass('col-span-full');
+    expect(screen.getByTestId('drawer-details-grid')).toContainElement(footer);
+    expect(footer).toContainElement(screen.getByTestId('x-footer'));
+    cleanup();
+
+    renderDetails();
+    expect(screen.queryByTestId('drawer-details-footer')).toBeNull();
+  });
+
+  it('carries the cockpit markers', () => {
+    renderDetails();
+    for (const name of ['NowPanel', 'CrewStage', 'Cost / Artifacts / Ship homes', 'PickupGateCard', 'Awareness rail', 'UatEnvironmentPanel']) {
+      const el = document.querySelector(`[data-section="${name}"]`);
+      expect(el, name).toBeInTheDocument();
+      expect(el?.closest('[hidden]'), `${name} is hidden`).toBeNull();
+      expect(el?.attributes[0]?.name, `${name}: data-section is the first attribute`).toBe('data-section');
+      expect(el?.className ?? '', `${name}: no hidden token`).not.toMatch(/(^|\s)hidden(\s|$)/);
+    }
   });
 
   it('shows the no-workspace line when the workspace does not exist', async () => {

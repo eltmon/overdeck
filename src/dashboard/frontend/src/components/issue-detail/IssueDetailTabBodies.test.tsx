@@ -86,6 +86,20 @@ describe('IssueDetailTabBodies', () => {
     expect(screen.getByTestId('mock-drawer-activity-panel')).toHaveTextContent('PAN-42');
   });
 
+  it('the Map view carries the PlanMapCard marker around the plan panel', () => {
+    render(<IssuePlanBody issueId="PAN-1" value="plan" onSelect={vi.fn()} />);
+    const card = document.querySelector('[data-section="PlanMapCard"]');
+    expect(card).toHaveClass('contents');
+    expect(card?.querySelector('[data-section="DrawerPlanPanel / XBriefViewer"]')).not.toBeNull();
+  });
+
+  it('the Artifacts view carries the Cost / Artifacts / Ship homes marker', () => {
+    render(<IssueChangesBody issueId="PAN-1" value="artifacts" onSelect={vi.fn()} />);
+    const home = document.querySelector('[data-section="Cost / Artifacts / Ship homes"]');
+    expect(home).toHaveClass('contents');
+    expect(home).toContainElement(screen.getByTestId('issue-changes-artifacts'));
+  });
+
   it('the bodies keep the console markers', () => {
     render(<IssueTasksBody issueId="PAN-1" />);
     expect(screen.getByTestId('drawer-tab-panel-tasks')).toHaveAttribute('data-section', 'DrawerTasksList');

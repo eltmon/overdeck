@@ -18,8 +18,8 @@ interface IssueViewProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'
  * PAN-5244: `IssueView` renders no start surface of its own. At console
  * density (the drawer) the start and resume surface is the Conversation tab's
  * (`DrawerAgentSession`, conversation-header layout); at rail density
- * `FeatureItem` mounts the chip inline; at cockpit density it is
- * `DrawerAgentSession`'s empty state.
+ * `FeatureItem` mounts the chip inline; at cockpit density (the Stage tab)
+ * the start surface is the Conversation tab's, the same as the drawer.
  */
 export function IssueView({ issueId: _issueId, density, children, ...rootProps }: IssueViewProps) {
   const dataComponent = (rootProps as Record<string, unknown>)['data-component'];

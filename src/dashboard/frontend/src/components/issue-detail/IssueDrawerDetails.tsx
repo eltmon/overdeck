@@ -8,12 +8,13 @@
  *
  * It must not import `drawer/DrawerAgentSession` or `IssueDetailShell`.
  */
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { presenceForPaneState, type BackendPane } from '@overdeck/contracts';
 
 import type { Agent } from '../../types';
 import { cn } from '../../lib/utils';
+import { githubCompareUrl, trackerIssueUrl } from '../../lib/issueLinks';
 import { PHASES, phaseLabel, type Phase, type PhaseStepState } from '../../lib/simple/phases';
 import { isEndedAgent } from '../../lib/agentConversation';
 import { useAgentSessionOutcome } from '../../lib/useSessionOutcome';
@@ -52,6 +53,8 @@ export interface IssueDrawerDetailsProps {
   /** False once the Skills panel reported the issue has no project. */
   skillsAvailable: boolean;
   skillsCount: number | null;
+  /** Shell-specific block after both columns, spanning the grid (PAN-5246 D-7). */
+  footer?: ReactNode;
 }
 
 const HEADING_CLASS = 'mb-[8px] text-[13px] font-semibold text-foreground';
@@ -177,9 +180,10 @@ export function IssueDrawerDetails({
   onOpenTab,
   skillsAvailable,
   skillsCount,
+  footer,
 }: IssueDrawerDetailsProps) {
   const { rail, derived } = usePipelineRail(issueId);
-  const { activityRail } = useIssueData(issueId);
+  const { activityRail, issue } = useIssueData(issueId);
   const { data: workspace } = useDrawerWorkspace(issueId);
   const panes = useBackendPanes(issueId);
   const now = useSharedTick();
@@ -202,6 +206,7 @@ export function IssueDrawerDetails({
   const totalCost = costsData?.resolvedTotalCost ?? costsData?.totalCost ?? 0;
   const pr = usePrQuery(issueId).data?.pr ?? null;
   const mergeOid = typeof pr?.mergeCommit === 'string' ? pr.mergeCommit : pr?.mergeCommit?.oid;
+  const createPrHref = githubCompareUrl(trackerIssueUrl(issueId, issue?.url), derived?.branch?.name ?? `feature/${issueId.toLowerCase()}`);
 
   return (
     <div data-testid="drawer-tab-panel-overview" className="@container">
@@ -210,12 +215,12 @@ export function IssueDrawerDetails({
         className="grid grid-cols-1 gap-x-[36px] gap-y-[22px] @[900px]:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]"
       >
       <div className="min-w-0 space-y-[22px]">
-        <section data-testid="drawer-details-status">
+        <section data-section="NowPanel" data-testid="drawer-details-status">
           <h3 className={HEADING_CLASS}>Status</h3>
-          <StatusNarrative issueId={issueId} hasPlan={hasPlan} workRunning={workRunning} />
+          <StatusNarrative issueId={issueId} hasPlan={hasPlan} workRunning={workRunning} showNext />
         </section>
 
-        <section data-testid="drawer-details-pipeline">
+        <section data-section="CrewStage" data-testid="drawer-details-pipeline">
           <h3 className={HEADING_CLASS}>Pipeline</h3>
           <table className="w-full border-collapse text-[13px]">
             <tbody>
@@ -300,7 +305,7 @@ export function IssueDrawerDetails({
         <DeftGatesPanel issueId={issueId} />
         <DeftReviewCyclePanel issueId={issueId} />
 
-        <section data-testid="drawer-details-ship">
+        <section data-section="Cost / Artifacts / Ship homes" data-testid="drawer-details-ship">
           <h3 className={HEADING_CLASS}>Ship</h3>
           <ShipProgress ship={deriveShip(derived)} />
           {pr ? (
@@ -308,6 +313,8 @@ export function IssueDrawerDetails({
               <span className="text-success-foreground">+{pr.additions}</span> <span className="text-destructive-foreground">−{pr.deletions}</span> · {pr.changedFiles} file{pr.changedFiles === 1 ? '' : 's'}
               {mergeOid ? <> · merged as <span className="font-mono-ui text-foreground">{mergeOid}</span></> : null}
             </p>
+          ) : createPrHref ? (
+            <a data-testid="drawer-details-create-pr" href={createPrHref} target="_blank" rel="noreferrer" className="mt-[6px] inline-block text-[12px] text-primary-ink hover:underline">Create PR</a>
           ) : null}
           <DeftDeliveryChip issueId={issueId} />
         </section>
@@ -330,10 +337,12 @@ export function IssueDrawerDetails({
         </section>
       </div>
 
-      <div className="min-w-0 space-y-[22px]">
+      <div data-section="Awareness rail" className="min-w-0 space-y-[22px]">
         <section>
           <h3 className={HEADING_CLASS}>Pickup controls</h3>
-          <div data-section="DrawerPickupSection / PickupGateControls"><PickupSection issueId={issueId} /></div>
+          <div data-section="PickupGateCard" className="contents">
+            <div data-section="DrawerPickupSection / PickupGateControls"><PickupSection issueId={issueId} /></div>
+          </div>
         </section>
         <div data-section="DrawerVerificationGates"><VerificationGates issueId={issueId} /></div>
         <div data-section="DrawerWorkspaceSection">
@@ -360,6 +369,7 @@ export function IssueDrawerDetails({
           </button>
         ) : null}
       </div>
+      {footer ? <div data-testid="drawer-details-footer" className="col-span-full">{footer}</div> : null}
       </div>
     </div>
   );

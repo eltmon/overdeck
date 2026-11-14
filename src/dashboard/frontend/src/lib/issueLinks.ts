@@ -16,3 +16,10 @@ export function trackerIssueUrl(issueId: string, explicitUrl?: string | null): s
   const repo = GITHUB_REPO_BY_PREFIX[match[1].toUpperCase()];
   return repo ? `https://github.com/${repo}/issues/${match[2]}` : null;
 }
+
+/** The GitHub "open a pull request" URL for a branch, or null when the tracker is not GitHub. */
+export function githubCompareUrl(issueUrl: string | null, branch: string): string | null {
+  if (!issueUrl) return null;
+  const match = /^(https:\/\/github\.com\/[^/]+\/[^/]+)\/issues\/\d+$/.exec(issueUrl);
+  return match ? `${match[1]}/compare/main...${encodeURIComponent(branch)}?expand=1` : null;
+}

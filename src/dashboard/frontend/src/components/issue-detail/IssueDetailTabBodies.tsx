@@ -40,7 +40,9 @@ export function IssuePlanBody({ issueId, value, onSelect }: ViewBodyProps) {
       ) : (
         <div data-testid="issue-plan-map">
           <DeftScopeDag issueId={issueId} />
-          <div data-section="DrawerPlanPanel / XBriefViewer"><DrawerPlanPanel issueId={issueId} /></div>
+          <div data-section="PlanMapCard" className="contents">
+            <div data-section="DrawerPlanPanel / XBriefViewer"><DrawerPlanPanel issueId={issueId} /></div>
+          </div>
         </div>
       )}
     </div>
@@ -52,7 +54,11 @@ export function IssueChangesBody({ issueId, value, onSelect }: ViewBodyProps) {
     <div data-testid="issue-tab-changes">
       <ViewSwitch entry="changes" value={value} label="Change views" onSelect={onSelect} />
       {value === 'checks' ? <IssueChecksPanel issueId={issueId} />
-        : value === 'artifacts' ? <div data-testid="issue-changes-artifacts" data-section="DrawerArtifactsPanel"><DrawerArtifactsPanel issueId={issueId} /></div>
+        : value === 'artifacts' ? (
+          <div data-section="Cost / Artifacts / Ship homes" className="contents">
+            <div data-testid="issue-changes-artifacts" data-section="DrawerArtifactsPanel"><DrawerArtifactsPanel issueId={issueId} /></div>
+          </div>
+        )
         : <div data-testid="drawer-tab-panel-files" data-section="ChangedFilesView"><ChangedFilesView issueId={issueId} /></div>}
     </div>
   );

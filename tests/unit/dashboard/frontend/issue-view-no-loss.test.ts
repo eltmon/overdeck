@@ -246,7 +246,7 @@ describe('issue-view no-loss inventory (FR-0 surface-lock, PAN-2499)', () => {
     }]);
   });
 
-  it('records the physical homes and folded-surface relocations from PAN-3356', () => {
+  it('records the shared-view homes (PAN-5246) and the folded-surface relocations from PAN-3356', () => {
     const cockpit = ISSUE_VIEW_INVENTORY.filter((entry) => entry.view === 'cockpit');
     const homes = new Map(cockpit.map((entry) => [entry.section, entry.home]));
     const relocations = new Map(
@@ -254,12 +254,14 @@ describe('issue-view no-loss inventory (FR-0 surface-lock, PAN-2499)', () => {
         .filter((entry) => entry.actionRelocation)
         .map((entry) => [entry.section, entry.actionRelocation!.surface]),
     );
-    const missionControl = 'src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx';
+    // PAN-5246: the Stage tab renders the shared view, so these sections live in IssueDetail.
+    const issueDetail = 'src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx';
 
-    expect(homes.get('Detail Tabs')).toBe(missionControl);
-    expect(homes.get('Session tab')).toBe(missionControl);
-    expect(homes.get('Changes tab')).toBe(missionControl);
-    expect(homes.get('TasksRail / TasksTab')).toBe(missionControl);
+    expect(homes.get('Detail Tabs')).toBe(issueDetail);
+    expect(homes.get('Session tab')).toBe(issueDetail);
+    expect(homes.get('Changes tab')).toBe(issueDetail);
+    expect(homes.get('TasksRail / TasksTab')).toBe(issueDetail);
+    expect(homes.get('Header bar')).toBe('src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx');
     expect(relocations.get('Session tab')).toBe('Conversation / Files / Terminal tabs');
     expect(relocations.get('Changes tab')).toBe('Code / Files / Artifacts tabs');
     expect(relocations.get('Plan / Activity / Discussion tabs')).toBe('PRD / Timeline / Discussion tabs');

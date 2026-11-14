@@ -3,12 +3,10 @@ import type { NeedsYouResolvedAction } from './NeedsYouSlot';
 import type { OperatorNeedsYou } from './types';
 
 /**
- * PAN-5253: a shell-independent copy of
- * Stage/cockpit/useCockpitNeedsYouActions.ts. The cockpit hook resolves
- * "open the conversation" against its session tree; this one resolves it
- * against a map of every id a needs-you item's `sessionId` can carry (an
- * agent id, or — on Herdr — a backend pane's `terminalId`/`id`) to the real
- * agent id, so it works outside the cockpit and on every terminal backend.
+ * PAN-5253: resolves "open the conversation" against a map of every id a
+ * needs-you item's `sessionId` can carry (an agent id, or — on Herdr — a
+ * backend pane's `terminalId`/`id`) to the real agent id, so it works in both
+ * shells and on every terminal backend.
  */
 export function useNeedsYouActions(
   agentIdByKey: ReadonlyMap<string, string>,
