@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5224",
   "created": "2026-11-14T03:12:38.408Z",
-  "updated": "2026-11-14T03:24:57.176Z",
+  "updated": "2026-11-14T03:25:05.999Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,6 +40,11 @@
     "pr-freshness-policy.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T03:24:57.176Z"
+    },
+    "pr-listing-webhook-ttl": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5224",
+      "claimedAt": "2026-11-14T03:25:05.999Z"
     }
   }
 }
