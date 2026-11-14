@@ -12,6 +12,7 @@
 import { lstat, readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { createPromiseConcurrencyLimiter } from '../concurrency.js';
 import {
   detectAdapter,
   KNOWN_PACKS,
@@ -23,6 +24,9 @@ import {
 import { isBrowserReady } from '../skill-packs/browser.js';
 import { isRenderReady } from '../skill-packs/render.js';
 import { listPacks, packExtractDir, packRenderDir } from '../skill-packs/sources.js';
+
+const CATALOG_FS_CONCURRENCY = 32;
+const limitFs = createPromiseConcurrencyLimiter(CATALOG_FS_CONCURRENCY);
 
 export type SkillOrigin = 'overdeck' | 'personal' | 'project';
 
@@ -42,24 +46,26 @@ export function parseSkillDescription(content: string): string {
 async function readRoot(root: string, origin: SkillOrigin): Promise<SkillCatalogEntry[]> {
   let dirents;
   try {
-    dirents = await readdir(root, { withFileTypes: true });
+    dirents = await limitFs(() => readdir(root, { withFileTypes: true }));
   } catch {
     return [];
   }
-  const entries: SkillCatalogEntry[] = [];
-  for (const dirent of dirents) {
-    if (!dirent.isDirectory() && !dirent.isSymbolicLink()) continue;
-    let content: string;
-    try {
-      content = await readFile(join(root, dirent.name, 'SKILL.md'), 'utf8');
-    } catch {
-      continue;
-    }
-    const entry: SkillCatalogEntry = { name: dirent.name, description: parseSkillDescription(content), origin };
-    if (origin === 'project') entry.projectSkill = true;
-    entries.push(entry);
-  }
-  return entries;
+  const read = await Promise.all(
+    dirents
+      .filter((dirent) => dirent.isDirectory() || dirent.isSymbolicLink())
+      .map(async (dirent): Promise<SkillCatalogEntry | null> => {
+        let content: string;
+        try {
+          content = await limitFs(() => readFile(join(root, dirent.name, 'SKILL.md'), 'utf8'));
+        } catch {
+          return null;
+        }
+        const entry: SkillCatalogEntry = { name: dirent.name, description: parseSkillDescription(content), origin };
+        if (origin === 'project') entry.projectSkill = true;
+        return entry;
+      }),
+  );
+  return read.filter((entry): entry is SkillCatalogEntry => entry !== null);
 }
 
 export async function listSkillCatalog(
@@ -72,9 +78,10 @@ export async function listSkillCatalog(
     [join(home, '.agents', 'skills'), 'personal'],
     ...(opts.projectRoot ? [[join(opts.projectRoot, '.pan', 'skills'), 'project'] as [string, SkillOrigin]] : []),
   ];
+  const perRoot = await Promise.all(roots.map(([root, origin]) => readRoot(root, origin)));
   const byName = new Map<string, SkillCatalogEntry>();
-  for (const [root, origin] of roots) {
-    for (const entry of await readRoot(root, origin)) {
+  for (const entries of perRoot) {
+    for (const entry of entries) {
       if (!byName.has(entry.name)) byName.set(entry.name, entry);
     }
   }
