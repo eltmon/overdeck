@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5195",
   "created": "2026-11-14T01:04:02.519Z",
-  "updated": "2026-11-14T01:48:47.775Z",
+  "updated": "2026-11-14T01:48:55.418Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,11 @@
     "rpc-wrapper-returns-result.ac2": {
       "status": "completed",
       "doneAt": "2026-11-14T01:48:47.775Z"
+    },
+    "docs-discard-trash": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5195",
+      "claimedAt": "2026-11-14T01:48:55.418Z"
     }
   }
 }
