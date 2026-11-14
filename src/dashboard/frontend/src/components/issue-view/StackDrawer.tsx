@@ -6,9 +6,8 @@ import { UatStackStatus, getUatStackSummary } from '../CommandDeck/UatStackStatu
 import styles from '../Stage/cockpit/agentsLane.module.css';
 
 /**
- * StackDrawer (PAN-5253) — a shell-independent copy of
- * Stage/cockpit/AgentsLane.tsx's StackDrawer, for the shared issue view's
- * Details workspace section: the workspace stack's health summary, service
+ * StackDrawer (PAN-5253) — the shared issue view's stack disclosure (the
+ * cockpit copy was deleted in PAN-5246), in the Details workspace section: the workspace stack's health summary, service
  * URLs, live per-container status (reusing UatStackStatus), git
  * ahead/behind/dirty, and the registry stack actions.
  */

@@ -114,7 +114,6 @@ src/components/Stage/__tests__/explorer-migration.test.tsx
 src/components/Stage/__tests__/revealPane.test.tsx
 src/components/Stage/cockpit/IssueMissionControl.header-title.test.tsx
 src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx
-src/components/Stage/cockpit/IssueTreeLane.test.ts
 src/components/Stage/launcherFocusStore.test.ts
 src/components/Stage/panes/EditorPane.test.tsx
 src/components/XTerminal.test.tsx

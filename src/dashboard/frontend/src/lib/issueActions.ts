@@ -73,7 +73,7 @@ export const GROUP_ORDER: IssueActionGroup[] = [
  *
  * `menu` entries are the ones every grouped menu surface lists. `contextual`
  * entries stay in the registry because a card or button invokes them by key
- * (NeedsYouSlot, AgentsLane, WorkspaceCard, the agent-scope strip), but no menu
+ * (NeedsYouSlot, StackDrawer, WorkspaceCard, the agent-scope strip), but no menu
  * lists them.
  */
 export type IssueActionPlacement = 'menu' | 'contextual';

@@ -80,7 +80,6 @@ vi.mock('../../components/CommandDeck/ZoneCOverviewTabs/PrDiffTab', () => ({
   statusColor: () => ({ bg: 'transparent', fg: 'currentColor', label: 'pass' }),
 }));
 vi.mock('../../components/CommandDeck/SessionView/SessionPanel', () => ({ SessionPanel: () => <div>Session</div> }));
-vi.mock('../../components/Stage/cockpit/AgentsLane', () => ({ AgentsLane: () => <div>Agents</div> }));
 vi.mock('../../components/Stage/cockpit/ChangedFilesView', () => ({ ChangedFilesView: () => <div>Changed files</div> }));
 vi.mock('../../components/Stage/cockpit/IssueBlockerSpotlight', () => ({ IssueBlockerSpotlight: () => <div>Blocker</div> }));
 vi.mock('../../components/Stage/cockpit/PickupGateCard', () => ({ PickupGateCard: () => <div>Pickup gate</div> }));
