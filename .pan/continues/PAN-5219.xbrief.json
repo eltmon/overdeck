@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5219",
   "created": "2026-11-14T01:41:21.515Z",
-  "updated": "2026-11-14T01:54:41.657Z",
+  "updated": "2026-11-14T01:54:49.249Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,6 +58,11 @@
     "android-notification-link-paths.ac2": {
       "status": "completed",
       "doneAt": "2026-11-14T01:54:41.656Z"
+    },
+    "route-scopes-issue-reads": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5219",
+      "claimedAt": "2026-11-14T01:54:49.249Z"
     }
   }
 }
