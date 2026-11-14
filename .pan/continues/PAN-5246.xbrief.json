@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5246",
   "created": "2026-11-14T12:41:52.786Z",
-  "updated": "2026-11-14T13:09:58.394Z",
+  "updated": "2026-11-14T13:10:08.922Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -182,6 +182,11 @@
     "inventory-homes.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T13:09:58.394Z"
+    },
+    "stage-frame": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5246",
+      "claimedAt": "2026-11-14T13:10:08.922Z"
     }
   }
 }
