@@ -316,7 +316,23 @@ describe('pairWithMachine outcome codes (PAN-5069 FR-4, FR-7)', () => {
         throw new ChannelOpenError('unreachable', 'ICE failed');
       },
     }));
-    expect(unreachable).toMatchObject({ ok: false, code: 'machine-unreachable' });
+    expect(unreachable).toEqual({
+      ok: false,
+      code: 'machine-unreachable',
+      message: 'Could not reach studio. relay: ICE failed; direct: ICE failed',
+    });
+  });
+
+  it('returns no-webrtc-egress when the relay dial gathered no TURN relay candidate (PAN-5242)', async () => {
+    await signIn();
+    const outcome = await pair(deps({
+      open: async (url) => {
+        if (url.startsWith('rtc://')) throw new ChannelOpenError('unreachable', 'timed out');
+        throw new ChannelOpenError('unreachable', 'relay connection: gathered no TURN relay candidate', { cause: 'no-relay-candidate' });
+      },
+    }));
+    expect(outcome).toMatchObject({ ok: false, code: 'no-webrtc-egress' });
+    expect(await readPairing(home)).toBeNull();
   });
 
   it('classifies the exchange answer: 403 is pairing-code-refused, 409 is pairing-failed', async () => {
