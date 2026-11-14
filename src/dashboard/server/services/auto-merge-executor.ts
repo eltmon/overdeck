@@ -63,11 +63,12 @@ interface MergeResult {
 export interface AutoMergeExecutorDeps {
   now?: () => Date;
   listEntries?: () => PendingAutoMerge[];
-  isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
+  /** A strike row passes `preferBranch: strike/<id>` (PAN-4753 WI-6). */
+  isEligible?: (issueId: string, options?: { preferBranch?: string }) => Promise<AutoMergeEligibility>;
   /** PAN-4820: the Deft human-merge hold; `deftAutoMergeHold` by default. */
   deftHold?: (issueId: string) => Promise<string | null>;
   /** The one merge gate (#4040); `evaluateIssueMergeGate` by default. */
-  mergeGate?: (issueId: string) => Promise<MergeReadiness & { facts: Pick<PrFacts, 'headSha'> }>;
+  mergeGate?: (issueId: string, options?: { preferBranch?: string }) => Promise<MergeReadiness & { facts: Pick<PrFacts, 'headSha'> }>;
   hasPendingDeploy?: () => Promise<boolean>;
   transition?: (id: number) => boolean;
   markBlocked?: (id: number, reason: string) => boolean;
@@ -77,7 +78,7 @@ export interface AutoMergeExecutorDeps {
   markMerged?: (id: number) => boolean;
   markFailed?: (id: number, reason: string) => boolean;
   requeueToPending?: (id: number, nextScheduledMergeAt: string) => boolean;
-  mergeIssue?: (issueId: string, headSha: string) => Promise<MergeResult>;
+  mergeIssue?: (issueId: string, headSha: string, kind: PendingAutoMerge['kind']) => Promise<MergeResult>;
   /**
    * #3983: the tracker's live answer for the issue; null when no tracker
    * answered. `readIssueFromTracker` by default.
@@ -142,10 +143,24 @@ function failureReason(result: MergeResult): string {
   return result.error ?? result.message ?? `merge returned status ${result.statusCode ?? 'unknown'}`;
 }
 
-async function defaultMergeIssue(issueId: string, headSha: string): Promise<MergeResult> {
+async function defaultMergeIssue(issueId: string, headSha: string, kind: PendingAutoMerge['kind']): Promise<MergeResult> {
   const { triggerMerge } = await import('../routes/workspaces/merge-ops.js');
+  if (kind === 'strike') {
+    // PAN-4753 WI-6: an automatic strike merge, pinned to the approved head;
+    // `expectedHeadSha` keeps the head-approval rule (PAN-4750).
+    const { buildStrikeMergeRequest } = await import('./strike-merge.js');
+    const built = await buildStrikeMergeRequest(issueId, { expectedHeadSha: headSha });
+    if (!built.ok) return { success: false, error: built.error, statusCode: built.status, refused: built.status !== 409 };
+    return triggerMerge(issueId, built.request);
+  }
   // #3983: pin the merge to the head this row was scheduled for.
   return triggerMerge(issueId, { kind: 'normal', expectedHeadSha: headSha });
+}
+
+/** PAN-4753 R5: due strike rows first, then by due time and id (as `listDuePendingAutoMerges` sorts). */
+function dueOrder(a: PendingAutoMerge, b: PendingAutoMerge): number {
+  return Number(b.kind === 'strike') - Number(a.kind === 'strike')
+    || a.scheduledMergeAt.localeCompare(b.scheduledMergeAt) || a.id - b.id;
 }
 
 function defaultAnnounceFailure(issueId: string, reason: string): void {
@@ -164,7 +179,7 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
   const entries = deps.listEntries
     ? deps.listEntries()
       .filter((entry) => entry.status === 'pending' && Date.parse(entry.scheduledMergeAt) <= nowDate.getTime())
-      .sort((a, b) => a.scheduledMergeAt.localeCompare(b.scheduledMergeAt) || a.id - b.id)
+      .sort(dueOrder)
     : listDuePendingAutoMerges(nowDate.toISOString());
 
   if (entries.length === 0) return;
@@ -191,7 +206,11 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
       continue;
     }
 
-    const eligibility = await (deps.isEligible ?? isAutoMergeEligible)(entry.issueId);
+    // PAN-4753 WI-6: a strike row is read, gated and judged on its own branch.
+    const branch = entry.kind === 'strike' ? { preferBranch: `strike/${entry.issueId.toLowerCase()}` } : null;
+    const eligibility = branch
+      ? await (deps.isEligible ?? ((id: string, options?: { preferBranch?: string }) => isAutoMergeEligible(id, {}, options)))(entry.issueId, branch)
+      : await (deps.isEligible ?? isAutoMergeEligible)(entry.issueId);
     if (!eligibility.eligible) {
       if (!(deps.markBlocked ?? markBlocked)(entry.id, eligibility.reason)) {
         log(`[auto-merge] lost block race for ${entry.issueId} (#${entry.id}), skipping`);
@@ -212,7 +231,9 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
     // trusted verdict marker), green checks, and mergeability (#4040, #3983).
     // Re-read on every tick, because a push or a failing check between
     // scheduling and the cooldown expiring must stop the merge.
-    const gate = await (deps.mergeGate ?? ((id: string) => evaluateIssueMergeGate(id)))(entry.issueId);
+    const gate = branch
+      ? await (deps.mergeGate ?? ((id: string, options?: { preferBranch?: string }) => evaluateIssueMergeGate(id, {}, options)))(entry.issueId, branch)
+      : await (deps.mergeGate ?? ((id: string) => evaluateIssueMergeGate(id)))(entry.issueId);
     // #3983: the cooldown covered the head that was scheduled. A new head gets
     // its own cooldown: blocking this row lets the scheduler re-arm it.
     const liveHead = gate.facts.headSha;
@@ -242,7 +263,7 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
     }
 
     try {
-      const result = await (deps.mergeIssue ?? defaultMergeIssue)(entry.issueId, entry.headSha);
+      const result = await (deps.mergeIssue ?? defaultMergeIssue)(entry.issueId, entry.headSha, entry.kind);
       if (result.success) {
         if (result.outcome === 'merged') {
           (deps.markMerged ?? markMerged)(entry.id);

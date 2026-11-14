@@ -38,7 +38,7 @@ export const HOLD_FOR_UAT_LABEL = 'hold-for-uat';
 export type AutoMergeEligibility = { eligible: true } | { eligible: false; reason: string };
 
 export interface AutoMergeEligibilityDeps {
-  getFacts?: (issueId: string) => Promise<PrFacts>;
+  getFacts?: (issueId: string, deps?: Record<string, never>, options?: { preferBranch?: string }) => Promise<PrFacts>;
   getIssueLabels?: (issueId: string) => Promise<string[]>;
   getProjectDefault?: typeof getProjectAutoMergeDefault;
   isGlobalUatRequired?: () => boolean;
@@ -172,11 +172,20 @@ export async function issueWaitsForBatch(
   return !(deps.droppedFromBatch ?? issueDroppedFromBatch)(issueId);
 }
 
+/**
+ * `preferBranch` (PAN-4753 WI-6): the PR branch the row merges. A strike row
+ * passes `strike/<id>`, which reads the strike PR and makes the issue high
+ * priority under the route rule.
+ */
 export async function isAutoMergeEligible(
   issueId: string,
   deps: AutoMergeEligibilityDeps = {},
+  options: { preferBranch?: string } = {},
 ): Promise<AutoMergeEligibility> {
-  const facts = await withForgeApprovalAtHead(await (deps.getFacts ?? getPrFacts)(issueId), deps.readReviews, deps.overdeckLogins);
+  const read = options.preferBranch
+    ? (deps.getFacts ?? getPrFacts)(issueId, {}, { preferBranch: options.preferBranch })
+    : (deps.getFacts ?? getPrFacts)(issueId);
+  const facts = await withForgeApprovalAtHead(await read, deps.readReviews, deps.overdeckLogins);
   // The UAT policy is applied below as the hold itself: an issue that requires
   // UAT is never auto-merged, so a failed UAT verdict (#4036) cannot reach here.
   const readiness = evaluateMergeReadiness(facts, {
@@ -211,7 +220,7 @@ export async function isAutoMergeEligible(
   // row scheduled while the train was off is blocked here after an off→on
   // flip, so it never merges next to the batch that now owns it.
   const trainOn = (deps.isTrainOn ?? issueTrainOn)(issueId);
-  const highPriority = isHighPriorityMerge({ labels });
+  const highPriority = isHighPriorityMerge({ branch: options.preferBranch ?? null, labels });
   const route = mergeRouteFor({
     heldForUat: false,
     trainOn,
