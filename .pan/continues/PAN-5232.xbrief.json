@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5232",
   "created": "2026-11-14T03:50:14.887Z",
-  "updated": "2026-11-14T03:50:14.888Z",
+  "updated": "2026-11-14T03:59:47.756Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,30 @@
   "sessionHistory": [],
   "items": {
     "pane-read-parser": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5232",
-      "claimedAt": "2026-11-14T03:50:14.887Z"
+      "claimedAt": "2026-11-14T03:50:14.887Z",
+      "doneAt": "2026-11-14T03:59:47.756Z"
+    },
+    "pane-read-parser.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:59:47.756Z"
+    },
+    "pane-read-parser.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:59:47.756Z"
+    },
+    "pane-read-parser.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:59:47.756Z"
+    },
+    "pane-read-parser.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:59:47.756Z"
+    },
+    "pane-read-parser.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T03:59:47.756Z"
     }
   }
 }
