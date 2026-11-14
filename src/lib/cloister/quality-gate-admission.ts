@@ -1,4 +1,4 @@
-import { link, mkdir, open, readFile, readdir, stat, unlink } from 'node:fs/promises'
+import { link, mkdir, open, readFile, readdir, rename, stat, unlink } from 'node:fs/promises'
 import { cpus, loadavg } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 
@@ -10,7 +10,8 @@ import {
   ownerReservationBytes,
   readGateFootprintEstimate,
   recordGateFootprintPeak,
-  resolveSoftReserveBytes,
+  resolveGateReserveBytes,
+  type MemoryHeadroomVerdict,
 } from './quality-gate-memory.js'
 
 /**
@@ -22,6 +23,16 @@ import {
  * gates keep their slots. A request with a `footprintKey` also waits while
  * MemAvailable minus the live owners' reservations and its own measured
  * footprint would fall below the governor's soft reserve (PAN-5248).
+ *
+ * PAN-5285: FIFO yields only to memory. A later waiter may pass when every
+ * waiter ahead of it is blocked on memory, judged from their tickets with the
+ * same reading, so the first waiter that fits goes and the others keep their
+ * places. The head records in its ticket when it first failed the memory rule
+ * as head. Once that block outlasts the bypass bound and the head could start
+ * alone above the governor's hard reserve, nobody passes it: the slots drain
+ * and the head is admitted alone. The estimate and the reserves are re-read on
+ * every poll, and each waiter writes its current wait reason into its ticket
+ * for status readers.
  * Admitted parents set OVERDECK_GATE_ADMITTED=1 for child-process reentrancy.
  */
 
@@ -41,6 +52,26 @@ const QUALITY_GATE_ADMISSION_STALE_MS = 25 * 60 * 1_000
  * by an old-version process, so pollers leave it alone until it ages out.
  */
 const QUALITY_GATE_ADMISSION_TORN_GRACE_MS = 10_000
+/**
+ * PAN-5285: how long later waiters may pass a memory-blocked head, counted from
+ * the head's first memory block as head. Well under the wrappers' 30-minute
+ * wait, so the head is admitted alone before it times out.
+ */
+const QUALITY_GATE_HEAD_BYPASS_MS = 5 * 60 * 1_000
+/**
+ * PAN-5285: an older-version waiter froze its estimate and reserve at enqueue,
+ * so it can look as if it fits today and still never start. One that has
+ * "fitted" with a slot free for this long is treated as blocked on memory.
+ */
+const QUALITY_GATE_LEGACY_FIT_GRACE_MS = 30 * 1_000
+/**
+ * PAN-5285: tickets written by this version re-read their estimate per poll
+ * and can be admitted alone. Older tickets froze their estimate at enqueue
+ * and never start alone, so the bypass bound never applies to them.
+ */
+const ADMISSION_TICKET_VERSION = 2
+/** PAN-5285: a changed wait reason is reported at most this often, so a flapping queue does not flood the log. */
+const QUALITY_GATE_WAIT_REPORT_MS = 60 * 1_000
 export const DEFAULT_QUALITY_GATE_SLOTS = 2
 
 export interface QualityGatePressureSample {
@@ -62,8 +93,23 @@ export interface QualityGateAdmissionRequest {
   fullReservation?: boolean
 }
 
+/** Who a queued waiter is behind (PAN-5285). */
+export interface QualityGateQueueBlocker {
+  gateName: string
+  issueId?: string
+  workspacePath: string
+}
+
 export type QualityGateWaitReason =
-  | { kind: 'queue' }
+  | {
+    kind: 'queue'
+    /** 0-based place in the queue. */
+    position?: number
+    /** The waiter ahead that this one may not pass. */
+    blocker?: QualityGateQueueBlocker
+    /** The blocker is the head and is due to be admitted alone (PAN-5285). */
+    headAlone?: boolean
+  }
   | { kind: 'slots' }
   | { kind: 'cpu'; sample: QualityGatePressureSample }
   | { kind: 'memory'; memAvailableBytes: number; reservationsBytes: number; footprintBytes: number; softReserveBytes: number }
@@ -81,6 +127,8 @@ export interface QualityGateAdmissionHandle {
   slots: number
   /** Footprint estimate the lease was admitted with; 0 without a `footprintKey`. */
   footprintBytes: number
+  /** PAN-5285: admitted alone past the bypass bound, below the soft reserve but above the hard reserve. */
+  admittedAlone: boolean
   /** Record the gate's peak RSS under its footprint key (D12); no-op without a key, never throws. */
   recordPeak(peakBytes: number): Promise<void>
   release(): Promise<void>
@@ -91,12 +139,20 @@ interface AdmissionTicket extends QualityGateAdmissionRequest {
   pid: number
   createdAt: number
   footprintBytes?: number
+  /** PAN-5285: absent on tickets from older checkouts. */
+  admissionVersion?: number
+  /** PAN-5285: the waiter's current wait reason and when it began. */
+  wait?: { since: number; reason: QualityGateWaitReason }
+  /** PAN-5285: when this waiter, as head, first failed the memory rule; cleared once it fits. */
+  memoryBlockedSince?: number
 }
 
 interface AdmissionOwner extends AdmissionTicket {
   acquiredAt: number
   /** Owner tree RSS just before publishing (FR-11). */
   rssBaselineBytes?: number
+  /** PAN-5285: admitted alone past the bypass bound. */
+  admittedAlone?: boolean
 }
 
 interface AdmissionBreaker {
@@ -120,11 +176,16 @@ export interface QualityGateAdmissionDeps {
   sampleMemory?: () => Promise<QualityGateMemorySample | null>
   readTreeRssBytes?: (pid: number) => Promise<number | null>
   softReserveBytes?: number
+  /** PAN-5285: floor for a head admitted alone; defaults to `resources.governor_hard_reserve_gb`. */
+  hardReserveBytes?: number
+  /** PAN-5285: how long later waiters may pass a memory-blocked head. */
+  headBypassMs?: number
   readFootprintEstimate?: (key: string) => Promise<number>
   onWaiting?: (reason: QualityGateWaitReason) => void
 }
 
 type MemoryWaitReason = Extract<QualityGateWaitReason, { kind: 'memory' }>
+type QueueWaitReason = Extract<QualityGateWaitReason, { kind: 'queue' }>
 
 export class QualityGateAdmissionTimeoutError extends Error {
   constructor(
@@ -237,6 +298,22 @@ async function publishExclusive(path: string, value: unknown): Promise<void> {
   }
   try {
     await link(temp, path)
+  } finally {
+    await unlinkIfExists(temp)
+  }
+}
+
+/** PAN-5285: overwrite our own ticket atomically (temp file, then rename). */
+async function replaceFile(path: string, value: unknown): Promise<void> {
+  const temp = join(dirname(path), `.tmp-${process.pid}-${tempSequence++}-${basename(path)}`)
+  try {
+    const file = await open(temp, 'wx', 0o600)
+    try {
+      await file.writeFile(`${JSON.stringify(value)}\n`, 'utf8')
+    } finally {
+      await file.close()
+    }
+    await rename(temp, path)
   } finally {
     await unlinkIfExists(temp)
   }
@@ -438,6 +515,8 @@ export interface QualityGateQueueEntry {
   createdAt: number
   /** Set on owners only. */
   acquiredAt?: number
+  /** PAN-5285: set on waiters only; the reason the waiter last reported and when it began. */
+  wait?: { since: number; reason: QualityGateWaitReason }
 }
 
 export interface QualityGateQueueSnapshot {
@@ -455,6 +534,7 @@ function queueEntry(ticket: AdmissionTicket | AdmissionOwner): QualityGateQueueE
   if (ticket.issueId) entry.issueId = ticket.issueId
   if (typeof ticket.footprintBytes === 'number') entry.footprintBytes = ticket.footprintBytes
   if ('acquiredAt' in ticket && Number.isFinite(ticket.acquiredAt)) entry.acquiredAt = ticket.acquiredAt
+  if (ticket.wait && Number.isFinite(ticket.wait.since)) entry.wait = ticket.wait
   return entry
 }
 
@@ -513,6 +593,22 @@ export async function readQualityGateMemory(): Promise<QualityGateMemorySample |
   return readMemory(sampleProcMemory)
 }
 
+function queueBlocker(ticket: AdmissionTicket): QualityGateQueueBlocker {
+  return {
+    gateName: ticket.gateName,
+    ...(ticket.issueId ? { issueId: ticket.issueId } : {}),
+    workspacePath: ticket.workspacePath,
+  }
+}
+
+/** Memory facts one poll shares between its own rule and its judgement of the waiters ahead. */
+interface PollMemory {
+  memory: QualityGateMemorySample
+  reservationsBytes: number
+  softReserveBytes: number
+  hardReserveBytes: number
+}
+
 export async function acquireQualityGateAdmission(
   request: QualityGateAdmissionRequest,
   deps: QualityGateAdmissionDeps = {},
@@ -527,6 +623,7 @@ export async function acquireQualityGateAdmission(
   const settleMs = deps.settleMs ?? QUALITY_GATE_ADMISSION_SETTLE_MS
   const staleMs = deps.staleMs ?? QUALITY_GATE_ADMISSION_STALE_MS
   const tornGraceMs = deps.tornGraceMs ?? QUALITY_GATE_ADMISSION_TORN_GRACE_MS
+  const headBypassMs = deps.headBypassMs ?? QUALITY_GATE_HEAD_BYPASS_MS
   const slots = Number.isInteger(deps.slots) && deps.slots! >= 1 ? deps.slots! : await resolveQualityGateSlots()
   const maxWaitMs = deps.maxWaitMs
   const footprintKey = request.footprintKey
@@ -535,8 +632,6 @@ export async function acquireQualityGateAdmission(
   const readFootprintEstimate = deps.readFootprintEstimate ?? ((key: string) => readGateFootprintEstimate(key, root))
 
   await mkdir(root, { recursive: true })
-  const estimate = footprintKey ? await readFootprintEstimate(footprintKey) : 0
-  const softReserveBytes = footprintKey ? deps.softReserveBytes ?? await resolveSoftReserveBytes() : 0
   const createdAt = now()
   const ticketId = `${String(createdAt).padStart(16, '0')}-${String(pid).padStart(10, '0')}-${String(ticketSequence++).padStart(6, '0')}`
   const ticket: AdmissionTicket = {
@@ -544,15 +639,65 @@ export async function acquireQualityGateAdmission(
     ticketId,
     pid,
     createdAt,
-    ...(footprintKey ? { footprintBytes: estimate } : {}),
+    admissionVersion: ADMISSION_TICKET_VERSION,
+    ...(footprintKey ? { footprintBytes: await readFootprintEstimate(footprintKey) } : {}),
+  }
+  const ownTicketPath = ticketPath(root, ticketId)
+
+  /** PAN-5285: read per poll, like the estimate, so a lowered reserve reaches waiters already queued. */
+  const resolveReserves = async (): Promise<{ soft: number; hard: number }> => {
+    if (deps.softReserveBytes != null && deps.hardReserveBytes != null) {
+      return { soft: deps.softReserveBytes, hard: deps.hardReserveBytes }
+    }
+    const resolved = await resolveGateReserveBytes()
+    return { soft: deps.softReserveBytes ?? resolved.softBytes, hard: deps.hardReserveBytes ?? resolved.hardBytes }
   }
 
+  /** The ticket on disk lags `ticket` until a write succeeds; the loop retries every poll. */
+  let ticketDirty = false
+  const persistTicket = async (): Promise<void> => {
+    try {
+      await replaceFile(ownTicketPath, ticket)
+      ticketDirty = false
+    } catch {
+      ticketDirty = true
+    }
+  }
+  /** Start or clear our memory-block clock (head polls only), writing it to the ticket for the waiters behind. */
+  const setMemoryBlocked = async (blocked: boolean): Promise<void> => {
+    const since = blocked ? ticket.memoryBlockedSince ?? now() : undefined
+    if (since !== ticket.memoryBlockedSince) {
+      ticket.memoryBlockedSince = since
+      ticketDirty = true
+    }
+    if (ticketDirty) await persistTicket()
+  }
+  /** Older-version peers first seen "fitting" with a slot free, by ticket id (PAN-5285). */
+  const legacyFitSince = new Map<string, number>()
+
+  let reportedKey: string | null = null
+  let reportedAt = 0
   let lastWaitKind: QualityGateWaitReason['kind'] | null = null
+  let waitingSince = 0
   let lastMemory: MemoryWaitReason | undefined
-  const notifyWaiting = (reason: QualityGateWaitReason): void => {
+  /**
+   * Called on every blocked poll. Reports the reason the first time, then a
+   * changed reason at most once per QUALITY_GATE_WAIT_REPORT_MS (PAN-5285), and
+   * records each reported reason in our ticket for status readers.
+   */
+  const notifyWaiting = async (reason: QualityGateWaitReason): Promise<void> => {
     if (reason.kind === 'memory') lastMemory = reason
-    if (reason.kind === lastWaitKind) return
+    if (reason.kind !== lastWaitKind) waitingSince = now()
     lastWaitKind = reason.kind
+    const key = reason.kind === 'queue'
+      ? `queue:${reason.blocker?.gateName}:${reason.blocker?.workspacePath}:${reason.headAlone === true}`
+      : reason.kind
+    if (key === reportedKey) return
+    if (reportedKey !== null && now() - reportedAt < QUALITY_GATE_WAIT_REPORT_MS) return
+    reportedKey = key
+    reportedAt = now()
+    ticket.wait = { since: waitingSince, reason }
+    await persistTicket()
     try {
       deps.onWaiting?.(reason)
     } catch {
@@ -560,23 +705,77 @@ export async function acquireQualityGateAdmission(
     }
   }
 
-  /** FR-2: the memory reason this waiter must wait on, or null when it may start. */
-  const memoryBlock = async (owners: AdmissionOwner[]): Promise<MemoryWaitReason | null> => {
-    if (!footprintKey) return null
+  const readPollMemory = async (owners: AdmissionOwner[]): Promise<PollMemory | null> => {
     const memory = await readMemory(sampleMemory)
     if (!memory) return null
-    const reservationsBytes = await sumReservations(owners, readTreeRssBytes)
-    const verdict = evaluateMemoryHeadroom({ ...memory, softReserveBytes, estimateBytes: estimate, reservationsBytes })
-    if (verdict.ok) return null
-    return {
-      kind: 'memory',
-      memAvailableBytes: memory.memAvailableBytes,
-      reservationsBytes,
-      footprintBytes: verdict.footprintBytes,
-      softReserveBytes,
-    }
+    const { soft, hard } = await resolveReserves()
+    return { memory, reservationsBytes: await sumReservations(owners, readTreeRssBytes), softReserveBytes: soft, hardReserveBytes: hard }
   }
-  const ownTicketPath = ticketPath(root, ticketId)
+  const verdictFor = (poll: PollMemory, estimateBytes: number): MemoryHeadroomVerdict => evaluateMemoryHeadroom({
+    ...poll.memory,
+    softReserveBytes: poll.softReserveBytes,
+    estimateBytes,
+    reservationsBytes: poll.reservationsBytes,
+  })
+  const memoryReason = (poll: PollMemory, verdict: MemoryHeadroomVerdict): MemoryWaitReason => ({
+    kind: 'memory',
+    memAvailableBytes: poll.memory.memAvailableBytes,
+    reservationsBytes: poll.reservationsBytes,
+    footprintBytes: verdict.footprintBytes,
+    softReserveBytes: poll.softReserveBytes,
+  })
+  /**
+   * Alone, the gate would still leave the hard reserve free. Its footprint is
+   * clamped to what the host could give it above the hard reserve, not the
+   * soft reserve, so a large estimate is never under-counted.
+   */
+  const fitsAlone = (poll: PollMemory, estimateBytes: number): boolean => {
+    const footprintBytes = Math.min(estimateBytes, Math.max(0, poll.memory.memTotalBytes - poll.hardReserveBytes))
+    return poll.memory.memAvailableBytes - footprintBytes >= poll.hardReserveBytes
+  }
+  /**
+   * Why we must keep our place behind `ahead`, or null when we may pass all of
+   * them: each is blocked on memory and the head is not due to run alone. A
+   * head whose memory block has outlasted the bound is due while any slot is
+   * held (draining the slots is what lets it start) or while it would fit
+   * alone right now. Called only while a slot is free.
+   */
+  const queueBlock = async (
+    ahead: AdmissionTicket[],
+    poll: PollMemory | null,
+    slotsHeld: boolean,
+  ): Promise<QueueWaitReason | null> => {
+    const position = ahead.length
+    const keepPlace = (blocker: AdmissionTicket, headAlone = false): QueueWaitReason => ({
+      kind: 'queue',
+      position,
+      blocker: queueBlocker(blocker),
+      ...(headAlone ? { headAlone } : {}),
+    })
+    if (!poll) return keepPlace(ahead[0]!)
+    for (const [index, peer] of ahead.entries()) {
+      if (!peer.footprintKey) return keepPlace(peer)
+      // Older tickets are judged by the estimate they froze at enqueue, as they judge themselves.
+      const estimate = peer.admissionVersion ? await readFootprintEstimate(peer.footprintKey) : peer.footprintBytes ?? 0
+      const verdict = verdictFor(poll, estimate)
+      if (verdict.ok) {
+        if (peer.admissionVersion) return keepPlace(peer)
+        // An older peer that fits with a slot free would have started; past the grace, it is stuck on its frozen numbers.
+        const since = legacyFitSince.get(peer.ticketId) ?? now()
+        legacyFitSince.set(peer.ticketId, since)
+        if (now() - since <= QUALITY_GATE_LEGACY_FIT_GRACE_MS) return keepPlace(peer)
+        continue
+      }
+      legacyFitSince.delete(peer.ticketId)
+      const blockedSince = peer.memoryBlockedSince
+      if (index === 0 && peer.admissionVersion && blockedSince != null && now() - blockedSince > headBypassMs
+        && (slotsHeld || fitsAlone(poll, estimate))) {
+        return keepPlace(peer, true)
+      }
+    }
+    return null
+  }
+
   await publishExclusive(ownTicketPath, ticket)
 
   try {
@@ -585,18 +784,14 @@ export async function acquireQualityGateAdmission(
         throw new QualityGateAdmissionTimeoutError(maxWaitMs, lastWaitKind, lastWaitKind === 'memory' ? lastMemory : undefined)
       }
       const waiters = await listLiveTickets(root, isProcessAlive, tornGraceMs)
-      if (!waiters.some((waiter) => waiter.ticketId === ticketId)) {
+      const position = waiters.findIndex((waiter) => waiter.ticketId === ticketId)
+      if (position < 0) {
         // D15: another poller deleted our ticket; republish it to keep our FIFO place.
         try {
           await publishExclusive(ownTicketPath, ticket)
         } catch (error) {
           if (!isErrnoException(error) || error.code !== 'EEXIST') throw error
         }
-        await sleep(pollMs)
-        continue
-      }
-      if (waiters[0]?.ticketId !== ticketId) {
-        notifyWaiting({ kind: 'queue' })
         await sleep(pollMs)
         continue
       }
@@ -629,21 +824,43 @@ export async function acquireQualityGateAdmission(
       }
       // `taken` counts every slot file, so a held slot above a lowered N still counts (D3).
       if (reclaimed || taken.size >= slots) {
-        if (taken.size >= slots) notifyWaiting({ kind: 'slots' })
+        if (taken.size >= slots) {
+          await notifyWaiting(position === 0 ? { kind: 'slots' } : { kind: 'queue', position, blocker: queueBlocker(waiters[0]!) })
+        }
         await sleep(pollMs)
         continue
       }
 
-      const memoryReason = await memoryBlock(liveOwners)
-      if (memoryReason) {
-        notifyWaiting(memoryReason)
-        await sleep(pollMs)
-        continue
+      // PAN-5285: re-read the estimate every poll, so a corrected footprint file unblocks a queued waiter.
+      if (footprintKey) ticket.footprintBytes = await readFootprintEstimate(footprintKey)
+      const poll = footprintKey || position > 0 ? await readPollMemory(liveOwners) : null
+      const ownVerdict = footprintKey && poll ? verdictFor(poll, ticket.footprintBytes!) : null
+      let alone = false
+      if (position > 0) {
+        const queued = await queueBlock(waiters.slice(0, position), poll, taken.size > 0)
+        if (queued) {
+          await notifyWaiting(queued)
+          await sleep(pollMs)
+          continue
+        }
+      }
+      if (position === 0 && ownVerdict) await setMemoryBlocked(!ownVerdict.ok)
+      if (ownVerdict && !ownVerdict.ok) {
+        // PAN-5285: a head blocked on memory for longer than the bypass bound starts alone
+        // once the slots are empty, as long as it would leave the hard reserve free.
+        const blockedSince = ticket.memoryBlockedSince
+        alone = position === 0 && taken.size === 0 && blockedSince != null && now() - blockedSince > headBypassMs
+          && fitsAlone(poll!, ticket.footprintBytes!)
+        if (!alone) {
+          await notifyWaiting(memoryReason(poll!, ownVerdict))
+          await sleep(pollMs)
+          continue
+        }
       }
 
       const pressure = await samplePressure()
       if (pressure.pressured) {
-        notifyWaiting({ kind: 'cpu', sample: pressure })
+        await notifyWaiting({ kind: 'cpu', sample: pressure })
         await sleep(pollMs)
         continue
       }
@@ -655,8 +872,11 @@ export async function acquireQualityGateAdmission(
       const baseline = footprintKey ? await readTreeRssBytes(pid).catch(() => null) : null
       const owner: AdmissionOwner = {
         ...ticket,
+        wait: undefined,
+        memoryBlockedSince: undefined,
         acquiredAt: now(),
         ...(baseline != null ? { rssBaselineBytes: baseline } : {}),
+        ...(alone ? { admittedAlone: true } : {}),
       }
       try {
         await publishExclusive(path, owner)
@@ -674,7 +894,7 @@ export async function acquireQualityGateAdmission(
       await sleep(settleMs)
       const settledPressure = await samplePressure()
       if (settledPressure.pressured) {
-        notifyWaiting({ kind: 'cpu', sample: settledPressure })
+        await notifyWaiting({ kind: 'cpu', sample: settledPressure })
         if (sameOwner(await readJson<AdmissionOwner>(path), owner)) {
           await unlinkIfExists(path)
         }
@@ -689,9 +909,17 @@ export async function acquireQualityGateAdmission(
           const other = await readJson<AdmissionOwner>(otherPath)
           if (other && other.ticketId !== ticketId && !ownerIsStale(other, now(), staleMs, isProcessAlive)) others.push(other)
         }
-        const settledMemory = await memoryBlock(others)
-        if (settledMemory) {
-          notifyWaiting(settledMemory)
+        // PAN-5285: a head admitted alone skips the soft-reserve rule, which it already
+        // failed, but re-checks the hard reserve with fresh memory and reserves, and gives
+        // the slot back if that now fails or another gate joined it.
+        const footprintBytes = owner.footprintBytes ?? 0
+        const settledPoll = await readPollMemory(others)
+        const settledVerdict = settledPoll ? verdictFor(settledPoll, footprintBytes) : null
+        const failed = alone
+          ? others.length > 0 || (settledPoll != null && !fitsAlone(settledPoll, footprintBytes))
+          : settledVerdict != null && !settledVerdict.ok
+        if (failed) {
+          if (settledPoll && settledVerdict) await notifyWaiting(memoryReason(settledPoll, settledVerdict))
           if (sameOwner(await readJson<AdmissionOwner>(path), owner)) await unlinkIfExists(path)
           await sleep(pollMs)
           continue
@@ -704,7 +932,8 @@ export async function acquireQualityGateAdmission(
         admittedAt: new Date(owner.acquiredAt).toISOString(),
         slot,
         slots,
-        footprintBytes: estimate,
+        footprintBytes: owner.footprintBytes ?? 0,
+        admittedAlone: alone,
         async recordPeak(peakBytes: number) {
           if (!footprintKey) return
           try {
