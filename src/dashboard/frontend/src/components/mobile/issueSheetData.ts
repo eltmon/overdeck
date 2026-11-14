@@ -145,6 +145,10 @@ export function stageCostLine(byStage: Record<string, { cost: number; tokens: nu
 /** D-8: true when `value` has a numeric check-runs summary; never throws. */
 export function isCheckRunsResponse(value: unknown): value is IssueCheckRunsResponse {
   if (typeof value !== 'object' || value === null) return false;
+  // D-8: a soft-failed gh api read (rate limit, auth, timeout) answers 200 with a
+  // zeroed summary plus a non-empty `error`; treat it as invalid so the caller
+  // falls back to derived.pr.checks instead of showing "No checks reported".
+  if (typeof (value as { error?: unknown }).error === 'string' && (value as { error: string }).error !== '') return false;
   const summary = (value as { summary?: unknown }).summary;
   if (typeof summary !== 'object' || summary === null) return false;
   const s = summary as Record<string, unknown>;

@@ -2,9 +2,11 @@
  * MobileIssueSheet — the read-only full-screen issue sheet (PAN-4661, PAN-5219).
  *
  * D-4661-9 Full screen: the shell hides its header and tab bar while this is
- *     open. D-4661-10 fields, in order: Back + identifier, title, then Phase,
- *     State, Needs you (only when `issueNeedsOperator`), Project, Pull
- *     request, Agent, Labels, Updated, and an Open-in-tracker link.
+ *     open. D-11 (PAN-5219) section order: Back + identifier, title, What
+ *     happened (only with an event), then Phase, State, Needs you (only
+ *     when `issueNeedsOperator`), Agent, Cost, Pull request and Checks,
+ *     Description, then Project, Labels, Updated, and an Open-in-tracker
+ *     link.
  * D-4661-11 It does not reuse `IssueActionMenu`, `AutoMergeToggle`,
  *     `IssuePeek`, the desktop `IssueRow` or the issue drawer — none of
  *     those are read-only.
@@ -68,16 +70,16 @@ export function MobileIssueSheet({
             </dd>
           </div>
         )}
+        <AgentRow issueId={identifier} storeAgents={agents} />
+        <CostSection issueId={identifier} />
+        <PrChecksSection issueId={identifier} derived={derived} />
+        <DescriptionSection text={issue?.description ?? ''} available={Boolean(issue)} />
         {issue?.project && (
           <div>
             <dt className="text-xs text-muted-foreground">Project</dt>
             <dd className="break-words text-sm">{issue.project.name}</dd>
           </div>
         )}
-        <PrChecksSection issueId={identifier} derived={derived} />
-        <AgentRow issueId={identifier} storeAgents={agents} />
-        <CostSection issueId={identifier} />
-        <DescriptionSection text={issue?.description ?? ''} available={Boolean(issue)} />
         {issue && issue.labels.length > 0 && (
           <div>
             <dt className="text-xs text-muted-foreground">Labels</dt>

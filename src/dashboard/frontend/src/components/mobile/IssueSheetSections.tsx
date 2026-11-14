@@ -90,10 +90,15 @@ export function CostSection({ issueId }: { issueId: string }) {
     retry: false,
     refetchInterval: (q) => (q.state.status === 'error' ? false : 30_000),
   });
-  const headline = query.data
-    ? headlineCost(query.data) === 0 ? 'No spend recorded' : formatUsd(headlineCost(query.data))
-    : query.isError ? 'Cost not available' : 'Loading…';
-  const stageLine = query.data ? stageCostLine(query.data.byStage) : null;
+  // Check isError first: a failed refetch leaves react-query's last-good `data`
+  // in place, and NFR-2 wants that error to replace it with "Cost not available",
+  // not keep showing the stale figure.
+  const headline = query.isError
+    ? 'Cost not available'
+    : query.data
+      ? headlineCost(query.data) === 0 ? 'No spend recorded' : formatUsd(headlineCost(query.data))
+      : 'Loading…';
+  const stageLine = !query.isError && query.data ? stageCostLine(query.data.byStage) : null;
   return (
     <div>
       <dt className="text-xs text-muted-foreground">Cost</dt>

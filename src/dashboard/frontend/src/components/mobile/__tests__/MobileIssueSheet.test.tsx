@@ -382,6 +382,35 @@ describe('MobileIssueSheet', () => {
     expect(await screen.findByText('Checks failed')).toBeInTheDocument();
   });
 
+  it('falls back to derived.pr.checks when check-runs soft-fails with a zeroed summary and an error field (D-8)', async () => {
+    stubFetch({
+      '/api/agent-directory': () => Response.json({ generatedAt: '2026-01-01T00:00:00.000Z', windowHours: 0, scope: 'live', entries: [] }),
+      '/check-runs': () => Response.json({
+        issueId: 'PAN-23',
+        pr: { number: 23, url: 'https://example.com/pr/23', headRefName: 'x', headRefOid: 'a', mergeable: null, statusCheckRollup: [] },
+        checkRuns: [],
+        summary: { total: 0, passed: 0, failed: 0, running: 0, skipped: 0, pending: 0, cancelled: 0 },
+        error: 'gh api check-runs failed: rate limited',
+      }),
+    });
+    useDashboardStore.setState({
+      issuesRaw: [issue({ identifier: 'PAN-23' })],
+      derivedIssueStateByIssueId: {
+        'PAN-23': {
+          issueId: 'PAN-23',
+          state: 'ready',
+          pr: { url: 'https://example.com/pr/23', number: 23, reviewState: 'none', checks: 'red', mergeable: true },
+        },
+      } satisfies Record<string, DerivedIssueState>,
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderSheet('PAN-23');
+
+    expect(await screen.findByText('Checks failed')).toBeInTheDocument();
+    expect(screen.queryByText('No checks reported')).not.toBeInTheDocument();
+  });
+
   it('renders "No pull request" when neither source knows one', () => {
     useDashboardStore.setState({
       issuesRaw: [issue({ identifier: 'PAN-18' })],

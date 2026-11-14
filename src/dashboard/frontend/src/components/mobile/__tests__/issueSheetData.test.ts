@@ -224,6 +224,14 @@ describe('isCheckRunsResponse', () => {
     expect(isCheckRunsResponse({ summary: { total: '5' } })).toBe(false);
     expect(isCheckRunsResponse(null)).toBe(false);
   });
+
+  it('rejects a soft-failed gh api read even with a numeric zeroed summary (D-8)', () => {
+    expect(isCheckRunsResponse({ ...checkRunsResponse({}), error: 'gh api check-runs failed: rate limited' })).toBe(false);
+  });
+
+  it('accepts a response with an empty error string', () => {
+    expect(isCheckRunsResponse({ ...checkRunsResponse({}), error: '' })).toBe(true);
+  });
 });
 
 describe('prStateLabel', () => {
