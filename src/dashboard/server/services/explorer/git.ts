@@ -13,7 +13,12 @@
  * Overdeck trash (PAN-5187), so such a request fails as a whole with
  * NOT_IMPLEMENTED before any git command changes anything.
  */
-import type { ExplorerGitCommittedEntry, ExplorerGitStatusEntry, ExplorerGitStatusResult } from '@overdeck/contracts';
+import type {
+  ExplorerGitCommittedEntry,
+  ExplorerGitStageResult,
+  ExplorerGitStatusEntry,
+  ExplorerGitStatusResult,
+} from '@overdeck/contracts';
 import { resolveBaseRef } from '../../../../lib/checkpoint/checkpoint-manager.js';
 import { explorerError } from './errors.js';
 import { runGit, type GitRunResult } from './git-exec.js';
@@ -167,7 +172,7 @@ export async function gitStage(
   root: ExplorerRoot,
   paths: readonly string[],
   action: 'stage' | 'unstage' | 'discard',
-): Promise<void> {
+): Promise<ExplorerGitStageResult> {
   // A root that is not itself a checkout's top level (e.g. a polyrepo
   // wrapper dir) would let git find an enclosing repository and change its
   // index instead.
@@ -178,7 +183,7 @@ export async function gitStage(
       `Root ${root.id} is not the top level of a git checkout; refusing to change an enclosing repository`,
     );
   }
-  if (paths.length === 0) return;
+  if (paths.length === 0) return { trashIds: [] };
   for (const p of paths) await resolveInsideRoot(root, p, { forWrite: true });
 
   let run: GitRunResult;
@@ -195,4 +200,5 @@ export async function gitStage(
     run = await runGit(root.absPath, ['restore', '--source=HEAD', '--staged', '--worktree', '--', ...paths]);
   }
   if (run.code !== 0) throw failed(`git ${action}`, run);
+  return { trashIds: [] };
 }

@@ -59,10 +59,7 @@ export const explorerRpcHandlers = {
   [WS_METHODS.explorerGitStatus]: (input) =>
     run(async () => gitStatus(await resolveExplorerRoot(input.rootId))),
   [WS_METHODS.explorerGitStage]: (input) =>
-    run(async () => {
-      await gitStage(await resolveExplorerRoot(input.rootId), input.paths, input.action);
-      return {};
-    }),
+    run(async () => gitStage(await resolveExplorerRoot(input.rootId), input.paths, input.action)),
   [WS_METHODS.explorerSearchFiles]: (input) =>
     run(async () => searchFiles(await resolveExplorerRoot(input.rootId), input.query, input.limit)),
   [WS_METHODS.explorerSearchContent]: (input) =>
