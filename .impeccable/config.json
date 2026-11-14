@@ -55,6 +55,15 @@
         ],
         "createdAt": "2026-11-14T18:40:59.115Z",
         "reason": "Claude: compact inline tags, keycaps and counters in a data-dense developer UI, matching the style guide's badge pattern; throwaway mockup"
+      },
+      {
+        "rule": "undersized-ui-text",
+        "value": "*",
+        "files": [
+          ".tmp/overdeck-workflow-mockup-v2.html"
+        ],
+        "createdAt": "2026-11-14T18:41:20.614Z",
+        "reason": "Claude: remaining sub-11px text is the letter glyph inside file-type icon badges (an icon, not text) and the mockup-notes tag chrome (not product UI); the one real 10.5px label was raised to 11px"
       }
     ]
   }
