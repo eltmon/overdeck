@@ -1,4 +1,5 @@
 import type { Role } from './role.js';
+import { paneHasBlockingChoiceMenu } from '../pane-choice-menu.js';
 import {
   answerSessionPaneChoice,
   captureSessionPaneChoice,
@@ -39,7 +40,7 @@ async function backendPaneChoiceDeps(pane: AgentPaneRef): Promise<SessionPaneCho
   const { readHerdrPaneText } = await import('../terminal-backends/herdr.js');
   const { sendHerdrPaneKeys } = await import('../terminal-backends/agent-pane-io.js');
   return {
-    capture: (_agentId, lines) => readHerdrPaneText(pane.paneId, lines),
+    capture: (_agentId, lines) => readHerdrPaneText(pane.paneId, lines, 'visible'),
     sendKey: (_agentId, key) => sendHerdrPaneKeys(pane.paneId, [key]),
     // The pane was just launched and every step reads it directly; a read
     // that fails is what reports it gone.
@@ -80,6 +81,9 @@ export async function prepareAutonomousAgentResumePane(
       };
     }
     choice = paneChoiceFromText(screen);
+    if (!choice && paneHasBlockingChoiceMenu(screen)) {
+      return { ready: false, reason: 'pane is blocked on a choice menu other than the Claude resume-summary gate' };
+    }
   } else {
     choice = paneDeps.capture
       ? await captureSessionPaneChoice(agentId, paneDeps.capture)
