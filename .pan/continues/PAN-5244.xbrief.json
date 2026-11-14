@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5244",
   "created": "2026-11-14T05:28:55.884Z",
-  "updated": "2026-11-14T06:29:06.831Z",
+  "updated": "2026-11-14T06:29:09.885Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -258,6 +258,11 @@
     "skills-tab-panel.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T06:29:06.831Z"
+    },
+    "details-body": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5244",
+      "claimedAt": "2026-11-14T06:29:09.885Z"
     }
   }
 }
