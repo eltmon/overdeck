@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5237",
   "created": "2026-11-14T04:16:13.968Z",
-  "updated": "2026-11-14T04:49:51.785Z",
+  "updated": "2026-11-14T04:49:55.740Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,11 @@
     "queued-send-cancel.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T04:49:51.784Z"
+    },
+    "bubble-cancel-controls": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5237",
+      "claimedAt": "2026-11-14T04:49:55.739Z"
     }
   }
 }
