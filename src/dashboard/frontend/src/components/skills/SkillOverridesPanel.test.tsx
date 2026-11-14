@@ -79,6 +79,10 @@ function rowIn(groupKey: string, name: string): HTMLElement {
   return element;
 }
 
+function getCount(): number {
+  return fetchImpl.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method !== 'PUT').length;
+}
+
 beforeEach(() => {
   putBodies = [];
 });
@@ -205,6 +209,57 @@ describe('SkillOverridesPanel — issue', () => {
     expect(screen.getByTestId('skills-changed-count').textContent).toBe('2');
     expect(rowIn('personal', 'grilling')).toBeTruthy();
     expect(rowIn('project', 'local')).toBeTruthy();
+  });
+
+  it('Reset all clears each changed skill in order and reloads once', async () => {
+    mockApi(issueSkills);
+    renderPanel({ level: 'issue', issueId: 'TST-1' });
+    await waitFor(() => expect(row('okf')).toBeTruthy());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset all' }));
+    await waitFor(() => expect(putBodies).toEqual([
+      { level: 'issue', skill: 'grilling', enabled: null, issueId: 'TST-1' },
+      { level: 'issue', skill: 'local', enabled: null, issueId: 'TST-1' },
+    ]));
+    await waitFor(() => expect(getCount()).toBe(2));
+  });
+
+  it('Reset all stops at the first failure and shows that row\'s error', async () => {
+    mockApi(issueSkills, [{ ok: false, status: 500, body: { error: 'push rejected' } }]);
+    renderPanel({ level: 'issue', issueId: 'TST-1' });
+    await waitFor(() => expect(row('okf')).toBeTruthy());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset all' }));
+    await waitFor(() => expect(within(rowIn('changed', 'grilling')).getByRole('alert').textContent).toContain('push rejected'));
+    expect(putBodies).toHaveLength(1);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Reset all' })).not.toBeDisabled());
+  });
+
+  it('disables every switch in the panel while a Reset all PUT is pending', async () => {
+    const oneChanged = {
+      project: 'tst', issue: 'TST-1',
+      skills: [skill({ name: 'grilling', issue: false, enabled: false, source: 'issue' }), skill({ name: 'okf' })],
+    };
+    let resolvePut: (() => void) | undefined;
+    fetchImpl = vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        putBodies.push(JSON.parse(String(init.body)));
+        await new Promise<void>(resolve => { resolvePut = resolve; });
+        return { ok: true, status: 200, json: async () => ({ ok: true }) };
+      }
+      return { ok: true, status: 200, json: async () => oneChanged, url };
+    });
+    vi.stubGlobal('fetch', fetchImpl);
+    renderPanel({ level: 'issue', issueId: 'TST-1' });
+    await waitFor(() => expect(row('okf')).toBeTruthy());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset all' }));
+    await waitFor(() => expect(putBodies).toHaveLength(1));
+    for (const switchEl of screen.getAllByRole('switch')) {
+      expect(switchEl).toHaveProperty('disabled', true);
+    }
+    resolvePut?.();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Reset all' })).not.toBeDisabled());
   });
 
   it('says nothing is changed when no skill has a stored value', async () => {

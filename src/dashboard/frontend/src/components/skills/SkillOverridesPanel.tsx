@@ -138,6 +138,7 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
   const [rowErrors, setRowErrors] = useState<Record<string, { message: string; enabled: boolean | null }>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const [changed, setChanged] = useState(false);
+  const [resettingAll, setResettingAll] = useState(false);
   const packsRef = useRef<HTMLElement>(null);
 
   const query = useQuery({
@@ -147,7 +148,8 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
     retry: false,
   });
 
-  const save = async (skill: string, value: boolean | null) => {
+  /** Resolves true when the write succeeded. `refresh: false` leaves the reload to the caller. */
+  const save = async (skill: string, value: boolean | null, refresh = true): Promise<boolean> => {
     setSaving(prev => ({ ...prev, [skill]: true }));
     setRowErrors(({ [skill]: _cleared, ...rest }) => rest);
     try {
@@ -161,9 +163,11 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
       if (!res.ok) throw new Error(result.error ?? `HTTP ${res.status}`);
       setNotice(result.committed && result.pushed === false ? `Saved locally; push pending: ${result.reason ?? 'unknown reason'}` : null);
       setChanged(true);
-      await queryClient.invalidateQueries({ queryKey: SKILL_OVERRIDES_QUERY_KEY });
+      if (refresh) await queryClient.invalidateQueries({ queryKey: SKILL_OVERRIDES_QUERY_KEY });
+      return true;
     } catch (error) {
       setRowErrors(prev => ({ ...prev, [skill]: { message: error instanceof Error ? error.message : String(error), enabled: value } }));
+      return false;
     } finally {
       setSaving(({ [skill]: _done, ...rest }) => rest);
     }
@@ -211,6 +215,19 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
   // PAN-5245: skills with a stored value at this level, listed first below global.
   const changedHere = level === 'global' ? [] : skills.filter(skill => !skill.core && levelValue(skill, level) !== null);
   const showChanged = level !== 'global' && !narrowing;
+  const resetAll = async () => {
+    // A snapshot: the list reloads under the loop.
+    const names = changedHere.map(skill => skill.name);
+    setResettingAll(true);
+    try {
+      for (const name of names) {
+        if (!(await save(name, null, false))) break;
+      }
+    } finally {
+      await queryClient.invalidateQueries({ queryKey: SKILL_OVERRIDES_QUERY_KEY });
+      setResettingAll(false);
+    }
+  };
 
   return (
     <div className="space-y-4" data-testid={`skill-overrides-${level}`}>
@@ -313,6 +330,17 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
                   <h3 className="text-[13px] font-medium text-foreground">Changed for this {level}</h3>
                   <span className="ml-auto flex shrink-0 items-center gap-3">
                     <span className="font-mono-ui text-xs tabular-nums text-muted-foreground" data-testid="skills-changed-count">{changedHere.length}</span>
+                    {changedHere.length > 0 && (
+                      <button
+                        type="button"
+                        disabled={resettingAll}
+                        onClick={() => void resetAll()}
+                        title={`Return ${changedHere.length === 1 ? 'this skill' : `these ${changedHere.length} skills`} to what this ${level} inherits`}
+                        className="rounded px-1.5 py-0.5 text-xs text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Reset all
+                      </button>
+                    )}
                   </span>
                 </div>
               </div>
@@ -330,7 +358,7 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
                       skill={skill}
                       level={level}
                       below={null}
-                      saving={saving[skill.name] === true}
+                      saving={saving[skill.name] === true || resettingAll}
                       error={rowErrors[skill.name]}
                       onSave={value => void save(skill.name, value)}
                     />
@@ -373,7 +401,7 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
                           skill={skill}
                           level={level}
                           below={level === 'global' ? belowNote(below[skill.name]) : null}
-                          saving={saving[skill.name] === true}
+                          saving={saving[skill.name] === true || resettingAll}
                           error={rowErrors[skill.name]}
                           onSave={value => void save(skill.name, value)}
                         />
