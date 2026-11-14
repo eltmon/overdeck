@@ -10,9 +10,10 @@
  */
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { Effect } from 'effect';
 import { parse as parseYaml } from 'yaml';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
-import { listProjectsAsync, resolveInfraRepo, resolveProjectFromIssueSync, type ProjectConfig } from '../projects.js';
+import { listProjectsAsync, resolveInfraRepo, resolveProjectFromIssue, type ProjectConfig } from '../projects.js';
 
 export type ProjectWithSkillOverrides = ProjectConfig & {
   skill_overrides?: Record<string, boolean>;
@@ -77,7 +78,7 @@ export function planHomeFor(project: ProjectConfig): string {
 
 /** The registered project that owns an issue, with its key. */
 export async function projectForIssue(issueId: string): Promise<{ projectKey: string; project: ProjectConfig } | null> {
-  const resolved = resolveProjectFromIssueSync(issueId);
+  const resolved = await Effect.runPromise(resolveProjectFromIssue(issueId));
   if (!resolved) return null;
   const project = await findProject(resolved.projectKey);
   return project ? { projectKey: resolved.projectKey, project } : null;
