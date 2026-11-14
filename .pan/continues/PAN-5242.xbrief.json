@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5242",
   "created": "2026-11-14T05:32:10.178Z",
-  "updated": "2026-11-14T08:21:57.935Z",
+  "updated": "2026-11-14T08:22:05.283Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -210,6 +210,11 @@
     "relay-check-route.ac6": {
       "status": "completed",
       "doneAt": "2026-11-14T08:21:57.935Z"
+    },
+    "doctor-relay-row": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5242",
+      "claimedAt": "2026-11-14T08:22:05.283Z"
     }
   }
 }
