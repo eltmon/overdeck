@@ -11,12 +11,12 @@
  *
  * Drives the real Stage issue route against route mocks; no live server.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { lstat, mkdir, readFile, symlink, unlink } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { createRequire } from 'node:module';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
 
 type ViteDevServer = {
@@ -232,6 +232,13 @@ beforeAll(async () => {
   vite = await createServer({
     root: frontendRoot,
     configFile: false,
+    // The real vite.config.ts alias that pdfDocument.ts's import.meta.glob
+    // calls rely on. Without it Vite's dependency scan fails on CI ("Invalid
+    // glob: pdfjs-dist-assets/…"), skips pre-bundling, and serves every
+    // dependency unbundled, which pushes the first page load past 30s.
+    resolve: {
+      alias: [{ find: 'pdfjs-dist-assets', replacement: dirname(realpathSync(resolvePackage('pdfjs-dist/package.json'))) }],
+    },
     plugins: [react(), {
       name: 'issue-tree-mock-ws-transport',
       enforce: 'pre',
