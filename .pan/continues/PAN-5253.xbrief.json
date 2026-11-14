@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5253",
   "created": "2026-11-14T08:19:14.576Z",
-  "updated": "2026-11-14T08:21:45.543Z",
+  "updated": "2026-11-14T08:21:52.980Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
     "tab-table.ac3": {
       "status": "completed",
       "doneAt": "2026-11-14T08:21:45.543Z"
+    },
+    "tab-strip": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5253",
+      "claimedAt": "2026-11-14T08:21:52.980Z"
     }
   }
 }
