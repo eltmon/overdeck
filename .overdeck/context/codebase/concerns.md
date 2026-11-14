@@ -204,6 +204,9 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   `origin/<target>` before comparing), `close-out.ts
   isBranchMerged` (reaper) and `pipeline-membership-gather.ts
   resolveRepositoryDefaultBranch` (prefers local over `origin/`) — these last two are not fixed.
+  `~/.overdeck/cli-bin/pan` is first on PATH and is rewritten by launchers, `pan install`,
+  `pan sync` and (since PAN-5225) `pan reload` activation — before PAN-5225 a reload left the
+  shell `pan` on the previous generation.
 - **Close-out ceremony lives in `lifecycle/workflows.ts closeOut()`** — `pan close` and
   `POST /api/issues/:id/close-out` both call it. Row 4's merge verification lives in
   `lifecycle/verify-merged.ts` and compares against a fetched `origin/<target>`, not the
