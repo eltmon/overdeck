@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5261",
   "created": "2026-11-14T08:29:10.265Z",
-  "updated": "2026-11-14T08:50:05.068Z",
+  "updated": "2026-11-14T08:52:57.071Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,9 +76,30 @@
       "doneAt": "2026-11-14T08:49:59.405Z"
     },
     "webhook-fire-filters": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5261",
-      "claimedAt": "2026-11-14T08:50:05.068Z"
+      "claimedAt": "2026-11-14T08:50:05.068Z",
+      "doneAt": "2026-11-14T08:52:57.071Z"
+    },
+    "webhook-fire-filters.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:52:57.071Z"
+    },
+    "webhook-fire-filters.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:52:57.071Z"
+    },
+    "webhook-fire-filters.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:52:57.071Z"
+    },
+    "webhook-fire-filters.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:52:57.071Z"
+    },
+    "webhook-fire-filters.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T08:52:57.071Z"
     }
   }
 }
