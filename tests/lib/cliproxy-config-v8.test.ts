@@ -143,3 +143,36 @@ describe('buildCliproxyConfigV8 extra merge', () => {
     expect(out.config.management).toEqual({ 'secret-key': 'generated-management-key' });
   });
 });
+
+describe('buildCliproxyConfigV8 claude exclusion', () => {
+  it('excludes every codex alias from the claude channel and keeps existing exclusions', () => {
+    const extra = { ...operatorExtra(), oauth: { 'excluded-models': { claude: ['claude-3-opus'] } } };
+    const config = parsed({ extra });
+    const expected = [...CODEX_ALIASES.map(([, alias]) => alias), 'claude-3-opus'].sort();
+    expect(config.oauth['excluded-models'].claude).toEqual(expected);
+    expect(config.oauth['excluded-models'].claude).toHaveLength(10);
+  });
+
+  it('given the operator fixture the top-level sections appear once and the claude list is the sorted alias set', () => {
+    const config = parsed({ extra: operatorExtra() });
+    const keys = Object.keys(config);
+    for (const section of ['routing', 'management', 'oauth']) {
+      expect(keys.filter((key) => key === section)).toHaveLength(1);
+    }
+    expect(config.oauth['excluded-models'].claude).toEqual(CODEX_ALIASES.map(([, alias]) => alias).sort());
+  });
+
+  it('writes no claude exclusion when there are no codex aliases', () => {
+    const config = parsed({ extra: { routing: { strategy: 'fill-first' } } });
+    expect(config.oauth).not.toHaveProperty('excluded-models');
+  });
+
+  it('keeps other excluded-models channels', () => {
+    const config = parsed({
+      extra: { ...operatorExtra(), 'oauth-excluded-models': { codex: ['gpt-5-codex-mini'] } },
+    });
+    expect(config.oauth['excluded-models'].codex).toEqual(['gpt-5-codex-mini']);
+    expect(config.oauth['excluded-models'].claude).toHaveLength(9);
+    expect(config).not.toHaveProperty('oauth-excluded-models');
+  });
+});

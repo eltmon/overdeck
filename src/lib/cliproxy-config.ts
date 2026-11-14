@@ -110,6 +110,30 @@ function sectionOf(config: Record<string, unknown>, key: string): Record<string,
 }
 
 /**
+ * Keep every Codex-aliased model name off Claude accounts (PAN-5282 FR-6).
+ * v8 routes a client model name to any upstream offering it, and a real
+ * Claude account natively offers names such as `claude-opus-4-6` that the
+ * operator's Codex aliases also claim. Union the aliases into
+ * `oauth.excluded-models.claude` so those names always go to Codex.
+ */
+function excludeCodexAliasesFromClaude(config: Record<string, unknown>): void {
+  const oauth = isPlainObject(config.oauth) ? config.oauth : {};
+  const modelAlias = isPlainObject(oauth['model-alias']) ? oauth['model-alias'] : {};
+  const codex = Array.isArray(modelAlias.codex) ? modelAlias.codex : [];
+  const aliases = codex
+    .map((entry) => (isPlainObject(entry) ? entry.alias : undefined))
+    .filter((alias): alias is string => typeof alias === 'string' && alias.length > 0);
+  if (aliases.length === 0) return;
+
+  const excluded = isPlainObject(oauth['excluded-models']) ? oauth['excluded-models'] : {};
+  const existing = Array.isArray(excluded.claude)
+    ? excluded.claude.filter((name): name is string => typeof name === 'string')
+    : [];
+  const claude = [...new Set([...existing, ...aliases])].sort();
+  config.oauth = { ...oauth, 'excluded-models': { ...excluded, claude } };
+}
+
+/**
  * Build the generated v8 config object and its YAML text: Overdeck's base
  * config with `extra` (legacy keys converted) deep-merged over it. Extra wins,
  * except that Overdeck's client token always stays in `access.api-keys`.
@@ -150,6 +174,8 @@ export function buildCliproxyConfigV8(input: CliproxyConfigInput): CliproxyConfi
       warnings.push('config.extra.yaml management secret-key is a bcrypt hash; using the key in management-key instead');
     }
   }
+
+  excludeCodexAliasesFromClaude(config);
 
   return {
     config,
