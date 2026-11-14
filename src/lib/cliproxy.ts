@@ -85,6 +85,10 @@ export const CLIPROXY_BASE_URL = `http://${CLIPROXY_HOST}:${CLIPROXY_PORT}`;
 // a throwaway instance: --version banner unchanged, /v0/management unchanged,
 // oauth.excluded-models.claude hides Codex-aliased names from a Claude account,
 // and startup rewrites only management.secret-key (plaintext -> bcrypt hash).
+// Re-probed 2026-11-14 with Overdeck's generated config (port 18317, fake
+// auth files): auth-files 200 with both files, "1 Gemini API keys" at startup,
+// Claude list free of the nine Codex aliases (8 of them reappear when
+// oauth.excluded-models.claude is removed), second write skipped (wrote: false).
 const CLIPROXY_RELEASE_VERSION = 'v8.0.71';
 
 function getCliproxyDir(): string {
