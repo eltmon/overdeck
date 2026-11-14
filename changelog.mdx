@@ -10,6 +10,24 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: do not edit this page for an unreleased change. Each PR adds its bullets to changelog.d/<issue>.md (format: changelog.d/README.md), and pan release stable folds them into a dated <Update> block here. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so in its entry and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.85.0" description="2026-11-14">
+  #### Improved
+
+  - **One issue view everywhere:** the issue tab in the Command Deck now shows the same conversation-first view as the issue drawer: the agent's conversation first, with the pipeline, checks and pickup controls in one compact header, and the same tabs. The crew list and the status rail left the issue tab; the Command Deck's issue tree and Awareness column show them. Details gains a "Create PR" link and spells out the next step. ([#5246](https://github.com/eltmon/overdeck/issues/5246))
+  - **More in the issue drawer:** the drawer gains a Discussion tab, a PRD view beside the plan map, a Changes tab with Files, Checks and Artifacts, and a status history beside the activity feed. A banner under the pipeline says when an agent is waiting for you or something blocks the merge. Details now shows what the issue is doing, each agent's model and cost, the merge gate, linked conversations and the workspace stack. ([#5253](https://github.com/eltmon/overdeck/issues/5253))
+  - **Fewer GitHub API calls:** each GitHub webhook and pipeline refresh now costs a fraction of what it did. The dashboard ignores check events that cannot change a pull request, reads short pull request lists at a third of the price, and stops re-asking GitHub for issue states it already knows. ([#5261](https://github.com/eltmon/overdeck/issues/5261))
+
+  #### Fixed
+
+  - **Sidebar workspaces:** the Workspaces list shows only workspaces you created or favorited. Session Vault scratch workspaces, agent-made workspaces and the "Pipeline worktrees" group no longer appear, and finished issue worktrees no longer pile up as live rows. ([#5233](https://github.com/eltmon/overdeck/issues/5233))
+  - **Bot connections that cannot use WebRTC say so:** when a bot's computer cannot reach the TURN relay or send UDP, `pan mcp connector connect` now stops with the code `no-webrtc-egress` and points to Public MCP, instead of asking the bot to retry a "direct connection failed". Connector errors name the route that failed, and `pan doctor` shows whether this machine can reach the TURN relay. ([#5242](https://github.com/eltmon/overdeck/issues/5242))
+  - **A second `pan start` no longer kills a running work agent:** when two starts raced for the same issue, for example a recovery `pan start` and the late auto-start after planning, the losing start closed the winner's pane and left its own pane behind. Now only one start can launch an agent at a time. The second start prints that the agent is already running, names its pane and exits 0. A failed launch closes only the pane it opened itself. ([#5243](https://github.com/eltmon/overdeck/issues/5243))
+  - **Merge train batches always get CI:** a one-member batch whose feature already contained `main` used to fast-forward onto the feature's own commit, so GitHub ran no CI for the batch branch. The batch then dissolved and switched batching off for the whole project for a day, with a wrong notice telling you to add `uat/**` to the CI triggers. Batches now always get a new merge commit, and a fast-forwarded batch head no longer pauses batching. ([#5269](https://github.com/eltmon/overdeck/issues/5269))
+  - **Review feedback reaches handoff conversations:** review, verification, UAT and CodeRabbit feedback on a PR that a `pan handoff` conversation pushed (and that has no work agent) now goes to that conversation while it is live, instead of raising Needs you. A stopped conversation is never restarted to receive it. ([#5271](https://github.com/eltmon/overdeck/issues/5271))
+
+  [Compare v0.84.0...v0.85.0](https://github.com/eltmon/overdeck/compare/v0.84.0...v0.85.0)
+</Update>
+
 <Update label="v0.84.0" description="2026-11-14">
   #### New
 
