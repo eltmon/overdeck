@@ -111,6 +111,8 @@ export interface ConversationWindow {
   cursor: string | null;
   hasOlder: boolean;
   transcript?: string;
+  /** PAN-5211: the server holds only the newest records; older pages load from the transcript on disk. */
+  bounded?: boolean;
 }
 
 /** A human-origin message read from a subagent's own sidechain transcript (PAN-4247). */

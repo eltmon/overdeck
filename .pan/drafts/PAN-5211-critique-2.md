@@ -1,0 +1,17 @@
+plan-digest: 8e1029fc49a3c6a4d491f83c2d742ff0bfff530c8d528efddd7603ef93665972
+
+## blocks-the-design: Range boundary hides a tool call
+
+The PRD's D12 explicitly permits a call and its output to land in separate disk ranges (`.pan/drafts/PAN-5211.md`, lines 200–214). The existing parser gives both the original call and an orphan output the same `call_id` as `WorkLogEntry.id` (`src/dashboard/server/services/codex-conversation-parser.ts`, lines 181–191 and 202–211). The newer page therefore loads a stand-alone output under that ID; when the older page loads the call, `prependOlderPage` removes it because that ID is already in the cache (`src/dashboard/frontend/src/components/chat/conversationHistory.ts`, lines 132–137). The documented outcome of showing both rows cannot happen, and the call's arguments disappear. Make range parsing preserve the call/output pair across a boundary, or assign and reconcile distinct IDs for the two partial rows. Add a paging test with the boundary between a call and its output, including the client prepend step.
+
+## blocks-the-design: Bookmark ordinals drift after eviction
+
+WI-21 streams the full transcript through the normal located accumulator to map old counter IDs (`.pan/drafts/PAN-5211.md`, lines 774–790). D8 drops old call-index entries after 16 Mi characters and sends their later outputs down the orphan path (lines 182–188). In the current counter parser, a matched output does not increment `sequence`, while an orphan does (`src/dashboard/server/services/codex-conversation-parser.ts`, lines 195–211). Once migration evicts a call before its output, its legacy counter advances by one when the old full parser's counter would not. Every later bookmark can be rewritten to the wrong message. Use a bounded migration-specific ordinal scan that remembers pending call IDs independently of displayed rows, and test a bookmarked message after a call has been evicted but before its output arrives.
+
+## blocks-the-design: Tail reads can zero the cost
+
+D6 claims cumulative token counts and a repeated `turn_context` keep totals correct (`.pan/drafts/PAN-5211.md`, lines 153–157), but WI-17 itself specifies a 200 MB transcript with one `turn_context` followed by 170 call/output pairs (lines 691–708). A 64 MiB tail of that fixture omits its only model record. The cost parser learns the model from `turn_context` (`src/lib/cost-parsers/codex-parser.ts`, lines 108–110); without it, `result()` substitutes `unknown` and calculates zero when pricing is absent (lines 141–153). `totalTokens` can still pass WI-17 while `totalCost` is wrong, contrary to FR-8. Retrieve the last model context before the tail start, or supply a verified model to the cost parser, and assert nonzero expected cost in the tail-read test.
+
+## blocks-the-design: Bookmark migration is not atomic or retryable
+
+WI-21 says to rename each mapped bookmark separately, put the conversation in a process-level `Set`, and leave bookmarks unchanged on any error (`.pan/drafts/PAN-5211.md`, lines 770–784). The existing bookmark door uses individual database writes (`src/lib/overdeck/conversation-bookmarks.ts`, lines 104–135). If a later rename or transcript read fails, earlier renames remain committed; marking the conversation done also blocks a retry until restart. Collect mappings before writing, apply the renames in one database transaction, and add the name to the completed set only after success. Test a failure after one mapping and a successful retry.

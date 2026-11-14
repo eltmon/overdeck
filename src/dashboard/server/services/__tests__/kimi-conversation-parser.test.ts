@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { parseKimiConversationMessages } from '../kimi-conversation-parser.js';
@@ -54,5 +56,29 @@ describe('parseKimiConversationMessages (PAN-1837 wi8b AC4, against the pinned w
     expect(result.streaming).toBe(false);
     expect(result.byteOffset).toBeGreaterThan(0);
     expect(result.mtimeMs).toBeGreaterThan(0);
+  });
+});
+
+/** PAN-5211: kimi stringifies non-string results, so image data URLs must become placeholders. */
+describe('parseKimiConversationMessages — bounded tool results', () => {
+  let dir: string;
+  beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), 'kimi-bounds-')); });
+  afterEach(async () => { await rm(dir, { recursive: true, force: true }); });
+
+  it('stores a result object holding a PNG data URL with a placeholder', async () => {
+    const file = join(dir, 'wire.jsonl');
+    const image = `data:image/png;base64,${Buffer.alloc(200_000, 5).toString('base64')}`;
+    const events = [
+      { type: 'tool.call', uuid: 'tool_1', turnId: '0', toolCallId: 'tool_1', name: 'Screenshot', args: {} },
+      { type: 'tool.result', toolCallId: 'tool_1', result: { content: [{ type: 'image', url: image }], note: 'captured' } },
+    ];
+    await writeFile(file, events.map((event, i) => JSON.stringify({ type: 'context.append_loop_event', event, time: 1785265211159 + i })).join('\n') + '\n');
+
+    const result = await parseKimiConversationMessages(file);
+
+    const stored = result.workLog.find((e) => e.id === 'tool_1')?.result ?? '';
+    expect(stored).toContain('[image: png, ');
+    expect(stored).toContain('captured');
+    expect(stored).not.toContain('data:image');
   });
 });

@@ -2,13 +2,21 @@
 import { stat } from 'node:fs/promises';
 import type { ParseResult, ParseState } from './conversation/types.js';
 import { runDashboardDbJob } from './dashboard-db-task.js';
+import {
+  estimateParseResultChars,
+  estimateUnresolvedResultsChars,
+  TRANSCRIPT_CACHE_MAX_RETAINED_CHARS,
+  TRANSCRIPT_ENTRY_MAX_RETAINED_CHARS,
+} from './conversation/tool-result-bounds.js';
 
 type Parser = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'muse' | 'kimi' | 'prime-agent' | 'claude-initial';
 interface CachedParse {
   signature: string;
-  bytes: number;
+  /** PAN-5211: retained characters of the settled result; 0 while the job is pending. */
+  retainedChars: number;
   result: Promise<ParseResult>;
 }
+const MAX_SNAPSHOTS = 8;
 const snapshots = new Map<string, CachedParse>();
 
 /** A cached snapshot is shared; the incremental parser mutates priorState containers in place. */
@@ -53,21 +61,27 @@ export function sharedTranscriptParser(parser: Parser) {
       return cached.result;
     }
     const result = runDashboardDbJob<ParseResult>('parseTranscriptSnapshot', { sessionFile, parser });
-    const entry = { signature, bytes: info.size, result };
+    const entry: CachedParse = { signature, retainedChars: 0, result };
     snapshots.delete(key);
     snapshots.set(key, entry);
-    // Keep one oversized active transcript: evicting it on every append would
-    // defeat coalescing precisely for the histories that need it most.
-    let bytes = [...snapshots.values()].reduce((sum, item) => sum + item.bytes, 0);
-    for (const [oldKey, old] of snapshots) {
-      if (snapshots.size <= 8 && (bytes <= 32 * 1024 * 1024 || snapshots.size === 1)) break;
-      bytes -= old.bytes;
-      snapshots.delete(oldKey);
-    }
-    try { return await result; }
+    let parsed: ParseResult;
+    try { parsed = await result; }
     catch (error) {
       if (snapshots.get(key) === entry) snapshots.delete(key);
       throw error;
     }
+    // PAN-5211: budgets count retained characters. A result over the hard cap is returned but
+    // not kept, so concurrent subscribers share it only while its job is pending.
+    entry.retainedChars = estimateParseResultChars(parsed) + estimateUnresolvedResultsChars(parsed.unresolvedResults);
+    if (entry.retainedChars > TRANSCRIPT_ENTRY_MAX_RETAINED_CHARS && snapshots.get(key) === entry) snapshots.delete(key);
+    let retained = 0;
+    for (const item of snapshots.values()) retained += item.retainedChars;
+    for (const [oldKey, old] of snapshots) {
+      if (snapshots.size <= MAX_SNAPSHOTS && retained <= TRANSCRIPT_CACHE_MAX_RETAINED_CHARS) break;
+      if (oldKey === key) continue;
+      retained -= old.retainedChars;
+      snapshots.delete(oldKey);
+    }
+    return parsed;
   };
 }

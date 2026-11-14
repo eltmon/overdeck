@@ -557,6 +557,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         style={{ flex: 1 }}
       >
       <div ref={innerRef} className={styles.messagesTimelineInner}>
+        {history?.bounded && <div className={styles.timelineHistoryEdge}>Large conversation: the dashboard keeps recent history in memory and loads older history from the transcript as you scroll up.</div>}
         {history?.loadingOlder && <div className={styles.timelineHistoryEdge}>Loading earlier messages…</div>}
         {!history?.loadingOlder && history?.loadedOlder && !history.hasOlder && (
           <div className={styles.timelineHistoryEdge}>Start of conversation</div>

@@ -35,9 +35,17 @@
 
 import type { ChatMessage, CompactBoundary, WorkLogEntry } from '@overdeck/contracts';
 import type { ParseResult } from './conversation-service.js';
+import type { RecordLocation } from './conversation/types.js';
 import { createCodexSessionParser } from '../../../lib/cost-parsers/codex-parser.js';
 import { readCodexRolloutMessage } from '../../../lib/codex-rollout-message.js';
 import { createIncrementalTranscriptReader } from './incremental-transcript-reader.js';
+import {
+  boundToolResultText,
+  estimateMessageChars,
+  estimateWorkLogEntryChars,
+  TRANSCRIPT_ENTRY_MAX_RETAINED_CHARS,
+  TRANSCRIPT_WINDOW_TARGET_CHARS,
+} from './conversation/tool-result-bounds.js';
 
 interface CodexTokenUsage {
   input_tokens?: number;
@@ -75,7 +83,7 @@ function parseToolInput(args: string): Record<string, unknown> | undefined {
 }
 
 /** Flatten a Codex tool output (usually a string) into display text. */
-function extractToolOutput(output: unknown): string {
+export function extractCodexToolOutput(output: unknown): string {
   if (typeof output === 'string') return output.trim();
   if (output && typeof output === 'object') {
     const obj = output as Record<string, unknown>;
@@ -107,14 +115,31 @@ function extractCommand(name: string, args: string): string | undefined {
   return undefined;
 }
 
+const OVERSIZED_OUTPUT_TYPE_RE = /"type":"(function_call_output|custom_tool_call_output)"/;
+const OVERSIZED_CALL_ID_RE = /"call_id":"([^"]+)"/;
+const OVERSIZED_TIMESTAMP_RE = /"timestamp":"([^"]+)"/;
+
+export interface CodexAccumulatorOptions {
+  /** PAN-5211: byte offset of the first record this accumulator receives (a tail read starts above 0). */
+  readonly historyStartOffset?: number;
+  /** PAN-5211: reports each new message row's counter-form id next to its offset-form id (bookmark migration). */
+  readonly onRowCreated?: (legacyId: string, id: string) => void;
+  /** PAN-5211: a push that leaves more retained characters than this drops the oldest rows. */
+  readonly maxRetainedChars?: number;
+  /** PAN-5211: the retained characters a window slide shrinks to. */
+  readonly windowTargetChars?: number;
+}
+
 /** Incremental rollout accumulator; each JSONL record is consumed once per cached file. */
-export function createCodexConversationAccumulator(sessionFile: string) {
+export function createCodexConversationAccumulator(sessionFile: string, options: CodexAccumulatorOptions = {}) {
   const costs = createCodexSessionParser(sessionFile);
   const messages: ChatMessage[] = [];
   const workLog: WorkLogEntry[] = [];
   const compactBoundaries: CompactBoundary[] = [];
   // Matches function_call → function_call_output by call_id within this parse.
-  const toolCallsByCallId = new Map<string, WorkLogEntry>();
+  // PAN-5211: holds the call row's absolute work-log index (rows dropped so far + array position).
+  const toolCallsByCallId = new Map<string, number>();
+  let droppedWorkLogRows = 0;
   let totalTokens = 0;
   let sequence = 0;
   // The trailing agent_message, if the file ends on one. Codex narrates
@@ -122,8 +147,75 @@ export function createCodexConversationAccumulator(sessionFile: string) {
   // completed-looking assistant message does NOT mean the turn ended — only a
   // message with no tool activity after it does (PAN-3770 spinner fix).
   let trailingAgentMessageAt: string | undefined;
+  // PAN-5211: retained characters of every kept row (see tool-result-bounds.ts).
+  let retained = 0;
+  let historyStart = options.historyStartOffset ?? 0;
+  const maxRetainedChars = options.maxRetainedChars ?? TRANSCRIPT_ENTRY_MAX_RETAINED_CHARS;
+  const windowTargetChars = options.windowTargetChars ?? TRANSCRIPT_WINDOW_TARGET_CHARS;
+  // True once any record arrived with a location, so row sequences are record offsets.
+  let located = false;
+  // PAN-5211: byte location of each kept tool result's record, keyed by call_id (expand reads it).
+  const resultLocations = new Map<string, RecordLocation>();
+  // Sequence of the newest row; equals the legacy counter when no locations are given.
+  let lastRowSequence = 0;
 
-  const push = (line: string): void => {
+  // PAN-5211 D7: a located row's sequence is its record's byte offset, and its id suffix is `@<offset>`,
+  // so the same record has the same id in every parse. Unlocated pushes keep the counter form.
+  // Call after incrementing the legacy counter.
+  const nextRowSequence = (location: RecordLocation | undefined): number => {
+    lastRowSequence = location ? location.offset : sequence;
+    return lastRowSequence;
+  };
+  const rowSuffix = (location: RecordLocation | undefined): string => (location ? `@${location.offset}` : `${sequence}`);
+
+  const addMessage = (message: ChatMessage): void => {
+    messages.push(message);
+    retained += estimateMessageChars(message);
+  };
+  const addWork = (wl: WorkLogEntry): void => {
+    workLog.push(wl);
+    retained += estimateWorkLogEntryChars(wl);
+  };
+  const replaceWork = (position: number, next: WorkLogEntry): void => {
+    retained += estimateWorkLogEntryChars(next) - estimateWorkLogEntryChars(workLog[position]!);
+    workLog[position] = next;
+  };
+
+  // PAN-5211 D8: drop the oldest rows (lowest sequence first, across both arrays) until the window holds
+  // at most windowTargetChars, keeping at least one row. The hysteresis between the two limits means the
+  // kept-row prefix changes once per slide, not once per append.
+  const dropOldest = (): void => {
+    let m = 0;
+    let w = 0;
+    while (retained > windowTargetChars && messages.length - m + workLog.length - w > 1) {
+      const message = messages[m];
+      const work = workLog[w];
+      if (message && (!work || (message.sequence ?? 0) <= (work.sequence ?? 0))) {
+        retained -= estimateMessageChars(message);
+        m += 1;
+      } else if (work) {
+        retained -= estimateWorkLogEntryChars(work);
+        toolCallsByCallId.delete(work.id);
+        resultLocations.delete(work.id);
+        w += 1;
+      }
+    }
+    messages.splice(0, m);
+    workLog.splice(0, w);
+    droppedWorkLogRows += w;
+    if (located) {
+      const oldest = Math.min(messages[0]?.sequence ?? Infinity, workLog[0]?.sequence ?? Infinity);
+      if (Number.isFinite(oldest)) historyStart = oldest;
+    }
+  };
+
+  const push = (line: string, location?: RecordLocation): void => {
+    if (location) located = true;
+    consume(line, location);
+    if (retained > maxRetainedChars) dropOldest();
+  };
+
+  const consume = (line: string, location?: RecordLocation): void => {
     costs.push(line);
     let entry: CodexEntry;
     try {
@@ -142,19 +234,23 @@ export function createCodexConversationAccumulator(sessionFile: string) {
       if (rolloutMessage) {
         const isUser = rolloutMessage.role === 'user';
         sequence += 1;
+        const rowSequence = nextRowSequence(location);
+        const legacyId = `codex-${isUser ? 'user' : 'agent'}-${sequence}`;
+        const id = `codex-${isUser ? 'user' : 'agent'}-${rowSuffix(location)}`;
         // PAN-3770: a completed-looking assistant message does NOT mean the
         // turn ended — Codex narrates mid-turn, so only a message with no tool
         // activity after it does. The tool branches below clear this.
         trailingAgentMessageAt = isUser ? undefined : createdAt;
-        messages.push({
-          id: `codex-${isUser ? 'user' : 'agent'}-${sequence}`,
+        addMessage({
+          id,
           role: rolloutMessage.role,
           text: rolloutMessage.text,
           createdAt,
           completedAt: createdAt,
           streaming: false,
-          sequence,
+          sequence: rowSequence,
         });
+        options.onRowCreated?.(legacyId, id);
       } else if (ptype === 'token_count') {
         // Cumulative usage — the latest token_count carries the running total.
         const usage = payload.info?.total_token_usage;
@@ -179,37 +275,45 @@ export function createCodexConversationAccumulator(sessionFile: string) {
         const command = extractCommand(name, args);
         sequence += 1;
         const wl: WorkLogEntry = {
-          id: callId || `codex-tool-${sequence}`,
+          id: callId || `codex-tool-${rowSuffix(location)}`,
           createdAt,
           label: command ? 'Shell' : name,
           tone: 'tool',
           ...(name === 'spawn_agent' ? { toolInput: parseToolInput(args) } : {}),
-          sequence,
+          sequence: nextRowSequence(location),
           ...(command ? { command } : args ? { detail: args } : {}),
         };
-        workLog.push(wl);
-        if (callId) toolCallsByCallId.set(callId, wl);
+        addWork(wl);
+        if (callId) toolCallsByCallId.set(callId, droppedWorkLogRows + workLog.length - 1);
       } else if (ptype === 'function_call_output' || ptype === 'custom_tool_call_output') {
         const callId = typeof payload.call_id === 'string' ? payload.call_id : '';
-        const output = extractToolOutput(payload.output);
-        const wl = callId ? toolCallsByCallId.get(callId) : undefined;
+        // PAN-5211: images become placeholders and long text keeps its head and tail.
+        const output = boundToolResultText(extractCodexToolOutput(payload.output)).text;
+        const absolute = callId ? toolCallsByCallId.get(callId) : undefined;
+        const position = absolute === undefined ? -1 : absolute - droppedWorkLogRows;
+        const wl = position >= 0 ? workLog[position] : undefined;
         if (wl) {
+          // A replaced entry is a new object, so earlier result() snapshots keep their own entry.
           if (output) {
-            const index = workLog.indexOf(wl);
-            workLog[index] = { ...wl, result: output };
+            replaceWork(position, { ...wl, result: output });
+            if (location) resultLocations.set(callId, location);
           }
-          if (callId) toolCallsByCallId.delete(callId);
+          toolCallsByCallId.delete(callId);
         } else if (output) {
           // Output with no matching call (truncated/rotated) — stand-alone entry.
+          // PAN-5211: a located row gets its own offset id, so a disk page that later shows the call under
+          // its call_id does not collapse the two rows into one.
           sequence += 1;
-          workLog.push({
-            id: callId || `codex-tool-out-${sequence}`,
+          const id = location ? `codex-tool-out-@${location.offset}` : callId || `codex-tool-out-${sequence}`;
+          addWork({
+            id,
             createdAt,
             label: 'Tool result',
             result: output,
             tone: 'tool',
-            sequence,
+            sequence: nextRowSequence(location),
           });
+          if (callId && location) resultLocations.set(id, location);
         }
       }
       // response_item 'message' (injected context) and 'reasoning' (encrypted)
@@ -244,14 +348,48 @@ export function createCodexConversationAccumulator(sessionFile: string) {
       contextActiveBytes: size,
       pendingToolUse: new Map(),
       unresolvedResults: new Map(),
-      lastSequence: sequence,
+      lastSequence: lastRowSequence,
       mtimeMs,
       planToolUseIds: new Set(),
       compactBoundaries,
       fileEditsByAssistantId: new Map(),
+      historyStartOffset: historyStart,
+      toolResultLocations: new Map(resultLocations),
     };
   };
-  return { push, result };
+  // PAN-5211 D3: a record over the parse limit is never decoded whole; `head` is its first bytes.
+  const pushOversized = (head: string, location: RecordLocation): void => {
+    located = true;
+    const outputType = OVERSIZED_OUTPUT_TYPE_RE.exec(head);
+    const callId = OVERSIZED_CALL_ID_RE.exec(head)?.[1] ?? '';
+    const absolute = outputType && callId ? toolCallsByCallId.get(callId) : undefined;
+    const position = absolute === undefined ? -1 : absolute - droppedWorkLogRows;
+    const wl = position >= 0 ? workLog[position] : undefined;
+    if (wl) {
+      // The full read on expand serves this body (withFullToolResult).
+      const { result: _result, ...call } = wl;
+      replaceWork(position, { ...call, bodyOmitted: true, resultBytes: location.length });
+      resultLocations.set(callId, location);
+      toolCallsByCallId.delete(callId);
+    } else {
+      const previous = workLog[workLog.length - 1]?.createdAt ?? messages[messages.length - 1]?.createdAt;
+      addWork({
+        id: `codex-skipped-${location.offset}`,
+        createdAt: OVERSIZED_TIMESTAMP_RE.exec(head)?.[1] ?? previous ?? new Date().toISOString(),
+        label: `Skipped a ${(location.length / (1024 * 1024)).toFixed(1)} MB transcript record`,
+        tone: 'info',
+        sequence: nextRowSequence(location),
+      });
+    }
+    if (retained > maxRetainedChars) dropOldest();
+  };
+
+  return { push, pushOversized, result, retainedChars: (): number => retained };
 }
 
-export const parseCodexConversationMessages = createIncrementalTranscriptReader(createCodexConversationAccumulator);
+/** PAN-5211: a tail read keeps the newest `turn_context` before the tail, so cost keeps its pricing model. */
+export const CODEX_TAIL_CONTEXT_MARKER = '"type":"turn_context"';
+
+export const parseCodexConversationMessages = createIncrementalTranscriptReader(createCodexConversationAccumulator, {
+  tailContextMarker: CODEX_TAIL_CONTEXT_MARKER,
+});

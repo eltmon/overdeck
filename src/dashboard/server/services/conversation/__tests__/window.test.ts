@@ -284,3 +284,35 @@ describe('selectResumeDelta (PAN-4558)', () => {
     expect(delta).toEqual({ messages: [], workLog: [] });
   });
 });
+
+describe('bounded windows (PAN-5211)', () => {
+  it('marks a window bounded with older history when historyStartOffset is above 0', () => {
+    const rows = { messages: [message(0), message(2)], workLog: [tool(1)] };
+
+    const { window } = selectInitialWindow({ ...rows, historyStartOffset: 1000 }, '1:2');
+
+    expect(window).toMatchObject({ hasOlder: true, bounded: true });
+  });
+
+  it('adds no bounded key without historyStartOffset', () => {
+    const rows = { messages: [message(0), message(2)], workLog: [tool(1)] };
+
+    const { window } = selectInitialWindow(rows, '1:2');
+
+    expect(window).not.toHaveProperty('bounded');
+    expect(window.hasOlder).toBe(false);
+  });
+});
+
+describe('resume across a sequence renumbering (PAN-5211 D7)', () => {
+  it('returns null when afterSequence names no row the server holds', () => {
+    // Offset-sequenced rows; the client still holds counter sequences from before the change.
+    const messages = [message(0, { sequence: 1200 }), message(2, { sequence: 5400 })];
+    const workLog = [tool(1, { sequence: 3100 })];
+
+    expect(selectResumeDelta({ messages, workLog }, { afterSequence: 3, openIds: [], transcript: '1:2' }, '1:2')).toBeNull();
+    expect(selectResumeDelta({ messages, workLog }, { afterSequence: 3100, openIds: [], transcript: '1:2' }, '1:2'))
+      .toEqual({ messages: [message(2, { sequence: 5400 })], workLog: [] });
+  });
+});
+

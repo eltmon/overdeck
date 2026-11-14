@@ -26,8 +26,8 @@ function diffRows<T extends { id: string }>(previous: readonly T[], next: readon
  */
 export function createTranscriptDelta(model: string | null, resume?: ConversationResume) {
   let previous: MessagesEvent | undefined;
-  const windowed = (next: MessagesEvent, transcript: string | undefined, reset: boolean): MessagesEvent => {
-    const rows = selectInitialWindow(next, transcript);
+  const windowed = (next: MessagesEvent, result: ParseResult, transcript: string | undefined, reset: boolean): MessagesEvent => {
+    const rows = selectInitialWindow({ ...next, historyStartOffset: result.historyStartOffset }, transcript);
     return { ...next, ...rows, snapshot: true, ...(reset ? { reset: true } : {}) };
   };
   return (result: ParseResult, reset = false, transcript?: string): MessagesEvent | null => {
@@ -44,9 +44,9 @@ export function createTranscriptDelta(model: string | null, resume?: Conversatio
         const resumed = selectResumeDelta(next, resume, transcript);
         if (resumed) return { ...next, ...resumed, snapshot: false };
         // An empty fallback never wipes what the client already shows.
-        return windowed(next, transcript, next.messages.length + next.workLog.length > 0);
+        return windowed(next, result, transcript, next.messages.length + next.workLog.length > 0);
       }
-      return windowed(next, transcript, reset);
+      return windowed(next, result, transcript, reset);
     }
     const before = previous!;
     const messages = diffRows(before.messages, next.messages);
@@ -56,7 +56,7 @@ export function createTranscriptDelta(model: string | null, resume?: Conversatio
       !isDeepStrictEqual(before.compactBoundaries, next.compactBoundaries) ||
       !isDeepStrictEqual(before.contextUsage, next.contextUsage);
     previous = next;
-    if (messages.snapshot || workLog.snapshot) return windowed(next, transcript, true);
+    if (messages.snapshot || workLog.snapshot) return windowed(next, result, transcript, true);
     if (!messages.rows.length && !workLog.rows.length && !metadataChanged) return null;
     return { ...next, snapshot: false, messages: messages.rows, workLog: projectWorkLog(workLog.rows) };
   };

@@ -46,7 +46,7 @@ import {
   getConversationMessageLocator,
   getConversationMessagesRead,
   getConversationRead,
-  getConversationToolBodyRead,
+  getConversationToolBodyRead, toolBodyQuery,
   getConversationsPendingInputFeed,
   patchConversationTitle,
   handleConversationMove,
@@ -497,9 +497,9 @@ const getConversationToolBodyRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     const toolUseId = params['toolUseId'] ?? '';
-    const agentId = new URL(request.url, 'http://localhost').searchParams.get('agentId') ?? undefined;
+    const { agentId, seq } = toolBodyQuery(request.url);
     return yield* Effect.promise(async () =>
-      conversationReadJson(await getConversationToolBodyRead(name, toolUseId, conversationReadDependencies, agentId)));
+      conversationReadJson(await getConversationToolBodyRead(name, toolUseId, conversationReadDependencies, agentId, seq)));
   }),
 );
 const getConversationMessageLocatorRoute = HttpRouter.add(

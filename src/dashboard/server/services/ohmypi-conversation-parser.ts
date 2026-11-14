@@ -30,6 +30,7 @@ import { readFile, stat } from 'node:fs/promises';
 import type { ChatMessage, CompactBoundary, WorkLogEntry } from '@overdeck/contracts';
 import type { ParseResult } from './conversation-service.js';
 import { summarizeToolInputForWorkLog } from './format-tool-input.js';
+import { boundToolResultText } from './conversation/tool-result-bounds.js';
 
 export function isOhmypiSessionFile(sessionFile: string): boolean {
   const normalized = sessionFile.replace(/\\/g, '/');
@@ -224,7 +225,8 @@ export async function parseOhmypiConversationMessages(sessionFile: string): Prom
           toolTitle: resolvedName,
           toolInput: input,
           detail: summarizeToolInputForWorkLog(resolvedName, input),
-          result: text,
+          // PAN-5211: long results keep their head and tail.
+          result: boundToolResultText(text).text,
           tone: isError ? 'error' : 'tool',
           sequence,
         });

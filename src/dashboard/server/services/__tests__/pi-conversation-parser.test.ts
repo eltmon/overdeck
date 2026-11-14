@@ -1,7 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { isPiSessionFile, parsePiConversationMessages } from '../pi-conversation-parser.js';
+import { parsePrimeAgentConversationMessages } from '../prime-agent-conversation-parser.js';
 
 describe('isPiSessionFile (PAN-1908)', () => {
   const ROOT = '/home/u/.overdeck/agents/agent-pan-1908';
@@ -68,5 +71,39 @@ describe('parsePiConversationMessages — tool-call join', () => {
     const roles = result.messages.map((m) => m.role);
     expect(roles).toEqual(['user', 'assistant', 'assistant', 'assistant']);
     expect(result.messages.map((m) => m.text)).toContain('reading the dir');
+  });
+});
+
+/** PAN-5211: pi and prime-agent tool results are stored bounded. */
+describe('parsePiConversationMessages — bounded tool results', () => {
+  let dir: string;
+  beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), 'pi-bounds-')); });
+  afterEach(async () => { await rm(dir, { recursive: true, force: true }); });
+
+  const MARKER = /\n\n… \[[\d,]+ characters omitted\] …\n\n/;
+
+  async function writeTranscript(): Promise<string> {
+    const file = join(dir, 'session.jsonl');
+    const lines = [
+      { type: 'session', id: 'sess-1', timestamp: '2026-11-13T00:00:00.000Z' },
+      { type: 'message', id: 'msg-asst-1', timestamp: '2026-11-13T00:00:01.000Z', message: { role: 'assistant', content: [{ type: 'toolCall', id: 'call_big', name: 'bash', arguments: { command: 'cat big' } }] } },
+      { type: 'message', id: 'msg-tool-1', timestamp: '2026-11-13T00:00:02.000Z', message: { role: 'toolResult', toolCallId: 'call_big', toolName: 'bash', isError: false, content: [{ type: 'text', text: 'w'.repeat(100_000) }] } },
+    ];
+    await writeFile(file, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+    return file;
+  }
+
+  it('cuts a 100,000-character pi result to the stored cap plus the marker', async () => {
+    const result = await parsePiConversationMessages(await writeTranscript());
+    const stored = result.workLog.find((e) => e.toolTitle === 'bash')?.result ?? '';
+    expect(stored).toMatch(MARKER);
+    expect(stored.replace(MARKER, '').length).toBeLessThanOrEqual(65_536);
+  });
+
+  it('cuts the same result in the prime-agent dialect', async () => {
+    const result = await parsePrimeAgentConversationMessages(await writeTranscript());
+    const stored = result.workLog.find((e) => e.toolTitle === 'bash')?.result ?? '';
+    expect(stored).toMatch(MARKER);
+    expect(stored.replace(MARKER, '').length).toBeLessThanOrEqual(65_536);
   });
 });

@@ -64,7 +64,7 @@ export interface MessagesTimelineProps {
   /** PAN-4642 — main timeline only: selected message text can be cited into the composer. */
   citationsEnabled?: boolean;
   /** PAN-4558 — older history state: more rows exist before the first loaded row. */
-  history?: { hasOlder: boolean; loadingOlder: boolean; loadedOlder?: boolean };
+  history?: { hasOlder: boolean; loadingOlder: boolean; loadedOlder?: boolean; bounded?: boolean };
   /** PAN-4558 — load the next older page (scroll near the top). */
   onLoadOlder?: () => void;
   /** PAN-4558 — load older pages until a message id is loaded; resolves false at the start. */

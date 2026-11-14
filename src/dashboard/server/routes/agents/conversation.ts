@@ -4,6 +4,8 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import type { ConversationResponse, WorkLogEntry } from '@overdeck/contracts';
+import type { RecordLocation } from '../../services/conversation/types.js';
+import { resolveToolBodyEntry, selectHistoryPageBefore, toolBodyQuery } from '../../services/conversation/codex-transcript-ranges.js';
 import { Effect, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
@@ -19,7 +21,7 @@ import { parseOhmypiConversationMessages } from '../../services/ohmypi-conversat
 import { parseCodexConversationMessages } from '../../services/codex-conversation-parser.js';
 import { parseAcpConversationMessages } from '../../services/acp-conversation-parser.js';
 import { sharedTranscriptParser } from '../../services/shared-transcript-parser.js';
-import { readPageParams, selectInitialWindow, selectPageBefore, transcriptIdOf } from '../../services/conversation/window.js';
+import { readPageParams, selectInitialWindow, transcriptIdOf } from '../../services/conversation/window.js';
 import {
   listAgentTranscriptCandidates,
 } from '../../../../lib/agents/transcript-resolver.js';
@@ -144,8 +146,14 @@ async function agentWorkspaceFor(id: string): Promise<string | null> {
 const EMPTY_CONVERSATION: ConversationResponse = { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 };
 
 type AgentConversationResult =
-  /** `transcriptPath` is server-side only; routes send `body`. */
-  | { status: 200; body: ConversationResponse; transcriptPath?: string }
+  /** `transcriptPath`, `toolResultLocations` and `historyStartOffset` are server-side only; routes send `body`. */
+  | {
+    status: 200;
+    body: ConversationResponse;
+    transcriptPath?: string;
+    toolResultLocations?: ReadonlyMap<string, RecordLocation> | undefined;
+    historyStartOffset?: number | undefined;
+  }
   | { status: 400; body: { error: string } }
   | { status: 404; body: { error: string; checked: string[] } }
   | { status: 500; body: { error: string } };
@@ -201,8 +209,10 @@ export async function buildAgentConversationResult(
       : selected.kind === 'acp' ? await parseAcpConversationMessages(selected.path)
       : await sharedTranscriptParser(selected.kind)(selected.path);
     // latestCompactSummary (PAN-4245) is server-internal title/About input, never an HTTP response field.
-    const { latestCompactSummary: _latestCompactSummary, ...parsed } =
+    // PAN-5211: toolResultLocations and historyStartOffset are server-internal too.
+    const { latestCompactSummary: _latestCompactSummary, toolResultLocations, historyStartOffset, ...parsed } =
       rawResult as typeof rawResult & { latestCompactSummary?: unknown };
+    const serverOnly = { transcriptPath: selected.path, toolResultLocations, historyStartOffset };
     // PAN-4255: the composer effort chip compares what the transcript shows with what was launched.
     const state = isExternalAgentId(id) ? null : getAgentState(id);
     const resolution = state ? resolveRelaunchEffort(state) : null;
@@ -213,7 +223,7 @@ export async function buildAgentConversationResult(
     };
 
     if (selected.kind === 'acp') {
-      return { status: 200, transcriptPath: selected.path, body: {
+      return { status: 200, ...serverOnly, body: {
         ...result,
         messages: result.messages.map((message) => message.role === 'assistant'
           ? {
@@ -225,7 +235,7 @@ export async function buildAgentConversationResult(
         streaming: false,
       } };
     }
-    return { status: 200, transcriptPath: selected.path, body: { ...result, streaming: false } };
+    return { status: 200, ...serverOnly, body: { ...result, streaming: false } };
   } catch (err) {
     console.error('[conversation] failed for', id, err);
     return { status: 500, body: { error: `Failed to load transcript for ${id}.` } };
@@ -246,9 +256,13 @@ async function buildAgentSubagentResult(
     ? await parseEntireConversation(resolved.path)
     : await parseCodexConversationMessages(resolved.path);
   // latestCompactSummary (PAN-4245) is server-internal title/About input, never an HTTP response field.
-  const { latestCompactSummary: _latestCompactSummary, ...result } =
+  // PAN-5211: toolResultLocations and historyStartOffset are server-internal too.
+  const { latestCompactSummary: _latestCompactSummary, toolResultLocations, historyStartOffset, ...result } =
     rawResult as typeof rawResult & { latestCompactSummary?: unknown };
-  return { status: 200, transcriptPath: resolved.path, body: { ...result, streaming: false } };
+  return {
+    status: 200, transcriptPath: resolved.path, toolResultLocations, historyStartOffset,
+    body: { ...result, streaming: false },
+  };
 }
 
 async function transcriptIdAt(path: string | undefined): Promise<string | undefined> {
@@ -272,10 +286,13 @@ export async function buildAgentConversationWindowResult(
   const result = await buildAgentConversationResult(id, subagentId === null ? {} : { subagentId });
   if (result.status !== 200) return result;
   if (page) {
-    return { status: 200, body: selectPageBefore(result.body, page.before, page.limit, await transcriptIdAt(result.transcriptPath)) };
+    const input = { ...result.body, historyStartOffset: result.historyStartOffset };
+    const transcript = await transcriptIdAt(result.transcriptPath);
+    return { status: 200, body: await selectHistoryPageBefore(input, result.transcriptPath, page.before, page.limit, transcript) };
   }
   if (query.get('window') === 'initial') {
-    return { status: 200, body: { ...result.body, ...selectInitialWindow(result.body, await transcriptIdAt(result.transcriptPath)) } };
+    const input = { ...result.body, historyStartOffset: result.historyStartOffset };
+    return { status: 200, body: { ...result.body, ...selectInitialWindow(input, await transcriptIdAt(result.transcriptPath)) } };
   }
   return { status: 200, body: result.body };
 }
@@ -284,11 +301,15 @@ export async function buildAgentConversationWindowResult(
 export async function buildAgentToolBodyResult(
   id: string,
   toolUseId: string,
-  opts: { subagentId?: string } = {},
+  opts: { subagentId?: string; seq?: number } = {},
 ): Promise<{ status: number; body: unknown }> {
-  const result = await buildAgentConversationResult(id, opts);
+  const result = await buildAgentConversationResult(id, opts.subagentId === undefined ? {} : { subagentId: opts.subagentId });
   if (result.status !== 200) return result;
-  const entry: WorkLogEntry | undefined = result.body.workLog.find((candidate) => candidate.id === toolUseId);
+  const entry: WorkLogEntry | undefined = await resolveToolBodyEntry(result.transcriptPath, {
+    workLog: result.body.workLog,
+    toolResultLocations: result.toolResultLocations,
+    historyStartOffset: result.historyStartOffset,
+  }, toolUseId, opts.seq);
   return entry ? { status: 200, body: { entry } } : { status: 404, body: { error: 'Tool entry not found' } };
 }
 
@@ -322,10 +343,12 @@ export const getAgentConversationToolBodyRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const toolUseId = params['toolUseId'] ?? '';
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const urlOpt = HttpServerRequest.toURL(request);
-    const subagentId = Option.isSome(urlOpt) ? urlOpt.value.searchParams.get('subagentId') : null;
+    const { subagentId, seq } = toolBodyQuery(request.url);
     return yield* Effect.promise(async () => {
-      const result = await buildAgentToolBodyResult(id, toolUseId, subagentId === null ? {} : { subagentId });
+      const result = await buildAgentToolBodyResult(id, toolUseId, {
+        ...(subagentId !== undefined ? { subagentId } : {}),
+        ...(seq !== undefined ? { seq } : {}),
+      });
       return jsonResponse(result.body, { status: result.status });
     });
   })),

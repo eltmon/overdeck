@@ -9,6 +9,7 @@ import {
   validateBookmarkInput,
 } from '../../../lib/overdeck/conversation-bookmarks.js';
 import { getConversationByName } from '../../../lib/overdeck/conversations.js';
+import { migrateCodexCounterBookmarks } from '../../../lib/overdeck/codex-bookmark-migration.js';
 import { validateOrigin } from './origin-validation.js';
 
 const readJsonBody = Effect.gen(function* () {
@@ -31,6 +32,8 @@ const getConversationBookmarksRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const name = decodeURIComponent(params['name'] ?? '');
     if (!getConversationByName(name)) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+    // PAN-5211 D20: counter-form Codex ids move to offset ids before the first list.
+    yield* Effect.promise(() => migrateCodexCounterBookmarks(name));
     return jsonResponse({ bookmarks: listConversationBookmarks(name) });
   }),
 );

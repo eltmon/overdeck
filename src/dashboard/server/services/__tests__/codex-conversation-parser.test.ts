@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseCodexConversationMessages } from '../codex-conversation-parser.js';
+import { createCodexConversationAccumulator, parseCodexConversationMessages } from '../codex-conversation-parser.js';
 import { summarizeConversationActivity } from '../conversation-service.js';
 
 /**
@@ -107,9 +107,13 @@ describe('codex conversation parser', () => {
     const sorted = [...seqs].sort((a, b) => a - b);
     expect(seqs.length).toBeGreaterThan(0);
     expect(new Set(seqs).size).toBe(seqs.length); // all unique
-    // A single shared counter across messages + workLog yields contiguous 1..N,
+    // PAN-5211: each row's sequence is the byte offset of the record that created it,
     // so re-sorting by sequence reconstructs original file order in the UI.
-    expect(sorted).toEqual(Array.from({ length: seqs.length }, (_, i) => i + 1));
+    const lineOffsets: number[] = [];
+    let offset = 0;
+    for (const l of ROLLOUT_LINES) { lineOffsets.push(offset); offset += Buffer.byteLength(JSON.stringify(l)) + 1; }
+    for (const seq of seqs) expect(lineOffsets).toContain(seq);
+    expect(result.lastSequence).toBe(sorted[sorted.length - 1]);
   });
 
   it('summarizes a completed Codex turn as not working even when the tmux session is alive', async () => {
@@ -214,5 +218,125 @@ describe('codex conversation parser — cli >= 0.153.4 item_completed shape', ()
 
     expect(result.totalTokens).toBe(60700);
     expect(result.totalCost).toBeGreaterThan(0);
+  });
+});
+
+/** PAN-5211: stored tool results are bounded even when no reader scrub ran first. */
+describe('codex conversation parser — bounded tool results', () => {
+  const record = (payload: object) => JSON.stringify({ type: 'response_item', timestamp: '2026-11-13T00:00:00.000Z', payload });
+
+  function parseDirect(output: unknown) {
+    const accumulator = createCodexConversationAccumulator('/nonexistent/rollout.jsonl');
+    accumulator.push(record({ type: 'custom_tool_call', name: 'screenshot', input: 'take', call_id: 'call_img' }));
+    accumulator.push(record({ type: 'custom_tool_call_output', call_id: 'call_img', output }));
+    return accumulator.result(0, 0);
+  }
+
+  it('stores an input_image data URL as a placeholder next to its text', () => {
+    const image = `data:image/png;base64,${Buffer.alloc(1024 * 1024, 3).toString('base64')}`;
+    const result = parseDirect([
+      { type: 'input_text', text: 'Screenshot of the login page' },
+      { type: 'input_image', image_url: image, detail: 'high' },
+    ]);
+
+    const stored = result.workLog[0]?.result ?? '';
+    expect(stored).toContain('Screenshot of the login page');
+    expect(stored).toContain('[image: png, ');
+    expect(stored).not.toContain('data:image');
+  });
+
+  it('cuts a 100,000-character string output to the stored cap plus the marker', () => {
+    const result = parseDirect('q'.repeat(100_000));
+
+    const stored = result.workLog[0]?.result ?? '';
+    expect(stored).toContain('characters omitted');
+    expect(stored.replace(/\n\n… \[[\d,]+ characters omitted\] …\n\n/, '').length).toBeLessThanOrEqual(65_536);
+  });
+});
+
+/** PAN-5211: outputs attach through the stored call index, not a linear search. */
+describe('codex conversation parser — stored call index', () => {
+  const record = (payload: object) => JSON.stringify({ type: 'response_item', timestamp: '2026-11-13T00:00:00.000Z', payload });
+
+  it('attaches 5,000 interleaved outputs to their calls', () => {
+    const accumulator = createCodexConversationAccumulator('/nonexistent/rollout.jsonl');
+    for (let i = 0; i < 5_000; i++) {
+      accumulator.push(record({ type: 'function_call', name: 'exec_command', arguments: '{"cmd":"true"}', call_id: `call-${i}` }));
+      if (i > 0) accumulator.push(record({ type: 'function_call_output', call_id: `call-${i - 1}`, output: `out-${i - 1}` }));
+    }
+    accumulator.push(record({ type: 'function_call_output', call_id: 'call-4999', output: 'out-4999' }));
+
+    const { workLog } = accumulator.result(0, 0);
+    expect(workLog).toHaveLength(5_000);
+    for (let i = 0; i < 5_000; i++) expect(workLog[i]?.result).toBe(`out-${i}`);
+  });
+
+  it('leaves an earlier snapshot entry without the result that arrived later', () => {
+    const accumulator = createCodexConversationAccumulator('/nonexistent/rollout.jsonl');
+    accumulator.push(record({ type: 'function_call', name: 'exec_command', arguments: '{"cmd":"ls"}', call_id: 'call-a' }));
+    const before = accumulator.result(0, 0);
+    accumulator.push(record({ type: 'function_call_output', call_id: 'call-a', output: 'listing' }));
+    const after = accumulator.result(0, 0);
+
+    expect(before.workLog[0]?.result).toBeUndefined();
+    expect(after.workLog[0]?.result).toBe('listing');
+  });
+});
+
+/** PAN-5211 D8: an over-cap accumulator keeps a window of its newest rows. */
+describe('codex conversation parser — in-memory window', () => {
+  const event = (payload: object) => JSON.stringify({ type: 'event_msg', timestamp: '2026-11-13T00:00:00.000Z', payload });
+
+  function pushRows(count: number, onPush?: (result: ReturnType<ReturnType<typeof createCodexConversationAccumulator>['result']>) => void) {
+    const accumulator = createCodexConversationAccumulator('/nonexistent/rollout.jsonl', {
+      maxRetainedChars: 20_000, windowTargetChars: 15_000,
+    });
+    let offset = 0;
+    let lastRowOffset = 0;
+    for (let i = 0; i < count; i++) {
+      const text = event({ type: 'user_message', message: `row ${i} ${'x'.repeat(950)}` });
+      lastRowOffset = offset;
+      accumulator.push(text, { offset, length: Buffer.byteLength(text) });
+      offset += Buffer.byteLength(text) + 1;
+      const tokens = event({ type: 'token_count', info: { total_token_usage: { input_tokens: 0, output_tokens: 0, total_tokens: (i + 1) * 100 } } });
+      accumulator.push(tokens, { offset, length: Buffer.byteLength(tokens) });
+      offset += Buffer.byteLength(tokens) + 1;
+      onPush?.(accumulator.result(offset, 0));
+    }
+    return { accumulator, lastRowOffset };
+  }
+
+  it('keeps at most maxRetainedChars and the newest row', () => {
+    const { accumulator } = pushRows(200);
+    const result = accumulator.result(0, 0);
+
+    expect(accumulator.retainedChars()).toBeLessThanOrEqual(20_000);
+    expect(result.messages.length).toBeLessThan(200);
+    expect(result.messages[result.messages.length - 1]?.text.startsWith('row 199 ')).toBe(true);
+  });
+
+  it('reports the oldest kept row as historyStartOffset and keeps totals for all rows', () => {
+    const { accumulator, lastRowOffset } = pushRows(200);
+    const result = accumulator.result(0, 0);
+
+    expect(result.historyStartOffset).toBe(result.messages[0]?.sequence);
+    expect(result.historyStartOffset).toBeGreaterThan(0);
+    expect(result.totalTokens).toBe(200 * 100);
+    expect(result.lastSequence).toBe(lastRowOffset);
+  });
+
+  it('keeps the kept-row prefix identical across appends between two slides', () => {
+    const snapshots: string[][] = [];
+    pushRows(200, (result) => snapshots.push(result.messages.map((m) => m.id)));
+
+    let slides = 0;
+    for (let i = 1; i < snapshots.length; i++) {
+      const previous = snapshots[i - 1]!;
+      const next = snapshots[i]!;
+      if (next[0] === previous[0]) expect(next.slice(0, previous.length)).toEqual(previous);
+      else slides += 1;
+    }
+    expect(slides).toBeGreaterThan(1);
+    expect(slides).toBeLessThan(snapshots.length / 3);
   });
 });

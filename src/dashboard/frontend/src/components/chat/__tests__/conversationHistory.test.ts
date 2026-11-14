@@ -172,3 +172,16 @@ describe('resumePayloadFromCache (PAN-4558)', () => {
     expect(resume.openIds[0]).toBe('t499');
   });
 });
+
+describe('bounded history (PAN-5211)', () => {
+  it('keeps bounded through mergeWindowIntoCache and prependOlderPage', () => {
+    const previous: HistoryRows = { ...rows(100, 300), history: window(100) };
+    const merged = mergeWindowIntoCache(previous, { ...rows(226, 302), window: { ...window(226), bounded: true } });
+    expect(merged.history?.bounded).toBe(true);
+
+    const paged = prependOlderPage(merged, { ...rows(50, 100), window: window(50) }, merged.history!.cursor!);
+    expect(paged.history?.bounded).toBe(true);
+    expect(paged.history?.cursor).toBe(cursorAt(50));
+  });
+});
+

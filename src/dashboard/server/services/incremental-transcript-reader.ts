@@ -1,12 +1,163 @@
 /** Bounded worker-local parser state: append reads avoid decoding the history again. */
-import { open } from 'node:fs/promises';
-import { StringDecoder } from 'node:string_decoder';
-import type { ParseResult } from './conversation/types.js';
+import { open, type FileHandle } from 'node:fs/promises';
+import type { ParseResult, RecordLocation } from './conversation/types.js';
+import {
+  RECORD_PARSE_MAX_BYTES,
+  TRANSCRIPT_CACHE_MAX_RETAINED_CHARS,
+  TRANSCRIPT_ENTRY_MAX_RETAINED_CHARS,
+  TRANSCRIPT_TAIL_READ_BYTES,
+  scrubImageDataUrls,
+} from './conversation/tool-result-bounds.js';
 
-interface Accumulator {
-  push(line: string): void;
+/** Bytes of an oversized record's start that `pushOversized` receives, decoded. */
+const OVERSIZED_HEAD_BYTES = 4096;
+/** Block size used to find the first line boundary of a tail read. */
+const TAIL_SCAN_BLOCK_BYTES = 64 * 1024;
+
+export interface Accumulator {
+  push(line: string, location?: RecordLocation): void;
+  /** PAN-5211: a record over `recordParseMaxBytes` after the scrub; only its first bytes are decoded. */
+  pushOversized?(head: string, location: RecordLocation): void;
   result(size: number, mtimeMs: number): ParseResult;
+  /** PAN-5211: retained characters of the rows this accumulator holds. */
+  retainedChars(): number;
 }
+
+export interface AccumulatorOptions {
+  /** Byte offset of the first record the accumulator will receive. */
+  readonly historyStartOffset: number;
+}
+
+export interface IncrementalTranscriptReaderOptions {
+  readonly maxEntryRetainedChars?: number;
+  readonly maxCacheRetainedChars?: number;
+  readonly tailReadBytes?: number;
+  readonly recordParseMaxBytes?: number;
+  /**
+   * PAN-5211: on a tail read, the newest line before the tail that holds these bytes is pushed first,
+   * without a location, so context records (Codex `turn_context` carries the pricing model) survive.
+   */
+  readonly tailContextMarker?: string;
+}
+
+export interface TranscriptLineSplitter {
+  /** Split a chunk on `0x0A`; complete lines go to `onLine`, the rest is kept. */
+  write(chunk: Buffer): void;
+  /** Emit a final record that has no newline yet, when it is a complete JSON value. */
+  flushComplete(): void;
+  /** Bytes of the partial last line, not yet emitted. */
+  pending(): Buffer[];
+}
+
+function isCompleteJson(bytes: Buffer): boolean {
+  const text = scrubImageDataUrls(bytes).toString('utf8');
+  if (!text.trim()) return false;
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * PAN-5211: split transcript bytes into lines without decoding them. `0x0A` never occurs inside a UTF-8
+ * multibyte sequence, so a byte split is safe; each line arrives with its absolute byte location.
+ */
+export function createTranscriptLineSplitter(
+  startOffset: number,
+  onLine: (line: Buffer, location: RecordLocation) => void,
+): TranscriptLineSplitter {
+  let pieces: Buffer[] = [];
+  let lineStart = startOffset;
+
+  const emit = (line: Buffer): void => {
+    onLine(line, { offset: lineStart, length: line.length });
+  };
+
+  return {
+    write(chunk: Buffer): void {
+      let from = 0;
+      for (let end = chunk.indexOf(10, from); end !== -1; end = chunk.indexOf(10, from)) {
+        const segment = chunk.subarray(from, end);
+        const line = pieces.length === 0 ? segment : Buffer.concat([...pieces, segment]);
+        pieces = [];
+        emit(line);
+        lineStart += line.length + 1;
+        from = end + 1;
+      }
+      // The caller reuses its read buffer, so keep a copy of the partial line.
+      if (from < chunk.length) pieces.push(Buffer.from(chunk.subarray(from)));
+    },
+    flushComplete(): void {
+      if (pieces.length === 0) return;
+      const line = pieces.length === 1 ? pieces[0]! : Buffer.concat(pieces);
+      if (!isCompleteJson(line)) return;
+      pieces = [];
+      emit(line);
+      // No newline yet: the next append's leading `\n` closes this record as an empty line.
+      lineStart += line.length;
+    },
+    pending(): Buffer[] {
+      return pieces;
+    },
+  };
+}
+
+/**
+ * PAN-5211: scrub one raw transcript line and hand it to an accumulator. A line still over
+ * `recordParseMaxBytes` after the scrub goes to `pushOversized` with only its first bytes decoded.
+ * The location always describes the original (pre-scrub) bytes.
+ */
+export function pushTranscriptLine(
+  parser: Pick<Accumulator, 'push' | 'pushOversized'>,
+  line: Buffer,
+  location: RecordLocation,
+  recordParseMaxBytes: number = RECORD_PARSE_MAX_BYTES,
+): void {
+  if (line.length === 0) return;
+  const scrubbed = scrubImageDataUrls(line);
+  if (scrubbed.length > recordParseMaxBytes) {
+    parser.pushOversized?.(scrubbed.toString('utf8', 0, OVERSIZED_HEAD_BYTES), location);
+  } else {
+    parser.push(scrubbed.toString('utf8'), location);
+  }
+}
+
+/** Most bytes of a context line that `findLineBefore` reads. */
+const CONTEXT_LINE_MAX_BYTES = 1024 * 1024;
+
+/**
+ * The newest complete line that ends before `end` and holds `marker`, scanning back at most `maxScan`
+ * bytes. Lines longer than CONTEXT_LINE_MAX_BYTES are not returned.
+ */
+async function findLineBefore(handle: FileHandle, end: number, marker: Buffer, maxScan: number): Promise<Buffer | undefined> {
+  const floor = Math.max(0, end - maxScan);
+  const block = Buffer.alloc(TAIL_SCAN_BLOCK_BYTES + marker.length);
+  for (let blockEnd = end; blockEnd > floor;) {
+    const blockStart = Math.max(floor, blockEnd - TAIL_SCAN_BLOCK_BYTES);
+    // Overlap by the marker length so a marker that straddles two blocks is still found.
+    const readEnd = Math.min(end, blockEnd + marker.length);
+    const { bytesRead } = await handle.read(block, 0, readEnd - blockStart, blockStart);
+    const hit = block.subarray(0, bytesRead).lastIndexOf(marker);
+    if (hit !== -1) {
+      const at = blockStart + hit;
+      const windowStart = Math.max(0, at - CONTEXT_LINE_MAX_BYTES / 2);
+      const windowEnd = Math.min(end, at + CONTEXT_LINE_MAX_BYTES / 2);
+      const window = Buffer.alloc(windowEnd - windowStart);
+      const { bytesRead: windowRead } = await handle.read(window, 0, window.length, windowStart);
+      const bytes = window.subarray(0, windowRead);
+      const rel = at - windowStart;
+      const lineStart = bytes.lastIndexOf(10, rel) + 1;
+      const lineEnd = bytes.indexOf(10, rel);
+      if ((lineStart > 0 || windowStart === 0) && lineEnd !== -1) return Buffer.from(bytes.subarray(lineStart, lineEnd));
+      return undefined;
+    }
+    blockEnd = blockStart;
+  }
+  return undefined;
+}
+
 interface Entry {
   generation: number;
   head: Buffer;
@@ -16,17 +167,34 @@ interface Entry {
   size: number;
   mtimeMs: number;
   parser: Accumulator;
-  pending: string;
-  decoder: StringDecoder;
+  splitter: TranscriptLineSplitter;
   result?: ParseResult;
 }
 
-export function createIncrementalTranscriptReader(create: (file: string) => Accumulator) {
+export function createIncrementalTranscriptReader(
+  create: (file: string, options: AccumulatorOptions) => Accumulator,
+  options: IncrementalTranscriptReaderOptions = {},
+) {
+  const recordParseMaxBytes = options.recordParseMaxBytes ?? RECORD_PARSE_MAX_BYTES;
+  const maxEntryRetainedChars = options.maxEntryRetainedChars ?? TRANSCRIPT_ENTRY_MAX_RETAINED_CHARS;
+  const maxCacheRetainedChars = options.maxCacheRetainedChars ?? TRANSCRIPT_CACHE_MAX_RETAINED_CHARS;
+  const tailReadBytes = options.tailReadBytes ?? TRANSCRIPT_TAIL_READ_BYTES;
+  const contextMarker = options.tailContextMarker ? Buffer.from(options.tailContextMarker, 'utf8') : undefined;
   const cache = new Map<string, Entry>();
   const pending = new Map<string, Promise<ParseResult>>();
   let generation = 0;
-  const maxBytes = 32 * 1024 * 1024;
   const maxFiles = 8;
+
+  const newEntry = (file: string, stats: { dev: number; ino: number; mtimeMs: number }, start: number): Entry => {
+    const parser = create(file, { historyStartOffset: start });
+    const splitter = createTranscriptLineSplitter(start, (line, location) => {
+      pushTranscriptLine(parser, line, location, recordParseMaxBytes);
+    });
+    return {
+      generation: ++generation, head: Buffer.alloc(0), tail: Buffer.alloc(0), dev: stats.dev, ino: stats.ino,
+      size: start, mtimeMs: stats.mtimeMs, parser, splitter,
+    };
+  };
 
   const read = async (file: string): Promise<ParseResult> => {
     const handle = await open(file, 'r');
@@ -41,14 +209,30 @@ export function createIncrementalTranscriptReader(create: (file: string) => Accu
         const { bytesRead } = await handle.read(bytes, 0, length, offset);
         return bytes.subarray(0, bytesRead);
       };
+      const firstLineStartAtOrAfter = async (from: number, size: number): Promise<number> => {
+        for (let offset = from; offset < size; offset += TAIL_SCAN_BLOCK_BYTES) {
+          const block = await bytesAt(offset, Math.min(TAIL_SCAN_BLOCK_BYTES, size - offset));
+          const newline = block.indexOf(10);
+          if (newline !== -1) return offset + newline + 1;
+          if (block.length === 0) break;
+        }
+        return size;
+      };
       const prefixChanged = entry && stats.size >= entry.size && (
         !entry.head.equals(await bytesAt(0, entry.head.length)) ||
         !entry.tail.equals(await bytesAt(entry.size - entry.tail.length, entry.tail.length))
       );
       if (!entry || entry.dev !== stats.dev || entry.ino !== stats.ino || stats.size < entry.size ||
         (stats.size === entry.size && stats.mtimeMs !== entry.mtimeMs) || prefixChanged) {
-        entry = { generation: ++generation, head: Buffer.alloc(0), tail: Buffer.alloc(0), dev: stats.dev, ino: stats.ino, size: 0, mtimeMs: stats.mtimeMs,
-          parser: create(file), pending: '', decoder: new StringDecoder('utf8') };
+        // PAN-5211: a cold open of a large transcript reads only its last tailReadBytes.
+        const start = stats.size > tailReadBytes ? await firstLineStartAtOrAfter(stats.size - tailReadBytes, stats.size) : 0;
+        entry = newEntry(file, stats, start);
+        if (start > 0 && contextMarker) {
+          // The newest context before the tail, else the newest one in the file's head.
+          const context = await findLineBefore(handle, start, contextMarker, tailReadBytes)
+            ?? await findLineBefore(handle, Math.min(start, tailReadBytes), contextMarker, tailReadBytes);
+          if (context) entry.parser.push(scrubImageDataUrls(context).toString('utf8'));
+        }
       }
       if (stats.size !== entry.size || !entry.result) {
         const buffer = Buffer.alloc(Math.min(1024 * 1024, Math.max(1, stats.size - entry.size)));
@@ -56,33 +240,26 @@ export function createIncrementalTranscriptReader(create: (file: string) => Accu
           const { bytesRead } = await handle.read(buffer, 0, Math.min(buffer.length, stats.size - entry.size), entry.size);
           if (!bytesRead) throw new Error('Transcript changed during incremental read');
           entry.size += bytesRead;
-          const text = entry.pending + entry.decoder.write(buffer.subarray(0, bytesRead));
-          let from = 0;
-          for (let end = text.indexOf('\n'); end !== -1; end = text.indexOf('\n', from)) {
-            entry.parser.push(text.slice(from, end));
-            from = end + 1;
-          }
-          entry.pending = text.slice(from);
+          entry.splitter.write(buffer.subarray(0, bytesRead));
         }
         // Historical fixtures/files may omit the final newline. Accept a complete
         // JSON value, but keep incomplete writes until the next append arrives.
-        if (entry.pending.trim()) {
-          try {
-            JSON.parse(entry.pending);
-            entry.parser.push(entry.pending);
-            entry.pending = '';
-          } catch { /* incomplete final record */ }
-        }
+        entry.splitter.flushComplete();
         entry.mtimeMs = stats.mtimeMs;
         entry.head = await bytesAt(0, Math.min(4096, stats.size));
         entry.tail = await bytesAt(Math.max(0, stats.size - 4096), Math.min(4096, stats.size));
         entry.result = { ...entry.parser.result(stats.size, stats.mtimeMs), transcriptGeneration: entry.generation };
       }
+      // PAN-5211: an entry over the hard cap is returned but never cached, so no single
+      // transcript can hold more than the cap between reads.
+      if (entry.parser.retainedChars() > maxEntryRetainedChars) return entry.result!;
       cache.set(file, entry);
-      let bytes = [...cache.values()].reduce((sum, item) => sum + item.size, 0);
+      let retained = 0;
+      for (const item of cache.values()) retained += item.parser.retainedChars();
       for (const [key, item] of cache) {
-        if (cache.size <= maxFiles && (bytes <= maxBytes || cache.size === 1)) break;
-        bytes -= item.size;
+        if (cache.size <= maxFiles && retained <= maxCacheRetainedChars) break;
+        if (key === file) continue;
+        retained -= item.parser.retainedChars();
         cache.delete(key);
       }
       return entry.result!;

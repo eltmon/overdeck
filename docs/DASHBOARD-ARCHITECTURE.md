@@ -24,6 +24,14 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 - `GET /api/deacon/status` and `GET /api/cloister/status` compose `deaconLite` from that report: `running` is whether the child process is running, `intervalMs` is 60000, and `lastRunAt`/`lastRunError` are the relayed report.
 - The `pan up` supervisor watchdog restarts the dashboard when `deaconLite.lastRunAt` is older than three intervals. A null `lastRunAt` never produces a verdict.
 
+**Heap limit** (PAN-5211): the dashboard runs with Node's default heap limit and sets no
+`--max-old-space-size`. On the 62.6 GiB development host the default `heap_size_limit` was
+4,144 MiB per isolate (main thread and each worker), measured on 2026-11-13. PAN-5211 bounds
+retained parse state by design, so a cap adds no protection against that bug. A cap set too
+low would turn a transient spike (a burst of large parses across the worker lanes) into an
+out-of-memory crash, and that crash takes down every conversation view and the pipeline UI
+at once. Revisit this if the steady-state heap passes 1 GiB.
+
 **WebSocket endpoints:**
 - `/ws/rpc` — Effect RPC (PanRpcGroup): domain events, snapshots, replay. Uses typed Schema.
 - `/ws/terminal?session=<name>` — Raw WebSocket: live PTY terminal streaming via `ws` library.
@@ -365,6 +373,65 @@ door that does not exist; a real record read door would be a separate change.
   reorder) is windowed too, and explicit resets replace history after
   truncation/replacement; metadata snapshots clear removed plans or compact boundaries.
   Selection lives in `services/conversation/window.ts` and keeps full rows server-side.
+  - **Bounded transcript memory (PAN-5211).** One Codex rollout once held about 1.2 GB of
+    tool output (base64 screenshots) in the dashboard heap. Parsing is now bounded both in
+    what it reads and in what it keeps:
+    - The incremental reader (`services/incremental-transcript-reader.ts`) splits lines on
+      byte `0x0A` and scrubs every `data:image/<format>;base64,…` data URL to
+      `[image: <format>, <N> KB]` before it decodes or runs `JSON.parse`. Each record
+      reaches the accumulator with its byte location (`{ offset, length }`).
+    - A line still over 8 MiB after the scrub is not parsed whole. An output for a call in
+      the window becomes a `bodyOmitted` entry with `resultBytes`; anything else becomes a
+      "Skipped a <X.Y> MB transcript record" info row.
+    - A cold open of a transcript over 64 MiB reads only its last 64 MiB (tail read). Token
+      totals stay correct because Codex `token_count` totals are cumulative. Cost also needs
+      the pricing model, which only `turn_context` records carry, and one long turn can fill
+      the whole tail. So a tail read first pushes the newest `"type":"turn_context"` line
+      before the tail (scanning back up to 64 MiB, then the head of the file). That line
+      creates no row, so it changes no ids or sequences.
+    - Stored tool results cap at 65,536 characters (first and last 32,768, joined by an
+      "omitted" marker) through `services/conversation/tool-result-bounds.ts`, for Codex,
+      pi, prime-agent, ohmypi and kimi. ACP keeps its 500-character cap.
+    - The reader cache and the main-thread snapshot cache (`shared-transcript-parser.ts`)
+      budget retained characters, not file bytes: 32 Mi characters in total, a 16 Mi hard
+      cap per entry (an entry over it is returned and then dropped), and 8 files. Each
+      budget applies per cache. There are four caches: the reader cache on the main
+      thread, the reader cache in the worker parse lane, the snapshot cache, and
+      `messagesCache` in `conversation-reads.ts`, which evicts by count (100 entries) and
+      has no character budget. There is no dashboard-wide limit.
+    - Codex rows carry record-offset sequences: a row's `sequence` is the byte offset of
+      the record that created it, and its id is `codex-user-@<offset>`,
+      `codex-agent-@<offset>` (or the `call_id` for tool rows), so a record has the same id
+      in every parse. The Codex accumulator keeps a window of its newest rows: past 16 Mi
+      retained characters it drops the oldest rows down to 12 Mi.
+      `ParseResult.historyStartOffset` is the byte offset of the oldest record held; above
+      0 the conversation is bounded and older history exists only on disk.
+    - Windows of a bounded conversation (initial, paged and WebSocket) carry
+      `bounded: true` and `hasOlder: true`. The timeline shows "Large conversation: the
+      dashboard keeps recent history in memory and loads older history from the
+      transcript as you scroll up." Older pages come from disk through
+      `services/conversation/codex-transcript-ranges.ts` (`selectHistoryPageBefore`, which
+      reads 8 MiB ranges and doubles up to 64 MiB). At a range boundary, a call whose output
+      lies after the range is marked `bodyOmitted`, so expanding it reads forward from the
+      call to its output. If that output is already in memory, it also shows as a stand-alone
+      "Tool result" row with its own `codex-tool-out-@<offset>` id. A record longer than
+      64 MiB just before a range is skipped, so paging moves past it.
+    - Expanding a row that came from a disk page sends its `sequence` as `?seq=<n>`. When
+      the in-memory parse lacks the id, the server checks that `seq` is a line start and
+      parses forward from it until the row has its output.
+    - Codex bookmarks saved with the old counter ids (`codex-user-3`) are migrated on the
+      first bookmark list (`src/lib/overdeck/codex-bookmark-migration.ts`). The pass counts
+      rows by the old parser's rules (every call id kept, oversized records counted by
+      kind), applies all renames in one transaction, and records success for the life of
+      the process; a pass that could not read the transcript runs again on the next list.
+      Ids it cannot map are left alone.
+    - Every other consumer of a bounded Codex conversation sees only its in-memory rows:
+      title generation, retitle, title refinement and the admin title backfill read the
+      newest rows; conversation diffs cover the in-memory rows only;
+      `readFlywheelTranscript` reads the newest rows; the unwindowed agent body and
+      `?window=all` exports hold only the in-memory rows, with bounded results; and
+      `listCodexSubagents` loses the `spawn_agent` match for calls outside the window and
+      falls back to the thread's own metadata.
   - Wire projection (`services/conversation/wire-projection.ts`): on every windowed or
     paged body and every WS event, a tool `result` over 4 KiB is replaced by
     `resultBytes` and a `detail`/`toolInput` string over 4 KiB is cut to a 512-character
@@ -592,6 +659,11 @@ door that does not exist; a real record read door would be a separate change.
     `GET /api/agents/:id/conversation/tool-body/:toolUseId` serves tool bodies; all of
     them combine with `subagentId`. Agent panels in `ConversationPanel` use
     `window=initial`.
+  - A Codex tool body is read from its transcript record by byte location
+    (`withFullToolResult` in `services/conversation/codex-transcript-ranges.ts`, PAN-5211):
+    the record is scrubbed, so images stay placeholders, its `call_id` is checked, and the
+    text caps at 4 Mi characters. Other harnesses return the stored entry, which keeps the
+    head and tail of a result over 64 KiB.
   - Windowed and paged bodies carry wire-projected tool rows (`resultBytes`,
     `bodyOmitted`). The timeline loads the next older page within 400 px of the top
     ("Loading earlier messages…", then "Start of conversation"), and palette or
