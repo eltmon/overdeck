@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5191",
   "created": "2026-11-14T01:35:38.518Z",
-  "updated": "2026-11-14T01:56:42.607Z",
+  "updated": "2026-11-14T01:56:48.451Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -194,6 +194,11 @@
     "pipeline-pr.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T01:56:42.607Z"
+    },
+    "client-switch": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5191",
+      "claimedAt": "2026-11-14T01:56:48.451Z"
     }
   }
 }
