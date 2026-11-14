@@ -112,6 +112,7 @@
               "features/skill-packs",
               "features/workspaces",
               "features/file-explorer",
+              "features/keyboard-shortcuts",
               "features/convoys",
               "features/swarm",
               "features/merge-batches"

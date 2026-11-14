@@ -1,0 +1,389 @@
+{
+  "version": "1",
+  "issueId": "PAN-5287",
+  "created": "2026-11-14T19:49:14.970Z",
+  "updated": "2026-11-14T20:51:04.628Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "contracts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T19:49:14.970Z",
+      "doneAt": "2026-11-14T20:11:01.033Z"
+    },
+    "contracts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:11:01.033Z"
+    },
+    "contracts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:11:01.033Z"
+    },
+    "contracts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:11:01.033Z"
+    },
+    "dock-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:11:10.471Z",
+      "doneAt": "2026-11-14T20:13:00.871Z"
+    },
+    "dock-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:13:00.871Z"
+    },
+    "dock-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:13:00.871Z"
+    },
+    "dock-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:13:00.871Z"
+    },
+    "dock-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:13:00.871Z"
+    },
+    "stage-seams": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:13:20.990Z",
+      "doneAt": "2026-11-14T20:16:18.688Z"
+    },
+    "root-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:16:33.830Z",
+      "doneAt": "2026-11-14T20:16:58.893Z"
+    },
+    "project-resolver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:17:00.985Z",
+      "doneAt": "2026-11-14T20:17:21.767Z"
+    },
+    "agents-working": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:17:23.223Z",
+      "doneAt": "2026-11-14T20:17:43.958Z"
+    },
+    "needs-you": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:17:45.405Z",
+      "doneAt": "2026-11-14T20:18:10.638Z"
+    },
+    "registry-core": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:18:12.346Z",
+      "doneAt": "2026-11-14T20:18:34.365Z"
+    },
+    "stage-seams.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:16:18.688Z"
+    },
+    "stage-seams.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:16:18.688Z"
+    },
+    "stage-seams.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:16:18.688Z"
+    },
+    "stage-seams.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:16:18.688Z"
+    },
+    "stage-seams.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:16:18.688Z"
+    },
+    "root-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:16:58.893Z"
+    },
+    "root-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:16:58.893Z"
+    },
+    "root-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:16:58.893Z"
+    },
+    "root-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:16:58.893Z"
+    },
+    "project-resolver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:17:21.767Z"
+    },
+    "project-resolver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:17:21.767Z"
+    },
+    "project-resolver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:17:21.767Z"
+    },
+    "agents-working.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:17:43.958Z"
+    },
+    "agents-working.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:17:43.958Z"
+    },
+    "agents-working.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:17:43.958Z"
+    },
+    "agents-working.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:17:43.958Z"
+    },
+    "needs-you.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:18:10.638Z"
+    },
+    "needs-you.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:18:10.638Z"
+    },
+    "needs-you.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:18:10.638Z"
+    },
+    "needs-you.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:18:10.638Z"
+    },
+    "needs-you.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:18:10.638Z"
+    },
+    "registry-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:18:34.365Z"
+    },
+    "registry-core.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:18:34.365Z"
+    },
+    "registry-core.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:18:34.365Z"
+    },
+    "registry-core.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:18:34.365Z"
+    },
+    "registry-core.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:18:34.365Z"
+    },
+    "app-migration": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:46:02.048Z",
+      "doneAt": "2026-11-14T20:46:52.593Z"
+    },
+    "stage-shortcuts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:46:06.363Z",
+      "doneAt": "2026-11-14T20:47:34.551Z"
+    },
+    "panebar-chip": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:46:08.808Z",
+      "doneAt": "2026-11-14T20:47:54.152Z"
+    },
+    "sidebar-shortcut": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:46:11.073Z",
+      "doneAt": "2026-11-14T20:48:13.542Z"
+    },
+    "emergency-stop-shortcut": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:46:13.193Z",
+      "doneAt": "2026-11-14T20:48:36.701Z"
+    },
+    "new-conversation-shortcut": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:46:15.418Z",
+      "doneAt": "2026-11-14T20:48:54.157Z"
+    },
+    "explorer-shortcuts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:46:17.588Z",
+      "doneAt": "2026-11-14T20:49:28.017Z"
+    },
+    "workflow-fixture": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:46:19.724Z",
+      "doneAt": "2026-11-14T20:49:50.749Z"
+    },
+    "app-migration.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:46:52.593Z"
+    },
+    "app-migration.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:46:52.593Z"
+    },
+    "app-migration.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:46:52.593Z"
+    },
+    "shortcuts-sheet": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:47:13.938Z"
+    },
+    "shortcuts-sheet.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:47:13.938Z"
+    },
+    "shortcuts-sheet.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:47:13.938Z"
+    },
+    "shortcuts-sheet.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:47:13.938Z"
+    },
+    "shortcuts-sheet.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:47:13.938Z"
+    },
+    "stage-shortcuts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:47:34.551Z"
+    },
+    "stage-shortcuts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:47:34.551Z"
+    },
+    "stage-shortcuts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:47:34.551Z"
+    },
+    "stage-shortcuts.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:47:34.551Z"
+    },
+    "panebar-chip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:47:54.152Z"
+    },
+    "panebar-chip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:47:54.152Z"
+    },
+    "sidebar-shortcut.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:48:13.542Z"
+    },
+    "sidebar-shortcut.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:48:13.542Z"
+    },
+    "emergency-stop-shortcut.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:48:36.701Z"
+    },
+    "emergency-stop-shortcut.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:48:36.701Z"
+    },
+    "new-conversation-shortcut.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:48:54.157Z"
+    },
+    "new-conversation-shortcut.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:48:54.157Z"
+    },
+    "explorer-shortcuts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:28.017Z"
+    },
+    "explorer-shortcuts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:28.017Z"
+    },
+    "explorer-shortcuts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:28.017Z"
+    },
+    "workflow-fixture.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:50.749Z"
+    },
+    "workflow-fixture.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:50.749Z"
+    },
+    "workflow-fixture.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:50.749Z"
+    },
+    "workflow-fixture.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:50.749Z"
+    },
+    "workflow-fixture.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:49:50.749Z"
+    },
+    "test-subset": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:50:21.462Z",
+      "doneAt": "2026-11-14T20:50:45.296Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5287",
+      "claimedAt": "2026-11-14T20:50:23.973Z",
+      "doneAt": "2026-11-14T20:51:04.628Z"
+    },
+    "test-subset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:50:45.296Z"
+    },
+    "test-subset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:50:45.296Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:51:04.628Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:51:04.628Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:51:04.628Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T20:51:04.628Z"
+    }
+  }
+}

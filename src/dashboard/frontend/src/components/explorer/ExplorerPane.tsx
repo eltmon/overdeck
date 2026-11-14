@@ -305,7 +305,8 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
 
   const onQuickOpen = useCallback(() => setQuickOpen(true), [])
   const onContentSearch = useCallback(() => setContentSearchScope(''), [])
-  const onKeyDown = useExplorerShortcuts({ onQuickOpen, onContentSearch })
+  const paneRootRef = useRef<HTMLDivElement | null>(null)
+  useExplorerShortcuts({ rootRef: paneRootRef, onQuickOpen, onContentSearch })
   const onPickMatch = useCallback((target: ContentSearchTarget) => openFile({ rootId, ...target }), [openFile, rootId])
 
   const onToggle = useCallback(
@@ -464,7 +465,7 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
   const branch = git.result?.branch
 
   return (
-    <div className="flex h-full min-h-0 flex-col" data-testid="explorer-pane" onKeyDown={onKeyDown}>
+    <div className="flex h-full min-h-0 flex-col" data-testid="explorer-pane" ref={paneRootRef}>
       <div className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-xs">
         <span className="truncate font-mono text-foreground">{rootLabel(rootId)}</span>
         {branch && <span className="min-w-0 truncate font-mono text-muted-foreground">{branch}</span>}

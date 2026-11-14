@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { useEffect } from 'react'
 import { render, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BackendConnectionBoundary } from '../../App/BackendConnectionBoundary'
@@ -10,12 +11,22 @@ import {
   selectActivePaneId,
 } from '../../lib/panesStore'
 import { useTerminalStateStore, selectThreadTerminalState } from '../terminal/terminalStateStore'
+import { installShortcutListener, resetShortcutsForTests } from '../../lib/shortcuts/registry'
 
 const WS = 'PAN-1549'
 
 function Host() {
+  useEffect(() => installShortcutListener(), [])
   useStageShortcuts(WS)
   return null
+}
+
+let platform: ReturnType<typeof vi.spyOn>
+function onLinux() {
+  platform.mockReturnValue('Linux x86_64')
+}
+function ctrlAlt(key: string) {
+  fireEvent.keyDown(window, { key, ctrlKey: true, altKey: true })
 }
 
 function panes() {
@@ -29,6 +40,7 @@ function meta(key: string) {
 }
 
 beforeEach(() => {
+  platform = vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
   localStorage.clear()
   usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} })
   useTerminalStateStore.setState({ terminalStateByThreadId: {} })
@@ -37,6 +49,8 @@ beforeEach(() => {
 afterEach(() => {
   // Drop focus so the text-entry guard test doesn't leak.
   ;(document.activeElement as HTMLElement | null)?.blur?.()
+  resetShortcutsForTests()
+  vi.restoreAllMocks()
 })
 
 describe('useStageShortcuts', () => {
@@ -125,6 +139,45 @@ describe('useStageShortcuts', () => {
     } finally {
       useConnectionState.setState({ hasSnapshot: false, serverReachable: true })
     }
+  })
+
+  it('Ctrl+Alt+N sets the active pane by index on Linux; ⌘N does nothing there', () => {
+    onLinux()
+    const homeId = panes()[0].paneId
+    const t = usePanesStore.getState().addPane(WS, { paneType: 'terminal', label: 'T' })
+    render(<Host />)
+
+    ctrlAlt('1')
+    expect(activeId()).toBe(homeId)
+    meta('2')
+    expect(activeId()).toBe(homeId)
+    ctrlAlt('2')
+    expect(activeId()).toBe(t)
+    fireEvent.keyDown(window, { key: '1', ctrlKey: true })
+    expect(activeId()).toBe(t) // Ctrl+1 alone is left to the browser
+  })
+
+  it('Ctrl+Alt+W closes the active pane on Linux, never HOME', () => {
+    onLinux()
+    const homeId = panes()[0].paneId
+    usePanesStore.getState().addPane(WS, { paneType: 'docs', label: 'D' })
+    render(<Host />)
+
+    ctrlAlt('w')
+    expect(panes()).toHaveLength(1)
+    expect(activeId()).toBe(homeId)
+    ctrlAlt('w')
+    expect(panes()).toHaveLength(1)
+  })
+
+  it('⌘T does nothing on Linux (unbound there)', () => {
+    onLinux()
+    render(<Host />)
+    const open = () => selectThreadTerminalState(useTerminalStateStore.getState().terminalStateByThreadId, WS).terminalOpen
+    meta('t')
+    fireEvent.keyDown(window, { key: 't', ctrlKey: true })
+    ctrlAlt('t')
+    expect(open()).toBe(false)
   })
 
   it('ignores combos without the meta key', () => {

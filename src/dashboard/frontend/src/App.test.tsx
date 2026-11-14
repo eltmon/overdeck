@@ -99,7 +99,9 @@ vi.mock('./components/sessionFeed/SessionFeedSidebar', () => ({
   ),
 }));
 vi.mock('./components/search/SearchModal', () => ({ SearchModal: () => null }));
-vi.mock('./components/CommandPalette', () => ({ CommandPalette: () => null }));
+vi.mock('./components/CommandPalette', () => ({
+  CommandPalette: ({ isOpen }: { isOpen: boolean }) => (isOpen ? <div data-testid="command-palette" /> : null),
+}));
 vi.mock('./components/ResourcesPanel', () => ({ ResourcesPanel: () => null }));
 vi.mock('./components/GodView', () => ({ GodViewPage: () => null }));
 vi.mock('./components/context/ContextPage', () => ({ ContextPage: () => <div data-testid="context-page" /> }));
@@ -733,6 +735,34 @@ describe('App global lens chord shortcuts', () => {
     fireEvent.keyDown(input, { key: 'p' });
     expect(window.location.pathname).toBe('/');
     document.body.removeChild(input);
+  });
+
+  it('toggles the command palette with Ctrl+K on Linux (PAN-5287)', () => {
+    const platform = vi.spyOn(navigator, 'platform', 'get').mockReturnValue('Linux x86_64');
+    try {
+      renderApp();
+      expect(screen.queryByTestId('command-palette')).toBeNull();
+      fireEvent.keyDown(document, { key: 'k', ctrlKey: true });
+      expect(screen.getByTestId('command-palette')).toBeTruthy();
+      fireEvent.keyDown(document, { key: 'k', ctrlKey: true });
+      expect(screen.queryByTestId('command-palette')).toBeNull();
+    } finally {
+      platform.mockRestore();
+    }
+  });
+
+  it('opens the keyboard shortcuts sheet with ? (PAN-5287)', () => {
+    renderApp();
+    expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).toBeNull();
+    fireEvent.keyDown(document, { key: '?', shiftKey: true });
+    expect(screen.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeTruthy();
+  });
+
+  it('leaves ? to God View on the god-view tab (PAN-5287 S-D8)', () => {
+    window.history.replaceState(null, '', '/god-view');
+    renderApp();
+    fireEvent.keyDown(document, { key: '?', shiftKey: true });
+    expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).toBeNull();
   });
 
   it('cancels the chord on an unbound second key', () => {
