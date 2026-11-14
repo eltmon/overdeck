@@ -235,6 +235,14 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
     },
     [cancelPreview, openFile, rootId],
   )
+  // PAN-5191: a write on a project root lands on the edit root, so actions open files on the root they wrote.
+  const openFileOnRoot = useCallback(
+    (path: string, id: string) => {
+      cancelPreview()
+      openFile({ rootId: id, path })
+    },
+    [cancelPreview, openFile],
+  )
   const previewFileFromTree = useCallback(
     (path: string) => {
       cancelPreview()
@@ -246,9 +254,9 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
     [cancelPreview, openFile, rootId],
   )
 
-  // PAN-5190 D-E1, D-E2: write actions only on issue/workspace roots with the Changed filter off.
-  const writable = rootKind !== 'project' && !changedOnly
-  const actions = useExplorerActions({ rootId, writable, reloadDirs: reloadLoaded, refreshGit: git.refresh, openFile: openFileFromTree })
+  // PAN-5191: project roots are writable through an edit workspace; the Changed filter still hides write actions.
+  const writable = !changedOnly
+  const actions = useExplorerActions({ rootId, writable, reloadDirs: reloadLoaded, refreshGit: git.refresh, openFile: openFileOnRoot })
   const inline = useInlineEdit({ rootId, root, rows, actions, treeRef })
   const clearSelection = useCallback(() => useExplorerStore.getState().clearSelection(rootId), [rootId])
   const requestDelete = useDeleteFlow(actions, rootId)
@@ -267,8 +275,7 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
     expand: (path) => useExplorerStore.getState().setExpanded(rootId, path, true),
     onMove: (paths, dir) => void actions.move(paths, dir),
     onFiles: (dt, dir) => {
-      if (rootKind === 'project') toast.error("The main checkout is read-only, so files can't be added here.")
-      else if (changedOnly) toast.error('Turn off the Changed filter to add files.')
+      if (changedOnly) toast.error('Turn off the Changed filter to add files.')
       else void uploadDroppedItems(snapshotDroppedItems(dt), dir, actions)
     },
   })

@@ -3,8 +3,9 @@
  *
  * `createExplorerActions` is a plain factory, testable without React; the
  * hook memoizes it over its deps. Every write RPC and upload goes through the
- * one `runWrite` seam (D-E3), which refuses `project` roots. PAN-5191 wraps
- * that seam to make project roots writable through an edit workspace.
+ * one `runWrite` seam (D-E3). On a `project` root (PAN-5191) a write never
+ * reaches the primary checkout: `runWrite` and every action first switch to
+ * the project's edit workspace (ensureEditRoot), then replay there.
  *
  * A rename or a move keeps open code panes on the file: it waits for each
  * affected draft's save, renames on disk, rekeys the drafts, then retargets
@@ -22,6 +23,8 @@ import { toast } from 'sonner'
 import { usePanesStore } from '../../../lib/panesStore'
 import { draftKey, useCodeDrafts } from '../code/code-drafts'
 import { codeSaveQueue } from '../code/useCodePaneSave'
+import { useEditWorkspaceStore } from '../edit/edit-workspace-store'
+import { ensureEditRoot } from '../edit/edit-workspace-switch'
 import {
   copyEntry,
   createEntry,
@@ -41,13 +44,13 @@ import type { UndoStep } from './undo-stack'
 
 export interface ExplorerActionsDeps {
   rootId: string
-  /** False for project roots and while the Changed filter is on (D-E1, D-E2). */
+  /** False while the Changed filter is on (D-E2). Project roots write through an edit workspace. */
   writable: boolean
   /** Re-list these folders when they are loaded (ExplorerPane's reloadLoaded). */
   reloadDirs(paths: readonly string[]): void
   refreshGit(): void
-  /** Open a file in a permanent code pane. */
-  openFile(path: string): void
+  /** Open a file of `rootId` in a permanent code pane. */
+  openFile(path: string, rootId: string): void
 }
 
 export interface ExplorerActions {
@@ -66,8 +69,6 @@ export interface ExplorerActions {
   undoEntry(opId: string): Promise<void>
 }
 
-export const READ_ONLY_MESSAGE = 'The main checkout is read-only.'
-
 /** How many more copy names `duplicate` tries after an ALREADY_EXISTS answer (D-E12). */
 const DUPLICATE_RETRIES = 10
 
@@ -82,10 +83,15 @@ function countLabel(verb: string, paths: readonly string[], noun: string): strin
 
 export function createExplorerActions(deps: ExplorerActionsDeps): ExplorerActions {
   const { rootId, writable } = deps
-  const isProject = parseRootId(rootId)?.kind === 'project'
+  const parsedRoot = parseRootId(rootId)
+  const isProject = parsedRoot?.kind === 'project'
+
+  /** PAN-5191: the same actions on the project's edit root, after the switch. */
+  const editActions = async (): Promise<ExplorerActions> =>
+    createExplorerActions({ ...deps, rootId: await ensureEditRoot(rootId), reloadDirs: () => {}, refreshGit: () => {} })
 
   const runWrite = async <T>(op: (id: string) => Promise<T>): Promise<T> => {
-    if (isProject) throw new Error(READ_ONLY_MESSAGE)
+    if (isProject) return op(await ensureEditRoot(rootId))
     return op(rootId)
   }
 
@@ -175,7 +181,7 @@ export function createExplorerActions(deps: ExplorerActionsDeps): ExplorerAction
     }
   }
 
-  return {
+  const actions: ExplorerActions = {
     writable,
     runWrite,
 
@@ -184,7 +190,7 @@ export function createExplorerActions(deps: ExplorerActionsDeps): ExplorerAction
       const path = joinPath(parentDir, name)
       await runWrite((id) => createEntry(id, path, kind))
       selectOnly(path)
-      if (kind === 'file') deps.openFile(path)
+      if (kind === 'file') deps.openFile(path, rootId)
       history.commitOp(rootId, {
         label: `${kind === 'file' ? 'new file' : 'new folder'} ${name}`,
         steps: [createdStep(path)],
@@ -261,6 +267,13 @@ export function createExplorerActions(deps: ExplorerActionsDeps): ExplorerAction
     },
 
     recordCreated: (paths, label) => {
+      if (isProject) {
+        // An upload ran runWrite first, which switched the project to its edit root.
+        const active = parsedRoot ? useEditWorkspaceStore.getState().active[parsedRoot.key] : undefined
+        return active
+          ? createExplorerActions({ ...deps, rootId: active, reloadDirs: () => {}, refreshGit: () => {} }).recordCreated(paths, label)
+          : ''
+      }
       if (!writable || paths.length === 0) return ''
       afterWrite(paths.map(parentPath))
       return history.commitOp(rootId, { label, steps: paths.map(createdStep) })
@@ -270,6 +283,16 @@ export function createExplorerActions(deps: ExplorerActionsDeps): ExplorerAction
     redo: () => runHistory('Redid', 'redo', history.peekLabel(rootId, 'future'), () => history.redo(rootId)),
     undoEntry: (opId) =>
       runHistory('Undid', 'undo', history.peekLabel(rootId, 'past', opId), () => history.undoEntry(rootId, opId)),
+  }
+
+  if (!isProject) return actions
+  return {
+    ...actions,
+    create: async (...args) => (await editActions()).create(...args),
+    rename: async (...args) => (await editActions()).rename(...args),
+    duplicate: async (...args) => (await editActions()).duplicate(...args),
+    remove: async (...args) => (await editActions()).remove(...args),
+    move: async (...args) => (await editActions()).move(...args),
   }
 }
 

@@ -2,10 +2,11 @@
 // WI-B10; FR-5) and write actions (PAN-5190, FR-E1).
 //
 // Git actions write the index and the working tree, so they never render on a
-// `project` root: the primary checkout is never written (D-B7). Write actions
-// (New file, New folder, Rename, Duplicate, Delete) render only in a writable
-// tree: never on a `project` root and never under the Changed filter (D-E1,
-// D-E2). Download links the PAN-5188 route (D-B6).
+// `project` root: the primary checkout's index is never written (D-B7). Write
+// actions (New file, New folder, Rename, Duplicate, Delete) render in a
+// writable tree, which is every tree except under the Changed filter (D-E2).
+// On a `project` root they route through an edit workspace (PAN-5191).
+// Download links the PAN-5188 route (D-B6).
 
 import { useRef, type ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -39,7 +40,7 @@ export interface ExplorerContextMenuProps {
   onOpen(path: string): void
   onFindInFolder(dirPath: string): void
   onGitChanged(): void
-  /** True when write actions apply: not a project root, Changed filter off (PAN-5190). */
+  /** True when write actions apply: the Changed filter is off (PAN-5190). Project roots write through an edit workspace (PAN-5191). */
   writable: boolean
   onNewFile(): void
   onNewFolder(): void
