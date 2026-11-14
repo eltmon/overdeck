@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5261",
   "created": "2026-11-14T08:29:10.265Z",
-  "updated": "2026-11-14T08:52:57.071Z",
+  "updated": "2026-11-14T08:53:02.110Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,11 @@
     "webhook-fire-filters.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T08:52:57.071Z"
+    },
+    "tracker-trigger-raw-rows": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5261",
+      "claimedAt": "2026-11-14T08:53:02.109Z"
     }
   }
 }
