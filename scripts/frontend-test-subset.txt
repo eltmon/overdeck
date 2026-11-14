@@ -291,6 +291,7 @@ src/components/mobile/__tests__/MobileNeedsYou.test.tsx
 src/components/mobile/__tests__/MobilePipeline.test.tsx
 src/components/mobile/__tests__/brand.test.tsx
 src/components/mobile/__tests__/conversationGroups.test.ts
+src/components/mobile/__tests__/issueSheetData.test.ts
 src/components/mobile/__tests__/useMobileAppearance.test.ts
 src/components/newConversation/__tests__/ConversationSkillsField.test.tsx
 src/components/newConversation/__tests__/IssuePickerField.test.tsx

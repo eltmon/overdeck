@@ -5,7 +5,7 @@ export const NOTIFICATION_LINK_PREFIX = 'ai.overdeck.app:/open#';
 
 export interface NotificationOpen {
   environmentId: string;
-  /** `/m` plus its query: the only screens a notification may open. */
+  /** `/m` or a `/m/` screen, plus its query. */
   path: string;
 }
 
@@ -25,6 +25,7 @@ export function parseNotificationLink(url: string): NotificationOpen | null {
   } catch {
     return null;
   }
-  if (parsed.origin !== BASE || parsed.pathname !== '/m') return null;
-  return { environmentId, path: `/m${parsed.search}` };
+  if (parsed.origin !== BASE) return null;
+  if (parsed.pathname !== '/m' && !parsed.pathname.startsWith('/m/')) return null;
+  return { environmentId, path: parsed.pathname + parsed.search };
 }

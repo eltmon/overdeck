@@ -14,10 +14,11 @@
  *
  * Test A proves the grouped list, the Needs you mark, tap targets, scrollX
  * and the sheet round trip. Test B proves tab navigation from /m and the
- * not-found sheet. Both record every request and assert /m/pipeline issues
- * no `/api/` request beyond the set the shell already issues from /m (the
- * PRD's implementation checkpoint): rather than hard-code that set, the spec
- * measures it live from /m's own Needs-you tab load before comparing.
+ * not-found sheet. Only Test A records every request and asserts /m/pipeline
+ * issues no `/api/` request beyond the set the shell already issues from /m
+ * (the PRD's implementation checkpoint), plus the PAN-5219 issue-sheet reads:
+ * rather than hard-code that set, the spec measures it live from /m's own
+ * Needs-you tab load before comparing.
  */
 
 import { test, expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
@@ -69,6 +70,10 @@ async function installFixtures(page: Page): Promise<void> {
 
   await page.route('**/api/conversations/pending-input', (route) => route.fulfill({ json: [] }));
   await page.route('**/api/conversations', (route) => route.fulfill({ json: [] }));
+  // PAN-5219: the issue sheet's cost, checks and agent reads, for the needs-you row's sheet round trip.
+  await page.route('**/api/issues/PAN-90002/costs', (route) => route.fulfill({ json: { issueId: 'PAN-90002', totalCost: 0, totalTokens: 0, sessions: [], byModel: {} } }));
+  await page.route('**/api/issues/PAN-90002/check-runs', (route) => route.fulfill({ json: { issueId: 'PAN-90002', pr: null, checkRuns: [], summary: { total: 0, passed: 0, failed: 0, running: 0, skipped: 0, pending: 0, cancelled: 0 } } }));
+  await page.route('**/api/agent-directory*', (route) => route.fulfill({ json: { generatedAt: iso(), windowHours: 0, scope: 'live', entries: [] } }));
   // The isolated server's WS upgrade auth never consults loopback/peer trust,
   // so a fresh browser context has no credential and the real handshake
   // fails anyway. Close it immediately so the app falls back to the seeded
@@ -185,7 +190,14 @@ test('lists active issues by phase', async ({ browser }) => {
     await expect(page.locator('section[data-phase]').first()).toBeVisible();
 
     const apiPaths = apiPathsOf(requests, baseUrl);
-    const unexpected = [...apiPaths].filter((path) => !baselineApiPaths.has(path));
+    // PAN-5219: the issue sheet may (but need not) have fired its cost, checks
+    // and agent-directory reads by the time this assertion runs.
+    const allowedExtra = new Set([
+      '/api/issues/PAN-90002/costs',
+      '/api/issues/PAN-90002/check-runs',
+      '/api/agent-directory',
+    ]);
+    const unexpected = [...apiPaths].filter((path) => !baselineApiPaths.has(path) && !allowedExtra.has(path));
     expect(unexpected, `/m/pipeline issued /api/ requests beyond /m's baseline set: ${JSON.stringify([...baselineApiPaths])}`).toEqual([]);
   } finally {
     await context.close();

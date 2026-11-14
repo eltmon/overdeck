@@ -16,6 +16,13 @@ describe('parseNotificationLink', () => {
     expect(parseNotificationLink(link('/m'))).toEqual({ environmentId: E, path: '/m' });
   });
 
+  it('accepts a /m/ screen with its query', () => {
+    expect(parseNotificationLink(link('/m/pipeline?issue=PAN-5&event=stopped&at=x'))).toEqual({
+      environmentId: E,
+      path: '/m/pipeline?issue=PAN-5&event=stopped&at=x',
+    });
+  });
+
   it('rejects another version, a bad machine id, a missing timestamp and other prefixes', () => {
     expect(parseNotificationLink(LINK.replace('v=1', 'v=2'))).toBeNull();
     expect(parseNotificationLink(LINK.replace(E, 'not-a-uuid'))).toBeNull();

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { phoneIssueSheetPath } from '@overdeck/contracts';
 import {
   edgeNotificationFromEvent,
   pendingItemsFromConversationRow,
@@ -72,13 +73,36 @@ describe('push classifier (PAN-2354)', () => {
     ['merge.failed', 'failed', 'Merge failed.'],
     ['review.stall-escalated', 'failed', 'A review stalled and needs you.'],
     ['conflict.repair-escalated', 'failed', 'A conflict repair needs you.'],
-  ])('maps pipeline.journal %s to %s with url /m', (type, kind, body) => {
+  ])('maps pipeline.journal %s to %s with a link to the issue sheet', (type, kind, body) => {
     const n = edgeNotificationFromEvent({
       type: 'pipeline.journal',
       timestamp: NOW,
       payload: { issueId: 'PAN-9', entry: { type, issueId: 'PAN-9', at: NOW } },
     });
-    expect(n).toEqual(expect.objectContaining({ kind, category: kind, body, url: '/m', tag: `journal:PAN-9:${type}:${NOW}`, title: expect.stringContaining('PAN-9') }));
+    expect(n).toEqual(expect.objectContaining({
+      kind,
+      category: kind,
+      body,
+      url: phoneIssueSheetPath('PAN-9', { kind: type as never, at: NOW }),
+      tag: `journal:PAN-9:${type}:${NOW}`,
+      title: expect.stringContaining('PAN-9'),
+    }));
+  });
+
+  it('uses the journal entry at when present, and the event timestamp when the entry only carries a head sha', () => {
+    const withAt = edgeNotificationFromEvent({
+      type: 'pipeline.journal',
+      timestamp: NOW,
+      payload: { issueId: 'PAN-9', entry: { type: 'merge.completed', at: '2026-11-13T19:43:00.000Z' } },
+    });
+    expect(withAt?.url).toBe(phoneIssueSheetPath('PAN-9', { kind: 'merge.completed', at: '2026-11-13T19:43:00.000Z' }));
+
+    const withHeadOnly = edgeNotificationFromEvent({
+      type: 'pipeline.journal',
+      timestamp: NOW,
+      payload: { issueId: 'PAN-9', entry: { type: 'merge.completed', data: { head: 'abc1234' } } },
+    });
+    expect(withHeadOnly?.url).toBe(phoneIssueSheetPath('PAN-9', { kind: 'merge.completed', at: NOW }));
   });
 
   it('ignores verification.failed and other journal types', () => {
@@ -87,10 +111,21 @@ describe('push classifier (PAN-2354)', () => {
     }
   });
 
-  it('maps agent.heartbeat_dead to failed and ignores agent.stopped', () => {
+  it('maps agent.heartbeat_dead to failed, linking to the issue sheet, and ignores agent.stopped', () => {
     expect(edgeNotificationFromEvent({ type: 'agent.heartbeat_dead', timestamp: NOW, payload: { agentId: 'agent-pan-5', issueId: 'PAN-5' } }))
-      .toEqual(expect.objectContaining({ kind: 'failed', category: 'stopped', tag: `dead:agent-pan-5:${NOW}`, body: 'The agent stopped responding.', url: '/m' }));
+      .toEqual(expect.objectContaining({
+        kind: 'failed',
+        category: 'stopped',
+        tag: `dead:agent-pan-5:${NOW}`,
+        body: 'The agent stopped responding.',
+        url: phoneIssueSheetPath('PAN-5', { kind: 'stopped', at: NOW }),
+      }));
     expect(edgeNotificationFromEvent({ type: 'agent.stopped', timestamp: NOW, payload: { agentId: 'agent-pan-5' } })).toBeNull();
+  });
+
+  it('keeps url /m for agent.heartbeat_dead without an issueId', () => {
+    expect(edgeNotificationFromEvent({ type: 'agent.heartbeat_dead', timestamp: NOW, payload: { agentId: 'agent-pan-5' } }))
+      .toEqual(expect.objectContaining({ url: '/m' }));
   });
 
   // PAN-5074: an agent whose stop was already recorded ended normally.
