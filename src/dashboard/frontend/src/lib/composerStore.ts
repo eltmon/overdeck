@@ -350,9 +350,6 @@ interface ComposerStore {
    * second permission-pending re-holds; any other failure goes to the outbox.
    */
   releaseHeld(conversationName: string): Promise<void>;
-  /** Drop a held bubble without sending it (found by id in any conversation). */
-  discardHeld(id: string): void;
-
   /**
    * PAN-5237: a send was cancelled. Remove its bubble and give the text back to
    * the empty mounted composer, else keep it in the outbox as Cancelled. Idempotent.
@@ -680,18 +677,6 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
       releasingConversations.delete(conversationName);
     }
   },
-
-  discardHeld: (id) => set((state) => {
-    const conversationName = Object.keys(state.byConversation).find((name) =>
-      state.byConversation[name]!.optimistic.some((message) => message.id === id && message.deliveryState === 'held'));
-    if (!conversationName) return state;
-    return {
-      byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
-        ...s,
-        optimistic: s.optimistic.filter((message) => message.id !== id),
-      })),
-    };
-  }),
 
   settleCancelled: (conversationName, clientMessageId) => {
     const bubble = get().byConversation[conversationName]?.optimistic

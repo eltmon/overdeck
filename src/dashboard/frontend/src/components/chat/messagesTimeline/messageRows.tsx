@@ -143,19 +143,13 @@ export function UserMessageRow({ message, cwd, issueId, bookmarkable, citeConver
         <div
           className={styles.userMessageBubble}
           style={{ opacity: 0.6 }}
-          title="Not sent yet: the agent is waiting on a permission prompt. This message sends itself once the prompt is answered."
+          title="Not sent yet: the agent is waiting on a permission prompt. This message sends itself once the prompt is answered. Cancel keeps its text."
         >
           <div className={styles.userMessageText}><ChatMarkdown text={message.text} cwd={cwd} issueId={issueId} /></div>
           <AttachmentThumbnails text={message.text} />
           <span className={styles.messageTimestamp}>
-            Waiting: the agent needs a permission answer first ·{' '}
-            <button
-              type="button"
-              onClick={() => useComposerStore.getState().discardHeld(message.id)}
-              style={{ border: 'none', background: 'transparent', padding: 0, color: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}
-            >
-              Discard
-            </button>
+            Waiting: the agent needs a permission answer first
+            {message.clientMessageId && <CancelMessageButton messageId={message.id} />}
           </span>
         </div>
         <MessageRoleIcon message={message} role="user" bookmarkable={false} className="ml-2 mt-3 shrink-0 text-muted-foreground opacity-70" />
@@ -165,6 +159,16 @@ export function UserMessageRow({ message, cwd, issueId, bookmarkable, citeConver
 
   const isPending = message.id.startsWith('optimistic-') && !message.acknowledged;
   const isOptimistic = message.id.startsWith('optimistic-');
+  // PAN-5237 FR-1: an opted-in Sending… bubble offers Cancel, except an in-flight
+  // agent-endpoint send (no receipts) and while a cancel runs or was refused.
+  const canCancel = isPending && !!message.clientMessageId && !!message.sendPhase
+    && message.cancelState !== 'cancelling' && message.cancelState !== 'too-late'
+    && !(message.sendPhase === 'in-flight' && message.sendRoute === 'agent');
+  const pendingLabel = message.cancelState === 'cancelling' ? 'Cancelling…'
+    : message.cancelState === 'too-late' ? "Already delivered, can't cancel"
+      : message.cancelState === 'unconfirmed' ? "Couldn't confirm the cancel"
+        : message.deliveryState === 'unknown' ? 'Delivery not confirmed' : 'Sending…';
+  const pendingSpinner = message.cancelState !== 'too-late' && message.cancelState !== 'unconfirmed';
   const isCitable = !!citeConversationName && !isPending && !isOptimistic;
   const userMessageText = <ChatMarkdown text={message.text} cwd={cwd} issueId={issueId} />;
   return (
@@ -191,10 +195,13 @@ export function UserMessageRow({ message, cwd, issueId, bookmarkable, citeConver
           )}
           {isPending ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-              <svg style={{ width: '10px', height: '10px', animation: 'spin 1s linear infinite', color: 'var(--primary)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 12a9 9 0 11-6.219-8.56" />
-              </svg>
-              {message.deliveryState === 'unknown' ? 'Delivery not confirmed' : 'Sending…'}
+              {pendingSpinner && (
+                <svg style={{ width: '10px', height: '10px', animation: 'spin 1s linear infinite', color: 'var(--primary)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 12a9 9 0 11-6.219-8.56" />
+                </svg>
+              )}
+              {pendingLabel}
+              {canCancel && <CancelMessageButton messageId={message.id} />}
             </span>
           ) : (
             message.id.startsWith('optimistic-') ? 'Sent · waiting for transcript' : formatTimestamp(message.createdAt)
@@ -208,6 +215,23 @@ export function UserMessageRow({ message, cwd, issueId, bookmarkable, citeConver
         className="ml-2 mt-3 shrink-0 text-muted-foreground opacity-70"
       />
     </div>
+  );
+}
+
+/** PAN-5237: ` · Cancel` on a Sending… or held bubble. */
+function CancelMessageButton({ messageId }: { messageId: string }) {
+  return (
+    <>
+      {' · '}
+      <button
+        type="button"
+        aria-label="Cancel this message"
+        onClick={() => { void useComposerStore.getState().cancelSend(messageId); }}
+        style={{ border: 'none', background: 'transparent', padding: 0, color: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}
+      >
+        Cancel
+      </button>
+    </>
   );
 }
 
