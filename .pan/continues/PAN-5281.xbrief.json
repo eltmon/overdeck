@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5281",
   "created": "2026-11-14T18:36:54.537Z",
-  "updated": "2026-11-14T18:36:54.538Z",
+  "updated": "2026-11-14T19:00:06.590Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,26 @@
   "sessionHistory": [],
   "items": {
     "agent-shim-trailer": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5281",
-      "claimedAt": "2026-11-14T18:36:54.537Z"
+      "claimedAt": "2026-11-14T18:36:54.537Z",
+      "doneAt": "2026-11-14T19:00:06.590Z"
+    },
+    "agent-shim-trailer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:00:06.590Z"
+    },
+    "agent-shim-trailer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:00:06.590Z"
+    },
+    "agent-shim-trailer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:00:06.590Z"
+    },
+    "agent-shim-trailer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T19:00:06.590Z"
     }
   }
 }
