@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5244",
   "created": "2026-11-14T05:28:55.884Z",
-  "updated": "2026-11-14T05:50:59.978Z",
+  "updated": "2026-11-14T06:01:43.142Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,9 +106,30 @@
       "doneAt": "2026-11-14T05:50:49.067Z"
     },
     "pipeline-strip": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5244",
-      "claimedAt": "2026-11-14T05:50:59.978Z"
+      "claimedAt": "2026-11-14T05:50:59.978Z",
+      "doneAt": "2026-11-14T06:01:43.141Z"
+    },
+    "pipeline-strip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:01:43.141Z"
+    },
+    "pipeline-strip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:01:43.141Z"
+    },
+    "pipeline-strip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:01:43.141Z"
+    },
+    "pipeline-strip.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:01:43.141Z"
+    },
+    "pipeline-strip.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:01:43.141Z"
     }
   }
 }
