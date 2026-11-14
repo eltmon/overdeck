@@ -3,20 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FlywheelDerivedStatus } from '@overdeck/contracts';
 
 vi.mock('../../components/flywheel/FlywheelConversationPane', () => ({
-  FlywheelConversationPane: ({
-    tickTarget, onTickTargetHandled,
-  }: {
-    tickTarget?: { messageId?: string; nonce: number } | null;
-    onTickTargetHandled?: () => void;
-  }) => (
-    <div
-      data-testid="flywheel-conversation-pane"
-      data-target-id={tickTarget?.messageId ?? ''}
-      data-target-nonce={tickTarget ? String(tickTarget.nonce) : ''}
-    >
-      <button type="button" data-testid="mock-tick-handled" onClick={() => onTickTargetHandled?.()}>tick-handled</button>
-    </div>
-  ),
+  FlywheelConversationPane: () => <div data-testid="flywheel-conversation-pane" />,
 }));
 vi.mock('../../components/flywheel/FlywheelOrderBookCard', () => ({ FlywheelOrderBookCard: () => null }));
 vi.mock('../../components/flywheel/PendingAutoMergesCard', () => ({ PendingAutoMergesCard: () => null }));
@@ -193,6 +180,7 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
   });
 
   it('clicking NEEDS YOU reopens the pending question when one is open (PAN-4751 ac1)', async () => {
+    const onOpen = vi.fn();
     const status = flywheelStatus({
       lastTick: {
         tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the scope', at: '2026-09-23T09:59:50.000Z',
@@ -200,17 +188,18 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
       },
     });
     setup(status, { pendingInput: [{ name: 'conv-flywheel', pendingAskUserQuestion: { toolUseId: 'tu-1', askedAt: '2026-09-23T09:59:00.000Z', questions: [] } }] });
-    const { client } = renderWithQuery(<FlywheelPage />);
+    const { client } = renderWithQuery(<FlywheelPage onOpenConversationMessage={onOpen} />);
     const jump = (await screen.findAllByTestId('flywheel-needs-you-jump'))[0]!;
     await waitFor(() => expect(client.getQueryData(['conv-ask-user-question'])).toBeDefined());
 
     fireEvent.click(jump);
     expect(useAskUserQuestionUiStore.getState().reopenId).toBe('conv-flywheel');
     expect(useAskUserQuestionUiStore.getState().reopenNonce).toBe(1);
-    expect(screen.getByTestId('flywheel-conversation-pane')).toHaveAttribute('data-target-id', '');
+    expect(onOpen).not.toHaveBeenCalled();
   });
 
-  it('with no pending question, NEEDS YOU jumps to the tick message and tracks handled state (PAN-4751 ac2, ac5)', async () => {
+  it('with no pending question, the jump opens conv-flywheel at the first-raised message (PAN-4751 ac2, PAN-5239)', async () => {
+    const onOpen = vi.fn();
     const status = flywheelStatus({
       lastTick: {
         tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the scope', at: '2026-09-23T09:59:50.000Z', messageId: 'msg-9',
@@ -218,30 +207,21 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
       },
     });
     setup(status, { pendingInput: [] });
-    const { client } = renderWithQuery(<FlywheelPage />);
+    const { client } = renderWithQuery(<FlywheelPage onOpenConversationMessage={onOpen} />);
     const jump = (await screen.findAllByTestId('flywheel-needs-you-jump'))[0]!;
     await waitFor(() => expect(client.getQueryData(['conv-ask-user-question'])).toBeDefined());
 
     fireEvent.click(jump);
-    const pane = screen.getByTestId('flywheel-conversation-pane');
-    expect(pane).toHaveAttribute('data-target-id', 'msg-9');
-    expect(pane).toHaveAttribute('data-target-nonce', '1');
+    expect(onOpen).toHaveBeenCalledWith('conv-flywheel', 'msg-9');
     expect(useAskUserQuestionUiStore.getState().reopenNonce).toBe(0);
 
     fireEvent.click(jump);
-    expect(pane).toHaveAttribute('data-target-nonce', '2');
+    expect(onOpen).toHaveBeenCalledTimes(2);
     expect(useAskUserQuestionUiStore.getState().reopenNonce).toBe(0);
-
-    fireEvent.click(screen.getByTestId('mock-tick-handled'));
-    expect(pane).toHaveAttribute('data-target-id', '');
-    expect(pane).toHaveAttribute('data-target-nonce', '2');
-
-    fireEvent.click(jump);
-    expect(pane).toHaveAttribute('data-target-id', 'msg-9');
-    expect(pane).toHaveAttribute('data-target-nonce', '3');
   });
 
   it('a needs-you row jumps to its first-raised message (PAN-5198)', async () => {
+    const onOpen = vi.fn();
     const status = flywheelStatus({
       lastTick: {
         tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the scope', at: '2026-09-23T09:59:50.000Z', messageId: 'msg-9',
@@ -249,15 +229,16 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
       },
     });
     setup(status, { pendingInput: [] });
-    const { client } = renderWithQuery(<FlywheelPage />);
+    const { client } = renderWithQuery(<FlywheelPage onOpenConversationMessage={onOpen} />);
     const jump = (await screen.findAllByTestId('flywheel-needs-you-jump'))[0]!;
     await waitFor(() => expect(client.getQueryData(['conv-ask-user-question'])).toBeDefined());
 
     fireEvent.click(jump);
-    expect(screen.getByTestId('flywheel-conversation-pane')).toHaveAttribute('data-target-id', 'msg-2');
+    expect(onOpen).toHaveBeenCalledWith('conv-flywheel', 'msg-2');
   });
 
   it('a needs-you row reopens the pending question instead of jumping to its first-raised message (PAN-5198)', async () => {
+    const onOpen = vi.fn();
     const status = flywheelStatus({
       lastTick: {
         tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the scope', at: '2026-09-23T09:59:50.000Z', messageId: 'msg-9',
@@ -265,12 +246,12 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
       },
     });
     setup(status, { pendingInput: [{ name: 'conv-flywheel', pendingAskUserQuestion: { toolUseId: 'tu-1', askedAt: '2026-09-23T09:59:00.000Z', questions: [] } }] });
-    const { client } = renderWithQuery(<FlywheelPage />);
+    const { client } = renderWithQuery(<FlywheelPage onOpenConversationMessage={onOpen} />);
     const jump = (await screen.findAllByTestId('flywheel-needs-you-jump'))[0]!;
     await waitFor(() => expect(client.getQueryData(['conv-ask-user-question'])).toBeDefined());
 
     fireEvent.click(jump);
     expect(useAskUserQuestionUiStore.getState().reopenNonce).toBe(1);
-    expect(screen.getByTestId('flywheel-conversation-pane')).toHaveAttribute('data-target-id', '');
+    expect(onOpen).not.toHaveBeenCalled();
   });
 });

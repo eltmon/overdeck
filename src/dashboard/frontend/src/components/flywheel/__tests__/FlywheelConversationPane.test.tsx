@@ -1,5 +1,4 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FlywheelDerivedStatus } from '@overdeck/contracts';
 
@@ -175,40 +174,6 @@ describe('FlywheelConversationPane (PAN-3964 FR-13)', () => {
     await screen.findByTestId('conversation-panel');
     fireEvent.click(screen.getByRole('tab', { name: 'Terminal' }));
     expect(screen.getByTestId('xterminal')).toHaveTextContent('conv-flywheel');
-  });
-
-  it('a tick target switches to Conversation view and forwards the jump (PAN-4751)', async () => {
-    setup('running');
-    const { client, rerender } = renderWithQuery(<FlywheelConversationPane />);
-    await screen.findByTestId('conversation-panel');
-    fireEvent.click(screen.getByRole('tab', { name: 'Terminal' }));
-    expect(screen.getByTestId('xterminal')).toBeInTheDocument();
-
-    rerender(
-      <QueryClientProvider client={client}>
-        <FlywheelConversationPane tickTarget={{ messageId: 'msg-7', nonce: 1 }} />
-      </QueryClientProvider>,
-    );
-
-    expect(screen.queryByTestId('xterminal')).toBeNull();
-    const panel = await screen.findByTestId('conversation-panel');
-    expect(panel).toHaveAttribute('data-target-id', 'msg-7');
-    expect(panel).toHaveAttribute('data-target-nonce', '1');
-  });
-
-  it('forwards onTargetMessageHandled to onTickTargetHandled (PAN-4751)', async () => {
-    setup('running');
-    const onTickTargetHandled = vi.fn();
-    renderWithQuery(<FlywheelConversationPane tickTarget={{ messageId: 'msg-7', nonce: 1 }} onTickTargetHandled={onTickTargetHandled} />);
-    fireEvent.click(await screen.findByTestId('mock-target-handled'));
-    expect(onTickTargetHandled).toHaveBeenCalledOnce();
-  });
-
-  it('a tick target with no messageId passes targetMessageId undefined (PAN-4751)', async () => {
-    setup('running');
-    renderWithQuery(<FlywheelConversationPane tickTarget={{ nonce: 2 }} />);
-    const panel = await screen.findByTestId('conversation-panel');
-    expect(panel).toHaveAttribute('data-target-id', '');
   });
 
   it('the popout route renders the pane without chrome or its own Pop out button', async () => {
