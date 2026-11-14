@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
-    # PAN-4753: `uat/**` is the merge train's batch branch. Its check runs are
-    # the batch's combined CI; the train merges a batch only when they pass.
+    # PAN-4753: `uat/**` is the merge train's batch branch. This workflow's
+    # run on its head is the batch's combined CI; the train merges a batch
+    # only when that run succeeds.
     branches: [main, 'uat/**']
     # PAN-4618: ~95% of main commits are bookkeeping (.pan/** plan/task state,
     # .overdeck/memory/** curated facts) with no code change to verify. Skip

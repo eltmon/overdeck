@@ -11,7 +11,8 @@ import type { ReadyFeature } from '../../../../lib/cloister/uat-generation-engin
 vi.mock('../issue-service-singleton.js', () => ({ getSharedIssueService: () => ({ getTrackerIssue: () => null }) }));
 
 const { buildSelectBatch, _resetBatchWindowClockForTests } = await import('../merge-train-batching.js');
-const { runBatchAutoPromoteTick, batchCiVerdict, memberToDrop } = await import('../batch-auto-promote.js');
+const { runBatchAutoPromoteTick, batchCiVerdict, failedGatingChecks, memberToDrop } = await import('../batch-auto-promote.js');
+type WorkflowRunSummary = import('../batch-auto-promote.js').WorkflowRunSummary;
 const { droppedFromBatch, mergeRouteFor } = await import('../../../../lib/cloister/merge-route.js');
 
 const MIN = 60_000;
@@ -84,29 +85,47 @@ describe('buildSelectBatch (window wiring)', () => {
   });
 });
 
-describe('batchCiVerdict', () => {
-  it('is green when every gating check passed, ignoring CodeRabbit and the non-blocking flake lane', () => {
-    expect(batchCiVerdict(runs({
-      names: ['build', 'test', 'CodeRabbit', 'Non-blocking flake lane'],
-      successful: ['build', 'test'],
-      failed: ['CodeRabbit', 'Non-blocking flake lane'],
-    }))).toBe('green');
+describe('batchCiVerdict (positive evidence from the CI workflow run)', () => {
+  const run = (over: Partial<WorkflowRunSummary>): WorkflowRunSummary => ({
+    name: 'CI', status: 'completed', conclusion: 'success', run_attempt: 1, created_at: '2026-11-14T12:00:00Z', ...over,
   });
 
-  it('is pending with no gating checks reported, or any still running', () => {
-    expect(batchCiVerdict(runs({ names: [] }))).toBe('pending');
-    expect(batchCiVerdict(runs({ names: ['CodeRabbit'], pending: ['CodeRabbit'] }))).toBe('pending');
-    expect(batchCiVerdict(runs({ names: ['build', 'test'], successful: ['build'], pending: ['test'] }))).toBe('pending');
+  it('is green only for a completed, successful CI run', () => {
+    expect(batchCiVerdict([run({})])).toBe('green');
   });
 
-  it('names the failed gating checks', () => {
-    expect(batchCiVerdict(runs({ names: ['build', 'test'], successful: ['build'], failed: ['test'] }))).toEqual({ failed: ['test'] });
+  it('is pending with no CI run yet, a run in progress, or a cancelled run', () => {
+    expect(batchCiVerdict([])).toBe('pending');
+    expect(batchCiVerdict([run({ name: 'Windows smoke' })])).toBe('pending');
+    expect(batchCiVerdict([run({ status: 'in_progress', conclusion: null })])).toBe('pending');
+    expect(batchCiVerdict([run({ conclusion: 'cancelled' })])).toBe('pending');
+  });
+
+  it('is failed for a failed or timed-out run', () => {
+    expect(batchCiVerdict([run({ conclusion: 'failure' })])).toBe('failed');
+    expect(batchCiVerdict([run({ conclusion: 'timed_out' })])).toBe('failed');
+  });
+
+  it('lets the newest run decide (a re-run after a failure)', () => {
+    expect(batchCiVerdict([
+      run({ conclusion: 'failure', created_at: '2026-11-14T12:00:00Z' }),
+      run({ conclusion: 'success', created_at: '2026-11-14T12:30:00Z' }),
+    ])).toBe('green');
+    expect(batchCiVerdict([
+      run({ conclusion: 'failure', run_attempt: 1 }),
+      run({ status: 'queued', conclusion: null, run_attempt: 2 }),
+    ])).toBe('pending');
+  });
+
+  it('names failed gating checks, leaving out CodeRabbit and the non-blocking flake lane', () => {
+    expect(failedGatingChecks(runs({ failed: ['test', 'CodeRabbit', 'Non-blocking flake lane'] }))).toEqual(['test']);
   });
 });
 
 describe('runBatchAutoPromoteTick', () => {
   function tick(opts: {
     gen?: UatGeneration | null;
+    ci?: WorkflowRunSummary[];
     checks?: CommitCheckRuns;
     labels?: Record<string, string[]>;
     trainOn?: boolean;
@@ -126,6 +145,7 @@ describe('runBatchAutoPromoteTick', () => {
       getIssueLabels: (id) => opts.labels?.[id] ?? [],
       listReady: () => (opts.gen === null ? [] : [opts.gen ?? generation([1, 2, 3])]),
       branchHead: async () => 'headsha',
+      workflowRuns: async () => opts.ci ?? [{ name: 'CI', status: 'completed', conclusion: 'success' }],
       checkRuns: async () => opts.checks ?? runs({ names: ['build', 'test'], successful: ['build', 'test'] }),
       promote,
       markDropped,
@@ -143,7 +163,7 @@ describe('runBatchAutoPromoteTick', () => {
   });
 
   it('waits while the combined CI is still running', async () => {
-    const { run, promote } = tick({ checks: runs({ names: ['build', 'test'], successful: ['build'], pending: ['test'] }) });
+    const { run, promote } = tick({ ci: [{ name: 'CI', status: 'in_progress', conclusion: null }] });
     await expect(run).resolves.toEqual([{ projectKey: 'overdeck', generation: 'uat/pan-otter-1114', action: 'waiting-ci' }]);
     expect(promote).not.toHaveBeenCalled();
   });
@@ -151,20 +171,23 @@ describe('runBatchAutoPromoteTick', () => {
   it('drops the last member when the combined CI fails; the rest are not blocked', async () => {
     const gen = generation([1, 2, 3]);
     const { run, promote, markDropped, teardownStack } = tick({
-      gen, checks: runs({ names: ['build', 'test'], successful: ['build'], failed: ['test'] }),
+      gen,
+      ci: [{ name: 'CI', status: 'completed', conclusion: 'failure' }],
+      checks: runs({ names: ['build', 'test', 'CodeRabbit'], successful: ['build'], failed: ['test', 'CodeRabbit'] }),
     });
     const [outcome] = await run;
     expect(outcome).toMatchObject({ action: 'dropped', issueId: 'PAN-3' });
     expect(promote).not.toHaveBeenCalled();
     expect(teardownStack).toHaveBeenCalledWith(gen);
-    const heldOut = markDropped.mock.calls[0]![1] as UatGeneration['heldOut'];
+    const { members, heldOut } = markDropped.mock.calls[0]![1] as Pick<UatGeneration, 'members' | 'heldOut'>;
+    expect(members.map((m) => m.issueId)).toEqual(['PAN-1', 'PAN-2']);
     expect(heldOut).toEqual([{
       issueId: 'PAN-3', branch: 'feature/pan-3', headSha: 'h3',
       reason: 'combined CI failed on uat/pan-otter-1114 (test); PAN-3 merges on its own',
     }]);
 
     // The stored drop routes PAN-3 per-PR; PAN-1 and PAN-2 stay on the batch path.
-    const invalidated = [{ ...gen, status: 'invalidated' as const, heldOut }];
+    const invalidated = [{ ...gen, status: 'invalidated' as const, members, heldOut }];
     const routeOf = (id: string) => mergeRouteFor({
       heldForUat: false, trainOn: true, highPriority: false,
       droppedFromBatch: droppedFromBatch(id, '/repos/overdeck', { listInvalidated: () => invalidated }),
@@ -192,6 +215,34 @@ describe('runBatchAutoPromoteTick', () => {
     const promote = vi.fn();
     await expect(runBatchAutoPromoteTick(vi.fn(), { env: { OVERDECK_DISABLE_AUTO_MERGE: '1' }, promote })).resolves.toEqual([]);
     expect(promote).not.toHaveBeenCalled();
+  });
+
+  it('never runs two ticks at once: a tick during a slow promote returns at once', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const promote = vi.fn(async (name: string) => {
+      await gate;
+      return { success: true as const, generation: name, mergeSha: 'm', members: [], postMergeStarted: [], invalidated: [] };
+    });
+    const deps = {
+      env: {},
+      listProjects: () => [{ key: 'overdeck', config: PROJECT }],
+      isTrainOn: () => true,
+      forgeOf: () => 'github' as const,
+      isRequireUatBeforeMerge: () => false,
+      getIssueLabels: () => [] as string[],
+      listReady: () => [generation([1, 2, 3])],
+      branchHead: async () => 'headsha',
+      workflowRuns: async () => [{ name: 'CI', status: 'completed', conclusion: 'success' }],
+      promote,
+      log: () => {},
+    };
+    const first = runBatchAutoPromoteTick(vi.fn(), deps);
+    await vi.waitFor(() => expect(promote).toHaveBeenCalledTimes(1));
+    await expect(runBatchAutoPromoteTick(vi.fn(), deps)).resolves.toEqual([]);
+    release();
+    await expect(first).resolves.toEqual([{ projectKey: 'overdeck', generation: 'uat/pan-otter-1114', action: 'promoted' }]);
+    expect(promote).toHaveBeenCalledTimes(1);
   });
 
   it('drops a lone failing member', () => {

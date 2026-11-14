@@ -76,21 +76,33 @@ resets it). A batch, once assembled, keeps its members; features that become
 ready later wait for the next batch. Both keys are in **Settings → Merge
 Train**.
 
-**Combined CI and the merge.** CI runs on every push to a `uat/**` branch, so
-each batch gets its own run. Each 60-second tick, the auto-promote tick
-(`src/dashboard/server/services/batch-auto-promote.ts`) reads the newest
-`ready` batch's head check runs, ignoring CodeRabbit and the
-`Non-blocking flake lane`. When they are green it promotes the batch through
-the same door as the operator's **Merge batch** click, which re-checks every
-member's PR and refuses a moved base. A batch with any member held for UAT
-is never promoted automatically.
+**Combined CI and the merge.** The `CI` workflow runs on every push to a
+`uat/**` branch, so each batch gets its own run. Each 60-second tick, the
+auto-promote tick (`src/dashboard/server/services/batch-auto-promote.ts`)
+reads the `CI` workflow run for the newest `ready` batch's head commit. It
+needs positive evidence: the newest run is completed with conclusion
+`success` (CodeRabbit is not part of that run, and the non-blocking flake lane
+cannot fail it). No run yet, a run in progress, or a cancelled run means wait.
+Then it promotes the batch through the same door as the operator's
+**Merge batch** click, which re-checks every member's PR and refuses a moved
+base. One tick runs at a time. A batch with any member held for UAT is never
+promoted automatically.
+
+**The roll leaves waiting features alone.** With the train on, the
+merge-train roll after a merge skips features that wait for the batch window
+(`issueWaitsForBatch` in `src/lib/cloister/auto-merge-eligibility.ts`): the
+batch is assembled on current `main` anyway, and a rebase would re-run their
+CI, restart their wait clock and void a live batch that holds them.
+High-priority, dropped and held features are still rebased.
 
 **A failing member never blocks the rest.** When the batch CI fails, the tick
 drops the member merged last onto the branch (highest merge order), marks the
-batch `invalidated`, and records the drop on the batch's held-out list with
-the reason `combined CI failed on <batch> (<checks>); <ID> merges on its
-own`. That member then takes the per-PR path, and the next reconcile
-assembles the rest.
+batch `invalidated`, and moves the dropped member to the batch's held-out list
+with the reason `combined CI failed on <batch> (<checks>); <ID> merges on its
+own`. That member then takes the per-PR path. The others return to the batch
+window with their wait clocks unchanged, so they re-assemble without it as
+soon as the window allows (at once, when the oldest has already waited
+`batch_wait_minutes`).
 
 ### Merging from the Flywheel UAT card (PAN-4598)
 

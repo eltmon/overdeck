@@ -15,6 +15,7 @@ import type { ReadyFeature } from '../../../../src/lib/cloister/uat-generation-e
 import type { UatGeneration, UatGenerationStatus } from '../../../../src/lib/database/uat-generations-db.js';
 import { makeUniqueUatCandidateName } from '../../../../src/lib/cloister/uat-candidate-name.js';
 import { generationFolderName } from '../../../../src/lib/cloister/uat-generation-engine.js';
+import { chooseBatch } from '../../../../src/lib/cloister/batch-window.js';
 import { safeBranchName, safeGenerationWorktreePath } from '../../../../src/lib/cloister/uat-generation-deps.js';
 
 const MAIN = 'main-sha-1';
@@ -735,6 +736,31 @@ describe('batch window (PAN-4753 D4)', () => {
     const result = await reconcileUatGenerations(proj, deps);
     expect(result.action).toBe('single-feature');
     expect(deps.assembled).toEqual([]);
+  });
+
+  it('after a drop, re-assembles the rest without the dropped member (real chooseBatch)', async () => {
+    const proj = freshProject();
+    const THREE: ReadyFeature[] = [
+      ...READY,
+      { issueId: 'PAN-3', title: 'Third', branch: 'feature/pan-3' },
+    ];
+    // The failed batch is invalidated; PAN-3 now merges per-PR.
+    const failed = gen(proj, 'uat/pan-failed-0610', 'invalidated');
+    const deps = makeDeps(proj, {
+      rows: [failed],
+      readySet: THREE,
+      headShas: { 'feature/pan-1': 'h1', 'feature/pan-2': 'h2', 'feature/pan-3': 'h3' },
+      mergesPerPr: (feature) => feature.issueId === 'PAN-3',
+    });
+    // Both survivors became ready 40 minutes ago, past the 30-minute wait.
+    deps.selectBatch = async (features, live) => chooseBatch({
+      features, live, size: 3, waitMs: 30 * 60_000, now: T0,
+      readySince: new Map(features.map((f) => [f.issueId.toUpperCase(), T0 - 40 * 60_000])),
+    });
+    const result = await reconcileUatGenerations(proj, deps);
+    expect(result.action).toBe('assembled');
+    expect(result.perPr).toEqual(['PAN-3']);
+    expect(deps.assembled).toEqual([READY]);
   });
 
   it('passes the live generations so a frozen batch is not rebuilt', async () => {

@@ -144,6 +144,34 @@ export async function issueHoldsForUat(
   return shouldHoldForUat(autoMergeFromLabels(labels), projectAutoMergeDefault(project), globalRequireUat);
 }
 
+/**
+ * PAN-4753 D4: whether the issue waits for the batch window: the train is on,
+ * it is normal priority, it is not held for UAT, and it was not dropped from a
+ * batch. The merge-train roll skips these siblings: their batch is assembled
+ * on current main anyway, and a rebase would re-run their CI, restart their
+ * ready-since clock and void a live batch that holds them. A held feature
+ * (a UAT batch the operator promotes) is still rebased, as before. A label
+ * read failure answers false, so the roll keeps its old behavior.
+ */
+export async function issueWaitsForBatch(
+  issueId: string,
+  deps: Pick<AutoMergeEligibilityDeps, 'getIssueLabels' | 'getProjectDefault' | 'isGlobalUatRequired' | 'isTrainOn' | 'droppedFromBatch'> = {},
+): Promise<boolean> {
+  if (!(deps.isTrainOn ?? issueTrainOn)(issueId)) return false;
+  let labels: string[];
+  try {
+    labels = await (deps.getIssueLabels ?? defaultGetIssueLabels)(issueId);
+  } catch {
+    return false;
+  }
+  if (isHighPriorityMerge({ labels })) return false;
+  const globalRequireUat = deps.isGlobalUatRequired ? deps.isGlobalUatRequired() : await defaultIsGlobalUatRequired();
+  if (shouldHoldForUat(autoMergeFromLabels(labels), (deps.getProjectDefault ?? getProjectAutoMergeDefault)(issueId), globalRequireUat)) {
+    return false;
+  }
+  return !(deps.droppedFromBatch ?? issueDroppedFromBatch)(issueId);
+}
+
 export async function isAutoMergeEligible(
   issueId: string,
   deps: AutoMergeEligibilityDeps = {},
@@ -182,11 +210,14 @@ export async function isAutoMergeEligible(
   // PAN-4753 D4: with the train on, a normal-priority PR waits for a batch. A
   // row scheduled while the train was off is blocked here after an off→on
   // flip, so it never merges next to the batch that now owns it.
+  const trainOn = (deps.isTrainOn ?? issueTrainOn)(issueId);
+  const highPriority = isHighPriorityMerge({ labels });
   const route = mergeRouteFor({
     heldForUat: false,
-    trainOn: (deps.isTrainOn ?? issueTrainOn)(issueId),
-    highPriority: isHighPriorityMerge({ labels }),
-    droppedFromBatch: (deps.droppedFromBatch ?? issueDroppedFromBatch)(issueId),
+    trainOn,
+    highPriority,
+    // The drop lookup reads stored generations; skip it when it cannot matter.
+    droppedFromBatch: trainOn && !highPriority && (deps.droppedFromBatch ?? issueDroppedFromBatch)(issueId),
   });
   if (route === 'batch') {
     return { eligible: false, reason: BATCH_ROUTE_REASON };

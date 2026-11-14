@@ -97,11 +97,14 @@ export function autoMergePolicyRefusal(
   if (shouldHoldForUat(autoMergeFromLabels(labels), projectDefault, globalRequireUat)) {
     return { status: 412, body: { error: 'UAT is still required before merge' } };
   }
+  const trainOn = (deps.isTrainOn ?? issueTrainOn)(issueId);
+  const highPriority = isHighPriorityMerge({ labels });
   const route = mergeRouteFor({
     heldForUat: false,
-    trainOn: (deps.isTrainOn ?? issueTrainOn)(issueId),
-    highPriority: isHighPriorityMerge({ labels }),
-    droppedFromBatch: (deps.droppedFromBatch ?? issueDroppedFromBatch)(issueId),
+    trainOn,
+    highPriority,
+    // The drop lookup reads stored generations; skip it when it cannot matter.
+    droppedFromBatch: trainOn && !highPriority && (deps.droppedFromBatch ?? issueDroppedFromBatch)(issueId),
   });
   if (route === 'batch') {
     return { status: 412, body: { error: BATCH_ROUTE_REASON } };
