@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5287",
   "created": "2026-11-14T19:49:14.970Z",
-  "updated": "2026-11-14T20:46:02.048Z",
+  "updated": "2026-11-14T20:46:06.364Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -197,7 +197,7 @@
     "stage-shortcuts": {
       "status": "in_progress",
       "claimedBy": "agent-pan-5287",
-      "claimedAt": "2026-11-14T20:42:35.378Z"
+      "claimedAt": "2026-11-14T20:46:06.363Z"
     },
     "panebar-chip": {
       "status": "in_progress",
