@@ -1225,6 +1225,60 @@ reconnecting status, and region-scoped boundaries (`LoadingBoundary`,
 is `src/dashboard/frontend/tests/pan-4279-degraded-mode.spec.ts`, which runs on
 an isolated dashboard.
 
+## New-build banner (PAN-5236)
+
+A dashboard tab keeps running the frontend bundle it loaded until something
+tells it otherwise — a deploy does not push new code into an open tab. This
+banner is that something: it tells a tab its own bundle is older than what the
+server is now running, and offers a one-click way to catch up.
+
+`lib/buildDrift.ts` compares two commits:
+
+- **Bundle commit** — `vite build` compiles the current `git rev-parse HEAD`
+  into the frontend as `__OVERDECK_FRONTEND_BUILD_COMMIT__`
+  (`vite.config.ts`'s `resolveFrontendBuildCommit`). It is `null` under
+  `vite serve`, because `pan dev` hot-rebuilds only the server, so a dev tab
+  would otherwise always look stale.
+- **Server commit** — `GET /api/health`'s `buildCommit`, the same field
+  `StaleBuildChip` reads. `buildDrift.ts` fetches it itself, once per
+  `useConnectionState` stream rising edge (`streamLive` going `false` →
+  `true`, on first bootstrap and every reconnect) — never polled. A failed or
+  timed-out fetch (3 s, `fetchServerBuildCommit`) keeps the previous value and
+  tries again on the next rising edge.
+
+**Drift rule:** both commits are non-null, non-empty strings and they differ
+(`isBuildDrift`). Either side `null` — dev server, native phone bundle, or a
+server running from source — never shows the banner.
+
+On drift, `components/NewBuildBanner.tsx` renders "A newer Overdeck is
+running. Reload to update.", plus "Unsent drafts are kept." whenever any
+`conv-draft:*` localStorage key holds text (`hasSavedDraft()`). Reload calls
+`window.location.reload()`; because drafts are already flushed to localStorage
+on `pagehide`, nothing new needs saving. Before reloading it writes the
+current server commit to `sessionStorage` under
+`overdeck.build-drift.reloaded-for` (`markReloadedFor`). After the reload,
+`reloadAlreadyTriedFor(serverCommit)` suppresses the banner for that exact
+server commit: a server-only rebuild (no new frontend bundle) would otherwise
+show the same mismatch forever. A genuinely newer server commit after that
+clears the suppression and shows the banner again. Nothing reloads
+automatically — there is no timer and no retry loop.
+
+The banner is mounted on three surfaces: the main app shell (`AppChrome.tsx`,
+directly after `DegradedModeBanner`), the web `/m` phone browser shell
+(`MobileApp.tsx`, with `safeAreaTop`, in both the list and full-screen views),
+and the standalone conversation pop-out (`StandaloneRoutes.tsx`). The native
+phone app (`apps/mobile`) never shows it — its bundle cannot be reloaded to
+update, so there is nothing a reload would fix.
+
+This is a different problem from `StaleBuildChip` ("build stale ×N" in the
+command deck), which compares the *server's* build with `origin/main` to flag
+that the running server itself is behind — not whether a given tab's own
+bundle matches that server. A tab can show the new-build banner while the
+server is perfectly up to date with `origin/main`, and vice versa. Browser
+coverage is
+`src/dashboard/frontend/tests/pan-5236-new-build-banner.spec.ts`, which runs
+on an isolated dashboard.
+
 ## Agents page: Live and History (PAN-3920, PAN-4197)
 
 `/agents` opens the **Live view** (`components/Agents/live/`): what is running and progressing,
