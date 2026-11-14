@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5236",
   "created": "2026-11-14T04:12:49.397Z",
-  "updated": "2026-11-14T04:46:44.538Z",
+  "updated": "2026-11-14T04:46:50.009Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,11 @@
     "mount-conversation-popout.ac2": {
       "status": "completed",
       "doneAt": "2026-11-14T04:46:44.537Z"
+    },
+    "browser-spec": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5236",
+      "claimedAt": "2026-11-14T04:46:50.009Z"
     }
   }
 }
