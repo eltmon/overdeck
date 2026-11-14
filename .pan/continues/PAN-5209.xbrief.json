@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5209",
   "created": "2026-11-14T01:28:12.101Z",
-  "updated": "2026-11-14T01:51:59.564Z",
+  "updated": "2026-11-14T01:52:05.979Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,11 @@
     "verify-merged-fixture-tests.ac5": {
       "status": "completed",
       "doneAt": "2026-11-14T01:51:59.563Z"
+    },
+    "gitlab-mr-head-tolerance": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5209",
+      "claimedAt": "2026-11-14T01:52:05.979Z"
     }
   }
 }
