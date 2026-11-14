@@ -21,6 +21,8 @@ import { VerificationGates } from '../issue-view/VerificationGates';
 import { ActiveAgentPanel } from '../issue-view/ActiveAgentPanel';
 import { usePipelineRail } from '../issue-view/IssuePipelineStrip';
 import { UatEnvironmentPanel } from '../CommandDeck/UatEnvironmentPanel';
+import { useIssueActions } from '../IssueActionMenu/useIssueActions';
+import { StatusNarrative } from '../Stage/cockpit/StatusNarrative';
 import { pickPhaseAgent } from './IssuePhaseRail';
 import { agentsToReviewerSessions, deriveSpecialistChips } from './deriveSpecialists';
 import { PickupSection, ResourcesFacet, WorkspaceSection, useDrawerWorkspace } from './IssueDetailSections';
@@ -119,13 +121,21 @@ export function IssueDrawerDetails({
   const { data: workspace } = useDrawerWorkspace(issueId);
   const chips = deriveSpecialistChips(agentsToReviewerSessions(agents), derived);
   const reviewStarted = chips.some((chip) => chip.status !== 'queued');
+  const hasPlan = useIssueActions(issueId).state.hasPlan;
+  const workRunning = agents.some((agent) => agent.role === 'work' && (agent.status === 'running' || agent.status === 'starting'));
 
   return (
-    <div
-      data-testid="drawer-tab-panel-overview"
-      className="grid grid-cols-1 gap-x-[36px] gap-y-[22px] min-[900px]:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]"
-    >
+    <div data-testid="drawer-tab-panel-overview" className="@container">
+      <div
+        data-testid="drawer-details-grid"
+        className="grid grid-cols-1 gap-x-[36px] gap-y-[22px] @[900px]:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]"
+      >
       <div className="min-w-0 space-y-[22px]">
+        <section data-testid="drawer-details-status">
+          <h3 className={HEADING_CLASS}>Status</h3>
+          <StatusNarrative issueId={issueId} hasPlan={hasPlan} workRunning={workRunning} />
+        </section>
+
         <section data-testid="drawer-details-pipeline">
           <h3 className={HEADING_CLASS}>Pipeline</h3>
           <table className="w-full border-collapse text-[13px]">
@@ -217,6 +227,7 @@ export function IssueDrawerDetails({
             {skillsCount === null ? 'Skills for this issue' : `Skills: ${skillsCount} changed for this issue`}
           </button>
         ) : null}
+      </div>
       </div>
     </div>
   );

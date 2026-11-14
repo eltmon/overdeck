@@ -17,6 +17,9 @@ vi.mock('../issue-view/ActiveAgentPanel', () => ({ ActiveAgentPanel: () => <div 
 vi.mock('../backlog/PickupGateControls', () => ({ PickupGateControls: () => <div data-testid="mock-pickup" /> }));
 vi.mock('../CommandDeck/UatEnvironmentPanel', () => ({ UatEnvironmentPanel: () => <div data-testid="mock-uat" /> }));
 vi.mock('../PanOpenInPicker', () => ({ PanOpenInPicker: () => <div /> }));
+vi.mock('../IssueActionMenu/useIssueActions', () => ({
+  useIssueActions: () => ({ all: [], state: { hasPlan: true } }),
+}));
 
 import type { Agent } from '../../types';
 import { useDashboardStore } from '../../lib/store';
@@ -77,6 +80,14 @@ afterEach(() => {
 });
 
 describe('IssueDrawerDetails', () => {
+  it('the Status section shows the narrative', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: { 'PAN-1': { issueId: 'PAN-1', state: 'changes-requested' } },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderDetails();
+    expect(screen.getByTestId('drawer-details-status')).toHaveTextContent('The reviewer asked for changes');
+  });
+
   it('renders the six pipeline rows in order', () => {
     renderDetails();
     const rows = screen.getByTestId('drawer-details-pipeline').querySelectorAll('tr[data-phase]');
