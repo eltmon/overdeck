@@ -1,0 +1,162 @@
+/*
+ * Form body of the edit-workspace dialogs (Create PR, Discard; PAN-5191).
+ * They build on shared/Modal and use the scale of the Anywhere dialogs:
+ * 13px labels and help, 14px inputs, 32px buttons.
+ */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 0 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--body-foreground, var(--foreground));
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+
+.text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--body-foreground, var(--foreground));
+}
+
+.form code,
+.mono {
+  font-family: var(--font-mono-ui);
+  font-size: 12.5px;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 0 10px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--foreground);
+  background: var(--surface-overlay-field, var(--background));
+  border: 1px solid var(--border-overlay, var(--border));
+  border-radius: 6px;
+}
+
+.input {
+  height: 34px;
+}
+
+.textarea {
+  min-height: 88px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.input:focus-visible,
+.textarea:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.choice input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--primary);
+}
+
+.action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.list {
+  margin: 0;
+  padding-left: 18px;
+  font-family: var(--font-mono-ui);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--body-foreground, var(--foreground));
+}
+
+.error {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--destructive);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.button,
+.primaryButton,
+.destructiveButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  font: 500 13px var(--font-sans, inherit);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.button {
+  color: var(--foreground);
+  background: transparent;
+  border: 1px solid var(--border-overlay, var(--border));
+}
+
+.button:hover:not(:disabled) {
+  background: var(--accent);
+}
+
+.primaryButton {
+  color: var(--primary-foreground);
+  background: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+.destructiveButton {
+  color: var(--destructive-foreground, var(--primary-foreground));
+  background: var(--destructive);
+  border: 1px solid var(--destructive);
+}
+
+.button:disabled,
+.primaryButton:disabled,
+.destructiveButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.button:focus-visible,
+.primaryButton:focus-visible,
+.destructiveButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
