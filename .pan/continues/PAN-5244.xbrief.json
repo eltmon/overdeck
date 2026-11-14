@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5244",
   "created": "2026-11-14T05:28:55.884Z",
-  "updated": "2026-11-14T06:23:27.485Z",
+  "updated": "2026-11-14T06:26:08.399Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -224,9 +224,22 @@
       "doneAt": "2026-11-14T06:23:19.082Z"
     },
     "skills-count-hook": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5244",
-      "claimedAt": "2026-11-14T06:23:27.484Z"
+      "claimedAt": "2026-11-14T06:23:27.484Z",
+      "doneAt": "2026-11-14T06:26:08.398Z"
+    },
+    "skills-count-hook.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:26:08.398Z"
+    },
+    "skills-count-hook.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:26:08.398Z"
+    },
+    "skills-count-hook.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T06:26:08.398Z"
     }
   }
 }
