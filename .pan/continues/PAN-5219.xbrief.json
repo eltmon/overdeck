@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5219",
   "created": "2026-11-14T01:41:21.515Z",
-  "updated": "2026-11-14T01:41:21.515Z",
+  "updated": "2026-11-14T01:43:30.838Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,22 @@
   "sessionHistory": [],
   "items": {
     "contracts-phone-issue-event": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5219",
-      "claimedAt": "2026-11-14T01:41:21.515Z"
+      "claimedAt": "2026-11-14T01:41:21.515Z",
+      "doneAt": "2026-11-14T01:43:30.838Z"
+    },
+    "contracts-phone-issue-event.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:43:30.838Z"
+    },
+    "contracts-phone-issue-event.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:43:30.838Z"
+    },
+    "contracts-phone-issue-event.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T01:43:30.838Z"
     }
   }
 }
