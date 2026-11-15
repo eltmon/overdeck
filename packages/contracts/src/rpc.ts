@@ -17,6 +17,7 @@ import {
 } from "./types"
 import { BrowserIdSchema, EditorIdSchema, OpenInBrowserInput, OpenInEditorInput } from "./editor"
 import { EffortLevelSchema } from "./effort"
+import { UiCommand } from "./ui-commands"
 import {
   ExplorerBeginEditInput,
   ExplorerBeginEditResult,
@@ -69,6 +70,7 @@ export const WS_METHODS = {
   subscribeAgentOutput: "pan.subscribeAgentOutput",
   subscribeConversationMessages: "pan.subscribeConversationMessages",
   subscribeProjectSessionTree: "pan.subscribeProjectSessionTree",
+  subscribeUiCommands: "pan.subscribeUiCommands",
 
   // Snapshot / replay
   getSnapshot: "pan.getSnapshot",
@@ -344,6 +346,13 @@ export type SessionTreeDelta = typeof SessionTreeDelta.Type
 export const SubscribeDomainEventsRpc = Rpc.make(WS_METHODS.subscribeDomainEvents, {
   payload: Schema.Struct({}),
   success: DomainEvent,
+  stream: true,
+})
+
+/** 1a. Subscribe to transient UI commands such as "open this path" (stream, PAN-5349) */
+export const SubscribeUiCommandsRpc = Rpc.make(WS_METHODS.subscribeUiCommands, {
+  payload: Schema.Struct({}),
+  success: UiCommand,
   stream: true,
 })
 
@@ -887,6 +896,7 @@ export const GetConversationStatsRpc = Rpc.make(WS_METHODS.getConversationStats,
 /** All Overdeck WebSocket RPC methods */
 export const PanRpcGroup = RpcGroup.make(
   SubscribeDomainEventsRpc,
+  SubscribeUiCommandsRpc,
   SubscribeIssueEventsRpc,
   SubscribeTerminalRpc,
   SubscribeAgentOutputRpc,

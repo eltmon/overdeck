@@ -8,7 +8,9 @@
  *
  * `initialUrl` and `onCreated` let a caller open clone mode with the URL filled
  * in and hear about the created project (PAN-4437 D-13: Session Vault's
- * "Clone and register"). `hide()` clears both so the next open starts empty.
+ * "Clone and register"). `initialPath` opens the folder step on that folder
+ * (PAN-5349 O-D10: `/open` for a path outside every project). `hide()` clears
+ * all of them so the next open starts empty.
  */
 
 import { create } from 'zustand';
@@ -18,6 +20,8 @@ export type AddProjectMode = 'clone' | 'existing' | 'new';
 
 export interface AddProjectShowOptions {
   initialUrl?: string;
+  /** Existing mode: resolve this folder at once instead of showing the picker. */
+  initialPath?: string;
   onCreated?: (project: CreatedProject) => void;
 }
 
@@ -26,6 +30,7 @@ interface AddProjectDialogState {
   mode?: AddProjectMode;
   returnTo?: string;
   initialUrl?: string;
+  initialPath?: string;
   onCreatedExtra?: (project: CreatedProject) => void;
   show(mode?: AddProjectMode, returnTo?: string, options?: AddProjectShowOptions): void;
   hide(): void;
@@ -34,8 +39,23 @@ interface AddProjectDialogState {
 export const useAddProjectDialog = create<AddProjectDialogState>((set) => ({
   open: false,
   show: (mode, returnTo, options) =>
-    set({ open: true, mode, returnTo, initialUrl: options?.initialUrl, onCreatedExtra: options?.onCreated }),
-  hide: () => set({ open: false, mode: undefined, returnTo: undefined, initialUrl: undefined, onCreatedExtra: undefined }),
+    set({
+      open: true,
+      mode,
+      returnTo,
+      initialUrl: options?.initialUrl,
+      initialPath: options?.initialPath,
+      onCreatedExtra: options?.onCreated,
+    }),
+  hide: () =>
+    set({
+      open: false,
+      mode: undefined,
+      returnTo: undefined,
+      initialUrl: undefined,
+      initialPath: undefined,
+      onCreatedExtra: undefined,
+    }),
 }));
 
 /** Returns and clears the pending returnTo so a later create does not reuse it. */

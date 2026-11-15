@@ -15,6 +15,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
 import { DomainEvent as DomainEventSchema, isAgentSessionName, PanRpcGroup, PanRpcError, WS_METHODS } from '@overdeck/contracts';
 import { PanOpen } from './services/open.js';
+import { uiCommandStream } from './services/ui-commands.js';
 import { EventStoreService } from './services/domain-services.js';
 import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
@@ -715,6 +716,9 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           Stream.merge(heartbeats),
         );
       },
+
+      // ── subscribeUiCommands (PAN-5349) ───────────────────────────────────────
+      [WS_METHODS.subscribeUiCommands]: () => uiCommandStream(),
 
       // ── subscribeIssueEvents ──────────────────────────────────────────────────
       [WS_METHODS.subscribeIssueEvents]: (input) => {
