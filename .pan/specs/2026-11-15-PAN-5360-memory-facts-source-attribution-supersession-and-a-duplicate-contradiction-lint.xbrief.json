@@ -1,0 +1,1028 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T15:12:47Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5360: Memory facts: source attribution, supersession and a duplicate/contradiction lint",
+    "updated": "2026-11-15T15:21:53.208Z"
+  },
+  "plan": {
+    "id": "pan-5360",
+    "title": "Memory facts: source attribution, supersession and a duplicate/contradiction lint",
+    "status": "proposed",
+    "uid": "b92ddc43-d688-4fbb-a4c3-add80b9e9fdf",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-15T15:12:47Z",
+    "updated": "2026-11-15T15:21:53.208Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5360",
+        "label": "PAN-5360",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5360.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "memory",
+      "memory-facts",
+      "cli",
+      "lint"
+    ],
+    "narratives": {
+      "Problem": "Curated memory facts cannot record who made a rule or when (pan memory add hardcodes source: null), cannot record what they replace (no supersedes/superseded_by/status; retire deletes the file), and edit silently drops unknown frontmatter keys. Nothing detects duplicate or contradicting facts, so a replaced rule such as dfai disable-timestream-for-sieges-and-caravans stays in every launch index.",
+      "Proposal": "Extend the fact frontmatter with created, supersedes, superseded_by and status (keeping source and preserving unknown keys); redefine isActiveFact so superseded and retired facts leave the launch index and search; add pan memory add|edit --source/--supersedes with a validated two-file write that links both ways and never deletes; print attribution and links in show; add list --all; add an advisory pan memory lint that reports link problems, duplicate pairs (embedding similarity with a lexical fallback) and LLM-judged contradictions over the 20 most similar pairs, never editing. retire stays the hard delete. Full detail in .pan/drafts/PAN-5360.md.",
+      "NonGoals": "- MCP memory_add or /api/self/memory/facts gaining source or supersedes (sibling issue PAN-5365)\n- Migrating existing facts: no created backfill and no automatic supersession of existing facts\n- Supersession across stores (project, operator, machine)\n- A CLI flag that writes status: retired or undoes a supersession\n- Any change to pan memory retire (still a hard delete) or to the pan done uncommitted-fact guard\n- pan memory lint editing, fixing, retiring or superseding any fact\n- Running the lint at launch, in CI or as a pipeline gate\n- Persisting embeddings or lint results\n- Dashboard UI for supersession or lint"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Absent status means active; superseded_by alone also makes a fact inactive (D1, D2)",
+        "rationale": "Existing files keep their shape and a hand-edited half link can never leave a replaced rule in the index."
+      },
+      {
+        "summary": "--supersedes looks up ids in the same store only and refuses self, missing and already-superseded-by-another ids (D4, D5)",
+        "rationale": "Smallest safe rule set; it makes CLI-created cycles impossible and keeps writes inside one git checkout."
+      },
+      {
+        "summary": "Both files of a supersession are validated (parse + secret scan) before either is written (D11)",
+        "rationale": "A hand-edited old fact can trip the scanner; validating first avoids a half-written supersession."
+      },
+      {
+        "summary": "show keeps its Source: <file> line and prints the fact source as Attribution: (D12)",
+        "rationale": "The Source: line is asserted by tests and read by agents; a new label avoids ambiguity."
+      },
+      {
+        "summary": "list --review now means review.length > 0; new --all shows every fact (D13)",
+        "rationale": "Otherwise superseded facts would appear under --review once isActiveFact changes."
+      },
+      {
+        "summary": "Similarity uses the conversationSearch embedder when available and falls back to local TF-IDF cosine (D16)",
+        "rationale": "The issue asks for embedding similarity, but embeddings need an OpenAI key that is often absent; the lint must still work offline."
+      },
+      {
+        "summary": "Contradiction pass uses the memory extraction provider via extractWithProviderPolicy with a no-op recordHealth, capped at 20 pairs (D17, D18)",
+        "rationale": "Reuses configured provider selection (no hardcoded model) and bounds cost on large stores (dfai has 172 facts)."
+      },
+      {
+        "summary": "pan memory lint exits 0 after any report (D19)",
+        "rationale": "The issue calls it an advisory report like /okf lint."
+      },
+      {
+        "summary": "MCP memory_add source/supersedes deferred to sibling issue PAN-5365 (D21)",
+        "rationale": "supersedes via agent token is a trust decision, and the extra src/dashboard subsystem would breach the 6-subsystem plan limit."
+      },
+      {
+        "summary": "No CLI flag writes status: retired; retire stays the hard delete (D8)",
+        "rationale": "The issue lists only --source and --supersedes and says to keep retire as the hard delete."
+      }
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-5360.md",
+      "canonicalFilename": "2026-11-15-PAN-5360-memory-facts-source-attribution-supersession-and-a-duplicate-contradiction-lint.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "w1-fact-schema",
+        "title": "Fact schema: new frontmatter fields, unknown-key preservation, active definition",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:12:47Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5360",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "parallelSafeReason": "First item of the store chain; no other item touches store.ts or operator-sync-conflicts.ts before it lands.",
+          "foundationFor": [
+            "w2-supersede-store",
+            "w3-cli-add",
+            "w4-cli-edit",
+            "w5-cli-show",
+            "w6-cli-list",
+            "w7-lint-links",
+            "w10-lint-orchestrator"
+          ],
+          "files_scope": [
+            "src/lib/memory/facts/store.ts",
+            "src/lib/memory/facts/operator-sync-conflicts.ts",
+            "tests/unit/lib/memory/facts/store.test.ts",
+            "tests/unit/lib/memory/facts/render.test.ts",
+            "tests/unit/lib/memory/facts/operator-sync-conflicts.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/memory/facts/store.test.ts tests/unit/lib/memory/facts/render.test.ts tests/unit/lib/memory/facts/operator-sync-conflicts.test.ts tests/unit/cli/memory-facts.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "store.test.ts, render.test.ts and operator-sync-conflicts.test.ts pass including the W1 named tests",
+            "existing memory-facts.test.ts still passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5360.md work item W1 and decisions D1, D2, D3, D10, D14. In src/lib/memory/facts/store.ts add MEMORY_FACT_STATUSES ('active','superseded','retired'), MemoryFactStatus, and fields created, status, supersedes, supersededBy (frontmatter key superseded_by), extra (unknown keys) to MemoryFact; add the MemoryFactInput write type (new fields optional). parseMemoryFact validates created (YYYY-MM-DD), status, supersedes (list of MEMORY_FACT_ID strings), superseded_by (MEMORY_FACT_ID), source (one line, <=200 chars) and collects every key outside KNOWN_FRONTMATTER_KEYS into extra in parsed order. serializeMemoryFact(MemoryFactInput) writes keys in the D3 order, writes status only when not 'active', then the extra keys. isActiveFact returns fact.status === 'active' && fact.supersededBy === null && fact.review.length === 0. conflictCopyText in operator-sync-conflicts.ts sets supersedes: [] and supersededBy: null on the copy. Update every test-side MemoryFact literal/factory (render.test.ts fact() at line 34, store.test.ts literals) with created: null, status: 'active', supersedes: [], supersededBy: null, extra: {} — typecheck skips test files, so missing fields would only show as wrong runtime filtering."
+        },
+        "items": [
+          {
+            "id": "w1-fact-schema.ac1",
+            "title": "Given a fact file with created, status: superseded, supersedes: [old] and superseded_by: new, parseMemoryFact returns those values in created, status, supersedes and supersededBy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-fact-schema.ac2",
+            "title": "Given a fact file with an invalid status, a non-id supersedes entry or a multi-line source, readMemoryFactsSync reports it under problems with the PRD reason text instead of returning a fact",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-fact-schema.ac3",
+            "title": "Given a fact file with unknown keys owner: bob and weight: 3, parse then serializeMemoryFact produces text that still contains both keys with the same values after the known keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-fact-schema.ac4",
+            "title": "isActiveFact returns false for a superseded fact, a retired fact, a fact with only superseded_by set and a review-marked fact, and renderMemoryIndexSection omits a superseded fact from both the lines and the active count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-fact-schema.ac5",
+            "title": "A sync-conflict copy produced by conflictCopyText has no supersedes or superseded_by keys and preserves the unknown keys of the original, and a legacy fact file without any new key parses as active and re-serializes byte-identical",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-supersede-store",
+        "title": "Store: writeSupersedingFact validated two-file write",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:12:47Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5360",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "parallelSafeReason": "Only store.ts and store.test.ts, serialized after w1 by a blocks edge.",
+          "foundationFor": [
+            "w3-cli-add",
+            "w4-cli-edit"
+          ],
+          "files_scope": [
+            "src/lib/memory/facts/store.ts",
+            "tests/unit/lib/memory/facts/store.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/memory/facts/store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "store.test.ts passes including the five W2 named tests",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5360.md work item W2 and decisions D4, D5, D6, D11. Add MemoryFactSupersedeError and writeSupersedingFact(dir, scope, fact, supersedes, { overwrite, today }) to store.ts. Look up every id in the same dir; refuse an id whose file exists but is listed in problems ('fact \"<y>\" cannot be parsed (<reason>); fix it first'), a missing id ('no fact \"<y>\" in <dir>'), a self id ('a fact cannot supersede itself'), a fact superseded by another id ('\"<y>\" is already superseded by \"<z>\"'), and in overwrite (edit) mode an edited fact that is itself superseded ('\"<x>\" is superseded by \"<z>\"; edit that fact instead'). An id already superseded by this fact id is skipped (idempotent). The new fact's supersedes is the ordered, de-duplicated union of its current list and the new ids. Each old fact is rewritten with status 'superseded', supersededBy = fact.id, updated = today, all other fields (review, source, extra, body) kept. Serialize, parseMemoryFact and redactSensitiveText-check every text before writing any file; write the new fact first then each old fact via temp file + rename; an I/O error after the first write rethrows naming the files already written. Never delete a file."
+        },
+        "items": [
+          {
+            "id": "w2-supersede-store.ac1",
+            "title": "Given facts y in the store, writeSupersedingFact for new fact x with supersedes [y] writes x with supersedes [y] and rewrites y with status superseded and superseded_by x, and y.md still exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-supersede-store.ac2",
+            "title": "Given a missing id, an unparseable fact file, the fact own id, or a fact already superseded by another id, writeSupersedingFact rejects with the PRD W2/D4/D5 message and the store directory listing and file contents are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-supersede-store.ac3",
+            "title": "Given y already superseded by x, a repeat writeSupersedingFact for x with [y] leaves y.md byte-identical",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-supersede-store.ac4",
+            "title": "Given an old fact whose body was hand-edited to contain secret-like text, writeSupersedingFact rejects before writing and x.md is not created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-supersede-store.ac5",
+            "title": "In overwrite mode, an existing supersedes list [a] plus new ids [b, a] produces supersedes [a, b]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3-cli-add",
+        "title": "CLI: pan memory add --source and --supersedes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:12:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5360",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/cli/commands/memory-facts.ts",
+            "tests/unit/cli/memory-facts.test.ts",
+            "sync-sources/skills/pan-memory/SKILL.md"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/memory-facts.test.ts",
+            "npm run typecheck",
+            "npm run build",
+            "node dist/cli/index.js memory add --help",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "memory-facts.test.ts passes including the three W3 named tests",
+            "typecheck completes without errors",
+            "memory add --help lists --source and --supersedes",
+            "lint-skills.sh exits 0"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5360.md work item W3. Add MemoryFactAddOptions.source and .supersedes, register --source <text> and --supersedes <ids> on 'add' with the PRD help strings, set created to today and source to options.source ?? null (replacing the hardcoded source: null at memory-facts.ts line 224). Split --supersedes with the existing parseTags comma splitter; when non-empty call writeSupersedingFact(..., { overwrite: false, today }), else writeMemoryFact. Print '✓ Wrote <file>' plus '✓ Marked superseded <file>' per old fact; the project commit hint becomes one git add naming every written file; --json prints { file, superseded: [files] } (plus sync when present). Update sync-sources/skills/pan-memory/SKILL.md in the same commit: add synopsis gains [--source <text>] [--supersedes <ids>] and a Notes sentence on supersession (Skills<->CLI lockstep rule)."
+        },
+        "items": [
+          {
+            "id": "w3-cli-add.ac1",
+            "title": "pan memory add x --source \"twitch:alice\" --supersedes y writes x with source twitch:alice, created today and supersedes [y], rewrites y with status superseded and superseded_by x, and renderManagedMemorySections(projectRoot) contains an x line and no y line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-cli-add.ac2",
+            "title": "pan memory add x --supersedes missing exits 1 with no fact \"missing\" and creates no x.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-cli-add.ac3",
+            "title": "A project-store add with --supersedes y prints a git add hint that names both .overdeck/memory/x.md and .overdeck/memory/y.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-cli-add.ac4",
+            "title": "After npm run build, node dist/cli/index.js memory add --help prints --source and --supersedes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-cli-edit",
+        "title": "CLI: pan memory edit --source and --supersedes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:12:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5360",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/cli/commands/memory-facts.ts",
+            "tests/unit/cli/memory-facts.test.ts",
+            "sync-sources/skills/pan-memory/SKILL.md"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/memory-facts.test.ts",
+            "npm run typecheck",
+            "npm run build",
+            "node dist/cli/index.js memory edit --help",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "memory-facts.test.ts passes including the four W4 named tests",
+            "typecheck completes without errors",
+            "memory edit --help lists --source and --supersedes",
+            "lint-skills.sh exits 0"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5360.md work item W4. Add MemoryFactEditOptions.source and .supersedes; include both in hasChange (lines 258-259); register both flags on 'edit'. The edit write passes created, status, supersedes, supersededBy and extra from the existing fact and source: options.source ?? existing.source. With --supersedes call writeSupersedingFact(..., { overwrite: true, today }). Same output, commit hint and --json shape as W3. Update the edit synopsis in SKILL.md in the same commit."
+        },
+        "items": [
+          {
+            "id": "w4-cli-edit.ac1",
+            "title": "Given existing facts new-rule and old-rule, pan memory edit new-rule --supersedes old-rule marks old-rule superseded by new-rule and adds old-rule to new-rule supersedes (the dfai case)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-cli-edit.ac2",
+            "title": "pan memory edit x --description \"changed\" preserves created, supersedes, superseded_by, status and unknown frontmatter keys of x",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-cli-edit.ac3",
+            "title": "pan memory edit x --source \"operator\" replaces the source value and pan memory edit x with no field flag still exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-cli-edit.ac4",
+            "title": "pan memory edit of a fact that has superseded_by, with --supersedes, exits 1 and leaves both files unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-cli-edit.ac5",
+            "title": "After npm run build, node dist/cli/index.js memory edit --help prints --source and --supersedes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5-cli-show",
+        "title": "CLI: pan memory show prints attribution, created, status and links",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:12:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5360",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/cli/commands/memory-facts.ts",
+            "tests/unit/cli/memory-facts.test.ts",
+            "sync-sources/skills/pan-memory/SKILL.md"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/memory-facts.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "memory-facts.test.ts passes including the two W5 named tests and the existing Source: <file> assertion",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5360.md work item W5 and D12. After the existing console.log(`Source: ${file}`) line in memoryFactShowCommand, parse the file with parseMemoryFact(file, raw, target.scope); when it parses, print in order and only when set: 'Attribution: <source>', 'Created: <created>', 'Status: superseded by <id>' (or 'Status: <status>' for a non-active status without a link), 'Supersedes: <a, b>'. Then print the raw file as today. A file that fails to parse prints raw only. Mention the new lines in the SKILL.md show note."
+        },
+        "items": [
+          {
+            "id": "w5-cli-show.ac1",
+            "title": "pan memory show x for a fact with source, created, superseded_by and supersedes prints Attribution:, Created:, Status: superseded by and Supersedes: lines after the Source: <file> line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-cli-show.ac2",
+            "title": "pan memory show for a fact without source or links prints no Attribution:, Status: or Supersedes: line and still prints the Source: <file> line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w6-cli-list",
+        "title": "CLI: pan memory list --all and status-independent --review",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:12:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5360",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/cli/commands/memory-facts.ts",
+            "tests/unit/cli/memory-facts.test.ts",
+            "sync-sources/skills/pan-memory/SKILL.md"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/memory-facts.test.ts",
+            "npm run typecheck",
+            "npm run build",
+            "node dist/cli/index.js memory list --help",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "memory-facts.test.ts passes including the three W6 named tests",
+            "typecheck completes without errors",
+            "memory list --help lists --all",
+            "lint-skills.sh exits 0"
+          ],
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5360.md work item W6 and D13. Register --all on 'list' ('List every fact, including superseded and retired ones'). Before reading the store, refuse --review with --all ('--review and --all are mutually exclusive', exit 1). Replace line 152 so --review keeps facts with review.length > 0, --all keeps every parsed fact, and the default keeps isActiveFact facts. Plain-text lines for non-active facts end with ' [superseded by <id>]', ' [superseded]', ' [retired]' or ' [review: <markers>]'. JSON output keeps its shape (facts now carry the new fields). Update the SKILL.md list synopsis and note in the same commit."
+        },
+        "items": [
+          {
+            "id": "w6-cli-list.ac1",
+            "title": "pan memory list omits a superseded fact, and pan memory list --all prints it with a [superseded by x] suffix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-cli-list.ac2",
+            "title": "pan memory list --review prints a review-marked fact and omits a superseded fact that has no review marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-cli-list.ac3",
+            "title": "pan memory list --review --all exits 1 with --review and --all are mutually exclusive",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-cli-list.ac4",
+            "title": "After npm run build, node dist/cli/index.js memory list --help prints --all",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w7-lint-links",
+        "title": "Lint: deterministic supersession link checks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:12:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5360",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/memory/facts/lint-links.ts",
+            "tests/unit/lib/memory/facts/lint-links.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/memory/facts/lint-links.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lint-links.test.ts passes with one test per LinkFindingKind plus the clean-store test",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5360.md work item W7 and D20. New module src/lib/memory/facts/lint-links.ts exporting LinkFindingKind, LinkFinding and findLinkProblems(facts). Kinds: dangling-supersedes, dangling-superseded-by, one-way-link, status-without-link, link-without-status, cycle (reported once per cycle under its smallest id), description-says-superseded (an isActiveFact fact whose description matches /\\bsupersed/i; message suggests pan memory edit <new> --supersedes <id>). Output sorted by id then kind. Pure function; imports only store.ts. Tests build facts by writing files to a temp dir and reading them with readMemoryFactsSync."
+        },
+        "items": [
+          {
+            "id": "w7-lint-links.ac1",
+            "title": "findLinkProblems returns exactly one finding of each kind for a seeded store containing one instance of each problem",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-lint-links.ac2",
+            "title": "findLinkProblems returns an empty list for a store where x supersedes [y] and y has status superseded and superseded_by x",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-lint-links.ac3",
+            "title": "An active fact whose description starts with \"Superseded arrival rule\" produces a description-says-superseded finding whose message names pan memory edit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w8-lint-similarity",
+        "title": "Lint: lexical and embedding similarity scoring",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:12:47Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5360",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "parallelSafeReason": "Touches only two new files no other item edits.",
+          "files_scope": [
+            "src/lib/memory/facts/lint-similarity.ts",
+            "tests/unit/lib/memory/facts/lint-similarity.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/memory/facts/lint-similarity.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lint-similarity.test.ts passes including the three W8 named tests",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5360.md work item W8 and D16. New module src/lib/memory/facts/lint-similarity.ts with the threshold constants (lexical duplicate 0.60, lexical candidate 0.30, embedding duplicate 0.90, embedding candidate 0.75), Embedder, ScoredPair, SimilarityResult, factText, lexicalVectors (lowercase [a-z0-9]+ tokens of length >= 2 minus a fixed stopword list, TF-IDF idf = ln(1 + N/df)), cosine, scoreFactPairs(facts, embedder) and defaultEmbedder() wrapping createConversationEmbeddingProvider() (null + unavailableReason when not enabled). scoreFactPairs returns pairs at or above the method's candidate threshold, a < b, sorted by score desc then ids; an embedder that throws falls back to lexical with fallbackReason (<=200 chars). Takes facts as input (the caller filters active ones); must not import render.ts. Implementation checkpoint from the PRD: score the dfai store (~/Projects/dfai/.overdeck/memory) with a scratch script; if more than 20 pairs score >= 0.60 and most are distinct rules, raise LEXICAL_DUPLICATE_THRESHOLD in 0.05 steps up to 0.75; record the final value in the commit message; keep 0.60 if the store is absent. Do not commit the scratch script."
+        },
+        "items": [
+          {
+            "id": "w8-lint-similarity.ac1",
+            "title": "scoreFactPairs with a null embedder returns a seeded near-duplicate pair with score >= LEXICAL_DUPLICATE_THRESHOLD and method lexical, and does not return an unrelated pair above the candidate threshold",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-lint-similarity.ac2",
+            "title": "scoreFactPairs with an injected embedder returns method embedding, the embedder model, and scores computed from the injected vectors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-lint-similarity.ac3",
+            "title": "scoreFactPairs with an embedder that throws returns method lexical and a fallbackReason containing the thrown message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w9-lint-contradictions",
+        "title": "Lint: LLM contradiction judging over candidate pairs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:12:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5360",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/memory/facts/lint-contradictions.ts",
+            "tests/unit/lib/memory/facts/lint-contradictions.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/memory/facts/lint-contradictions.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lint-contradictions.test.ts passes including the four W9 named tests",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-9",
+            "FR-11",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5360.md work item W9, D17 and D18. New module src/lib/memory/facts/lint-contradictions.ts exporting MAX_CONTRADICTION_PAIRS = 20, CONTRADICTION_JSON_SCHEMA ({ contradicts: boolean, reason: string }), ContradictionJudge, ContradictionReport, buildContradictionPrompt (type, id, description and body truncated to 2,000 chars for each fact), judgeContradictions({ facts, candidates, judge, maxPairs }) and defaultContradictionJudge(identity) which calls extractWithProviderPolicy(prompt, schema, { identity, temperature: 0, maxTokens: 300 }, { recordHealth: async () => {} }). Declare a local structural pair type { a, b, score } instead of importing lint-similarity.ts. Judge candidates in the given order (most similar first) up to maxPairs; a skipped or dropped first result stops with status unavailable and its reason; a malformed answer increments pairsFailed and continues. No model id literal in this file."
+        },
+        "items": [
+          {
+            "id": "w9-lint-contradictions.ac1",
+            "title": "judgeContradictions with an injected judge answering contradicts: true for pair (a, b) returns status checked and a finding { a, b, reason }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-lint-contradictions.ac2",
+            "title": "judgeContradictions whose judge returns status dropped on the first call returns status unavailable and calls the judge exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-lint-contradictions.ac3",
+            "title": "Given 30 candidates and maxPairs 20, judgeContradictions returns pairsChecked 20 and the judge receives only the 20 highest-scored pairs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-lint-contradictions.ac4",
+            "title": "When a judge answer lacks a boolean contradicts field, judgeContradictions returns pairsFailed 1 and still judges the next pair",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w10-lint-orchestrator",
+        "title": "Lint: lintMemoryFacts report orchestrator",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:12:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5360",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/memory/facts/lint.ts",
+            "tests/unit/lib/memory/facts/lint.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/memory/facts/lint.test.ts",
+            "npm run typecheck",
+            "grep -nE \"from .*lint\" src/lib/memory/facts/render.ts src/lib/memory/facts/store.ts src/lib/memory/facts/operator-sync.ts src/lib/memory/facts/operator-sync-conflicts.ts"
+          ],
+          "expected_outputs": [
+            "lint.test.ts passes including the three W10 named tests",
+            "typecheck completes without errors",
+            "the grep prints nothing (no lint import on the launch or store path)"
+          ],
+          "traces": [
+            "FR-9",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5360.md work item W10 and D15. New module src/lib/memory/facts/lint.ts exporting MemoryLintReport and lintMemoryFacts({ dir, scope, threshold?, llm, embedder?, judge?, identity }). Reads the store with readMemoryFactsSync; links = findLinkProblems(all parsed facts); similarity and contradictions use facts.filter(isActiveFact) only; duplicates = pairs at or above threshold ?? the method duplicate threshold; contradictions run over all candidate pairs when llm is true, else status skipped with reason 'llm disabled (--no-llm)'. embedder undefined means defaultEmbedder(); null forces lexical; judge undefined means defaultContradictionJudge(identity). Never writes a file. render.ts, store.ts and operator-sync*.ts must not import any lint module."
+        },
+        "items": [
+          {
+            "id": "w10-lint-orchestrator.ac1",
+            "title": "lintMemoryFacts over a seeded store with an injected embedder and judge returns the seeded duplicate pair in duplicates and the seeded contradiction in contradictions.findings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w10-lint-orchestrator.ac2",
+            "title": "lintMemoryFacts never passes a superseded fact or its successor-by-link pair to the judge and never lists a superseded fact in duplicates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w10-lint-orchestrator.ac3",
+            "title": "When lintMemoryFacts runs, it preserves the store directory listing and every file mtime unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w11-cli-lint",
+        "title": "CLI: pan memory lint command",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:12:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5360",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/cli/commands/memory-lint.ts",
+            "src/cli/commands/memory.ts",
+            "tests/unit/cli/memory-lint.test.ts",
+            "sync-sources/skills/pan-memory/SKILL.md"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/memory-lint.test.ts",
+            "npm run typecheck",
+            "npm run build",
+            "node dist/cli/index.js memory lint --help",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "memory-lint.test.ts passes including the four W11 named tests",
+            "memory lint --help lists --threshold, --no-llm and --json",
+            "lint-skills.sh exits 0"
+          ],
+          "traces": [
+            "FR-9",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5360.md work item W11, D19 and D23. New file src/cli/commands/memory-lint.ts exporting MemoryLintOptions (store flags, threshold, llm, json, injectable embedder and judge), memoryLintCommand and registerMemoryLintCommand(memory); call registerMemoryLintCommand(memory) in src/cli/commands/memory.ts right after registerMemoryFactCommands(memory). Flags: --threshold <n> (number, 0 < n <= 1, else exit 1), --no-llm, --project/--user/--machine/--here (resolveFactTarget(flags, 'read')), --json. Build the D18 identity (projectId = project key, 'operator' for --user, 'machine' for --machine). Print the PRD text format (sections Links, Duplicates, Contradictions; '  none' for empty sections; fallback and skipped/unavailable lines) or the MemoryLintReport as JSON. Exit 0 after any report. Add the lint synopsis line and a Notes line to SKILL.md in the same commit."
+        },
+        "items": [
+          {
+            "id": "w11-cli-lint.ac1",
+            "title": "pan memory lint over a seeded store with injected embedder and judge prints the seeded duplicate under Duplicates and the seeded contradiction under Contradictions and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w11-cli-lint.ac2",
+            "title": "pan memory lint --json prints one JSON object with links, duplicates, similarity and contradictions keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w11-cli-lint.ac3",
+            "title": "pan memory lint --threshold 2 exits 1 and pan memory lint --no-llm reports contradictions skipped without calling the judge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w11-cli-lint.ac4",
+            "title": "node dist/cli/index.js memory lint --help lists --threshold, --no-llm and --json, and bash scripts/lint-skills.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w12-docs",
+        "title": "Docs: memory configuration page and changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:12:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5360",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "configuration/memory.mdx",
+            "changelog.d/pan-5360.md"
+          ],
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n \"## Replacing a fact\\|## Linting facts\\|superseded_by:\" configuration/memory.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints the two new headings and the superseded_by: frontmatter key"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5",
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5360.md work item W12. In configuration/memory.mdx: extend the 'What a fact is' frontmatter block (lines 18-30) with created:, source: (comment: optional attribution, who or what made the rule and when), status:, supersedes:, superseded_by:, and one sentence that unknown keys are preserved; in 'How agents see them' state that superseded, retired, superseded_by-set and review-marked facts are not injected and pan memory list --all shows them; add '## Replacing a fact' (add|edit --supersedes example, D5 refusals, old file stays on disk and both files need committing, hand-edit undo per D7, retire is still the hard delete); add '## Linting facts' (pan memory lint flags, the three report sections, embedding vs lexical fallback, 20-pair LLM cap, --no-llm, exit 0, never edits). Create changelog.d/pan-5360.md with a '#### New' heading and two bullets (attribution/supersession; pan memory lint) each ending ([#5360](https://github.com/eltmon/overdeck/issues/5360))."
+        },
+        "items": [
+          {
+            "id": "w12-docs.ac1",
+            "title": "configuration/memory.mdx renders the frontmatter block with created:, status:, supersedes: and superseded_by: keys and a sentence stating unknown keys are preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w12-docs.ac2",
+            "title": "configuration/memory.mdx contains a ## Replacing a fact section showing pan memory add <id> --supersedes <old> and stating the old file stays on disk",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w12-docs.ac3",
+            "title": "configuration/memory.mdx contains a ## Linting facts section stating pan memory lint never edits facts and falls back to lexical similarity without an embedding provider",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w12-docs.ac4",
+            "title": "changelog.d/pan-5360.md exists with a #### New heading and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w1-fact-schema",
+        "to": "w2-supersede-store",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-supersede-store",
+        "to": "w3-cli-add",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-cli-add",
+        "to": "w4-cli-edit",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-cli-edit",
+        "to": "w5-cli-show",
+        "type": "blocks"
+      },
+      {
+        "from": "w5-cli-show",
+        "to": "w6-cli-list",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-fact-schema",
+        "to": "w7-lint-links",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-fact-schema",
+        "to": "w10-lint-orchestrator",
+        "type": "blocks"
+      },
+      {
+        "from": "w7-lint-links",
+        "to": "w10-lint-orchestrator",
+        "type": "blocks"
+      },
+      {
+        "from": "w8-lint-similarity",
+        "to": "w10-lint-orchestrator",
+        "type": "blocks"
+      },
+      {
+        "from": "w9-lint-contradictions",
+        "to": "w10-lint-orchestrator",
+        "type": "blocks"
+      },
+      {
+        "from": "w10-lint-orchestrator",
+        "to": "w11-cli-lint",
+        "type": "blocks"
+      },
+      {
+        "from": "w6-cli-list",
+        "to": "w11-cli-lint",
+        "type": "blocks"
+      },
+      {
+        "from": "w6-cli-list",
+        "to": "w12-docs",
+        "type": "informs"
+      },
+      {
+        "from": "w11-cli-lint",
+        "to": "w12-docs",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}
