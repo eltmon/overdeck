@@ -1,14 +1,11 @@
 /**
  * PAN-4753 WI-12: the project Home shows that project's merge train card,
- * after the settings disclosure.
+ * directly after the pipeline lanes (PAN-5294 §5a).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-vi.mock('../ProjectSettingsDisclosure', () => ({
-  ProjectSettingsDisclosure: () => <div data-testid="project-settings-disclosure" />,
-}));
 vi.mock('../../merge-train/train/MergeTrain', () => ({
   MergeTrain: ({ placement, projectKey, onNavigateIssue }: {
     placement: string; projectKey?: string; onNavigateIssue?: (id: string) => void;
@@ -48,13 +45,15 @@ function renderOverview(props: { projectKey?: string; onSelectFeature?: (f: Proj
 describe('ProjectOverview merge train card (PAN-4753 WI-12)', () => {
   afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-  it('renders the project placement for this project, after the settings disclosure', () => {
+  it('renders the project placement for this project, after the pipeline lanes', () => {
     renderOverview({ projectKey: 'overdeck' });
     const card = screen.getByTestId('merge-train-component');
     expect(card).toHaveAttribute('data-placement', 'project');
     expect(card).toHaveAttribute('data-project', 'overdeck');
-    expect(screen.getByTestId('project-settings-disclosure').compareDocumentPosition(card))
-      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    const lanes = screen.getByTestId('pipeline-section').querySelectorAll('[data-phase-group]');
+    const lastLane = lanes[lanes.length - 1]!;
+    expect(lastLane.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId('pipeline-section').contains(card)).toBe(false);
   });
 
   it('opens the issue through the overview navigation callback', () => {
