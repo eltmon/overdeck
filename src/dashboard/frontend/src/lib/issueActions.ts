@@ -512,7 +512,7 @@ const isPaused = (state: IssueActionState) => state.agent?.paused === true;
 const canonicalState = (state: IssueActionState) => normalizeCanonicalState(state.issueCanonicalState);
 const isDoneOrCanceled = (state: IssueActionState) => {
   const canonical = canonicalState(state);
-  return canonical === 'done' || canonical === 'canceled';
+  return canonical === 'done' || canonical === 'canceled' || state.derived?.state === 'closed';
 };
 const isMerged = (state: IssueActionState) => state.isMerged === true || state.derived?.state === 'merged';
 const derivedState = (state: IssueActionState) => state.derived?.state;
@@ -660,8 +660,10 @@ export function getMenuActions(state: IssueActionState): IssueActionEntry[] {
   return ISSUE_ACTIONS.filter((action) => action.placement === 'menu' && action.enabledWhen(state));
 }
 
-export function getPhasePrimaryActions(_state: IssueActionState, phase: PipelinePhase): IssueActionEntry[] {
-  return PHASE_PRIMARY_KEYS[phase]
+export function getPhasePrimaryActions(state: IssueActionState, phase: PipelinePhase): IssueActionEntry[] {
+  // PAN-5310: a closed issue's one next move is Reopen — never Plan, Start work or Close out.
+  const keys: IssueActionKey[] = isDoneOrCanceled(state) ? ['reopen'] : PHASE_PRIMARY_KEYS[phase];
+  return keys
     .map((key) => ACTION_BY_KEY.get(key))
     .filter((action): action is IssueActionEntry => !!action);
 }
