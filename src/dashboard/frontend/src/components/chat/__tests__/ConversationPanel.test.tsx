@@ -335,13 +335,20 @@ describe('ConversationPanel rename flow', () => {
   });
 
   it('shows Hide tool calls as a visible pressed-state toggle', () => {
-    renderPanel();
+    // An ended conversation with history renders the (mocked) timeline, which receives hideToolCalls.
+    renderPanel(
+      { ...mockConversation, endedAt: '2024-01-01T01:00:01Z' },
+      {},
+      { messages: [{ id: 'u1', role: 'user', text: 'hello', createdAt: '2024-01-01T00:00:00Z' }], workLog: [], streaming: false },
+    );
     fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
     const item = screen.getByRole('menuitemcheckbox', { name: /Show tool calls/ });
     expect(item).toHaveAttribute('aria-checked', 'true');
     expect(item).toHaveTextContent(/on$/);
 
+    expect(timelineMock.props).toHaveBeenLastCalledWith(expect.objectContaining({ hideToolCalls: false }));
     fireEvent.click(item);
+    expect(timelineMock.props).toHaveBeenLastCalledWith(expect.objectContaining({ hideToolCalls: true }));
 
     fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
     expect(screen.getByRole('menuitemcheckbox', { name: /Show tool calls/ })).toHaveAttribute('aria-checked', 'false');
