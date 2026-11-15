@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5347",
   "created": "2026-11-15T13:35:45.395Z",
-  "updated": "2026-11-15T13:50:37.547Z",
+  "updated": "2026-11-15T13:50:46.225Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,11 @@
     "server-conversation-skill-scope.ac5": {
       "status": "completed",
       "doneAt": "2026-11-15T13:50:37.546Z"
+    },
+    "frontend-skill-commands-module": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5347",
+      "claimedAt": "2026-11-15T13:50:46.224Z"
     }
   }
 }
