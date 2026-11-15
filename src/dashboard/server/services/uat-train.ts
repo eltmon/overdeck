@@ -81,6 +81,7 @@ import { isFlywheelRequireUatBeforeMerge } from '../../../lib/overdeck/control-s
 import { memberSpecRoots } from './uat-member-spec-roots.js';
 import { getWorkspaceInfoForIssue } from '../routes/workspaces.js';
 import { promoteStackHealthRefusal, type StackHealthOverride } from './promote-stack-gate.js';
+import { BOARD_SCAN_LIMIT, selectBoardChain } from './uat-board-chain.js';
 
 const RECONCILE_INTERVAL_MS = 60_000;
 const CHAIN_PAYLOAD_LIMIT = 10;
@@ -721,14 +722,20 @@ async function loadAcceptanceCriteriaCache(
 }
 
 /** The generation chain, newest first, enriched for the UAT batches card. */
-export async function getUatGenerationsPayload(projectRootOverride?: string): Promise<UatGenerationPayload[]> {
+export async function getUatGenerationsPayload(
+  projectRootOverride?: string,
+  options: { board?: { now: number } } = {},
+): Promise<UatGenerationPayload[]> {
   // PAN-1696: no flywheel-run requirement — list generations directly from store.
   // projectRootOverride lets the aggregate /api/merge-train/generations route read
   // each tracked project's chain instead of only the dashboard's own repo.
   const root = projectRootOverride ? resolve(projectRootOverride) : projectRoot();
   const project = findProjectByPath(root);
   const versionSyncConfigured = Boolean(project?.version_sync);
-  const chain = listUatGenerations({ projectRoot: root, limit: CHAIN_PAYLOAD_LIMIT });
+  // PAN-5364: the board scans further back and ages out old voided/merged batches.
+  const chain = options.board
+    ? selectBoardChain(listUatGenerations({ projectRoot: root, limit: BOARD_SCAN_LIMIT }), options.board.now)
+    : listUatGenerations({ projectRoot: root, limit: CHAIN_PAYLOAD_LIMIT });
   if (chain.length === 0) return [];
   const memberIssueIds = new Set(chain.flatMap((gen) => gen.members.map((member) => member.issueId.toUpperCase())));
   // Resolve each member's xBRIEF in ITS OWN project, not the dashboard's repo,

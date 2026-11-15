@@ -293,6 +293,16 @@ describe('getUatGenerationsPayload', () => {
     ]);
   });
 
+  it('scans 50 rows for the board and 10 rows otherwise (PAN-5364)', async () => {
+    mocks.listUatGenerations.mockReturnValue([]);
+
+    await getUatGenerationsPayload('/repos/myn', { board: { now: Date.parse('2026-11-15T12:00:00.000Z') } });
+    expect(mocks.listUatGenerations).toHaveBeenLastCalledWith({ projectRoot: '/repos/myn', limit: 50 });
+
+    await getUatGenerationsPayload('/repos/myn');
+    expect(mocks.listUatGenerations).toHaveBeenLastCalledWith({ projectRoot: '/repos/myn', limit: 10 });
+  });
+
   it('carries voidedBy for an invalidated batch only (PAN-5364)', async () => {
     mocks.listUatGenerations.mockReturnValue([
       { ...gen([]), name: 'uat/pan-voided-1115', status: 'invalidated', voidedBy: 'uat/a' } as UatGeneration,

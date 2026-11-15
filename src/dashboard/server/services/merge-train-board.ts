@@ -627,7 +627,7 @@ async function defaultBoardDeps(): Promise<BoardDeps> {
       if (!feature) return [];
       return journalMod.readPipelineJournal(branch.startsWith('strike/') ? `${feature}-strike` : feature);
     },
-    generations: (projectRoot) => uatTrain.getUatGenerationsPayload(projectRoot),
+    generations: (projectRoot) => uatTrain.getUatGenerationsPayload(projectRoot, { board: { now: Date.now() } }),
     promoted: (projectRoot) => mergeSync.listUatGenerations({ projectRoot, statuses: ['promoted'], limit: 10 }),
     droppedFromBatch: (issueId, projectRoot) => mergeRoute.droppedFromBatch(issueId, projectRoot),
     lacksBatchCi: (projectRoot) => mergeRoute.projectLacksBatchCi(projectRoot),
