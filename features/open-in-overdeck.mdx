@@ -56,7 +56,7 @@ pan integrate file-manager --dry-run   # print what would be written, change not
 pan integrate file-manager --remove    # remove exactly what was added
 ```
 
-Every entry runs the absolute path of `pan` (the shim `pan sync` writes in `~/.overdeck/cli-bin`, or the first `pan` on PATH), so it works without a login shell. If no `pan` is found, the command stops with `pan is not installed on PATH. Run: pan sync`. All entries are per user; nothing needs root or an administrator.
+Every entry runs the absolute path of `pan` (the shim `pan sync` writes in `~/.overdeck/cli-bin`, or the first `pan` on PATH), so it works without a login shell. If no `pan` is found, the command stops and tells you to run `pan sync` first. All entries are per user; nothing needs root or an administrator.
 
 `pan install` offers the same entries after the Ollama step: on a terminal it asks `Add "Open in Overdeck" to your file manager's right-click menu?` (default No). `pan install --file-manager-integration` adds them without asking, and `--skip-file-manager-integration` neither asks nor adds them. A failed install of the entries is a warning; it never fails `pan install`.
 
