@@ -266,6 +266,7 @@ src/components/chat/header/__tests__/ConversationStatusLine.test.tsx
 src/components/chat/header/__tests__/OpenFolderMenuItems.test.tsx
 src/components/chat/header/__tests__/headerChanges.test.tsx
 src/components/chat/messagesTimeline/__tests__/CommandResultRow.test.tsx
+src/components/chat/messagesTimeline/__tests__/TurnChangesCard.test.tsx
 src/components/chat/messagesTimeline/__tests__/UserMessageAttachments.test.tsx
 src/components/chat/messagesTimeline/__tests__/attachmentRefs.test.ts
 src/components/chat/messagesTimeline/__tests__/turnChanges.test.ts
