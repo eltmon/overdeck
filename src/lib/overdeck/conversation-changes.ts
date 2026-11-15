@@ -335,6 +335,87 @@ export function getChangeTotals(name: string): { totals: ConversationChangeTotal
   return totalsMap.get(name) ?? null;
 }
 
+// ─── changeTotals on list rows (WI-7, A-D16) ──────────────────────────────────
+
+const ACTIVE_WINDOW_MS = 24 * 60 * 60_000;
+const BACKGROUND_MAX_RUNNING = 2;
+const BACKGROUND_MAX_SCHEDULED_PER_CALL = 20;
+
+const backgroundQueue: Array<{ name: string; compute: (name: string) => Promise<unknown> }> = [];
+const backgroundPending = new Set<string>();
+let backgroundRunning = 0;
+let idleWaiters: Array<() => void> = [];
+
+function pumpBackground(): void {
+  while (backgroundRunning < BACKGROUND_MAX_RUNNING && backgroundQueue.length > 0) {
+    const job = backgroundQueue.shift()!;
+    backgroundRunning++;
+    let run: Promise<unknown>;
+    try {
+      run = job.compute(job.name);
+    } catch (error) {
+      run = Promise.reject(error);
+    }
+    void run
+      .catch((error: unknown) => {
+        console.warn(`[conversation-changes] background totals for ${job.name} failed:`, error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        backgroundRunning--;
+        backgroundPending.delete(job.name);
+        pumpBackground();
+        if (backgroundRunning === 0 && backgroundQueue.length === 0) {
+          const waiters = idleWaiters;
+          idleWaiters = [];
+          for (const resolve of waiters) resolve();
+        }
+      });
+  }
+}
+
+function activityMs(row: { lastActivityAt?: unknown; lastAttachedAt?: unknown; createdAt?: unknown }): number {
+  for (const value of [row.lastActivityAt, row.lastAttachedAt, row.createdAt]) {
+    if (typeof value === 'string' && value !== '') return Date.parse(value);
+  }
+  return Number.NaN;
+}
+
+/**
+ * Copies of `rows` with `changeTotals` from the totals map for rows active
+ * in the last 24 h. Never computes in the caller's path: rows whose entry is
+ * missing or older than 30 s are queued for a background computation (at
+ * most 2 running, at most 20 queued per call, deduplicated by name). Input
+ * rows are never mutated, and Session Vault copies are skipped.
+ */
+export function stampChangeTotals<T extends { name: string; origin?: unknown; lastActivityAt?: unknown; lastAttachedAt?: unknown; createdAt?: unknown }>(
+  rows: readonly T[],
+  deps: ConversationChangesDependencies,
+  compute: (name: string) => Promise<unknown> = (name) => getConversationChanges(name, { scope: 'conversation' }, deps),
+): Array<T & { changeTotals?: ConversationChangeTotals }> {
+  const now = deps.now();
+  let scheduled = 0;
+  const stamped = rows.map((row): T & { changeTotals?: ConversationChangeTotals } => {
+    if (row.origin === 'vault') return row;
+    const activity = activityMs(row);
+    if (!Number.isFinite(activity) || now - activity > ACTIVE_WINDOW_MS) return row;
+    const entry = totalsMap.get(row.name);
+    if ((!entry || now - entry.at >= CACHE_TTL_MS) && !backgroundPending.has(row.name) && scheduled < BACKGROUND_MAX_SCHEDULED_PER_CALL) {
+      backgroundPending.add(row.name);
+      backgroundQueue.push({ name: row.name, compute });
+      scheduled++;
+    }
+    return entry ? { ...row, changeTotals: entry.totals } : row;
+  });
+  if (scheduled > 0) pumpBackground();
+  return stamped;
+}
+
+/** Resolves when no background totals computation is queued or running. */
+export function whenChangeTotalsIdle(): Promise<void> {
+  if (backgroundRunning === 0 && backgroundQueue.length === 0) return Promise.resolve();
+  return new Promise((resolve) => idleWaiters.push(resolve));
+}
+
 export function resetConversationChangesCachesForTests(): void {
   cache.clear();
   totalsMap.clear();

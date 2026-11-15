@@ -41,6 +41,8 @@ import {
   getConversationChanges,
   resetConversationChangesCachesForTests,
   rootIdForConversationRow,
+  stampChangeTotals,
+  whenChangeTotalsIdle,
   type ConversationChangesDependencies,
 } from '../../../../src/lib/overdeck/conversation-changes.js';
 import type { ConversationDiffParseResult } from '../../../../src/lib/overdeck/conversation-diffs.js';
@@ -257,5 +259,93 @@ describe('rootIdForConversationRow', () => {
     expect(rootIdForConversationRow(row({ cwd: '/repos/proj/packages/inner/x' }), projects)).toBe('project:inner');
     expect(rootIdForConversationRow(row({ cwd: '/elsewhere' }), projects)).toBeNull();
     expect(rootIdForConversationRow(row({ origin: 'vault', issueId: 'PAN-1' }), projects)).toBeNull();
+  });
+});
+
+describe('stampChangeTotals', () => {
+  const HOUR = 60 * 60_000;
+  const iso = (ms: number) => new Date(ms).toISOString();
+
+  /** A compute whose calls stay unresolved until `release()` runs them down. */
+  function deferredCompute() {
+    const state = { calls: [] as string[], inFlight: 0, maxInFlight: 0 };
+    const resolvers: Array<() => void> = [];
+    const compute = (name: string) => {
+      state.calls.push(name);
+      state.inFlight++;
+      state.maxInFlight = Math.max(state.maxInFlight, state.inFlight);
+      return new Promise<void>((resolve) => resolvers.push(() => { state.inFlight--; resolve(); }));
+    };
+    const release = async () => {
+      while (resolvers.length > 0) {
+        resolvers.shift()!();
+        // Let the queue start the next job (no timer waits).
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      await whenChangeTotalsIdle();
+    };
+    return { state, compute, release };
+  }
+
+  it('stamps a recently active row from the totals map and leaves a row idle for 25 h alone', async () => {
+    await getConversationChanges('fixture-1', { scope: 'conversation' }, deps());
+    const { state, compute, release } = deferredCompute();
+    const rows = [
+      { name: 'fixture-1', lastActivityAt: iso(clock - HOUR) },
+      { name: 'fixture-2', lastActivityAt: iso(clock - 25 * HOUR) },
+    ];
+
+    const stamped = stampChangeTotals(rows, deps(), compute);
+
+    expect(stamped[0]?.changeTotals).toEqual(getChangeTotals('fixture-1')?.totals);
+    expect(stamped[1]).not.toHaveProperty('changeTotals');
+    expect(state.calls).toEqual([]);
+    await release();
+  });
+
+  it('queues a missing entry without blocking, then stamps it once the computation settles', async () => {
+    const { state, compute, release } = deferredCompute();
+    const row = { name: 'fixture-1', lastActivityAt: iso(clock) };
+
+    const first = stampChangeTotals([row], deps(), compute);
+    expect(first[0]).not.toHaveProperty('changeTotals');
+    expect(state.calls).toEqual(['fixture-1']);
+    await release();
+
+    // The default compute runs the real computation.
+    stampChangeTotals([row], deps());
+    await whenChangeTotalsIdle();
+    const next = stampChangeTotals([row], deps());
+    expect(next[0]?.changeTotals).toEqual({ files: 2, additions: 10, deletions: 1, uncommittedFiles: 1, commitsLocal: 1 });
+  });
+
+  it('never mutates its input rows', async () => {
+    await getConversationChanges('fixture-1', { scope: 'conversation' }, deps());
+    const rows = [
+      { name: 'fixture-1', lastActivityAt: iso(clock) },
+      { name: 'fixture-2', lastActivityAt: iso(clock), origin: 'vault' },
+    ];
+    const copy = structuredClone(rows);
+    const { compute, release } = deferredCompute();
+
+    const stamped = stampChangeTotals(rows, deps(), compute);
+
+    expect(rows).toEqual(copy);
+    expect(stamped[0]).not.toBe(rows[0]);
+    expect(stamped[0]?.changeTotals).toBeDefined();
+    expect(stamped[1]).not.toHaveProperty('changeTotals');
+    await release();
+  });
+
+  it('computes at most 20 rows per call with at most 2 running at once', async () => {
+    const { state, compute, release } = deferredCompute();
+    const rows = Array.from({ length: 30 }, (_, i) => ({ name: `bulk-${i}`, lastActivityAt: iso(clock) }));
+
+    stampChangeTotals(rows, deps(), compute);
+    expect(state.calls.length).toBeLessThanOrEqual(2);
+    await release();
+
+    expect(state.calls).toHaveLength(20);
+    expect(state.maxInFlight).toBeLessThanOrEqual(2);
   });
 });
