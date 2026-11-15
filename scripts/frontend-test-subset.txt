@@ -443,6 +443,7 @@ src/lib/__tests__/composerCancel.test.ts
 src/lib/__tests__/composerCitations.test.ts
 src/lib/__tests__/composerDraft.test.ts
 src/lib/__tests__/composerSendQueue.test.ts
+src/lib/__tests__/composerSendNow.test.ts
 src/lib/__tests__/connectionState.test.ts
 src/lib/__tests__/explorer-drag-paths.test.ts
 src/lib/__tests__/flywheelNeedsYou.test.ts
