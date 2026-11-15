@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5290",
   "created": "2026-11-15T11:24:24.576Z",
-  "updated": "2026-11-15T13:37:41.470Z",
+  "updated": "2026-11-15T13:37:47.118Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -274,6 +274,11 @@
     "editor-uat.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T13:37:41.469Z"
+    },
+    "docs-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5290",
+      "claimedAt": "2026-11-15T13:37:47.118Z"
     }
   },
   "agentModel": "claude-opus-5-5"
