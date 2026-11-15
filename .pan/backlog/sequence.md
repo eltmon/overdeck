@@ -1,12 +1,14 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T19:36:40.268150Z · model: claude-opus-5-5 · open: 898_
+_Last sequenced: 2026-11-15T20:06:38.300093Z · model: claude-opus-5-5 · open: 900_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5392 | XS | low | ok |  |  | In pipeline: docs PR from the file explorer noting Mission Control recent changes refresh every minute. |
+| 2 | PAN-5395 | S | critical | ok |  |  | In pipeline: single-repo workspaces read untracked Overdeck sync output as dirty, so work agents are refused and never start. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
+| 4 | PAN-5394 | XS | high | ok |  |  | In pipeline: admission test asserts after a fixed 10 ms drive and flakes under CI load, turning main red; wait on the condition. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
@@ -910,9 +912,17 @@ _Last sequenced: 2026-11-15T19:36:40.268150Z · model: claude-opus-5-5 · open: 
 
 New since the prior run and already in review with a live workspace, so it is pinned at the top per the in-pipeline rule; it is a docs-only change with no dependencies.
 
+### PAN-5395 (rank 2)
+
+New since the prior run and already in the pipeline, so it is pinned near the top; it blocks work-agent starts in every single-repo project that does not gitignore all sync paths, which makes it a critical substrate fix.
+
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
+
+### PAN-5394 (rank 4)
+
+New since the prior run and already in the pipeline, so it is pinned near the top; a red main empties the merge gate, so this test-only flake fix unblocks merges.
 
 ### PAN-5385 (rank 8)
 
@@ -1218,14 +1228,6 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
 
 New substrate bug placed in a freed high-tier slot. With several workspace stacks up, browser checks hit the wrong backend and flake, which corrupts verification.
 
-### PAN-3234 (rank 84)
-
-Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
-
-### PAN-3205 (rank 85)
-
-New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1233,10 +1235,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T19:36:40.268150Z",
+  "generatedAt": "2026-11-15T20:06:38.300093Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 898,
+  "openCount": 900,
   "nodes": [
     {
       "issue": "PAN-5392",
@@ -1252,6 +1254,19 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
+      "issue": "PAN-5395",
+      "rank": 2,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: single-repo workspaces read untracked Overdeck sync output as dirty, so work agents are refused and never start.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned near the top; it blocks work-agent starts in every single-repo project that does not gitignore all sync paths, which makes it a critical substrate fix.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5013",
       "rank": 3,
       "size": "S",
@@ -1261,6 +1276,19 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned.",
       "rationale": "Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5394",
+      "rank": 4,
+      "size": "XS",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: admission test asserts after a fixed 10 ms drive and flakes under CI load, turning main red; wait on the condition.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned near the top; a red main empties the merge gate, so this test-only flake fix unblocks merges.",
       "gate": "auto",
       "planning": "auto"
     },
