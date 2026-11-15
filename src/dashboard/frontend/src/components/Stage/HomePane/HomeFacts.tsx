@@ -58,6 +58,8 @@ export interface HomeFactsProps {
   spend: { week: number; today: number } | null
   /** No issue prefix is known, so spend cannot be scoped to the project. */
   spendUnavailable: boolean
+  /** The spend read failed or timed out (PAN-5370): show "—" / "unavailable", as Landed does. */
+  spendError: boolean
   onAgents: () => void
   onNeedsYou: () => void
   onInReview: () => void
@@ -104,6 +106,7 @@ export function HomeFacts({
   changes,
   spend,
   spendUnavailable,
+  spendError,
   onAgents,
   onNeedsYou,
   onInReview,
@@ -137,9 +140,9 @@ export function HomeFacts({
       <Fact label="Landed this week" value={landedValue} sub={landedSub} onClick={onLanded} />
       <Fact
         label="Spend this week"
-        value={spendUnavailable ? '—' : spend ? formatCost(spend.week) : '…'}
-        sub={spendUnavailable ? 'needs an issue prefix' : spend ? `${formatTodayCost(spend.today)} today` : '…'}
-        valueClass={spendUnavailable ? undefined : 'text-signal-cost-foreground'}
+        value={spendUnavailable || spendError ? '—' : spend ? formatCost(spend.week) : '…'}
+        sub={spendUnavailable ? 'needs an issue prefix' : spendError ? 'unavailable' : spend ? `${formatTodayCost(spend.today)} today` : '…'}
+        valueClass={spendUnavailable || spendError ? undefined : 'text-signal-cost-foreground'}
         onClick={onSpend}
       />
     </div>

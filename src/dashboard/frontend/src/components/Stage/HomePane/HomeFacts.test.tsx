@@ -34,6 +34,7 @@ function renderFacts(props: Partial<HomeFactsProps> = {}) {
       changes={{ data: { projectKey: 'wfx', branch: 'main', commits: [] }, isLoading: false, isError: false }}
       spend={{ week: 0, today: 0 }}
       spendUnavailable={false}
+      spendError={false}
       {...handlers}
       {...props}
     />,
@@ -142,6 +143,26 @@ describe('HomeFacts (PAN-5294 G-D10)', () => {
     expect(fact('Spend this week').value).toHaveTextContent('—')
     expect(fact('Spend this week').value).not.toHaveClass('text-signal-cost-foreground')
     expect(fact('Spend this week').sub).toHaveTextContent('needs an issue prefix')
+  })
+
+  it('shows — and unavailable when spend fails, even over stale data (PAN-5370)', () => {
+    renderFacts({ spend: null, spendError: true })
+    expect(fact('Spend this week').value).toHaveTextContent('—')
+    expect(fact('Spend this week').value).not.toHaveClass('text-signal-cost-foreground')
+    expect(fact('Spend this week').sub).toHaveTextContent('unavailable')
+    cleanup()
+
+    renderFacts({ spend: { week: 412, today: 43 }, spendError: true })
+    expect(fact('Spend this week').value).toHaveTextContent('—')
+    expect(fact('Spend this week').sub).toHaveTextContent('unavailable')
+    cleanup()
+
+    renderFacts({ spend: null, spendUnavailable: true, spendError: true })
+    expect(fact('Spend this week').sub).toHaveTextContent('needs an issue prefix')
+    cleanup()
+
+    renderFacts({ spend: null })
+    expect(fact('Spend this week').value).toHaveTextContent('…')
   })
 
   it('calls each fact handler exactly once', () => {
