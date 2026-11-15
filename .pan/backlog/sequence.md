@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T14:56:30.742387Z · model: claude-opus-5-5 · open: 902_
+_Last sequenced: 2026-11-15T14:57:06.447530Z · model: claude-opus-5-5 · open: 902_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1237,7 +1237,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T14:56:30.742387Z",
+  "generatedAt": "2026-11-15T14:57:06.447530Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 902,
