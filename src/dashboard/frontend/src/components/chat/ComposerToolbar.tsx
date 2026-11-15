@@ -15,6 +15,10 @@ import type { ContextWindowSnapshot } from '../../lib/contextWindow';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
+/** PAN-5295 D2-13: why a started conversation's model button cannot change the model. */
+const AGENT_MODEL_LOCKED = "An agent's model is fixed when it starts.";
+const CONVERSATION_MODEL_LOCKED = 'The model is fixed once a conversation starts. To use another model, hand off to a new conversation (⋯ → Hand off).';
+
 export interface ComposerToolbarProps {
   conversation: Conversation;
   agentId?: string;
@@ -79,7 +83,8 @@ export function ComposerToolbar({
           value={model}
           onChange={onModelChange}
           onComboChange={onComboChange}
-          disabled={isDisabled || !canEditModelBeforeStart}
+          disabled={isDisabled}
+          lockedReason={canEditModelBeforeStart ? undefined : agentId ? AGENT_MODEL_LOCKED : CONVERSATION_MODEL_LOCKED}
           harness={harness}
           onHarnessChange={onHarnessChange}
           liveConversation={conversation.sessionAlive}

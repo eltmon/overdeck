@@ -237,9 +237,11 @@ interface ModelPickerProps {
   liveConversation?: boolean;
   /** Keep a pre-launch picker aligned with the selected model provider's configured harness. */
   followProviderDefault?: boolean;
+  /** PAN-5295 D2-13: the model cannot change; the trigger stays enabled and its menu shows only this reason. */
+  lockedReason?: string;
 }
 
-export function ModelPicker({ value, onChange, disabled = false, harness, onHarnessChange, onComboChange, liveConversation = false, followProviderDefault = false }: ModelPickerProps) {
+export function ModelPicker({ value, onChange, disabled = false, harness, onHarnessChange, onComboChange, liveConversation = false, followProviderDefault = false, lockedReason }: ModelPickerProps) {
   const [open, setOpen] = useState(false);
   const [groups, setGroups] = useState<ModelGroup[]>(FALLBACK_GROUPS);
   const [harnessPolicy, setHarnessPolicy] = useState<HarnessPolicyDecisions>({});
@@ -483,8 +485,18 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
         <ChevronDown size={11} />
       </button>
 
+      {/* ── Locked: the reason, and no model rows (D2-13) ── */}
+      {open && lockedReason && createPortal(
+        <div ref={dropdownRef} data-testid="model-picker-dropdown" className={styles.pickerDropdown} style={dropdownStyle}>
+          <p data-testid="model-picker-locked-reason" className="max-w-xs px-3 py-2 text-xs text-muted-foreground">
+            {lockedReason}
+          </p>
+        </div>,
+        document.body,
+      )}
+
       {/* ── Dropdown ── */}
-      {open && createPortal(
+      {open && !lockedReason && createPortal(
         <div
           ref={dropdownRef}
           data-testid="model-picker-dropdown"

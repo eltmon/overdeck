@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resetComposerStore } from '../../../lib/composerStore';
@@ -127,7 +127,29 @@ describe('ComposerFooter active conversation model restoration', () => {
     await waitFor(() => {
       expect(vi.mocked(fetch)).toHaveBeenCalledWith(expect.stringContaining('/api/settings/harness-policy'));
     });
-    expect(screen.getByRole('button', { name: /Claude Sonnet 4\.6/i })).toBeDisabled();
+    // PAN-5295 D2-13: a started conversation's model button is enabled and explains itself.
+    expect(screen.getByRole('button', { name: /Claude Sonnet 4\.6/i })).toBeEnabled();
     expect(screen.queryByRole('button', { name: /Kimi K2\.6 Flash/i })).not.toBeInTheDocument();
+  });
+
+  it('opens the hand-off reason, not the model list, on a live conversation (PAN-5295)', async () => {
+    render(<ComposerFooter conversation={conversation} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Claude Sonnet 4\.6/i }));
+
+    expect(await screen.findByTestId('model-picker-locked-reason')).toHaveTextContent(
+      'The model is fixed once a conversation starts. To use another model, hand off to a new conversation (⋯ → Hand off).',
+    );
+    expect(screen.queryByPlaceholderText(/search/i)).not.toBeInTheDocument();
+    // No model switch is posted: the catalog reads are the only requests.
+    expect(vi.mocked(fetch).mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'POST')).toEqual([]);
+  });
+
+  it('gives an agent session the agent reason (PAN-5295)', async () => {
+    render(<ComposerFooter conversation={conversation} agentId="agent-pan-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Claude Sonnet 4\.6/i }));
+
+    expect(await screen.findByTestId('model-picker-locked-reason')).toHaveTextContent("An agent's model is fixed when it starts.");
   });
 });
