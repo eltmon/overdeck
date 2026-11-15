@@ -124,6 +124,7 @@ pan backlog write-sequence /tmp/sequence-result.json
 - The human-readable header, ranked table, and rationale section.
 - The machine-readable fenced JSON block below the `<!-- machine-readable; do not hand-edit below this line -->` marker.
 - The `chore(workspace): backlog sequence` commit on the plan home's branch (normally `main`), and its push to that branch's upstream. If origin has moved, the command replays the sequence commits onto it and pushes; it never forces, never pushes an unrelated local commit (anything beyond plan artifacts), and prints a warning when it cannot push safely.
+- An unchanged ranking: when only `generatedAt` would change, the command leaves `sequence.md` as it is, makes no commit, prints `unchanged … not committed` and exits 0. Treat that as success; do not retry.
 
 Stamp `pass` and `generatedAt` (current ISO timestamp) in the JSON block.
 

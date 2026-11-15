@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, readFileSync, writeFileSync, statSync, utimesSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -303,5 +303,118 @@ describe('writeSequenceMd – operatorEdit mode resets gate/planning (FR-15/FR-1
       expect(result.doc.nodes[0].gate).toBe('blocked');
       expect(result.doc.nodes[0].planning).toBe('interactive');
     }
+  });
+});
+
+describe('writeSequenceMd change detection (PAN-5357)', () => {
+  let tmpDir: string;
+  const seqPath = () => join(tmpDir, '.pan/backlog/sequence.md');
+  const manifestPath = () => join(tmpDir, '.pan/backlog/manifest.json');
+  const examinedPath = () => join(tmpDir, '.pan/backlog/examined-manifest.json');
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'sequence-changedetect-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+    vi.clearAllMocks();
+  });
+
+  it('returns written:false and keeps the bytes when only generatedAt differs', () => {
+    writeSequenceMd(tmpDir, SAMPLE_DOC);
+    const priorBytes = readFileSync(seqPath(), 'utf-8');
+    const past = new Date('2020-01-01');
+    utimesSync(seqPath(), past, past);
+
+    const result = writeSequenceMd(tmpDir, { ...SAMPLE_DOC, generatedAt: '2026-06-20T00:00:00Z' });
+
+    expect(result).toEqual({ written: false });
+    expect(readFileSync(seqPath(), 'utf-8')).toBe(priorBytes);
+    expect(readFileSync(seqPath(), 'utf-8')).toContain('2026-06-19T00:00:00Z');
+    expect(statSync(seqPath()).mtimeMs).toBeGreaterThan(past.getTime());
+  });
+
+  it('treats a permuted node and edge order as unchanged', () => {
+    const doc: SequenceDoc = {
+      ...SAMPLE_DOC,
+      edges: [
+        { from: 'PAN-1', to: 'PAN-2', type: 'unblocks', source: 'github-ref', confidence: 0.4 },
+        { from: 'PAN-1', to: 'PAN-2', type: 'unblocks', source: 'github-ref', confidence: 0.9 },
+        { from: 'PAN-2', to: 'PAN-3', type: 'informs', source: 'ai-inferred', confidence: 0.7 },
+      ],
+    };
+    writeSequenceMd(tmpDir, doc);
+
+    const reversed: SequenceDoc = {
+      ...doc,
+      generatedAt: '2026-06-20T00:00:00Z',
+      nodes: [...doc.nodes].reverse(),
+      edges: [...doc.edges].reverse(),
+    };
+    const result = writeSequenceMd(tmpDir, reversed);
+
+    expect(result).toEqual({ written: false });
+  });
+
+  it('writes when a rank changes', () => {
+    writeSequenceMd(tmpDir, SAMPLE_DOC);
+    const swapped: SequenceDoc = {
+      ...SAMPLE_DOC,
+      generatedAt: '2026-06-20T00:00:00Z',
+      nodes: [
+        { ...SAMPLE_DOC.nodes[0]!, rank: 2 },
+        { ...SAMPLE_DOC.nodes[1]!, rank: 1 },
+        SAMPLE_DOC.nodes[2]!,
+      ],
+    };
+
+    const result = writeSequenceMd(tmpDir, swapped);
+
+    expect(result).toEqual({ written: true });
+    expect(readFileSync(seqPath(), 'utf-8')).toContain('2026-06-20T00:00:00Z');
+  });
+
+  it('does not touch mtime on an unchanged operator edit', () => {
+    writeSequenceMd(tmpDir, SAMPLE_DOC);
+    const past = new Date('2020-01-01');
+    utimesSync(seqPath(), past, past);
+
+    const result = writeSequenceMd(tmpDir, { ...SAMPLE_DOC, generatedAt: '2026-06-20T00:00:00Z' }, { operatorEdit: true });
+
+    expect(result).toEqual({ written: false });
+    expect(statSync(seqPath()).mtimeMs).toBe(past.getTime());
+  });
+
+  it('writes when no prior file exists', () => {
+    const result = writeSequenceMd(tmpDir, SAMPLE_DOC);
+    expect(result).toEqual({ written: true });
+  });
+
+  it('an AI write copies manifest.json to examined-manifest.json', () => {
+    mkdirSync(join(tmpDir, '.pan/backlog'), { recursive: true });
+    writeFileSync(manifestPath(), '[{"id":"PAN-1"}]', 'utf-8');
+
+    writeSequenceMd(tmpDir, SAMPLE_DOC);
+    expect(readFileSync(examinedPath(), 'utf-8')).toBe('[{"id":"PAN-1"}]');
+
+    writeFileSync(manifestPath(), '[{"id":"PAN-2"}]', 'utf-8');
+    const result = writeSequenceMd(tmpDir, { ...SAMPLE_DOC, generatedAt: '2026-06-20T00:00:00Z' });
+
+    expect(result).toEqual({ written: false });
+    expect(readFileSync(examinedPath(), 'utf-8')).toBe('[{"id":"PAN-2"}]');
+  });
+
+  it('an operator edit never writes examined-manifest.json', () => {
+    mkdirSync(join(tmpDir, '.pan/backlog'), { recursive: true });
+    writeFileSync(manifestPath(), '[{"id":"PAN-1"}]', 'utf-8');
+    writeSequenceMd(tmpDir, SAMPLE_DOC);
+    rmSync(examinedPath(), { force: true });
+
+    const changed: SequenceDoc = { ...SAMPLE_DOC, nodes: [{ ...SAMPLE_DOC.nodes[0]!, rank: 2 }, { ...SAMPLE_DOC.nodes[1]!, rank: 1 }, SAMPLE_DOC.nodes[2]!] };
+    const result = writeSequenceMd(tmpDir, changed, { operatorEdit: true });
+
+    expect(result).toEqual({ written: true });
+    expect(existsSync(examinedPath())).toBe(false);
   });
 });

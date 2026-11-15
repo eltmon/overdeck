@@ -79,7 +79,10 @@ To recover:
 2. Run `git pull --rebase` in the plan home to bring local `main` back in
    sync with origin.
 3. Re-run the `.pan/` write (`pan backlog write-sequence` or the `pan orders`
-   command) if it didn't land.
+   command) if it didn't land. A re-run whose ranking is unchanged prints
+   `unchanged … not committed` (or `committed an earlier uncommitted sequence
+   write`), and it still pushes the earlier sequence commit, so that output is
+   not a failure.
 
 ## pan: command not found
 
