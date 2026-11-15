@@ -90,7 +90,8 @@
 - Bare-host CI: `scripts/bare-host-smoke.sh` runs in the `bare-host-linux`, `bare-host-macos`,
   `bare-host-macos-known-bad` and `bare-host-linux-spawner-canary` jobs (`ci.yml`) and gates the
   release (`release.yml` `bare-host-macos`); macOS asserts the single-window traced spawn cost,
-  Linux the min-of-3 PID net `min(idle) - min(baseline)` (PAN-5176, PAN-5361).
+  Linux the min-of-5 PID net `min(idle) - min(baseline)` (2 of the 5 windows are structurally
+  elevated by the dashboard's own post-boot probes and a permanent periodic check, PAN-5176, PAN-5361).
 - Root `setupFiles` (`vitest.config.ts`) run in order: `tests/setup/overdeck-home.ts`,
   `tests/setup/no-real-home-writes.ts`, `tests/setup/no-worker-signals.ts`, `tests/setup.ts`; the
   latter two guards throw `[test-guard]` errors (PAN-4925).

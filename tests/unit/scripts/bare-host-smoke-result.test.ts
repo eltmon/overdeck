@@ -50,6 +50,25 @@ describe('decideIdle (Linux pid-net, min-of-N)', () => {
     expect(r.pass).toBe(true);
   });
 
+  it('5 windows absorb a burst even with 2 structurally elevated windows (real linux-08 shape, PAN-5361 review)', () => {
+    // Real shape from calibration run 43741946470, rep linux-08: windows 1
+    // and 3 are the dashboard's own always-elevated post-boot probe/periodic
+    // check windows (never the minimum); 0, 2 and 4 are the 3 genuinely
+    // steady samples min-of-3 needs. A +65 burst on the lowest steady window
+    // (0) must still land within budget via the next-lowest steady window.
+    const baselineWindows = [7, 37, 11, 9, 86];
+    const idleWindows = [window(18, 0, 30000), window(125, 30000, 60000), window(29, 60000, 90000), window(322, 90000, 120000), window(26, 120000, 150000)];
+    const clean = decideIdle(linuxArgs({ baselineWindows, idleWindows }));
+    expect(clean.decidingWindow).toBe(0);
+    expect(clean.pass).toBe(true);
+
+    const burstedIdle = [window(18 + 65, 0, 30000), idleWindows[1], idleWindows[2], idleWindows[3], idleWindows[4]];
+    const bursted = decideIdle(linuxArgs({ baselineWindows, idleWindows: burstedIdle }));
+    expect(bursted.decidingWindow).toBe(4);
+    expect(bursted.net).toBe(19);
+    expect(bursted.pass).toBe(true);
+  });
+
   it('a steady +40 in every idle window fails pid-net', () => {
     const r = decideIdle(linuxArgs({
       baselineWindows: [6, 6, 6],

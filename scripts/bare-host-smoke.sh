@@ -7,14 +7,21 @@
 #   1. `pan up --no-resume --no-open --detach` must exit 0, pass /api/health and
 #      print no line that asks for a tool the Herdr backend does not need.
 #   2. The idle dashboard must stay within the per-OS idle budget per 30 s
-#      window. On Linux the measure takes 3 back-to-back baseline windows and
-#      3 idle windows and decides on min(idle) - min(baseline): the machine-
-#      wide PID counter (every process AND thread, not just Overdeck's) sees
-#      runner bursts of about +20 to +60 in either side in 5-7% of windows,
-#      and min-of-3 keeps one such burst from moving the net by more than the
-#      normal spread between that side's windows (PAN-5361). A failed Linux
-#      check also reports a heuristic, /proc-based guess (traced spawn calls
-#      plus live process-tree growth, never the verdict) at whether the
+#      window. On Linux the measure takes WINDOWS_PER_SIDE_LINUX=5 back-to-
+#      back baseline windows and 5 idle windows and decides on min(idle) -
+#      min(baseline): besides random host PID bursts, the directly started
+#      dashboard itself runs one-time post-boot probes (around 0-2 s and
+#      45-62 s after boot) and a permanent periodic docker/git check every
+#      60 s forever (PAN-5361), so with the 20 s settle below, idle window 1
+#      (and, early on, window 3 too) is *structurally* elevated on every run,
+#      never the minimum. 5 windows per side (not 3) restores the 3
+#      genuinely-steady samples windows 0, 2 and 4 the single-burst immunity
+#      assumes; a random burst on any one of the 5 windows moves the net by
+#      at most the spread between the other steady windows (confirmed by a
+#      burst-injection replay over 20 calibration runs: 0/20 flip at +20,
+#      +30 or +65 on any single window, either side). A failed Linux check
+#      also reports a heuristic, /proc-based guess (traced spawn calls plus
+#      live process-tree growth, never the verdict) at whether the
 #      dashboard's own process tree accounts for the excess. On macOS it is
 #      the traced spawn cost over one window each side, unchanged: the
 #      child_process calls the dashboard makes, plus 5 for each call that
@@ -46,40 +53,42 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 #     (the known-bad 0.81.0 scores 126 on the same runner)
 #   Linux PID net 10, 5, 6, 8 -> min(30, 30) = 30
 #     (after the systemctl fix, #5181; 15 and 16 before it)
-# PAN-5361 recalibration 2026-11-15 (same D14 rule) for the min-of-3 Linux
-# measure, from 20 plain runs of the temporary bare-host-calibration workflow
-# against @overdeck/core@0.86.0 (workflow run 43734201237; see "Calibration
-# evidence" in .pan/drafts/pan-5361.md for the full table):
-#   Linux PID net (min(idle)-min(baseline)): 27, 10, 6, 23, 12, 9, 24, 13, 26,
-#     8, 13, 13, 14, 9, 2, 13, 13, 10, 24, 12 -> max(10, min(30, 3x27)) = 30
-#     (unchanged; two --idle-spawner-ms 500 canary runs net 82 and 70, both
-#     correctly failing and attributed to the dashboard tree)
+# PAN-5361 recalibration 2026-11-15 (same D14 rule), for the min-of-5 Linux
+# measure (review cycles fa257f60/8f9a2499 found min-of-3 insufficient; see
+# below and "Calibration evidence" in .pan/drafts/pan-5361.md), 20 plain runs
+# of the temporary bare-host-calibration workflow against
+# @overdeck/core@0.86.0 (workflow run 43741946470):
+#   Linux PID net (min(idle[0:5])-min(baseline[0:5])): 5, 6, 7, 4, 6, 5, 6,
+#     11, 5, 3, 4, 5, 4, 10, 5, 6, 9, 4, 6, 5 -> max(10, min(30, 3x11)) = 30
+#     (unchanged; two --idle-spawner-ms 500 canary runs net 66 and 66, both
+#     correctly failing and attributed to the dashboard tree; two 2000 ms
+#     runs net 19 and 18, both passing)
 #   macOS unchanged (one window per side, traced-cost): the 0.86.0 leg passed
 #     at cost 25 with windowsPerSide 1; the 0.81.0 known-bad leg failed at
-#     cost 127 with the expected tmux forbidden-tool lines.
+#     cost 126 with the expected tmux forbidden-tool lines.
 IDLE_BUDGET_MACOS=30
 IDLE_BUDGET_LINUX=30
 BARE_PATH_ENTRIES=6
 WINDOW_SECS=30
 SETTLE_SECS=20
-# PAN-5361 review (cycles fa257f60, 8f9a2499): min-of-3 was not immune to a
-# single burst. A SETTLE_SECS_LINUX=80 s experiment (cycle 8f9a2499 fix,
-# since reverted) proved the cause is not one startup sweep: the directly
-# started dashboard runs at least three distinct one-time/periodic probe
-# bursts after boot (one around 45-62 s, a tightly-timed one around 120-122 s
-# in every run, and a third, untraced one of about +27 PIDs that floats
-# between runs), and the "floor" itself steps up after about 60 s. Waiting
-# past one burst walks the idle windows into the next. This constant is
-# WIP while PAN-5361 maps the full timeline (see the issue/PRD); do not
-# treat it as final. macOS is untouched regardless (non-goal: do not change
-# idle behaviour).
 HEALTH_TIMEOUT_SECS=120
 CHURN_SECS=20
-# PAN-5361: Linux takes WINDOWS_PER_SIDE_LINUX windows per side (min-of-N
-# absorbs one runner PID burst); macOS keeps the single window its
-# traced-cost rule has always used. The Linux count is temporarily raised
-# for PAN-5361's exploratory mapping run; it is not the final value.
-WINDOWS_PER_SIDE_LINUX=10
+# PAN-5361 (review cycles fa257f60/8f9a2499): min-of-3 was not immune to a
+# single burst. Live calibration traces showed why: at SETTLE_SECS=20, idle
+# window 1 ([50s,80s) after boot) always contains both a one-time post-boot
+# probe sweep (ending by about 62 s) and the first tick of a permanent
+# periodic docker/git availability check that recurs every 60 s forever;
+# window 3 ([110s,140s) after boot) catches the same periodic tick plus a
+# second one-time sweep (about 120-122 s). Those two windows are elevated by
+# design, not by chance, so 3 consecutive windows gave only 2 genuinely
+# steady samples (0 and 2) -- not enough redundancy (a burst-injection
+# replay over the original 20-run calibration flipped 9 of 20 clean runs at
+# a +20 burst). Taking 5 windows restores 3 steady samples (0, 2 and 4;
+# windows 1 and 3 are the sacrificial, always-elevated ones and are never
+# the minimum), which a replay over a fresh 20-run calibration shows is
+# immune to a +20/+30/+65 burst on any single window, either side (0/20
+# flips). macOS is untouched (non-goal: do not change idle behaviour).
+WINDOWS_PER_SIDE_LINUX=5
 WINDOWS_PER_SIDE_MACOS=1
 
 DENIED_TOOLS="docker tmux systemctl journalctl brew"
@@ -135,7 +144,7 @@ Usage: bare-host-smoke.sh (--tarball <path> | --version <npm version>) --work-di
   --out <file>         Where to write the JSON result (default <work-dir>/result.json).
   --budget <n>         Idle budget (default 30 on macOS and on Linux). On
                        Linux: new PIDs per 30 s window, min(idle) - min
-                       (baseline) over 3 windows per side. On macOS: the
+                       (baseline) over 5 windows per side. On macOS: the
                        traced spawn cost over 1 window per side (unchanged).
   --idle-spawner-ms <n> Load a preload into the idle dashboard server only
                        that spawns `true` every <n> ms (whole number >= 50).

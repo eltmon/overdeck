@@ -1230,12 +1230,12 @@ other branch.
 
 ### Bare-host checks (PAN-5176)
 
-Four CI jobs in `.github/workflows/ci.yml` run `scripts/bare-host-smoke.sh`, which installs the packed `@overdeck/core` on a host with no `docker`, `tmux`, `systemctl`, `journalctl` or `brew` on `PATH` (see "Bare-host smoke" in `docs/RELEASING.md`). On Linux the smoke decides on `min(idle) - min(baseline)` over 3 windows per side (PAN-5361); macOS keeps its single-window traced-cost measure.
+Four CI jobs in `.github/workflows/ci.yml` run `scripts/bare-host-smoke.sh`, which installs the packed `@overdeck/core` on a host with no `docker`, `tmux`, `systemctl`, `journalctl` or `brew` on `PATH` (see "Bare-host smoke" in `docs/RELEASING.md`). On Linux the smoke decides on `min(idle) - min(baseline)` over 5 windows per side, since 2 of the 5 are structurally elevated by the dashboard's own post-boot probes and a permanent periodic check, leaving 3 genuinely steady samples (PAN-5361); macOS keeps its single-window traced-cost measure.
 
 - `bare-host-linux` runs on every PR and every CI-triggering push to `main`.
 - `bare-host-macos` runs on every CI-triggering push to `main`, and on a PR that touches `src/dashboard/server/**`, `src/lib/**`, `src/cli/**`, `package.json`, `bun.lock`, the smoke script (`scripts/bare-host-smoke.sh` or `scripts/bare-host-smoke/**`) or `ci.yml`. The `bare-host-changes` job computes that filter.
 - `bare-host-macos-known-bad` runs only when the smoke script changes. It smokes `@overdeck/core@0.81.0` and passes only if the smoke still fails it for the PAN-5168/5169 reasons.
-- `bare-host-linux-spawner-canary` runs only when the smoke script changes (same `bare-host-changes` `smoke` filter). It smokes the packed subject with a steady spawner in the idle dashboard (`--idle-spawner-ms 500`, about +60 PIDs per window) and passes only if the Linux check fails `pid-net` with `idle.attribution.source === "dashboard-tree"` — the positive control proving the min-of-3 measure and its `/proc` attribution still catch a real regression.
+- `bare-host-linux-spawner-canary` runs only when the smoke script changes (same `bare-host-changes` `smoke` filter). It smokes the packed subject with a steady spawner in the idle dashboard (`--idle-spawner-ms 500`, about +60 PIDs per window) and passes only if the Linux check fails `pid-net` with `idle.attribution.source === "dashboard-tree"` — the positive control proving the min-of-5 measure and its `/proc` attribution still catch a real regression.
 
 None of them has `continue-on-error`. A failing one blocks merge through the merge gate's any-failing-check rule (`cloister/pr-facts.ts` marks the PR failed when a completed check concludes anything other than SUCCESS, NEUTRAL or SKIPPED). A job that its `if:` skips reports SKIPPED, which counts as passing, so the macOS filter never strands a PR. `main` has no GitHub branch protection; this rule is what makes the jobs required.
 
