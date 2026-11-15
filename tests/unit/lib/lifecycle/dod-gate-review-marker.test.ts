@@ -12,7 +12,11 @@ vi.mock('../../../../src/lib/github-app-installations.js', () => ({
 
 import { emptyPrFacts, getPrFacts, type PrFacts } from '../../../../src/lib/cloister/pr-facts.js';
 import type { IssuePullRequestData } from '../../../../src/lib/overdeck/pull-requests.js';
-import { checkReviewRow, type DodStatusRowDeps } from '../../../../src/lib/lifecycle/dod-gate.js';
+import {
+  checkReviewRow,
+  type DodStatusRowDeps,
+  type TerminalVerdictSettlement,
+} from '../../../../src/lib/lifecycle/dod-gate.js';
 
 const issueId = 'OKF-11';
 const HEAD = 'a'.repeat(40);
@@ -62,6 +66,17 @@ function approvedComment(sha: string, createdAt = '2026-11-15T20:39:17Z') {
     body: `<!-- overdeck-verdict: APPROVED sha=${sha} -->\n\nreview verdict: passed`,
   };
 }
+
+function changesRequestedComment(sha: string, createdAt = '2026-11-15T20:39:17Z') {
+  return {
+    authorAssociation: 'OWNER',
+    author: { login: 'eltmon' },
+    createdAt,
+    body: `<!-- overdeck-verdict: CHANGES_REQUESTED sha=${sha} -->`,
+  };
+}
+
+const SETTLEMENT: TerminalVerdictSettlement = { trackerClosed: true, landedWork: true, mainVerifyStatus: 'pass' };
 
 describe('Row 1 — comment-posted verdict evidence (PAN-5401)', () => {
   it('T1: passes when reviewDecision is empty and a trusted APPROVED comment names the head', async () => {
@@ -153,5 +168,70 @@ describe('Row 1 — comment-posted verdict evidence (PAN-5401)', () => {
       { strikeLanded: true },
     );
     expect(strikeRow).toMatchObject({ status: 'skip' });
+  });
+
+  it('T6: a trusted CHANGES_REQUESTED-only verdict comment misses row 1 even when settlement applies', async () => {
+    const row = await checkReviewRow(
+      issueId,
+      {
+        readPullRequest: () => pr({ comments: [changesRequestedComment(HEAD)] }),
+        readVerification: () => null,
+        readReviewFacts: readReviewFactsFromPr,
+      },
+      SETTLEMENT,
+    );
+    expect(row).toMatchObject({
+      status: 'miss',
+      observed: 'PR #12 reviewDecision: none; Overdeck verdict comment requested changes',
+    });
+  });
+
+  it('T7: a CHANGES_REQUESTED comment posted after an APPROVED comment misses row 1', async () => {
+    const row = await checkReviewRow(
+      issueId,
+      {
+        readPullRequest: () => pr({
+          comments: [
+            approvedComment(HEAD, '2026-11-15T20:39:17Z'),
+            changesRequestedComment(HEAD, '2026-11-15T20:45:00Z'),
+          ],
+        }),
+        readVerification: () => null,
+        readReviewFacts: readReviewFactsFromPr,
+      },
+      SETTLEMENT,
+    );
+    expect(row).toMatchObject({
+      status: 'miss',
+      observed: 'PR #12 reviewDecision: none; Overdeck verdict comment requested changes',
+    });
+  });
+
+  it('T8: the strike path does not skip a CHANGES_REQUESTED verdict comment', async () => {
+    const row = await checkReviewRow(
+      issueId,
+      {
+        readPullRequest: () => pr({ comments: [changesRequestedComment(HEAD)] }),
+        readVerification: () => null,
+        readReviewFacts: readReviewFactsFromPr,
+      },
+      undefined,
+      { strikeLanded: true },
+    );
+    expect(row).toMatchObject({ status: 'miss' });
+  });
+
+  it('T9: an APPROVED comment after an older CHANGES_REQUESTED comment still passes (the real OKF-11 order)', async () => {
+    const row = await checkReviewRow(issueId, {
+      readPullRequest: () => pr({
+        comments: [
+          changesRequestedComment(OTHER, '2026-11-15T20:34:07Z'),
+          approvedComment(HEAD, '2026-11-15T20:39:17Z'),
+        ],
+      }),
+      readVerification: () => null,
+      readReviewFacts: readReviewFactsFromPr,
+    });
+    expect(row).toMatchObject({ status: 'pass' });
   });
 });

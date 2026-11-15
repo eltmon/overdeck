@@ -414,26 +414,33 @@ function terminalVerdictSettlement(
 }
 
 /**
- * PAN-5401: the merge gate's approval evidence for a PR with no forge decision — a trusted
- * `overdeck-verdict: APPROVED` comment whose `sha=` names the head. Read only when some comment
- * carries a verdict marker; a failed read is reported, never a pass.
+ * PAN-5401: the merge gate's evidence for a PR with no forge decision — a trusted
+ * `overdeck-verdict` comment naming the head. An APPROVED comment naming the head passes; a
+ * newest trusted CHANGES_REQUESTED comment is a negative verdict, as it is for the merge gate.
+ * Read only when some comment carries a verdict marker; a failed read is reported, never a pass.
  */
-async function commentApprovalAtHead(
+type CommentReviewVerdict =
+  | { kind: 'approved'; head: string }
+  | { kind: 'changes-requested' }
+  | { kind: 'none'; note?: string };
+
+async function commentReviewVerdict(
   issueId: string,
   pr: IssuePullRequestData,
   deps: DodStatusRowDeps,
-): Promise<{ approved: true; head: string } | { approved: false; note?: string }> {
+): Promise<CommentReviewVerdict> {
   if (!(pr.comments ?? []).some(comment => parseVerdictMarker(comment.body) !== null)) {
-    return { approved: false };
+    return { kind: 'none' };
   }
   try {
     const facts = await (deps.readReviewFacts ?? readReviewFactsFromPr)(issueId, pr);
-    if (facts.error) return { approved: false, note: `review verdict comment unreadable: ${facts.error}` };
-    if (approvalProvenAtHead(facts) && facts.headSha) return { approved: true, head: facts.headSha };
-    return { approved: false };
+    if (facts.error) return { kind: 'none', note: `review verdict comment unreadable: ${facts.error}` };
+    if (facts.changesRequested) return { kind: 'changes-requested' };
+    if (approvalProvenAtHead(facts) && facts.headSha) return { kind: 'approved', head: facts.headSha };
+    return { kind: 'none' };
   } catch (error) {
     return {
-      approved: false,
+      kind: 'none',
       note: `review verdict comment unreadable: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
@@ -482,17 +489,23 @@ async function checkVerdict(
     const decision = pr.reviewDecision || 'none';
     let observed = `PR #${pr.number} reviewDecision: ${decision}`;
     if (decision === 'APPROVED') return result('review', 'pass', observed);
-    if (decision !== 'CHANGES_REQUESTED') {
-      const comment = await commentApprovalAtHead(issueId, pr, deps);
-      if (comment.approved) {
+    let rejected = decision === 'CHANGES_REQUESTED';
+    if (!rejected) {
+      const comment = await commentReviewVerdict(issueId, pr, deps);
+      if (comment.kind === 'approved') {
         return result('review', 'pass', `${observed}; Overdeck verdict comment approved head ${comment.head.slice(0, 12)}`);
       }
-      if (comment.note) observed = `${observed}; ${comment.note}`;
+      if (comment.kind === 'changes-requested') {
+        rejected = true;
+        observed = `${observed}; Overdeck verdict comment requested changes`;
+      } else if (comment.note) {
+        observed = `${observed}; ${comment.note}`;
+      }
     }
-    if (landing?.strikeLanded && decision !== 'CHANGES_REQUESTED') {
+    if (landing?.strikeLanded && !rejected) {
       return result('review', 'skip', `${observed}; skipped by the strike path — ${STRIKE_BYPASS_NOTE.review}`);
     }
-    const negative = decision === 'CHANGES_REQUESTED' ? 'failed' : undefined;
+    const negative = rejected ? 'failed' : undefined;
     return terminalVerdictSettlement('review', negative, observed, settlement) ?? result('review', 'miss', observed);
   }
 
