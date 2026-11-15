@@ -18,13 +18,13 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { escapeHtml } from '../../../lib/mcp/oauth-flow.js';
 import { channelOfRequest } from '../channel-peer.js';
 import { jsonResponse } from '../http-helpers.js';
-import { isTrustedLocalRequest } from '../remote-request-gate.js';
 import { accountSignInService, CALLBACK_PATH, type CallbackResult } from '../services/account-sign-in.js';
 import { accountViewService } from '../services/account-view.js';
 import {
   hasProxyForwardingHeader,
   isLoopbackPeer,
   isTailscaleFunnelRequest,
+  isTrustedLocalCaller,
   rejectUnauthorizedDashboardRequest,
   rejectUnsafeDashboardMutationRequest,
   resolveRequestCredential,
@@ -51,7 +51,7 @@ const viewRoute = HttpRouter.add(
     }
     const refused = rejectUnauthorizedDashboardRequest(request);
     if (refused) return refused;
-    const canSignIn = resolveRequestCredential(request)?.kind === 'root-session' && isTrustedLocalRequest(request);
+    const canSignIn = resolveRequestCredential(request)?.kind === 'root-session' && isTrustedLocalCaller(request);
     const signIn = accountSignInService().view(canSignIn);
     const view = yield* Effect.promise(() => accountViewService().view({ canSignIn, signIn }));
     return jsonResponse(view, { headers: NO_STORE });
@@ -69,7 +69,7 @@ const signInRoute = HttpRouter.add(
     if (kind !== 'root-session' && kind !== 'internal-token') {
       return jsonResponse({ error: 'Only this machine can sign in to overdeck.ai.' }, { status: 403, headers: NO_STORE });
     }
-    if (!isTrustedLocalRequest(request)) {
+    if (!isTrustedLocalCaller(request)) {
       return jsonResponse(
         { error: 'Sign in from a browser on this machine; the sign-in returns to 127.0.0.1.' },
         { status: 403, headers: NO_STORE },

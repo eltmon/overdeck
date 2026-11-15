@@ -1,6 +1,7 @@
 /**
  * PAN-4645 WI-15: with a machine link and the YAML key unset, a forwarded
- * loopback session mint is refused; with nothing remote it passes.
+ * loopback session mint is refused; with nothing remote it passes. PAN-5344:
+ * a local caller (no forwarding header) mints and reads either way.
  */
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -70,9 +71,28 @@ describe('forwarded loopback mint with automatic require_token_mint (PAN-4645 WI
     expect(readRemoteAccessConfig()).toMatchObject({ requireTokenMint: true, configured: false, autoReasons: ['machine-link'] });
     expect(rejectUnauthorizedDashboardSessionMintRequest(forwardedMint())?.status).toBe(401);
     expect(remoteGateRejection(forwardedLocalRead())).toEqual({ status: 401 });
-    // A plain loopback peer (no forwarding header) still mints: the local browser keeps working.
+    // PAN-5344: a plain loopback peer (no forwarding header) still mints and reads: the local browser keeps working.
     const local = HttpServerRequest.fromWeb(new Request('http://dashboard.test/api/dashboard/session', { method: 'POST' }))
       .modify({ remoteAddress: Option.some('127.0.0.1') });
-    expect(rejectUnauthorizedDashboardSessionMintRequest(local)?.status).toBe(401);
+    expect(rejectUnauthorizedDashboardSessionMintRequest(local)).toBeNull();
+    const localRead = HttpServerRequest.fromWeb(new Request('http://dashboard.test/api/issues'))
+      .modify({ remoteAddress: Option.some('127.0.0.1') });
+    expect(remoteGateRejection(localRead)).toBeNull();
+  });
+
+  it('PAN-5344: a Funnel request from a loopback peer never mints, even with nothing remote', () => {
+    const funnel = HttpServerRequest.fromWeb(new Request('http://dashboard.test/api/dashboard/session', {
+      method: 'POST', headers: { 'tailscale-funnel-request': '?1' },
+    })).modify({ remoteAddress: Option.some('127.0.0.1') });
+    expect(rejectUnauthorizedDashboardSessionMintRequest(funnel)?.status).toBe(401);
+  });
+
+  it('PAN-5344: a request on a secure channel never mints from peer trust', async () => {
+    await upsertLink({
+      environmentId: 'env-peer', label: 'peer', machineKey: 'a1'.repeat(32), token: `odk_${'9'.repeat(64)}`, access: 'operator', routes: [],
+    });
+    const request = HttpServerRequest.fromWeb(new Request('http://dashboard.test/api/dashboard/session', { method: 'POST' }))
+      .modify({ remoteAddress: Option.some('127.0.0.1') });
+    expect(rejectUnauthorizedDashboardSessionMintRequest(request, { mode: 'link', remoteKeyHex: 'a1'.repeat(32) } as never)?.status).toBe(401);
   });
 });

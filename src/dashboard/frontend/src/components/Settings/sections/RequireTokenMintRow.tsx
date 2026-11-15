@@ -34,8 +34,8 @@ export function RequireTokenMintRow({ formData, onSettingsChange }: RequireToken
         <span className="text-sm font-medium text-foreground">Require a token to sign in</span>
         <p className="text-xs text-muted-foreground mt-0.5">
           Turn this on when a local reverse proxy (Tailscale Serve, cloudflared) forwards outside
-          traffic. Browsers that already have a session keep working; a new browser on this
-          machine then needs the <code>#overdeck_token=</code> link or pairing to sign in.
+          traffic. Visitors the proxy forwards then need pairing or the{' '}
+          <code>#overdeck_token=</code> link to sign in. A browser on this machine always signs in.
         </p>
         {forcedOn && (
           <p className="text-xs text-muted-foreground mt-1" data-testid="require-token-mint-auto">

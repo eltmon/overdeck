@@ -519,9 +519,15 @@ entries but cannot replace it. A local browser shows up there as the bridge
 gateway (for example `172.23.0.1`), because it reaches Traefik through
 docker-proxy. Literal-loopback and in-container peers do not read the header.
 With
-`dashboard.require_token_mint: true` (see "Remote request gate"), the loopback
-bullet no longer applies: only the internal token or an existing credential
-mints.
+`dashboard.require_token_mint: true` (see "Remote request gate"), a
+literal-loopback peer that carries `X-Forwarded-For`, `X-Forwarded-Host` or
+`Forwarded` is no longer trusted: that is a host-local reverse proxy (Tailscale
+Serve and cloudflared target `http://127.0.0.1:<port>`) forwarding a remote
+visitor. A local caller still mints whatever the toggle says (PAN-5344): a
+loopback peer with no forwarding header (a browser on `localhost:3011`) and a
+Docker-bridge peer whose forwarded client is local (a browser on
+`overdeck.localhost`). `isTrustedLocalCaller` (`dashboard-auth.ts`) is the one
+rule; the mint, the remote request gate and the account routes all call it.
 
 **Two-host mint** — when `VITE_API_URL` puts the API on a different host than
 the page (a workspace dev stack, PAN-3711), `ensureDashboardSession()`
@@ -932,9 +938,10 @@ reach any route at all:
    `insufficient_scope`. This rule never falls back to peer trust. `GET
    /events/stream` also accepts its own `OVERDECK_EVENTS_TOKEN` bearer when that
    variable is set, so remote SSE consumers keep working.
-4. The request is a trusted local caller (`isLoopbackPeer`, the same peer check
-   as the mint): pass. With `require_token_mint`, a loopback peer that carries
-   `X-Forwarded-For`, `X-Forwarded-Host` or `Forwarded` counts as remote.
+4. The request is a trusted local caller (`isTrustedLocalCaller`, the same rule
+   as the mint): pass. With `require_token_mint`, a literal-loopback peer that
+   carries `X-Forwarded-For`, `X-Forwarded-Host` or `Forwarded` counts as
+   remote; a bridge peer whose forwarded client is local stays local.
 5. Otherwise: **401** `{ "error": "unauthorized" }`.
 
 The gate normalizes the path before deciding (query, absolute-form target,
@@ -1049,6 +1056,11 @@ stay 404. The switch is read from the operator's global `config.yaml` only
   `dashboard.require_token_mint` is `false` (the default): the proxy connects
   from loopback, so every visitor is a trusted local caller. Turn the switch on
   whenever a proxy forwards outside traffic.
+- A local TCP forwarder that adds no forwarding header (`socat`, `ssh -L`):
+  its requests are indistinguishable from a local browser, so they mint even
+  with `require_token_mint` on. A browser on this machine is never locked out
+  (PAN-5344); the price is that the toggle only catches proxies that announce
+  themselves, which every HTTP reverse proxy Overdeck sets up does.
 
 ## Troubleshooting
 
