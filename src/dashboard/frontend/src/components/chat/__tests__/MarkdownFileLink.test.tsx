@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WS_METHODS } from '@overdeck/contracts';
 
 const wsTransportMock = vi.hoisted(() => ({
@@ -28,6 +28,12 @@ vi.mock('@pierre/diffs', () => ({
   getSharedHighlighter: vi.fn().mockResolvedValue({
     codeToHtml: (code: string) => `<pre><code>${code}</code></pre>`,
   }),
+}));
+
+// PAN-5295 WI-13: the panel's changes context; null (outside a scope) unless a test sets it.
+const changesCtxMock = vi.hoisted(() => ({ value: null as unknown }));
+vi.mock('../conversationChanges/ConversationChangesScope', () => ({
+  useConversationChangesContext: () => changesCtxMock.value,
 }));
 
 import { MarkdownFileLink, fileLinkIconForPath } from '../MarkdownFileLink';
@@ -661,6 +667,120 @@ describe('MarkdownFileLink', () => {
       fireEvent.click(screen.getByRole('link'));
 
       expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.filePath, markdownMeta.basename, null);
+    });
+  });
+});
+
+describe('MarkdownFileLink inside a Stage with conversation changes (PAN-5295)', () => {
+  const REPO = '/home/eltmon/project';
+  const stage = {
+    rootId: 'project:p',
+    rootPathOf: (repoPath: string) => repoPath,
+    repoPathOfAbs: (abs: string) => (abs.startsWith(`${REPO}/`) ? abs.slice(REPO.length + 1) : null),
+    openDiff: vi.fn(),
+    openBeside: vi.fn(),
+    reveal: vi.fn(),
+    showInFiles: vi.fn(),
+  };
+  const changes = {
+    conversation: 'c1', repoRoot: REPO, rootId: null, branch: 'main', scope: 'conversation',
+    uncommitted: [{ path: 'docs/README.md', status: 'M', additions: 2, deletions: 0, attribution: 'lines', turnIds: [] }],
+    commits: [
+      { sha: 'old1', shortSha: 'old1', subject: 's', authoredAt: '2026-11-01T00:00:00Z', pushed: true, attribution: 'trailer', files: [{ path: 'src/App.tsx', status: 'M', additions: 1, deletions: 0 }] },
+      { sha: 'new2', shortSha: 'new2', subject: 's', authoredAt: '2026-11-02T00:00:00Z', pushed: false, attribution: 'trailer', files: [{ path: 'src/App.tsx', status: 'M', additions: 3, deletions: 1 }] },
+    ],
+    totals: { files: 2, additions: 6, deletions: 1, commitsPushed: 1, commitsLocal: 1, uncommittedFiles: 1 },
+  };
+  const readme = { path: 'docs/README.md', repoPath: 'docs/README.md', repoRoot: REPO };
+  const appOld = { path: 'src/App.tsx', repoPath: 'src/App.tsx', repoRoot: REPO, sha: 'old1', pushed: true };
+  const appNew = { path: 'src/App.tsx', repoPath: 'src/App.tsx', repoRoot: REPO, sha: 'new2', pushed: false };
+  const unchangedTs = { filePath: `${REPO}/src/x.ts`, targetPath: `${REPO}/src/x.ts:12`, displayPath: 'project/src/x.ts:12', basename: 'x.ts', line: 12 };
+  const unchangedMd = { filePath: `${REPO}/docs/guide.md`, targetPath: `${REPO}/docs/guide.md`, displayPath: 'project/docs/guide.md', basename: 'guide.md' };
+
+  beforeEach(() => {
+    localStorage.clear();
+    for (const fn of [stage.openDiff, stage.openBeside, stage.reveal]) fn.mockReset();
+    changesCtxMock.value = { conversation: { name: 'c1' }, changes, rootId: 'project:p', stage, openDiffWindow: vi.fn() };
+    wsTransportMock.getAvailableEditors.mockReset();
+    wsTransportMock.getAvailableEditors.mockResolvedValue({ editors: ['vscode'] });
+    wsTransportMock.shellOpenInEditor.mockReset();
+    wsTransportMock.shellOpenInEditor.mockResolvedValue({ success: true });
+    wsTransportMock.getAvailableBrowsers.mockReset();
+    wsTransportMock.getAvailableBrowsers.mockResolvedValue({ browsers: [] });
+    wsTransportMock.request.mockReset();
+    wsTransportMock.request.mockImplementation((connect: (client: Record<string, unknown>) => unknown) => connect({
+      [WS_METHODS.getAvailableEditors]: wsTransportMock.getAvailableEditors,
+      [WS_METHODS.shellOpenInEditor]: wsTransportMock.shellOpenInEditor,
+      [WS_METHODS.getAvailableBrowsers]: wsTransportMock.getAvailableBrowsers,
+    }));
+  });
+
+  afterEach(() => {
+    changesCtxMock.value = null;
+    fireEvent.keyDown(document, { key: 'Escape' });
+  });
+
+  const allTargets = [readme, appOld, appNew];
+
+  it('opens the dock diff for an uncommitted path, with every conversation target as the list', () => {
+    render(<MarkdownFileLink {...markdownMeta} />);
+    fireEvent.click(screen.getByRole('link'));
+    expect(stage.openDiff).toHaveBeenCalledWith(readme, allTargets);
+    expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
+  });
+
+  it('opens the newest commit\'s diff for a committed path', () => {
+    render(<MarkdownFileLink {...meta} />);
+    fireEvent.click(screen.getByRole('link'));
+    expect(stage.openDiff).toHaveBeenCalledWith(appNew, allTargets);
+  });
+
+  it('opens an unchanged .ts path beside the chat at its line', () => {
+    render(<MarkdownFileLink {...unchangedTs} />);
+    fireEvent.click(screen.getByRole('link'));
+    expect(stage.openBeside).toHaveBeenCalledWith('src/x.ts', 12);
+    expect(stage.openDiff).not.toHaveBeenCalled();
+  });
+
+  it('keeps the persisted Markdown open target for an unchanged .md path', async () => {
+    // 'cursor' is not in the available list, so only the persisted-target path can choose it.
+    localStorage.setItem('overdeck:markdown-open-target', 'cursor');
+    render(<MarkdownFileLink {...unchangedMd} />);
+    fireEvent.click(screen.getByRole('link'));
+    await waitFor(() => expect(wsTransportMock.shellOpenInEditor).toHaveBeenCalledWith({ cwd: unchangedMd.targetPath, editor: 'cursor' }));
+    expect(stage.openBeside).not.toHaveBeenCalled();
+  });
+
+  it('keeps the external editor call for a path outside the repo', async () => {
+    render(<MarkdownFileLink filePath="/elsewhere/y.ts" targetPath="/elsewhere/y.ts" displayPath="elsewhere/y.ts" basename="y.ts" />);
+    fireEvent.click(screen.getByRole('link'));
+    await waitFor(() => expect(wsTransportMock.shellOpenInEditor).toHaveBeenCalledWith({ cwd: '/elsewhere/y.ts', editor: 'vscode' }));
+    expect(stage.openBeside).not.toHaveBeenCalled();
+  });
+
+  it('changes nothing without the context', async () => {
+    changesCtxMock.value = null;
+    render(<MarkdownFileLink {...unchangedTs} />);
+    fireEvent.click(screen.getByRole('link'));
+    await waitFor(() => expect(wsTransportMock.shellOpenInEditor).toHaveBeenCalledWith({ cwd: unchangedTs.targetPath, editor: 'vscode' }));
+    expect(stage.openBeside).not.toHaveBeenCalled();
+  });
+
+  it('leads the context menu with Open diff, Open beside and Reveal in files', async () => {
+    render(<MarkdownFileLink {...meta} />);
+    fireEvent.contextMenu(screen.getByRole('link'));
+    await waitFor(() => {
+      expect(screen.getAllByRole('menuitem').map((item) => item.textContent).slice(0, 4)).toEqual(['Open diff', 'Open beside', 'Reveal in files', 'Open in editor']);
+    });
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Reveal in files' }));
+    expect(stage.reveal).toHaveBeenCalledWith('src/App.tsx');
+  });
+
+  it('offers no Open diff for an unchanged path, and leads the Markdown menu too', async () => {
+    render(<MarkdownFileLink {...unchangedMd} />);
+    fireEvent.contextMenu(screen.getByRole('link'));
+    await waitFor(() => {
+      expect(screen.getAllByRole('menuitem').map((item) => item.textContent).slice(0, 3)).toEqual(['Open beside', 'Reveal in files', 'Open in internal editor']);
     });
   });
 });
