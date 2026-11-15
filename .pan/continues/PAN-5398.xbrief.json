@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5398",
   "created": "2026-11-15T20:47:31.521Z",
-  "updated": "2026-11-15T21:08:07.773Z",
+  "updated": "2026-11-15T21:08:13.294Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,11 @@
     "cli-open-success-line.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T21:08:07.772Z"
+    },
+    "switcher-uses-project-deck-key": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5398",
+      "claimedAt": "2026-11-15T21:08:13.294Z"
     }
   }
 }
