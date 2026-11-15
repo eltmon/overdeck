@@ -2,6 +2,7 @@
  * Per-skill on/off overrides (PAN-3942) and skill pack toggles (PAN-4334).
  *
  *   GET /api/skills/overrides?project=<key>&issue=<id>[&checkUpdates=1]
+ *   GET /api/skills/overrides?conversation=<name>[&cwd=<path>][&issue=<id>] (PAN-5347)
  *   PUT /api/skills/overrides  { level, skill | pack, enabled: true|false|null, projectKey?, issueId? }
  *
  * Both return `{ project, issue, skills, packs }`: the effective state of
@@ -10,10 +11,16 @@
  * `packOverriddenBelow` (pack toggles) from projects and issues. Only a GET
  * with `checkUpdates=1` fills `packs[].updateAvailable`, because that runs
  * `git ls-remote`; the PUT response never does.
+ *
+ * A GET naming `conversation` or `cwd` resolves the conversation's own launch
+ * scope and per-conversation overrides instead (PAN-5347 FR-3), so the
+ * composer's / menu reflects the same resolution the launcher applies; it
+ * never reports `overriddenBelow`.
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
+import { listConversationSkillStates } from '../../../../lib/skill-overrides/conversation-scope.js';
 import {
   listLowerLevelOverrides,
   listLowerLevelPackOverrides,
@@ -34,6 +41,7 @@ const STATUS_BY_CODE: Record<SkillOverrideErrorCode, number> = {
   'unknown-pack': 404,
   'unknown-project': 404,
   'unknown-issue': 404,
+  'unknown-conversation': 404,
   'bad-request': 400,
 };
 
@@ -60,10 +68,15 @@ const getSkillOverridesRoute = HttpRouter.add(
     const url = new URL(request.url, 'http://localhost');
     const projectKey = url.searchParams.get('project') || undefined;
     const issueId = url.searchParams.get('issue') || undefined;
+    const conversationName = url.searchParams.get('conversation') || undefined;
+    const cwd = url.searchParams.get('cwd') || undefined;
     const checkUpdates = url.searchParams.get('checkUpdates') === '1';
     return yield* Effect.promise(async () => {
       const started = Date.now();
       try {
+        if (conversationName || cwd) {
+          return jsonResponse(await listConversationSkillStates({ conversationName, cwd, issueId }));
+        }
         return jsonResponse(await skillStatesResponseBody({ projectKey, issueId }, checkUpdates));
       } catch (error) {
         return errorResponse(error);

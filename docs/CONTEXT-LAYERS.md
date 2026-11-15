@@ -213,6 +213,13 @@ precedence `listSkillCatalog()` uses server-side. `GET /api/skills/overrides`
 reports each native skill's root as `origin` (`overdeck`, `personal`, or
 `project`); the dialog groups by that field rather than re-deriving it.
 
+`GET /api/skills/overrides?conversation=<name>` (PAN-5347) resolves the
+states a launch of that conversation applies — its own cwd, issue, and
+per-conversation overrides — falling back to the `cwd`/`issue` query
+parameters for an agent session, which has no conversation row of its own.
+The dashboard composer's `/` menu uses this to list skills on harnesses that
+declare `skillSlashCommands`.
+
 Each group header shows a `<on> on · <total>` count. Groups start
 collapsed, except a group holding a row with an explicit choice made in this
 dialog, which starts open. Typing in the filter opens every group with a

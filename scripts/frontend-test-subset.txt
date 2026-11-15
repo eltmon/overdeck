@@ -209,6 +209,7 @@ src/components/chat/__tests__/ComposerFooter.path-drop.test.tsx
 src/components/chat/__tests__/ComposerFooter.schedule.test.tsx
 src/components/chat/__tests__/ComposerFooter.send-queue.test.tsx
 src/components/chat/__tests__/ComposerFooter.streaming-render-count.test.tsx
+src/components/chat/__tests__/ComposerPromptEditor.skills.test.tsx
 src/components/chat/__tests__/ComposerPromptEditor.test.tsx
 src/components/chat/__tests__/ConversationAboutDrawer.test.tsx
 src/components/chat/__tests__/ConversationMachineBanner.test.tsx
@@ -234,6 +235,8 @@ src/components/chat/__tests__/heldKickoff.test.tsx
 src/components/chat/__tests__/queuedPromptSend.test.ts
 src/components/chat/__tests__/resetClippedScroll.test.ts
 src/components/chat/__tests__/scheduledMessages.test.ts
+src/components/chat/__tests__/skillSlashCommands.test.ts
+src/components/chat/__tests__/slashCommands.skills.test.ts
 src/components/chat/__tests__/useComposerRestoreTarget.test.tsx
 src/components/chat/__tests__/useFloatingPickerPosition.test.tsx
 src/components/chat/__tests__/useOlderHistory.test.ts
