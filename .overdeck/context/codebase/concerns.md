@@ -322,8 +322,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   the primary checkout** (PAN-4225) — `resolveIssueWorkspacePlanHome(projectRoot,
   issueId)` in `xbrief/lifecycle-io.ts` is the one place that resolves
   `<project>/workspaces/feature-<issue>`'s plan home; every per-issue writer
-  (feedback, session history, `transitionIssueXBrief`, the swarm slot ledger)
-  routes through it and writes nothing once that workspace is gone. Readers
+  (feedback, session history, `transitionIssueXBrief`, the swarm slot ledger,
+  the skip-plan `writeAutoStartXBrief` synthesis, which takes the workspace
+  path itself and refuses any other target (PAN-5316)) routes through it and
+  writes nothing once that workspace is gone. Readers
   (`readContinueStateForIssue`) check the workspace copy first, then the
   primary. Routine server writes leave `.pan/continues/`/`.pan/specs/` dirty
   and uncommitted in the workspace — `isOverdeckOwnedOnlyStatus`
