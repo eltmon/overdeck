@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5353",
   "created": "2026-11-15T14:41:35.965Z",
-  "updated": "2026-11-15T15:23:18.709Z",
+  "updated": "2026-11-15T15:23:36.076Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,6 +170,11 @@
     "empty-ctrl-enter.ac5": {
       "status": "completed",
       "doneAt": "2026-11-15T15:23:18.708Z"
+    },
+    "docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5353",
+      "claimedAt": "2026-11-15T15:23:36.076Z"
     }
   }
 }
