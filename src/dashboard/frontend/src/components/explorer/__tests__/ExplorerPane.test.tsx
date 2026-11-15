@@ -218,6 +218,12 @@ describe('ExplorerFiles', () => {
     expect(ids).not.toContain('explorer.content-search')
   })
 
+  it('reveals and selects the revealPath file (PAN-5289)', async () => {
+    renderPane({ revealPath: 'src/a.ts' })
+    expect(await screen.findByText('a.ts')).toBeInTheDocument()
+    expect(useExplorerStore.getState().roots['issue:PAN-1'].selection).toEqual(['src/a.ts'])
+  })
+
   it('Find in folder calls onFindInFolder with the folder path', async () => {
     const onFindInFolder = vi.fn()
     renderPane({ onFindInFolder })

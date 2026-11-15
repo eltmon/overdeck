@@ -94,7 +94,7 @@ export interface ExplorerFilesProps {
   onFindInFolder(dirPath: string): void
 }
 
-export function ExplorerFiles({ rootId, deckKey, onFindInFolder }: ExplorerFilesProps) {
+export function ExplorerFiles({ rootId, deckKey, revealPath, onFindInFolder }: ExplorerFilesProps) {
   const parsed = parseRootId(rootId)
   const rootKind = parsed?.kind ?? 'workspace'
   const root: RootState | undefined = useExplorerStore((s) => s.roots[rootId])
@@ -189,6 +189,7 @@ export function ExplorerFiles({ rootId, deckKey, onFindInFolder }: ExplorerFiles
   })
 
   const showDotfiles = root?.showDotfiles ?? true
+  const showIgnored = root?.showIgnored ?? false
   const changedOnly = root?.changedOnly ?? false
   const notGit = git.errorCode === 'NOT_A_GIT_REPO'
 
@@ -198,8 +199,13 @@ export function ExplorerFiles({ rootId, deckKey, onFindInFolder }: ExplorerFiles
       const changed = [...git.decorations.files].map(([path, d]) => ({ path, isDeleted: d.status === 'deleted' }))
       return projectChangedRows(changed, showDotfiles)
     }
-    return projectRows({ dirs: root.dirs, expanded: new Set(root.expanded), showDotfiles })
-  }, [root, changedOnly, git.decorations, showDotfiles])
+    return projectRows({ dirs: root.dirs, expanded: new Set(root.expanded), showDotfiles, showIgnored })
+  }, [root, changedOnly, git.decorations, showDotfiles, showIgnored])
+
+  // The active code pane's file: open its folders and select it.
+  useEffect(() => {
+    if (revealPath) useExplorerStore.getState().revealPath(rootId, revealPath)
+  }, [rootId, revealPath])
 
   const treeRows = useMemo(() => rows.filter((r): r is TreeRow => !isTruncatedRow(r)), [rows])
   const visibleOrder = useMemo(() => treeRows.map((r) => r.path), [treeRows])

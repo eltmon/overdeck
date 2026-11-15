@@ -29,6 +29,7 @@ describe('explorerStore persistence', () => {
     expect(JSON.parse(localStorage.getItem(`overdeck.explorer.${ROOT}`) ?? '{}')).toEqual({
       expanded: ['src'],
       showDotfiles: false,
+      showIgnored: false,
     })
 
     resetStore()
@@ -50,6 +51,37 @@ describe('explorerStore persistence', () => {
     resetStore()
     state().ensureRoot(ROOT)
     expect(root().changedOnly).toBe(false)
+  })
+
+  it('hides git-ignored entries by default and persists the toggle (PAN-5289)', () => {
+    state().ensureRoot(ROOT)
+    expect(root().showIgnored).toBe(false)
+    state().setShowIgnored(ROOT, true)
+    expect(JSON.parse(localStorage.getItem(`overdeck.explorer.${ROOT}`) ?? '{}').showIgnored).toBe(true)
+    resetStore()
+    state().ensureRoot(ROOT)
+    expect(root().showIgnored).toBe(true)
+  })
+
+  it('hydrates showIgnored false from a non-boolean stored value', () => {
+    localStorage.setItem(`overdeck.explorer.${ROOT}`, JSON.stringify({ expanded: [], showDotfiles: true, showIgnored: 'yes' }))
+    state().ensureRoot(ROOT)
+    expect(root().showIgnored).toBe(false)
+  })
+})
+
+describe('explorerStore revealPath (PAN-5289)', () => {
+  it('opens every ancestor folder and selects, anchors and focuses the path', () => {
+    state().ensureRoot('r')
+    state().setExpanded('r', 'other', true)
+    state().revealPath('r', 'a/b/c.ts')
+    const r = state().roots.r
+    expect(r.expanded).toEqual(expect.arrayContaining(['other', 'a', 'a/b']))
+    expect(r.expanded).not.toContain('a/b/c.ts')
+    expect(r.selection).toEqual(['a/b/c.ts'])
+    expect(r.anchor).toBe('a/b/c.ts')
+    expect(r.focused).toBe('a/b/c.ts')
+    expect(JSON.parse(localStorage.getItem('overdeck.explorer.r') ?? '{}').expanded).toEqual(expect.arrayContaining(['a', 'a/b']))
   })
 })
 

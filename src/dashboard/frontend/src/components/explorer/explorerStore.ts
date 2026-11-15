@@ -1,8 +1,8 @@
 // Explorer tree state, keyed by root id (PAN-5186, WI-B3).
 //
 // Per root: the loaded directories, the expanded set, the dotfile toggle, the
-// Changed filter and the selection. The expanded set and the dotfile toggle
-// persist in localStorage under `overdeck.explorer.<rootId>`; every read and
+// git-ignored toggle, the Changed filter and the selection. The expanded set
+// and the two toggles persist in localStorage under `overdeck.explorer.<rootId>`; every read and
 // write is in try/catch, and a corrupt value hydrates the defaults (D-B13).
 
 import { create } from 'zustand'
@@ -24,6 +24,8 @@ export interface RootState {
   expanded: string[]
   /** Persisted; default true. */
   showDotfiles: boolean
+  /** Show git-ignored entries. Persisted; default false (PAN-5289). */
+  showIgnored: boolean
   /** Not persisted. */
   changedOnly: boolean
   selection: string[]
@@ -44,6 +46,9 @@ export interface ExplorerStore {
   setExpandedMany(rootId: string, paths: readonly string[]): void
   collapseAll(rootId: string): void
   setShowDotfiles(rootId: string, show: boolean): void
+  setShowIgnored(rootId: string, show: boolean): void
+  /** Open every ancestor folder of `path` (persisted) and make it the selection, anchor and focus. */
+  revealPath(rootId: string, path: string): void
   setChangedOnly(rootId: string, on: boolean): void
   select(rootId: string, path: string, mode: SelectMode, visibleOrder: readonly string[]): void
   setFocused(rootId: string, path: string | null): void
@@ -62,19 +67,21 @@ const storageKey = (rootId: string): string => `overdeck.explorer.${rootId}`
 interface Persisted {
   expanded: string[]
   showDotfiles: boolean
+  showIgnored: boolean
 }
 
 function readPersisted(rootId: string): Persisted {
-  const defaults: Persisted = { expanded: [], showDotfiles: true }
+  const defaults: Persisted = { expanded: [], showDotfiles: true, showIgnored: false }
   try {
     const raw = localStorage.getItem(storageKey(rootId))
     if (!raw) return defaults
     const parsed: unknown = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object') return defaults
-    const { expanded, showDotfiles } = parsed as Record<string, unknown>
+    const { expanded, showDotfiles, showIgnored } = parsed as Record<string, unknown>
     return {
       expanded: Array.isArray(expanded) ? expanded.filter((p): p is string => typeof p === 'string') : [],
       showDotfiles: typeof showDotfiles === 'boolean' ? showDotfiles : true,
+      showIgnored: typeof showIgnored === 'boolean' ? showIgnored : false,
     }
   } catch {
     return defaults
@@ -83,7 +90,7 @@ function readPersisted(rootId: string): Persisted {
 
 function writePersisted(rootId: string, root: RootState): void {
   try {
-    const value: Persisted = { expanded: root.expanded, showDotfiles: root.showDotfiles }
+    const value: Persisted = { expanded: root.expanded, showDotfiles: root.showDotfiles, showIgnored: root.showIgnored }
     localStorage.setItem(storageKey(rootId), JSON.stringify(value))
   } catch {
     // Storage blocked or full: the tree still works for this session.
@@ -107,6 +114,7 @@ function freshRoot(rootId: string): RootState {
     dirs: {},
     expanded: persisted.expanded,
     showDotfiles: persisted.showDotfiles,
+    showIgnored: persisted.showIgnored,
     changedOnly: false,
     selection: [],
     anchor: null,
@@ -168,6 +176,20 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => {
 
     setShowDotfiles: (rootId, show) =>
       update(rootId, (r) => (r.showDotfiles === show ? r : { ...r, showDotfiles: show }), true),
+
+    setShowIgnored: (rootId, show) =>
+      update(rootId, (r) => (r.showIgnored === show ? r : { ...r, showIgnored: show }), true),
+
+    revealPath: (rootId, path) =>
+      update(
+        rootId,
+        (r) => {
+          const expanded = new Set(r.expanded)
+          for (let slash = path.indexOf('/'); slash > 0; slash = path.indexOf('/', slash + 1)) expanded.add(path.slice(0, slash))
+          return { ...r, expanded: [...expanded], selection: [path], anchor: path, focused: path }
+        },
+        true,
+      ),
 
     setChangedOnly: (rootId, on) => update(rootId, (r) => (r.changedOnly === on ? r : { ...r, changedOnly: on })),
 
