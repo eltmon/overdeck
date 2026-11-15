@@ -19,6 +19,7 @@ import { backfillMemoryFromTranscripts } from '../../lib/memory/backfill.js';
 import { findMatchingFacts, printMatchingFacts, registerMemoryFactCommands } from './memory-facts.js';
 import type { MemoryFact } from '../../lib/memory/facts/store.js';
 import { registerMemorySyncCommand } from './memory-sync.js';
+import { registerMemoryReindexCommand } from './memory-reindex.js';
 import { resolveContainedPinPath, verifyPinPathContainment } from '../../lib/memory/pin-path.js';
 import { resolveProjectKeyForCwdAsync } from '../../lib/projects.js';
 import { getProjectByKey, getWorkspaceById, listPinnedDocs, listWorkspacesForPath } from '../../lib/workspaces/resolver.js';
@@ -473,6 +474,7 @@ export function createMemoryCommand(): Command {
 
   registerMemoryFactCommands(memory);
   registerMemorySyncCommand(memory);
+  registerMemoryReindexCommand(memory);
 
   return memory;
 }

@@ -11,6 +11,8 @@ import {
   type OperatorMemorySyncOutcome,
   type OperatorMemorySyncStatus,
 } from '../../lib/memory/facts/operator-sync.js';
+import { userMemoryDir } from '../../lib/memory/facts/store.js';
+import { refreshStoreVectorsBestEffort } from '../../lib/memory/facts/vectors.js';
 import { exitCli } from '../exit.js';
 
 /** The fact id a conflict copy `<id>-conflict-<slug>` was made from. */
@@ -87,12 +89,15 @@ export interface MemorySyncDeps {
   sync: () => Promise<OperatorMemorySyncOutcome>;
   setup: (remoteUrl: string) => Promise<OperatorMemorySetupResult>;
   status: () => Promise<OperatorMemorySyncStatus>;
+  /** Injectable for tests; defaults to `refreshStoreVectorsBestEffort` over the operator store (PAN-5358 FR-15). */
+  refreshVectors: typeof refreshStoreVectorsBestEffort;
 }
 
 const defaultDeps: MemorySyncDeps = {
   sync: () => syncOperatorMemory(),
   setup: (remoteUrl) => setupOperatorMemorySync(remoteUrl),
   status: () => readOperatorMemorySyncStatus(),
+  refreshVectors: refreshStoreVectorsBestEffort,
 };
 
 function printStatus(status: OperatorMemorySyncStatus): void {
@@ -151,6 +156,14 @@ export async function memorySyncCommand(options: MemorySyncOptions, deps: Memory
   const formatted = formatSyncOutcome(outcome);
   if (options.json) console.log(JSON.stringify(outcome, null, 2));
   else for (const line of formatted.lines) console.log(line);
+
+  if (outcome.status === 'synced') {
+    const refreshResult = await deps.refreshVectors({ stores: [{ dir: userMemoryDir(), scope: 'user' }] });
+    if (!refreshResult.ok) {
+      console.error(chalk.yellow(`vector index not refreshed: ${refreshResult.reason}; run pan memory reindex`));
+    }
+  }
+
   if (!formatted.ok) return exitCli(1);
 }
 
