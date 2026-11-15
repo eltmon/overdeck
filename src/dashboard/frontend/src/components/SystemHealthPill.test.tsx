@@ -298,6 +298,26 @@ describe('SystemHealthPill', () => {
     expect(screen.getByRole('dialog', { name: 'System health' })).toBeInTheDocument();
   });
 
+  it('closes when a click inside it navigates, and stays open for one that does not', () => {
+    setSnapshot('healthy');
+    window.history.replaceState(null, '', '/');
+    renderPill(newQueryClient(), (
+      <>
+        <button type="button" onClick={() => window.history.pushState({}, '', '/settings')}>Open settings</button>
+        <button type="button">Stay here</button>
+      </>
+    ));
+
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+    fireEvent.click(screen.getByRole('button', { name: 'Stay here' }));
+    expect(screen.getByRole('dialog', { name: 'System health' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open settings' }));
+    expect(window.location.pathname).toBe('/settings');
+    expect(screen.queryByRole('dialog', { name: 'System health' })).not.toBeInTheDocument();
+    window.history.replaceState(null, '', '/');
+  });
+
   it('reaches the Cloister system controls through the health dot', () => {
     setSnapshot('healthy');
     renderPill(newQueryClient(), <CloisterStatusBar />);

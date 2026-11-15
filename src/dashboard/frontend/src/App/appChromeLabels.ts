@@ -7,11 +7,6 @@ export function projectCrumbLabel(key: string): string {
   return key === NO_PROJECT_KEY ? NO_PROJECT_LABEL : key;
 }
 
-/** The search button's placeholder text for a selected deck key, or null for "all projects" (PAN-5000). */
-export function searchButtonText(key: string | null): string {
-  return key === null || key === NO_PROJECT_KEY ? 'Search issues, conversations, commands…' : `Search ${key}…`;
-}
-
 /** The top bar's search-box text; the box opens the command palette (PAN-5292 E-D15). Child B changes it when the palette gains files. */
 export const PALETTE_SEARCH_PLACEHOLDER = 'Search issues, conversations, commands…';
 

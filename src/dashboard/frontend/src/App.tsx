@@ -634,7 +634,8 @@ export default function App() {
   }, [syncDrawerFromUrl, applyIssueRoute]);
 
   // PAN-4560: App subscribes to no agent, issue or activity slice — those
-  // consumers live in AppLiveStoreHost. The running count is a number.
+  // consumers live in AppLiveStoreHost. The running count is a number, and it
+  // feeds only UpdateDialog (PAN-5292 E-D2); the top bar counts in its leaves.
   const runningAgentCount = useDashboardStore((s) => countRunningAgents(s.agentsById));
 
   // App-level shortcuts go through the shortcut registry (PAN-5287).
@@ -782,7 +783,6 @@ export default function App() {
         <AppChrome
           activeTab={activeTab}
           selectedProjectKey={selectedProjectKey}
-          runningAgentCount={runningAgentCount}
           dashboardLifecycle={dashboardLifecycle}
           missingKeyTrackers={missingKeyTrackers}
           trackerBannerDismissed={trackerBannerDismissed}
@@ -790,13 +790,12 @@ export default function App() {
           isRestartBackendPending={restartBackendMutation.isPending}
           isRestartCliproxyPending={restartCliproxyMutation.isPending}
           isSessionFeedSidebarOpen={isSessionFeedSidebarOpen}
-          onSearchOpen={() => setIsSearchOpen(true)}
+          onPaletteOpen={() => { setPaletteInitialScope('all'); setIsPaletteOpen(true); }}
           onOpenSettings={() => setActiveTab('settings')}
           onDismissTrackerBanner={() => setTrackerBannerDismissed(true)}
           onRestartBackend={() => restartBackendMutation.mutate()}
           onRestartCliproxy={() => restartCliproxyMutation.mutate()}
           onToggleSessionFeedSidebar={() => setSessionFeedSidebarOpen(!isSessionFeedSidebarOpen)}
-          onNavigateNeedsYou={() => setActiveTab('flywheel')}
           onProjectCreated={handleProjectCreated}
         />
 

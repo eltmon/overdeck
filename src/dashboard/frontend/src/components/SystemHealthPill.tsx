@@ -253,6 +253,7 @@ export function SystemHealthPill({ compact = false, children }: { compact?: bool
   const previousState = useRef<HealthState | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const urlBeforeClickRef = useRef<string | null>(null);
 
   const closePopover = useCallback((restoreFocus = true) => {
     setHighlightLeakedOnly(false);
@@ -361,6 +362,16 @@ export function SystemHealthPill({ compact = false, children }: { compact?: bool
           id={POPOVER_ID}
           role="dialog"
           aria-labelledby={POPOVER_TITLE_ID}
+          // E-D6: a click that navigates (a stopped-agent row, Cloister's
+          // Settings) closes the popover. Child handlers run before this
+          // bubble-phase handler, so a URL change here means they navigated,
+          // whether through pushState alone or pushState plus popstate.
+          onClickCapture={() => { urlBeforeClickRef.current = window.location.pathname + window.location.search; }}
+          onClick={() => {
+            const before = urlBeforeClickRef.current;
+            urlBeforeClickRef.current = null;
+            if (before !== null && before !== window.location.pathname + window.location.search) closePopover(false);
+          }}
           className="absolute right-0 top-full z-[200] mt-2 w-[min(24rem,calc(100vw-1rem))] max-h-[calc(100vh-1rem)] overflow-auto rounded-xl border border-border bg-popover p-3 text-sm shadow-lg"
         >
           <div className="mb-3 flex items-start justify-between gap-3">

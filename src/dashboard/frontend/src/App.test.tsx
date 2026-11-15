@@ -113,7 +113,9 @@ vi.mock('./components/skeletons/GodViewSkeleton', () => ({ GodViewSkeleton: () =
 vi.mock('./components/skeletons/PipelineSkeleton', () => ({ PipelineSkeleton: () => null }));
 vi.mock('./components/StandaloneTerminal', () => ({ StandaloneTerminal: () => null }));
 vi.mock('./hooks/useCodexAutoRetry', () => ({ useCodexAutoRetry: () => null }));
-vi.mock('./components/SystemHealthPill', () => ({ SystemHealthPill: () => null }));
+vi.mock('./components/SystemHealthPill', () => ({ SystemHealthPill: () => null, HealthSection: () => null }));
+vi.mock('./App/topbar/AgentsMenu', () => ({ AgentsMenu: () => null }));
+vi.mock('./components/flywheel/NeedsYouIndicator', () => ({ NeedsYouIndicator: () => null }));
 // lucide-react icons are lightweight SVG components that render fine in jsdom,
 // so we don't mock them — the enumerated mock used to drift every time the app
 // bar gained an icon (PAN-1593 added Search/Snowflake/SlidersHorizontal).

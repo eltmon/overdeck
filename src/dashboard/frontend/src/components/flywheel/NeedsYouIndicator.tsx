@@ -46,10 +46,7 @@ function navigateToActivity(): void {
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
-export function NeedsYouIndicator(_props: {
-  /** @deprecated Ignored; WI-E10 removes it. */
-  onActivate?: () => void;
-} = {}) {
+export function NeedsYouIndicator() {
   const items = useNeedsYouItems();
   const { data: projects } = useQuery({ queryKey: ['registered-projects'], queryFn: fetchRegisteredProjects });
   const [open, setOpen] = useState(false);

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { formatSpec } from '../lib/shortcuts/keys';
 import { TAB_PATHS } from './routes';
-import { PALETTE_SEARCH_PLACEHOLDER, paletteKeycap, projectCrumbLabel, searchButtonText, TAB_TITLES } from './appChromeLabels';
+import { PALETTE_SEARCH_PLACEHOLDER, paletteKeycap, projectCrumbLabel, TAB_TITLES } from './appChromeLabels';
 
 describe('projectCrumbLabel (PAN-5000)', () => {
   it('renders the No project deck as "No project"', () => {
@@ -11,20 +11,6 @@ describe('projectCrumbLabel (PAN-5000)', () => {
 
   it('renders a registered project key as-is', () => {
     expect(projectCrumbLabel('overdeck')).toBe('overdeck');
-  });
-});
-
-describe('searchButtonText (PAN-5000)', () => {
-  it('shows the global placeholder for the No project deck', () => {
-    expect(searchButtonText('__no-project__')).toBe('Search issues, conversations, commands…');
-  });
-
-  it('shows the global placeholder when no deck is selected', () => {
-    expect(searchButtonText(null)).toBe('Search issues, conversations, commands…');
-  });
-
-  it('shows a project-scoped placeholder for a registered project key', () => {
-    expect(searchButtonText('overdeck')).toBe('Search overdeck…');
   });
 });
 

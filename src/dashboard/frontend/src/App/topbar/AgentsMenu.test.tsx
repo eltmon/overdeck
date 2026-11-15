@@ -19,6 +19,7 @@ vi.mock('../../components/EmergencyStopOverlay', () => ({
   triggerEmergencyStop: mocks.triggerEmergencyStop,
 }));
 
+import { isRunningAgentStatus } from '../../components/AgentPillPopoverRow';
 import { AgentsMenu } from './AgentsMenu';
 
 const CONVERSATIONS = [
@@ -108,6 +109,14 @@ describe('AgentsMenu', () => {
     setWorking([]);
     vi.unstubAllGlobals();
     vi.useRealTimers();
+  });
+
+  it('counts the complete running-status family as working (re-expressed from RunningAgentsPill)', () => {
+    expect(['running', 'active', 'starting', 'thinking', 'working'].every(
+      (status) => isRunningAgentStatus(status as Agent['status']),
+    )).toBe(true);
+    expect(isRunningAgentStatus('stopped')).toBe(false);
+    expect(isRunningAgentStatus('failed')).toBe(false);
   });
 
   it.each([
