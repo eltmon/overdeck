@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5289",
   "created": "2026-11-15T02:58:13.006Z",
-  "updated": "2026-11-15T03:07:12.891Z",
+  "updated": "2026-11-15T03:12:45.644Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,30 @@
       "doneAt": "2026-11-15T03:07:02.646Z"
     },
     "dock-scope": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5289",
-      "claimedAt": "2026-11-15T03:07:12.891Z"
+      "claimedAt": "2026-11-15T03:07:12.891Z",
+      "doneAt": "2026-11-15T03:12:45.644Z"
+    },
+    "dock-scope.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T03:12:45.644Z"
+    },
+    "dock-scope.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T03:12:45.644Z"
+    },
+    "dock-scope.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T03:12:45.644Z"
+    },
+    "dock-scope.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T03:12:45.644Z"
+    },
+    "dock-scope.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T03:12:45.644Z"
     }
   }
 }
