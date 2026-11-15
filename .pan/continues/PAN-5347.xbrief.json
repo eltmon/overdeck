@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5347",
   "created": "2026-11-15T13:35:45.395Z",
-  "updated": "2026-11-15T14:05:06.930Z",
+  "updated": "2026-11-15T14:05:13.227Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,11 @@
     "frontend-get-slash-commands-skills.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T14:05:06.930Z"
+    },
+    "frontend-editor-skills-menu": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5347",
+      "claimedAt": "2026-11-15T14:05:13.226Z"
     }
   }
 }
