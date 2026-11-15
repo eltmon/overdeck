@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5295",
   "created": "2026-11-15T19:39:19.043Z",
-  "updated": "2026-11-15T20:27:16.987Z",
+  "updated": "2026-11-15T20:28:31.645Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -268,6 +268,11 @@
     "file-chips.ac5": {
       "status": "completed",
       "doneAt": "2026-11-15T20:27:16.986Z"
+    },
+    "rail-closed-default": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5295",
+      "claimedAt": "2026-11-15T20:28:31.645Z"
     }
   }
 }
