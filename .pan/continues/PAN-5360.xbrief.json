@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5360",
   "created": "2026-11-15T15:42:12.629Z",
-  "updated": "2026-11-15T16:40:27.105Z",
+  "updated": "2026-11-15T16:44:43.199Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,9 +110,18 @@
       "doneAt": "2026-11-15T16:40:16.768Z"
     },
     "w5-cli-show": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5360",
-      "claimedAt": "2026-11-15T16:40:27.105Z"
+      "claimedAt": "2026-11-15T16:40:27.105Z",
+      "doneAt": "2026-11-15T16:44:43.198Z"
+    },
+    "w5-cli-show.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:44:43.198Z"
+    },
+    "w5-cli-show.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:44:43.198Z"
     }
   }
 }
