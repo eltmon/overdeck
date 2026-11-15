@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5292",
   "created": "2026-11-15T01:03:44.357Z",
-  "updated": "2026-11-15T01:21:03.706Z",
+  "updated": "2026-11-15T01:21:49.423Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -124,9 +124,18 @@
       "doneAt": "2026-11-15T01:20:59.890Z"
     },
     "stale-build-chip": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5292",
-      "claimedAt": "2026-11-15T01:21:03.705Z"
+      "claimedAt": "2026-11-15T01:21:03.705Z",
+      "doneAt": "2026-11-15T01:21:49.422Z"
+    },
+    "stale-build-chip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T01:21:49.422Z"
+    },
+    "stale-build-chip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T01:21:49.422Z"
     }
   }
 }
