@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5293",
   "created": "2026-11-15T06:57:45.448Z",
-  "updated": "2026-11-15T08:23:29.659Z",
+  "updated": "2026-11-15T08:26:57.345Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -375,6 +375,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5293",
       "claimedAt": "2026-11-15T08:23:29.658Z"
+    },
+    "awareness-removal": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5293",
+      "claimedAt": "2026-11-15T08:26:57.345Z"
     }
   }
 }
