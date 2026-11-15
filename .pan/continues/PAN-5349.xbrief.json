@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5349",
   "created": "2026-11-15T15:32:54.289Z",
-  "updated": "2026-11-15T18:28:46.537Z",
+  "updated": "2026-11-15T18:33:30.130Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -27,6 +27,11 @@
       "reason": "feedback",
       "note": "[2026-11-15T18:28Z] ci-monitor → FAILED — seq 3",
       "timestamp": "2026-11-15T18:28:46.537Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-15T18:33:30.129Z"
     }
   ],
   "items": {
