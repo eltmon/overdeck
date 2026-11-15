@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5353",
   "created": "2026-11-15T14:41:35.965Z",
-  "updated": "2026-11-15T15:06:28.957Z",
+  "updated": "2026-11-15T15:06:43.954Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,11 @@
     "client.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T15:06:28.956Z"
+    },
+    "bubble-link": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5353",
+      "claimedAt": "2026-11-15T15:06:43.953Z"
     }
   }
 }
