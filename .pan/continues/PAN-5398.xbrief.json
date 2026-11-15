@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5398",
   "created": "2026-11-15T20:47:31.521Z",
-  "updated": "2026-11-15T21:01:17.462Z",
+  "updated": "2026-11-15T21:01:22.884Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
     "open-path-in-deck-uses-deck-key.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T21:01:17.461Z"
+    },
+    "open-link-host-deck-route": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5398",
+      "claimedAt": "2026-11-15T21:01:22.884Z"
     }
   }
 }
