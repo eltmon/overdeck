@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5337",
   "created": "2026-11-15T11:36:29.093Z",
-  "updated": "2026-11-15T15:28:59.035Z",
+  "updated": "2026-11-15T15:30:17.414Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -166,7 +166,7 @@
       "doneAt": "2026-11-15T15:24:28.857Z"
     },
     "code-pane-preview-links.ac3": {
-      "status": "cancelled"
+      "status": "pending"
     },
     "editor-pane-preview-links.ac3": {
       "status": "cancelled"
