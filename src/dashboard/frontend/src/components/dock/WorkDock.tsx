@@ -103,10 +103,10 @@ export function WorkDock({ deckKey, activePane, layoutLeafIds, panesById, conver
   )
   const rootLabel = useRootLabel(scope.rootId)
   const live = useLiveTab(deckKey)
-  const changesCount = useChangesCount(scope)
 
   const open = state?.open ?? false
   const changedPaths = useScopeChangedPaths(scope, { open })
+  const changesCount = useChangesCount(scope, { open })
   // A persisted 'live' tab with nothing to watch shows Files (B-D9).
   const tab: DockTab = state?.tab === 'live' && !live.visible ? 'files' : (state?.tab ?? 'files')
 

@@ -9,6 +9,10 @@ vi.mock('../panes/AgentPane', () => ({
 vi.mock('../../terminal/TerminalDrawer', () => ({
   TerminalDrawer: () => <div data-testid="terminal-drawer" />,
 }))
+// The dock's Changes count reads git status of an issue root; no RPC transport here.
+vi.mock('../../explorer/git/useExplorerGitStatus', () => ({
+  useExplorerGitStatus: () => ({ result: null, decorations: { files: new Map(), folders: new Map() }, errorCode: undefined, errorMessage: undefined, refresh: () => {} }),
+}))
 // The explorer body is covered by ExplorerPane.test.tsx; here it only shows which root it got.
 vi.mock('../../explorer/ExplorerPane', () => ({
   ExplorerFiles: ({ rootId }: { rootId: string }) => <div data-testid="explorer-files">{rootId}</div>,
