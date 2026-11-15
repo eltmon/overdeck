@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -16,6 +16,7 @@ import {
   matchMemoryFacts,
   MemoryFactExistsError,
   MemoryFactSensitiveError,
+  MemoryFactSupersedeError,
   MEMORY_FACT_DESCRIPTION_MAX,
   type MemoryFact,
   parseMemoryFact,
@@ -25,6 +26,7 @@ import {
   serializeMemoryFact,
   userMemoryDir,
   writeMemoryFact,
+  writeSupersedingFact,
 } from '../../../../../src/lib/memory/facts/store.js';
 
 describe('memory facts store', () => {
@@ -450,6 +452,121 @@ describe('memory facts store', () => {
       await expect(
         writeMemoryFact(dir, 'project', { ...baseFact('local-fact'), body: 'See ~/.overdeck and localhost:3011.' }),
       ).resolves.toBe(join(dir, 'local-fact.md'));
+    });
+  });
+
+  describe('writeSupersedingFact', () => {
+    const today = '2026-11-15';
+
+    function readOne(dir: string, id: string): MemoryFact {
+      const found = readMemoryFactsSync(dir, 'project').facts.find((entry) => entry.id === id);
+      if (!found) throw new Error(`no fact ${id}`);
+      return found;
+    }
+
+    it('marks the old fact superseded and links both ways without deleting it', async () => {
+      const dir = join(tmpRoot, 'memory');
+      await writeMemoryFact(dir, 'project', { ...baseFact('old-rule'), source: 'operator', extra: { owner: 'bob' } });
+
+      const result = await writeSupersedingFact(dir, 'project', baseFact('new-rule'), ['old-rule'], { overwrite: false, today });
+      expect(result).toEqual({ file: join(dir, 'new-rule.md'), supersededFiles: [join(dir, 'old-rule.md')] });
+
+      const next = readOne(dir, 'new-rule');
+      const old = readOne(dir, 'old-rule');
+      expect(next.supersedes).toEqual(['old-rule']);
+      expect(isActiveFact(next)).toBe(true);
+      expect(old.status).toBe('superseded');
+      expect(old.supersededBy).toBe('new-rule');
+      expect(old.updated).toBe(today);
+      expect(old.source).toBe('operator');
+      expect(old.extra).toEqual({ owner: 'bob' });
+      expect(old.body).toBe('Body text.');
+      expect(isActiveFact(old)).toBe(false);
+    });
+
+    it('refuses a missing id, a self id and a fact superseded by another id, writing nothing', async () => {
+      const dir = join(tmpRoot, 'memory');
+      await writeMemoryFact(dir, 'project', baseFact('old-rule'));
+      await writeMemoryFact(dir, 'project', { ...baseFact('taken-rule'), status: 'superseded', supersededBy: 'other-rule' });
+      writeFileSync(join(dir, 'broken-rule.md'), '---\ntype: feedback\n---\nno description\n', 'utf8');
+      const snapshot = () => Object.fromEntries(readdirSync(dir).sort().map((name) => [name, readFileSync(join(dir, name), 'utf8')]));
+      const before = snapshot();
+      const run = (ids: string[]) => writeSupersedingFact(dir, 'project', baseFact('new-rule'), ids, { overwrite: false, today });
+
+      await expect(run(['missing-rule'])).rejects.toThrow(`no fact "missing-rule" in ${dir}`);
+      await expect(run(['new-rule'])).rejects.toThrow('a fact cannot supersede itself');
+      await expect(run(['old-rule', 'taken-rule'])).rejects.toThrow('"taken-rule" is already superseded by "other-rule"');
+      await expect(run(['broken-rule'])).rejects.toThrow('fact "broken-rule" cannot be parsed (missing description); fix it first');
+      await expect(run(['missing-rule'])).rejects.toBeInstanceOf(MemoryFactSupersedeError);
+
+      expect(snapshot()).toEqual(before);
+    });
+
+    it('is idempotent when the old fact is already superseded by the same id', async () => {
+      const dir = join(tmpRoot, 'memory');
+      await writeMemoryFact(dir, 'project', baseFact('old-rule'));
+      await writeSupersedingFact(dir, 'project', baseFact('new-rule'), ['old-rule'], { overwrite: false, today: '2026-11-01' });
+
+      const oldBefore = readFileSync(join(dir, 'old-rule.md'), 'utf8');
+
+      const again = await writeSupersedingFact(
+        dir, 'project', readOne(dir, 'new-rule'), ['old-rule'], { overwrite: true, today },
+      );
+      expect(again.supersededFiles).toEqual([]);
+      expect(readFileSync(join(dir, 'old-rule.md'), 'utf8')).toBe(oldBefore);
+      expect(readOne(dir, 'new-rule').supersedes).toEqual(['old-rule']);
+    });
+
+    it("refuses before any write when the old fact's rewrite trips the secret scanner", async () => {
+      const dir = join(tmpRoot, 'memory');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(
+        join(dir, 'old-rule.md'),
+        '---\ntype: feedback\ndescription: Old rule.\n---\n\nKey is sk-ant-abcdef1234567890.\n',
+        'utf8',
+      );
+
+      await expect(
+        writeSupersedingFact(dir, 'project', baseFact('new-rule'), ['old-rule'], { overwrite: false, today }),
+      ).rejects.toBeInstanceOf(MemoryFactSensitiveError);
+      expect(existsSync(join(dir, 'new-rule.md'))).toBe(false);
+      expect(readOne(dir, 'old-rule').status).toBe('active');
+    });
+
+    it('edit mode appends to an existing supersedes list without duplicates', async () => {
+      const dir = join(tmpRoot, 'memory');
+      await writeMemoryFact(dir, 'project', baseFact('rule-a'));
+      await writeMemoryFact(dir, 'project', baseFact('rule-b'));
+      await writeSupersedingFact(dir, 'project', baseFact('new-rule'), ['rule-a'], { overwrite: false, today });
+
+      const existing = readOne(dir, 'new-rule');
+      expect(existing.supersedes).toEqual(['rule-a']);
+      await writeSupersedingFact(dir, 'project', existing, ['rule-b', 'rule-a'], { overwrite: true, today });
+
+      expect(readOne(dir, 'new-rule').supersedes).toEqual(['rule-a', 'rule-b']);
+      expect(readOne(dir, 'rule-b').supersededBy).toBe('new-rule');
+    });
+
+    it('refuses to edit a fact that is itself superseded', async () => {
+      const dir = join(tmpRoot, 'memory');
+      await writeMemoryFact(dir, 'project', baseFact('rule-a'));
+      await writeMemoryFact(dir, 'project', baseFact('mid-rule'));
+      await writeSupersedingFact(dir, 'project', baseFact('top-rule'), ['mid-rule'], { overwrite: false, today });
+
+      await expect(
+        writeSupersedingFact(dir, 'project', readOne(dir, 'mid-rule'), ['rule-a'], { overwrite: true, today }),
+      ).rejects.toThrow('"mid-rule" is superseded by "top-rule"; edit that fact instead');
+      expect(readOne(dir, 'rule-a').status).toBe('active');
+    });
+
+    it('refuses a new id that already exists when not overwriting', async () => {
+      const dir = join(tmpRoot, 'memory');
+      await writeMemoryFact(dir, 'project', baseFact('old-rule'));
+      await writeMemoryFact(dir, 'project', baseFact('new-rule'));
+      await expect(
+        writeSupersedingFact(dir, 'project', baseFact('new-rule'), ['old-rule'], { overwrite: false, today }),
+      ).rejects.toBeInstanceOf(MemoryFactExistsError);
+      expect(readOne(dir, 'old-rule').status).toBe('active');
     });
   });
 

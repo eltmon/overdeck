@@ -247,12 +247,8 @@ export function serializeMemoryFact(fact: MemoryFactInput): string {
   return `---\n${yamlText}\n---\n\n${fact.body}\n`;
 }
 
-export async function writeMemoryFact(
-  dir: string,
-  scope: MemoryFactScope,
-  fact: MemoryFactInput,
-  opts?: { overwrite?: boolean },
-): Promise<string> {
+/** Serialize `fact` and check it would parse and carries no secret-like text; throws before any write. */
+function prepareFactText(dir: string, scope: MemoryFactScope, fact: MemoryFactInput): { file: string; text: string } {
   const file = join(dir, `${fact.id}.md`);
   const text = serializeMemoryFact(fact);
 
@@ -262,16 +258,101 @@ export async function writeMemoryFact(
   if (redactSensitiveText(text) !== text) {
     throw new MemoryFactSensitiveError('fact contains secret-like content; rephrase it');
   }
+  return { file, text };
+}
+
+async function writeFactFile(dir: string, file: string, text: string): Promise<void> {
+  await mkdir(dir, { recursive: true });
+  const tmpFile = `${file}.${randomUUID()}.tmp`;
+  await writeFile(tmpFile, text, 'utf8');
+  await rename(tmpFile, file);
+}
+
+export async function writeMemoryFact(
+  dir: string,
+  scope: MemoryFactScope,
+  fact: MemoryFactInput,
+  opts?: { overwrite?: boolean },
+): Promise<string> {
+  const { file, text } = prepareFactText(dir, scope, fact);
 
   if (!opts?.overwrite && existsSync(file)) {
     throw new MemoryFactExistsError(`fact "${fact.id}" already exists at ${file}`);
   }
 
-  await mkdir(dir, { recursive: true });
-  const tmpFile = `${file}.${randomUUID()}.tmp`;
-  await writeFile(tmpFile, text, 'utf8');
-  await rename(tmpFile, file);
+  await writeFactFile(dir, file, text);
   return file;
+}
+
+export class MemoryFactSupersedeError extends Error {}
+
+/**
+ * Write `fact` and mark each id in `supersedes` superseded by it (PAN-5360 D4-D6, D11).
+ * Every id must name a parseable fact in `dir` (the same store). Validates every file
+ * before writing any; writes the new fact first, then each old fact. An old fact already
+ * superseded by `fact.id` is left as it is, so a repeat is a no-op for it.
+ */
+export async function writeSupersedingFact(
+  dir: string,
+  scope: MemoryFactScope,
+  fact: MemoryFactInput,
+  supersedes: readonly string[],
+  opts: { overwrite: boolean; today: string },
+): Promise<{ file: string; supersededFiles: string[] }> {
+  const { facts, problems } = readMemoryFactsSync(dir, scope);
+  const byId = new Map(facts.map((entry) => [entry.id, entry]));
+  const problemByFile = new Map(problems.map((problem) => [problem.file, problem.reason]));
+
+  if (opts.overwrite) {
+    const existing = byId.get(fact.id);
+    if (existing?.supersededBy) {
+      throw new MemoryFactSupersedeError(`"${fact.id}" is superseded by "${existing.supersededBy}"; edit that fact instead`);
+    }
+  }
+
+  const ids = [...new Set(supersedes)];
+  const toRewrite: MemoryFact[] = [];
+  for (const id of ids) {
+    if (id === fact.id) throw new MemoryFactSupersedeError('a fact cannot supersede itself');
+    const problemReason = problemByFile.get(join(dir, `${id}.md`));
+    if (problemReason !== undefined) {
+      throw new MemoryFactSupersedeError(`fact "${id}" cannot be parsed (${problemReason}); fix it first`);
+    }
+    const old = byId.get(id);
+    if (!old) throw new MemoryFactSupersedeError(`no fact "${id}" in ${dir}`);
+    if (old.supersededBy !== null && old.supersededBy !== fact.id) {
+      throw new MemoryFactSupersedeError(`"${id}" is already superseded by "${old.supersededBy}"`);
+    }
+    if (old.supersededBy !== fact.id) toRewrite.push(old);
+  }
+
+  const next = prepareFactText(dir, scope, {
+    ...fact,
+    supersedes: [...new Set([...(fact.supersedes ?? []), ...ids])],
+  });
+  const olds = toRewrite.map((old) => prepareFactText(dir, scope, {
+    ...old,
+    status: 'superseded',
+    supersededBy: fact.id,
+    updated: opts.today,
+  }));
+
+  if (!opts.overwrite && existsSync(next.file)) {
+    throw new MemoryFactExistsError(`fact "${fact.id}" already exists at ${next.file}`);
+  }
+
+  await writeFactFile(dir, next.file, next.text);
+  const supersededFiles: string[] = [];
+  for (const old of olds) {
+    try {
+      await writeFactFile(dir, old.file, old.text);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`wrote ${[next.file, ...supersededFiles].join(', ')}; failed writing ${old.file}: ${message}`);
+    }
+    supersededFiles.push(old.file);
+  }
+  return { file: next.file, supersededFiles };
 }
 
 export async function removeMemoryFact(dir: string, id: string): Promise<string> {
