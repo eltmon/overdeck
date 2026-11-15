@@ -625,6 +625,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/projects/create-jobs/reconcile',   kind: 'http', disposition: 'READ',        door: 'resolveProjectCreateRecovery — read-only; never registers, clones or repairs (PAN-3836)' },
   { surface: 'POST /api/projects/:projectKey/finish-setup', kind: 'http', disposition: 'WRITE',      door: 'finishProjectSetup — idempotent repair through existing workspace doors; never clones (PAN-3836)' },
   { surface: 'GET /api/fs/list-dirs',                     kind: 'http', disposition: 'READ',        door: 'FilesystemResolver.listDirs (folder-browser for project registration)' },
+  { surface: 'POST /api/ui/open',                          kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'pan open (PAN-5349): resolves a path to an explorer root and publishes a UI command' },
   { surface: 'GET /api/explorer/download',                 kind: 'http', disposition: 'READ',        door: 'Explorer door (src/dashboard/server/routes/explorer.ts, PAN-5188): file bytes with Range, folder .tar.gz' },
   { surface: 'POST /api/explorer/upload',                  kind: 'http', disposition: 'WRITE',       door: 'Explorer door (src/dashboard/server/routes/explorer.ts, PAN-5188): one new file, no-clobber' },
   { surface: 'GET /api/explorer/edit-workspaces/:workspaceId', kind: 'http', disposition: 'READ',        door: 'Explorer edit-workspace door (src/dashboard/server/routes/explorer-edit-workspaces.ts, PAN-5191): workspace, PR with merge verdict, PR and pipeline support' },

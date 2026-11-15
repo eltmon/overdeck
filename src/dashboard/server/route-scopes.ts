@@ -236,6 +236,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   // PAN-5188: file explorer download and upload (parent PRD PAN-5183 D-8: explicit admin).
   { method: 'GET', path: '/api/explorer/download', scope: 'admin' },
   { method: 'POST', path: '/api/explorer/upload', scope: 'admin' },
+  // PAN-5349: pan open resolves a path and publishes an open-path UI command.
+  { method: 'POST', path: '/api/ui/open', scope: 'operate' },
   // PAN-5191: explorer edit workspaces (parent PRD PAN-5183 D-8: explicit admin).
   { method: 'GET', path: '/api/explorer/edit-workspaces/:workspaceId', scope: 'admin' },
   { method: 'GET', path: '/api/explorer/edit-workspaces/:workspaceId/changes', scope: 'admin' },
