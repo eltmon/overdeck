@@ -152,24 +152,110 @@ new_pids() {
   echo $((b - a))
 }
 
-# take_windows <side>: side is "baseline" or "idle". Takes WINDOWS_PER_SIDE
-# back-to-back WINDOW_SECS windows, appending each window's new-PID count to
-# R_BASELINE_WINDOWS or R_IDLE_WINDOWS (space separated, one entry per
-# window). For the idle side it also stamps each window's spawn-trace bounds
-# into R_IDLE_FROM/R_IDLE_TO, so the traced cost never covers two windows: a
-# retake after a PID-counter wrap restamps "from" before the retake, and the
-# kept attempt's bounds are the ones appended. Call it directly, never in
-# $(...), so its assignments reach the caller.
+# Linux only, called from take_windows at idle window boundaries. Builtins
+# only (no command substitution, backtick or pipe): it adds no PID of its own
+# to the counter. Sets TREE_PROCS and TREE_TASKS to the dashboard tree's
+# totals: the root pid (the directly started server), every descendant
+# reachable by its ppid chain, and any process whose /proc/<pid>/cmdline
+# names a path under WORK_DIR/home or WORK_DIR/tools (the same two strings
+# kill_work_processes matches, which also catches a daemonized child
+# reparented away from the server). Indexed arrays only; bash 3.2 has no
+# associative arrays.
+tree_snapshot() {
+  local root="$1" f line rest pid ppid thr i j n changed arg
+  local -a all_pid all_ppid all_thr member
+  TREE_PROCS=0
+  TREE_TASKS=0
+  n=0
+  for f in /proc/[0-9]*/stat; do
+    if ! read -r line 2>/dev/null <"$f"; then continue; fi
+    pid=${line%% *}
+    rest=${line##*) }
+    set -f
+    set -- $rest
+    set +f
+    ppid="$2"
+    thr="${18}"
+    all_pid[n]="$pid"
+    all_ppid[n]="$ppid"
+    all_thr[n]="$thr"
+    member[n]=0
+    if [ "$pid" = "$root" ]; then member[n]=1; fi
+    while IFS= read -r -d '' arg; do
+      case "$arg" in
+        *"$WORK_DIR/home/"*) member[n]=1 ;;
+      esac
+      case "$arg" in
+        *"$WORK_DIR/tools/"*) member[n]=1 ;;
+      esac
+    done 2>/dev/null <"/proc/$pid/cmdline"
+    (( n += 1 ))
+  done
+  changed=1
+  while [ "$changed" -eq 1 ]; do
+    changed=0
+    i=0
+    while [ "$i" -lt "$n" ]; do
+      if [ "${member[i]}" -eq 0 ]; then
+        j=0
+        while [ "$j" -lt "$n" ]; do
+          if [ "${all_pid[j]}" = "${all_ppid[i]}" ] && [ "${member[j]}" -eq 1 ]; then
+            member[i]=1
+            changed=1
+          fi
+          (( j += 1 ))
+        done
+      fi
+      (( i += 1 ))
+    done
+  done
+  i=0
+  while [ "$i" -lt "$n" ]; do
+    if [ "${member[i]}" -eq 1 ]; then
+      (( TREE_PROCS += 1 ))
+      (( TREE_TASKS += all_thr[i] ))
+    fi
+    (( i += 1 ))
+  done
+}
+
+# take_windows <side> [server]: side is "baseline" or "idle". Takes
+# WINDOWS_PER_SIDE back-to-back WINDOW_SECS windows, appending each window's
+# new-PID count to R_BASELINE_WINDOWS or R_IDLE_WINDOWS (space separated, one
+# entry per window). For the idle side it also stamps each window's
+# spawn-trace bounds into R_IDLE_FROM/R_IDLE_TO, so the traced cost never
+# covers two windows: a retake after a PID-counter wrap restamps "from"
+# before the retake, and the kept attempt's bounds are the ones appended. On
+# Linux, for the idle side, it snapshots the dashboard tree (`server`)
+# immediately before each window's "from" stamp as the start (replaced by a
+# fresh snapshot before a retake's "from" stamp) and immediately after "to"
+# as the end, appending "startProcs:startTasks:endProcs:endTasks" to
+# R_IDLE_TREE. Call it directly, never in $(...), so its assignments reach
+# the caller.
 take_windows() {
-  local side="$1" count=0 from to n
+  local side="$1" server="${2:-}" count=0 from to n start_procs start_tasks
   while [ "$count" -lt "$WINDOWS_PER_SIDE" ]; do
+    if [ "$side" = idle ] && [ "$OS_NAME" = linux ]; then
+      tree_snapshot "$server"
+      start_procs=$TREE_PROCS
+      start_tasks=$TREE_TASKS
+    fi
     if [ "$OS_NAME" = darwin ]; then from="$(date +%s)000"; else from="$(date +%s%3N)"; fi
     n=$(new_pids "$WINDOW_SECS")
     if [ "$n" -lt 0 ]; then
+      if [ "$side" = idle ] && [ "$OS_NAME" = linux ]; then
+        tree_snapshot "$server"
+        start_procs=$TREE_PROCS
+        start_tasks=$TREE_TASKS
+      fi
       if [ "$OS_NAME" = darwin ]; then from="$(date +%s)000"; else from="$(date +%s%3N)"; fi
       n=$(new_pids "$WINDOW_SECS")
     fi
     if [ "$OS_NAME" = darwin ]; then to="$(date +%s)999"; else to="$(date +%s%3N)"; fi
+    if [ "$side" = idle ] && [ "$OS_NAME" = linux ]; then
+      tree_snapshot "$server"
+      R_IDLE_TREE="${R_IDLE_TREE:+$R_IDLE_TREE }${start_procs}:${start_tasks}:${TREE_PROCS}:${TREE_TASKS}"
+    fi
     if [ "$side" = baseline ]; then
       R_BASELINE_WINDOWS="${R_BASELINE_WINDOWS:+$R_BASELINE_WINDOWS }$n"
     else
@@ -509,7 +595,7 @@ measure_idle() {
 
   if [ "$R_IDLE_BOOTED" = true ]; then
     sleep "$SETTLE_SECS"
-    take_windows idle
+    take_windows idle "$server"
     echo "idle new PIDs per window: $R_IDLE_WINDOWS (the verdict is in the summary below)"
     # A dashboard that died during the window spawns nothing, so an empty
     # trace would pass: it must still be running and healthy afterwards.
