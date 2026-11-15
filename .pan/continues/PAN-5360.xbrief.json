@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5360",
   "created": "2026-11-15T15:42:12.629Z",
-  "updated": "2026-11-15T16:40:16.769Z",
+  "updated": "2026-11-15T16:40:27.105Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,11 @@
     "w4-cli-edit.ac5": {
       "status": "completed",
       "doneAt": "2026-11-15T16:40:16.768Z"
+    },
+    "w5-cli-show": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5360",
+      "claimedAt": "2026-11-15T16:40:27.105Z"
     }
   }
 }
