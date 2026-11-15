@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5360",
   "created": "2026-11-15T15:42:12.629Z",
-  "updated": "2026-11-15T16:49:54.268Z",
+  "updated": "2026-11-15T16:50:02.850Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -144,6 +144,11 @@
     "w6-cli-list.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T16:49:54.267Z"
+    },
+    "w7-lint-links": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5360",
+      "claimedAt": "2026-11-15T16:50:02.849Z"
     }
   }
 }
