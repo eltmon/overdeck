@@ -62,6 +62,16 @@ IDLE_BUDGET_LINUX=30
 BARE_PATH_ENTRIES=6
 WINDOW_SECS=30
 SETTLE_SECS=20
+# PAN-5361 review (cycle fa257f60/8f9a2499): the directly started dashboard
+# runs a one-time startup probe sweep (docker/tailscale/nvidia-smi/gh/claude/
+# herdr/etc. availability checks) that, across 20 calibration runs, never
+# started later than server start and never ran past about +62 s after it
+# (tight across runs: 60.7-62.4 s). At SETTLE_SECS=20 s that sweep landed
+# inside the idle windows -- mostly window 2 -- so min-of-3 was effectively
+# min-of-2 over two windows whose own spread (13-45 PIDs) already crosses
+# the budget on a burst. Linux waits past the sweep before any idle window
+# starts; macOS is untouched (non-goal: do not change idle behaviour).
+SETTLE_SECS_LINUX=80
 HEALTH_TIMEOUT_SECS=120
 CHURN_SECS=20
 # PAN-5361: Linux takes 3 windows per side (min-of-N absorbs one runner PID
@@ -624,7 +634,8 @@ sample_churn() {
 }
 
 measure_idle() {
-  local server waited=0 node_options
+  local server waited=0 node_options settle_secs="$SETTLE_SECS"
+  if [ "$OS_NAME" = linux ]; then settle_secs="$SETTLE_SECS_LINUX"; fi
   sample_churn
   echo "== baseline window(s) (${WINDOWS_PER_SIDE} x ${WINDOW_SECS} s, no Overdeck process)"
   take_windows baseline
@@ -648,7 +659,7 @@ measure_idle() {
   done
 
   if [ "$R_IDLE_BOOTED" = true ]; then
-    sleep "$SETTLE_SECS"
+    sleep "$settle_secs"
     take_windows idle "$server"
     echo "idle new PIDs per window: $R_IDLE_WINDOWS (the verdict is in the summary below)"
     # A dashboard that died during the window spawns nothing, so an empty
