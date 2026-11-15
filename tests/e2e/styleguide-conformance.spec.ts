@@ -538,8 +538,10 @@ describe('styleguide rendered surface conformance', () => {
     expect(drawerFont.split(',')[0]?.replace(/["']/g, '').trim()).toBe('Space Grotesk');
     await drawer.context.close();
 
+    // PAN-5293: the Command Deck tree head moved to the left column; the
+    // selected project's name in the project switcher carries the display font.
     const commandDeck = await openRoute('/command-deck');
-    const treeTitle = commandDeck.page.getByTestId('command-deck-tree-title').first();
+    const treeTitle = commandDeck.page.getByTestId('project-switcher-name').first();
     await expect.poll(() => treeTitle.count(), renderPoll).toBe(1);
     const treeTitleFont = await treeTitle.evaluate((node) => window.getComputedStyle(node).fontFamily);
     expect(treeTitleFont.split(',')[0]?.replace(/["']/g, '').trim()).toBe('Space Grotesk');

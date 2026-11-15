@@ -158,7 +158,7 @@ export function ProjectSwitcher({ selectedProject, onSelectProject, onNewProject
         {!collapsed && (
           <>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium text-foreground">{label}</span>
+              <span data-testid="project-switcher-name" className="block truncate font-display text-sm font-medium text-foreground">{label}</span>
               {selected && (
                 <span className="block truncate font-mono text-[11px] text-muted-foreground">{tildeHomePath(selected.path)}</span>
               )}

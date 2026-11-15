@@ -36,10 +36,10 @@ export function isUserFacingWorkspace(workspace: WorkspaceRegistryRow): boolean 
 }
 
 /**
- * A row the sidebar Workspaces rail lists. A project's main checkout is
- * reached from its Projects entry (Main checkout), so the rail lists it only
- * when favorited; otherwise every project would appear twice. Cmd-K keeps
- * listing main rows, under their project's name.
+ * A row the left column's Workspaces section lists. A project's main
+ * checkout is reached from its Home pane (Main checkout), so the section
+ * lists it only when favorited. Cmd-K keeps listing main rows, under their
+ * project's name.
  */
 export function isRailWorkspace(workspace: WorkspaceRegistryRow): boolean {
   return isUserFacingWorkspace(workspace) && (workspace.kind !== 'main' || workspace.isFavorite);

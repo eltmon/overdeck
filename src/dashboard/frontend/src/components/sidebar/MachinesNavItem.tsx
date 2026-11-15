@@ -30,10 +30,11 @@ export function MachinesNavItem({ collapsed, onOpenSettings, variant = 'nav' }: 
         onClick={open}
         title={online > 0 ? `Machines · ${online} online` : 'Machines'}
         aria-label="Machines"
-        className="list-row flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground"
+        className="list-row flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground"
       >
         <Network aria-hidden className="h-3.5 w-3.5 shrink-0" />
-        {!collapsed && <span>Machines</span>}
+        {/* The label is the one footer item that shrinks, so ? never overflows a narrow column. */}
+        {!collapsed && <span className="truncate">Machines</span>}
       </button>
     );
   }

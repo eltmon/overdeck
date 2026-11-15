@@ -92,7 +92,7 @@ export function LeftColumnFooter({ activeTab, onTabChange, onOpenUpdater, onOpen
             : <Hammer aria-hidden className={`h-4 w-4 ${rebuildMutation.isError ? 'text-destructive-foreground' : ''}`} />}
         </button>
       )}
-      <span className={collapsed ? '' : 'ml-auto'}>
+      <span className={collapsed ? '' : 'ml-auto shrink-0'}>
         <FreshnessIndicator />
       </span>
       <button
