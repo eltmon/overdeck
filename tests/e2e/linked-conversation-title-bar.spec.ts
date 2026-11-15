@@ -17,6 +17,8 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright';
 
+import { createViteCacheDir, pdfjsAssetsAlias, removeViteCacheDir } from './fixtures/vite-harness.js';
+
 type ViteDevServer = {
   listen: () => Promise<void> | void;
   close: () => Promise<void> | void;
@@ -50,6 +52,7 @@ const EXPECTED: Record<State, { chip: string | null; banner: string | null; butt
 };
 
 let vite: ViteDevServer;
+let viteCacheDir: string | undefined;
 let browser: Browser;
 let baseUrl: string;
 
@@ -77,6 +80,7 @@ async function openState(state: State, theme: string, mode: string): Promise<Pag
 
 beforeAll(async () => {
   const paths = [frontendRoot, projectRoot];
+  viteCacheDir = await createViteCacheDir(projectRoot, 'linked-title-bar');
   const { createServer } = await import(require.resolve('vite', { paths })) as { createServer: (options: Record<string, unknown>) => Promise<ViteDevServer> };
   const { default: react } = await import(require.resolve('@vitejs/plugin-react', { paths })) as { default: () => unknown };
   // Tailwind resolves its config from the process cwd; point it at the frontend's.
@@ -100,8 +104,12 @@ beforeAll(async () => {
       },
     }],
     css: { postcss: { plugins: [tailwindcss({ config: join(frontendRoot, 'tailwind.config.js') }), autoprefixer()] } },
+    cacheDir: viteCacheDir,
     // The fixture lives outside the frontend; keep one copy of each shared package.
-    resolve: { dedupe: ['react', 'react-dom', '@tanstack/react-query', 'lucide-react', 'zustand', 'sonner'] },
+    resolve: {
+      dedupe: ['react', 'react-dom', '@tanstack/react-query', 'lucide-react', 'zustand', 'sonner'],
+      alias: [pdfjsAssetsAlias((specifier) => require.resolve(specifier, { paths }))],
+    },
     server: { host: '127.0.0.1', port: 0, watch: null, fs: { allow: [projectRoot] } },
     logLevel: 'error',
   });
@@ -120,6 +128,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await browser?.close();
   await vite?.close();
+  await removeViteCacheDir(viteCacheDir);
 }, 30_000);
 
 describe('linked conversation title bar (PAN-4650 WI-21)', () => {

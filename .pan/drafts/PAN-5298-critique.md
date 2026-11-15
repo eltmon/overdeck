@@ -1,0 +1,9 @@
+plan-digest: 479ed45269e2d35828c7b24d599db063cf3f96bca0ad9e02790eaae973e00c51
+
+## blocks-the-design: Scan check hides scan failures
+
+[The PRD](/home/eltmon/Projects/overdeck/workspaces/feature-pan-5298/.pan/drafts/PAN-5298.md), lines 232–235, pipes the three-spec run through `grep -E "renaming .* to .*/deps$"`, then says the same output must contain no `Failed to run dependency scan`. That grep removes the very error line the next check needs. Vite emits that error at `node_modules/.bun/vite@8.3.1/node_modules/vite/dist/node/chunks/node.js`, line 35571. Replaying the pipeline with both a scan error and a valid rename printed only the rename. The draft xBRIEF uses a different grep that includes errors, but neither version makes an explicit negative assertion. Capture the full run output, preserve Vitest's exit status, assert at least one private-cache rename, and separately assert that the captured output contains no scan failure.
+
+## blocks-the-design: Recording logger breaks warning state
+
+[The PRD](/home/eltmon/Projects/overdeck/workspaces/feature-pan-5298/.pan/drafts/PAN-5298.md), lines 123–132, replaces `warn` and `warnOnce` without calling the base logger, while its `hasWarned` getter reads `base.hasWarned`. Vite's logger sets that flag and deduplicates `warnOnce` in `node_modules/.bun/vite@8.3.1/node_modules/vite/dist/node/chunks/node.js`, lines 14610–14622. A runtime check with Vite 8.3.1 yielded `{"hasWarned":false,"lines":["warn  a","warn  b","warn  b"]}` after one `warn('a')` and two `warnOnce('b')` calls. This custom logger reports false warning state and can fill the last-40-line diagnostic with repeats. Use a base logger at `error` level, forward `warn` and `warnOnce` to it, record each `warnOnce` message once, and add unit assertions for `hasWarned` and deduplication.

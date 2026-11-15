@@ -1,0 +1,149 @@
+{
+  "version": "1",
+  "issueId": "PAN-5298",
+  "created": "2026-11-14T21:08:19.124Z",
+  "updated": "2026-11-15T00:23:50.509Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "vite-harness-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5298",
+      "claimedAt": "2026-11-14T21:08:19.124Z",
+      "doneAt": "2026-11-14T21:11:57.058Z"
+    },
+    "vite-harness-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T21:11:57.058Z"
+    },
+    "vite-harness-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T21:11:57.058Z"
+    },
+    "vite-harness-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T21:11:57.058Z"
+    },
+    "vite-harness-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T21:11:57.058Z"
+    },
+    "issue-tree-isolation": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5298",
+      "claimedAt": "2026-11-14T21:12:32.802Z",
+      "doneAt": "2026-11-14T21:31:57.127Z"
+    },
+    "issue-tree-isolation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T21:31:57.127Z"
+    },
+    "issue-tree-isolation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T21:31:57.127Z"
+    },
+    "issue-tree-isolation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T21:31:57.127Z"
+    },
+    "issue-tree-diagnostics": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5298",
+      "claimedAt": "2026-11-14T21:32:05.343Z",
+      "doneAt": "2026-11-14T21:54:29.646Z"
+    },
+    "issue-tree-diagnostics.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T21:54:29.646Z"
+    },
+    "issue-tree-diagnostics.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T21:54:29.646Z"
+    },
+    "issue-tree-diagnostics.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T21:54:29.646Z"
+    },
+    "merge-train-isolation": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5298",
+      "claimedAt": "2026-11-14T21:54:35.654Z",
+      "doneAt": "2026-11-14T21:56:37.892Z"
+    },
+    "merge-train-isolation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T21:56:37.892Z"
+    },
+    "merge-train-isolation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T21:56:37.892Z"
+    },
+    "styleguide-isolation": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5298",
+      "claimedAt": "2026-11-14T21:56:42.344Z",
+      "doneAt": "2026-11-14T21:58:50.727Z"
+    },
+    "styleguide-isolation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T21:58:50.727Z"
+    },
+    "styleguide-isolation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T21:58:50.727Z"
+    },
+    "linked-title-bar-isolation": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5298",
+      "claimedAt": "2026-11-14T21:58:56.157Z",
+      "doneAt": "2026-11-14T22:00:28.174Z"
+    },
+    "linked-title-bar-isolation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T22:00:28.174Z"
+    },
+    "linked-title-bar-isolation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T22:00:28.174Z"
+    },
+    "docs-e2e-harness": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5298",
+      "claimedAt": "2026-11-14T22:00:33.104Z",
+      "doneAt": "2026-11-14T22:01:43.251Z"
+    },
+    "docs-e2e-harness.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T22:01:43.251Z"
+    },
+    "docs-e2e-harness.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T22:01:43.251Z"
+    },
+    "docs-e2e-harness.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T22:01:43.251Z"
+    },
+    "repeat-evidence": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5298",
+      "claimedAt": "2026-11-14T22:01:50.432Z",
+      "doneAt": "2026-11-15T00:23:50.508Z"
+    },
+    "repeat-evidence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T22:58:23.304Z"
+    },
+    "repeat-evidence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:23:50.508Z"
+    },
+    "repeat-evidence.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:23:50.508Z"
+    }
+  }
+}
