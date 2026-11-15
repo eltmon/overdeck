@@ -440,7 +440,7 @@ function WorkspaceBar({
       {dialog === 'pr' && (
         <CreatePrDialog
           status={data}
-          changedPaths={changes.data?.files.map((f) => f.path) ?? []}
+          changes={changes.data}
           onClose={() => setDialog(null)}
           onDone={onPrDone}
         />
