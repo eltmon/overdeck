@@ -24,8 +24,8 @@ import { sessionFilePath } from '../../../lib/runtimes/storage/claude-code.js';
 import { assertMemorySafeSegment } from '../../../lib/memory/paths.js';
 import { hasDashboardInternalToken } from './dashboard-auth.js';
 import { ReadModelService } from '../read-model.js';
-import { clearConversationFailureState, getConversationByClaudeSessionId, markConversationActive, updateConversationTitle, type LegacyConversation } from '../../../lib/overdeck/conversations.js';
-import { getWorkspaceById } from '../../../lib/workspaces/resolver.js';
+import { clearConversationFailureState, getConversationByClaudeSessionId, getConversationByTmuxSession, markConversationActive, updateConversationTitle, type LegacyConversation } from '../../../lib/overdeck/conversations.js';
+import { memoryIdentityForConversation } from '../../../lib/memory/conversation-identity.js';
 import { derivePromptTitle } from '../../../lib/conversations/transcript-summary.js';
 import { generateAiTitle, resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
 import { handleTurnComplete } from '../../../lib/overdeck/title-refinement.js';
@@ -738,7 +738,9 @@ async function resolveMemoryIdentity(
   resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>,
 ): Promise<MemoryIdentity | null> {
   const state = await resolveAgentState(body, sessionId, resolveAgentIdBySessionId);
-  return resolveMemoryIdentityFromState(state, sessionId) ?? resolveMemoryIdentityFromConversation(sessionId);
+  return resolveMemoryIdentityFromState(state, sessionId)
+    ?? resolveMemoryIdentityFromConversation(sessionId)
+    ?? resolveMemoryIdentityFromConversationName(stringField(body.conversation), sessionId);
 }
 
 function resolveMemoryIdentityFromState(state: AgentState | null, sessionId: string): MemoryIdentity | null {
@@ -761,19 +763,12 @@ function resolveMemoryIdentityFromState(state: AgentState | null, sessionId: str
  * name (mirrors how the agent-state path uses the agent's own id).
  */
 function resolveMemoryIdentityFromConversation(sessionId: string): MemoryIdentity | null {
-  const conversation = getConversationByClaudeSessionId(sessionId);
-  if (!conversation?.workspaceId) return null;
-  const workspace = getWorkspaceById(conversation.workspaceId);
-  if (!workspace) return null;
-  return {
-    projectId: workspace.projectId,
-    workspaceId: workspace.id,
-    issueId: null,
-    runId: conversation.tmuxSession,
-    sessionId,
-    agentRole: 'conversation',
-    agentHarness: conversation.harness ?? 'claude-code',
-  };
+  return memoryIdentityForConversation(getConversationByClaudeSessionId(sessionId), sessionId);
+}
+
+/** PAN-5359: a Codex host names its conversation; its thread id may not be a recorded locator yet. */
+function resolveMemoryIdentityFromConversationName(name: string | null, sessionId: string): MemoryIdentity | null {
+  return name ? memoryIdentityForConversation(getConversationByTmuxSession(name), sessionId) : null;
 }
 
 async function resolveTrustedTranscriptPath(

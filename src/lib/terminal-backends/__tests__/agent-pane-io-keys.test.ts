@@ -9,6 +9,7 @@ import type { TerminalBackend } from '../types.js';
 
 const capturePane = vi.hoisted(() => vi.fn(async (_id: string, _lines?: number) => 'tmux screen'));
 const sendKeysAsync = vi.hoisted(() => vi.fn(async (_id: string, _key: string, _caller?: string) => {}));
+const tmuxExecAsync = vi.hoisted(() => vi.fn(async (_args: string[], _options?: unknown) => ({ stdout: '', stderr: '' })));
 const findHerdrAgentPane = vi.hoisted(() =>
   vi.fn(async (_id: string): Promise<{ paneId: string; terminalId: string; workspaceId: string } | null> => null),
 );
@@ -19,6 +20,7 @@ vi.mock('../../tmux.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../tmux.js')>()),
   capturePane,
   sendKeysAsync,
+  tmuxExecAsync,
 }));
 vi.mock('../herdr.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../herdr.js')>()),
@@ -39,6 +41,7 @@ describe('resolveAgentPaneIo', () => {
   beforeEach(() => {
     capturePane.mockClear();
     sendKeysAsync.mockClear();
+    tmuxExecAsync.mockClear();
     findHerdrAgentPane.mockReset();
     findHerdrAgentPane.mockResolvedValue(null);
     readHerdrPaneText.mockClear();
@@ -75,5 +78,35 @@ describe('resolveAgentPaneIo', () => {
     expect(capturePane).toHaveBeenCalledWith('conv-legacy', 60);
     await io.sendKey('Escape');
     expect(sendKeysAsync).toHaveBeenCalledWith('conv-legacy', 'Escape', 'input-target');
+  });
+
+  describe('pressSendNow', () => {
+    it('sends exactly one pane.send_keys call for the send-now chord on a Herdr pane', async () => {
+      findHerdrAgentPane.mockResolvedValue({ paneId: 'p-1', terminalId: 't-1', workspaceId: 'w-1' });
+      const io = await resolveAgentPaneIo('conv-x', herdrHost);
+      await io.pressSendNow();
+      expect(herdrCall).toHaveBeenCalledTimes(1);
+      expect(herdrCall).toHaveBeenCalledWith('pane.send_keys', { pane_id: 'p-1', keys: ['ctrl+x', 'ctrl+s'] });
+    });
+
+    it('sends exactly one tmux send-keys call for the send-now chord on a tmux host', async () => {
+      const io = await resolveAgentPaneIo('conv-x', tmuxHost);
+      await io.pressSendNow();
+      expect(tmuxExecAsync).toHaveBeenCalledTimes(1);
+      const [args] = tmuxExecAsync.mock.calls[0]!;
+      expect(args.slice(0, 2)).toEqual(['send-keys', '-t']);
+      expect(args.slice(-2)).toEqual(['C-x', 'C-s']);
+      expect(sendKeysAsync).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the tmux send-keys call on a Herdr host that holds no pane for the agent', async () => {
+      const io = await resolveAgentPaneIo('conv-legacy', herdrHost);
+      await io.pressSendNow();
+      expect(tmuxExecAsync).toHaveBeenCalledTimes(1);
+      const [args] = tmuxExecAsync.mock.calls[0]!;
+      expect(args.slice(0, 2)).toEqual(['send-keys', '-t']);
+      expect(args.slice(-2)).toEqual(['C-x', 'C-s']);
+      expect(herdrCall).not.toHaveBeenCalled();
+    });
   });
 });

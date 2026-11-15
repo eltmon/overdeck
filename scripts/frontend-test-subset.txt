@@ -8,6 +8,7 @@ src/App.test.tsx
 src/App/AppChrome.test.tsx
 src/App/AppLiveStoreHost.render-count.test.tsx
 src/App/BackendConnectionBoundary.test.tsx
+src/App/__tests__/StandaloneDiffPopoutRoute.test.tsx
 src/App/__tests__/countAgreement.test.tsx
 src/App/api.test.ts
 src/App/appChromeLabels.test.ts
@@ -27,6 +28,7 @@ src/components/CommandDeck/ProjectTree/ProjectIdentityChip.test.tsx
 src/components/CommandDeck/ProjectTree/ProjectNode.test.tsx
 src/components/CommandDeck/ProjectTree/featureStateBadge.test.ts
 src/components/CommandDeck/SessionView/SessionPanel.test.tsx
+src/components/CommandDeck/ZoneCOverviewTabs/__tests__/MarkdownTab.test.tsx
 src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx
 src/components/CommandDeck/__tests__/ConversationList.render-count.test.tsx
 src/components/CommandDeck/__tests__/ConversationList.sort.test.ts
@@ -50,7 +52,10 @@ src/components/CommandDeck/__tests__/useDefaultDeckSelection.test.ts
 src/components/CommandPalette.test.tsx
 src/components/DeaconPauseToggle.test.tsx
 src/components/__tests__/ActivityFeedTab.test.tsx
+src/components/diff/__tests__/DiffFileBar.test.tsx
+src/components/diff/__tests__/DiffMarkdownPreview.test.tsx
 src/components/diff/__tests__/PatchFiles.test.tsx
+src/components/diff/__tests__/markdownPreviewSource.test.ts
 src/components/frame/__tests__/ConversationsSection.test.tsx
 src/components/frame/__tests__/IssuesSection.test.tsx
 src/components/frame/__tests__/LeftColumn.test.tsx
@@ -184,6 +189,7 @@ src/components/__tests__/AskUserQuestionDialog.test.tsx
 src/components/__tests__/BackendRestartCard.test.tsx
 src/components/__tests__/DecisionsPanel.test.tsx
 src/components/__tests__/DegradedModeBanner.test.tsx
+src/components/__tests__/DiffPanel.preview.test.tsx
 src/components/__tests__/DiskAlertCard.test.tsx
 src/components/__tests__/GitHubQuotaPill.test.tsx
 src/components/__tests__/GitHubRateLimitBanner.test.tsx
@@ -197,12 +203,15 @@ src/components/backlog/__tests__/PickupGateControls.test.tsx
 src/components/chat/SubagentRail.test.tsx
 src/components/chat/__tests__/ChatMarkdown.issue-links.test.tsx
 src/components/chat/__tests__/ChatMarkdown.pull-request-links.test.tsx
+src/components/chat/__tests__/ChatMarkdown.relative-links.test.tsx
 src/components/chat/__tests__/ComposerFooter.citations.test.tsx
 src/components/chat/__tests__/ComposerFooter.native.test.tsx
 src/components/chat/__tests__/ComposerFooter.path-drop.test.tsx
 src/components/chat/__tests__/ComposerFooter.schedule.test.tsx
+src/components/chat/__tests__/ComposerFooter.send-now.test.tsx
 src/components/chat/__tests__/ComposerFooter.send-queue.test.tsx
 src/components/chat/__tests__/ComposerFooter.streaming-render-count.test.tsx
+src/components/chat/__tests__/ComposerPromptEditor.skills.test.tsx
 src/components/chat/__tests__/ComposerPromptEditor.test.tsx
 src/components/chat/__tests__/ConversationAboutDrawer.test.tsx
 src/components/chat/__tests__/ConversationMachineBanner.test.tsx
@@ -213,6 +222,7 @@ src/components/chat/__tests__/EffortPicker.test.tsx
 src/components/chat/__tests__/HandoffNotice.test.tsx
 src/components/chat/__tests__/HeldHandoffView.test.tsx
 src/components/chat/__tests__/ImageLightbox.test.tsx
+src/components/chat/__tests__/MarkdownDocLink.test.tsx
 src/components/chat/__tests__/MarkdownFileLink.test.tsx
 src/components/chat/__tests__/ModelPicker.test.tsx
 src/components/chat/__tests__/OpenPreviewPopover.test.tsx
@@ -228,6 +238,8 @@ src/components/chat/__tests__/heldKickoff.test.tsx
 src/components/chat/__tests__/queuedPromptSend.test.ts
 src/components/chat/__tests__/resetClippedScroll.test.ts
 src/components/chat/__tests__/scheduledMessages.test.ts
+src/components/chat/__tests__/skillSlashCommands.test.ts
+src/components/chat/__tests__/slashCommands.skills.test.ts
 src/components/chat/__tests__/useComposerRestoreTarget.test.tsx
 src/components/chat/__tests__/useFloatingPickerPosition.test.tsx
 src/components/chat/__tests__/useOlderHistory.test.ts
@@ -285,6 +297,7 @@ src/components/explorer/actions/__tests__/useExplorerActions.test.ts
 src/components/explorer/actions/__tests__/useOsFileDrop.test.ts
 src/components/explorer/actions/__tests__/useTreeActionKeys.test.ts
 src/components/explorer/actions/__tests__/useTreeDragMove.test.tsx
+src/components/explorer/code/__tests__/CodePane.markdown-links.test.tsx
 src/components/explorer/code/__tests__/CodePane.save.test.tsx
 src/components/explorer/code/__tests__/CodePane.test.tsx
 src/components/explorer/code/__tests__/CodePaneHeader.test.tsx
@@ -381,10 +394,12 @@ src/components/merge-train/train/__tests__/CarStatusPill.test.tsx
 src/components/merge-train/train/__tests__/MergeStepTracker.test.tsx
 src/components/merge-train/train/__tests__/MergeTrain.test.tsx
 src/components/merge-train/train/__tests__/OlderBatchRow.test.tsx
+src/components/merge-train/train/__tests__/OlderBatchRun.test.tsx
 src/components/merge-train/train/__tests__/ProjectTrainCard.test.tsx
 src/components/merge-train/train/__tests__/RecentMergesStrip.test.tsx
 src/components/merge-train/train/__tests__/StrikeLane.test.tsx
 src/components/merge-train/train/__tests__/TrainCarRow.test.tsx
+src/components/merge-train/train/__tests__/batchSections.test.ts
 src/components/AutoMergeToggle.test.tsx
 src/components/CommandDeck/__tests__/ProjectOverview-merge-train.test.tsx
 src/components/CommandDeck/__tests__/ProjectSettingsDisclosure.test.tsx
@@ -459,6 +474,7 @@ src/lib/__tests__/composerCancel.test.ts
 src/lib/__tests__/composerCitations.test.ts
 src/lib/__tests__/composerDraft.test.ts
 src/lib/__tests__/composerSendQueue.test.ts
+src/lib/__tests__/composerSendNow.test.ts
 src/lib/__tests__/connectionState.test.ts
 src/lib/__tests__/explorer-drag-paths.test.ts
 src/lib/__tests__/flywheelNeedsYou.test.ts
@@ -470,12 +486,14 @@ src/lib/__tests__/issueActions.parity.test.tsx
 src/lib/__tests__/issueActions.test.ts
 src/lib/__tests__/issueLinks.test.ts
 src/lib/__tests__/linkedConversation.test.ts
+src/lib/__tests__/markdownDocLinks.test.ts
 src/lib/__tests__/monaco-setup.test.ts
 src/lib/__tests__/nativeQuietReads.test.tsx
 src/lib/__tests__/panesStore.code.test.ts
 src/lib/__tests__/panesStore.explorer.test.ts
 src/lib/__tests__/pendingInput.test.ts
 src/lib/__tests__/pendingInputAnswer.test.ts
+src/lib/__tests__/remarkHeadingSlugs.test.ts
 src/lib/__tests__/requestFailures.test.ts
 src/lib/__tests__/selectBackendPanes.render-count.test.tsx
 src/lib/__tests__/settingsSection.test.ts

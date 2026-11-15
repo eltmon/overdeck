@@ -1,0 +1,151 @@
+{
+  "version": "1",
+  "issueId": "PAN-5359",
+  "created": "2026-11-15T15:42:47.790Z",
+  "updated": "2026-11-15T17:13:40.182Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "conversation-identity": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5359",
+      "claimedAt": "2026-11-15T15:42:47.790Z",
+      "doneAt": "2026-11-15T16:07:20.923Z"
+    },
+    "conversation-identity.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:07:20.923Z"
+    },
+    "conversation-identity.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:07:20.923Z"
+    },
+    "conversation-identity.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:07:20.923Z"
+    },
+    "conversation-identity.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:07:20.923Z"
+    },
+    "main-workspace-backfill": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5359",
+      "claimedAt": "2026-11-15T16:07:34.833Z",
+      "doneAt": "2026-11-15T16:23:00.779Z"
+    },
+    "main-workspace-backfill.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:23:00.779Z"
+    },
+    "main-workspace-backfill.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:23:00.779Z"
+    },
+    "main-workspace-backfill.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:23:00.779Z"
+    },
+    "main-workspace-backfill.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:23:00.779Z"
+    },
+    "main-workspace-backfill.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:23:00.779Z"
+    },
+    "rollout-turn-context": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5359",
+      "claimedAt": "2026-11-15T16:23:07.753Z",
+      "doneAt": "2026-11-15T16:38:18.423Z"
+    },
+    "rollout-turn-context.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:38:18.423Z"
+    },
+    "rollout-turn-context.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:38:18.423Z"
+    },
+    "rollout-turn-context.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:38:18.423Z"
+    },
+    "codex-prompt-memory-client": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5359",
+      "claimedAt": "2026-11-15T16:38:28.438Z",
+      "doneAt": "2026-11-15T16:49:25.926Z"
+    },
+    "codex-prompt-memory-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:49:25.926Z"
+    },
+    "codex-prompt-memory-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:49:25.926Z"
+    },
+    "codex-prompt-memory-client.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:49:25.926Z"
+    },
+    "codex-prompt-memory-client.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:49:25.926Z"
+    },
+    "codex-host-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5359",
+      "claimedAt": "2026-11-15T16:49:35.295Z",
+      "doneAt": "2026-11-15T17:09:49.150Z"
+    },
+    "codex-host-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:09:49.150Z"
+    },
+    "codex-host-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:09:49.150Z"
+    },
+    "codex-host-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:09:49.150Z"
+    },
+    "codex-host-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:09:49.150Z"
+    },
+    "claude-registration-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5359",
+      "claimedAt": "2026-11-15T17:09:56.466Z",
+      "doneAt": "2026-11-15T17:11:54.648Z"
+    },
+    "claude-registration-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:11:54.648Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5359",
+      "claimedAt": "2026-11-15T17:12:05.436Z",
+      "doneAt": "2026-11-15T17:13:40.182Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:13:40.182Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:13:40.182Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:13:40.182Z"
+    }
+  }
+}

@@ -44,9 +44,15 @@ Each card has:
   held-out features with the reason, offers **Open UAT** (a live stack serving
   that exact branch), a per-feature **What to UAT** checklist, and **Merge
   batch (N) to main**.
-- **Older batches**, one line each: "Older batch `uat/…` · superseded" or
-  "· voided". **show** opens the full card and the reason it ended, for
-  example "PAN-1 was merged on its own, outside the batch". Nothing is hidden.
+- **After a merge**, the merged batch sits at the top ("merged to main ·
+  `<sha>` · `<time>`"), and the rebuilds that merge voided are one line under
+  it, with **show**.
+- **Older batches**, at most three lines, then **show N more**: "Older batch
+  `uat/…` · superseded" or "· voided", where **show** opens the full card and
+  the reason it ended. Identical voided rebuilds are one line ("8 rebuilds
+  voided, … same members"), and voided batches whose features all merged later
+  sit behind one **show** line. Voided or merged batches older than a day are
+  left off the card.
 - **Strike PRs** at the front of the train, with a pill for each: checks
   running, flagged by review (with the reviewer's summary), waits for UAT,
   merging, or approved, and a **Merge** button where a merge can start.

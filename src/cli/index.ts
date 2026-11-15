@@ -289,38 +289,7 @@ backlog
   .command('write-sequence <file>')
   .description('Validate a SequenceDoc JSON file, write it to .pan/backlog/sequence.md, and commit it')
   .option('--project-root <path>', 'Project root (default: cwd)')
-  .action(async (file: string, opts: { projectRoot?: string }) => {
-    const { readFileSync } = await import('node:fs');
-    const { parseSequenceJson } = await import('../lib/backlog/types.js');
-    const { writeSequenceMd } = await import('../lib/backlog/sequence-io.js');
-    const projectRoot = opts.projectRoot ?? process.cwd();
-    let raw: unknown;
-    try {
-      raw = JSON.parse(readFileSync(file, 'utf-8'));
-    } catch (e: any) {
-      console.error(chalk.red(`Error: could not read ${file}: ${e.message}`));
-      return exitCli(1);
-    }
-    const result = parseSequenceJson(raw);
-    if (!result.ok) {
-      console.error(chalk.red(`Validation error: ${result.error}`));
-      return exitCli(1);
-    }
-    writeSequenceMd(projectRoot, result.doc);
-    // Whoever writes a .pan/ artifact commits it; the sequence commit is pushed too (PAN-3923).
-    const { commitPlanArtifacts, pushPlanArtifacts } = await import('../lib/overdeck/plan-artifact-commit.js');
-    const { surfacePlanArtifactPush } = await import('../lib/overdeck/plan-artifact-push-report.js');
-    const planHome = (await import('../lib/pan-dir/paths.js')).resolvePlanHome(projectRoot);
-    const commit = await commitPlanArtifacts({ cwd: planHome, paths: ['.pan/backlog'], message: 'chore(workspace): backlog sequence' });
-    console.log(chalk.green(`✓ Wrote .pan/backlog/sequence.md (${result.doc.nodes.length} nodes, pass=${result.doc.pass})`));
-    if (!commit.committed && commit.reason !== 'nothing to commit') {
-      console.error(chalk.yellow(`  ⚠ Could not commit the sequence: ${commit.reason}`));
-    } else {
-      const push = await pushPlanArtifacts(planHome);
-      const description = await surfacePlanArtifactPush(push, { planHome, command: 'pan backlog write-sequence' });
-      if (description) console.error(chalk.yellow(`  ⚠ Sequence push: ${description.message}`));
-    }
-  });
+  .action(lazyAction(() => import('./commands/backlog-write-sequence.js'), 'backlogWriteSequenceCommand'));
 
 // pan plan finalize <id>
 const planCmd = program

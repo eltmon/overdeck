@@ -44,6 +44,9 @@ export interface MessagesTimelineProps {
   conversationName?: string;
   cwd?: string;
   issueId?: string | null;
+  /** PAN-5353 — a queued optimistic bubble may offer Send now. */
+  sendNowAvailable?: boolean;
+  agentId?: string;
   subagentByToolUseId?: ReadonlyMap<string, SubagentSummary>;
   onOpenSubagent?: (toolUseId: string) => void;
   turnDiffSummaryByAssistantMessageId?: Map<string, TurnDiffSummary>;

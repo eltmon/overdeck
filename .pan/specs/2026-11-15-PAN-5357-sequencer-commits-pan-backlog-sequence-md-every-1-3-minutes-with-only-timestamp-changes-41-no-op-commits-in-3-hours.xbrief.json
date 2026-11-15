@@ -1,0 +1,513 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T15:10:26Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5357: Sequencer commits .pan/backlog/sequence.md every 1-3 minutes with only timestamp changes (41 no-op commits in 3 hours)",
+    "updated": "2026-11-15T15:31:58.104Z"
+  },
+  "plan": {
+    "id": "pan-5357",
+    "title": "Sequencer commits .pan/backlog/sequence.md every 1-3 minutes with only timestamp changes (41 no-op commits in 3 hours)",
+    "status": "running",
+    "uid": "a8f83213-9a4e-4a4f-adf1-75c3e088ca35",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T15:10:26Z",
+    "updated": "2026-11-15T15:31:58.104Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5357",
+        "label": "PAN-5357",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5357.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "backlog",
+      "sequencer",
+      "main-churn",
+      "dashboard-server",
+      "cli"
+    ],
+    "narratives": {
+      "Problem": "The dashboard spawns a fresh sequencer-runner agent 30 s after every burst of issues.delta events (src/lib/backlog/backlog-auto-trigger.ts, called from src/dashboard/server/read-model.ts), and pan backlog write-sequence always rewrites, commits and pushes .pan/backlog/sequence.md with a new generatedAt. A run that changes nothing still makes a two-line commit to main. The 42-second spacing suggests the loop feeds itself: each push moves main, which changes derived read-model state and emits another issues.delta. That is an unverified hypothesis; each fix layer stops the churn without it. Result: 41 no-op commits in 3 hours on 2026-11-15. That churn starves the merge train and forces every worktree to merge noise.",
+      "Proposal": "Fix three layers (full detail and before/after code in .pan/drafts/PAN-5357.md). (1) writeSequenceMd renders deterministically (nodes sorted by rank, issue, then JSON text; edges by from, to, type, source, then confidence) and returns { written: false } without writing when the rendering differs from the prior file only in generatedAt; on every AI write (written or unchanged) it copies manifest.json to the gitignored .pan/backlog/examined-manifest.json, and on an unchanged AI write it bumps the mtime so the fresh-sequence done signal still fires. Operator edits never write the examined copy. (2) pan backlog write-sequence moves into src/cli/commands/backlog-write-sequence.ts; it still calls commitPlanArtifacts (which commits nothing for an untouched file but retries an earlier uncommitted write) and pushPlanArtifacts, and prints 'unchanged ... not committed' when nothing was written or committed. (3) spawnSequencerAgent gains skipWhenUnchanged: when the new manifest's key equals examined-manifest.json's key it returns null and spawns nothing; a failed spawn restores the prior manifest.json. (4) The auto-trigger passes skipWhenUnchanged and enforces a 30-minute minimum interval after an automatic pass that actually spawned, coalescing in-window deltas into one fire at the window end. (5) The sequencer prompt and roles/sequencer.md treat 'unchanged' as success. (6) Docs: docs/XBRIEF.md, reference/troubleshooting.mdx, changelog.d/pan-5357.md.",
+      "NonGoals": "- Filtering issues.delta by project or field in src/dashboard/server/read-model.ts\n- Changing the merge train's reassembly on main moves (filed separately)\n- A config key for the 30-minute interval or the 30 s debounce\n- Delaying, rate-limiting or skipping the dashboard regenerate button (POST /api/backlog/sequence/regenerate) or any operator-started pass\n- Changing the operator gate/planning routes in src/dashboard/server/routes/backlog.ts beyond what the new writeSequenceMd return type requires (nothing)\n- Changing the incremental prompt's updatedAt-versus-generatedAt re-read rule\n- Rewriting or squashing the existing no-op commits on main\n- Skipping commitPlanArtifacts or pushPlanArtifacts on an unchanged write (both must still run)\n- Fixing the pre-existing polyrepo mismatch where spawnSequencerAgent writes manifest.json under projectRoot/.pan while writeSequenceMd resolves the plan home"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The automatic skip compares the new manifest to .pan/backlog/examined-manifest.json, a copy that only the sequencer's submission path (writeSequenceMd without operatorEdit) writes; not issue updatedAt versus prior generatedAt as the issue comment suggested, and not manifest.json or file mtimes.",
+        "rationale": "The writer fix freezes generatedAt on unchanged passes, so the updatedAt rule would never skip again after any comment. manifest.json is written at spawn time, so a pass that died before submitting would leave a matching file behind. Operator gate/planning edits also write sequence.md, so mtimes prove nothing. The submission-path copy advances only when a pass actually submitted."
+      },
+      {
+        "summary": "An unchanged write still calls commitPlanArtifacts and pushPlanArtifacts, as the CLI does today.",
+        "rationale": "An untouched file gives git nothing to commit, so no-op commits stop anyway. Keeping both calls preserves recovery: a write whose commit failed earlier is committed on the re-run, and the troubleshooting.mdx recovery (re-run write-sequence after a failed push) still pushes. pushPlanArtifacts pushes nothing when nothing is ahead, so origin/main does not move."
+      },
+      {
+        "summary": "Change detection byte-compares a deterministic rendering with generatedAt pinned to the prior value, and every other field (model, pass, lastReviewPass, openCount, node fields, edge set) counts as a change.",
+        "rationale": "Byte comparison avoids undefined-versus-missing-key mismatches in a hand-written deep-equal; sorting nodes and edges removes false differences from agent array order. Only the timestamp is noise according to the issue."
+      },
+      {
+        "summary": "The 30-minute window starts only when an automatic pass actually spawned an agent; skipped, failed and suppressed fires leave it closed.",
+        "rationale": "A skipped check costs no agent and must not delay sequencing a real change that arrives a minute later; failed fires spawn nothing and are cheap to retry on the next delta."
+      },
+      {
+        "summary": "The interval is a hardcoded constant MIN_AUTO_PASS_INTERVAL_MS = 30 * 60_000, as the issue comment suggested, with no config key.",
+        "rationale": "No one asked for configurability; the Karpathy rules forbid speculative configuration."
+      },
+      {
+        "summary": "On an unchanged AI write, writeSequenceMd bumps sequence.md's mtime with utimesSync; on an unchanged operator edit it does not touch the file.",
+        "rationale": "getSequencerRunStatus marks a pass done when sequence.md's mtime is at or after startedAt; without the bump, no-op passes would finish only through the slower idle path. Git ignores mtime. Operator edits can run while a pass is live and must not falsely finish it."
+      }
+    ],
+    "items": [
+      {
+        "id": "seq-write-noop",
+        "title": "writeSequenceMd returns written:false for a timestamp-only change and records the examined manifest",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:10:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5357",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/backlog/sequence-io.ts",
+            "src/lib/backlog/__tests__/write-sequence.test.ts",
+            ".gitignore"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/backlog/__tests__/write-sequence.test.ts src/lib/backlog/__tests__/sequence-io.test.ts",
+            "npm run typecheck",
+            "git check-ignore .pan/backlog/examined-manifest.json"
+          ],
+          "expected_outputs": [
+            "write-sequence.test.ts and sequence-io.test.ts pass, including the seven PAN-5357 cases",
+            "typecheck completes without errors",
+            "git check-ignore prints .pan/backlog/examined-manifest.json and exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-11",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 in .pan/drafts/PAN-5357.md. In src/lib/backlog/sequence-io.ts: add utimesSync and copyFileSync to the node:fs import; extract a private renderSequenceMd(doc) from the current lines 131-142 that sorts nodes by rank, then issue (localeCompare), then JSON.stringify(node), and serializes the JSON block as { ...doc, nodes: sortedNodes, edges: sortEdges(doc.edges) } with edges sorted by from, to, type, source, then numeric confidence; read the prior file once at the top regardless of operatorEdit (keep merge preservation gated on !opts?.operatorEdit); before writing, if the prior file parsed OK and renderSequenceMd({ ...mergedDoc, generatedAt: prior.generatedAt }) === priorText, then when !opts?.operatorEdit bump mtime/atime with utimesSync and call recordExaminedManifest(outPath), and return { written: false }; otherwise write, call recordExaminedManifest(outPath) when !opts?.operatorEdit, and return { written: true }. recordExaminedManifest copies <dir of sequence.md>/manifest.json to <same dir>/examined-manifest.json when manifest.json exists. Export interface WriteSequenceMdResult { written: boolean }. In .gitignore add '.pan/backlog/examined-manifest.json' below the '.pan/backlog/manifest.json' line with the PRD's comment. Add the seven tests named in WI-1 to src/lib/backlog/__tests__/write-sequence.test.ts."
+        },
+        "items": [
+          {
+            "id": "seq-write-noop.ac1",
+            "title": "Given a written sequence.md, when writeSequenceMd is called with the same doc and only a new generatedAt, then it returns { written: false } and the file bytes stay identical (still contain the old generatedAt)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "seq-write-noop.ac2",
+            "title": "Given the same doc with nodes and edges in reversed array order, including two edges that differ only in confidence, and a new generatedAt, when writeSequenceMd runs, then it returns { written: false }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "seq-write-noop.ac3",
+            "title": "Given a doc where two nodes swap rank, or no prior sequence.md, when writeSequenceMd runs, then it writes the file with the new generatedAt and returns { written: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "seq-write-noop.ac4",
+            "title": "Given an unchanged AI write, when writeSequenceMd runs, then the file's mtime advances past a 2020 mtime set before the call; given an unchanged write with { operatorEdit: true }, then it preserves the 2020 mtime",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "seq-write-noop.ac5",
+            "title": "Given manifest.json exists, when writeSequenceMd runs without operatorEdit (written or unchanged), then examined-manifest.json contains manifest.json's bytes; when it runs with { operatorEdit: true }, then it creates no examined-manifest.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-write-sequence-noop",
+        "title": "pan backlog write-sequence adds no commit when the ranking is unchanged",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:10:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5357",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/backlog-write-sequence.ts",
+            "src/cli/commands/__tests__/backlog-write-sequence.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/backlog-write-sequence.test.ts tests/unit/cli/startup-lazy-load.test.ts",
+            "npm run typecheck",
+            "npm run lint:skills",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "backlog-write-sequence.test.ts passes all three real-git cases and startup-lazy-load.test.ts passes",
+            "typecheck completes without errors",
+            "lint:skills and lint:file-size pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. Move the inline write-sequence action out of src/cli/index.ts (the block after `.command('write-sequence <file>')`, lines 286-316) into a new src/cli/commands/backlog-write-sequence.ts exporting async function backlogWriteSequenceCommand(file: string, opts: { projectRoot?: string }): Promise<void>, and register it with .action(lazyAction(() => import('./commands/backlog-write-sequence.js'), 'backlogWriteSequenceCommand')). Keep the description and --project-root option strings byte-identical. In the command: keep the read/validation error paths (red message, exitCli(1)); call const { written } = writeSequenceMd(projectRoot, result.doc); ALWAYS call commitPlanArtifacts({ cwd: planHome, paths: ['.pan/backlog'], message: 'chore(workspace): backlog sequence' }) as today; print the written line when written, '✓ .pan/backlog/sequence.md unchanged; committed an earlier uncommitted sequence write' when !written && commit.committed, otherwise '✓ .pan/backlog/sequence.md unchanged (only generatedAt differs), not committed'; keep today's commit-failure warning (no push) and otherwise push and surface the push warning as today. Write src/cli/commands/__tests__/backlog-write-sequence.test.ts against a real git repo in a mkdtempSync temp root (git init -b main, user.email/user.name, commit.gpgsign false, a seed commit, as in tests/unit/lib/overdeck/plan-artifact-commit.test.ts lines 25-34), keeping the real commitPlanArtifacts via vi.importActual and mocking only pushPlanArtifacts and surfacePlanArtifactPush; pass { projectRoot: tmp } (an unregistered path is its own plan home)."
+        },
+        "items": [
+          {
+            "id": "cli-write-sequence-noop.ac1",
+            "title": "Given a committed sequence in a real git repo, when backlogWriteSequenceCommand runs on a JSON file that differs only in generatedAt, then git rev-list --count HEAD stays the same, git status --porcelain is empty, and stdout contains 'not committed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-write-sequence-noop.ac2",
+            "title": "Given a committed sequence, when the command runs on a JSON file where one node's rank changed, then it commits exactly one new commit with subject 'chore(workspace): backlog sequence'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-write-sequence-noop.ac3",
+            "title": "Given sequence.md was changed by writeSequenceMd but left uncommitted, when the command runs with the same doc, then it commits one new commit and stdout contains 'committed an earlier uncommitted sequence write'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-write-sequence-noop.ac4",
+            "title": "grep -n \"writeSequenceMd(projectRoot, result.doc)\" src/cli/index.ts returns no match, and `pan backlog write-sequence --help` still renders the same description and --project-root option",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-skip-unchanged",
+        "title": "spawnSequencerAgent skips the automatic pass when manifest.json is unchanged",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:10:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5357",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "auto-trigger-interval",
+            "sequencer-prompt-unchanged"
+          ],
+          "files_scope": [
+            "src/lib/backlog/sequencer-agent.ts",
+            "src/lib/backlog/__tests__/spawn-sequencer.test.ts",
+            "src/lib/backlog/__tests__/sequencer-agent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/backlog/__tests__/spawn-sequencer.test.ts src/lib/backlog/__tests__/sequencer-agent.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "spawn-sequencer.test.ts and sequencer-agent.test.ts pass, including the new skip, key and restore cases",
+            "typecheck completes without errors, including src/dashboard/server/routes/backlog.ts against the overloads"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In src/lib/backlog/sequencer-agent.ts: import readFile and rm from node:fs/promises and type BacklogManifestEntry from ./backlog-input.js; add exported pure helpers backlogManifestKey(manifest) (drops ageMs, sorts entries by id and labels alphabetically, maps priority/isEpic/partOf undefined to null) and manifestKeyFromText(text) (null on bad JSON or non-array); add skipWhenUnchanged?: boolean to SpawnSequencerOptions; replace the signature with two overloads (no/false option -> Promise<AgentState>; true -> Promise<AgentState | null>). Replace the manifest-write-through-spawnRun block (lines 211-233) with the PRD's code: when opts.skipWhenUnchanged && input.priorSequence !== null, read join(projectRoot, '.pan', 'backlog', 'examined-manifest.json') with readFile(...).catch(() => null); if it is non-null and manifestKeyFromText(examined) === backlogManifestKey(input.manifest), log one '[sequencer] skipped ...' line and return null before writing manifest.json, reaping or spawning. Otherwise read the prior manifest.json text, write the new manifest, and wrap model resolution, prompt build, clearFinishedSequencerRun, assertUnpaused and `return await spawnRun(...)` in try/catch that restores the prior manifest.json bytes (or rm with force when there was none) and rethrows. Never read or compare manifest.json itself for the skip. Do not change src/dashboard/server/routes/backlog.ts. Add the tests named in WI-3; in spawn-sequencer.test.ts create the project root with mkdtemp from node:fs/promises (node:fs is mocked in that file, node:fs/promises is not) and override the collectOpenBacklog mock to return a non-null priorSequence."
+        },
+        "items": [
+          {
+            "id": "spawn-skip-unchanged.ac1",
+            "title": "Given a prior sequence and an examined-manifest.json whose key equals the new manifest's key, when spawnSequencerAgent('incremental', { skipWhenUnchanged: true, ... }) runs, then it resolves null, writes no manifest.json, and spawnRun is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-skip-unchanged.ac2",
+            "title": "Given a matching manifest.json but no examined-manifest.json (a pass that spawned and never submitted), or an examined-manifest.json with a different updatedAt, or a call without skipWhenUnchanged, when spawnSequencerAgent runs, then spawnRun is called once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-skip-unchanged.ac3",
+            "title": "Given spawnRun rejects with 'already running', when spawnSequencerAgent runs, then it rejects with that error and manifest.json's bytes equal the prior file's bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-skip-unchanged.ac4",
+            "title": "backlogManifestKey returns the same string for manifests that differ only in ageMs, entry order and label order, and a different string when one entry's updatedAt changes; manifestKeyFromText returns null for non-JSON and for a JSON object",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auto-trigger-interval",
+        "title": "Auto-trigger limits automatic sequencer passes to one per 30 minutes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:10:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5357",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/backlog/backlog-auto-trigger.ts",
+            "src/lib/backlog/__tests__/backlog-auto-trigger.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/backlog/__tests__/backlog-auto-trigger.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "backlog-auto-trigger.test.ts passes, including the window, skipped-pass and failed-pass cases, all under fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4: replace everything in src/lib/backlog/backlog-auto-trigger.ts from `let _incrementalTimer` to the end with the 'After' code in the PRD (keep autonomousSpawnSuppressed and its comments unchanged). Add module state _lastAutoPassAt and _spawnInFlight; export MIN_AUTO_PASS_INTERVAL_MS = 30 * 60_000; triggerDebouncedIncrementalPass schedules at max(DEBOUNCE_MS, windowEnd - now); fire() re-checks the window and reschedules to its end if still inside, reschedules DEBOUNCE_MS while a spawn is in flight, honours autonomousSpawnSuppressed, then calls spawnSequencerAgent('incremental', { projectRoot, skipWhenUnchanged: true }) and sets _lastAutoPassAt = Date.now() only when the promise resolves non-null; export resetBacklogAutoTriggerForTests(). In the test file: call resetBacklogAutoTriggerForTests() in beforeEach, update the existing toHaveBeenCalledWith to include skipWhenUnchanged: true, and add the coalescing, skipped-pass and failed-pass tests from WI-4 using vi.useFakeTimers() and vi.advanceTimersByTimeAsync() only (never real waits)."
+        },
+        "items": [
+          {
+            "id": "auto-trigger-interval.ac1",
+            "title": "Given a spawned automatic pass, when two more deltas arrive inside the next 30 minutes, then spawnSequencerAgent is called no further times until MIN_AUTO_PASS_INTERVAL_MS after the first spawn, and exactly once more at that point",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-trigger-interval.ac2",
+            "title": "Given spawnSequencerAgent resolves null (skipped) or rejects for a pass, when another delta arrives, then a new pass fires 30 s later (the window stays closed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-trigger-interval.ac3",
+            "title": "When a debounced fire runs, then the trigger calls spawnSequencerAgent with ('incremental', { projectRoot: '/tmp/proj', skipWhenUnchanged: true }); given OVERDECK_NO_RESUME or a peer dashboard, then it spawns nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sequencer-prompt-unchanged",
+        "title": "Sequencer prompt and role file treat an unchanged write-sequence as success",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:10:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5357",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/backlog/sequencer-agent.ts",
+            "src/lib/backlog/__tests__/sequencer-agent.test.ts",
+            "roles/sequencer.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/backlog/__tests__/sequencer-agent.test.ts",
+            "npm run lint:prompts",
+            "npm run lint:prompt-trailer"
+          ],
+          "expected_outputs": [
+            "sequencer-agent.test.ts passes including the new 'unchanged result is success' test",
+            "lint:prompts and lint:prompt-trailer pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. In buildSequencerPrompt (src/lib/backlog/sequencer-agent.ts, Output section, after the paragraph ending 'so DO NOT write the file directly with the Write tool. Always go through this command.') append: 'If the ranking matches the prior sequence apart from generatedAt, the command prints \"unchanged (only generatedAt differs), not committed\" and exits 0. That is a successful pass: stop there. Do not retry, and do not edit the JSON to force a write.' In roles/sequencer.md, under '## Output' -> 'The command handles:', add a bullet: 'An unchanged ranking: when only `generatedAt` would change, the command leaves `sequence.md` as it is, makes no commit, prints `unchanged … not committed` and exits 0. Treat that as success; do not retry.' Add test 'the prompt tells the agent an unchanged result is success' expecting toContain('not committed') and toContain('Do not retry'). The commit touching roles/sequencer.md MUST carry the trailer 'Prompt-Change: sequencer treats an unchanged write-sequence as success (PAN-5357)'."
+        },
+        "items": [
+          {
+            "id": "sequencer-prompt-unchanged.ac1",
+            "title": "buildSequencerPrompt('incremental', ...) returns a prompt that contains 'not committed' and 'Do not retry'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sequencer-prompt-unchanged.ac2",
+            "title": "roles/sequencer.md's Output section contains a bullet stating that an unchanged ranking makes no commit, prints 'unchanged … not committed' and is treated as success",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sequencer-prompt-unchanged.ac3",
+            "title": "The commit that changes roles/sequencer.md carries a 'Prompt-Change:' trailer, so npm run lint:prompt-trailer exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-sequencer-churn",
+        "title": "Document the unchanged-write rule and the 30-minute automatic sequencing interval",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:10:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5357",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/XBRIEF.md",
+            "reference/troubleshooting.mdx",
+            "changelog.d/pan-5357.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'at most once every 30 minutes' docs/XBRIEF.md",
+            "grep -n 'not committed' reference/troubleshooting.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "both greps print one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6. In docs/XBRIEF.md line 51 (paragraph starting '`.pan/` lives in the project repo'), insert the PRD's paragraph after the sentence ending '(PAN-3923, #4108).' stating that write-sequence rewrites sequence.md only when something other than generatedAt changed, that an unchanged result prints 'unchanged … not committed' and adds no commit but still commits and pushes an earlier write that failed to commit or push, that each submitted pass records its manifest in the gitignored .pan/backlog/examined-manifest.json, and that the dashboard starts an automatic incremental pass 30 seconds after issue changes settle, at most once every 30 minutes, only when the backlog manifest differs from that record, while the regenerate button is never delayed or skipped. In reference/troubleshooting.mdx, section '## Local main diverged after a backlog or order-book write', recovery step 3, add the PRD's note that an unchanged re-run prints 'unchanged … not committed' (or 'committed an earlier uncommitted sequence write') and still pushes the earlier commit, so that output is not a failure. Create changelog.d/pan-5357.md with the '#### Fixed' entry from the PRD (format per changelog.d/README.md)."
+        },
+        "items": [
+          {
+            "id": "docs-sequencer-churn.ac1",
+            "title": "docs/XBRIEF.md contains the sentence saying an automatic incremental pass runs at most once every 30 minutes and only when the backlog manifest differs from .pan/backlog/examined-manifest.json, and that an unchanged write-sequence adds no commit but still pushes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-sequencer-churn.ac2",
+            "title": "reference/troubleshooting.mdx recovery step 3 contains the note that 'unchanged … not committed' after a re-run is not a failure and still pushes the earlier commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-sequencer-churn.ac3",
+            "title": "Given changelog.d/pan-5357.md with a single '#### Fixed' bullet linking #5357, when npm run lint:docs runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "seq-write-noop",
+        "to": "cli-write-sequence-noop",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-skip-unchanged",
+        "to": "auto-trigger-interval",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-skip-unchanged",
+        "to": "sequencer-prompt-unchanged",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One inseparable fix touching 15 files: the spawner's skip (src/lib/backlog/sequencer-agent.ts) reads examined-manifest.json, which only the writer (src/lib/backlog/sequence-io.ts) creates and only .gitignore keeps out of commits. The CLI test exercises the writer, and the docs, role prompt and changelog describe this one behavior. Shipping any slice alone either leaves no-op commits on main or adds a skip with no watermark. The seventh subsystem is only the root .gitignore line.",
+      "canonicalFilename": "2026-11-15-PAN-5357-sequencer-commits-pan-backlog-sequence-md-every-1-3-minutes-with-only-timestamp-changes-41-no-op-commits-in-3-hours.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

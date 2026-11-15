@@ -1,8 +1,9 @@
 /**
  * One non-hero batch of a project's chain (PAN-4753 WI-10, FR-7): a single
  * collapsed line "Older batch <name> · voided" that expands to the full
- * `BatchCard`, so a superseded or voided batch and its reason are never
- * hidden.
+ * `BatchCard`. Voided batches can be grouped into a run, folded under the
+ * merge that voided them, or put behind a toggle (PAN-5364), and every one
+ * stays reachable through a show control.
  */
 import { useState, type ReactNode } from 'react';
 import type { UatGenerationPayload } from './boardTypes';

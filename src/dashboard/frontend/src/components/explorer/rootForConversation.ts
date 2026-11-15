@@ -45,10 +45,29 @@ export function rootIdForConversation(conv: RootConversation, ctx: RootContext):
     }
   }
   if (!conv.cwd) return null
-  // 4–6. Feature workspace, then the longest project path, else outside (shared rules,
-  // PAN-5349). No scratch rows: they carry no path here, so rule 3 covers them.
-  const hit = resolvePathRoot(trimSlash(conv.cwd), ctx.projects, [])
-  return hit.kind === 'root' ? hit.rootId : null
+  // 4-5. A feature workspace, else the primary checkout or any folder under
+  // it (longest project path wins) — shared with explorerLocationForPath
+  // (WI-7, PAN-5337), which also returns the root-relative path.
+  return explorerLocationForPath(conv.cwd, ctx)?.rootId ?? null
+}
+
+/**
+ * The explorer root and root-relative path of an absolute file path (rules 4-5 of
+ * `rootIdForConversation`), or null. The rules are the shared `resolvePathRoot`
+ * (PAN-5349); no scratch rows, since registry rows carry no path here.
+ */
+export function explorerLocationForPath(absPath: string, ctx: RootContext): { rootId: string; path: string } | null {
+  const cwd = trimSlash(absPath)
+  const hit = resolvePathRoot(cwd, ctx.projects, [])
+  if (hit.kind !== 'root') return null
+  const project = ctx.projects.find((p) => p.key === hit.projectKey)
+  if (!project) return null
+  const projectPath = trimSlash(project.path)
+  // An issue root is <project>/workspaces/<first segment>; a project root is the project folder.
+  const base = hit.rootId.startsWith('issue:')
+    ? `${projectPath}/workspaces/${cwd.slice(projectPath.length + '/workspaces/'.length).split('/')[0]}`
+    : projectPath
+  return { rootId: hit.rootId, path: cwd === base ? '' : cwd.slice(base.length + 1) }
 }
 
 const TITLE_MAX = 40

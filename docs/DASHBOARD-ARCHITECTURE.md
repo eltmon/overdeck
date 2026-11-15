@@ -733,6 +733,11 @@ door that does not exist; a real record read door would be a separate change.
   `input-target-not-main`, the toast shows the reason, and the message moves to the
   outbox, whose Retry sends it again under a fresh `clientMessageId` because the
   response proved nothing was delivered (PAN-5184).
+  **Send now (PAN-5353).** An acknowledged optimistic bubble on a busy Claude Code
+  conversation or agent shows **Send now**, and Ctrl/Cmd+Enter on an empty composer does
+  the same. Both POST the send-now route through `composerSendQueue.ts`, so the chord
+  never lands between a pending paste and its Enter. The server runs the permission and
+  ensure-main guards, then presses Ctrl+X Ctrl+S; a refusal becomes a toast.
   Conversation rows carry `inputTarget` (`'main' | { subagent } | 'unknown'`), which
   drives the composer's "Typed messages are going to subagent" notice. An `accepted` bubble
   that stays unmatched for `TURN_STALL_MS` (4 minutes) **while the conversation is not

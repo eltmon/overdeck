@@ -23,6 +23,8 @@ const mocks = vi.hoisted(() => ({
   reapFinishedRemoteAgents: vi.fn(async () => [] as string[]),
   recoverAdvisoryFollowups: vi.fn(async () => [] as string[]),
   readRecordedAgentStopAt: vi.fn((): number | null => null),
+  resumeCrashedWorkAgents: vi.fn(async () => [] as string[]),
+  logDeaconEvent: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/overdeck/control-settings.js', () => ({
@@ -105,6 +107,15 @@ vi.mock('../../../../src/lib/cloister/advisory-followup-patrol.js', () => ({
   recoverAdvisoryFollowups: mocks.recoverAdvisoryFollowups,
 }));
 
+vi.mock('../../../../src/lib/cloister/crashed-work-resume.js', () => ({
+  resumeCrashedWorkAgents: mocks.resumeCrashedWorkAgents,
+}));
+
+vi.mock('../../../../src/lib/persistent-logger.js', () => ({
+  logDeaconEvent: mocks.logDeaconEvent,
+  logAgentLifecycle: vi.fn(),
+}));
+
 const {
   checkStuckWorkAgents,
   reconcileAgentLiveness,
@@ -145,6 +156,7 @@ describe('deacon-lite', () => {
     mocks.capturePaneText.mockReturnValue('');
     mocks.reconcileClosedIssueAgents.mockResolvedValue([]);
     mocks.readRecordedAgentStopAt.mockReturnValue(null);
+    mocks.resumeCrashedWorkAgents.mockResolvedValue([]);
     __resetStuckWorkAgentCooldownForTests();
     __resetReportedDeadAgentsForTests();
     __resetApiErrorRecoveryStateForTests();
@@ -642,6 +654,7 @@ describe('deacon-lite', () => {
       expect(mocks.reconcileClosedIssueAgents).not.toHaveBeenCalled();
       expect(mocks.reapFinishedRemoteAgents).not.toHaveBeenCalled();
       expect(mocks.recoverAdvisoryFollowups).not.toHaveBeenCalled();
+      expect(mocks.resumeCrashedWorkAgents).not.toHaveBeenCalled();
     });
 
     it('runs the remote reap once, last, after retryDeferredHandoffs (PAN-4295)', async () => {
@@ -654,6 +667,37 @@ describe('deacon-lite', () => {
       expect(mocks.retryDeferredHandoffs).toHaveBeenCalledTimes(1);
       expect(mocks.retryDeferredHandoffs.mock.invocationCallOrder[0])
         .toBeLessThan(mocks.reapFinishedRemoteAgents.mock.invocationCallOrder[0]!);
+    });
+
+    it('runDeaconLite runs resumeCrashedWorkAgents after reconcileAgentLiveness', async () => {
+      mocks.listAgentStates.mockReturnValue([workAgent()]);
+      mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+      mocks.isAlive.mockResolvedValue({ alive: false, reason: 'no-pane' });
+
+      await runDeaconLite();
+
+      expect(mocks.resumeCrashedWorkAgents).toHaveBeenCalledTimes(1);
+      // reconcileAgentLiveness probes the oracle for the absent agent; the resume routine runs after it, before the reaper.
+      expect(mocks.isAlive.mock.invocationCallOrder.at(-1))
+        .toBeLessThan(mocks.resumeCrashedWorkAgents.mock.invocationCallOrder[0]!);
+      expect(mocks.resumeCrashedWorkAgents.mock.invocationCallOrder[0])
+        .toBeLessThan(mocks.reconcileClosedIssueAgents.mock.invocationCallOrder[0]!);
+    });
+
+    it('runDeaconLite logs each routine action line', async () => {
+      mocks.listAgentStates.mockReturnValue([]);
+      mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+      mocks.resumeCrashedWorkAgents.mockResolvedValue(['resumeCrashedWorkAgents: resumed agent-pan-5337']);
+      mocks.reconcileClosedIssueAgents.mockResolvedValue(['Reaped agent-pan-9 — parent issue PAN-9 is closed']);
+      mocks.recoverAdvisoryFollowups.mockResolvedValue(['PAN-7: 1 follow-up outcome(s)']);
+
+      await runDeaconLite();
+
+      expect(mocks.logDeaconEvent.mock.calls.map((call) => call[0])).toEqual([
+        '[deacon-lite] resumeCrashedWorkAgents: resumed agent-pan-5337',
+        '[deacon-lite] Reaped agent-pan-9 — parent issue PAN-9 is closed',
+        '[deacon-lite] PAN-7: 1 follow-up outcome(s)',
+      ]);
     });
 
     it('runs the advisory follow-up patrol once, after the remote reap (PAN-5218)', async () => {

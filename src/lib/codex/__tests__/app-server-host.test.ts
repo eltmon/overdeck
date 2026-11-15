@@ -100,6 +100,7 @@ function makeHost(manager: FakeManager, opts: Partial<ConstructorParameters<type
     overdeckHome,
     manager,
     effort: 'high',
+    promptMemory: async ({ prompt }) => ({ text: prompt, contextChars: 0 }),
     ...opts,
   });
 }
@@ -299,6 +300,35 @@ describe('CodexAppServerHost', () => {
         }),
       ]));
     });
+  });
+
+  it('prepends the prompt-memory stub text to the turn while the pane and events keep the original (PAN-5359)', async () => {
+    const manager = new FakeManager();
+    const { stdout, lines } = captureStdout();
+    const promptMemory = vi.fn(async () => ({ text: 'WRAPPED build it', contextChars: 7 }));
+    const host = makeHost(manager, { stdout, promptMemory });
+
+    await host.handleOp({ op: 'message', content: 'build it', model: 'gpt-5.6-sol', effort: 'high' });
+
+    expect(manager.startTurnCalls[0]?.text).toBe('WRAPPED build it');
+    expect(lines).toEqual(expect.arrayContaining(['[user] build it']));
+    expect(readEventLog()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'op/message', memoryContextChars: 7 }),
+    ]));
+  });
+
+  it('calls the prompt-memory stub with the prompt, the host agent id, and the started thread id (PAN-5359)', async () => {
+    const manager = new FakeManager();
+    const promptMemory = vi.fn(async () => ({ text: 'build it', contextChars: 0 }));
+    const host = makeHost(manager, { promptMemory });
+
+    await host.handleOp({ op: 'message', content: 'build it', model: 'gpt-5.6-sol', effort: 'high' });
+
+    expect(promptMemory).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: 'build it',
+      agentId: 'agent-host-test',
+      sessionId: 'thread-started',
+    }));
   });
 
   it('projects app-server notifications into agent activity without tmux', async () => {

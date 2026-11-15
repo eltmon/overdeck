@@ -23,9 +23,12 @@ merge mechanics after a PR is chosen are in [MERGE-WORKFLOW.md](MERGE-WORKFLOW.m
 | **Car** | One issue on the train: an open PR a review approved, or an issue with a live auto-merge row or merge run. |
 | **Batch** (generation) | A `uat/<label>-<codename>-<MMDD>-<n>` branch merging several ready features for joint testing, stored in `uat_generations`. |
 | **Live batch** | A batch with status `assembling`, `ready` or `superseded`. |
-| **Superseded** | A batch a newer one replaced (its base moved or its input set changed). Still testable and promotable. |
+| **Superseded** | A batch a newer one replaced (main moved by a code commit, or its input set changed). Still testable and promotable. |
+| **Bookkeeping commit** | A commit that touches only `BOOKKEEPING_PATH_GLOBS` (`.pan/**`, `.overdeck/memory/**`; `src/lib/cloister/bookkeeping-paths.ts`). CI's `paths-ignore` is the same list, and a test fails if the two drift. |
 | **Invalidated** (voided) | A batch whose content can no longer be trusted. Cannot be promoted. |
 | **Status reason** | `uat_generations.status_reason`: one sentence saying why a batch became `superseded` or `invalidated`. |
+| **Voided by** | `uat_generations.voided_by`: the name of the batch whose promote voided this one. Promote writes it on every sibling it voids; it is null for any other void and for rows voided before PAN-5364. |
+| **Outcome** | The merged batch the board shows in the hero slot when no live batch remains and nothing was created after its merge except voided rebuilds of its own members. |
 | **Cooldown** | `AUTO_MERGE_COOLDOWN_MS` (5 minutes) between scheduling an auto-merge and merging it. Cancel works during it. |
 
 ## The merge route rule
@@ -94,7 +97,7 @@ A batch moves `assembling` → `ready` → (`superseded`) → `promoted`, or end
 | Writer | Reason |
 | --- | --- |
 | Engine supersede (`uat-generation-engine.ts`, `uat-polyrepo-engine.ts`) | `replaced by <name>` |
-| Promote (`uat-promote.ts`), for every other live batch | `<name> was merged to main` |
+| Promote (`uat-promote.ts`), for every other live batch | `<name> was merged to main`, and sets `voided_by` to `<name>` |
 | Reconciler (`uat-reconciler.ts`, `isStale`) | `<ID> was merged on its own, outside the batch`, `<ID> is no longer ready to merge`, `<ID> branch gained commits`, or `<ID> merges through the per-PR auto-merge train` |
 | Chain trim (`cleanupUatGenerations`) | `trimmed: older than the newest <N> batches` |
 | Auto-promote drop or dissolve (`batch-auto-promote.ts`) | the drop reason, e.g. `combined CI failed on <name> (<checks>); <ID> merges on its own` |
@@ -104,8 +107,67 @@ reconciler's optional `mergedIssueIds` dep answers it with
 `mergedIssueIdsForProject` (`ready-set.ts`): the merged rows of the same
 listings the ready set reads, from any member repo in a polyrepo project. It is
 read once per tick and only while a live batch exists. If that read fails, the
-less specific "no longer ready to merge" reason is used. The generations payload and the board carry `statusReason`, and the
-UI never hides a voided or superseded batch.
+less specific "no longer ready to merge" reason is used. The generations payload and the board carry `statusReason`
+and `voidedBy` (invalidated batches only).
+
+### How the board shows the chain
+
+The board payload (`getUatGenerationsPayload(root, { board: { now } })`, which
+calls `selectBoardChain` in `uat-board-chain.ts`) scans the newest 50 batches.
+It drops voided batches whose `updatedAt` is older than 24 hours, merged
+batches whose merge time (the latest repo `promotedAt`, else `updatedAt`) is
+older than 24 hours, and failed batches older than 24 hours unless the failure
+is the newest row. Live batches stay at any age. It keeps at most 10 batches,
+newest first, and always appends the newest merged batch that survived the
+age filter. No row is deleted: the database keeps the full chain, and
+`/api/merge-train/generations` still returns the plain newest 10.
+
+The card (`batchSections.ts`) then groups the chain:
+
+- **Hero.** The live batch, else the **outcome**: the merged batch with the
+  latest merge time, shown as "merged to main · <sha7> · <ago>", but only when
+  no other batch was created after that merge except voided rebuilds of its
+  own members. Creation time is used because stack start/stop and record heals
+  move `updatedAt` on unrelated batches. A newer failed batch means no
+  outcome, so Retry batch assembly stays offered.
+- **Folded rebuilds.** Voided batches whose `voided_by` names the outcome are
+  one line under it, "2 rebuilds voided when this merged: …", with **show**.
+- **Covered voided batches.** A voided batch whose members all merged in a
+  later merged batch is behind one "N voided batches whose features all merged
+  later" line with **show**.
+- **Identical runs.** Two or more consecutive voided batches with the same
+  members are one row, "8 rebuilds voided, <oldest> to <newest>, same members".
+- **Cap.** Three older rows show, then **show N more**; a failed batch is never
+  hidden by the cap.
+
+Superseded and failed batches are never folded, covered or collapsed, and
+every voided batch stays reachable through a **show** control.
+
+### When a batch is rebuilt
+
+Each tick, the reconciler assembles a new batch only when no live batch
+answers the ready set. A live batch answers it when its members, held-out
+features and branch heads match the ready set, and its base is still main's
+head. Main moving past the base counts as no change (PAN-5356) when all
+three of these hold:
+
+- the base is an ancestor of main;
+- every commit between them is a bookkeeping commit, checked per commit with
+  renames split, so a code change and its revert still count;
+- none of those commits touches a file the batch changes.
+
+The third rule keeps a kept batch promotable: promote refuses as
+`stale-base` when main's new commits overlap the batch's files, and the
+reconciler would never rebuild a batch it kept. The check
+(`isBookkeepingOnlyBaseMove` in `uat-generation-deps.ts`) runs for monorepo
+projects only. A polyrepo batch, a failed check, or any other main move
+rebuilds the batch as before. Bookkeeping-only churn also leaves a recent
+failed assembly's 10-minute backoff in force. When the batch merges, the
+bookkeeping commits come in with it.
+
+Before this rule, a writer pushing bookkeeping commits every one to three
+minutes rebuilt the batch each time. No batch lived long enough for its
+roughly 25-minute combined CI to finish.
 
 ## Strikes
 

@@ -54,6 +54,7 @@ interface OverdeckUatGenerationRow {
   cleaned_at: number | null;
   /** PAN-4753; absent on a database that predates the top-up. */
   status_reason?: string | null;
+  voided_by?: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -213,6 +214,7 @@ function rowToUatGeneration(
     stackStartedAt: isoFromMillis(row.stack_started_at) ?? null,
     cleanedAt: isoFromMillis(row.cleaned_at) ?? null,
     statusReason: row.status_reason ?? null,
+    voidedBy: row.voided_by ?? null,
     createdAt: isoFromMillisRequired(row.created_at),
     updatedAt: isoFromMillisRequired(row.updated_at),
   };
@@ -459,7 +461,7 @@ export function listUatGenerationNames(): string[] {
 /** Drop-in for updateUatGenerationSync() from uat-generations-db.ts. */
 export function updateUatGeneration(
   name: string,
-  patch: Partial<Pick<UatGeneration, 'status' | 'baseSha' | 'members' | 'heldOut' | 'resolutions' | 'cleanedAt' | 'repos' | 'statusReason'>>,
+  patch: Partial<Pick<UatGeneration, 'status' | 'baseSha' | 'members' | 'heldOut' | 'resolutions' | 'cleanedAt' | 'repos' | 'statusReason' | 'voidedBy'>>,
 ): void {
   const db = getOverdeckDatabase();
 
@@ -471,6 +473,7 @@ export function updateUatGeneration(
     if (patch.baseSha !== undefined) { sets.push('base_sha = ?'); params.push(patch.baseSha); }
     if (patch.cleanedAt !== undefined) { sets.push('cleaned_at = ?'); params.push(millisFromIso(patch.cleanedAt)); }
     if (patch.statusReason !== undefined) { sets.push('status_reason = ?'); params.push(patch.statusReason); }
+    if (patch.voidedBy !== undefined) { sets.push('voided_by = ?'); params.push(patch.voidedBy); }
 
     if (sets.length > 0) {
       // PAN-4598: cleaned_at is artifact bookkeeping, not a lifecycle change.

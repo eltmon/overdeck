@@ -16,6 +16,7 @@
  * uat-generation-deps.ts for the real wiring), so every path — happy,
  * conflict-resolved, held-out, failed — is unit-testable with fake deps.
  */
+import type { BaseMove } from './bookkeeping-paths.js';
 import { makeUniqueUatCandidateName } from './uat-candidate-name.js';
 import {
   applyUnionLintPlan,
@@ -84,6 +85,13 @@ export interface GenerationGitDeps {
   /** Whether a UAT branch tip is already contained in the target branch. */
   isBranchContainedInMain?(branch: string): Promise<boolean>;
   /**
+   * PAN-5356: true when `fromSha` is an ancestor of `toSha` and every commit
+   * between them touches only bookkeeping paths (`BOOKKEEPING_PATH_GLOBS`),
+   * none of them a file `batchBranch` changes. Used by the reconciler, not
+   * the engine. Omitted, false or a rejection all mean "the base really moved".
+   */
+  isBookkeepingOnlyBaseMove?(move: BaseMove): Promise<boolean>;
+  /**
    * Merge a feature branch into the generation worktree. On conflict the
    * worktree is left MID-CONFLICT (the hook needs that state); the engine
    * decides whether to resolve or abort.
@@ -118,7 +126,7 @@ export interface GenerationStorePort {
     name: string,
     // 'repos' is written only by the polyrepo engine; the monorepo path never
     // sets it, so its generations keep reading back as a synthesized N=1 entry.
-    patch: Partial<Pick<UatGeneration, 'status' | 'baseSha' | 'members' | 'heldOut' | 'resolutions' | 'cleanedAt' | 'repos' | 'statusReason'>>,
+    patch: Partial<Pick<UatGeneration, 'status' | 'baseSha' | 'members' | 'heldOut' | 'resolutions' | 'cleanedAt' | 'repos' | 'statusReason' | 'voidedBy'>>,
   ): void;
   /** Existing generation names. */
   listNames(): string[];

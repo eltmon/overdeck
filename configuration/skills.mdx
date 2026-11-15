@@ -130,6 +130,16 @@ it does not merge with whatever was unparseable. That is the current
 behavior; a follow-up issue tracks fixing it. Writers: `pan skills set …
 --issue`, the dashboard, and `pan skills deft use|back`.
 
+## In the composer
+
+On a harness that declares the `skillSlashCommands` capability (Claude Code
+today), the dashboard composer's `/` menu lists every enabled skill as a
+`/<skill-name>` entry under a **Skills** group, scoped to the open
+conversation's own cwd, issue, and per-conversation overrides. A skill turned
+off at any level — global, project, issue, or conversation — disappears from
+that group the next time the menu opens; it does not disappear from an
+already-open menu.
+
 ## Related
 
 - [Skills](/features/skills) — the on/off model and where overrides apply.

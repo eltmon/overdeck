@@ -151,6 +151,7 @@ model's context:
 | ACP `--context-file`, Muse developer-prompt file, Kimi first-message context envelope | delivered | skipped |
 | `session-start-hook`: memory briefing from `/api/memory/session/start`, post-compaction note | injected as `additionalContext` | hook stops after its observing half |
 | `user-prompt-submit-hook`: `/api/memory/inject` (`overdeck-memory-context`, `overdeck-briefing-update`) | printed into every prompt | skipped |
+| Codex app-server host: `/api/memory/inject` before each turn, wrapped in `<overdeck-turn-context>` | prepended to the turn | skipped (`OVERDECK_BARE_CONTEXT=1`) |
 | Resume contract (`CONVERSATION RESUME: …`) and Kimi resume context | typed on resume | not sent |
 
 The launcher exports `OVERDECK_BARE_CONTEXT=1`; the injecting hooks check it and
@@ -212,6 +213,13 @@ root that has it, checked in the order `~/.overdeck/skills`,
 precedence `listSkillCatalog()` uses server-side. `GET /api/skills/overrides`
 reports each native skill's root as `origin` (`overdeck`, `personal`, or
 `project`); the dialog groups by that field rather than re-deriving it.
+
+`GET /api/skills/overrides?conversation=<name>` (PAN-5347) resolves the
+states a launch of that conversation applies — its own cwd, issue, and
+per-conversation overrides — falling back to the `cwd`/`issue` query
+parameters for an agent session, which has no conversation row of its own.
+The dashboard composer's `/` menu uses this to list skills on harnesses that
+declare `skillSlashCommands`.
 
 Each group header shows a `<on> on · <total>` count. Groups start
 collapsed, except a group holding a row with an explicit choice made in this

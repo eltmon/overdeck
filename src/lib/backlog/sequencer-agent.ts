@@ -1,5 +1,5 @@
 import { existsSync, statSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import type { AgentState } from '../agents.js';
 import { Effect } from 'effect';
@@ -21,7 +21,37 @@ import {
 import { closeAgentPane } from '../terminal-backends/launch.js';
 import { collectOpenBacklog, normalizeBacklogIssues } from './backlog-input.js';
 import type { PassMode } from './types.js';
-import type { CollectOpenBacklogResult } from './backlog-input.js';
+import type { BacklogManifestEntry, CollectOpenBacklogResult } from './backlog-input.js';
+
+/** PAN-5357: a manifest's identity, minus `ageMs` (which changes every call). */
+export function backlogManifestKey(manifest: readonly BacklogManifestEntry[]): string {
+  return JSON.stringify(
+    [...manifest]
+      .map((e) => ({
+        id: e.id,
+        title: e.title,
+        labels: [...e.labels].sort(),
+        priority: e.priority ?? null,
+        inPipeline: e.inPipeline,
+        hasPrd: e.hasPrd,
+        ready: e.ready,
+        updatedAt: e.updatedAt,
+        isEpic: e.isEpic ?? null,
+        partOf: e.partOf ?? null,
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
+  );
+}
+
+/** The key of a manifest.json file's text, or null when it is not a manifest array. */
+export function manifestKeyFromText(text: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return Array.isArray(parsed) ? backlogManifestKey(parsed as BacklogManifestEntry[]) : null;
+  } catch {
+    return null;
+  }
+}
 
 export const SEQUENCER_AGENT_ID = 'sequencer-runner';
 
@@ -47,6 +77,11 @@ export type SpawnSequencerOptions = {
   issues?: ReadonlyArray<Record<string, unknown>>;
   /** Test seam for the finished-run reap; production callers pass nothing. */
   stopFinishedRun?: () => Promise<void>;
+  /**
+   * PAN-5357: auto-trigger only. Return null instead of spawning when the
+   * manifest equals examined-manifest.json (the last submitted pass's manifest).
+   */
+  skipWhenUnchanged?: boolean;
 };
 
 export async function getSequencerRunStatus(projectRoot: string): Promise<SequencerRunStatus> {
@@ -135,10 +170,18 @@ export async function clearFinishedSequencerRun(
   return status;
 }
 
+export function spawnSequencerAgent(
+  pass: PassMode | 'auto',
+  opts?: SpawnSequencerOptions & { skipWhenUnchanged?: false },
+): Promise<AgentState>;
+export function spawnSequencerAgent(
+  pass: PassMode | 'auto',
+  opts: SpawnSequencerOptions & { skipWhenUnchanged: true },
+): Promise<AgentState | null>;
 export async function spawnSequencerAgent(
   pass: PassMode | 'auto',
   opts: SpawnSequencerOptions = {},
-): Promise<AgentState> {
+): Promise<AgentState | null> {
   const assertUnpaused = () => {
     if (getAgentState(SEQUENCER_AGENT_ID)?.paused) {
       throw new Error('Sequencer is paused. Run pan unpause sequencer-runner before starting it again.');
@@ -209,28 +252,49 @@ export async function spawnSequencerAgent(
   // chat message that froze the dashboard conversation panel and blew past
   // small-context models (PAN-1866). The agent reads the file with the Read tool.
   const manifestPath = join(projectRoot, '.pan', 'backlog', 'manifest.json');
+  const examinedPath = join(projectRoot, '.pan', 'backlog', 'examined-manifest.json');
+  // PAN-5357 FR-5: the auto-trigger skips spawning when nothing has changed
+  // since the last pass that actually submitted a ranking. Never compare
+  // against manifest.json itself — it is written at spawn time, so a pass
+  // that died before submitting would leave a "matching" manifest behind.
+  if (opts.skipWhenUnchanged && input.priorSequence !== null) {
+    const examinedText = await readFile(examinedPath, 'utf-8').catch(() => null);
+    if (examinedText !== null && manifestKeyFromText(examinedText) === backlogManifestKey(input.manifest)) {
+      console.log(
+        `[sequencer] skipped ${resolvedPass} pass: backlog manifest unchanged since the last submitted pass (${input.manifest.length} issues)`,
+      );
+      return null;
+    }
+  }
+  const priorManifestText = await readFile(manifestPath, 'utf-8').catch(() => null);
   await mkdir(dirname(manifestPath), { recursive: true });
   await writeFile(manifestPath, JSON.stringify(input.manifest, null, 2), 'utf-8');
+  try {
+    const model = determineModel({ role: 'sequencer', model: opts.model, spawnKey: 'sequencer:global' });
+    const prompt = buildSequencerPrompt(resolvedPass, { projectRoot, projectKey, input, batchSize });
 
-  const model = determineModel({ role: 'sequencer', model: opts.model, spawnKey: 'sequencer:global' });
-  const prompt = buildSequencerPrompt(resolvedPass, { projectRoot, projectKey, input, batchSize });
+    // The sequencer is a singleton one-shot: the previous pass's pane lingers
+    // after it finishes, and `spawnRun` refuses over any live pane. Reap a
+    // finished run here so the auto-trigger path benefits, not only the route.
+    await clearFinishedSequencerRun(projectRoot, opts.stopFinishedRun);
 
-  // The sequencer is a singleton one-shot: the previous pass's pane lingers
-  // after it finishes, and `spawnRun` refuses over any live pane. Reap a
-  // finished run here so the auto-trigger path benefits, not only the route.
-  await clearFinishedSequencerRun(projectRoot, opts.stopFinishedRun);
-
-  // Backlog collection and manifest writes yield; an operator may pause meanwhile.
-  assertUnpaused();
-  return spawnRun(SEQUENCER_AGENT_ID, 'sequencer', {
-    agentId: SEQUENCER_AGENT_ID,
-    workspace: opts.workspace ?? projectRoot,
-    prompt,
-    model,
-    allowHost: true,
-    registerConversation: true,
-    startedBy: 'backlog-sequencer',
-  });
+    // Backlog collection and manifest writes yield; an operator may pause meanwhile.
+    assertUnpaused();
+    return await spawnRun(SEQUENCER_AGENT_ID, 'sequencer', {
+      agentId: SEQUENCER_AGENT_ID,
+      workspace: opts.workspace ?? projectRoot,
+      prompt,
+      model,
+      allowHost: true,
+      registerConversation: true,
+      startedBy: 'backlog-sequencer',
+    });
+  } catch (err) {
+    // PAN-5357 FR-6: a pass that never started must not replace the manifest a running pass will record.
+    if (priorManifestText === null) await rm(manifestPath, { force: true }).catch(() => {});
+    else await writeFile(manifestPath, priorManifestText, 'utf-8').catch(() => {});
+    throw err;
+  }
 }
 
 export type SequencerPromptInput = {
@@ -310,6 +374,10 @@ After completing your analysis, write the SequenceDoc JSON to a temp file and su
 The \`pan backlog write-sequence\` command validates the JSON, writes the formatted
 \`.pan/backlog/sequence.md\`, commits it, and pushes the commit — so DO NOT write the file
 directly with the Write tool. Always go through this command.
+
+If the ranking matches the prior sequence apart from generatedAt, the command prints
+"unchanged (only generatedAt differs), not committed" and exits 0. That is a successful
+pass: stop there. Do not retry, and do not edit the JSON to force a write.
 
 The SequenceDoc JSON must conform to the schema:
   { version (number, e.g. 1), project, generatedAt (ISO), model, pass, openCount, nodes[], edges[] }

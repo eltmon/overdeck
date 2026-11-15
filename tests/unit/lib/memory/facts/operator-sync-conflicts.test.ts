@@ -87,6 +87,22 @@ describe('operator memory sync conflicts (PAN-4578 D10)', () => {
     expect(git(dirB, 'status', '--porcelain').trim()).toBe('');
   });
 
+  it('a conflict copy drops supersedes and superseded_by and keeps unknown keys', async () => {
+    const linked = '---\ntype: feedback\ndescription: Edited on B.\nsupersedes:\n  - older\nsuperseded_by: newer\nowner: bob\n---\n\nBody.\n';
+    await divergeShared(linked);
+
+    expect(await syncB()).toMatchObject({ status: 'synced', conflicts: ['shared-conflict-beta'] });
+    const copyText = readFileSync(join(dirB, 'shared-conflict-beta.md'), 'utf8');
+    expect(copyText).not.toContain('supersedes:');
+    expect(copyText).not.toContain('superseded_by:');
+    const copy = parseMemoryFact(join(dirB, 'shared-conflict-beta.md'), copyText, 'user');
+    if ('reason' in copy) throw new Error(copy.reason);
+    expect(copy.supersedes).toEqual([]);
+    expect(copy.supersededBy).toBeNull();
+    expect(copy.extra).toEqual({ owner: 'bob' });
+    expect(copy.review).toEqual(['sync-conflict']);
+  });
+
   it('the conflict copy is pushed and B sees it after sync', async () => {
     await divergeShared(factText('Edited on B.'));
     await syncB();
