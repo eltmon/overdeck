@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5402",
   "created": "2026-11-15T23:07:41.060Z",
-  "updated": "2026-11-15T23:08:34.183Z",
+  "updated": "2026-11-15T23:08:51.597Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "vendor-okf-v0-1-1.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T23:08:34.183Z"
+    },
+    "changelog-okf-publish": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5402",
+      "claimedAt": "2026-11-15T23:08:51.597Z"
     }
   }
 }
