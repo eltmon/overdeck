@@ -206,40 +206,34 @@ describe('AwaitingMergeRow UAT context', () => {
  * that is not listed here, so a reintroduced /api/flywheel dependency (deleted
  * by PAN-3917) shows up as an unexpected request rather than passing silently.
  */
-const MERGE_TRAIN_QUEUES = [
-  {
-    projectKey: 'overdeck',
-    projectName: 'Overdeck',
-    enabled: true,
-    queue: [
-      { issueId: 'PAN-1', title: 'Loading-wedge fix', branchName: 'feature/pan-1', pr: 11, prUrl: 'https://x/pull/11', mergeOrder: 1, conflictsWith: [] },
-    ],
-  },
-  { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, queue: [] },
-];
+const OTTER_BATCH = {
+  name: 'uat/pan-otter-0610',
+  status: 'ready',
+  baseSha: 'abc',
+  createdAt: '2026-06-10T02:00:00.000Z',
+  updatedAt: '',
+  members: [
+    { issueId: 'PAN-1', title: 'Loading-wedge fix', branch: 'feature/pan-1', pr: 11, mergeOrder: 1, acceptanceCriteria: [{ title: 'Inspector opens in <1s', status: 'pending' }] },
+  ],
+  heldOut: [],
+  resolutions: [],
+  statusReason: null,
+  stack: { status: 'absent', frontendUrl: 'https://uat-pan-otter-0610.overdeck.localhost' },
+};
 
-const MERGE_TRAIN_GENERATIONS = [
-  {
-    projectKey: 'overdeck',
-    projectName: 'Overdeck',
-    enabled: true,
-    generations: [
-      {
-        name: 'uat/pan-otter-0610',
-        status: 'ready',
-        baseSha: 'abc',
-        createdAt: '2026-06-10T02:00:00.000Z',
-        updatedAt: '',
-        members: [
-          { issueId: 'PAN-1', title: 'Loading-wedge fix', branch: 'feature/pan-1', pr: 11, mergeOrder: 1, acceptanceCriteria: [{ title: 'Inspector opens in <1s', status: 'pending' }] },
-        ],
-        heldOut: [],
-        resolutions: [],
-        stack: { status: 'absent', frontendUrl: 'https://uat-pan-otter-0610.overdeck.localhost' },
-      },
-    ],
-  },
-];
+const PROJECT_BASE = {
+  repo: null, forge: 'github', polyrepo: null, enabled: true, override: null, cooldownMinutes: 5, window: null,
+  cars: [], strikes: [], batches: [], recent: [],
+};
+
+/** PAN-4753 WI-12: the section renders `MergeTrain`, which reads the board. */
+const MERGE_TRAIN_BOARD = {
+  masterEnabled: true,
+  projects: [
+    { ...PROJECT_BASE, projectKey: 'overdeck', projectName: 'Overdeck', mode: 'hold', batches: [OTTER_BATCH] },
+    { ...PROJECT_BASE, projectKey: 'myn', projectName: 'Mind Your Now', mode: 'hold' },
+  ],
+};
 
 function renderPage(config: Record<string, unknown> = { auto_pickup_backlog: false, require_uat_before_merge: false, merge_train_enabled: true }) {
   const configPosts: unknown[] = [];
@@ -251,8 +245,7 @@ function renderPage(config: Record<string, unknown> = { auto_pickup_backlog: fal
       configPosts.push(patch);
       return Response.json({ ...config, ...patch });
     }
-    if (method === 'GET' && url === '/api/merge-train/queues') return Response.json(MERGE_TRAIN_QUEUES);
-    if (method === 'GET' && url === '/api/merge-train/generations') return Response.json(MERGE_TRAIN_GENERATIONS);
+    if (method === 'GET' && url === '/api/merge-train/board') return Response.json(MERGE_TRAIN_BOARD);
     if (method === 'GET' && url === '/api/merge-train/merge-backend') return Response.json({ available: true, mode: 'gh-cli', detail: 'ok' });
     return undefined;
   });
@@ -282,12 +275,10 @@ describe('AwaitingMergePage merge train', () => {
     await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
     expect(screen.getByTestId('merge-train-project-overdeck').textContent).toContain('pan-otter-0610');
     expect(screen.queryByTestId('merge-train-project-myn')).toBeNull();
-    expect(screen.getByTestId('merge-train-idle-hidden-note').textContent).toContain(
-      '1 project with nothing ready is hidden',
-    );
+    expect(screen.getByTestId('merge-train-idle-footer').textContent).toContain('1 project with nothing to merge: Mind Your Now');
 
     // Above the rows, not after them: the section precedes the merge list in DOM order.
-    const view = screen.getByTestId('merge-train-view');
+    const view = screen.getByTestId('merge-train');
     expect(section.contains(view)).toBe(true);
     expect(section.compareDocumentPosition(screen.getByRole('heading', { name: 'Awaiting Merge' })))
       .toBe(Node.DOCUMENT_POSITION_PRECEDING);

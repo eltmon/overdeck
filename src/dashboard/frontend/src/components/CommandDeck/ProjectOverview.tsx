@@ -13,6 +13,7 @@ import {
 } from './pipeline-helpers';
 import { PipelineSection } from './PipelineSection';
 import { ProjectSettingsDisclosure } from './ProjectSettingsDisclosure';
+import { MergeTrain } from '../merge-train/train/MergeTrain';
 
 export type { IssueCostBreakdown };
 
@@ -283,6 +284,17 @@ export function ProjectOverview({
       )}
 
       {projectKey && <ProjectSettingsDisclosure projectKey={projectKey} />}
+      {projectKey && (
+        <MergeTrain
+          placement="project"
+          projectKey={projectKey}
+          active
+          onNavigateIssue={(issueId) => {
+            const feature = features.find((f) => f.issueId.toUpperCase() === issueId.toUpperCase());
+            if (feature) onSelectFeature(feature);
+          }}
+        />
+      )}
 
       <div ref={pipelineRef} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <PipelineSection

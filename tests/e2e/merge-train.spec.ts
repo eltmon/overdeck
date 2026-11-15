@@ -167,20 +167,45 @@ const snapshot = {
 };
 
 /** The server's forge-derived merge queue — only the mergeable issue is in it. */
-const queues = [{
-  projectKey: 'overdeck',
-  projectName: 'Overdeck',
-  enabled: true,
-  queue: [{
-    issueId: 'PAN-9001',
-    title: 'Ready to merge',
-    branchName: 'feature/pan-9001',
-    pr: 9001,
-    prUrl: 'https://github.com/eltmon/overdeck/pull/9001',
-    mergeOrder: 1,
-    conflictsWith: [],
+/** PAN-4753 WI-12: the merge train section renders the board; its cars are the forge-ready set. */
+const queues = {
+  masterEnabled: true,
+  projects: [{
+    projectKey: 'overdeck',
+    projectName: 'Overdeck',
+    repo: 'eltmon/overdeck',
+    forge: 'github',
+    polyrepo: null,
+    enabled: true,
+    override: null,
+    mode: 'auto',
+    cooldownMinutes: 5,
+    window: null,
+    notices: [],
+    cars: [{
+      issueId: 'PAN-9001',
+      title: 'Ready to merge',
+      branch: 'feature/pan-9001',
+      prs: [{ label: '#9001', url: 'https://github.com/eltmon/overdeck/pull/9001' }],
+      state: 'ready',
+      route: 'auto-merge',
+      policy: null,
+      effectivePolicy: 'auto',
+      policyWritable: false,
+      readyAt: null,
+      mergeAt: null,
+      autoMergeRowId: null,
+      step: null,
+      notes: null,
+      blockers: [],
+      uatNotes: null,
+      liveBatch: null,
+    }],
+    strikes: [],
+    batches: [],
+    recent: [],
   }],
-}];
+};
 
 async function newContext(): Promise<BrowserContext> {
   const context = await browser.newContext();
@@ -191,8 +216,7 @@ async function newContext(): Promise<BrowserContext> {
       const path = new URL(url, window.location.origin).pathname;
       const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
 
-      if (path === '/api/merge-train/queues') return json(queuesFixture);
-      if (path === '/api/merge-train/generations') return json([]);
+      if (path === '/api/merge-train/board') return json(queuesFixture);
       if (path === '/api/merge-train/merge-backend') return json({ available: true, mode: 'gh-cli', detail: 'gh CLI' });
       if (path === '/api/merge-train/config') return json({ auto_pickup_backlog: false, require_uat_before_merge: false, merge_train_enabled: true });
       if (path === '/api/merge-train/auto-merge') return json({ issues: [] });
@@ -326,7 +350,7 @@ describe('merge train renders from forge mergeability', () => {
   it('lists exactly the forge queue in the merge train section', async () => {
     const { context, page } = await openAwaitingMerge();
 
-    await expect.poll(() => page.locator('[data-testid="merge-train-view"]').count(), renderPoll).toBe(1);
+    await expect.poll(() => page.locator('[data-testid="merge-train"]').count(), renderPoll).toBe(1);
     const section = page.locator('[data-testid="merge-train-project-overdeck"]');
     await expect.poll(() => section.count(), renderPoll).toBe(1);
     await expect.poll(() => section.innerText(), renderPoll).toContain('PAN-9001');

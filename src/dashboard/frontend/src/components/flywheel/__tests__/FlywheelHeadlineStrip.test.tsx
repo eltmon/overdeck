@@ -26,7 +26,7 @@ const stats: FlywheelStats = {
   bugs: [bug(1, '2026-09-10T00:00:00.000Z'), bug(2, '2026-09-11T00:00:00.000Z'), bug(3, null)],
 };
 
-const QUEUE_ITEM = (issueId: string) => ({ issueId, title: issueId, branchName: `feature/${issueId.toLowerCase()}`, mergeOrder: 1, conflictsWith: [] });
+const CAR = (issueId: string) => ({ issueId, state: 'held', liveBatch: null });
 
 function setup(opts: { statsStatus?: number; queue?: unknown[] } = {}) {
   return stubFetch((url) => {
@@ -34,11 +34,8 @@ function setup(opts: { statsStatus?: number; queue?: unknown[] } = {}) {
     if (url.startsWith('/api/flywheel/stats')) {
       return opts.statsStatus ? new Response('{}', { status: opts.statsStatus }) : Response.json(stats);
     }
-    if (url.includes('/api/merge-train/queues')) {
-      return Response.json([{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: opts.queue ?? [] }]);
-    }
-    if (url.includes('/api/merge-train/generations')) {
-      return Response.json([{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [] }]);
+    if (url.includes('/api/merge-train/board')) {
+      return Response.json({ masterEnabled: true, projects: [{ projectKey: 'overdeck', cars: opts.queue ?? [], strikes: [], batches: [], recent: [] }] });
     }
     return undefined;
   });
@@ -81,11 +78,12 @@ describe('FlywheelHeadlineStrip (PAN-4199 WI-13)', () => {
     renderWithQuery(<FlywheelHeadlineStrip orderBook={null} />);
     await waitFor(() => expect(screen.getByTestId('flywheel-headline-prs')).toHaveTextContent('—'));
     expect(screen.getByTestId('flywheel-headline-fixed')).toHaveTextContent('—');
-    expect(screen.getByTestId('flywheel-headline-uat')).toHaveTextContent('0');
+    // PAN-4753: an unusable board read is a dash too, never a zero.
+    await waitFor(() => expect(screen.getByTestId('flywheel-headline-uat')).toHaveTextContent('—'));
   });
 
-  it('counts the features queued on the merge train (ac4)', async () => {
-    setup({ queue: ['PAN-1', 'PAN-2', 'PAN-3'].map(QUEUE_ITEM) });
+  it('counts the features waiting on the merge train, from the board (ac4, PAN-4753 WI-11)', async () => {
+    setup({ queue: ['PAN-1', 'PAN-2', 'PAN-3'].map(CAR) });
     renderWithQuery(<FlywheelHeadlineStrip orderBook={null} />);
     await waitFor(() => expect(screen.getByTestId('flywheel-headline-uat')).toHaveTextContent('3'));
   });

@@ -40,7 +40,7 @@ function PolicyRow({ issue, title, onNavigateIssue }: {
         <span className="truncate text-xs text-foreground" title={title}>
           {title ?? PHASE_LABEL[issue.state] ?? issue.state}
         </span>
-        <span className="truncate text-[10px] text-muted-foreground">{PHASE_LABEL[issue.state] ?? issue.state}</span>
+        <span className="truncate text-[11px] text-muted-foreground">{PHASE_LABEL[issue.state] ?? issue.state}</span>
       </span>
       <AutoMergeToggle issueId={issue.issueId} variant="segmented" compact />
     </li>

@@ -89,12 +89,16 @@ describe('ProjectSettingsDisclosure', () => {
       if (method === 'POST' && url.endsWith('/api/dashboard/session')) {
         return Response.json({ csrfToken: 'test-csrf-token' });
       }
-      // PAN-1696 ac3: the cockpit merge-train summary reads the aggregate endpoints.
-      if (method === 'GET' && url === '/api/merge-train/queues') {
-        return Response.json([{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: mergeTrainAggregateEnabled, queue: mergeTrainQueue }]);
-      }
-      if (method === 'GET' && url === '/api/merge-train/generations') {
-        return Response.json([{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: mergeTrainAggregateEnabled, generations: mergeTrainGenerations }]);
+      // PAN-4753 WI-12: the cockpit merge-train summary reads the board.
+      if (method === 'GET' && url.startsWith('/api/merge-train/board')) {
+        return Response.json({
+          masterEnabled: true,
+          projects: [{
+            projectKey: 'overdeck', projectName: 'Overdeck', enabled: mergeTrainAggregateEnabled,
+            cars: mergeTrainQueue.map((car) => ({ ...(car as object), liveBatch: null })),
+            batches: mergeTrainGenerations, strikes: [], recent: [],
+          }],
+        });
       }
       return undefined;
     });
@@ -165,7 +169,7 @@ describe('ProjectSettingsDisclosure', () => {
     renderDisclosure();
 
     expect((await screen.findByTestId('merge-train-effective')).textContent)
-      .toBe('Following the global default — currently on for this project.');
+      .toBe('Global default: on while the merge train is on for all projects');
   });
 
   it('shows the global default resolving to off (ac1)', async () => {
@@ -174,7 +178,7 @@ describe('ProjectSettingsDisclosure', () => {
     renderDisclosure();
 
     expect((await screen.findByTestId('merge-train-effective')).textContent)
-      .toContain('currently off for this project');
+      .toBe('Off for this project');
   });
 
   it('omits the effective gloss when the project sets an explicit value (ac1)', async () => {
@@ -186,7 +190,7 @@ describe('ProjectSettingsDisclosure', () => {
   });
 
   // PAN-1696 fe-cockpit-toggle ac3.
-  it('carries count, batch name, STATUS and the Awaiting Merge link while COLLAPSED (ac3)', async () => {
+  it('carries count, batch name, STATUS and the Merge train link while COLLAPSED (ac3)', async () => {
     mergeTrainQueue = [{ issueId: 'PAN-1' }, { issueId: 'PAN-2' }];
     mergeTrainGenerations = [{ name: 'uat/pan-otter-0726', status: 'ready' }];
     const { container } = renderDisclosure();
@@ -197,8 +201,8 @@ describe('ProjectSettingsDisclosure', () => {
       .toContain('Train 2 ready · pan-otter-0726 (ready)'));
 
     // All three ac3 pieces must live on the collapsed surface, inside <summary>.
-    const link = screen.getByRole('link', { name: /Awaiting Merge/ });
-    expect(link).toHaveAttribute('href', '/awaiting-merge');
+    const link = screen.getByRole('link', { name: /Merge train ↓/ });
+    expect(link).toHaveAttribute('href', '#merge-train');
     expect(link.closest('summary')).not.toBeNull();
   });
 
@@ -210,18 +214,29 @@ describe('ProjectSettingsDisclosure', () => {
       .toContain('pan-copper-fox-0726 (assembling)'));
   });
 
-  it('navigates to Awaiting Merge from the COLLAPSED surface (ac3)', async () => {
+  it('scrolls to the project merge train card from the COLLAPSED surface (PAN-4753 WI-12)', async () => {
+    const card = document.createElement('div');
+    card.id = 'merge-train';
+    const scrollIntoView = vi.fn();
+    card.scrollIntoView = scrollIntoView;
+    document.body.appendChild(card);
     const pushState = vi.spyOn(window.history, 'pushState');
     const { container } = renderDisclosure();
 
     // Collapsed: the link is reachable without opening anything.
     expect(container.querySelector('details')).not.toHaveAttribute('open');
-    const link = await screen.findByRole('link', { name: /Awaiting Merge/ });
-    fireEvent.click(link);
+    fireEvent.click(await screen.findByRole('link', { name: /Merge train ↓/ }));
 
-    // In-app navigation, not a full reload. The handler also preventDefaults the
-    // <summary> toggle; jsdom applies the toggle anyway, and whether the panel
-    // opens is unobservable once we navigate away, so that is not asserted here.
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    expect(pushState).not.toHaveBeenCalled();
+    pushState.mockRestore();
+    card.remove();
+  });
+
+  it('opens Awaiting Merge when the page has no merge train card (sparse project Home)', async () => {
+    const pushState = vi.spyOn(window.history, 'pushState');
+    renderDisclosure();
+    fireEvent.click(await screen.findByRole('link', { name: /Merge train ↓/ }));
     expect(pushState).toHaveBeenCalledWith({}, '', '/awaiting-merge');
     pushState.mockRestore();
   });
@@ -236,7 +251,7 @@ describe('ProjectSettingsDisclosure', () => {
       .toContain('Train off'));
   });
 
-  it('summarises the ready-feature count and current batch, linking to Awaiting Merge (ac3)', async () => {
+  it('summarises the waiting-feature count and current batch (ac3)', async () => {
     mergeTrainQueue = [{ issueId: 'PAN-1' }, { issueId: 'PAN-2' }];
     mergeTrainGenerations = [
       { name: 'uat/pan-copper-fox-0726', status: 'assembling' },
@@ -248,7 +263,6 @@ describe('ProjectSettingsDisclosure', () => {
     await waitFor(() => expect(screen.getByTestId('merge-train-summary').textContent).toContain('2 features ready'));
     // The ready batch wins over the assembling one, matching the merge-train view.
     expect(screen.getByTestId('merge-train-summary').textContent).toContain('batch pan-otter-0726 (ready)');
-    expect(screen.getByRole('link', { name: /Awaiting Merge/ })).toHaveAttribute('href', '/awaiting-merge');
   });
 
   it('says so plainly when no batch is assembled (ac3)', async () => {
@@ -257,16 +271,6 @@ describe('ProjectSettingsDisclosure', () => {
 
     await waitFor(() => expect(screen.getByTestId('merge-train-summary').textContent).toContain('1 feature ready'));
     expect(screen.getByTestId('merge-train-summary').textContent).toContain('no batch assembled');
-  });
-
-  it('navigates to Awaiting Merge in-app rather than reloading (ac3)', async () => {
-    const pushState = vi.spyOn(window.history, 'pushState');
-    renderDisclosure();
-
-    fireEvent.click(await screen.findByRole('link', { name: /Awaiting Merge/ }));
-
-    expect(pushState).toHaveBeenCalledWith({}, '', '/awaiting-merge');
-    pushState.mockRestore();
   });
 
   it('posts the selected auto-merge value', async () => {

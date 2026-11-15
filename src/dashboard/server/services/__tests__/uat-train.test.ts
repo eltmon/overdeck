@@ -257,6 +257,22 @@ describe('getUatGenerationsPayload', () => {
     expect(JSON.stringify(payload[0]!.repos)).not.toContain('/repos/myn');
   });
 
+  // PAN-4753 WI-3: the train UI shows why a batch was voided or superseded.
+  it('carries the stored status reason, and null when none was stored', async () => {
+    mocks.listUatGenerations.mockReturnValue([
+      { ...gen([]), name: 'uat/pan-voided-1114', status: 'invalidated', statusReason: 'PAN-1 was merged on its own, outside the batch' } as UatGeneration,
+      { ...gen([]), name: 'uat/pan-live-1114', status: 'ready' } as UatGeneration,
+    ]);
+    mocks.findXBriefByIssue.mockReturnValue(Effect.succeed(null));
+
+    const payload = await getUatGenerationsPayload('/repos/myn');
+
+    expect(payload.map((p) => [p.name, p.statusReason])).toEqual([
+      ['uat/pan-voided-1114', 'PAN-1 was merged on its own, outside the batch'],
+      ['uat/pan-live-1114', null],
+    ]);
+  });
+
   it('projects the synthesized single repo for a monorepo generation', async () => {
     // The store always yields at least one entry, so the payload shape is the
     // same whether or not the project is polyrepo.

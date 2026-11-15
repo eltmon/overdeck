@@ -19,8 +19,7 @@ import { FlywheelOrderBookCard } from '../components/flywheel/FlywheelOrderBookC
 import { FlywheelReportPane, FlywheelStatePane } from '../components/flywheel/FlywheelStatePane';
 import { FlywheelStatsPanel } from '../components/flywheel/FlywheelStatsPanel';
 import { FlywheelStatusPane, FreshnessBadge, inFlightCountLabel } from '../components/flywheel/FlywheelStatusPane';
-import { FlywheelUatBatchesCard } from '../components/flywheel/FlywheelUatBatchesCard';
-import { PendingAutoMergesCard } from '../components/flywheel/PendingAutoMergesCard';
+import { FlywheelMergeTrainRail } from '../components/flywheel/FlywheelMergeTrainRail';
 import { RailCard, StatusBadge, ToggleSwitch } from '../components/flywheel/primitives';
 import { FLYWHEEL_CONVERSATION_NAME, formatDuration, useFlywheelStatus, useMergeTrainConfig, useMergeTrainConfigMutation } from '../lib/flywheelApi';
 import { consumePendingReveal, subscribeRevealNeedsYou } from '../lib/flywheelReveal';
@@ -208,8 +207,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue, onOpenConversati
           style={{ '--fw-left': `${leftWidth}px` } as CSSProperties}
           aria-label="Flywheel control rail"
         >
-          <PendingAutoMergesCard onNavigateIssue={onNavigateIssue} />
-          <FlywheelUatBatchesCard onNavigateIssue={onNavigateIssue} />
+          <FlywheelMergeTrainRail onNavigateIssue={onNavigateIssue} />
           <FlywheelOrderBookCard bookId={status?.orderBook?.id ?? null} />
           <RailCard
             label="Flywheel"

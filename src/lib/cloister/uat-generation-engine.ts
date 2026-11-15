@@ -118,7 +118,7 @@ export interface GenerationStorePort {
     name: string,
     // 'repos' is written only by the polyrepo engine; the monorepo path never
     // sets it, so its generations keep reading back as a synthesized N=1 entry.
-    patch: Partial<Pick<UatGeneration, 'status' | 'baseSha' | 'members' | 'heldOut' | 'resolutions' | 'cleanedAt' | 'repos'>>,
+    patch: Partial<Pick<UatGeneration, 'status' | 'baseSha' | 'members' | 'heldOut' | 'resolutions' | 'cleanedAt' | 'repos' | 'statusReason'>>,
   ): void;
   /** Existing generation names. */
   listNames(): string[];
@@ -361,7 +361,7 @@ export async function assembleUatGeneration(
     // This generation is now the current one; older ready generations remain
     // testable but are no longer the freshest — flip them to superseded.
     for (const older of deps.store.listChain(input.projectRoot, ['ready'])) {
-      if (older.name !== name) deps.store.update(older.name, { status: 'superseded' });
+      if (older.name !== name) deps.store.update(older.name, { status: 'superseded', statusReason: `replaced by ${name}` });
     }
 
     log(`[uat-generation] ${name}: ready — ${members.length} member(s), ${resolutions.length} resolution(s), ${heldOut.length} held out`);
@@ -479,7 +479,9 @@ export async function cleanupUatGenerations(
     if (!cleaned) continue;
     const cleanedAt = new Date().toISOString();
     if (gen.status === 'ready' || gen.status === 'superseded') {
-      deps.store.update(gen.name, { status: 'invalidated', cleanedAt });
+      const trimmed = `trimmed: older than the newest ${keep} batches`;
+      // Keep why a superseded batch was replaced; the trim only adds to it.
+      deps.store.update(gen.name, { status: 'invalidated', cleanedAt, statusReason: gen.statusReason ? `${gen.statusReason}; ${trimmed}` : trimmed });
       log(`[uat-generation] cleanup: trimmed ${gen.name} (beyond newest ${keep})`);
     } else {
       deps.store.update(gen.name, { cleanedAt });

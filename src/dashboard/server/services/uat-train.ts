@@ -68,6 +68,7 @@ import {
   type UatGenerationRepo,
 } from '../../../lib/overdeck/merge-sync.js';
 import { forgeForProject, getDerivedIssueState, listReadyIssuesForProject } from './derived-issue-state.js';
+import { mergedIssueIdsForGithubProject } from './merged-issue-ids.js';
 import { evaluateIssueMergeGate } from '../../../lib/cloister/merge-gate.js';
 import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.js';
 import { findXBriefByIssue, invalidateXBriefIndex, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
@@ -260,6 +261,8 @@ async function runUatTrainReconcileForProject(
       cleanup: makeCleanupForProject(projectPath, store),
       holdsForUat: (feature: ReadyFeature) => issueHoldsForUat(feature.issueId, projectConfig, isFlywheelRequireUatBeforeMerge()),
       mergesPerPr: async (feature: ReadyFeature) => (await mergePathOwner(feature.issueId, projectPath, projectConfig)) === 'per-pr',
+      // PAN-4753 WI-3: GitHub only until WI-4 brings the GitLab listing.
+      ...(forgeForProject(projectPath) === 'github' ? { mergedIssueIds: () => mergedIssueIdsForGithubProject(projectPath) } : {}),
       ...(lane === 'window' ? { selectBatch: buildSelectBatch(projectPath, projectConfig), laneKey: lane } : {}),
       ...(lane === 'uat' ? { laneKey: lane } : {}),
       log: (msg: string) => console.log(msg),
@@ -607,6 +610,8 @@ export interface UatGenerationPayload {
    * whether version sync is configured for the project.
    */
   shipStatus: null;
+  /** PAN-4753 WI-3: why the batch became superseded or invalidated; null otherwise. */
+  statusReason: string | null;
   /**
    * Per-repo generation detail, additive (PAN-3093). Always present and
    * non-empty: a monorepo generation projects the single synthesized entry, so
@@ -787,6 +792,8 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
       resolutions: gen.resolutions,
       versionSyncConfigured,
       shipStatus: null,
+      // A reason only explains a voided or replaced batch; a later promote keeps the column.
+      statusReason: gen.status === 'superseded' || gen.status === 'invalidated' ? gen.statusReason ?? null : null,
       repos: (gen.repos ?? []).map((r) => ({
         repoKey: r.repoKey,
         branch: r.branch,

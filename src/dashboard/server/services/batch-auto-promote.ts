@@ -137,7 +137,8 @@ export interface BatchAutoPromoteDeps {
   /** The head commit's check runs, read only to name the failed checks. */
   checkRuns?: (projectPath: string, sha: string) => Promise<CommitCheckRuns>;
   promote?: (name: string) => Promise<PromoteResult>;
-  markDropped?: (gen: UatGeneration, patch: Pick<UatGeneration, 'members' | 'heldOut'>) => void;
+  /** PAN-4753: the patch carries `statusReason`, the stored why of the invalidation. */
+  markDropped?: (gen: UatGeneration, patch: Pick<UatGeneration, 'members' | 'heldOut' | 'statusReason'>) => void;
   teardownStack?: (gen: UatGeneration) => Promise<void>;
   env?: NodeJS.ProcessEnv;
   log?: (msg: string) => void;
@@ -224,7 +225,7 @@ async function runTick(
   const markDropped = deps.markDropped ?? (await (async () => {
     const { buildUatGenerationStore } = await import('../../../lib/cloister/uat-generation-deps.js');
     const store = buildUatGenerationStore();
-    return (gen: UatGeneration, patch: Pick<UatGeneration, 'members' | 'heldOut'>) =>
+    return (gen: UatGeneration, patch: Pick<UatGeneration, 'members' | 'heldOut' | 'statusReason'>) =>
       store.update(gen.name, { status: 'invalidated', ...patch });
   })());
   const teardownStack = deps.teardownStack
@@ -304,6 +305,7 @@ async function runTick(
             ...gen.heldOut,
             ...gen.members.map((m) => ({ issueId: m.issueId, branch: m.branch, headSha: m.headSha, reason: `${why}; ${m.issueId} merges on its own` })),
           ],
+          statusReason: `${why}; every member merges on its own`,
         });
         lastLogged.delete(gen.name);
         log(`[batch-auto-promote] ${why}; dissolved, ${gen.members.length} member(s) merge one at a time`);
@@ -345,6 +347,7 @@ async function runTick(
           ...gen.heldOut,
           { issueId: dropped.issueId, branch: dropped.branch, headSha: dropped.headSha, reason: detail },
         ],
+        statusReason: detail,
       });
       lastLogged.delete(gen.name);
       log(`[batch-auto-promote] ${detail}; the rest re-assemble`);

@@ -511,7 +511,7 @@ describe('cleanupUatGenerations', () => {
       liveGen('uat/pan-a-0610', 'ready', '2026-06-10T05:00:00.000Z'),
       liveGen('uat/pan-b-0610', 'superseded', '2026-06-10T04:00:00.000Z'),
       liveGen('uat/pan-c-0610', 'superseded', '2026-06-10T03:00:00.000Z'),
-      liveGen('uat/pan-d-0610', 'superseded', '2026-06-10T02:00:00.000Z', true),
+      { ...liveGen('uat/pan-d-0610', 'superseded', '2026-06-10T02:00:00.000Z', true), statusReason: 'replaced by uat/pan-c-0610' },
       liveGen('uat/pan-e-0610', 'promoted', '2026-06-10T01:00:00.000Z'),
       liveGen('uat/pan-f-0610', 'failed', '2026-06-10T00:30:00.000Z'),
     ]);
@@ -533,6 +533,8 @@ describe('cleanupUatGenerations', () => {
     // 4th live generation trimmed: stack torn down, branch+worktree gone, invalidated
     expect(store.rows.get('uat/pan-d-0610')!.status).toBe('invalidated');
     expect(store.rows.get('uat/pan-d-0610')!.cleanedAt).toBeTruthy();
+    // PAN-4753: the trim keeps why the batch was superseded.
+    expect(store.rows.get('uat/pan-d-0610')!.statusReason).toBe('replaced by uat/pan-c-0610; trimmed: older than the newest 3 batches');
     expect(teardowns).toEqual(['uat/pan-d-0610']);
     // dead rows reaped but statuses preserved and marked cleaned so future ticks skip them
     expect(store.rows.get('uat/pan-e-0610')!.status).toBe('promoted');
