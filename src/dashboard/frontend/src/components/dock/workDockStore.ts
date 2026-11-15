@@ -1,9 +1,13 @@
 // Work dock state, keyed by deck (PAN-5287 §6.3, WI-S3).
 //
-// The dock is the future right column with Files, Changes and Search tabs
-// (child B of PAN-5284 builds its UI). Per deck it holds whether the dock is
-// open, the active tab, its width, and the transient reveal/diff/scope a
-// caller asked for. Only `open`, `tab` and `width` persist, as JSON under
+// The dock is the right column with Files, Changes, Search and Live tabs
+// (child B of PAN-5284, PAN-5289, builds its UI). Per deck it holds whether
+// the dock is open, the active tab, its width, and the transient state a
+// caller asked for: reveal/diff/scope, the Search tab's folder (`searchPath`),
+// an `openSeq` that counts `openDock` calls (so a tab can react to a repeat
+// open), the Go to file flag (`quickOpen`) and a root override with the pane
+// it belongs to (`rootOverrideAnchor`, B-D17). Only `open`, `tab` and `width`
+// persist, as JSON under
 // `overdeck.dock.<deckKey>`; every read and write is in try/catch, and a
 // corrupt stored field hydrates its default.
 //
@@ -13,19 +17,21 @@
 import { create } from 'zustand'
 import type { ChangeScope } from '@overdeck/contracts'
 
-export type DockTab = 'files' | 'changes' | 'search'
+export type DockTab = 'files' | 'changes' | 'search' | 'live'
 
 export const DOCK_DEFAULT_WIDTH = 340 // mockup --dock-w
 export const DOCK_MIN_WIDTH = 260
 export const DOCK_MAX_WIDTH = 720
 
-const DOCK_TABS: readonly DockTab[] = ['files', 'changes', 'search']
+const DOCK_TABS: readonly DockTab[] = ['files', 'changes', 'search', 'live']
 
 export interface OpenDockInput {
   tab: DockTab
   reveal?: { rootId: string; path: string }
   diff?: { path: string; sha?: string }
   changesScope?: ChangeScope
+  /** Search tab: limit content search to this root path (Find in folder). */
+  searchPath?: string
 }
 
 export interface DockState {
@@ -33,23 +39,34 @@ export interface DockState {
   tab: DockTab
   width: number
   rootOverride?: string
+  /** Pane id the override belongs to (B-D17); undefined applies to every pane. */
+  rootOverrideAnchor?: string
   changesScope?: ChangeScope
   diff?: { path: string; sha?: string }
   reveal?: { rootId: string; path: string }
+  searchPath?: string
+  /** Counts openDock calls; starts at 0 on hydrate, never persisted. */
+  openSeq: number
+  /** Go to file is open; shared by the Stage + menu and the dock, never persisted. */
+  quickOpen: boolean
 }
 
 export interface WorkDockStore {
   byDeck: Record<string, DockState>
   /** The deck's state, hydrated from localStorage on first read (defaults: closed, 'files', 340). */
   ensureDeck(deckKey: string): DockState
-  /** open=true and the tab; replaces reveal/diff/changesScope with the input's (absent fields cleared). */
+  /** open=true and the tab; replaces reveal/diff/changesScope/searchPath with the input's (absent fields cleared); increments openSeq. */
   openDock(deckKey: string, input: OpenDockInput): void
   /** open=false; keeps tab and width. */
   closeDock(deckKey: string): void
   setTab(deckKey: string, tab: DockTab): void
+  /** Closes the dock when it is open on `tab`; otherwise openDock({ tab }). */
+  toggleTab(deckKey: string, tab: DockTab): void
+  setQuickOpen(deckKey: string, open: boolean): void
   /** Clamps to [260, 720] and rounds to an integer. */
   setWidth(deckKey: string, width: number): void
-  setRootOverride(deckKey: string, rootId: string | undefined): void
+  /** Sets the override and its anchor pane; `rootId` undefined clears both. */
+  setRootOverride(deckKey: string, rootId: string | undefined, anchorPaneId?: string): void
 }
 
 export function dockStorageKey(deckKey: string): string {
@@ -65,7 +82,7 @@ function isDockTab(value: unknown): value is DockTab {
 }
 
 function readPersisted(deckKey: string): DockState {
-  const state: DockState = { open: false, tab: 'files', width: DOCK_DEFAULT_WIDTH }
+  const state: DockState = { open: false, tab: 'files', width: DOCK_DEFAULT_WIDTH, openSeq: 0, quickOpen: false }
   try {
     const raw = localStorage.getItem(dockStorageKey(deckKey))
     if (!raw) return state
@@ -113,11 +130,12 @@ export const useWorkDockStore = create<WorkDockStore>((set, get) => {
     },
 
     openDock: (deckKey, input) => {
-      const { reveal: _reveal, diff: _diff, changesScope: _scope, ...rest } = current(deckKey)
-      const next: DockState = { ...rest, open: true, tab: input.tab }
+      const { reveal: _reveal, diff: _diff, changesScope: _scope, searchPath: _searchPath, ...rest } = current(deckKey)
+      const next: DockState = { ...rest, open: true, tab: input.tab, openSeq: rest.openSeq + 1 }
       if (input.reveal) next.reveal = input.reveal
       if (input.diff) next.diff = input.diff
       if (input.changesScope) next.changesScope = input.changesScope
+      if (input.searchPath) next.searchPath = input.searchPath
       commit(deckKey, next)
     },
 
@@ -125,11 +143,25 @@ export const useWorkDockStore = create<WorkDockStore>((set, get) => {
 
     setTab: (deckKey, tab) => commit(deckKey, { ...current(deckKey), tab }),
 
+    toggleTab: (deckKey, tab) => {
+      const deck = current(deckKey)
+      if (deck.open && deck.tab === tab) get().closeDock(deckKey)
+      else get().openDock(deckKey, { tab })
+    },
+
+    setQuickOpen: (deckKey, open) => commit(deckKey, { ...current(deckKey), quickOpen: open }),
+
     setWidth: (deckKey, width) => commit(deckKey, { ...current(deckKey), width: clampWidth(width) }),
 
-    setRootOverride: (deckKey, rootId) => {
-      const { rootOverride: _old, ...rest } = current(deckKey)
-      commit(deckKey, rootId === undefined ? rest : { ...rest, rootOverride: rootId })
+    setRootOverride: (deckKey, rootId, anchorPaneId) => {
+      const { rootOverride: _old, rootOverrideAnchor: _oldAnchor, ...rest } = current(deckKey)
+      if (rootId === undefined) {
+        commit(deckKey, rest)
+        return
+      }
+      const next: DockState = { ...rest, rootOverride: rootId }
+      if (anchorPaneId !== undefined) next.rootOverrideAnchor = anchorPaneId
+      commit(deckKey, next)
     },
   }
 })
