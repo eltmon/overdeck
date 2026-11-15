@@ -2,17 +2,45 @@
   "version": "1",
   "issueId": "PAN-5294",
   "created": "2026-11-15T11:49:42.622Z",
-  "updated": "2026-11-15T11:49:42.622Z",
+  "updated": "2026-11-15T13:19:30.954Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-15T13:18:49.515Z"
+    }
+  ],
   "items": {
     "pipeline-lanes": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5294",
-      "claimedAt": "2026-11-15T11:49:42.622Z"
+      "claimedAt": "2026-11-15T11:49:42.622Z",
+      "doneAt": "2026-11-15T13:19:30.953Z"
+    },
+    "pipeline-lanes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:19:30.953Z"
+    },
+    "pipeline-lanes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:19:30.953Z"
+    },
+    "pipeline-lanes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:19:30.953Z"
+    },
+    "pipeline-lanes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:19:30.953Z"
+    },
+    "pipeline-lanes.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:19:30.953Z"
     }
-  }
+  },
+  "agentModel": "claude-opus-5-5"
 }
