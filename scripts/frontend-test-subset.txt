@@ -64,6 +64,7 @@ src/components/frame/__tests__/LeftNav.test.tsx
 src/components/frame/__tests__/NewConversationButton.test.tsx
 src/components/frame/__tests__/ProjectSwitcher.test.tsx
 src/components/frame/__tests__/WorkspacesSection.test.tsx
+src/components/frame/__tests__/newConversationSummary.test.ts
 src/components/frame/deck/__tests__/deckNavigation.test.tsx
 src/components/frame/deck/__tests__/useCreateConversation.test.tsx
 src/components/frame/deck/__tests__/useDeckProjects.test.tsx
