@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5360",
+  "created": "2026-11-15T15:42:12.629Z",
+  "updated": "2026-11-15T15:42:12.629Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w1-fact-schema": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5360",
+      "claimedAt": "2026-11-15T15:42:12.629Z"
+    }
+  }
+}
