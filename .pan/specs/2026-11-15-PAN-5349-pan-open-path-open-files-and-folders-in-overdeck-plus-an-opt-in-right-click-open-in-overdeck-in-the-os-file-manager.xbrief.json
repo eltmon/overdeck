@@ -4,17 +4,17 @@
     "created": "2026-11-15T15:23:30Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5349: pan open <path>: open files and folders in Overdeck, plus an opt-in right-click 'Open in Overdeck' in the OS file manager",
-    "updated": "2026-11-15T15:28:37.838Z"
+    "updated": "2026-11-15T15:32:05.122Z"
   },
   "plan": {
     "id": "pan-5349",
     "title": "pan open <path>: open files and folders in Overdeck, plus an opt-in right-click 'Open in Overdeck' in the OS file manager",
-    "status": "proposed",
+    "status": "running",
     "uid": "d1a0774e-82d5-484a-853c-3920838d492d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T15:23:30Z",
-    "updated": "2026-11-15T15:28:37.838Z",
+    "updated": "2026-11-15T15:32:05.122Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5349",
@@ -1439,5 +1439,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
