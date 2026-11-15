@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5347",
   "created": "2026-11-15T13:35:45.395Z",
-  "updated": "2026-11-15T14:05:13.227Z",
+  "updated": "2026-11-15T14:14:47.571Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,9 +98,30 @@
       "doneAt": "2026-11-15T14:05:06.930Z"
     },
     "frontend-editor-skills-menu": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5347",
-      "claimedAt": "2026-11-15T14:05:13.226Z"
+      "claimedAt": "2026-11-15T14:05:13.226Z",
+      "doneAt": "2026-11-15T14:14:47.570Z"
+    },
+    "frontend-editor-skills-menu.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:14:47.570Z"
+    },
+    "frontend-editor-skills-menu.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:14:47.570Z"
+    },
+    "frontend-editor-skills-menu.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:14:47.570Z"
+    },
+    "frontend-editor-skills-menu.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:14:47.570Z"
+    },
+    "frontend-editor-skills-menu.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:14:47.570Z"
     }
   }
 }
