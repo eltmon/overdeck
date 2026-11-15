@@ -160,7 +160,7 @@ test.describe('PAN-5293 left column checklist', () => {
     });
 
     await test.step('Off-deck History toggle → gone from the top bar', async () => {
-      await expect(page.getByRole('button', { name: 'Toggle activity feed' })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: /activity feed/i })).toHaveCount(0);
     });
 
     await test.step('Footer version → the updater', async () => {
