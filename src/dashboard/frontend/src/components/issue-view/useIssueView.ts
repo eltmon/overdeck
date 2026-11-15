@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { AgentSnapshot, SessionNode } from '@overdeck/contracts';
+import { isClosedIssue } from '../../lib/pipeline-state';
 import { selectIssues, useBackendPanes, useDashboardStore, useDerivedIssueState } from '../../lib/store';
 import {
   useActivityQuery,
@@ -276,7 +277,10 @@ function derivePhase(derived: DerivedIssueState | undefined, sessions: SessionNo
 function deriveNowText(derived: DerivedIssueState | undefined, activeAgent?: AgentRowModel): string {
   switch (derived?.state) {
     case 'merged': return 'Merged — ready to close out';
-    case 'closed': return isShipped(derived) ? 'Merged and closed out' : 'Closed';
+    case 'closed':
+      return isShipped(derived) ? 'Merged and closed out'
+        : derived.pr ? `Closed, but pull request #${derived.pr.number} is still open`
+        : 'Closed';
     case 'ready': return 'Approved and green — ready to merge';
     case 'changes-requested':
       return activeAgent?.type === 'work'
@@ -443,7 +447,8 @@ function deriveOperator(
   }
 
   const labels = new Set((issue?.labels ?? []).map((label) => label.toLowerCase()));
-  const needsRelease = issue?.hasPlan === true && labels.has('ready') && !labels.has('released') &&
+  const issueClosed = derived?.state === 'closed' || (issue ? isClosedIssue(issue) : false);
+  const needsRelease = !issueClosed && issue?.hasPlan === true && labels.has('ready') && !labels.has('released') &&
     !labels.has('parked') && !labels.has('vetoed') && !labels.has('objection');
   if (needsRelease) {
     items.push({ kind: 'pickup_gate', reason: 'The plan is ready, but work cannot be picked up until an operator releases it.' });

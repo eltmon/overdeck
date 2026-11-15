@@ -1,10 +1,15 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { QualityGateAdmissionTimeoutError } from '../../src/lib/cloister/quality-gate-admission.js'
-import vitestGlobalSetup, { setup, teardown, vitestFootprintKey } from '../vitest-cpu-admission.js'
+import {
+  DEFAULT_GATE_FOOTPRINT_BYTES,
+  readGateFootprintEstimate,
+  recordGateFootprintPeak,
+} from '../../src/lib/cloister/quality-gate-memory.js'
+import vitestGlobalSetup, { setup, teardown, vitestFootprintKey, vitestRunShape } from '../vitest-cpu-admission.js'
 
 const GiB = 1024 ** 3
 const noSampler = () => ({ stop: async () => null })
@@ -15,6 +20,7 @@ function admittedHandle(order: string[] = []) {
     slot: 0,
     slots: 2,
     footprintBytes: 2.5 * GiB,
+    admittedAlone: false,
     recordPeak: vi.fn(async (bytes: number) => { order.push(`recordPeak:${bytes}`) }),
     release: vi.fn(async () => { order.push('release') }),
   }
@@ -107,11 +113,77 @@ describe('Vitest CPU admission', () => {
     try {
       mkdirSync(join(top, '.git'))
       mkdirSync(join(top, 'a', 'b'), { recursive: true })
-      expect(vitestFootprintKey(join(top, 'a', 'b'))).toBe('vitest:a/b')
-      expect(vitestFootprintKey(top)).toBe('vitest:.')
+      expect(vitestFootprintKey(join(top, 'a', 'b'))).toBe('vitest:a/b:suite')
+      expect(vitestFootprintKey(top)).toBe('vitest:.:suite')
     } finally {
       rmSync(top, { recursive: true, force: true })
     }
+  })
+
+  it('keys a run by its shape: only a few existing files is a files run (PAN-5285)', () => {
+    const top = mkdtempSync(join(tmpdir(), 'pan-5285-vitest-shape-'))
+    try {
+      mkdirSync(join(top, '.git'))
+      mkdirSync(join(top, 'tests', 'unit'), { recursive: true })
+      const names = Array.from({ length: 11 }, (_, i) => `tests/unit/t${i}.test.ts`)
+      for (const name of names) writeFileSync(join(top, name), '')
+      expect(vitestRunShape(top, undefined)).toBe('suite')
+      expect(vitestRunShape(top, [])).toBe('suite')
+      expect(vitestRunShape(top, ['tests/unit'])).toBe('suite')
+      expect(vitestRunShape(top, names)).toBe('suite')
+      expect(vitestRunShape(top, names.slice(0, 2))).toBe('files')
+      expect(vitestFootprintKey(top, [names[0]!])).toBe('vitest:.:files')
+    } finally {
+      rmSync(top, { recursive: true, force: true })
+    }
+  })
+
+  it('treats substring filters that may match many files as a suite (PAN-5285)', () => {
+    const top = mkdtempSync(join(tmpdir(), 'pan-5285-vitest-substring-'))
+    try {
+      mkdirSync(join(top, '.git'))
+      mkdirSync(join(top, 'tests'))
+      writeFileSync(join(top, 'tests', 'a.test.ts'), '')
+      // Vitest matches filters as path substrings: `.test.ts` selects every test file.
+      expect(vitestRunShape(top, ['.test.ts'])).toBe('suite')
+      expect(vitestRunShape(top, ['admission'])).toBe('suite')
+      expect(vitestRunShape(top, ['tests/a.test.ts', 'admission'])).toBe('suite')
+      // Vitest's location form targets one file; a non-numeric suffix stays a substring filter.
+      expect(vitestRunShape(top, ['tests/a.test.ts:171'])).toBe('files')
+      expect(vitestRunShape(top, ['tests/a.test.ts:abc'])).toBe('suite')
+      expect(vitestRunShape(top, ['tests/missing.test.ts:12'])).toBe('suite')
+    } finally {
+      rmSync(top, { recursive: true, force: true })
+    }
+  })
+
+  it('a file-targeted run does not inherit a full-suite peak (PAN-5285)', async () => {
+    const top = mkdtempSync(join(tmpdir(), 'pan-5285-vitest-peak-'))
+    try {
+      mkdirSync(join(top, '.git'))
+      mkdirSync(join(top, 'tests', 'unit'), { recursive: true })
+      writeFileSync(join(top, 'tests', 'unit', 'a.test.ts'), '')
+      await recordGateFootprintPeak(vitestFootprintKey(top), 9.3 * GiB, top)
+      await expect(readGateFootprintEstimate(vitestFootprintKey(top), top)).resolves.toBe(9.3 * GiB)
+      await expect(readGateFootprintEstimate(vitestFootprintKey(top, ['tests/unit/a.test.ts']), top))
+        .resolves.toBe(DEFAULT_GATE_FOOTPRINT_BYTES)
+    } finally {
+      rmSync(top, { recursive: true, force: true })
+    }
+  })
+
+  it('passes its CLI filters into the key and prints every wait reason (PAN-5285)', async () => {
+    const warn = vi.fn()
+    const acquire = vi.fn(async (_request: unknown, acquireDeps?: { onWaiting?: (reason: unknown) => void }) => {
+      acquireDeps?.onWaiting?.({ kind: 'queue', position: 2, blocker: { gateName: 'typecheck', issueId: 'PAN-9', workspacePath: '/w' } })
+      return { ...admittedHandle(), admittedAlone: true, footprintBytes: 9 * GiB }
+    })
+    await setup({ env: {}, acquire: acquire as never, warn, startSampler: noSampler, filters: ['tests/unit/vitest-cpu-admission.test.ts'] })
+
+    const key = (acquire.mock.calls[0]![0] as { footprintKey: string }).footprintKey
+    expect(key).toMatch(/:files$/)
+    expect(warn).toHaveBeenCalledWith(`[gate-admission] ${key} waiting in the admission queue at position 3 behind typecheck (PAN-9) in /w`)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(`[gate-admission] ${key} admitted alone after waiting past the bypass bound: needs 9.0 GiB`))
   })
 
   it('sets OVERDECK_GATE_ADMITTED after acquiring', async () => {

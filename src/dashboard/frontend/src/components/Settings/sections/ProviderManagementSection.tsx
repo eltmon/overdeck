@@ -16,6 +16,7 @@ import { setReauthSession } from '../../../lib/pending-codex-spawn';
 import { popoutTerminal } from '../../TerminalPanel';
 import { HarnessLogo, ProviderLogo } from '../../shared/branding';
 import { SensitiveText } from '../../SensitiveText';
+import { CliproxyAccountsPanel } from './CliproxyAccountsPanel';
 import { OpenRouterPage } from '../OpenRouterPage';
 import { MODELS_BY_PROVIDER } from '../modelCatalog';
 import type { Harness, HarnessOverride, Provider, SettingsConfig } from '../types';
@@ -631,6 +632,7 @@ export function ProviderManagementSection({
             )}
           </div>
         </div>
+        <CliproxyAccountsPanel />
       </section>
 
       {modelsModalProvider && (

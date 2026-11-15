@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { emitActivityEntry } from '../activity-logger.js';
@@ -85,36 +85,22 @@ export interface MessageDeliveryOutcome {
 
 export type MessageAgentOutcome = 'delivered' | 'queued';
 
-/** PAN-3736 — the one phrase for "the message went to the mail file because the
- * agent was busy". It states that the agent is alive, and names the file, so a
- * reader never mistakes a mid-turn agent for a dead one. Turn-end delivery is
- * real for `.pending.md` mail: the codex notify hook replays the oldest pending
- * file at every turn boundary. The phrase still stops short of promising it,
- * because the hook only runs for codex sessions. */
-function busyAgentQueuedReason(mailPath: string): string {
-  return `agent is alive and mid-turn; message queued to its mail file (${mailPath})`;
-}
-
 /**
  * How a mail file is named — which is the same thing as saying who drains it
  * (PAN-3738):
  *
  * - `queued` → `<ts>.md` / `dedup-<hash>.md`. Plain mail: `pan monitor` drains
  *   and prints it (`isPlainMailFile`), `pan inbox` re-reads it.
- * - `pending` → `<ts>.pending.md` / `dedup-<hash>.pending.md`. Busy-turn mail
- *   the codex notify hook replays at the next turn end. The hook drains ONLY
- *   `*.pending.md`, so keyed busy mail must carry the suffix too or it strands.
  * - `delivered` → `<ts>.delivered.md` / `dedup-<hash>.delivered.md`. A
  *   post-delivery durable backup: the message already landed, and the suffix
  *   stops a receipt from reading as queued mail to anyone inspecting `mail/`.
  *   It stays plain mail for the monitor (`.delivered.md` ends with `.md` and
  *   not `.pending.md`), so monitor and inbox behavior is unchanged.
  */
-type MailKind = 'queued' | 'pending' | 'delivered';
+type MailKind = 'queued' | 'delivered';
 
 const MAIL_FILENAME_SUFFIX: Record<MailKind, string> = {
   queued: '.md',
-  pending: '.pending.md',
   delivered: '.delivered.md',
 };
 
@@ -153,15 +139,6 @@ export function resolveAgentDeliveryMethod(
 ): 'auto' | 'supervisor' | 'channels' | 'tmux' | undefined {
   if (hostTransportFor(state?.harness) !== null) return 'auto';
   return resilientDeliveryMethod(state?.deliveryMethod);
-}
-
-function claimCodexIdleTurn(agentId: string): boolean {
-  try {
-    unlinkSync(join(getAgentDir(agentId), 'turn-completed'));
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function appendTellInterventionForUserSource(normalizedId: string, caller: string): Promise<void> {
@@ -658,24 +635,12 @@ export async function messageAgent(
     // transport. Continue through the legacy tmux liveness path.
   }
   if (appServerState && appServerState !== 'closed' && appServerState !== 'error') {
-    const promptReady = claimCodexIdleTurn(normalizedId);
-    if (!promptReady) {
-      // PAN-3736: a busy agent is a WORKING agent, not a dead one. Say that in
-      // one phrase everywhere this outcome surfaces, and name the mail file so
-      // a human or peer can read or hand-deliver it.
-      //
-      // PAN-3738: the file is `pending` mail whether or not the send is keyed.
-      // The codex notify hook drains `*.pending.md` only, so a keyed message
-      // named `dedup-<hash>.md` used to strand here forever — the keyed name
-      // stays deterministic, it just carries the drainable suffix now.
-      const mailPath = queueAgentMail(normalizedId, message, 'pending', opts.dedupKey);
-      const busyReason = busyAgentQueuedReason(mailPath);
-      logAgentLifecycle(normalizedId, `messageAgent: ${busyReason}`);
-      console.log(`[agents] ${normalizedId}: ${busyReason}`);
-      await appendTellInterventionForUserSource(normalizedId, caller);
-      return { delivered: true, queuedToMail: true, reason: busyReason };
-    }
-
+    // The app-server host takes a message in every live state: during an
+    // active turn Codex adds it to that turn as user input. So deliver now,
+    // the way the dashboard composer does. Codex app-server does not run the
+    // notify hook at each turn end, so a `turn-completed` marker is no idle
+    // signal here, and nothing drains `*.pending.md` mail for these targets:
+    // gating on the marker parked every message for good (2026-11-06).
     const deliveryMethod = resolveAgentDeliveryMethod(agentState);
     const delivery = await deliverWithOptionalKey(normalizedId, message, `messageAgent:${caller}`, deliveryMethod, opts.dedupKey);
     queueAgentMail(normalizedId, message, 'delivered', opts.dedupKey);
@@ -738,11 +703,8 @@ export async function messageAgent(
     }
   }
 
-  // Codex's notify hook writes turn-completed at every idle boundary. Claiming
-  // that marker makes the idle signal one-shot: the next message starts a turn,
-  // and further messages queue until the hook reports the next completion.
-  // Claude Code continues to use its hook-driven runtime mirror (PAN-1594);
-  // on Herdr the pane's agent_status answers as well (PAN-4186).
+  // Claude Code uses its hook-driven runtime mirror (PAN-1594); on Herdr the
+  // pane's agent_status answers as well (PAN-4186).
   // A steer interrupts the running turn, so it never waits for idle (PAN-4292).
   const promptReady = steer || await waitForAgentIdle(normalizedId, 5000);
   if (!promptReady) {

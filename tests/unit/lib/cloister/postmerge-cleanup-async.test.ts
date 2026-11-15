@@ -151,6 +151,12 @@ vi.mock('../../../../src/lib/paths.js', () => ({
   packageRoot: '/tmp/overdeck-test',
 }));
 
+// PAN-5279: the post-merge epic check reads the tracker; keep these tests offline.
+const trackerIssue = vi.hoisted(() => ({ value: null as { open: boolean; labels: string[] } | null }));
+vi.mock('../../../../src/lib/overdeck/derived-issue-state.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../src/lib/overdeck/derived-issue-state.js')>()),
+  readIssueFromTracker: async () => trackerIssue.value,
+}));
 vi.mock('../../../../src/lib/tracker-utils.js', () => ({
   resolveGitHubIssue: vi.fn().mockReturnValue({ isGitHub: true, owner: 'test', repo: 'test', number: 399 }),
   resolveTrackerType: vi.fn().mockReturnValue('github'),
@@ -345,6 +351,24 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     ).rejects.toThrow('tracker transition failed');
 
     expect(mockTeardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith(ISSUE_ID.toLowerCase());
+  });
+
+  // PAN-5279: an open epic lands in slices; a slice merge must not mark it done.
+  it('strips workflow labels but adds neither merged nor verifying-on-main for an open epic', async () => {
+    trackerIssue.value = { open: true, labels: ['epic'] };
+    // The verifying-on-main transition would throw here; for an epic it never runs.
+    mockTransitionState.shouldFail = true;
+    try {
+      await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+      expect(mockCleanupMergedLabels).toHaveBeenCalledWith(expect.objectContaining({ issueId: ISSUE_ID }), { addMergedLabel: false });
+    } finally {
+      trackerIssue.value = null;
+    }
+  });
+
+  it('adds the merged label for a non-epic issue', async () => {
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+    expect(mockCleanupMergedLabels).toHaveBeenCalledWith(expect.objectContaining({ issueId: ISSUE_ID }), { addMergedLabel: true });
   });
 
   it('queues retry ownership when teardown and tracker transition both fail', async () => {

@@ -4,11 +4,15 @@
  * GET /api/conversations/:name/diffs/full     — whole conversation
  * GET /api/conversations/:name/diffs/vs-main  — conversation repo vs the project's default branch
  * GET /api/conversations/:name/diffs/:turnId  — one turn
+ * GET /api/conversations/:name/changes        — commits and uncommitted edits (PAN-5288)
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { getConversationDiffs, getConversationDiffFull, getConversationDiffTurn, getConversationDiffVsMain } from '../../../lib/overdeck/conversation-diffs.js';
-import { getCachedMessages, resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
+import { getCachedMessages, peekCachedMessages, resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
+import { getConversationChanges, type ConversationChangesDependencies } from '../../../lib/overdeck/conversation-changes.js';
+import { listConversations } from '../../../lib/overdeck/conversations.js';
+import type { ChangeScope } from '@overdeck/contracts';
 import { diffOptionsFromSearchParams } from '../../../lib/diffs/diff-output.js';
 import { jsonResponse } from '../http-helpers.js';
 import { validateOrigin } from './origin-validation.js';
@@ -100,9 +104,44 @@ const getConversationDiffTurnRoute = HttpRouter.add(
   }),
 );
 
+const conversationChangesDependencies: ConversationChangesDependencies = {
+  resolveSessionFile,
+  getCachedMessages,
+  peekCachedMessages,
+  listConversations: () => listConversations(),
+  now: Date.now,
+};
+
+const getConversationChangesRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/:name/changes',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const reqUrl = new URL(request.url, 'http://localhost');
+    // An unknown scope is passed through so getConversationChanges answers 400.
+    const scope = (reqUrl.searchParams.get('scope') ?? 'conversation') as ChangeScope;
+    const turnId = reqUrl.searchParams.get('turnId') ?? undefined;
+    return yield* Effect.promise(async () => {
+      const response = await getConversationChanges(
+        name,
+        turnId === undefined ? { scope } : { scope, turnId },
+        conversationChangesDependencies,
+      );
+      return jsonResponse(response.body, { status: response.status });
+    });
+  }),
+);
+
 export const conversationDiffRoutes = Layer.mergeAll(
   getConversationDiffsRoute,
   getConversationDiffFullRoute,
   getConversationDiffVsMainRoute,
   getConversationDiffTurnRoute,
+  getConversationChangesRoute,
 );

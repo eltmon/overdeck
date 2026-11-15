@@ -80,4 +80,24 @@ describe('IssueTitleRow (PAN-5246)', () => {
     expect(root(wrapped.container)).toHaveClass('flex-wrap');
     expect(root(wrapped.container)).not.toHaveClass('h-[46px]');
   });
+
+  // PAN-5279: the Stage header title wraps instead of ending in an ellipsis.
+  const LONG = 'Merge trains restored: one MergeTrain component on the Flywheel page, the Command Deck and the issue view';
+
+  it('wrap renders the full title without truncate', () => {
+    renderRow({ wrap: true, heading: 'h1', title: LONG });
+    const heading = screen.getByRole('heading', { name: LONG });
+    expect(heading).not.toHaveClass('truncate');
+    expect(heading).toHaveClass('line-clamp-3');
+    expect(heading).toHaveClass('break-words');
+    expect(heading).toHaveAttribute('title', LONG);
+  });
+
+  it('the drawer row keeps truncate', () => {
+    renderRow({ title: LONG });
+    const heading = screen.getByRole('heading', { name: LONG });
+    expect(heading).toHaveClass('truncate');
+    expect(heading).not.toHaveClass('line-clamp-3');
+    expect(heading).toHaveAttribute('title', LONG);
+  });
 });

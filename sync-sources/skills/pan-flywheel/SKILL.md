@@ -128,7 +128,7 @@ Every tick, before picking anything new, walk every in-flight issue and ask
 | PR conflicts with `main` | `gh pr view <pr> --json mergeable` is `CONFLICTING` | tell the work agent to merge `main`; `pan sync-main` stops at conflicts and does not resolve them |
 | Review never reports | review requested, no verdict, no reviewer activity | `pan review restart <id>` |
 | Checks red | the PR's checks fail | if `main` is green, the PR broke it: tell the agent |
-| Merged, not closed out | PR merged, issue still open | `pan close <id>`; a close-out refused on the deploy row needs `pan reload` first |
+| Merged, not closed out | PR merged, issue still open, issue NOT labeled `epic` | `pan close <id>`; a close-out refused on the deploy row needs `pan reload` first. Never `pan close` an `epic` issue because a PR merged: an epic lands in slices, a merged PR is one slice, and the close-out gate refuses it until the operator accepts `--accept-merged` |
 | Merged, not deployed (Overdeck) | the deployed build lacks the merge | `pan reload` once the newest CI run on `main` succeeded (deploy rule); it waits for the operator's restart approval, so say so in `needs-you` |
 
 For every stall: form the root-cause hypothesis first (Doctrine), act once,

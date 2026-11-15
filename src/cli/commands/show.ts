@@ -286,6 +286,7 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
       attention: issueState.attention ?? null,
       prOutsidePipeline: issueState.prOutsidePipeline ?? null,
       pr: issueState.pr,
+      mergedSlice: issueState.mergedSlice ?? null,
       branch: issueState.branch,
       health: healthData,
       liveness: liveness ? { backend, ...liveness } : null,
@@ -303,6 +304,8 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   // Derived state — nothing here is stored; it is read from the tracker, the
   // pull request, git, and agent liveness every time (FR-6).
   console.log(`  ${chalk.dim('state')}    ${chalk.cyan(issueState.state)}`);
+  // PAN-5279: an open epic's merged PR is one slice, not the epic landing.
+  if (issueState.mergedSlice) console.log(`  ${chalk.dim('slice')}    #${issueState.mergedSlice.number} merged — more slices to land`);
   if (issueState.attention) {
     console.log(`  ${chalk.dim('needs')}    ${chalk.yellow(issueState.attention)}`);
     if (issueState.prOutsidePipeline) console.log(`  ${chalk.dim('fix')}      ${issueState.prOutsidePipeline.fix}`);

@@ -13,7 +13,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ISSUE_ACTIONS,
+  deriveIssueActionPhase,
+  getEnabledActions,
   getMenuActions,
+  getPhasePrimaryActions,
   type IssueActionKey,
   type IssueActionState,
 } from '../issueActions';
@@ -176,6 +179,39 @@ describe('getMenuActions per derived state', () => {
   });
 });
 
+// PAN-5279: an open epic lands in slices; one merged slice is not the epic shipping.
+describe('an open epic with a merged slice', () => {
+  const epic = baseState({
+    derived: {
+      issueId: 'PAN-1',
+      state: 'planned',
+      mergedSlice: { number: 5254, url: 'https://example.test/pr/5254' },
+    },
+    hasPlan: true,
+    hasTasks: true,
+    workspace,
+    issueCanonicalState: 'in_progress',
+    // The membership bucket alone must not turn Close out on.
+    isMerged: true,
+  });
+
+  it('Close out is not offered for an open epic with a merged slice', () => {
+    expect(getMenuActions(epic).map((action) => action.key)).not.toContain('closeOut');
+    expect(getEnabledActions(epic).map((action) => action.key)).not.toContain('closeOut');
+    expect(deriveIssueActionPhase(epic)).not.toBe('MERGED');
+  });
+
+  it('leaves the next slice startable', () => {
+    expect(getMenuActions(epic).map((action) => action.key)).toContain('startAgent');
+  });
+
+  it('still offers Close out for a merged non-epic issue', () => {
+    const merged = baseState({ derived: { issueId: 'PAN-1', state: 'merged', pr: pr('approved', 'green', true) }, workspace, hasPr: true });
+    expect(getMenuActions(merged).map((action) => action.key)).toContain('closeOut');
+    expect(deriveIssueActionPhase(merged)).toBe('MERGED');
+  });
+});
+
 describe('registry copy (FR-5)', () => {
   it('has no planning jargon in any label', () => {
     for (const action of ISSUE_ACTIONS) {
@@ -188,5 +224,44 @@ describe('registry copy (FR-5)', () => {
       expect(action.description, action.key).toMatch(/^[^\n]+\.$/);
       expect(action.description, action.key).not.toContain('. ');
     }
+  });
+});
+
+// PAN-5310: a closed issue's one next move is Reopen — never Plan, Start
+// work or Close out, however stale the derived state or the tracker row.
+describe('getPhasePrimaryActions for a closed issue (PAN-5310)', () => {
+  it('a tracker-done issue with no derived state offers only reopen (ac1)', () => {
+    const state = baseState({ derived: null, hasPlan: true, hasTasks: true, issueCanonicalState: 'done' });
+
+    const primary = getPhasePrimaryActions(state, deriveIssueActionPhase(state));
+
+    expect(primary.map((action) => action.key)).toEqual(['reopen']);
+    const enabledKeys = new Set(getEnabledActions(state).map((action) => action.key));
+    expect(enabledKeys.has('plan')).toBe(false);
+    expect(enabledKeys.has('startAgent')).toBe(false);
+    expect(enabledKeys.has('closeOut')).toBe(false);
+  });
+
+  it('a derived closed state with an open PR offers only reopen, even with a lagging tracker row (ac2)', () => {
+    const state = baseState({
+      derived: { issueId: 'PAN-1', state: 'closed', pr: pr('review-requested', 'pending', false) },
+      issueCanonicalState: 'in_progress',
+    });
+
+    const primary = getPhasePrimaryActions(state, deriveIssueActionPhase(state));
+
+    expect(primary.map((action) => action.key)).toEqual(['reopen']);
+    expect(getEnabledActions(state).some((action) => action.key === 'reopen')).toBe(true);
+  });
+
+  it('a merged issue with an open tracker row keeps closeOut as the primary action (ac3)', () => {
+    const state = baseState({
+      derived: { issueId: 'PAN-1', state: 'merged' },
+      issueCanonicalState: 'in_progress',
+    });
+
+    const primary = getPhasePrimaryActions(state, deriveIssueActionPhase(state));
+
+    expect(primary.map((action) => action.key)).toEqual(['closeOut']);
   });
 });

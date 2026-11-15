@@ -172,6 +172,67 @@ describe('the plan home owns the spec', () => {
   });
 });
 
+// PAN-5279: an epic lands in slices; a merged PR on an open epic is one slice.
+describe('an open epic with a merged slice', () => {
+  const slicePr = {
+    url: 'https://github.com/eltmon/overdeck/pull/5254', number: 5254, reviewState: 'approved' as const,
+    checks: 'green' as const, mergeable: null, merged: true,
+  };
+  const workPane = {
+    id: 'w1:p1', issue: 'PAN-3917', role: 'work' as const, harness: 'claude-code',
+    model: 'opus', state: 'working' as const, stateSince: NOW, terminalId: 'w1:p1',
+  };
+
+  it('open issue labeled epic with a merged PR does not derive merged', () => {
+    const derived = deriveIssueState(facts({ labels: ['epic'], prMerged: true, pr: slicePr }));
+    expect(derived.state).not.toBe('merged');
+    expect(derived.state).toBe('backlog');
+    expect(derived.mergedSlice).toEqual({ number: 5254, url: slicePr.url });
+    // The slice's review, checks and merge are not the epic's own.
+    expect(derived.pr).toBeUndefined();
+  });
+
+  it('falls through to planned when the epic has a spec', () => {
+    expect(deriveIssueState(facts({ labels: ['epic'], prMerged: true, pr: slicePr, specExists: true })).state).toBe('planned');
+  });
+
+  it('ignores the squash-merged branch\'s leftover commits ahead of main', () => {
+    const derived = deriveIssueState(facts({
+      labels: ['epic'], prMerged: true, pr: slicePr, specExists: true,
+      branch: { name: 'feature/pan-3917', aheadOfMain: 7, pushed: true },
+    }));
+    expect(derived.state).toBe('planned');
+  });
+
+  it('open epic with a merged slice and a live work pane derives working', () => {
+    expect(deriveIssueState(facts({ labels: ['epic'], prMerged: true, pr: slicePr, panes: [workPane] })).state).toBe('working');
+  });
+
+  it('open non-epic issue with a merged PR still derives merged', () => {
+    const derived = deriveIssueState(facts({ prMerged: true, pr: slicePr }));
+    expect(derived.state).toBe('merged');
+    expect(derived.pr).toEqual(slicePr);
+    expect(derived.mergedSlice).toBeUndefined();
+  });
+
+  it('a closed epic is closed, and an unknown tracker keeps merged', () => {
+    expect(deriveIssueState(facts({ issueOpen: false, labels: ['epic'], prMerged: true, pr: slicePr })).state).toBe('closed');
+    expect(deriveIssueState(facts({ issueOpen: null, labels: ['epic'], prMerged: true, pr: slicePr })).state).toBe('merged');
+  });
+
+  it('the single-issue loader reads the epic label from the tracker', async () => {
+    const derived = await getDerivedIssueState('PAN-3917', {
+      ...offline,
+      readIssue: async () => ({ open: true, labels: ['Epic', 'needs-handoff'] }),
+      readPr: async () => slicePr,
+      readBranch: async () => ({ name: 'feature/pan-3917', aheadOfMain: 7, pushed: true }),
+    });
+    expect(derived.state).not.toBe('merged');
+    expect(derived.state).not.toBe('working');
+    expect(derived.mergedSlice?.number).toBe(5254);
+  });
+});
+
 describe('the backend owns liveness', () => {
   it('a live reviewer pane is in review even with no pull request', () => {
     const pane = {

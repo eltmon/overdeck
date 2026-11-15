@@ -155,6 +155,7 @@ export async function autoCommitWorkspaceChangesBeforeSync(
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import { resolveGitHubIssue } from '../tracker-utils.js';
+import { hasEpicLabel } from '../backlog/pickup.js';
 
 import { cleanupStaleLocks } from '../git-utils.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
@@ -303,6 +304,16 @@ export async function postMergeLifecycle(
 
     console.log(`[merge-agent] Running post-merge verify handoff for ${issueId}`);
 
+    // PAN-5279: an open epic lands in slices. Stamping `merged` and
+    // `verifying-on-main` on it would map the tracker state to done for one
+    // slice, so the stale workflow labels are still removed but neither of
+    // those is applied, and the epic stays open work.
+    const epicSkip = await postMergeLabelSkipReason(issueId);
+    if (epicSkip) {
+      console.log(`[merge-agent] ${epicSkip}`);
+      logActivity('labels_skipped', epicSkip);
+    }
+
     // 1. Clean up stale workflow labels and keep the legacy merged marker for history.
     // verifying-on-main is applied next and takes precedence in canonical state mapping.
     try {
@@ -312,7 +323,7 @@ export async function postMergeLifecycle(
         ? { issueId, projectPath, github: { owner: ghResolved.owner, repo: ghResolved.repo, number: ghResolved.number } }
         : { issueId, projectPath };
       // PAN-1249: cleanupMergedLabels returns Effect<StepResult>; bridge to Promise.
-      const labelResult = await Effect.runPromise(cleanupMergedLabels(labelCtx));
+      const labelResult = await Effect.runPromise(cleanupMergedLabels(labelCtx, { addMergedLabel: !epicSkip }));
       if (labelResult.success && !labelResult.skipped) {
         console.log(`[merge-agent] ✓ ${labelResult.details?.join('; ')}`);
         logActivity('labels_cleaned', labelResult.details?.join('; ') || 'Labels cleaned');
@@ -325,15 +336,17 @@ export async function postMergeLifecycle(
       console.warn(`[merge-agent] Could not clean labels: ${err}`);
     }
 
-    try {
-      await transitionIssueToVerifyingOnMain(issueId, projectPath);
-      void recordFeatureRegistryLifecycle({ issueId, status: 'merged' });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.warn(`[merge-agent] Could not transition issue to verifying_on_main: ${message}`);
-      announceMerge('failed', issueId, `Post-merge verifying_on_main transition failed: ${message}`);
-      logActivity('merge_failed', `Post-merge verifying_on_main transition failed for ${issueId}: ${message}`);
-      throw err;
+    if (!epicSkip) {
+      try {
+        await transitionIssueToVerifyingOnMain(issueId, projectPath);
+        void recordFeatureRegistryLifecycle({ issueId, status: 'merged' });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`[merge-agent] Could not transition issue to verifying_on_main: ${message}`);
+        announceMerge('failed', issueId, `Post-merge verifying_on_main transition failed: ${message}`);
+        logActivity('merge_failed', `Post-merge verifying_on_main transition failed for ${issueId}: ${message}`);
+        throw err;
+      }
     }
 
     // Release verification runs asynchronously so post-merge cleanup is not
@@ -516,6 +529,29 @@ export async function triggerPostMergeReleaseIfConfigured(issueId: string, proje
     console.warn(`[merge-agent] Post-merge release trigger failed for ${issueId}: ${message}`);
     logActivity('release_failed', `Post-merge release trigger failed for ${issueId}: ${message}`);
   }
+}
+
+/**
+ * PAN-5279: why the post-merge label steps must not run for this issue, or
+ * null when they should. Only an open issue labeled `epic` is skipped. A
+ * tracker that does not answer returns null, so the merge behaves as before.
+ */
+export async function postMergeLabelSkipReason(
+  issueId: string,
+  readIssue: (issueId: string) => Promise<{ readonly open: boolean; readonly labels: readonly string[] } | null> = defaultReadTrackerIssue,
+): Promise<string | null> {
+  try {
+    const issue = await readIssue(issueId);
+    if (!issue?.open || !hasEpicLabel(issue.labels)) return null;
+    return `${issueId} is an open epic: this merge is one slice, so the merged and verifying-on-main labels are not applied`;
+  } catch {
+    return null;
+  }
+}
+
+async function defaultReadTrackerIssue(issueId: string) {
+  const { readIssueFromTracker } = await import('../overdeck/derived-issue-state.js');
+  return readIssueFromTracker(issueId);
 }
 
 async function transitionIssueToVerifyingOnMain(issueId: string, projectPath: string): Promise<void> {

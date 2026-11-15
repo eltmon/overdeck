@@ -1,0 +1,225 @@
+{
+  "version": "1",
+  "issueId": "PAN-5310",
+  "created": "2026-11-14T22:39:01.503Z",
+  "updated": "2026-11-15T01:05:37.356Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "server-backfill-derived-refresh": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5310",
+      "claimedAt": "2026-11-14T22:39:01.503Z",
+      "doneAt": "2026-11-14T23:02:14.848Z"
+    },
+    "server-backfill-derived-refresh.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:02:14.848Z"
+    },
+    "server-backfill-derived-refresh.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:02:14.848Z"
+    },
+    "server-backfill-derived-refresh.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:02:14.848Z"
+    },
+    "server-backfill-derived-refresh.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:02:14.848Z"
+    },
+    "server-backfill-derived-refresh.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:02:14.848Z"
+    },
+    "cli-github-tracker-first": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5310",
+      "claimedAt": "2026-11-14T23:02:48.015Z",
+      "doneAt": "2026-11-14T23:21:47.167Z"
+    },
+    "cli-github-tracker-first.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:21:47.167Z"
+    },
+    "cli-github-tracker-first.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:21:47.167Z"
+    },
+    "cli-github-tracker-first.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:21:47.167Z"
+    },
+    "cli-github-tracker-first.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:21:47.167Z"
+    },
+    "merged-pr-read-for-backfilled": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5310",
+      "claimedAt": "2026-11-14T23:21:54.835Z",
+      "doneAt": "2026-11-14T23:45:08.561Z"
+    },
+    "merged-pr-read-for-backfilled.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:45:08.561Z"
+    },
+    "merged-pr-read-for-backfilled.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:45:08.561Z"
+    },
+    "merged-pr-read-for-backfilled.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:45:08.561Z"
+    },
+    "merged-pr-read-for-backfilled.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:45:08.561Z"
+    },
+    "merged-pr-read-for-backfilled.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:45:08.561Z"
+    },
+    "fe-pipeline-state-tracker-closed": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5310",
+      "claimedAt": "2026-11-14T23:45:16.438Z",
+      "doneAt": "2026-11-15T00:02:14.961Z"
+    },
+    "fe-pipeline-state-tracker-closed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:02:14.961Z"
+    },
+    "fe-pipeline-state-tracker-closed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:02:14.961Z"
+    },
+    "fe-pipeline-state-tracker-closed.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:02:14.961Z"
+    },
+    "fe-actions-closed-reopen-only": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5310",
+      "claimedAt": "2026-11-15T00:02:23.382Z",
+      "doneAt": "2026-11-15T00:31:11.132Z"
+    },
+    "fe-actions-closed-reopen-only.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:31:11.132Z"
+    },
+    "fe-actions-closed-reopen-only.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:31:11.132Z"
+    },
+    "fe-actions-closed-reopen-only.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:31:11.132Z"
+    },
+    "fe-ship-merged-only": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5310",
+      "claimedAt": "2026-11-15T00:31:24.616Z",
+      "doneAt": "2026-11-15T00:37:02.300Z"
+    },
+    "fe-ship-merged-only.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:37:02.300Z"
+    },
+    "fe-ship-merged-only.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:37:02.300Z"
+    },
+    "fe-ship-merged-only.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:37:02.300Z"
+    },
+    "fe-ship-merged-only.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:37:02.300Z"
+    },
+    "fe-issue-view-closed-now-release": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5310",
+      "claimedAt": "2026-11-15T00:37:08.997Z",
+      "doneAt": "2026-11-15T00:44:20.576Z"
+    },
+    "fe-issue-view-closed-now-release.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:44:20.576Z"
+    },
+    "fe-issue-view-closed-now-release.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:44:20.576Z"
+    },
+    "fe-issue-view-closed-now-release.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:44:20.576Z"
+    },
+    "fe-status-narrative-closed": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5310",
+      "claimedAt": "2026-11-15T00:44:28.439Z",
+      "doneAt": "2026-11-15T00:50:50.338Z"
+    },
+    "fe-status-narrative-closed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:50:50.338Z"
+    },
+    "fe-status-narrative-closed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:50:50.338Z"
+    },
+    "fe-status-narrative-closed.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:50:50.338Z"
+    },
+    "fe-status-narrative-closed.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:50:50.338Z"
+    },
+    "fe-status-narrative-closed.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T00:50:50.338Z"
+    },
+    "fe-details-closed-no-create-pr": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5310",
+      "claimedAt": "2026-11-15T00:50:58.016Z",
+      "doneAt": "2026-11-15T01:03:26.986Z"
+    },
+    "fe-details-closed-no-create-pr.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T01:03:26.986Z"
+    },
+    "fe-details-closed-no-create-pr.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T01:03:26.986Z"
+    },
+    "fe-details-closed-no-create-pr.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T01:03:26.986Z"
+    },
+    "docs-closed-issue-view": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5310",
+      "claimedAt": "2026-11-15T01:03:37.616Z",
+      "doneAt": "2026-11-15T01:05:37.356Z"
+    },
+    "docs-closed-issue-view.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T01:05:37.356Z"
+    },
+    "docs-closed-issue-view.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T01:05:37.356Z"
+    },
+    "docs-closed-issue-view.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T01:05:37.356Z"
+    }
+  }
+}

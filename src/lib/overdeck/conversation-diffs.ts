@@ -1,10 +1,9 @@
 import { exec } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import type { ChatMessage } from '@overdeck/contracts';
+import type { ChatMessage, WorkLogEntry } from '@overdeck/contracts';
 
 import {
   findCommitAtTime,
@@ -28,6 +27,8 @@ export interface ConversationDiffResult {
 
 export interface ConversationDiffParseResult {
   messages: Array<Pick<ChatMessage, 'role' | 'id' | 'createdAt' | 'completedAt'>>;
+  /** Full work log (tool inputs and results), used by the changes API (PAN-5288). */
+  workLog: ReadonlyArray<WorkLogEntry>;
   fileEditsByAssistantId?: Map<string, Array<{ filePath: string }>>;
 }
 
@@ -58,12 +59,12 @@ function cacheDiffsResult(cacheKey: string, entry: DiffsCacheEntry): void {
   }
 }
 
-function lookupConversation(name: string): Conversation | null {
+export function lookupConversation(name: string): Conversation | null {
   return getConversationByName(name) ?? (/^\d+$/.test(name) ? getConversationById(parseInt(name, 10)) : null);
 }
 
 /** The git top-level of `dir`, or null when `dir` is not inside a repository (PAN-4501). */
-async function repoRootForDir(dir: string): Promise<string | null> {
+export async function repoRootForDir(dir: string): Promise<string | null> {
   try {
     const { stdout } = await promisify(exec)(
       'git rev-parse --show-toplevel',
@@ -392,7 +393,7 @@ export async function getConversationDiffTurn(
     if (!conv) return result({ error: 'Conversation not found' }, 404);
 
     const cwd = conv.cwd;
-    const cwdRepoRoot = existsSync(join(cwd, '.git')) ? cwd : null;
+    const cwdRepoRoot = await repoRootForDir(cwd);
     const patches: string[] = [];
 
     if (cwdRepoRoot) {

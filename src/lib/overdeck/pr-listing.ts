@@ -244,6 +244,38 @@ async function loadClosedPullRequests(projectPath: string): Promise<ClosedListin
 }
 
 /**
+ * PAN-5310: the merged PR for one branch, for an issue older than the closed
+ * listing reaches (~100 PRs). A settled answer — a row or null — never
+ * changes for a closed issue, so it is kept for the process lifetime; a
+ * failed read is not kept and reads as null.
+ */
+const mergedPrByBranch = new Map<string, Promise<GhPrRow | null>>();
+export function readMergedPullRequestForBranch(projectPath: string, branch: string): Promise<GhPrRow | null> {
+  const key = `${projectPath}\0${branch}`;
+  let pending = mergedPrByBranch.get(key);
+  if (!pending) {
+    pending = (async () => {
+      if (!(await shouldListPullRequests(projectPath))) return null;
+      const { stdout } = await runGh([
+        'pr', 'list', '--state', 'merged', '--head', branch, '--limit', '1', '--json', GH_CLOSED_PR_FIELDS,
+      ], { caller: 'pr-cache', cwd: projectPath, timeout: 20_000 });
+      return (JSON.parse(stdout || '[]') as GhPrRow[])[0] ?? null;
+    })().catch((error) => {
+      mergedPrByBranch.delete(key);
+      logPrListingFailure(projectPath, 'closed', error);
+      return null;
+    });
+    mergedPrByBranch.set(key, pending);
+  }
+  return pending;
+}
+
+/** Test-only: drop every cached `readMergedPullRequestForBranch` answer. */
+export function resetMergedPullRequestCacheForTests(): void {
+  mergedPrByBranch.clear();
+}
+
+/**
  * Merge the open and closed listings into one, by PR number. A number in
  * both listings keeps the row from the one that settled later — open wins
  * only when it settled strictly after closed, otherwise closed wins (the

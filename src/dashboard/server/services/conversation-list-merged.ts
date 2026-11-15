@@ -9,11 +9,22 @@
  */
 import { linksSnapshot, type MachineLink } from '../../../lib/anywhere/link-store.js';
 import { readEnvironmentIdentity } from '../../../lib/environment-identity.js';
+import { stampChangeTotals, type ConversationChangesDependencies } from '../../../lib/overdeck/conversation-changes.js';
 import { getConversationListWithVaultCopies } from '../../../lib/overdeck/conversation-list.js';
+import { getCachedMessages, peekCachedMessages, resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
+import { listConversations } from '../../../lib/overdeck/conversations.js';
 import { listLinkedConversations } from '../../../lib/overdeck/linked-conversations.js';
 import { laneFieldsByRun, type LaneListFields } from '../../../lib/lanes/lane-list-fields.js';
 import { listRemoteLanes } from '../../../lib/lanes/remote-lanes.js';
 import { type LinkPresence, mergeConversationRows, remoteLaneKey, type RemoteLaneEntry } from '../../../lib/overdeck/linked-conversations-merge.js';
+
+const conversationChangesDependencies: ConversationChangesDependencies = {
+  resolveSessionFile,
+  getCachedMessages,
+  peekCachedMessages,
+  listConversations: () => listConversations(),
+  now: Date.now,
+};
 
 type ListRow = Record<string, unknown> & { name: string; origin?: string; claudeSessionId?: string | null };
 
@@ -35,7 +46,11 @@ function presenceOf(link: MachineLink): LinkPresence {
 
 /** The conversation list for `limit`/`offset`; `params.linked === '0'` leaves linked rows out. */
 export async function getMergedConversationList(limit: number, offset: number, params?: URLSearchParams): Promise<readonly unknown[]> {
-  const rows = (await getConversationListWithVaultCopies(limit, offset)) as readonly ListRow[];
+  // PAN-5288 A-D16: changeTotals come from the totals map only; never awaited here.
+  const rows = stampChangeTotals(
+    (await getConversationListWithVaultCopies(limit, offset)) as readonly ListRow[],
+    conversationChangesDependencies,
+  );
   if (offset !== 0 || params?.get('linked') === '0') return rows;
   const linked = listLinkedConversations();
   if (linked.length === 0) return rows;

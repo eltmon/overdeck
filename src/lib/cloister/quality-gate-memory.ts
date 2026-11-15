@@ -10,9 +10,10 @@ import { computeGovernorReserveDefaultsGb } from '../config-yaml/governor-reserv
  *
  * A gate's footprint estimate is the largest of its last recorded peak RSS
  * values (D5), stored one file per footprint key under
- * `<admissionRoot>/footprints/` (D8). The head waiter may start only while
+ * `<admissionRoot>/footprints/` (D8). A waiter may start only while
  * MemAvailable minus the live owners' reservations and its own footprint
- * stays at or above the governor's soft reserve (FR-2, NFR-3). An owner's
+ * stays at or above the governor's soft reserve (FR-2, NFR-3), except a head
+ * admitted alone (PAN-5285), which needs only the hard reserve. An owner's
  * reservation is the part of its footprint it has not allocated yet (D4).
  *
  * Kept free of memory-governor.ts and runaway-process-patrol.ts (NFR-6):
@@ -97,16 +98,32 @@ export async function recordGateFootprintPeak(
   }
 }
 
-/** `resources.governor_soft_reserve_gb` in bytes (global config only, D9), or the RAM-share default. */
-export async function resolveSoftReserveBytes(): Promise<number> {
+function reserveBytes(gb: unknown, fallbackGb: number): number {
+  return typeof gb === 'number' && Number.isFinite(gb) && gb >= 0 ? gb * GiB : fallbackGb * GiB
+}
+
+/**
+ * PAN-5285: `resources.governor_soft_reserve_gb` and `governor_hard_reserve_gb`
+ * in bytes from one global-config read (D9), each falling back to its RAM-share
+ * default. The hard reserve is the floor for a head admitted alone.
+ */
+export async function resolveGateReserveBytes(): Promise<{ softBytes: number; hardBytes: number }> {
+  const defaults = computeGovernorReserveDefaultsGb(totalmem() / GiB)
   try {
     const { loadGlobalConfigNoMigration } = await import('../config-yaml/load.js')
-    const gb = (await loadGlobalConfigNoMigration()).config.resources.governorSoftReserveGb
-    if (typeof gb === 'number' && Number.isFinite(gb) && gb >= 0) return gb * GiB
+    const { resources } = (await loadGlobalConfigNoMigration()).config
+    return {
+      softBytes: reserveBytes(resources.governorSoftReserveGb, defaults.soft),
+      hardBytes: reserveBytes(resources.governorHardReserveGb, defaults.hard),
+    }
   } catch {
-    // Fall through to the RAM-share default.
+    return { softBytes: defaults.soft * GiB, hardBytes: defaults.hard * GiB }
   }
-  return computeGovernorReserveDefaultsGb(totalmem() / GiB).soft * GiB
+}
+
+/** `resources.governor_soft_reserve_gb` in bytes (global config only, D9), or the RAM-share default. */
+export async function resolveSoftReserveBytes(): Promise<number> {
+  return (await resolveGateReserveBytes()).softBytes
 }
 
 export interface MemoryHeadroomInput {

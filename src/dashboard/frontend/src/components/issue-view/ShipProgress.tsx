@@ -20,6 +20,7 @@ interface ShipProgressProps {
 }
 
 function summary(ship: IssueShipModel): string {
+  if (ship.status === 'closed') return 'Closed — no pull request is linked';
   if (ship.status === 'merged') return 'Merged to main';
   if (ship.status === 'ready') return 'Approved, green, and mergeable';
   if (!ship.prUrl) return 'No pull request yet';

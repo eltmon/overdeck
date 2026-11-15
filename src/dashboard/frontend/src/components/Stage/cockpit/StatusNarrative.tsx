@@ -9,8 +9,9 @@ import {
   useIssueCheckRunsQuery,
   type IssueCheckRunsResponse,
 } from '../../CommandDeck/ZoneCOverviewTabs/queries'
-import { useDerivedIssueState } from '../../../lib/store'
-import type { DerivedIssueState } from '../../../types'
+import { isClosedIssue } from '../../../lib/pipeline-state'
+import { useDashboardStore, useDerivedIssueState } from '../../../lib/store'
+import type { DerivedIssueState, Issue } from '../../../types'
 
 interface PlanCounts { done: number; total: number }
 
@@ -27,8 +28,9 @@ export function deriveNarrative(args: {
   ci: IssueCheckRunsResponse | undefined
   plan: PlanCounts | undefined
   workRunning: boolean
+  trackerClosed?: boolean
 }): NarrativeModel {
-  const { hasPlan, issue, ci, plan, workRunning } = args
+  const { hasPlan, issue, ci, plan, workRunning, trackerClosed } = args
   const summary = ci?.summary
   const ciFailing = Boolean(summary && (summary.failed || summary.cancelled))
   const progress = plan && plan.total > 0 ? `${plan.done} of ${plan.total} tasks done` : undefined
@@ -37,9 +39,24 @@ export function deriveNarrative(args: {
   let next: string
   let needsYou = false
 
-  if (issue?.state === 'merged') {
+  if (issue?.state === 'closed' || trackerClosed === true) {
+    const pr = issue?.pr
+    if (pr?.merged) return { headline: 'Shipped — this change is on main', next: 'The issue is closed. Nothing needs you.', needsYou: false }
+    if (pr) return {
+      headline: `Closed, but pull request #${pr.number} is still open — close or merge it`,
+      next: 'The issue is closed but its pull request is still open. Close the pull request, or merge it if the change is still wanted.',
+      needsYou: true,
+    }
+    return { headline: 'Closed', next: 'This issue is closed. Nothing needs you.', needsYou: false }
+  } else if (issue?.state === 'merged') {
     headline = 'Shipped — this change is on main'
     next = 'Wrapping up: closing the issue out.'
+  } else if (issue?.mergedSlice && !workRunning && issue.state !== 'working') {
+    // PAN-5279: an open epic between slices. One slice is on main; the epic is not.
+    headline = progress
+      ? `Slice merged (#${issue.mergedSlice.number}) — ${progress}`
+      : `Slice merged (#${issue.mergedSlice.number}) — more slices to land`
+    next = 'This epic ships in slices; the next slice starts when it’s picked up.'
   } else if (issue?.state === 'ready') {
     headline = 'Ready to ship — everything passed'
     next = 'Waiting on you: press Merge when you want it on main.'
@@ -76,6 +93,8 @@ export function StatusNarrative({ issueId, workRunning, hasPlan, showNext = fals
   showNext?: boolean
 }) {
   const issue = useDerivedIssueState(issueId)
+  const row = useDashboardStore((s) => (s.issuesRaw as Issue[]).find((i) => i.identifier.toLowerCase() === issueId.toLowerCase()))
+  const trackerClosed = row ? isClosedIssue(row) : false
   const ci = useIssueCheckRunsQuery(issueId)
   const plan = useQuery<{ plan?: { items?: Array<{ status: string }> } }>({
     queryKey: ['plan', issueId],
@@ -91,7 +110,7 @@ export function StatusNarrative({ issueId, workRunning, hasPlan, showNext = fals
     ? { done: items.filter((item) => item.status === 'completed').length, total: items.length }
     : undefined
 
-  const model = deriveNarrative({ hasPlan, issue, ci: ci.data, plan: counts, workRunning })
+  const model = deriveNarrative({ hasPlan, issue, ci: ci.data, plan: counts, workRunning, trackerClosed })
 
   const headline = (
     <span
