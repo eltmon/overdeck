@@ -9,8 +9,10 @@
  *   when it still resolves and is reachable from `HEAD`, so an amended commit's
  *   old object (which resolves until `git gc`) is dropped (A-D7).
  *
- * `pushed` is "not in `git rev-list @{u}..HEAD`"; without an upstream every
- * commit is local. Async `execFile` only: the dashboard server calls this.
+ * Without an upstream, a commit counts as pushed when any remote-tracking ref
+ * contains it (`git rev-list HEAD --not --remotes`); with no remote every
+ * commit is local. `hasUpstream` means the shas set is meaningful. Async
+ * `execFile` only: the dashboard server calls this.
  */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -86,13 +88,24 @@ export function toolOutputCommitCandidates(workLog: ReadonlyArray<WorkLogEntry>)
   return candidates;
 }
 
-/** Commits on `HEAD` not yet on the upstream; no upstream (or any failure) ⇒ `hasUpstream: false`. */
+/**
+ * Commits on `HEAD` not yet on the upstream. A detached `HEAD` has no
+ * upstream, so without one this falls back to commits not reachable from any
+ * remote-tracking ref; no remote at all (or any failure) ⇒ `hasUpstream: false`.
+ */
 export async function listLocalShas(repoRoot: string): Promise<{ shas: Set<string>; hasUpstream: boolean }> {
   try {
     const out = await git(repoRoot, ['rev-list', '@{u}..HEAD']);
     return { shas: new Set(out.split('\n').map((l) => l.trim()).filter((l) => l !== '')), hasUpstream: true };
   } catch {
-    return { shas: new Set(), hasUpstream: false };
+    try {
+      const remotes = (await git(repoRoot, ['remote'])).split('\n').filter((l) => l.trim() !== '');
+      if (remotes.length === 0) return { shas: new Set(), hasUpstream: false };
+      const out = await git(repoRoot, ['rev-list', 'HEAD', '--not', '--remotes']);
+      return { shas: new Set(out.split('\n').map((l) => l.trim()).filter((l) => l !== '')), hasUpstream: true };
+    } catch {
+      return { shas: new Set(), hasUpstream: false };
+    }
   }
 }
 
