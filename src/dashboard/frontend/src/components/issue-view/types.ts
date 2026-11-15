@@ -120,7 +120,7 @@ export interface VerificationGateModel {
  * forge says: is the PR mergeable, are its checks green, has it merged.
  */
 export interface IssueShipModel {
-  status: 'pending' | 'ready' | 'merged';
+  status: 'pending' | 'ready' | 'merged' | 'closed';
   prUrl?: string;
   prNumber?: number;
   checks?: 'green' | 'red' | 'pending';
