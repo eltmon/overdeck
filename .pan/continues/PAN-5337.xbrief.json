@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5337",
   "created": "2026-11-15T11:36:29.093Z",
-  "updated": "2026-11-15T15:30:23.304Z",
+  "updated": "2026-11-15T15:56:59.569Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -166,10 +166,12 @@
       "doneAt": "2026-11-15T15:24:28.857Z"
     },
     "code-pane-preview-links.ac3": {
-      "status": "pending"
+      "status": "completed",
+      "doneAt": "2026-11-15T15:56:59.568Z"
     },
     "editor-pane-preview-links.ac3": {
-      "status": "pending"
+      "status": "completed",
+      "doneAt": "2026-11-15T15:56:59.568Z"
     },
     "editor-pane-preview-links.ac1": {
       "status": "completed",
