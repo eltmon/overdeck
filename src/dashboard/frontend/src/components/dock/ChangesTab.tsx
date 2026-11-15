@@ -1,13 +1,17 @@
 // Changes tab of the work dock (PAN-5289 §6.4, FR-6): what changed in the scope.
 //
-// A conversation scope lists its own changes (ConversationChangesList); the
-// other scopes are filled by the changes-roots item. useChangesCount gives the
-// tab label its count, only while the dock is open (NFR-2).
+// A conversation scope lists its own changes (ConversationChangesList); an
+// issue or edit-workspace root lists its git status (RootChangesList); a
+// project root lists today's commits on its default branch
+// (ProjectMainChangesList). useChangesCount gives the tab label its count,
+// only while the dock is open (NFR-2).
 
 import { useMemo } from 'react'
 
 import { useExplorerGitStatus } from '../explorer/git/useExplorerGitStatus'
 import { ConversationChangesList } from './changes/ConversationChangesList'
+import { ProjectMainChangesList } from './changes/ProjectMainChangesList'
+import { RootChangesList } from './changes/RootChangesList'
 import type { DockScope } from './dockScope'
 import { useConversationChanges } from './useConversationChanges'
 
@@ -17,10 +21,13 @@ export interface ChangesTabProps {
 }
 
 export function ChangesTab({ deckKey, scope }: ChangesTabProps) {
-  if (scope.changes.kind === 'conversation') {
-    return <ConversationChangesList key={scope.changes.conversation.name} deckKey={deckKey} scope={scope} conversation={scope.changes.conversation} />
+  const { changes } = scope
+  if (changes.kind === 'conversation') {
+    return <ConversationChangesList key={changes.conversation.name} deckKey={deckKey} scope={scope} conversation={changes.conversation} />
   }
-  return <p className="px-3 py-4 text-xs text-muted-foreground">The files changed in this scope show here.</p>
+  if (changes.kind === 'root') return <RootChangesList key={changes.rootId} deckKey={deckKey} rootId={changes.rootId} />
+  if (changes.kind === 'project-main') return <ProjectMainChangesList key={changes.projectKey} deckKey={deckKey} projectKey={changes.projectKey} />
+  return <p className="px-3 py-4 text-xs text-muted-foreground">No project is selected, so there are no changes to show.</p>
 }
 
 /** The count on the Changes tab label, or null while unknown or closed. */

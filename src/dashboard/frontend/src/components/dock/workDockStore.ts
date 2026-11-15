@@ -25,10 +25,17 @@ export const DOCK_MAX_WIDTH = 720
 
 const DOCK_TABS: readonly DockTab[] = ['files', 'changes', 'search', 'live']
 
+/** A file the Changes tab shows a diff of: a root path, its commit, or a committed file of an issue root (vs main). */
+export interface DockDiffTarget {
+  path: string
+  sha?: string
+  committedVsMain?: boolean
+}
+
 export interface OpenDockInput {
   tab: DockTab
   reveal?: { rootId: string; path: string }
-  diff?: { path: string; sha?: string }
+  diff?: DockDiffTarget
   changesScope?: ChangeScope
   /** Search tab: limit content search to this root path (Find in folder). */
   searchPath?: string
@@ -42,7 +49,7 @@ export interface DockState {
   /** Pane id the override belongs to (B-D17); undefined applies to every pane. */
   rootOverrideAnchor?: string
   changesScope?: ChangeScope
-  diff?: { path: string; sha?: string }
+  diff?: DockDiffTarget
   reveal?: { rootId: string; path: string }
   searchPath?: string
   /** Counts openDock calls; starts at 0 on hydrate, never persisted. */
