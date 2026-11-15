@@ -24,7 +24,7 @@ export const DOD_ROWS: readonly DodRowDef[] = [
     id: 'review',
     num: 1,
     title: 'Review passed',
-    expected: 'review passed, or tracker-closed with landed work and no negative review verdict',
+    expected: 'review passed (forge approval, or a trusted Overdeck verdict comment approving the PR head), or tracker-closed with landed work and no negative review verdict',
     overridable: true,
   },
   {

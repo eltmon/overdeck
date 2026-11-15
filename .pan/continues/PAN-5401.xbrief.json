@@ -1,0 +1,79 @@
+{
+  "version": "1",
+  "issueId": "PAN-5401",
+  "created": "2026-11-15T23:18:04.233Z",
+  "updated": "2026-11-15T23:31:38.649Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "dod-review-comment-verdict": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5401",
+      "claimedAt": "2026-11-15T23:18:04.233Z",
+      "doneAt": "2026-11-15T23:26:06.779Z"
+    },
+    "dod-review-comment-verdict.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:26:06.779Z"
+    },
+    "dod-review-comment-verdict.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:26:06.779Z"
+    },
+    "dod-review-comment-verdict.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:26:06.779Z"
+    },
+    "dod-review-comment-verdict.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:26:06.779Z"
+    },
+    "dod-review-comment-verdict.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:26:06.779Z"
+    },
+    "dod-review-comment-rejection": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5401",
+      "claimedAt": "2026-11-15T23:26:14.920Z",
+      "doneAt": "2026-11-15T23:29:28.457Z"
+    },
+    "dod-review-comment-rejection.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:29:28.457Z"
+    },
+    "dod-review-comment-rejection.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:29:28.457Z"
+    },
+    "dod-review-comment-rejection.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:29:28.457Z"
+    },
+    "dod-review-comment-rejection.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:29:28.457Z"
+    },
+    "dod-review-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5401",
+      "claimedAt": "2026-11-15T23:29:32.848Z",
+      "doneAt": "2026-11-15T23:31:38.649Z"
+    },
+    "dod-review-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:31:38.649Z"
+    },
+    "dod-review-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:31:38.649Z"
+    },
+    "dod-review-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:31:38.649Z"
+    }
+  }
+}
