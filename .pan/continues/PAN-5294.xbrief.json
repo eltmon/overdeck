@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5294",
   "created": "2026-11-15T11:49:42.622Z",
-  "updated": "2026-11-15T13:33:15.162Z",
+  "updated": "2026-11-15T13:34:05.891Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,9 +170,22 @@
       "doneAt": "2026-11-15T13:33:14.204Z"
     },
     "home-needs-you": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5294",
-      "claimedAt": "2026-11-15T13:33:15.162Z"
+      "claimedAt": "2026-11-15T13:33:15.162Z",
+      "doneAt": "2026-11-15T13:34:05.891Z"
+    },
+    "home-needs-you.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:34:05.891Z"
+    },
+    "home-needs-you.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:34:05.891Z"
+    },
+    "home-needs-you.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:34:05.891Z"
     }
   },
   "agentModel": "claude-opus-5-5"
