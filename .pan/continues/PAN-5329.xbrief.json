@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5329",
   "created": "2026-11-15T06:45:07.358Z",
-  "updated": "2026-11-15T06:57:55.081Z",
+  "updated": "2026-11-15T07:41:36.360Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,6 +112,14 @@
     "docs-and-changelog.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T06:57:55.081Z"
+    },
+    "quick-open-match-mark.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T07:41:36.360Z"
+    },
+    "change-tag-truncate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T07:41:36.360Z"
     }
   }
 }
