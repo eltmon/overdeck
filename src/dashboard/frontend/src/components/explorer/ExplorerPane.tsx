@@ -617,6 +617,7 @@ export function ExplorerFiles({ rootId, deckKey, changedPaths: scopeChangedPaths
             onKeyDown={onTreeKeyDown}
             onRowDragStart={onRowDragStart}
             dropDir={dropZone.dropDir}
+            changedPaths={scopeChangedPaths}
             decorations={git.decorations}
             selection={root?.selection ?? []}
             focused={root?.focused ?? null}

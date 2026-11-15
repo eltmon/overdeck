@@ -51,12 +51,12 @@ export function useConversationChanges(
   })
   const keyRef = useRef(key)
   keyRef.current = key
-  const enabledRef = useRef(opts.enabled && conversation !== null)
-  enabledRef.current = opts.enabled && conversation !== null
+  const enabled = opts.enabled && conversation !== null
   const refresh = (): void => {
-    if (enabledRef.current) void queryClient.invalidateQueries({ queryKey: keyRef.current, exact: true })
+    void queryClient.invalidateQueries({ queryKey: keyRef.current, exact: true })
   }
-  useExplorerWatch(opts.rootId ?? undefined, { onDirsChanged: refresh, onResync: refresh })
+  // Watch the root only while the query runs: a closed dock subscribes to nothing.
+  useExplorerWatch(enabled ? (opts.rootId ?? undefined) : undefined, { onDirsChanged: refresh, onResync: refresh })
   return query
 }
 
@@ -76,7 +76,10 @@ export function useScopeChangedPaths(scope: DockScope, { open }: { open: boolean
   useEffect(() => {
     if (!enabled || !rootId || rootDir || listed.current === rootId) return
     listed.current = rootId
-    listDir(rootId, '').then(
+    // Started inside a promise, so a missing transport becomes a handled rejection.
+    Promise.resolve()
+      .then(() => listDir(rootId, ''))
+      .then(
       (result) => {
         if (useExplorerStore.getState().roots[rootId]?.dirs['']?.status === 'ready') return
         useExplorerStore.getState().setDir(rootId, '', { status: 'ready', entries: result.entries, truncated: result.truncated, absPath: result.absPath })

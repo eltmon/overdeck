@@ -56,6 +56,8 @@ export interface ExplorerRowProps {
   onDragStart?(event: DragEvent, row: TreeRow): void
   /** The folder a drag would drop into (PAN-5190, D-E14). */
   dropTarget?: boolean
+  /** The scoped conversation changed this file, or files under this folder (PAN-5289). */
+  changedHere?: 'file' | 'folder' | null
 }
 
 function nameClass(row: TreeRow, decoration: ExplorerRowProps['decoration']): string {
@@ -76,6 +78,7 @@ export const ExplorerRow = memo(function ExplorerRow({
   draggable = false,
   onDragStart,
   dropTarget = false,
+  changedHere = null,
 }: ExplorerRowProps) {
   const isDir = row.kind === 'dir'
   const { Icon, label } = fileIconFor(row.name, row.kind, row.expanded)
@@ -131,7 +134,15 @@ export const ExplorerRow = memo(function ExplorerRow({
           {letter}
         </span>
       )}
-      <span className="ml-auto" aria-hidden />
+      {changedHere ? (
+        <span
+          className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
+          aria-label={changedHere === 'file' ? 'Changed by this conversation' : 'Contains files this conversation changed'}
+          data-changed-here={changedHere}
+        />
+      ) : (
+        <span className="ml-auto" aria-hidden />
+      )}
     </div>
   )
 })

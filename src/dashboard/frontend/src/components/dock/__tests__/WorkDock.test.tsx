@@ -9,7 +9,11 @@ vi.mock('../../Stage/panes/AgentPane', () => ({ AgentPane: () => <div data-testi
 vi.mock('../../terminal/TerminalDrawer', () => ({ TerminalDrawer: () => <div data-testid="terminal-drawer" /> }))
 // The explorer body is covered by ExplorerPane.test.tsx; here it only shows which root it got.
 vi.mock('../../explorer/ExplorerPane', () => ({
-  ExplorerFiles: ({ rootId }: { rootId: string }) => <div data-testid="explorer-files">{rootId}</div>,
+  ExplorerFiles: ({ rootId, changedPaths }: { rootId: string; changedPaths: ReadonlySet<string> }) => (
+    <div data-testid="explorer-files" data-changed={[...changedPaths].join(',')}>
+      {rootId}
+    </div>
+  ),
 }))
 
 import { WorkDock, type WorkDockProps } from '../WorkDock'
@@ -25,6 +29,16 @@ import type { Conversation } from '../../CommandDeck/ConversationList'
 import { NO_PROJECT_KEY } from '../../CommandDeck/projectsData'
 
 const DECK = 'p'
+const NO_CHANGES = {
+  conversation: 'c1',
+  repoRoot: '/home/u/Projects/p',
+  rootId: 'project:p',
+  branch: 'main',
+  scope: 'conversation',
+  uncommitted: [],
+  commits: [],
+  totals: { files: 0, additions: 0, deletions: 0, commitsPushed: 0, commitsLocal: 0, uncommittedFiles: 0 },
+}
 const PROJECTS = [{ key: 'p', name: 'Project P', path: '/home/u/Projects/p' }]
 
 function pane(fields: Partial<WorkspacePane> & { paneId: string; paneType: WorkspacePane['paneType'] }): WorkspacePane {
@@ -75,6 +89,7 @@ beforeEach(() => {
     vi.fn(async (url: string) => {
       if (url === '/api/registered-projects') return Response.json(PROJECTS)
       if (url === '/api/workspace-registry') return Response.json({ workspaces: [] })
+      if (url.startsWith('/api/conversations/') && url.includes('/changes?')) return Response.json(NO_CHANGES)
       return Response.json([])
     }),
   )
@@ -214,6 +229,28 @@ describe('WorkDock', () => {
     expect(useWorkDockStore.getState().byDeck[DECK]).toMatchObject({ open: true, tab: 'files', reveal: { rootId: 'project:p', path: 'src/b.ts' } })
     unmount()
     expect(useActiveDock.getState().current).toBeNull()
+  })
+})
+
+describe('WorkDock changed paths', () => {
+  it('publishes the same changed paths the Files tab passes to the tree', async () => {
+    const withChanges = {
+      ...NO_CHANGES,
+      uncommitted: [{ path: 'src/a.ts', status: 'M', additions: 1, deletions: 0, attribution: 'file', turnIds: [] }],
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url === '/api/registered-projects') return Response.json(PROJECTS)
+        if (url === '/api/workspace-registry') return Response.json({ workspaces: [] })
+        if (url.includes('/changes?scope=conversation')) return Response.json(withChanges)
+        return Response.json([])
+      }),
+    )
+    render(wrap(<WorkDock {...props({ activePane: chatPane, conversations: [conv({ name: 'c1' })] })} />))
+    openDock()
+    await waitFor(() => expect(screen.getByTestId('explorer-files')).toHaveAttribute('data-changed', 'src/a.ts'))
+    expect([...(useActiveDock.getState().current?.changedPaths ?? [])]).toEqual(['src/a.ts'])
   })
 })
 

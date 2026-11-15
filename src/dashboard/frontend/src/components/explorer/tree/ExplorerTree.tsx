@@ -32,6 +32,7 @@ import {
   type TreeRow,
 } from './explorer-tree-model'
 import { ExplorerRow, ExplorerTruncatedRow, ROW_HEIGHT } from './ExplorerRow'
+import { ancestorFolders } from '../../dock/changes-model'
 
 /** What the tree passes to `renderInline` for a create row or the row being renamed (PAN-5190). */
 export interface InlineRenderProps {
@@ -64,7 +65,11 @@ export interface ExplorerTreeProps extends Omit<HTMLAttributes<HTMLDivElement>, 
   onRowDragStart?(event: DragEvent, row: TreeRow): void
   /** The folder a drag over the tree would drop into; its row is highlighted (D-E14). */
   dropDir?: string | null
+  /** Root paths the scoped conversation changed: their rows and ancestor folders get a dot (PAN-5289). */
+  changedPaths?: ReadonlySet<string>
 }
+
+const NO_CHANGED_PATHS: ReadonlySet<string> = new Set()
 
 /** A focusable row: not a truncated row and not an inline name row. */
 function isTreeRow(row: ExplorerTreeRowItem | undefined): row is TreeRow {
@@ -88,6 +93,7 @@ export const ExplorerTree = forwardRef<HTMLDivElement, ExplorerTreeProps>(functi
     onContextMenuBlank,
     onRowDragStart,
     dropDir = null,
+    changedPaths = NO_CHANGED_PATHS,
     className,
     onKeyDown,
     onContextMenu,
@@ -98,6 +104,7 @@ export const ExplorerTree = forwardRef<HTMLDivElement, ExplorerTreeProps>(functi
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const idPrefix = useId()
   const selected = useMemo(() => new Set(selection), [selection])
+  const changedFolders = useMemo(() => ancestorFolders(changedPaths), [changedPaths])
 
   const setRefs = useCallback(
     (node: HTMLDivElement | null) => {
@@ -269,6 +276,9 @@ export const ExplorerTree = forwardRef<HTMLDivElement, ExplorerTreeProps>(functi
                   draggable={!!onRowDragStart}
                   onDragStart={onRowDragStart}
                   dropTarget={row.kind === 'dir' && row.path === dropDir}
+                  changedHere={
+                    row.kind === 'dir' ? (changedFolders.has(row.path) ? 'folder' : null) : changedPaths.has(row.path) ? 'file' : null
+                  }
                 />
               )}
             </div>

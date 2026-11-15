@@ -104,6 +104,19 @@ describe('ExplorerTree', () => {
     expect(name).not.toHaveClass('flex-1')
   })
 
+  it('dots a file the conversation changed and the folders above it', () => {
+    renderTree({ changedPaths: new Set(['src/a.ts']) })
+    expect(item('a.ts').querySelector('[aria-label="Changed by this conversation"]')).toHaveClass('bg-primary', 'h-1.5', 'w-1.5')
+    expect(item('src').querySelector('[aria-label="Contains files this conversation changed"]')).not.toBeNull()
+    expect(item('b.ts').querySelector('[data-changed-here]')).toBeNull()
+    expect(item('lib').querySelector('[data-changed-here]')).toBeNull()
+  })
+
+  it('shows no dot without changed paths', () => {
+    renderTree({ changedPaths: new Set() })
+    expect(document.querySelectorAll('[data-changed-here]')).toHaveLength(0)
+  })
+
   it('colors a modified file with its letter and its folder in the warning color', () => {
     renderTree({
       decorations: buildDecorations({ entries: [{ path: 'src/a.ts', status: 'modified', staged: false }], committed: [] }),

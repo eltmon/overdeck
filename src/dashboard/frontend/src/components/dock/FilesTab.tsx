@@ -7,6 +7,7 @@ import { useCallback } from 'react'
 
 import { ExplorerFiles } from '../explorer/ExplorerPane'
 import type { DockScope } from './dockScope'
+import { useScopeChangedPaths } from './useConversationChanges'
 import { useWorkDockStore } from './workDockStore'
 
 export interface FilesTabProps {
@@ -14,9 +15,9 @@ export interface FilesTabProps {
   scope: DockScope
 }
 
-const EMPTY_SET: ReadonlySet<string> = new Set()
-
 export function FilesTab({ deckKey, scope }: FilesTabProps) {
+  // The tab renders only while the dock is open; the dock publishes the same set (activeDock).
+  const changedPaths = useScopeChangedPaths(scope, { open: true })
   const onFindInFolder = useCallback(
     (searchPath: string) => useWorkDockStore.getState().openDock(deckKey, { tab: 'search', searchPath }),
     [deckKey],
@@ -27,7 +28,7 @@ export function FilesTab({ deckKey, scope }: FilesTabProps) {
       key={scope.rootId}
       rootId={scope.rootId}
       deckKey={deckKey}
-      changedPaths={EMPTY_SET}
+      changedPaths={changedPaths}
       conversationScope={scope.changes.kind === 'conversation'}
       revealPath={scope.revealPath}
       onFindInFolder={onFindInFolder}

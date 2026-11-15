@@ -24,6 +24,7 @@ import { deriveDockScope, type DockHeader, type DockScope } from './dockScope'
 import { FilesTab } from './FilesTab'
 import { LiveTab, useLiveTab } from './LiveTab'
 import { SearchTab } from './SearchTab'
+import { useScopeChangedPaths } from './useConversationChanges'
 import { DOCK_MAX_WIDTH, DOCK_MIN_WIDTH, useWorkDockStore, type DockTab } from './workDockStore'
 
 export interface WorkDockProps {
@@ -33,8 +34,6 @@ export interface WorkDockProps {
   panesById: ReadonlyMap<string, WorkspacePane>
   conversations: readonly Conversation[]
 }
-
-const NO_CHANGED_PATHS: ReadonlySet<string> = new Set()
 
 const NULL_ROOT_MESSAGE = {
   linked: "This conversation's files are not on this machine",
@@ -107,6 +106,7 @@ export function WorkDock({ deckKey, activePane, layoutLeafIds, panesById, conver
   const changesCount = useChangesCount(scope)
 
   const open = state?.open ?? false
+  const changedPaths = useScopeChangedPaths(scope, { open })
   // A persisted 'live' tab with nothing to watch shows Files (B-D9).
   const tab: DockTab = state?.tab === 'live' && !live.visible ? 'files' : (state?.tab ?? 'files')
 
@@ -146,7 +146,7 @@ export function WorkDock({ deckKey, activePane, layoutLeafIds, panesById, conver
       deckKey,
       activePaneId,
       rootId: scope.rootId,
-      changedPaths: NO_CHANGED_PATHS,
+      changedPaths,
       openFile: (path) => {
         const rootId = fileRootRef.current
         if (rootId) openBesideRef.current?.({ rootId, path })
@@ -156,7 +156,7 @@ export function WorkDock({ deckKey, activePane, layoutLeafIds, panesById, conver
         if (rootId) useWorkDockStore.getState().openDock(deckKey, { tab: 'files', reveal: { rootId, path } })
       },
     })
-  }, [deckKey, activePaneId, scope.rootId])
+  }, [deckKey, activePaneId, scope.rootId, changedPaths])
   useEffect(() => () => useActiveDock.getState().clear(deckKey), [deckKey])
 
   // ─── Resize ───────────────────────────────────────────────────────────────
