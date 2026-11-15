@@ -1,21 +1,25 @@
 /**
  * Edit-workspace HTTP client (PAN-5191, WI-F12).
  *
- * The four calls under /api/explorer/edit-workspaces/:workspaceId. POSTs send
+ * The calls under /api/explorer/edit-workspaces/:workspaceId. POSTs send
  * the dashboard CSRF header. A non-2xx answer throws ExplorerHttpError with
  * the server's `{ error, code }`. The status query never polls: the banner
- * refreshes it after a push, a merge attempt and on Refresh.
+ * refreshes it after a push, a merge attempt and on Refresh. The changes
+ * query (what will land, PAN-5290 C-D5) refetches on every explorer watch
+ * batch of the edit root; its route never calls gh.
  */
 import type {
+  EditWorkspaceChanges,
   EditWorkspaceCreatePrInput,
   EditWorkspaceCreatePrResult,
   EditWorkspaceStatus,
 } from '@overdeck/contracts'
-import { useQuery, type QueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 
 import { dashboardMutationJsonHeaders } from '../../../lib/wsTransport'
 import { ExplorerHttpError } from '../explorer-http'
 import { parseRootId } from '../explorer-rpc'
+import { useExplorerWatch } from '../watch/useExplorerWatch'
 
 const base = (workspaceId: string) => `/api/explorer/edit-workspaces/${encodeURIComponent(workspaceId)}`
 
@@ -36,6 +40,10 @@ async function post<T>(url: string, body: unknown, what: string): Promise<T> {
 
 export async function fetchEditWorkspaceStatus(workspaceId: string): Promise<EditWorkspaceStatus> {
   return answer<EditWorkspaceStatus>(await fetch(base(workspaceId)), 'Reading the edit workspace')
+}
+
+export async function fetchEditWorkspaceChanges(workspaceId: string): Promise<EditWorkspaceChanges> {
+  return answer<EditWorkspaceChanges>(await fetch(`${base(workspaceId)}/changes`), 'Reading what the edit workspace will land')
 }
 
 export function createEditWorkspacePr(workspaceId: string, input: EditWorkspaceCreatePrInput): Promise<EditWorkspaceCreatePrResult> {
@@ -70,4 +78,23 @@ export function refreshEditWorkspaceStatus(queryClient: QueryClient, workspaceId
 export function workspaceIdOf(rootId: string): string | null {
   const parsed = parseRootId(rootId)
   return parsed?.kind === 'workspace' ? parsed.key : null
+}
+
+export const editWorkspaceChangesKey = (workspaceId: string) => ['explorer', 'edit-workspace-changes', workspaceId] as const
+
+/** What the edit workspace will land; refetched on every explorer watch batch of its root. */
+export function useEditWorkspaceChanges(workspaceId: string | null) {
+  const queryClient = useQueryClient()
+  const query = useQuery({
+    queryKey: editWorkspaceChangesKey(workspaceId ?? ''),
+    queryFn: () => fetchEditWorkspaceChanges(workspaceId ?? ''),
+    enabled: workspaceId !== null,
+    staleTime: 2000,
+    retry: false,
+  })
+  const refresh = (): void => {
+    if (workspaceId !== null) void queryClient.invalidateQueries({ queryKey: editWorkspaceChangesKey(workspaceId), exact: true })
+  }
+  useExplorerWatch(workspaceId !== null ? `workspace:${workspaceId}` : undefined, { onDirsChanged: refresh, onResync: refresh })
+  return query
 }

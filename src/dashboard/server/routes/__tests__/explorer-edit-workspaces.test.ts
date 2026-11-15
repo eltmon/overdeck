@@ -14,7 +14,7 @@ import {
   _resetDashboardSessionTokenForTests,
   dashboardSessionCookieHeader,
 } from '../dashboard-auth.js';
-import { handleEditWorkspaceCreatePr, handleEditWorkspaceDiscard, handleEditWorkspaceStatus } from '../explorer-edit-workspaces.js';
+import { handleEditWorkspaceChanges, handleEditWorkspaceCreatePr, handleEditWorkspaceDiscard, handleEditWorkspaceStatus } from '../explorer-edit-workspaces.js';
 
 const TOKEN = 'explorer-edit-workspaces-internal-token';
 const PATH = '/p/workspaces/scratch-edit-1';
@@ -92,6 +92,44 @@ describe('handleEditWorkspaceStatus', () => {
       workspace: { id: 'w1', branch: 'scratch/edit-1', rootId: 'workspace:w1' },
       pr: { number: 4, canMerge: true },
       prSupport: { available: true, reason: null },
+    });
+  });
+});
+
+describe('handleEditWorkspaceChanges (PAN-5290)', () => {
+  async function changes(credential: boolean, d: EditWorkspacePrDeps) {
+    const response = HttpServerResponse.toWeb(await handleEditWorkspaceChanges(fakeRequest(credential), 'w1', d));
+    return { status: response.status, body: (await response.json()) as Record<string, unknown> };
+  }
+
+  it('answers 401 without a credential', async () => {
+    expect((await changes(false, deps('scratch/edit-1'))).status).toBe(401);
+  });
+
+  it('answers 404 ROOT_NOT_FOUND when the root does not resolve and 409 for a non-edit row', async () => {
+    const missing = await changes(true, deps('scratch/edit-1', { missing: true }));
+    expect(missing).toMatchObject({ status: 404, body: { code: 'ROOT_NOT_FOUND' } });
+    const notEdit = await changes(true, deps('scratch/notes'));
+    expect(notEdit).toMatchObject({ status: 409, body: { code: 'NOT_AN_EDIT_WORKSPACE' } });
+  });
+
+  it('answers 200 with what will land', async () => {
+    const runGit: NonNullable<EditWorkspacePrDeps['runGit']> = async (_cwd, args) => {
+      const out = (text: string) => ({ code: 0, stdout: Buffer.from(text), stderr: '', timedOut: false, truncated: false });
+      if (args[0] === 'merge-base') return out('base-sha\n');
+      if (args[0] === 'diff' && args[1] === '--numstat') return out('2\t1\tREADME.md\0');
+      if (args[0] === 'diff') return out('M\0README.md\0');
+      if (args[0] === 'status') return out('1 .M N... 100644 100644 100644 a b README.md\0');
+      return out('');
+    };
+    const { status, body } = await changes(true, { ...deps('scratch/edit-1'), runGit });
+    expect(status).toBe(200);
+    expect(body).toEqual({
+      base: 'base-sha',
+      files: [{ path: 'README.md', status: 'M', additions: 2, deletions: 1, binary: false }],
+      additions: 2,
+      deletions: 1,
+      uncommittedPaths: ['README.md'],
     });
   });
 });

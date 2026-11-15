@@ -238,6 +238,7 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/explorer/upload', scope: 'admin' },
   // PAN-5191: explorer edit workspaces (parent PRD PAN-5183 D-8: explicit admin).
   { method: 'GET', path: '/api/explorer/edit-workspaces/:workspaceId', scope: 'admin' },
+  { method: 'GET', path: '/api/explorer/edit-workspaces/:workspaceId/changes', scope: 'admin' },
   { method: 'POST', path: '/api/explorer/edit-workspaces/:workspaceId/pr', scope: 'admin' },
   { method: 'POST', path: '/api/explorer/edit-workspaces/:workspaceId/merge', scope: 'admin' },
   { method: 'POST', path: '/api/explorer/edit-workspaces/:workspaceId/discard', scope: 'admin' },
