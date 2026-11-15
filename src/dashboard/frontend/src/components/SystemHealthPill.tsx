@@ -19,7 +19,7 @@ import type {
 } from '@overdeck/contracts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { useSystemHealth } from '../hooks/useSystemHealth';
@@ -254,6 +254,23 @@ export function SystemHealthPill({ compact = false, children }: { compact?: bool
   const wrapperRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const urlBeforeClickRef = useRef<string | null>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // The popover starts below the top bar, so a fixed 100vh cap would push its
+  // last sections (System controls) past the bottom of the window. Cap it from
+  // its own top edge instead, and scroll inside it.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const fit = () => {
+      const el = popoverRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      el.style.maxHeight = `${Math.max(200, window.innerHeight - top - 8)}px`;
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [open]);
 
   const closePopover = useCallback((restoreFocus = true) => {
     setHighlightLeakedOnly(false);
@@ -359,6 +376,7 @@ export function SystemHealthPill({ compact = false, children }: { compact?: bool
 
       {open && !compact && (
         <div
+          ref={popoverRef}
           id={POPOVER_ID}
           role="dialog"
           aria-labelledby={POPOVER_TITLE_ID}

@@ -318,6 +318,18 @@ describe('SystemHealthPill', () => {
     window.history.replaceState(null, '', '/');
   });
 
+  it('caps the popover height from its own top edge so the last section stays reachable', () => {
+    setSnapshot('healthy');
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      top: 90, bottom: 1100, left: 0, right: 0, width: 0, height: 1010, x: 0, y: 90, toJSON: () => ({}),
+    } as DOMRect);
+    window.innerHeight = 1000;
+    renderPill();
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+    expect(screen.getByRole('dialog', { name: 'System health' }).style.maxHeight).toBe('902px');
+    rect.mockRestore();
+  });
+
   it('reaches the Cloister system controls through the health dot', () => {
     setSnapshot('healthy');
     renderPill(newQueryClient(), <CloisterStatusBar />);

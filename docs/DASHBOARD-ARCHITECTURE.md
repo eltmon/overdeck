@@ -1290,8 +1290,8 @@ and the standalone conversation pop-out (`StandaloneRoutes.tsx`). The native
 phone app (`apps/mobile`) never shows it — its bundle cannot be reloaded to
 update, so there is nothing a reload would fix.
 
-This is a different problem from `StaleBuildChip` ("build stale ×N" in the
-command deck), which compares the *server's* build with `origin/main` to flag
+This is a different problem from `StaleBuildChip` ("Build behind main" in the
+top bar), which compares the *server's* build with `origin/main` to flag
 that the running server itself is behind — not whether a given tab's own
 bundle matches that server. A tab can show the new-build banner while the
 server is perfectly up to date with `origin/main`, and vice versa. Browser
