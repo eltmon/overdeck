@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useShortcut, type ShortcutDef } from '../../lib/shortcuts/registry';
-import { toast } from 'sonner';
 import { useShallow } from 'zustand/react/shallow';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
@@ -20,10 +19,6 @@ import { ForkModal } from './ForkModal';
 import { NewConversationPickers } from './NewConversationPickers';
 import { openConversationTab } from './openConversationTab';
 import { type ViewMode } from '../chat/ConversationPanel';
-import { MODEL_EFFORT_SUPPORT, loadStoredHarness, loadStoredModel, onKnownModelsSync } from '../chat/ModelPicker';
-import { loadStoredEffort, type EffortLevel } from '../chat/EffortPicker';
-import { pickerEffortLevels } from '../shared/ModelPicker';
-import type { Harness } from '../shared/ModelPicker';
 import { NewConversationSplitButton } from '../newConversation/NewConversationSplitButton';
 import type { Issue } from '../../types';
 import { useDashboardStore } from '../../lib/store';
@@ -44,6 +39,9 @@ import { useContainerStats } from '../frame/deck/useContainerStats';
 import { useIssueCosts } from '../frame/deck/useIssueCosts';
 import { fetchConversations, useProjectScope } from '../frame/deck/useProjectScope';
 import { openIssueTabIn, useDeckDialogs, useIssueSessionActions } from '../frame/deck/useIssueSessionActions';
+import { useNewConversationDefaults } from '../frame/deck/newConversationDefaults';
+import { useCreateConversation } from '../frame/deck/useCreateConversation';
+import { useOpenConversation } from '../frame/deck/useOpenConversation';
 import { conversationRouteKey } from '../../lib/linkedConversation';
 
 async function fetchVersion(): Promise<{ version: string }> {
@@ -155,26 +153,11 @@ export function CommandDeck({
   const sectionDragStartSplit = useRef(50);
   const sectionContainerRef = useRef<HTMLDivElement>(null);
   const [treeFilter, setTreeFilter] = useState<TreeSessionFilter>('all');
-  const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
-  const [sidebarHarness, setSidebarHarness] = useState<Harness>(loadStoredHarness);
-  const [sidebarEffort, setSidebarEffort] = useState<EffortLevel>(loadStoredEffort);
-
-  // The mount-time loadStoredModel above runs before the picker's catalog
-  // fetch completes, when only FALLBACK ids are "known" — a stored
-  // catalog-only id (kimi-code/*, OpenRouter favorites) fails isKnownModel
-  // and the composer shows the default instead. Re-derive once the catalog
-  // syncs. Every explicit pick writes localStorage, so re-deriving always
-  // reflects the user's latest choice and can never clobber a manual pick.
-  useEffect(() => onKnownModelsSync(() => {
-    setSidebarModel((current) => {
-      const restored = loadStoredModel();
-      return restored === current ? current : restored;
-    });
-  }), []);
+  const { model: sidebarModel, harness: sidebarHarness, effort: sidebarEffort, setModel: setSidebarModel, setHarness: setSidebarHarness, setEffort: setSidebarEffort } =
+    useNewConversationDefaults(useShallow((d) => ({ model: d.model, harness: d.harness, effort: d.effort, setModel: d.setModel, setHarness: d.setHarness, setEffort: d.setEffort })));
 
   // Per-issue session selection (PAN-830 pan-11sr) — slice keyed by issueId.
   // The tree highlight uses the value for whichever feature is currently active.
-  const selectSession = useCommandDeckSelection((s) => s.selectSession);
   const selectedSessionByIssue = useCommandDeckSelection((s) => s.selectedSessionByIssue);
   const selectedSessionId = selectedFeature
     ? selectedSessionByIssue[selectedFeature] ?? null
@@ -408,32 +391,8 @@ export function CommandDeck({
 
   // PAN-1561: selecting a conversation opens it as an agent tab in its project's
   // deck (switching project if it belongs to a different one than is shown).
-  const handleSelectConversation = useCallback((name: string | null) => {
-    setSelectedConversation(name);
-    if (selectedFeature) {
-      selectSession(selectedFeature, null);
-    }
-    if (name) {
-      setSelectedFeature(null);
-      const conv = conversations.find((c) => c.name === name);
-      // Unscoped conversations live in the No-project bucket.
-      const projectName = resolveConversationProjectName(conv) ?? NO_PROJECT_KEY;
-      // Opening a conversation: the /conv/<id> route owns the URL, so switch the
-      // deck's project without writing /command-deck/<project> over it.
-      if (projectName !== selectedProject) onSelectProject?.(projectName, { updateUrl: false });
-      openConversationTabIn(projectName, name, conv?.title ?? 'Agent');
-      // A click is an explicit intent to open this conversation, so drive the
-      // /conv/<id> URL directly. Re-clicking the already-selected conversation
-      // leaves `selectedConversation` unchanged, so the state->URL sync effect
-      // never re-runs — without this the URL would stay on /command-deck/<project>
-      // (e.g. after navigating to another page and back). prevSelectedRef is kept
-      // in sync so that effect skips the redundant follow-up call.
-      if (conv && onConvIdChange) {
-        prevSelectedRef.current = name;
-        onConvIdChange(conversationRouteKey(conv));
-      }
-    }
-  }, [selectSession, selectedFeature, conversations, resolveConversationProjectName, selectedProject, onSelectProject, openConversationTabIn, onConvIdChange]);
+  const keepUrlSyncInStep = useCallback((name: string) => { prevSelectedRef.current = name; }, []);
+  const handleSelectConversation = useOpenConversation(selectedProject, { conversations, onOpened: keepUrlSyncInStep });
 
   const projectConvMutations = useConversationMutations(selectedConversation, handleSelectConversation);
 
@@ -456,48 +415,15 @@ export function CommandDeck({
   }, [projectConvMutations]);
 
   // Create a conversation (optionally scoped to a project) and open it as an
-  // agent tab in the current project's deck. Returns the new conversation's
-  // name or the creation error so launch components can render the outcome.
-  const createConversationForProject = useCallback(
-    async (projectKey?: string, harnessOverride?: Harness, message?: string, viewMode?: ViewMode): Promise<{ name: string } | { error: string }> => {
-      try {
-        const harness = harnessOverride ?? sidebarHarness;
-        const payload: Record<string, unknown> = { model: sidebarModel, harness };
-        const sidebarEffortLevels = pickerEffortLevels(sidebarModel) ?? MODEL_EFFORT_SUPPORT[sidebarModel as keyof typeof MODEL_EFFORT_SUPPORT];
-        if (sidebarEffortLevels?.length !== 0) payload.effort = sidebarEffort;
-        if (projectKey) payload.projectKey = projectKey;
-        const trimmedMessage = message?.trim();
-        if (trimmedMessage) payload.message = trimmedMessage;
-        const res = await fetch('/api/conversations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: 'Request failed' }));
-          throw new Error((err as { error?: string }).error || 'Failed to create conversation');
-        }
-        const conv = await res.json() as Conversation;
-        setSelectedConversation(conv.name);
-        if (convsCollapsed) setConvsCollapsed(false);
-        const deckKey = projectKey ?? selectedProject;
-        if (deckKey) openConversationTabIn(deckKey, conv.name, conv.title ?? 'Agent', undefined, viewMode);
-        if (onConvIdChange) {
-          const newId = String(conv.id);
-          onConvIdChange(newId);
-          appliedConvId.current = `${newId}::${conversationViewMode ?? 'conversation'}`;
-          prevSelectedRef.current = conv.name;
-        }
-        queryClient.invalidateQueries({ queryKey: ['conversations'] });
-        return { name: conv.name };
-      } catch (err) {
-        console.error('[CommandDeck] Failed to create conversation:', err);
-        toast.error(err instanceof Error ? err.message : 'Failed to create conversation');
-        return { error: err instanceof Error ? err.message : 'Failed to create conversation' };
-      }
-    },
-    [sidebarModel, sidebarHarness, sidebarEffort, queryClient, onConvIdChange, convsCollapsed, selectedProject, openConversationTabIn, conversationViewMode],
-  );
+  // agent tab in the deck. The deck's own refs follow the new conversation so
+  // its deep-link and URL-sync effects do not re-apply it.
+  const onConversationCreated = useCallback((conv: Conversation) => {
+    if (convsCollapsed) setConvsCollapsed(false);
+    appliedConvId.current = `${String(conv.id)}::${conversationViewMode ?? 'conversation'}`;
+    prevSelectedRef.current = conv.name;
+  }, [convsCollapsed, conversationViewMode]);
+  const { create: createConversationForProject, createForAgent: createDeckConversation } =
+    useCreateConversation(selectedProject, onConversationCreated);
 
   const handleNewConversation = useCallback(() => {
     const projectKey = selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined;
@@ -513,19 +439,6 @@ export function CommandDeck({
   const handleNewProjectConversation = useCallback((projectKey: string) => {
     void createConversationForProject(projectKey);
   }, [createConversationForProject]);
-
-  // Launch-component conversation creator (ProjectHome / IssueOverview): create
-  // a project conversation for the chosen agent and return its result so the
-  // caller can open the tab or surface the creation error.
-  const createDeckConversation = useCallback(
-    (agentId: string, message?: string, viewMode?: ViewMode): Promise<{ name: string } | { error: string }> => {
-      const harness: Harness = agentId === 'codex' ? 'codex' : agentId === 'pi' ? 'pi' : agentId === 'ohmypi' ? 'ohmypi' : 'claude-code';
-      // The No-project bucket creates unscoped conversations (no projectKey).
-      const projectKey = selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined;
-      return createConversationForProject(projectKey, harness, message, viewMode);
-    },
-    [createConversationForProject, selectedProject],
-  );
 
   // Section divider drag handlers
   const handleSectionDragStart = useCallback((e: React.MouseEvent) => {

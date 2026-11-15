@@ -4,7 +4,8 @@ import { render, screen, fireEvent, waitFor, act, within } from '@testing-librar
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { CommandDeck } from './index';
-import { TestDeckNavigationProvider } from '../frame/deck/deckNavigation';
+import { TestDeckNavigationProvider, type DeckTarget } from '../frame/deck/deckNavigation';
+import { useNewConversationDefaults } from '../frame/deck/newConversationDefaults';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { usePanesStore } from '../../lib/panesStore';
 import { usePlannedBacklogVisibility } from '../../hooks/usePlannedBacklogVisibility';
@@ -256,6 +257,16 @@ vi.mock('lucide-react', async () => {
   };
 });
 
+// Mirrors App's openInDeck for the deck tests: a conversation target writes
+// the conversation route through onConvIdChange.
+function deckNavigationLike(props?: Partial<React.ComponentProps<typeof CommandDeck>>) {
+  return {
+    openInDeck: (target: DeckTarget) => {
+      if ('conversationRouteKey' in target) props?.onConvIdChange?.(target.conversationRouteKey);
+    },
+  };
+}
+
 function renderCommandDeck(
   props?: Partial<React.ComponentProps<typeof CommandDeck>>,
   queryClient: QueryClient = new QueryClient({
@@ -436,7 +447,7 @@ function renderCommandDeck(
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <TestDeckNavigationProvider><CommandDeck {...props} /></TestDeckNavigationProvider>
+      <TestDeckNavigationProvider navigation={deckNavigationLike(props)}><CommandDeck {...props} /></TestDeckNavigationProvider>
     </QueryClientProvider>,
   );
 }
@@ -729,21 +740,17 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     ]));
   });
 
-  it('quick create from the header + sends no context opt-outs and opens no dialog (PAN-4486)', async () => {
-    localStorage.setItem('overdeck.commandDeck.newConversationContext', '{"bareContext":true,"skipClaudeMd":true}');
+  it('creates with the model set on newConversationDefaults (PAN-5293 F-D12)', async () => {
+    useNewConversationDefaults.getState().setModel('m2');
     renderCommandDeck({ selectedProject: 'test-project' });
     await screen.findByTestId('stage');
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'New conversation' }));
+      await latestStageProps.onCreateConversation('claude-code');
     });
 
     const post = vi.mocked(fetch).mock.calls.find(([url, init]) => url === '/api/conversations' && init?.method === 'POST');
-    const body = JSON.parse(String(post?.[1]?.body));
-    expect(body).toMatchObject({ projectKey: 'test-project' });
-    expect(body).not.toHaveProperty('bareContext');
-    expect(body).not.toHaveProperty('skipClaudeMd');
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({ model: 'm2', harness: 'claude-code', projectKey: 'test-project' });
   });
 
   it('no longer renders the sticky context checkboxes in the sidebar (PAN-4486)', async () => {

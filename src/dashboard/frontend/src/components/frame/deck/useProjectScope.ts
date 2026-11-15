@@ -47,6 +47,8 @@ export interface ProjectMembership {
 }
 
 export interface ProjectScope {
+  /** The conversation list the scope was computed from. */
+  conversations: Conversation[];
   projectConvs: Conversation[];
   projectConvIdSet: Set<number>;
   projectIssueIds: string[];
@@ -162,6 +164,7 @@ export function useProjectScope(deckKey: string | null, conversationsOverride?: 
   );
 
   return {
+    conversations,
     projectConvs,
     projectConvIdSet,
     projectIssueIds,
