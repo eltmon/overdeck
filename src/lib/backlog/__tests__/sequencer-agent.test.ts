@@ -104,6 +104,14 @@ describe('buildSequencerPrompt', () => {
     expect(prompt).toContain('NEVER inline the entire backlog');
     expect(prompt).toContain('read them batch by batch');
   });
+
+  it('the prompt tells the agent an unchanged result is success', () => {
+    const prompt = buildSequencerPrompt('incremental', {
+      projectRoot: '/tmp/proj', projectKey: 'overdeck', input: INPUT_WITH_PRIOR,
+    });
+    expect(prompt).toContain('not committed');
+    expect(prompt).toContain('Do not retry');
+  });
 });
 
 describe('backlogManifestKey (PAN-5357)', () => {

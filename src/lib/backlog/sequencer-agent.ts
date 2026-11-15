@@ -375,6 +375,10 @@ The \`pan backlog write-sequence\` command validates the JSON, writes the format
 \`.pan/backlog/sequence.md\`, commits it, and pushes the commit — so DO NOT write the file
 directly with the Write tool. Always go through this command.
 
+If the ranking matches the prior sequence apart from generatedAt, the command prints
+"unchanged (only generatedAt differs), not committed" and exits 0. That is a successful
+pass: stop there. Do not retry, and do not edit the JSON to force a write.
+
 The SequenceDoc JSON must conform to the schema:
   { version (number, e.g. 1), project, generatedAt (ISO), model, pass, openCount, nodes[], edges[] }
 
