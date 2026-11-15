@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5349",
   "created": "2026-11-15T15:32:54.289Z",
-  "updated": "2026-11-15T16:17:05.717Z",
+  "updated": "2026-11-15T16:17:13.385Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,11 @@
     "leader-tab.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T16:17:05.717Z"
+    },
+    "open-path-in-deck": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5349",
+      "claimedAt": "2026-11-15T16:17:13.384Z"
     }
   }
 }
