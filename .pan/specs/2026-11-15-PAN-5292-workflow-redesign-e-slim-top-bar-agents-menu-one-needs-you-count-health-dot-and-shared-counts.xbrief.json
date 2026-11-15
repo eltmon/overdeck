@@ -4,17 +4,17 @@
     "created": "2026-11-15T00:54:26Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5292: Workflow redesign E: slim top bar (agents menu, one Needs-you count, health dot) and shared counts",
-    "updated": "2026-11-15T01:01:54.382Z"
+    "updated": "2026-11-15T01:03:21.127Z"
   },
   "plan": {
     "id": "pan-5292",
     "title": "Workflow redesign E: slim top bar (agents menu, one Needs-you count, health dot) and shared counts",
-    "status": "proposed",
+    "status": "running",
     "uid": "9cf99efd-46e2-4c73-ab6a-50b09dbc66cd",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T00:54:26Z",
-    "updated": "2026-11-15T01:01:54.382Z",
+    "updated": "2026-11-15T01:03:21.127Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5292",
@@ -1085,5 +1085,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
