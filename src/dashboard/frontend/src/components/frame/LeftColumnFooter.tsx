@@ -7,7 +7,7 @@
  */
 
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Hammer, Loader2, Settings } from 'lucide-react';
+import { ArrowUpCircle, Hammer, Loader2, Settings } from 'lucide-react';
 import type { Tab } from '../Header';
 import { FreshnessIndicator } from '../FreshnessIndicator';
 import { MachinesNavItem } from '../sidebar/MachinesNavItem';
@@ -27,7 +27,7 @@ async function fetchVersion(): Promise<{ version: string; isDev?: boolean } | nu
   return res.json() as Promise<{ version: string; isDev?: boolean }>;
 }
 
-const ICON_BUTTON = 'list-row flex items-center justify-center rounded-md p-1.5 text-muted-foreground';
+const ICON_BUTTON = 'list-row flex shrink-0 items-center justify-center rounded-md p-1 text-muted-foreground';
 
 export function LeftColumnFooter({ activeTab, onTabChange, onOpenUpdater, onOpenShortcuts, collapsed }: LeftColumnFooterProps) {
   const { data: versionData } = useQuery({ queryKey: ['version'], queryFn: fetchVersion, staleTime: Infinity });
@@ -51,7 +51,7 @@ export function LeftColumnFooter({ activeTab, onTabChange, onOpenUpdater, onOpen
   return (
     <div
       data-testid="left-column-footer"
-      className={`shrink-0 border-t border-border px-2 py-2 ${collapsed ? 'flex flex-col items-center gap-1' : 'flex flex-wrap items-center gap-1'}`}
+      className={`shrink-0 border-t border-border px-2 py-2 ${collapsed ? 'flex flex-col items-center gap-1' : 'flex flex-nowrap items-center gap-0.5'}`}
     >
       <button
         type="button"
@@ -72,9 +72,9 @@ export function LeftColumnFooter({ activeTab, onTabChange, onOpenUpdater, onOpen
           onClick={onOpenUpdater}
           title={isDev ? 'Running from a source checkout · click to check for updates' : 'Click to check for updates'}
           aria-label={`Overdeck version ${versionData.version}. Click to check for updates.`}
-          className="list-row rounded-md px-1.5 py-1 font-mono text-[11px] text-muted-foreground"
+          className={collapsed ? ICON_BUTTON : 'list-row shrink-0 rounded-md px-1 py-1 font-mono text-[11px] text-muted-foreground'}
         >
-          v{versionData.version}
+          {collapsed ? <ArrowUpCircle aria-hidden className="h-4 w-4" /> : `v${versionData.version}`}
         </button>
       )}
       {isDev && (

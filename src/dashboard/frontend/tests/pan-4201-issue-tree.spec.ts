@@ -173,16 +173,28 @@ async function mockApi(page: Page) {
 }
 
 async function selectSidebarProject(page: Page, projectName: string) {
-  const sidebarProject = page.getByTestId(`sidebar-project-${projectName}`);
-  await expect(sidebarProject).toBeVisible({ timeout: 20_000 });
+  // PAN-5293: projects are picked from the left column's project switcher.
+  const switcher = page.getByTestId('project-switcher');
+  await expect(switcher).toBeVisible({ timeout: 20_000 });
+
+  // The dashboard recovery overlay is fixed and full-screen. In CI it can
+  // briefly outlive app boot and keep Playwright waiting for an actionable
+  // pointer click even though the switcher has rendered.
   await page.locator('#pan-recovery-overlay').evaluate((el) => el.remove()).catch(() => {});
-  await sidebarProject.dispatchEvent('click');
+  await switcher.dispatchEvent('click');
+  const row = page.getByTestId(`project-switcher-row-${projectName}`);
+  await expect(row).toBeVisible({ timeout: 20_000 });
+  await row.dispatchEvent('click');
 }
 
-async function gotoIssueTree(page: Page, theme: 'light' | 'dark') {
+async function gotoIssueTree(page: Page, theme: 'light' | 'dark', expandIds: string[] = []) {
   await mockApi(page);
   await page.goto(`${DASHBOARD_URL}/command-deck`);
-  await page.evaluate((t) => localStorage.setItem('overdeck.ui.theme', t), theme);
+  // PAN-5293 F-D16: state badges and status dots sit in a row's expanded body.
+  await page.evaluate(({ t, ids }) => {
+    localStorage.setItem('overdeck.ui.theme', t);
+    for (const id of ids) localStorage.setItem(`mc-feature-expanded:${id}`, 'true');
+  }, { t: theme, ids: expandIds });
   await page.reload();
   await selectSidebarProject(page, 'overdeck');
   await expect(page.locator('[data-component="feature-item"][data-issue-id="PAN-99001"]')).toBeVisible({ timeout: 20_000 });
@@ -193,7 +205,7 @@ for (const theme of ['light', 'dark'] as const) {
     test.use({ viewport: { width: 1440, height: 900 } });
 
     test(`renders real state badges, no Allocated text, one live dot (${theme})`, async ({ page }) => {
-      await gotoIssueTree(page, theme);
+      await gotoIssueTree(page, theme, [...Object.keys(EXPECTED_STATE_LABEL), 'PAN-99002']);
 
       await expect(page.getByText('Allocated')).toHaveCount(0);
       for (const [issueId, label] of Object.entries(EXPECTED_STATE_LABEL)) {

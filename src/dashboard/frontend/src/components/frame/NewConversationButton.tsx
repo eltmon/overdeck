@@ -91,7 +91,6 @@ export function NewConversationButton({ selectedProject, collapsed }: NewConvers
             data-testid="new-conversation-menu"
             onClose={() => setOpen(false)}
             returnFocusRef={caretRef}
-            autoFocus={false}
             className="absolute left-0 top-full z-[1000] mt-1 w-[280px]"
           >
             <p className="eyebrow px-2 pt-1 pb-1">Defaults for N</p>

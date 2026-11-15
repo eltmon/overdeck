@@ -437,7 +437,7 @@ export function ActivityPanel({ onClose, selectedProjectKey = null }: ActivityPa
       <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           <Terminal className="w-5 h-5 text-primary" />
-          <h2 className="font-medium text-foreground">Activity Log</h2>
+          <h2 className="font-medium text-foreground">{activeStream === 'feed' ? 'Activity' : 'Activity Log'}</h2>
           {activeStream !== 'feed' && totalCount > 0 && (
             <span className="text-xs text-muted-foreground bg-card px-1.5 py-0.5 rounded-full">
               {displayCount !== totalCount ? `${displayCount}/${totalCount}` : totalCount}
@@ -460,7 +460,8 @@ export function ActivityPanel({ onClose, selectedProjectKey = null }: ActivityPa
         </div>
       </div>
 
-      {/* Stream tabs */}
+      {/* Stream tabs — only when there is a choice (the log streams are experimental). */}
+      {streams.length > 1 && (
       <div role="tablist" aria-label="Activity streams" className="flex border-b border-border shrink-0">
         {streams.map((stream) => (
           <button
@@ -479,6 +480,7 @@ export function ActivityPanel({ onClose, selectedProjectKey = null }: ActivityPa
           </button>
         ))}
       </div>
+      )}
 
       {/* Filter bar */}
       {showFilters && activeStream !== 'tts' && activeStream !== 'feed' && (

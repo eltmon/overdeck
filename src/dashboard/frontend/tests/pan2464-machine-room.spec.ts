@@ -18,7 +18,6 @@ test.describe('PAN-2464 Machine Room visual verification', () => {
       localStorage.setItem('overdeck.ui.theme', 'light');
     });
     await page.reload();
-    await page.getByRole('button', { name: 'Toggle activity feed' }).click();
 
     const heading = page.getByRole('heading', { name: 'Machine Room' });
     const errorBoundary = page.getByText('The dashboard hit an error.');

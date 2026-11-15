@@ -54,7 +54,7 @@ afterEach(() => {
 
 describe('ActivityPanel Feed tab (PAN-5293 F-D21)', () => {
   it('opens on Feed with the Awareness scopes', () => {
-    renderPanel();
+    renderPanel({ experimental: true });
     expect(screen.getByTestId('activity-stream-feed')).toHaveAttribute('aria-selected', 'true');
     const scopes = screen.getByRole('tablist', { name: 'Awareness scope' });
     for (const label of ['Needs you', 'Project', 'Global']) {
@@ -64,8 +64,10 @@ describe('ActivityPanel Feed tab (PAN-5293 F-D21)', () => {
     expect(feedProps.mock.lastCall?.[0]).not.toHaveProperty('onClose', expect.anything());
   });
 
-  it('shows only the Feed stream while experimental features are off', () => {
+  it('shows only the Feed, with no stream tabs, while experimental features are off', () => {
     renderPanel({ experimental: false });
+    expect(screen.getByTestId('activity-feed-tab')).toBeInTheDocument();
+    expect(screen.queryByRole('tablist', { name: 'Activity streams' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('activity-stream-normal')).not.toBeInTheDocument();
   });
 
