@@ -274,6 +274,20 @@ describe('overdeck schema top-ups', () => {
     expect(columns(getOverdeckDatabase(dbPath))).toContain('status_reason');
   });
 
+  it('adds uat_generations.voided_by on a fresh and on a pre-existing database (PAN-5364)', () => {
+    const columns = (db: SqliteDatabase) => db
+      .prepare('PRAGMA table_info(`uat_generations`)')
+      .all<{ name: string }>()
+      .map((column) => column.name);
+    const dbPath = makeDbPath();
+    const fresh = getOverdeckDatabase(dbPath);
+    expect(columns(fresh)).toContain('voided_by');
+    fresh.exec('ALTER TABLE `uat_generations` DROP COLUMN `voided_by`');
+    closeOverdeckDatabase();
+
+    expect(columns(getOverdeckDatabase(dbPath))).toContain('voided_by');
+  });
+
   it('logs a missing-table top-up failure while startup and later top-ups continue', () => {
     const dbPath = makeDbPath();
     const initial = getOverdeckDatabase(dbPath);

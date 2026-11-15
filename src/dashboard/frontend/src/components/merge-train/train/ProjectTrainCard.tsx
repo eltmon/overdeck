@@ -7,35 +7,45 @@
  * queue, and the recent merges strip.
  *
  * D4: auto projects batch too (the window lane), so the batch section renders
- * for any project with batches. The hero batch is the newest `assembling` or
- * `ready` batch, else the newest `superseded` one; every other batch in the
- * chain is an `OlderBatchRow` (none is hidden, FR-7). Cars that belong to a
- * live `ready`/`assembling` batch render as its member chips, not as rows.
+ * for any project with batches. The hero is the live batch (the newest
+ * `assembling` or `ready` batch, else the newest `superseded` one), else the
+ * merged outcome with the rebuilds its merge voided folded under it
+ * (PAN-5364, `batchSections.ts`). Other batches are `OlderBatchRow`s. Cars
+ * that belong to a live `ready`/`assembling` batch render as its member
+ * chips, not as rows.
  */
+import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useConfirm } from '../../DialogProvider';
 import { canRetryAssembly, retryAssemblyConfirmCopy } from '../mergeTrainCopy';
 import { ToggleSwitch } from '../../flywheel/primitives';
 import { postJson } from '../mergeTrainApi';
-import type { BoardProject, UatGenerationPayload } from './boardTypes';
+import type { BoardProject } from './boardTypes';
 import { BatchCard } from './BatchCard';
 import { Pill } from './CarStatusPill';
 import { OlderBatchRow } from './OlderBatchRow';
+import { OlderBatchRun } from './OlderBatchRun';
+import { OutcomeBatch } from './OutcomeBatch';
 import { RecentMergesStrip } from './RecentMergesStrip';
 import { StrikeLane } from './StrikeLane';
 import { TrainCarRow } from './TrainCarRow';
 import {
   MODE_CHIP,
+  HIDE_LABEL,
   RETRY_ASSEMBLY_LABEL,
+  SHOW_FEWER_OLDER_LABEL,
+  SHOW_LABEL,
   TRAIN_SWITCH_LABEL,
   TRAIN_SWITCH_TITLE_OFF,
   TRAIN_SWITCH_TITLE_ON,
+  coveredVoidedLine,
   introLine,
   masterOffBanner,
   nextBatchLine,
   queueHeading,
   shortName,
+  showMoreOlderLabel,
   trainOffBanner,
 } from './trainCopy';
 import {
@@ -46,13 +56,9 @@ import {
   type LiveMergeRun,
   type ProjectTrainWrite,
 } from './useMergeTrainBoard';
+import { OLDER_ROWS_VISIBLE, buildBatchSections, capOlderRows, type OlderRow } from './batchSections';
 
-/** The hero batch: newest assembling/ready, else newest superseded. Batches arrive newest first. */
-export function pickHeroBatch(batches: readonly UatGenerationPayload[]): UatGenerationPayload | null {
-  return batches.find((b) => b.status === 'assembling' || b.status === 'ready')
-    ?? batches.find((b) => b.status === 'superseded')
-    ?? null;
-}
+export { pickHeroBatch } from './batchSections';
 
 export interface ProjectTrainCardProps {
   project: BoardProject;
@@ -80,13 +86,31 @@ export function ProjectTrainCard({ project, masterEnabled, runs, onNavigateIssue
   const switchOn = trainSwitch.isPending && trainSwitch.variables !== undefined
     ? trainSwitch.variables
     : project.override !== 'disabled';
-  const hero = pickHeroBatch(project.batches);
-  const older = project.batches.filter((b) => b !== hero);
+  const sections = buildBatchSections(project.batches);
+  const hero = sections.hero;
   const cars = project.cars.filter((car) => !inLiveHeroBatch(car, project.batches));
   const nextLine = nextBatchLine(project.window, now);
   const banner = !masterEnabled ? masterOffBanner(project.mode) : !project.enabled ? trainOffBanner(project.mode) : null;
   // merge-next refuses while the train is off, so Merge buttons hide then.
   const trainOn = masterEnabled && project.enabled;
+  const [olderExpanded, setOlderExpanded] = useState(false);
+  const [coveredOpen, setCoveredOpen] = useState(false);
+  const older = capOlderRows(sections.rows, olderExpanded);
+  const coveredCount = sections.covered.reduce((n, row) => n + (row.kind === 'single' ? 1 : row.gens.length), 0);
+  const renderOlder = (row: OlderRow) => (row.kind === 'single' ? (
+    <OlderBatchRow key={row.gen.name} gen={row.gen}>
+      <BatchCard gen={row.gen} projectKey={project.projectKey} projectName={project.projectName} mergeEnabled={trainOn} onNavigateIssue={onNavigateIssue} />
+    </OlderBatchRow>
+  ) : (
+    <OlderBatchRun
+      key={row.gens[0]!.name}
+      gens={row.gens}
+      projectKey={project.projectKey}
+      projectName={project.projectName}
+      mergeEnabled={trainOn}
+      onNavigateIssue={onNavigateIssue}
+    />
+  ));
 
   // PAN-4598: batches arrive newest first, so a failed newest batch with no
   // testable one means the last assembly failed. Retry is the forced assemble.
@@ -168,18 +192,49 @@ export function ProjectTrainCard({ project, masterEnabled, runs, onNavigateIssue
             </div>
           )}
 
-          {hero && (
+          {hero ? (
             <div className="space-y-2" data-testid={`hero-batch-${project.projectKey}`}>
               <BatchCard gen={hero} projectKey={project.projectKey} projectName={project.projectName} hero mergeEnabled={trainOn} onNavigateIssue={onNavigateIssue} />
             </div>
+          ) : sections.outcome && (
+            <div className="space-y-2" data-testid={`hero-batch-${project.projectKey}`} data-outcome="true">
+              <OutcomeBatch
+                gen={sections.outcome}
+                folded={sections.folded}
+                projectKey={project.projectKey}
+                projectName={project.projectName}
+                mergeEnabled={trainOn}
+                onNavigateIssue={onNavigateIssue}
+              />
+            </div>
           )}
-          {older.length > 0 && (
+          {(sections.rows.length > 0 || coveredCount > 0) && (
             <div className="space-y-1.5">
-              {older.map((gen) => (
-                <OlderBatchRow key={gen.name} gen={gen}>
-                  <BatchCard gen={gen} projectKey={project.projectKey} projectName={project.projectName} mergeEnabled={trainOn} onNavigateIssue={onNavigateIssue} />
-                </OlderBatchRow>
-              ))}
+              {older.shown.map(renderOlder)}
+              {(older.hiddenCount > 0 || (olderExpanded && sections.rows.length > OLDER_ROWS_VISIBLE)) && (
+                <button
+                  type="button"
+                  data-testid={`older-more-${project.projectKey}`}
+                  onClick={() => setOlderExpanded((open) => !open)}
+                  className="text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                >
+                  {olderExpanded ? SHOW_FEWER_OLDER_LABEL : showMoreOlderLabel(older.hiddenCount)}
+                </button>
+              )}
+              {coveredCount > 0 && (
+                <p className="text-[11px] text-muted-foreground" data-testid={`covered-voided-${project.projectKey}`}>
+                  {coveredVoidedLine(coveredCount)}{' '}
+                  <button
+                    type="button"
+                    aria-expanded={coveredOpen}
+                    onClick={() => setCoveredOpen((open) => !open)}
+                    className="underline-offset-2 hover:text-foreground hover:underline"
+                  >
+                    {coveredOpen ? HIDE_LABEL : SHOW_LABEL}
+                  </button>
+                </p>
+              )}
+              {coveredOpen && sections.covered.map(renderOlder)}
             </div>
           )}
 

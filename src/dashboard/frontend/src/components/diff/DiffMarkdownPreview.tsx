@@ -16,7 +16,9 @@ export function DiffMarkdownPreview({ source }: { source: PreviewSource }) {
 
 function DiffMarkdownPreviewBody({ source }: { source: PreviewSource }) {
   if (source.kind === 'patch') {
-    return <MarkdownTab body={source.text} plainRelativeLinks />
+    // A brand-new file's patch text has no explorer root to resolve
+    // relative links against; PAN-5337's default guard renders them inert.
+    return <MarkdownTab body={source.text} />
   }
 
   if (source.kind === 'unavailable') {
@@ -53,7 +55,8 @@ function DiffMarkdownPreviewRead({
   return (
     <>
       {note && <p data-testid="diff-preview-note" className="px-3 py-2 text-xs text-muted-foreground">{SHOWING_CURRENT_FILE}</p>}
-      <MarkdownTab body={query.data.text} plainRelativeLinks />
+      {/* PAN-5337: a real root + path is already in scope here, so relative links resolve instead of going inert. */}
+      <MarkdownTab body={query.data.text} docLocation={{ rootId, path }} />
     </>
   )
 }

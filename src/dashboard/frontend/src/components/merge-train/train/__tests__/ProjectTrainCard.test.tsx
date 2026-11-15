@@ -4,11 +4,11 @@
  * queue heading by mode, D4's window line, and live-batch members rendered
  * as batch chips rather than queue rows.
  */
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProjectTrainCard, pickHeroBatch } from '../ProjectTrainCard';
 import type { BoardProject } from '../boardTypes';
-import { callsTo, car, gen, mockFetch, project, renderWithClient } from './fixtures';
+import { callsTo, car, gen, member, mockFetch, project, renderWithClient, reportedChain } from './fixtures';
 
 vi.mock('../../../DialogProvider', () => ({ useConfirm: () => vi.fn(async () => true) }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() } }));
@@ -144,6 +144,83 @@ describe('pickHeroBatch', () => {
     expect(pickHeroBatch([a, b, c])?.name).toBe('uat/c');
     expect(pickHeroBatch([a, b])?.name).toBe('uat/b');
     expect(pickHeroBatch([a])).toBeNull();
+  });
+});
+
+describe('ProjectTrainCard outcome hero (PAN-5364)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('after a merge the merged batch is the top entry and the voided rebuild folds under it', () => {
+    mockFetch({});
+    renderCard(project({ batches: reportedChain() }));
+    const heroSlot = screen.getByTestId('hero-batch-overdeck');
+    expect(heroSlot.getAttribute('data-outcome')).toBe('true');
+    expect(heroSlot.textContent).toContain('pan-train-moss-1115-11');
+    expect(heroSlot.textContent).toContain('merged to main · 8ed9e9e');
+    expect(screen.getByTestId('outcome-folded-overdeck').textContent)
+      .toContain('2 rebuilds voided when this merged: pan-train-moss-1115-12, pan-train-moss-1115-10');
+    expect(screen.queryByTestId('older-batch-pan-train-moss-1115-12')).toBeNull();
+
+    fireEvent.click(within(screen.getByTestId('outcome-folded-overdeck')).getByRole('button', { name: 'show' }));
+    expect(screen.getByTestId('older-batch-pan-train-moss-1115-12')).toBeTruthy();
+    expect(screen.getByTestId('older-batch-pan-train-moss-1115-10')).toBeTruthy();
+  });
+
+  it('a promoted batch with a newer failed batch shows no outcome and offers Retry batch assembly', () => {
+    mockFetch({});
+    const merged = reportedChain()[1]!;
+    const failed = gen({ name: 'uat/pan-train-moss-1115-13', status: 'failed', createdAt: '2026-11-15T15:20:00.000Z', updatedAt: '2026-11-15T15:21:00.000Z' });
+    const { container } = renderCard(project({
+      batches: [failed, merged],
+      cars: [car({ issueId: 'PAN-1', state: 'held', route: 'batch' }), car({ issueId: 'PAN-2', state: 'held', route: 'batch' })],
+    }));
+    expect(screen.getByTestId('merge-train-retry-assembly-overdeck')).toBeTruthy();
+    expect(container.querySelector('[data-outcome]')).toBeNull();
+  });
+});
+
+describe('ProjectTrainCard older list grouping (PAN-5364)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const hero = gen({ name: 'uat/pan-live-1115-20', status: 'ready', members: [member('PAN-9')] });
+  const olderRowCount = () => screen.queryAllByTestId(/^older-batch-(?!run-)/).length;
+
+  it('a run of identical voided rebuilds renders as one row', () => {
+    mockFetch({});
+    const voided = Array.from({ length: 8 }, (_, i) => gen({
+      name: `uat/pan-void-1115-${8 - i}`, status: 'invalidated', members: [member('PAN-1'), member('PAN-2', 2)],
+    }));
+    renderCard(project({ batches: [hero, ...voided] }));
+    const runs = screen.getAllByTestId(/^older-batch-run-/);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]!.textContent).toContain('8 rebuilds voided');
+    for (const g of voided) expect(screen.queryByTestId(`older-batch-${g.name.replace('uat/', '')}`)).toBeNull();
+  });
+
+  it('the older list shows three rows and a show-more button', () => {
+    mockFetch({});
+    const voided = [1, 2, 3, 4, 5].map((n) => gen({ name: `uat/pan-void-1115-${n}`, status: 'invalidated', members: [member(`PAN-${n}`)] }));
+    renderCard(project({ batches: [hero, ...voided] }));
+    expect(olderRowCount()).toBe(3);
+    const more = screen.getByTestId('older-more-overdeck');
+    expect(more.textContent).toBe('show 2 more');
+    fireEvent.click(more);
+    expect(olderRowCount()).toBe(5);
+    expect(screen.getByTestId('older-more-overdeck').textContent).toBe('show fewer');
+  });
+
+  it('covered voided batches sit behind a toggle', () => {
+    mockFetch({});
+    renderCard(project({ batches: reportedChain() }));
+    const covered = screen.getByTestId('covered-voided-overdeck');
+    expect(covered.textContent).toContain('7 voided batches whose features all merged later');
+    expect(screen.queryByTestId('older-batch-pan-train-moss-1115-3')).toBeNull();
+    expect(screen.queryByTestId(/^older-batch-run-/)).toBeNull();
+
+    fireEvent.click(within(covered).getByRole('button', { name: 'show' }));
+    const run = screen.getByTestId('older-batch-run-pan-train-moss-1115-9');
+    fireEvent.click(within(run).getByRole('button', { name: 'show' }));
+    expect(screen.getByTestId('older-batch-pan-train-moss-1115-3')).toBeTruthy();
   });
 });
 

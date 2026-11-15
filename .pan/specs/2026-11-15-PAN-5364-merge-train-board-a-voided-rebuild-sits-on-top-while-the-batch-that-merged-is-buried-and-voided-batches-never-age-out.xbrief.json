@@ -1,0 +1,600 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T15:30:26Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5364: Merge train board: a voided rebuild sits on top while the batch that merged is buried, and voided batches never age out",
+    "updated": "2026-11-15T15:41:45.494Z"
+  },
+  "plan": {
+    "id": "pan-5364",
+    "title": "Merge train board: a voided rebuild sits on top while the batch that merged is buried, and voided batches never age out",
+    "status": "running",
+    "uid": "4c8f53a5-5fc4-48e7-9b08-4bb2d2ecfd85",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T15:30:26Z",
+    "updated": "2026-11-15T15:41:45.494Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5364",
+        "label": "PAN-5364",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "merge-train",
+      "dashboard",
+      "frontend",
+      "uat"
+    ],
+    "metadata": {
+      "sizeJustification": "33 files_scope entries: 14 production files (store, promote, payload, board selection, 5 frontend train modules), 13 test files and fixtures, 5 doc files and the frontend test subset list. It is one vertical change to how the board selects and presents a chain; the server age-out could ship alone, but the outcome hero and covered rule are only correct after a churn burst when the server keeps the newest merge in the payload, so the slices land together.",
+      "canonicalFilename": "2026-11-15-PAN-5364-merge-train-board-a-voided-rebuild-sits-on-top-while-the-batch-that-merged-is-buried-and-voided-batches-never-age-out.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "After a batch merges, the merge train card has no hero; a rebuild voided by that very merge sorts above the merged batch and reads as unmerged work, and voided batches stay on the card until ten newer batches exist, however old they are (a churn burst can push the merged batch out of the 10 entirely).",
+      "Proposal": "Record voidedBy (structured, new voided_by column) when promote voids a sibling and carry it in the payload; select the board chain server-side with a 24-hour age-out for voided/merged batches while always keeping the newest merge; on the card, show the merged batch as an outcome hero when nothing live remains and nothing happened after the merge, fold rebuilds voided by that merge under it, hide voided batches whose features all merged later behind show, collapse identical voided runs into one row, and cap the older list at three rows. Full detail in .pan/drafts/pan-5364.md.",
+      "NonGoals": "- Reducing rebuild churn (PAN-5356, PAN-5357)\n- Deleting or rewriting generation rows, backfilling voided_by, or parsing statusReason strings\n- Changing /api/merge-train/generations or the FeatureItem badge\n- Changing the keep=3 trim in cleanupUatGenerations\n- Changing promote, supersede or reconciler behavior beyond writing voidedBy\n- Hiding, folding or collapsing superseded or failed batches\n- Changing the Retry batch assembly rule (stays keyed on the live hero)\n- Changing RecentMergesStrip"
+    },
+    "autoDecisions": [
+      {
+        "summary": "No backfill of voided_by; legacy rows are handled by the covered-by-merge rule and age out after 24 hours",
+        "rationale": "The issue asks to key on structured data, not the reason string; the covered rule needs no parsing and the age-out clears old rows within a day."
+      },
+      {
+        "summary": "Implement the optional 24-hour age-out, in the board payload only (/api/merge-train/generations unchanged)",
+        "rationale": "The issue title and the operator's question are about how long batches stay; the FeatureItem badge reads the other endpoint and must keep its data. Rows stay in the database as the audit trail."
+      },
+      {
+        "summary": "Reverse PAN-4753 FR-7 ('none is hidden') for voided batches only; superseded and failed stay always visible",
+        "rationale": "Superseded batches are promotable and failed ones drive Retry batch assembly; every hidden voided batch stays reachable through a show control."
+      },
+      {
+        "summary": "Outcome hero shows only when no live batch exists and no batch changed after the merge except rebuilds that merge voided or voided batches it covers",
+        "rationale": "Matches the issue's 'newest event is a promote' rule while tolerating siblings voided a few seconds after the merge stamp."
+      },
+      {
+        "summary": "Promoted badge reads 'merged' (success tone) when the project has no version sync",
+        "rationale": "The server always sends shipStatus null, so the outcome hero would otherwise say 'version not shipped' in warning tone on every project."
+      },
+      {
+        "summary": "Copy uses shortName (strips only 'uat/'), e.g. pan-train-moss-1115-12",
+        "rationale": "Matches the existing older-row labels."
+      }
+    ],
+    "items": [
+      {
+        "id": "voided-by-field",
+        "title": "Record voidedBy on promote and carry it through the store and payload",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:30:26Z",
+        "metadata": {
+          "issueLabel": "pan-5364",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "batch-sections"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/infra.ts",
+            "src/lib/overdeck/merge-types.ts",
+            "src/lib/overdeck/merge-sync-uat.ts",
+            "src/lib/cloister/uat-generation-engine.ts",
+            "src/lib/cloister/uat-promote.ts",
+            "src/dashboard/server/services/uat-train.ts",
+            "src/dashboard/frontend/src/components/merge-train/train/boardTypes.ts",
+            "src/dashboard/frontend/src/components/merge-train/train/__tests__/fixtures.tsx",
+            "src/dashboard/server/services/__tests__/merge-train-board.test.ts",
+            "tests/unit/lib/cloister/uat-promote.test.ts",
+            "tests/unit/lib/overdeck/merge-sync-uat-generations.test.ts",
+            "src/lib/overdeck/__tests__/schema-topups.test.ts",
+            "src/dashboard/server/services/__tests__/uat-train.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/uat-promote.test.ts tests/unit/lib/overdeck/merge-sync-uat-generations.test.ts src/lib/overdeck/__tests__/schema-topups.test.ts src/dashboard/server/services/__tests__/uat-train.test.ts src/dashboard/server/services/__tests__/merge-train-board.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the five named test files pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/pan-5364.md WI-1 steps 1-8 exactly: add the voided_by top-up line (plus one comment line) after the status_reason top-up in src/lib/overdeck/infra.ts; add voidedBy?: string | null to UatGeneration in merge-types.ts; read voided_by in rowToUatGeneration and write it in updateUatGeneration (merge-sync-uat.ts); add 'voidedBy' to the GenerationStorePort patch Pick (uat-generation-engine.ts line 121); in uat-promote.ts's void loop pass voidedBy: gen.name in the same update as status 'invalidated' and the unchanged reason string; add voidedBy: string | null to the server UatGenerationPayload and set it to gen.voidedBy ?? null only for invalidated generations (uat-train.ts); add voidedBy?: string | null to boardTypes.ts; add voidedBy: null to the gen() fixture and the merge-train-board.test batch() fixture. Do not edit drizzle/overdeck/0000_overdeck_init.sql and do not backfill or parse statusReason. Add the tests listed in WI-1."
+        },
+        "items": [
+          {
+            "id": "voided-by-field.ac1",
+            "title": "Given batches A (ready) and B (superseded) in one chain, when promote merges B, then the stored A row has status 'invalidated', statusReason 'B was merged to main' and voidedBy equal to B's name (uat-promote.test.ts asserts it)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voided-by-field.ac2",
+            "title": "Given a database created before the change, when getOverdeckDatabase opens it, then uat_generations gains a voided_by column (schema-topups.test.ts asserts the column on a fresh and a pre-existing database)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voided-by-field.ac3",
+            "title": "Given updateUatGeneration(name, { voidedBy: 'uat/x-1' }), when getUatGeneration(name) reads it back, then voidedBy returns 'uat/x-1', and a freshly inserted row returns voidedBy null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voided-by-field.ac4",
+            "title": "Given an invalidated generation with voidedBy 'uat/a' and a promoted one, when getUatGenerationsPayload builds the payload, then it emits voidedBy 'uat/a' for the first and null for the second",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "board-chain-selection",
+        "title": "Select the board chain with a 24-hour age-out and keep the newest merge",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:30:26Z",
+        "metadata": {
+          "issueLabel": "pan-5364",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/services/uat-board-chain.ts",
+            "src/dashboard/server/services/__tests__/uat-board-chain.test.ts",
+            "src/dashboard/server/services/uat-train.ts",
+            "src/dashboard/server/services/merge-train-board.ts",
+            "src/dashboard/server/services/__tests__/uat-train.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/uat-board-chain.test.ts src/dashboard/server/services/__tests__/uat-train.test.ts src/dashboard/server/services/__tests__/merge-train-board.test.ts",
+            "git diff --exit-code origin/main...HEAD -- src/dashboard/server/routes/merge-train.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three named test files pass",
+            "git diff prints nothing for routes/merge-train.ts",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2: create src/dashboard/server/services/uat-board-chain.ts with BOARD_SCAN_LIMIT = 50, BOARD_CHAIN_LIMIT = 10, BOARD_TERMINAL_MAX_AGE_MS = 24h, generationMergedAt(gen) (latest repos[].promotedAt, else updatedAt) and the pure selectBoardChain(chain, now) shown in the PRD (drop invalidated older than 24h by updatedAt and promoted older than 24h by merge time; keep assembling/ready/superseded regardless of age; drop a failed batch older than 24h by updatedAt unless it is index 0 of the scanned chain; take the newest 10; append the newest surviving promoted batch when it fell outside the 10; an unparseable timestamp keeps the row). Add an options parameter { board?: { now: number } } to getUatGenerationsPayload in uat-train.ts that lists BOARD_SCAN_LIMIT rows and runs selectBoardChain; without options keep listUatGenerations({ limit: CHAIN_PAYLOAD_LIMIT }). Wire the board's default deps in merge-train-board.ts line ~630 to pass { board: { now: Date.now() } }. Do not change routes/merge-train.ts. Tests pass now explicitly; never use real time or timers."
+        },
+        "items": [
+          {
+            "id": "board-chain-selection.ac1",
+            "title": "Given a voided batch whose updatedAt is 25 hours before now and one 23 hours before now, when selectBoardChain runs, then it drops the first and keeps the second",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "board-chain-selection.ac2",
+            "title": "Given a promoted batch whose repos[0].promotedAt is 25 hours old but whose updatedAt is recent, when selectBoardChain runs, then it drops the batch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "board-chain-selection.ac3",
+            "title": "Given ready, superseded and assembling batches 30 days old, when selectBoardChain runs, then it keeps all three; given a failed batch 3 days old as the newest row it keeps it, and given the chain [voided 2 days old, failed 3 days old] it returns an empty list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "board-chain-selection.ac4",
+            "title": "Given 12 fresh voided batches created after one fresh promoted batch, when selectBoardChain runs, then it returns 11 rows: the 10 newest in chain order and the promoted batch last",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "board-chain-selection.ac5",
+            "title": "Given getUatGenerationsPayload is called with { board: { now } }, when it lists the chain, then listUatGenerations receives limit 50, and without options it receives limit 10",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "batch-sections",
+        "title": "Add the pure board-section selectors (outcome hero, folded, covered, runs, cap)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:30:26Z",
+        "metadata": {
+          "issueLabel": "pan-5364",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "frontend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "outcome-hero",
+            "older-list-grouping"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/merge-train/train/batchSections.ts",
+            "src/dashboard/frontend/src/components/merge-train/train/__tests__/batchSections.test.ts",
+            "src/dashboard/frontend/src/components/merge-train/train/ProjectTrainCard.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/merge-train/train/__tests__/batchSections.test.ts src/components/merge-train/train/__tests__/ProjectTrainCard.test.tsx",
+            "grep -c batchSections.test scripts/frontend-test-subset.txt",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "batchSections.test.ts and ProjectTrainCard.test.tsx pass",
+            "grep prints 1",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3 steps 1-3 exactly: create src/dashboard/frontend/src/components/merge-train/train/batchSections.ts (no React imports) and move pickHeroBatch into it unchanged, re-exporting it from ProjectTrainCard.tsx so existing imports work. Export OlderRow, BatchSections, batchMergedAt, isCoveredByMerge, pickOutcomeBatch, collapseIdenticalRuns, buildBatchSections, OLDER_ROWS_VISIBLE = 3 and capOlderRows with the precise rules in the PRD (member sets compare upper-cased issue ids; empty member sets are never covered or part of a run; outcome is null when any other batch was CREATED after mergedAt(P) (never compare updatedAt, which stack start/stop and the probe heal move), except invalidated batches whose non-empty members are all in P; precedence hero > outcome > folded > covered > runs > cap; superseded and failed are never folded, covered or collapsed; the cap never hides a failed single). Write batchSections.test.ts with the eight named cases from the PRD, including the reported PAN-5364 chain and the legacy (voidedBy null) variant, and add it to scripts/frontend-test-subset.txt in sort order."
+        },
+        "items": [
+          {
+            "id": "batch-sections.ac1",
+            "title": "Given the reported chain (-12 voidedBy -11, -11 promoted at 15:06:56, -10 voidedBy -11, -9..-3 voided earlier with the same members), when buildBatchSections runs, then it returns outcome -11, folded [-12, -10], no visible rows and one covered run of 7",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "batch-sections.ac2",
+            "title": "Given the same chain with every voidedBy null and -12 updated 5 seconds after the merge, when buildBatchSections runs, then outcome is still -11 and -12 and -10 appear in covered, not folded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "batch-sections.ac3",
+            "title": "Given a promoted batch and a failed batch created after the merge, when pickOutcomeBatch runs, then it returns null and the failed batch stays a single row; given an old voided batch whose updatedAt moved 10 minutes after the merge, it still returns the promoted batch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "batch-sections.ac4",
+            "title": "Given a live ready batch and 8 voided batches with identical members and no promoted batch, when buildBatchSections runs, then hero is the ready batch and rows is exactly one run of 8",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "batch-sections.ac5",
+            "title": "Given five older rows where the fifth is a failed single, when capOlderRows(rows, false) runs, then it returns rows 1-3 and 5 with hiddenCount 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "outcome-hero",
+        "title": "Render the merged batch as the outcome hero with its merge line and folded rebuilds",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:30:26Z",
+        "metadata": {
+          "issueLabel": "pan-5364",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/merge-train/train/ProjectTrainCard.tsx",
+            "src/dashboard/frontend/src/components/merge-train/train/OutcomeBatch.tsx",
+            "src/dashboard/frontend/src/components/merge-train/train/trainCopy.ts",
+            "src/dashboard/frontend/src/components/merge-train/train/BatchCard.tsx",
+            "src/dashboard/frontend/src/components/merge-train/train/__tests__/ProjectTrainCard.test.tsx",
+            "src/dashboard/frontend/src/components/merge-train/train/__tests__/BatchCard.test.tsx"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/merge-train/train/__tests__/ProjectTrainCard.test.tsx src/components/merge-train/train/__tests__/BatchCard.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ProjectTrainCard.test.tsx and BatchCard.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4 steps 1-4: add outcomeLine and foldedRebuildsLine to trainCopy.ts with the exact formats in the PRD, and make batchStatusText return 'merged' for a promoted batch when versionSyncConfigured !== true; make batchTone in BatchCard.tsx return success for promoted when shipStatus passed or versionSyncConfigured !== true. Create OutcomeBatch.tsx (outcome line with data-testid outcome-line-<key>, the BatchCard, and an outcome-folded-<key> line with a show/hide button that expands each folded batch as an OlderBatchRow). In ProjectTrainCard.tsx use buildBatchSections; render the live hero exactly as today, else the outcome in the hero slot (data-testid hero-batch-<key>, data-outcome=\"true\"); keep lastAssemblyFailed keyed on the live hero only; temporarily render sections.rows as OlderBatchRows (WI-5 replaces it); update the file header comment. Add the three tests named in WI-4."
+        },
+        "items": [
+          {
+            "id": "outcome-hero.ac1",
+            "title": "Given the reported chain, when ProjectTrainCard renders, then hero-batch-overdeck carries data-outcome=\"true\" and its text contains pan-train-moss-1115-11 and 'merged to main · 8ed9e9e'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outcome-hero.ac2",
+            "title": "Given the reported chain, when ProjectTrainCard renders, then outcome-folded-overdeck reads '2 rebuilds voided when this merged: pan-train-moss-1115-12, pan-train-moss-1115-10' and no older-batch-pan-train-moss-1115-12 element renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outcome-hero.ac3",
+            "title": "Given a promoted batch and a newer failed batch with ready cars and the train on, when ProjectTrainCard renders, then merge-train-retry-assembly-<key> renders and no element has data-outcome",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outcome-hero.ac4",
+            "title": "Given a promoted batch with versionSyncConfigured false, when BatchCard renders, then the status badge reads 'merged'; with versionSyncConfigured true and shipStatus null it reads 'merged · version not shipped'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "older-list-grouping",
+        "title": "Group the older list: identical runs as one row, covered voided behind show, three-row cap",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:30:26Z",
+        "metadata": {
+          "issueLabel": "pan-5364",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/merge-train/train/ProjectTrainCard.tsx",
+            "src/dashboard/frontend/src/components/merge-train/train/OlderBatchRun.tsx",
+            "src/dashboard/frontend/src/components/merge-train/train/OlderBatchRow.tsx",
+            "src/dashboard/frontend/src/components/merge-train/train/trainCopy.ts",
+            "src/dashboard/frontend/src/components/merge-train/train/__tests__/ProjectTrainCard.test.tsx",
+            "src/dashboard/frontend/src/components/merge-train/train/__tests__/OlderBatchRun.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/merge-train/train/__tests__/ProjectTrainCard.test.tsx src/components/merge-train/train/__tests__/OlderBatchRun.test.tsx src/components/merge-train/train/__tests__/OlderBatchRow.test.tsx",
+            "grep -c OlderBatchRun.test scripts/frontend-test-subset.txt",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three named test files pass",
+            "grep prints 1",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5 steps 1-4: add identicalRunLine, coveredVoidedLine, showMoreOlderLabel and SHOW_FEWER_OLDER_LABEL to trainCopy.ts with the exact formats in the PRD; create OlderBatchRun.tsx (collapsed dashed row data-testid older-batch-run-<shortName(first)> with identicalRunLine text and show; expanded = one OlderBatchRow+BatchCard per gen plus hide). In ProjectTrainCard.tsx render capOlderRows(sections.rows, olderExpanded).shown through renderOlder (single => OlderBatchRow, run => OlderBatchRun), an older-more-<key> button with 'show N more' / 'show fewer', and, when sections.covered is non-empty, a covered-voided-<key> line counting batches (a run counts its length) with a show/hide toggle revealing the covered rows (not capped). Change only the header comment of OlderBatchRow.tsx. Add the tests named in WI-5 and list OlderBatchRun.test.tsx in scripts/frontend-test-subset.txt in sort order."
+        },
+        "items": [
+          {
+            "id": "older-list-grouping.ac1",
+            "title": "Given a ready hero and 8 voided batches with the same two members and no promoted batch, when ProjectTrainCard renders, then exactly one older-batch-run-* element renders containing '8 rebuilds voided' and none of the 8 renders its own older-batch-<name> row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "older-list-grouping.ac2",
+            "title": "Given five distinct older rows, when ProjectTrainCard renders, then 3 rows render and older-more-<key> reads 'show 2 more'; after clicking it all 5 render and it reads 'show fewer'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "older-list-grouping.ac3",
+            "title": "Given the reported chain, when ProjectTrainCard renders, then covered-voided-overdeck contains '7 voided batches whose features all merged later' and older-batch-pan-train-moss-1115-3 renders only after its show button is clicked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "older-list-grouping.ac4",
+            "title": "Given an OlderBatchRun of three batches, when its show button is clicked, then it renders one older-batch-<name> row per batch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-changelog",
+        "title": "Document how the merge train board shows merges, voided batches and age-out",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:30:26Z",
+        "metadata": {
+          "issueLabel": "pan-5364",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/MERGE-TRAIN.md",
+            "docs/MERGE-WORKFLOW.md",
+            "docs/FLYWHEEL.md",
+            "features/merge-batches.mdx",
+            "changelog.d/pan-5364.md"
+          ],
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'never hides a voided' docs/MERGE-TRAIN.md || true",
+            "grep -n 'Nothing is hidden' features/merge-batches.mdx || true",
+            "grep -n 'voided_by' docs/MERGE-TRAIN.md",
+            "grep -n '24 hours' docs/MERGE-TRAIN.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "the two 'hidden' greps print nothing",
+            "the voided_by and 24 hours greps each print at least one line"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6 steps 1-5: in docs/MERGE-TRAIN.md add glossary rows 'Voided by' (uat_generations.voided_by) and 'Outcome', extend the Promote row of the status-reason table with 'and sets voided_by to <name>', and replace 'the UI never hides a voided or superseded batch' with a 'How the board shows the chain' paragraph (24-hour age-out of voided and merged batches in the board payload only, rows kept in the database, at most 10 plus the newest merge, outcome hero rule, folded rebuilds, covered voided batches behind show, identical runs as one row, three older rows then show N more, superseded and failed always shown). Replace the older-batches sentence in docs/MERGE-WORKFLOW.md (~208-209), the batches phrase in docs/FLYWHEEL.md line 34, and the 'Older batches … Nothing is hidden.' bullet in features/merge-batches.mdx (~47-49) with the PRD text. Create changelog.d/pan-5364.md with the exact Improved entry in the PRD. Run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "docs-and-changelog.ac1",
+            "title": "Given the docs change, when grep runs for 'never hides a voided' in docs/MERGE-TRAIN.md and 'Nothing is hidden' in features/merge-batches.mdx, then both return no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac2",
+            "title": "Given docs/MERGE-TRAIN.md, when grep runs for 'voided_by' and '24 hours', then each returns at least one line describing the new column and the board age-out",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac3",
+            "title": "Given changelog.d/pan-5364.md exists with one '#### Improved' bullet, when npm run lint:docs runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "voided-by-field",
+        "to": "board-chain-selection",
+        "type": "blocks"
+      },
+      {
+        "from": "voided-by-field",
+        "to": "batch-sections",
+        "type": "blocks"
+      },
+      {
+        "from": "batch-sections",
+        "to": "outcome-hero",
+        "type": "blocks"
+      },
+      {
+        "from": "batch-sections",
+        "to": "older-list-grouping",
+        "type": "blocks"
+      },
+      {
+        "from": "outcome-hero",
+        "to": "older-list-grouping",
+        "type": "blocks"
+      },
+      {
+        "from": "outcome-hero",
+        "to": "docs-and-changelog",
+        "type": "informs"
+      },
+      {
+        "from": "older-list-grouping",
+        "to": "docs-and-changelog",
+        "type": "informs"
+      },
+      {
+        "from": "board-chain-selection",
+        "to": "docs-and-changelog",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "active"
+}

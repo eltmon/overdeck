@@ -114,13 +114,15 @@ describe('ChatMarkdown file links', () => {
     expect(screen.getByText(/conv\/2209/)).toBeInTheDocument();
   });
 
-  it('keeps file-like hrefs as normal markdown links when cwd is unavailable', () => {
+  it('renders a file-like href as inert text when cwd is unavailable (PAN-5337)', () => {
+    // A relative href cannot resolve to a file chip without a cwd, and it
+    // must not reach TranscriptLink either, since the browser would resolve
+    // it against /conv/<id> and 404 (PAN-5337 D9, FR-8, FR-11).
     renderMarkdown(<ChatMarkdown text="Open [package.json:1](package.json:1)." cwd={undefined} />);
 
-    const link = screen.getByRole('link', { name: 'package.json:1' });
-    expect(link).not.toHaveClass('chat-markdown-file-link');
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    const inert = screen.getByTestId('markdown-inert-link');
+    expect(inert).toHaveTextContent('package.json:1');
   });
 
   it('keeps external links safe and blocks scriptable hrefs', () => {
