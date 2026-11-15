@@ -25,6 +25,7 @@ tags: [workflow]          # optional string array
 updated: 2026-09-23       # optional YYYY-MM-DD; add/edit set it; sort key
 source: claude:6c30e00a-54f1-4a0e-9d4b-1c2f3e4d5a6b   # optional provenance
 review: [unindexed]       # optional; non-empty means excluded from the index
+always: true              # optional, default false; see Prompt-time retrieval below
 ---
 <body: the fact, then **Why:** and **How to apply:** lines, free markdown>
 ```
@@ -70,14 +71,26 @@ Its source line says whether the store is synced: `synced across your machines b
 `not synced; pan memory sync --setup <git-url> shares it across machines`. The machine section comes
 last, with the heading `## Machine memory` and the source line `this machine only, never synced`.
 Nothing is stored: the index is rendered from frontmatter fresh at every launch, and a launch never
-touches git or the network. It is ordered by type (`feedback`, `project`, `reference`, `user`), then by
-`updated` descending, then by id. The project section is bounded at 12,000 characters, the operator
+touches git or the network. `always` facts lead the list; among those and among the rest, order is by
+type (`feedback`, `project`, `reference`, `user`), then by `updated` descending, then by id. The
+project section is bounded at 12,000 characters, the operator
 section at 4,000, and the machine section at 2,000; once the budget is reached, the index stops and
 prints how many more facts to find with `pan memory list` (`--user`, `--machine`). A fact
 carrying a non-empty `review` marker is never injected — only `pan memory list --review` shows it.
 Only the index line is injected; open the fact file (`pan memory show <id>`) for its body. A fact
 added inside a workspace reaches every session's index once its branch merges and the primary
 checkout pulls — not the agent's own next session inside that same workspace.
+
+### Prompt-time retrieval
+
+The launch index above is budget-cut, so a large store can omit a fact's index line entirely. Beyond
+that index, Claude Code's and Pi's per-turn prompts, and every agent's first prompt, also rank the
+active, non-`always` facts across all three stores against the prompt and inject up to 6 of them,
+each with its description and body, under a shared 1,500-token budget — so a fact the launch index
+cut can still reach the turn that names its topic. An `always` fact is never a retrieval candidate; it
+only ever reaches an agent through the launch index, where it always sorts first (see **Adding and
+curating facts** below). Launch budgets and the overflow line are unchanged. Every retrieval decision
+is logged to `rag-runs` alongside the other prompt-time candidate groups.
 
 ## Adding and curating facts
 
@@ -98,6 +111,32 @@ offline. `add --type user` without `--user` or `--machine` is refused: user fact
 operator store. A fact whose text trips the secret scanner (an API key, a `token: value` pair) is
 refused with no file written; rephrase it. If `.overdeck/` is gitignored in your project, `add`
 refuses with the exact line to add to `.gitignore`.
+
+`add --always` and `edit <id> --always`/`--no-always` set or clear the `always` flag described in
+**Prompt-time retrieval** above:
+
+```bash
+pan memory add release-process --type project --description "Releases always ship from main." --always
+pan memory edit release-process --no-always
+```
+
+After a successful write, `add` and `edit` also refresh that store's entry in the fact vector cache
+(`~/.overdeck/cache/memory-fact-vectors.json`, one file shared by every store) best-effort: a failure or
+timeout prints `vector index not refreshed: <reason>; run pan memory reindex` to stderr without
+changing the exit code or the written fact. Run it by hand, or after a bulk edit outside `pan memory`,
+with:
+
+```bash
+pan memory reindex
+pan memory reindex --project overdeck --json
+```
+
+`reindex` refreshes the project store (the same one `add`/`list` use, or `--project <key>`'s), the
+operator store, and the machine store, printing one `<scope>: <embedded> embedded, <reused> reused`
+line per store (or `--json`'s `{ stores: [...] }`). Unlike the best-effort refresh after a write, it
+exits 1 when embedding fails — it is the way you confirm the cache is healthy. Outside a registered
+project with no `--project`, it skips the project store with a note rather than failing. `pan memory
+sync` also refreshes the operator store's vectors, best-effort, after a `synced` outcome.
 
 ## Search
 
@@ -121,7 +160,7 @@ exits 1.
 | What | Short, durable, human-reviewable truths | Automatically extracted session logs | Long-form concepts and architecture |
 | Who writes | You, or an agent via `pan memory add` | The memory pipeline, automatically | A human (or agent) through `/okf author`, PR-gated |
 | Where | `<planHome>/.overdeck/memory/` (repo), `~/.overdeck/context/memory/` (operator, synced when set up), `~/.overdeck/context/machine-memory/` (this machine) | `~/.overdeck/memory/{projectId}/{workspaceId}/` | A separate knowledge-bundle repository |
-| How injected | A rendered index, every managed harness, every launch | Prompt-time retrieval and rollups | Prompt-time concept index, when configured |
+| How injected | A rendered index every launch, plus up to 6 ranked facts per prompt-time turn (not `always` facts) | Prompt-time retrieval and rollups | Prompt-time concept index, when configured |
 
 Facts use the same frontmatter keys (`type`, `title`, `description`, `tags`) OKF's indexer reads, so
 `/okf author` can promote a fact into the knowledge bundle by moving the file and re-casing its type.
