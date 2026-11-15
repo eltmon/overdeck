@@ -663,18 +663,19 @@ describe('ConversationPanel rename flow', () => {
     expect(onViewModeChange).toHaveBeenCalledWith('conversation');
   });
 
-  // Detach affordance — a header button next to Copy link that opens the
-  // conversation in a new browser window. Same target as the ⋮ pop-out item
-  // and the drag-off-to-detach in the PaneBar. All three detach entry points
-  // land on /popout/conversation/<id>, a bare conversation view (no sidebar
-  // or awareness rail) so the detached window focuses on the one chat.
-  it('exposes a Detach button that opens /popout/conversation/<id> in a new window', () => {
+  // Open in new window (formerly the header's Detach button, PAN-5291) —
+  // ⋯ → Open in new window opens the conversation in a new browser window.
+  // Same target as the drag-off-to-detach in the PaneBar: both land on
+  // /popout/conversation/<id>, a bare conversation view (no sidebar or
+  // awareness rail) so the detached window focuses on the one chat.
+  it('exposes Open in new window, which opens /popout/conversation/<id> in a new window', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
     renderPanel();
 
-    const detach = screen.getByRole('button', { name: 'Detach conversation' });
-    expect(detach).toBeInTheDocument();
-    fireEvent.click(detach);
+    expect(screen.queryByRole('button', { name: 'Detach conversation' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Copy link to conversation' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open in new window' }));
 
     expect(openSpy).toHaveBeenCalledWith('/popout/conversation/1', '_blank', expect.stringContaining('popup=yes'));
     openSpy.mockRestore();
@@ -684,7 +685,8 @@ describe('ConversationPanel rename flow', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
     renderPanel({ ...mockConversation, sessionAlive: true }, { viewMode: 'terminal' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Detach conversation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open in new window' }));
 
     expect(openSpy).toHaveBeenCalledWith(
       '/popout/conversation/1?view=terminal',
@@ -694,9 +696,43 @@ describe('ConversationPanel rename flow', () => {
     openSpy.mockRestore();
   });
 
-  it('hides the Detach button when the panel is embedded', () => {
+  it('hides the ⋯ menu when the panel is embedded', () => {
     renderPanel(mockConversation, { embedded: true });
+    expect(screen.queryByRole('button', { name: 'More conversation actions' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Detach conversation' })).toBeNull();
+  });
+
+  it('copies the conversation id and the link from the ⋯ menu (PAN-5291)', async () => {
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Copy conversation id/ }));
+    expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith('test-conv');
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Copied conversation id'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
+    expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(`${window.location.origin}/conv/1`);
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Copied link'));
+  });
+
+  it('offers Copy session id only when the session file id differs from the name (PAN-5291)', async () => {
+    renderPanel({ ...mockConversation, sessionFile: '/x/abc12345-0000.jsonl' });
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    const item = screen.getByRole('menuitem', { name: /^Copy session id/ });
+    expect(item).toHaveTextContent('abc12345');
+    fireEvent.click(item);
+    expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith('abc12345-0000');
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Copied session id'));
+    // The status line no longer shows the session id.
+    expect(screen.queryByText('abc12345-0000')).toBeNull();
+  });
+
+  it('has no Copy session id item and no session id text without a session file (PAN-5291)', () => {
+    renderPanel();
+    // The status line used to fall back to the conversation name here.
+    expect(screen.queryByText('test-conv')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    expect(screen.queryByRole('menuitem', { name: /^Copy session id/ })).toBeNull();
   });
 });
 

@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, Copy, ExternalLink, FileX, Loader2, MoreHorizontal, Pencil, Square, type LucideIcon } from 'lucide-react';
+import { FileX, Loader2, MoreHorizontal, Pencil, Square, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Conversation } from '../../CommandDeck/ConversationList';
 import { updateConversationTitle } from '../../CommandDeck/ConversationList';
@@ -62,7 +62,6 @@ export function ConversationHeader({
 }: ConversationHeaderProps) {
   const queryClient = useQueryClient();
   const native = isNativeShell(); // The phone app (PAN-4837): hide what its phone token cannot do.
-  const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -139,32 +138,6 @@ export function ConversationHeader({
     setEditingTitle(false);
     setDraftTitle('');
   }, []);
-
-  const handleCopyLink = useCallback(() => {
-    const params = new URLSearchParams();
-    if (viewMode === 'terminal') {
-      params.set('view', 'terminal');
-    }
-    const query = params.toString();
-    const url = `${window.location.origin}/conv/${conversation.id}${query ? `?${query}` : ''}`;
-    void navigator.clipboard.writeText(url).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }, [conversation.id, viewMode]);
-
-  // Open the conversation in a new browser window — the "detach" affordance
-  // matching the ⋮ → "Pop out to window" menu item, lifted into the header so
-  // it's discoverable next to Copy link. Mirrors Stage's drag-off-to-detach so
-  // both entry points land on the same /popout/conversation/<id> route — a bare
-  // conversation view with no dashboard chrome (sidebar, awareness rail, etc.).
-  const handleDetach = useCallback(() => {
-    const params = new URLSearchParams();
-    if (viewMode === 'terminal') params.set('view', 'terminal');
-    const query = params.toString();
-    const url = `/popout/conversation/${conversation.id}${query ? `?${query}` : ''}`;
-    window.open(url, '_blank', 'popup=yes,width=920,height=1040');
-  }, [conversation.id, viewMode]);
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   const showPiAbort = isWorking && (conversation.harness === 'ohmypi' || conversation.harness === 'pi');
@@ -257,28 +230,6 @@ export function ConversationHeader({
               <Loader2 size={14} className={styles.spinnerIcon} /><span>{archivePending ? 'Archiving…' : 'Stopping…'}</span>
             </span>
           )}
-          {/* Copy link */}
-          <button
-            className={styles.copyLinkButton}
-            onClick={handleCopyLink}
-            title="Copy link to conversation"
-            aria-label="Copy link to conversation"
-          >
-            {copied ? <Check size={14} /> : <Copy size={14} />}
-          </button>
-
-          {/* Detach — open the conversation in a new browser window. Same
-              target as the ⋮ → "Pop out to window" item, exposed here so
-              the action is discoverable next to Copy link. */}
-          <button
-            className={styles.copyLinkButton}
-            onClick={handleDetach}
-            title="Detach conversation"
-            aria-label="Detach conversation"
-          >
-            <ExternalLink size={14} />
-          </button>
-
           {changes && <HeaderDockButtons changes={changes} />}
 
           {/* Overflow menu — long-tail / prefs / config / destructive */}

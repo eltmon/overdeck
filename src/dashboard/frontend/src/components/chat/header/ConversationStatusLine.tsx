@@ -34,10 +34,6 @@ export function ConversationStatusLine({ conversation, status, native }: Convers
           </span>
         </>
       )}
-      <span className={styles.conversationMetaSep} aria-hidden>·</span>
-      <span className={styles.conversationSessionId}>
-        {conversation.sessionFile?.split('/').pop()?.replace('.jsonl', '') ?? conversation.name}
-      </span>
     </div>
   );
 }

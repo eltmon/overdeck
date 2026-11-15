@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type RefObject } from 'react';
-import { Archive, Download, ExternalLink, FileText, GitBranchPlus, Info, Loader2, MonitorSmartphone, Share2, Sparkles, Square, Star, Wrench } from 'lucide-react';
+import { Archive, Copy, Download, ExternalLink, FileText, GitBranchPlus, Hash, Info, Loader2, MonitorSmartphone, Share2, Sparkles, Square, Star, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Conversation } from '../../CommandDeck/ConversationList';
 import type { useConversationMutations } from '../../CommandDeck/useConversationMutations';
@@ -29,6 +29,13 @@ async function updateConversationDeliveryMethod(
     const body = await res.text().catch(() => '');
     throw new Error(`Failed to update delivery method (${res.status})${body ? `: ${body}` : ''}`);
   }
+}
+
+function copyText(text: string, done: string): void {
+  void navigator.clipboard.writeText(text).then(
+    () => { toast.success(done); },
+    () => { toast.error('Could not copy to the clipboard'); },
+  );
 }
 
 export interface ConversationHeaderMenuProps {
@@ -125,6 +132,30 @@ export function ConversationHeaderMenu({
     toast.success('Transcript exported');
   }, [agentId, conversation.title, conversation.name]);
 
+  // The session file id, kept reachable now that the status line no longer shows it (D1-4).
+  const sessionId = conversation.sessionFile?.split('/').pop()?.replace('.jsonl', '') ?? null;
+
+  const handleCopyLink = useCallback(() => {
+    const params = new URLSearchParams();
+    if (viewMode === 'terminal') {
+      params.set('view', 'terminal');
+    }
+    const query = params.toString();
+    copyText(`${window.location.origin}/conv/${conversation.id}${query ? `?${query}` : ''}`, 'Copied link');
+  }, [conversation.id, viewMode]);
+
+  // Open the conversation in a new browser window (formerly the header's
+  // Detach button). Mirrors Stage's drag-off-to-detach so both entry points
+  // land on the same /popout/conversation/<id> route — a bare conversation
+  // view with no dashboard chrome (sidebar, awareness rail, etc.).
+  const handleOpenInNewWindow = useCallback(() => {
+    const params = new URLSearchParams();
+    if (viewMode === 'terminal') params.set('view', 'terminal');
+    const query = params.toString();
+    const url = `/popout/conversation/${conversation.id}${query ? `?${query}` : ''}`;
+    window.open(url, '_blank', 'popup=yes,width=920,height=1040');
+  }, [conversation.id, viewMode]);
+
   const openHandoffDoc = useCallback(() => {
     window.open(`/api/conversations/${encodeURIComponent(conversation.name)}/handoff-doc`, '_blank', 'noopener,noreferrer');
   }, [conversation.name]);
@@ -164,6 +195,29 @@ export function ConversationHeaderMenu({
           <Wrench size={14} />
           <span>Show tool calls</span>
           <span className="ml-auto text-muted-foreground">{hideToolCalls ? 'off' : 'on'}</span>
+        </MenuItemButton>
+
+        {/* Group 2 — copy and open (visible in the phone app too). */}
+        <MenuSeparator />
+        <MenuItemButton onClick={() => { copyText(conversation.name, 'Copied conversation id'); onClose(); }}>
+          <Hash size={14} />
+          <span>Copy conversation id</span>
+          <span className="ml-auto font-mono text-[11px] text-muted-foreground">{conversation.name}</span>
+        </MenuItemButton>
+        {sessionId && sessionId !== conversation.name && (
+          <MenuItemButton onClick={() => { copyText(sessionId, 'Copied session id'); onClose(); }}>
+            <Hash size={14} />
+            <span>Copy session id</span>
+            <span className="ml-auto font-mono text-[11px] text-muted-foreground">{sessionId.slice(0, 8)}</span>
+          </MenuItemButton>
+        )}
+        <MenuItemButton onClick={() => { handleCopyLink(); onClose(); }}>
+          <Copy size={14} />
+          Copy link
+        </MenuItemButton>
+        <MenuItemButton onClick={() => { handleOpenInNewWindow(); onClose(); }}>
+          <ExternalLink size={14} />
+          Open in new window
         </MenuItemButton>
 
         {!native && (<>
