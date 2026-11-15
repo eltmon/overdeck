@@ -75,6 +75,7 @@ export const IPC = {
   DOWNLOAD_UPDATE: "pan:download-update",
   QUIT_AND_INSTALL: "pan:quit-and-install",
   RESTART_DASHBOARD: "pan:restart-dashboard",
+  RAISE_WINDOW: "pan:raise-window",
 } as const;
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -104,7 +105,26 @@ if (!app.requestSingleInstanceLock()) {
   app.exit(0);
 }
 
-app.on("second-instance", () => showOrCreateWindow());
+// `pan open` and the file-manager entry may launch the app with `--open <path>`
+// (PAN-5349 O-D11): the running instance loads the `/open` link for it.
+app.on("second-instance", (_event: unknown, argv: readonly string[] = []) => handleSecondInstance(argv));
+
+/** The value after `--open`, or null when the flag is absent or has no value. */
+export function parseOpenArg(argv: readonly string[]): string | null {
+  const index = argv.indexOf("--open");
+  if (index < 0) return null;
+  const value = argv[index + 1];
+  return value && !value.startsWith("--") ? value : null;
+}
+
+export function handleSecondInstance(argv: readonly string[]): void {
+  showOrCreateWindow();
+  const path = parseOpenArg(argv);
+  // A remote window shows another machine's files, so a local path means nothing there.
+  if (!path || getActiveDashboard().kind === "remote") return;
+  const win = BrowserWindow.getFocusedWindow() ?? mainWindow ?? BrowserWindow.getAllWindows()[0];
+  if (win && !win.isDestroyed()) void win.loadURL(`${resolveWindowUrl()}/open?path=${encodeURIComponent(path)}`);
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -231,6 +251,14 @@ function registerIpcHandlers(): void {
     const win = createTerminalWindow(sessionName, title);
     terminalWindows.set(sessionName, win);
     win.on("closed", () => terminalWindows.delete(sessionName));
+  });
+
+  // A tab that acted on a UI command raises its own window (PAN-5349).
+  ipcMain.on(IPC.RAISE_WINDOW, (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || win.isDestroyed()) return;
+    win.show();
+    win.focus();
   });
 
   ipcMain.on(IPC.SET_ALWAYS_ON_TOP, (_event, value: unknown) => {
