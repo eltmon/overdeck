@@ -12,11 +12,11 @@
 import { useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronsUpDown, FolderPlus, Plus } from 'lucide-react';
-import type { Issue } from '../../types';
 import type { DashboardState } from '../../lib/store';
 import { useDashboardStore } from '../../lib/store';
 import { getPipelineIssuePhase } from '../../lib/pipeline-state';
 import { useAgentsWorking } from '../../lib/selectors/agentsWorking';
+import { issueByIdentifier } from '../../lib/selectors/issueIndex';
 import { fetchProjects, NO_PROJECT_KEY, NO_PROJECT_LABEL, type ProjectData } from '../CommandDeck/projectsData';
 import { MenuOverlay, MenuSeparator, PopoverSurface } from '../shared/ContextMenu';
 import { OwnerGroupHeader } from '../sidebar/OwnerGroupHeader';
@@ -47,24 +47,13 @@ export function tildeHomePath(path: string): string {
   return path.replace(/^\/(?:home|Users)\/[^/]+(?=\/|$)/, '~');
 }
 
-let issueIndexSource: unknown = null;
-let issueIndex = new Map<string, Issue>();
-function issuesByIdentifier(issuesRaw: unknown): Map<string, Issue> {
-  if (issuesRaw !== issueIndexSource) {
-    issueIndexSource = issuesRaw;
-    issueIndex = new Map((issuesRaw as Issue[]).map((issue) => [issue.identifier.toLowerCase(), issue]));
-  }
-  return issueIndex;
-}
-
 /** How many of the project's issues are in the In review phase. */
 export function countInReview(state: Pick<DashboardState, 'issuesRaw' | 'derivedIssueStateByIssueId'>, project: ProjectData): number {
-  const issues = issuesByIdentifier(state.issuesRaw);
   let count = 0;
   for (const feature of project.features) {
     const derived = state.derivedIssueStateByIssueId[feature.issueId]
       ?? state.derivedIssueStateByIssueId[feature.issueId.toUpperCase()];
-    if (getPipelineIssuePhase(derived, issues.get(feature.issueId.toLowerCase())) === 'review') count += 1;
+    if (getPipelineIssuePhase(derived, issueByIdentifier(state.issuesRaw, feature.issueId)) === 'review') count += 1;
   }
   return count;
 }
