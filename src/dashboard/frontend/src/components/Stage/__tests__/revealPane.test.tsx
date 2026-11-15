@@ -8,13 +8,13 @@ vi.mock('../panes/AgentPane', () => ({
 vi.mock('../../terminal/TerminalDrawer', () => ({
   TerminalDrawer: () => <div data-testid="terminal-drawer" />,
 }))
-// The explorer stub opens a file the way ExplorerPane does: openCodePane, then
-// the deck's revealPane beside itself.
-vi.mock('../../explorer/ExplorerPane', async () => {
+// The code pane stub opens another file the way a code pane link does:
+// openCodePane, then the deck's revealPane beside itself.
+vi.mock('../../explorer/code/CodePaneSlot', async () => {
   const { useStageDeck } = await import('../StageDeckContext')
   const { openCodePane } = await import('../../explorer/openCodePane')
   return {
-    ExplorerPane: ({ pane }: { pane: { paneId: string } }) => {
+    CodePaneSlot: ({ pane }: { pane: { paneId: string } }) => {
       const deck = useStageDeck()
       return (
         <button
@@ -56,12 +56,12 @@ beforeEach(() => {
 })
 
 describe('Stage revealPane (PAN-5186)', () => {
-  it('puts a file opened from the explorer into the other split region, keeping the explorer visible', () => {
+  it('puts a file opened from a code pane into the other split region, keeping the opener visible', () => {
     const store = usePanesStore.getState()
     store.ensureHome(DECK)
     const web = store.addPane(DECK, { paneType: 'browser', label: 'Web' })
-    const explorer = store.addPane(DECK, { paneType: 'files', label: 'Files', explorerRootId: 'project:overdeck' })
-    const layout: PaneLayout = { kind: 'split', dir: 'row', ratio: 0.5, a: { kind: 'leaf', paneId: explorer }, b: { kind: 'leaf', paneId: web } }
+    const opener = store.addPane(DECK, { paneType: 'code', label: 'z.ts', explorerRootId: 'project:overdeck', explorerPath: 'src/z.ts' })
+    const layout: PaneLayout = { kind: 'split', dir: 'row', ratio: 0.5, a: { kind: 'leaf', paneId: opener }, b: { kind: 'leaf', paneId: web } }
     localStorage.setItem(`pan-layout:${DECK}`, JSON.stringify(layout))
 
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -73,10 +73,10 @@ describe('Stage revealPane (PAN-5186)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'open file' }))
 
-    const code = selectPanesForWorkspace(DECK)(usePanesStore.getState()).find((p) => p.paneType === 'code')
+    const code = selectPanesForWorkspace(DECK)(usePanesStore.getState()).find((p) => p.paneType === 'code' && p.explorerPath === 'src/a.ts')
     expect(code).toBeDefined()
     const saved = JSON.parse(localStorage.getItem(`pan-layout:${DECK}`) ?? 'null') as PaneLayout
-    expect(collectLeafIds(saved)).toEqual([explorer, code?.paneId])
+    expect(collectLeafIds(saved)).toEqual([opener, code?.paneId])
     expect(selectActivePaneId(DECK)(usePanesStore.getState())).toBe(code?.paneId)
   })
 })

@@ -40,7 +40,6 @@ import { CommitsPane } from './panes/CommitsPane'
 import { PlanPane } from './panes/PlanPane'
 import { DocsPane } from './panes/DocsPane'
 import { AgentPane } from './panes/AgentPane'
-import { ExplorerPane } from '../explorer/ExplorerPane'
 import { BrowserPane } from './panes/BrowserPane'
 import { EditorPane } from './panes/EditorPane'
 import { CodePaneSlot } from '../explorer/code/CodePaneSlot'
@@ -118,8 +117,6 @@ function renderPane(pane: WorkspacePane, ctx: StageContext) {
       return <DocsPane pane={pane} ctx={ctx} />
     case 'agent':
       return <AgentPane pane={pane} ctx={ctx} />
-    case 'files':
-      return <ExplorerPane pane={pane} ctx={ctx} />
     case 'browser':
       return <BrowserPane pane={pane} ctx={ctx} />
     case 'editor':
@@ -221,17 +218,19 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     const current = usePanesStore.getState().panesByWorkspace[deckKey] ?? []
     const seenConversationIds = new Set<string>()
     const ISSUE_SCOPED = new Set<PaneType>(['commits', 'plan', 'docs'])
+    let migratedRoot: string | null = null
     for (const p of current) {
       // Terminals are drawer-only now.
       if (p.paneType === 'terminal') {
         closePane(deckKey, p.paneId)
         continue
       }
-      // PAN-5186: the Files pane is the explorer, keyed by root. Migrate the
-      // legacy issue-scoped pane; close one with neither field.
-      if (p.paneType === 'files' && !p.explorerRootId) {
-        if (p.issueId) updatePane(deckKey, p.paneId, { explorerRootId: `issue:${p.issueId}` })
-        else closePane(deckKey, p.paneId)
+      // PAN-5289 (PAN-5284 D-3): the explorer is the dock's Files tab. Close every
+      // persisted Files pane; the last one with a root becomes the dock's root.
+      if (p.paneType === 'files') {
+        const root = p.explorerRootId ?? (p.issueId ? `issue:${p.issueId}` : null)
+        closePane(deckKey, p.paneId)
+        if (root) migratedRoot = root
         continue
       }
       // Issue-scoped panes created at project scope (no issueId) were broken —
@@ -246,7 +245,13 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
         else seenConversationIds.add(p.conversationId)
       }
     }
-  }, [deckKey, closePane, updatePane])
+    // The override belongs to the pane that is active after the closes (B-D17).
+    if (migratedRoot) {
+      const anchor = selectActivePaneId(deckKey)(usePanesStore.getState()) ?? undefined
+      useWorkDockStore.getState().setRootOverride(deckKey, migratedRoot, anchor)
+      useWorkDockStore.getState().openDock(deckKey, { tab: 'files' })
+    }
+  }, [deckKey, closePane])
 
   useStageShortcuts(deckKey)
 
