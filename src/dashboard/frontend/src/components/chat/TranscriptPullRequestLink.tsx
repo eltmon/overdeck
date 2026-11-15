@@ -40,6 +40,12 @@ export function ConversationPullRequestProvider({ conversation, children }: {
   );
 }
 
+/** PAN-5339 D4: the viewed conversation's name, or null outside a transcript. */
+export function useTranscriptConversation(): { conversationName: string } | null {
+  const context = useContext(ConversationPullRequestContext);
+  return context ? { conversationName: context.conversationName } : null;
+}
+
 export function TranscriptLink({ href, className, children }: { href: string | undefined; className?: string; children: ReactNode }) {
   const context = useContext(ConversationPullRequestContext);
   const ref = context && href ? parsePullRequestRef(href) : null;

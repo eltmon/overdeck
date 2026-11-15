@@ -135,6 +135,65 @@ jobs:
             ${{ runner.temp }}/bare-host/*.log
           if-no-files-found: warn
 
+  # PAN-5361: the positive control for the Linux idle measure. Smoke the
+  # packed subject with a steady spawner in the idle dashboard (spawn `true`
+  # every 500 ms, about +60 PIDs per window) and require pid-net to fail and
+  # blame the dashboard tree. Runs only when the smoke changes.
+  bare-host-linux-spawner-canary:
+    runs-on: ubuntu-latest
+    needs: [build, bare-host-changes]
+    if: needs.bare-host-changes.outputs.smoke == 'true'
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Download the bare-host subject
+        uses: actions/download-artifact@v4
+        with:
+          name: bare-host-subject
+          path: ${{ runner.temp }}/subject
+
+      # The smoke is expected to exit 1 here; record its exit code for the
+      # assertion instead of failing this step.
+      - id: smoke
+        name: Bare-host smoke with a 500 ms idle spawner
+        run: |
+          set +e
+          bash scripts/bare-host-smoke.sh --tarball "$(ls "$RUNNER_TEMP"/subject/*.tgz)" --work-dir "$RUNNER_TEMP/canary" --idle-spawner-ms 500
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+
+      - name: The spawner must fail pid-net and be attributed to the dashboard tree
+        env:
+          SMOKE_RC: ${{ steps.smoke.outputs.rc }}
+        run: |
+          node -e '
+            const r = require(process.env.RUNNER_TEMP + "/canary/result.json");
+            const fail = (m) => { console.error("::error::" + m); process.exit(1); };
+            if (r.setupError) fail("setup error, not a detection: " + r.setupError);
+            if (process.env.SMOKE_RC !== "1") fail("the smoke exited " + process.env.SMOKE_RC + ", expected 1 (a failed check)");
+            if (!r.panUp.pass) fail("pan up did not pass");
+            if (!r.enoent.pass) fail("ENOENT check did not pass");
+            if (r.idle.rule !== "pid-net") fail("idle rule is " + r.idle.rule + ", expected pid-net");
+            if (!(r.idle.value > r.idle.budget)) fail("idle value " + r.idle.value + " is not above budget " + r.idle.budget);
+            if (r.idle.injectedSpawnerMs !== 500) fail("idle.injectedSpawnerMs is " + r.idle.injectedSpawnerMs + ", expected 500");
+            if (!r.idle.attribution || r.idle.attribution.source !== "dashboard-tree") fail("attribution.source is " + (r.idle.attribution && r.idle.attribution.source) + ", expected dashboard-tree");
+            console.log("detected: idle " + r.idle.rule + " " + r.idle.value + " per 30 s (budget " + r.idle.budget + "), baseline=" + r.idle.baselineWindows.join(",") + " idle=" + r.idle.idleWindows.map((w) => w.new).join(",") + ", attribution " + r.idle.attribution.source);
+          '
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bare-host-linux-spawner-canary-logs
+          path: |
+            ${{ runner.temp }}/canary/result.json
+            ${{ runner.temp }}/canary/*.log
+          if-no-files-found: warn
+
   # PAN-5176: which changed paths warrant a macOS smoke. A job-level `if:`
   # over these outputs (never a workflow-level `paths:` filter) means a PR
   # that skips the macOS jobs still reports them as SKIPPED, which GitHub and
@@ -162,9 +221,11 @@ jobs:
               - 'package.json'
               - 'bun.lock'
               - 'scripts/bare-host-smoke.sh'
+              - 'scripts/bare-host-smoke/**'
               - '.github/workflows/ci.yml'
             smoke:
               - 'scripts/bare-host-smoke.sh'
+              - 'scripts/bare-host-smoke/**'
 
   # PAN-5176: the same bare-host smoke on macOS, the host where PAN-5168/5169/
   # 5170 hurt users, run with macOS /bin/bash 3.2. Blocking when it runs: no

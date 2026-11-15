@@ -7,8 +7,23 @@
 #   1. `pan up --no-resume --no-open --detach` must exit 0, pass /api/health and
 #      print no line that asks for a tool the Herdr backend does not need.
 #   2. The idle dashboard must stay within the per-OS idle budget per 30 s
-#      window. On Linux the measure is new PIDs, net of a baseline window with
-#      no Overdeck running. On macOS it is the traced spawn cost: the
+#      window. On Linux the measure takes WINDOWS_PER_SIDE_LINUX=5 back-to-
+#      back baseline windows and 5 idle windows and decides on min(idle) -
+#      min(baseline): besides random host PID bursts, the directly started
+#      dashboard itself runs one-time post-boot probes (around 0-2 s and
+#      45-62 s after boot) and a permanent periodic docker/git check every
+#      60 s forever (PAN-5361), so with the 20 s settle below, idle window 1
+#      (and, early on, window 3 too) is *structurally* elevated on every run,
+#      never the minimum. 5 windows per side (not 3) restores the 3
+#      genuinely-steady samples windows 0, 2 and 4 the single-burst immunity
+#      assumes; a random burst on any one of the 5 windows moves the net by
+#      at most the spread between the other steady windows (confirmed by a
+#      burst-injection replay over 20 calibration runs: 0/20 flip at +20,
+#      +30 or +65 on any single window, either side). A failed Linux check
+#      also reports a heuristic, /proc-based guess (traced spawn calls plus
+#      live process-tree growth, never the verdict) at whether the
+#      dashboard's own process tree accounts for the excess. On macOS it is
+#      the traced spawn cost over one window each side, unchanged: the
 #      child_process calls the dashboard makes, plus 5 for each call that
 #      fails to spawn (macOS tries every one of the 6 PATH entries, one
 #      process each). A hosted macOS runner's own process churn moves the
@@ -30,6 +45,7 @@
 #
 # Exit codes: 0 every check passed, 1 a check failed, 2 setup error, 64 bad usage.
 set -u
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 
 # PAN-5176 calibration 2026-11-13 (D14: budget = max(10, min(30, 3 x highest
 # sample)), never above 30), from green runs on PR #5179:
@@ -37,6 +53,19 @@ set -u
 #     (the known-bad 0.81.0 scores 126 on the same runner)
 #   Linux PID net 10, 5, 6, 8 -> min(30, 30) = 30
 #     (after the systemctl fix, #5181; 15 and 16 before it)
+# PAN-5361 recalibration 2026-11-15 (same D14 rule), for the min-of-5 Linux
+# measure (review cycles fa257f60/8f9a2499 found min-of-3 insufficient; see
+# below and "Calibration evidence" in .pan/drafts/pan-5361.md), 20 plain runs
+# of the temporary bare-host-calibration workflow against
+# @overdeck/core@0.86.0 (workflow run 43741946470):
+#   Linux PID net (min(idle[0:5])-min(baseline[0:5])): 5, 6, 7, 4, 6, 5, 6,
+#     11, 5, 3, 4, 5, 4, 10, 5, 6, 9, 4, 6, 5 -> max(10, min(30, 3x11)) = 30
+#     (unchanged; two --idle-spawner-ms 500 canary runs net 66 and 66, both
+#     correctly failing and attributed to the dashboard tree; two 2000 ms
+#     runs net 19 and 18, both passing)
+#   macOS unchanged (one window per side, traced-cost): the 0.86.0 leg passed
+#     at cost 25 with windowsPerSide 1; the 0.81.0 known-bad leg failed at
+#     cost 126 with the expected tmux forbidden-tool lines.
 IDLE_BUDGET_MACOS=30
 IDLE_BUDGET_LINUX=30
 BARE_PATH_ENTRIES=6
@@ -44,6 +73,23 @@ WINDOW_SECS=30
 SETTLE_SECS=20
 HEALTH_TIMEOUT_SECS=120
 CHURN_SECS=20
+# PAN-5361 (review cycles fa257f60/8f9a2499): min-of-3 was not immune to a
+# single burst. Live calibration traces showed why: at SETTLE_SECS=20, idle
+# window 1 ([50s,80s) after boot) always contains both a one-time post-boot
+# probe sweep (ending by about 62 s) and the first tick of a permanent
+# periodic docker/git availability check that recurs every 60 s forever;
+# window 3 ([110s,140s) after boot) catches the same periodic tick plus a
+# second one-time sweep (about 120-122 s). Those two windows are elevated by
+# design, not by chance, so 3 consecutive windows gave only 2 genuinely
+# steady samples (0 and 2) -- not enough redundancy (a burst-injection
+# replay over the original 20-run calibration flipped 9 of 20 clean runs at
+# a +20 burst). Taking 5 windows restores 3 steady samples (0, 2 and 4;
+# windows 1 and 3 are the sacrificial, always-elevated ones and are never
+# the minimum), which a replay over a fresh 20-run calibration shows is
+# immune to a +20/+30/+65 burst on any single window, either side (0/20
+# flips). macOS is untouched (non-goal: do not change idle behaviour).
+WINDOWS_PER_SIDE_LINUX=5
+WINDOWS_PER_SIDE_MACOS=1
 
 DENIED_TOOLS="docker tmux systemctl journalctl brew"
 GUARDED_PORTS="3010 3011 3012 8317"
@@ -59,8 +105,10 @@ VERSION=''
 WORK_DIR=''
 OUT=''
 BUDGET=''
+IDLE_SPAWNER_MS=''
 SUBJECT=''
 OS_NAME=''
+WINDOWS_PER_SIDE=''
 BARE_PATH=''
 RUN_USER=''
 CORE=''
@@ -73,12 +121,16 @@ R_PANUP_HEALTHY=false
 R_PANUP_PASS=false
 R_IDLE_BOOTED=false
 R_IDLE_STAYED_UP=false
-R_IDLE_BASELINE=''
-R_IDLE_NEW=''
-R_IDLE_NET=''
 R_ENOENT_PASS=false
-R_TRACE_FROM=''
-R_TRACE_TO=''
+# PAN-5361: one entry per window, space separated, appended by take_windows().
+# R_IDLE_FROM/R_IDLE_TO are stamped for the idle side only. R_IDLE_TREE stays
+# empty until WI-3 adds the /proc snapshot.
+R_BASELINE_WINDOWS=''
+R_IDLE_WINDOWS=''
+R_IDLE_FROM=''
+R_IDLE_TO=''
+R_IDLE_TREE=''
+R_IDLE_SPAWNER_MS=''
 
 usage() {
   cat <<'EOF'
@@ -90,8 +142,14 @@ Usage: bare-host-smoke.sh (--tarball <path> | --version <npm version>) --work-di
   --work-dir <dir>     Fresh directory for HOME, tools and logs (required; must
                        not exist or must be empty).
   --out <file>         Where to write the JSON result (default <work-dir>/result.json).
-  --budget <n>         Idle budget: new PIDs per 30 s window, net of baseline
-                       (default 30 on macOS and on Linux).
+  --budget <n>         Idle budget (default 30 on macOS and on Linux). On
+                       Linux: new PIDs per 30 s window, min(idle) - min
+                       (baseline) over 5 windows per side. On macOS: the
+                       traced spawn cost over 1 window per side (unchanged).
+  --idle-spawner-ms <n> Load a preload into the idle dashboard server only
+                       that spawns `true` every <n> ms (whole number >= 50).
+                       The positive control for the Linux idle measure: it
+                       must fail pid-net and blame the dashboard tree.
   --help               Print this help.
 
 Exit codes: 0 pass, 1 a check failed, 2 setup error, 64 bad usage.
@@ -142,133 +200,128 @@ new_pids() {
   echo $((b - a))
 }
 
-# Window count, retaken once when the PID counter wrapped (negative count).
-window_count() {
-  local n
-  n=$(new_pids "$WINDOW_SECS")
-  if [ "$n" -lt 0 ]; then n=$(new_pids "$WINDOW_SECS"); fi
-  echo "$n"
+# Linux only, called from take_windows at idle window boundaries. Builtins
+# only (no command substitution, backtick or pipe): it adds no PID of its own
+# to the counter. Sets TREE_PROCS and TREE_TASKS to the dashboard tree's
+# totals: the root pid (the directly started server), every descendant
+# reachable by its ppid chain, and any process whose /proc/<pid>/cmdline
+# names a path under WORK_DIR/home or WORK_DIR/tools (the same two strings
+# kill_work_processes matches, which also catches a daemonized child
+# reparented away from the server). Indexed arrays only; bash 3.2 has no
+# associative arrays.
+tree_snapshot() {
+  local root="$1" f line rest pid ppid thr i j n changed arg
+  local -a all_pid all_ppid all_thr member
+  TREE_PROCS=0
+  TREE_TASKS=0
+  n=0
+  for f in /proc/[0-9]*/stat; do
+    if ! read -r line 2>/dev/null <"$f"; then continue; fi
+    pid=${line%% *}
+    rest=${line##*) }
+    set -f
+    set -- $rest
+    set +f
+    ppid="$2"
+    thr="${18}"
+    all_pid[n]="$pid"
+    all_ppid[n]="$ppid"
+    all_thr[n]="$thr"
+    member[n]=0
+    if [ "$pid" = "$root" ]; then member[n]=1; fi
+    while IFS= read -r -d '' arg; do
+      case "$arg" in
+        *"$WORK_DIR/home/"*) member[n]=1 ;;
+      esac
+      case "$arg" in
+        *"$WORK_DIR/tools/"*) member[n]=1 ;;
+      esac
+    done 2>/dev/null <"/proc/$pid/cmdline"
+    (( n += 1 ))
+  done
+  changed=1
+  while [ "$changed" -eq 1 ]; do
+    changed=0
+    i=0
+    while [ "$i" -lt "$n" ]; do
+      if [ "${member[i]}" -eq 0 ]; then
+        j=0
+        while [ "$j" -lt "$n" ]; do
+          if [ "${all_pid[j]}" = "${all_ppid[i]}" ] && [ "${member[j]}" -eq 1 ]; then
+            member[i]=1
+            changed=1
+          fi
+          (( j += 1 ))
+        done
+      fi
+      (( i += 1 ))
+    done
+  done
+  i=0
+  while [ "$i" -lt "$n" ]; do
+    if [ "${member[i]}" -eq 1 ]; then
+      (( TREE_PROCS += 1 ))
+      (( TREE_TASKS += all_thr[i] ))
+    fi
+    (( i += 1 ))
+  done
 }
 
-# The idle window into R_IDLE_NEW, with the spawn-trace bounds stamped
-# around exactly the window that is kept: a retake after a PID-counter wrap
-# restamps R_TRACE_FROM, so the traced cost never covers two windows. Call
-# it directly, never in $(...), so its assignments reach the caller.
-idle_window() {
-  R_TRACE_FROM="$(date +%s)000"
-  R_IDLE_NEW=$(new_pids "$WINDOW_SECS")
-  if [ "$R_IDLE_NEW" -lt 0 ]; then
-    R_TRACE_FROM="$(date +%s)000"
-    R_IDLE_NEW=$(new_pids "$WINDOW_SECS")
-  fi
-  R_TRACE_TO="$(date +%s)999"
+# take_windows <side> [server]: side is "baseline" or "idle". Takes
+# WINDOWS_PER_SIDE back-to-back WINDOW_SECS windows, appending each window's
+# new-PID count to R_BASELINE_WINDOWS or R_IDLE_WINDOWS (space separated, one
+# entry per window). For the idle side it also stamps each window's
+# spawn-trace bounds into R_IDLE_FROM/R_IDLE_TO, so the traced cost never
+# covers two windows: a retake after a PID-counter wrap restamps "from"
+# before the retake, and the kept attempt's bounds are the ones appended. On
+# Linux, for the idle side, it snapshots the dashboard tree (`server`)
+# immediately before each window's "from" stamp as the start (replaced by a
+# fresh snapshot before a retake's "from" stamp) and immediately after "to"
+# as the end, appending "startProcs:startTasks:endProcs:endTasks" to
+# R_IDLE_TREE. Call it directly, never in $(...), so its assignments reach
+# the caller.
+take_windows() {
+  local side="$1" server="${2:-}" count=0 from to n start_procs start_tasks
+  while [ "$count" -lt "$WINDOWS_PER_SIDE" ]; do
+    if [ "$side" = idle ] && [ "$OS_NAME" = linux ]; then
+      tree_snapshot "$server"
+      start_procs=$TREE_PROCS
+      start_tasks=$TREE_TASKS
+    fi
+    if [ "$OS_NAME" = darwin ]; then from="$(date +%s)000"; else from="$(date +%s%3N)"; fi
+    n=$(new_pids "$WINDOW_SECS")
+    if [ "$n" -lt 0 ]; then
+      if [ "$side" = idle ] && [ "$OS_NAME" = linux ]; then
+        tree_snapshot "$server"
+        start_procs=$TREE_PROCS
+        start_tasks=$TREE_TASKS
+      fi
+      if [ "$OS_NAME" = darwin ]; then from="$(date +%s)000"; else from="$(date +%s%3N)"; fi
+      n=$(new_pids "$WINDOW_SECS")
+    fi
+    if [ "$OS_NAME" = darwin ]; then to="$(date +%s)999"; else to="$(date +%s%3N)"; fi
+    if [ "$side" = idle ] && [ "$OS_NAME" = linux ]; then
+      tree_snapshot "$server"
+      R_IDLE_TREE="${R_IDLE_TREE:+$R_IDLE_TREE }${start_procs}:${start_tasks}:${TREE_PROCS}:${TREE_TASKS}"
+    fi
+    if [ "$side" = baseline ]; then
+      R_BASELINE_WINDOWS="${R_BASELINE_WINDOWS:+$R_BASELINE_WINDOWS }$n"
+    else
+      R_IDLE_WINDOWS="${R_IDLE_WINDOWS:+$R_IDLE_WINDOWS }$n"
+      R_IDLE_FROM="${R_IDLE_FROM:+$R_IDLE_FROM }$from"
+      R_IDLE_TO="${R_IDLE_TO:+$R_IDLE_TO }$to"
+    fi
+    count=$((count + 1))
+  done
 }
 
 write_result() {
-  export R_SETUP_ERROR R_PANUP_RC R_PANUP_HEALTHY R_PANUP_PASS R_IDLE_BOOTED R_IDLE_STAYED_UP R_IDLE_BASELINE \
-    R_IDLE_NEW R_IDLE_NET R_ENOENT_PASS R_TRACE_FROM R_TRACE_TO
+  export R_SETUP_ERROR R_PANUP_RC R_PANUP_HEALTHY R_PANUP_PASS R_IDLE_BOOTED R_IDLE_STAYED_UP \
+    R_BASELINE_WINDOWS R_IDLE_WINDOWS R_IDLE_FROM R_IDLE_TO R_IDLE_TREE R_IDLE_SPAWNER_MS R_ENOENT_PASS
   R_OS="$OS_NAME" R_SUBJECT="$SUBJECT" R_BUDGET="$BUDGET" R_WINDOW="$WINDOW_SECS" R_OUT="$OUT" \
     R_FORBIDDEN_FILE="$WORK_DIR/forbidden-lines.txt" R_ENOENT_FILE="$WORK_DIR/enoent-counts.txt" \
     R_TRACE_FILE="$WORK_DIR/spawn-trace.log" R_PATH_ENTRIES="$BARE_PATH_ENTRIES" \
-    node -e '
-const fs = require("fs");
-const e = process.env;
-const readLines = (file) => { try { return fs.readFileSync(file, "utf8").split("\n").filter(Boolean); } catch { return []; } };
-const num = (value) => (value === undefined || value === "" ? null : Number(value));
-const bool = (value) => value === "true";
-const setupError = e.R_SETUP_ERROR || null;
-const repeats = readLines(e.R_ENOENT_FILE)
-  .map((line) => { const m = /^\s*(\d+)\s+(.*)$/.exec(line); return m ? { key: m[2], count: Number(m[1]) } : null; })
-  .filter((entry) => entry && entry.count >= 2);
-const net = num(e.R_IDLE_NET);
-// Diagnostic: the child_process calls Overdeck made during the idle window.
-let spawns = null;
-if (e.R_TRACE_FROM && e.R_TRACE_TO) {
-  const from = Number(e.R_TRACE_FROM), to = Number(e.R_TRACE_TO);
-  // A call is a "spawn" or "error" record; an "exit" record marks a call
-  // that already counted as failed (its shell exited 127).
-  const groups = new Map();
-  let count = 0, failed = 0, spawnErrors = 0;
-  for (const line of readLines(e.R_TRACE_FILE)) {
-    let rec; try { rec = JSON.parse(line); } catch { continue; }
-    if (!(rec.t >= from && rec.t <= to)) continue;
-    const g = groups.get(rec.program) || { program: rec.program, count: 0, failed: 0, errors: [] };
-    if (rec.event !== "exit") { count += 1; g.count += 1; }
-    if (rec.event === "error" && rec.error !== "exit 127") spawnErrors += 1;
-    if (rec.error) {
-      failed += 1; g.failed += 1;
-      if (!g.errors.includes(rec.error)) g.errors.push(rec.error);
-    }
-    groups.set(rec.program, g);
-  }
-  const top = [...groups.values()].sort((x, y) => y.count - x.count).slice(0, 10);
-  // A call that fails to spawn costs one process per bare PATH entry on
-  // macOS, so it weighs PATH_ENTRIES; every other call weighs 1.
-  const cost = count + (Number(e.R_PATH_ENTRIES) - 1) * spawnErrors;
-  spawns = { count, failed, spawnErrors, cost, top };
-}
-const window = Number(e.R_WINDOW);
-// Which number decides the idle check: the traced spawn cost on macOS, the
-// PID net elsewhere.
-const rule = e.R_OS === "darwin" ? "traced-cost" : "pid-net";
-const value = rule === "traced-cost" ? (spawns ? spawns.cost : null) : net;
-const budget = num(e.R_BUDGET);
-const idlePass = bool(e.R_IDLE_BOOTED) && bool(e.R_IDLE_STAYED_UP) && value !== null && budget !== null && value <= budget;
-const result = {
-  version: "1",
-  os: e.R_OS || null,
-  subject: e.R_SUBJECT || null,
-  panUp: { rc: num(e.R_PANUP_RC), healthy: bool(e.R_PANUP_HEALTHY), forbiddenToolLines: readLines(e.R_FORBIDDEN_FILE), pass: bool(e.R_PANUP_PASS) },
-  idle: {
-    booted: bool(e.R_IDLE_BOOTED), stayedUp: bool(e.R_IDLE_STAYED_UP), baselineNew: num(e.R_IDLE_BASELINE), idleNew: num(e.R_IDLE_NEW), net,
-    netPerSec: net === null ? null : Math.round((net / window) * 100) / 100, budget, rule, value, pass: idlePass, spawns,
-  },
-  enoent: { repeats, pass: bool(e.R_ENOENT_PASS) },
-  pass: false,
-  setupError,
-};
-result.pass = !setupError && result.panUp.pass && result.idle.pass && result.enoent.pass;
-if (e.R_OUT) {
-  fs.mkdirSync(require("path").dirname(e.R_OUT), { recursive: true });
-  fs.writeFileSync(e.R_OUT, JSON.stringify(result, null, 2) + "\n");
-}
-const show = (value) => (value === null ? "n/a" : String(value));
-const verdict = (ok) => (ok ? "PASS" : "FAIL");
-const lines = [
-  "bare-host smoke: " + (setupError ? "SETUP ERROR" : verdict(result.pass)) + " (" + show(result.os) + ", " + show(result.subject) + ")",
-];
-if (setupError) lines.push("  setup error: " + setupError);
-lines.push("  pan up:  " + verdict(result.panUp.pass) + " rc=" + show(result.panUp.rc) + " healthy=" + result.panUp.healthy + " forbidden-tool lines=" + result.panUp.forbiddenToolLines.length);
-for (const line of result.panUp.forbiddenToolLines) lines.push("           " + line);
-lines.push("  idle:    " + verdict(result.idle.pass) + " booted=" + result.idle.booted + " stayedUp=" + result.idle.stayedUp + " rule=" + rule + " value=" + show(value) + " budget=" + show(budget));
-lines.push("           PIDs: baseline=" + show(result.idle.baselineNew) + " idle=" + show(result.idle.idleNew) + " net=" + show(result.idle.net) + " (" + show(result.idle.netPerSec) + "/s)" + (rule === "pid-net" ? "" : " (reported, not asserted)"));
-if (spawns) {
-  lines.push("           Overdeck child_process calls in the idle window: " + spawns.count + " (" + spawns.failed + " failed, " + spawns.spawnErrors + " failed to spawn), traced cost " + spawns.cost);
-  for (const g of spawns.top) lines.push("             " + g.count + "x " + g.program + (g.failed ? " (" + g.failed + " failed: " + g.errors.join(", ") + ")" : ""));
-}
-lines.push("  ENOENT:  " + verdict(result.enoent.pass) + " repeats=" + repeats.length);
-for (const r of repeats) lines.push("           " + r.count + "x " + r.key);
-lines.push("  result:  " + (e.R_OUT || "not written"));
-console.log(lines.join("\n"));
-if (e.GITHUB_STEP_SUMMARY) {
-  const md = [
-    "### Bare-host smoke (" + show(result.os) + "): " + (setupError ? "setup error" : verdict(result.pass)),
-    "",
-    "| Check | Result | Detail |",
-    "| --- | --- | --- |",
-    "| pan up | " + verdict(result.panUp.pass) + " | rc " + show(result.panUp.rc) + ", healthy " + result.panUp.healthy + ", " + result.panUp.forbiddenToolLines.length + " forbidden-tool lines |",
-    "| Idle (" + rule + ") | " + verdict(result.idle.pass) + " | " + show(value) + " per " + window + " s, budget " + show(budget) + " |",
-    "| Idle new PIDs | " + (rule === "pid-net" ? verdict(result.idle.pass) : "info") + " | net " + show(result.idle.net) + " per " + window + " s (" + show(result.idle.netPerSec) + "/s) |",
-    "| Overdeck spawns (idle window) | info | " + (spawns ? spawns.count + " calls, " + spawns.failed + " failed" + (spawns.top.length ? "; top: " + spawns.top.slice(0, 5).map((g) => g.count + "x " + g.program + (g.failed ? " (" + g.failed + " failed)" : "")).join(", ") : "") : "n/a") + " |",
-    "| ENOENT repeats | " + verdict(result.enoent.pass) + " | " + repeats.length + " repeated |",
-    "",
-    "Subject: `" + show(result.subject) + "`" + (setupError ? ". Setup error: " + setupError : ""),
-    "",
-  ];
-  fs.appendFileSync(e.GITHUB_STEP_SUMMARY, md.join("\n") + "\n");
-}
-process.exit(result.pass ? 0 : 1);
-'
+    node "$SCRIPT_DIR/bare-host-smoke/result.mjs"
 }
 
 die_setup() {
@@ -287,6 +340,7 @@ parse_args() {
       --work-dir) [ $# -ge 2 ] || bad_usage "--work-dir needs a directory"; WORK_DIR="$2"; shift 2 ;;
       --out) [ $# -ge 2 ] || bad_usage "--out needs a file"; OUT="$2"; shift 2 ;;
       --budget) [ $# -ge 2 ] || bad_usage "--budget needs a number"; BUDGET="$2"; shift 2 ;;
+      --idle-spawner-ms) [ $# -ge 2 ] || bad_usage "--idle-spawner-ms needs a number"; IDLE_SPAWNER_MS="$2"; shift 2 ;;
       *) bad_usage "unknown argument: $1" ;;
     esac
   done
@@ -297,6 +351,12 @@ parse_args() {
     '') ;;
     *[!0-9]*) bad_usage "--budget must be a whole number" ;;
   esac
+  case "$IDLE_SPAWNER_MS" in
+    '') ;;
+    *[!0-9]*) bad_usage "--idle-spawner-ms must be a whole number" ;;
+    *) [ "$IDLE_SPAWNER_MS" -ge 50 ] || bad_usage "--idle-spawner-ms must be >= 50" ;;
+  esac
+  R_IDLE_SPAWNER_MS="$IDLE_SPAWNER_MS"
   case "$WORK_DIR" in
     /*) ;;
     *) WORK_DIR="$PWD/$WORK_DIR" ;;
@@ -313,8 +373,8 @@ parse_args() {
   check_work_dir_fresh
 
   case "$(uname -s)" in
-    Darwin) OS_NAME=darwin; [ -n "$BUDGET" ] || BUDGET="$IDLE_BUDGET_MACOS" ;;
-    Linux) OS_NAME=linux; [ -n "$BUDGET" ] || BUDGET="$IDLE_BUDGET_LINUX" ;;
+    Darwin) OS_NAME=darwin; [ -n "$BUDGET" ] || BUDGET="$IDLE_BUDGET_MACOS"; WINDOWS_PER_SIDE="$WINDOWS_PER_SIDE_MACOS" ;;
+    Linux) OS_NAME=linux; [ -n "$BUDGET" ] || BUDGET="$IDLE_BUDGET_LINUX"; WINDOWS_PER_SIDE="$WINDOWS_PER_SIDE_LINUX" ;;
     *) OS_NAME="$(uname -s)"; die_setup "unsupported OS $(uname -s); this smoke runs on macOS and Linux" ;;
   esac
 
@@ -496,9 +556,9 @@ if (file && !cp.__overdeckSpawnTrace) {
   Object.defineProperty(cp, '__overdeckSpawnTrace', { value: true });
   let depth = 0;
   const optionsOf = (a) => a.slice(1, 3).find((x) => x && typeof x === 'object' && !Array.isArray(x));
-  const programOf = (api, a) => {
+  const shellOf = (api, a) => api === 'exec' || api === 'execSync' || Boolean(optionsOf(a)?.shell);
+  const programOf = (api, a, shell) => {
     const target = String(a[0] ?? '');
-    const shell = api === 'exec' || api === 'execSync' || Boolean(optionsOf(a)?.shell);
     return path.basename(shell ? (target.trim().split(/\s+/)[0] || '') : target);
   };
   const log = (rec) => { try { fs.appendFileSync(file, JSON.stringify(rec) + '\n'); } catch {} };
@@ -507,7 +567,8 @@ if (file && !cp.__overdeckSpawnTrace) {
     if (typeof orig !== 'function') continue;
     const wrapped = function (...a) {
       if (depth > 0) return orig.apply(this, a);
-      const rec = { t: Date.now(), pid: process.pid, api, program: api === 'fork' ? 'node' : programOf(api, a) };
+      const shell = shellOf(api, a);
+      const rec = { t: Date.now(), pid: process.pid, api, program: api === 'fork' ? 'node' : programOf(api, a, shell), shell };
       depth += 1;
       try {
         const r = orig.apply(this, a);
@@ -548,6 +609,22 @@ if (file && !cp.__overdeckSpawnTrace) {
 TRACER
 }
 
+# PAN-5361: the positive control for the Linux idle measure (--idle-spawner-ms).
+# A Node preload that spawns `true` every <n> ms, loaded into the idle
+# dashboard server only via NODE_OPTIONS: the argv[1] guard keeps it out of
+# every other Node process the dashboard starts (child CLI invocations,
+# etc.), since NODE_OPTIONS rides into all of them.
+write_idle_spawner() {
+  cat >"$WORK_DIR/tools/idle-spawner.cjs" <<'SPAWNER'
+'use strict';
+const ms = Number(process.env.OVERDECK_SMOKE_SPAWNER_MS);
+if (ms > 0 && /[\\/]dist[\\/]dashboard[\\/]server\.js$/.test(process.argv[1] || '')) {
+  const { spawn } = require('child_process');
+  setInterval(() => { try { spawn('true', [], { stdio: 'ignore' }).on('error', () => {}); } catch {} }, ms).unref();
+}
+SPAWNER
+}
+
 # Diagnostic only, never an assertion, and outside both measured windows:
 # with no Overdeck process alive, sample `ps` every 0.2 s for CHURN_SECS and
 # count new processes by command, so a noisy baseline names its source.
@@ -569,16 +646,21 @@ sample_churn() {
 }
 
 measure_idle() {
-  local server waited=0
+  local server waited=0 node_options
   sample_churn
-  echo "== baseline window (${WINDOW_SECS} s, no Overdeck process)"
-  R_IDLE_BASELINE=$(window_count)
-  echo "baseline new PIDs: $R_IDLE_BASELINE"
+  echo "== baseline window(s) (${WINDOWS_PER_SIDE} x ${WINDOW_SECS} s, no Overdeck process)"
+  take_windows baseline
+  echo "baseline new PIDs per window: $R_BASELINE_WINDOWS"
 
   echo "== dashboard server idle window"
   write_spawn_tracer
+  node_options="--require \"$WORK_DIR/tools/spawn-trace.cjs\""
+  if [ -n "$IDLE_SPAWNER_MS" ]; then
+    write_idle_spawner
+    node_options="$node_options --require \"$WORK_DIR/tools/idle-spawner.cjs\""
+  fi
   bare OVERDECK_NO_RESUME=1 DASHBOARD_PORT=3010 API_PORT=3011 PORT=3011 OVERDECK_MODE=production \
-    NODE_OPTIONS="--require \"$WORK_DIR/tools/spawn-trace.cjs\"" OVERDECK_SPAWN_TRACE="$WORK_DIR/spawn-trace.log" \
+    NODE_OPTIONS="$node_options" OVERDECK_SPAWN_TRACE="$WORK_DIR/spawn-trace.log" OVERDECK_SMOKE_SPAWNER_MS="$IDLE_SPAWNER_MS" \
     "$NODE_BIN" "$CORE/dist/dashboard/server.js" >"$WORK_DIR/server.log" 2>&1 &
   server=$!
   while [ "$waited" -lt "$HEALTH_TIMEOUT_SECS" ]; do
@@ -589,9 +671,8 @@ measure_idle() {
 
   if [ "$R_IDLE_BOOTED" = true ]; then
     sleep "$SETTLE_SECS"
-    idle_window
-    R_IDLE_NET=$((R_IDLE_NEW - R_IDLE_BASELINE))
-    echo "idle new PIDs: $R_IDLE_NEW, net $R_IDLE_NET (the verdict is in the summary below)"
+    take_windows idle "$server"
+    echo "idle new PIDs per window: $R_IDLE_WINDOWS (the verdict is in the summary below)"
     # A dashboard that died during the window spawns nothing, so an empty
     # trace would pass: it must still be running and healthy afterwards.
     if kill -0 "$server" 2>/dev/null && curl -sf --max-time 5 -o /dev/null http://127.0.0.1:3011/api/health; then
