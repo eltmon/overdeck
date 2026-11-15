@@ -102,6 +102,23 @@ export function WorkDock({ deckKey, activePane, layoutLeafIds, panesById, conver
     [activePane, layoutLeafIds, panesById, deckKey, conversations, rootContext, rootOverride, rootOverrideAnchor],
   )
   const rootLabel = useRootLabel(scope.rootId)
+
+  // A diff or a Search folder belongs to the scope it was opened in: drop it when the scope changes.
+  const changesKey =
+    scope.changes.kind === 'conversation'
+      ? `conversation:${scope.changes.conversation.name}`
+      : scope.changes.kind === 'root'
+        ? `root:${scope.changes.rootId}`
+        : scope.changes.kind === 'project-main'
+          ? `project:${scope.changes.projectKey}`
+          : 'none'
+  const scopeKey = `${scope.rootId ?? ''}|${changesKey}`
+  const lastScopeKey = useRef(scopeKey)
+  useEffect(() => {
+    if (lastScopeKey.current === scopeKey) return
+    lastScopeKey.current = scopeKey
+    useWorkDockStore.getState().clearScopedState(deckKey)
+  }, [deckKey, scopeKey])
   const live = useLiveTab(deckKey)
 
   const open = state?.open ?? false

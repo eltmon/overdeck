@@ -1807,7 +1807,11 @@ Nothing renders the dock until child B builds it.
 Search tab refocuses on a repeat open), `quickOpen` (Go to file, shared by the
 Stage + menu and the dock) and `rootOverride` with its `rootOverrideAnchor`
 pane. `toggleTab(deck, tab)` closes the dock when it is open on that tab and
-opens it there otherwise. Only `open`, `tab` and `width` persist, as JSON under
+opens it there otherwise. The Files tab reveals both the active code pane's
+file (`scope.revealPath`) and the store's `reveal` (Reveal in files, keyed on
+`openSeq`; a reveal on another root first sets the root override). The dock
+drops `diff`, `diffList` and `searchPath` when its scope changes
+(`clearScopedState`). Only `open`, `tab` and `width` persist, as JSON under
 `localStorage` key `overdeck.dock.<deckKey>`. Width is clamped to 260–720 px
 (default 340). A corrupt stored field falls back to its default.
 

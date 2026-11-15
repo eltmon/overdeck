@@ -14,6 +14,7 @@ import { useStageDeck } from '../Stage/StageDeckContext'
 import type { DockScope } from './dockScope'
 import { useScopeChangedPaths } from './useConversationChanges'
 import { useWorkDockStore } from './workDockStore'
+import { useActiveDock } from './activeDock'
 
 export const NO_FILES_TOAST = 'No project files to search here.'
 
@@ -43,7 +44,14 @@ export function DockQuickOpen({ deckKey, scope, open, onClose }: DockQuickOpenPr
       onClose={onClose}
       changedPaths={changedPaths}
       onPick={(path) => deck?.openBeside?.({ rootId, path })}
-      onReveal={(path) => useWorkDockStore.getState().openDock(deckKey, { tab: 'files', reveal: { rootId, path } })}
+      onReveal={(path) => {
+        // Searching the deck root because the dock has none: point the dock there first.
+        if (rootId !== scope.rootId) {
+          const anchor = useActiveDock.getState().current?.activePaneId ?? undefined
+          useWorkDockStore.getState().setRootOverride(deckKey, rootId, anchor)
+        }
+        useWorkDockStore.getState().openDock(deckKey, { tab: 'files', reveal: { rootId, path } })
+      }}
     />
   )
 }

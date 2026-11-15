@@ -232,6 +232,27 @@ describe('WorkDock', () => {
   })
 })
 
+describe('WorkDock scope changes (PAN-5289 review)', () => {
+  it('drops an open diff and a Search folder when the scope changes, and keeps them otherwise', async () => {
+    const conversations = [conv({ name: 'c1' })]
+    const { rerender } = render(wrap(<WorkDock {...props({ activePane: chatPane, conversations })} />))
+    openDock()
+    // A diff is opened from a loaded list, so the scope has settled by then.
+    await waitFor(() => expect(scopeText()).toBe('For Fix the bug · Project P · main'))
+    act(() => useWorkDockStore.getState().openDock(DECK, { tab: 'changes', diff: { path: 'src/a.ts' }, diffList: [{ path: 'src/a.ts' }] }))
+    rerender(wrap(<WorkDock {...props({ activePane: chatPane, conversations })} />))
+    expect(useWorkDockStore.getState().byDeck[DECK].diff).toEqual({ path: 'src/a.ts' })
+
+    rerender(wrap(<WorkDock {...props({ activePane: issuePane, conversations })} />))
+    await waitFor(() => expect(useWorkDockStore.getState().byDeck[DECK].diff).toBeUndefined())
+    expect(useWorkDockStore.getState().byDeck[DECK].diffList).toBeUndefined()
+
+    act(() => useWorkDockStore.getState().openDock(DECK, { tab: 'search', searchPath: 'src' }))
+    rerender(wrap(<WorkDock {...props({ activePane: homePane, conversations })} />))
+    await waitFor(() => expect(useWorkDockStore.getState().byDeck[DECK].searchPath).toBeUndefined())
+  })
+})
+
 describe('WorkDock changed paths', () => {
   it('publishes the same changed paths the Files tab passes to the tree', async () => {
     const withChanges = {

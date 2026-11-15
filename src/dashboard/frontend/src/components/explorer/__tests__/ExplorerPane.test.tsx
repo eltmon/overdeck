@@ -37,6 +37,8 @@ vi.mock('../explorer-rpc', async (importOriginal) => {
 import { DialogProvider } from '../../DialogProvider'
 import { StageDeckProvider, type StageDeckContextValue } from '../../Stage/StageDeckContext'
 import { ExplorerFiles, PREVIEW_OPEN_DELAY_MS, type ExplorerFilesProps } from '../ExplorerPane'
+import { FilesTab } from '../../dock/FilesTab'
+import type { DockScope } from '../../dock/dockScope'
 import { resetShortcutsForTests, useShortcutList } from '../../../lib/shortcuts/registry'
 import { useExplorerStore } from '../explorerStore'
 import { usePanesStore, selectPanesForWorkspace } from '../../../lib/panesStore'
@@ -462,5 +464,52 @@ describe('ExplorerFiles', () => {
       expect(await screen.findByRole('menuitem', { name: 'New file' })).toBeInTheDocument()
       expect(screen.getByRole('menuitem', { name: 'New folder' })).toBeInTheDocument()
     })
+  })
+})
+
+describe('FilesTab Reveal in files (PAN-5289 review)', () => {
+  const scope: DockScope = {
+    rootId: 'issue:PAN-1',
+    changes: { kind: 'root', rootId: 'issue:PAN-1' },
+    header: { kind: 'issue', issueId: 'PAN-1' },
+    deckRootId: null,
+    overridden: false,
+  }
+
+  function renderTab() {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    return render(
+      <QueryClientProvider client={qc}>
+        <DialogProvider>
+          <FilesTab deckKey={DECK} scope={scope} />
+        </DialogProvider>
+      </QueryClientProvider>,
+    )
+  }
+  const treeRow = (path: string) => document.querySelector(`[role="treeitem"][data-path="${path}"]`) as HTMLElement | null
+
+  it('expands the folders, selects the row, and selects it again on a second Reveal', async () => {
+    renderTab()
+    await screen.findByText('README.md')
+    expect(treeRow('src/a.ts')).toBeNull()
+    act(() => useWorkDockStore.getState().openDock(DECK, { tab: 'files', reveal: { rootId: 'issue:PAN-1', path: 'src/a.ts' } }))
+    await waitFor(() => expect(treeRow('src/a.ts')).toHaveAttribute('aria-selected', 'true'))
+    expect(treeRow('src')).toHaveAttribute('aria-expanded', 'true')
+
+    // Select another row, then Reveal the same file again.
+    act(() => useExplorerStore.getState().select('issue:PAN-1', 'README.md', 'replace', ['README.md']))
+    expect(treeRow('src/a.ts')).toHaveAttribute('aria-selected', 'false')
+    act(() => useWorkDockStore.getState().openDock(DECK, { tab: 'files', reveal: { rootId: 'issue:PAN-1', path: 'src/a.ts' } }))
+    await waitFor(() => expect(treeRow('src/a.ts')).toHaveAttribute('aria-selected', 'true'))
+  })
+
+  it('points the dock at the reveal root when it is another root, anchored to the active tab', async () => {
+    useActiveDock.setState({
+      current: { deckKey: DECK, activePaneId: 'chat-1', rootId: 'issue:PAN-1', changedPaths: new Set(), openFile: vi.fn(), revealFile: vi.fn() },
+    })
+    renderTab()
+    await screen.findByText('README.md')
+    act(() => useWorkDockStore.getState().openDock(DECK, { tab: 'files', reveal: { rootId: 'project:overdeck', path: 'README.md' } }))
+    await waitFor(() => expect(useWorkDockStore.getState().byDeck[DECK]).toMatchObject({ rootOverride: 'project:overdeck', rootOverrideAnchor: 'chat-1' }))
   })
 })

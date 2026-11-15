@@ -78,6 +78,8 @@ export interface WorkDockStore {
   /** open=false; keeps tab and width. */
   closeDock(deckKey: string): void
   setTab(deckKey: string, tab: DockTab): void
+  /** Drop the diff, its list and the Search folder: they belong to the scope they were opened in. */
+  clearScopedState(deckKey: string): void
   /** Closes the dock when it is open on `tab`; otherwise openDock({ tab }). */
   toggleTab(deckKey: string, tab: DockTab): void
   setQuickOpen(deckKey: string, open: boolean): void
@@ -161,6 +163,13 @@ export const useWorkDockStore = create<WorkDockStore>((set, get) => {
     closeDock: (deckKey) => commit(deckKey, { ...current(deckKey), open: false }),
 
     setTab: (deckKey, tab) => commit(deckKey, { ...current(deckKey), tab }),
+
+    clearScopedState: (deckKey) => {
+      const deck = get().byDeck[deckKey]
+      if (!deck || (!deck.diff && !deck.diffList && deck.searchPath === undefined)) return
+      const { diff: _diff, diffList: _diffList, searchPath: _searchPath, ...rest } = deck
+      commit(deckKey, rest)
+    },
 
     toggleTab: (deckKey, tab) => {
       const deck = current(deckKey)

@@ -27,6 +27,7 @@ import { useWorkDockStore, type DockDiffTarget } from '../workDockStore'
 
 export const TOO_LARGE_SENTENCE = 'This file is too large or binary to diff here.'
 export const NO_FOLDER_SENTENCE = "Open this conversation's folder on this machine to see the diff"
+export const NO_WORKSPACE_COMMIT_DIFF = 'Diffs of committed files are not available for edit workspaces.'
 
 export interface DockDiffViewProps {
   deckKey: string
@@ -96,13 +97,24 @@ export function DockDiffView({ deckKey, scope, list, index, onIndex, onBack }: D
         const url = `/api/diffs/compare?repo=${encodeURIComponent(repo)}&base=${encodeURIComponent(`${target.sha}^`)}&head=${encodeURIComponent(target.sha)}&file=${encodeURIComponent(file)}`
         return { kind: 'patch', patch: (await readJson(await fetch(url))).diff ?? '' }
       }
+      // §6.4 non-goal: an edit workspace has no committed-file diff.
+      if (target.committedVsMain && !issueId) return { kind: 'message', text: NO_WORKSPACE_COMMIT_DIFF }
       if (target.committedVsMain && issueId) {
         if (!agentId) return { kind: 'message', text: "Couldn't load this diff: no agent has worked on this issue" }
         const url = `/api/agents/${encodeURIComponent(agentId)}/diffs/vs-main?file=${encodeURIComponent(target.path)}`
         return { kind: 'patch', patch: (await readJson(await fetch(url))).diff ?? '' }
       }
       if (!rootId) return { kind: 'message', text: NO_FOLDER_SENTENCE }
-      const work = await readFile(rootId, target.path)
+      let workText: string
+      try {
+        const work = await readFile(rootId, target.path)
+        if (work.kind !== 'text') return { kind: 'message', text: TOO_LARGE_SENTENCE }
+        workText = work.text ?? ''
+      } catch (e) {
+        // A file deleted in the working tree: diff its HEAD version against nothing.
+        if (explorerErrorCode(e) !== 'NOT_FOUND') throw e
+        workText = ''
+      }
       let head: string
       try {
         const committed = await readFile(rootId, target.path, 'HEAD')
@@ -113,8 +125,7 @@ export function DockDiffView({ deckKey, scope, list, index, onIndex, onBack }: D
         if (explorerErrorCode(e) !== 'NOT_FOUND') throw e
         head = ''
       }
-      if (work.kind !== 'text') return { kind: 'message', text: TOO_LARGE_SENTENCE }
-      return { kind: 'files', files: [parseDiffFromFile({ name: target.path, contents: head }, { name: target.path, contents: work.text ?? '' })] }
+      return { kind: 'files', files: [parseDiffFromFile({ name: target.path, contents: head }, { name: target.path, contents: workText })] }
     },
   })
 

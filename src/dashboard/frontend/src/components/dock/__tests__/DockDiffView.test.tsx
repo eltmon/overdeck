@@ -15,7 +15,7 @@ vi.mock('@pierre/diffs/react', () => ({
   FileDiff: ({ fileDiff }: { fileDiff: { name: string } }) => <div data-testid="file-diff">{fileDiff.name}</div>,
 }))
 
-import { DockDiffView, TOO_LARGE_SENTENCE } from '../changes/DockDiffView'
+import { DockDiffView, NO_WORKSPACE_COMMIT_DIFF, TOO_LARGE_SENTENCE } from '../changes/DockDiffView'
 import { useExplorerStore } from '../../explorer/explorerStore'
 import { useDashboardStore } from '../../../lib/store'
 import { installShortcutListener, resetShortcutsForTests } from '../../../lib/shortcuts/registry'
@@ -151,5 +151,21 @@ describe('DockDiffView', () => {
   it('says no agent has worked on the issue when there is none', async () => {
     renderView({ scope: scopeFor('issue:PAN-1'), list: [{ path: 'docs/x.md', committedVsMain: true }] })
     expect(await screen.findByText("Couldn't load this diff: no agent has worked on this issue")).toBeInTheDocument()
+  })
+
+  it('diffs a file deleted in the working tree against nothing (PAN-5289 review)', async () => {
+    rpc.readFile.mockImplementation(async (_root: string, _path: string, ref?: string) => {
+      if (ref === 'HEAD') return { kind: 'text', text: 'gone\n', size: 5, mtimeMs: 0, signature: 's', lang: 'ts', writable: true }
+      throw new PanRpcError({ message: '"src/gone.ts" does not exist', code: 'NOT_FOUND' })
+    })
+    renderView({ scope: scopeFor('issue:PAN-1'), list: [{ path: 'src/gone.ts' }] })
+    expect(await screen.findByTestId('file-diff')).toHaveTextContent('src/gone.ts')
+    expect(screen.queryByText(/Couldn't load this diff/)).toBeNull()
+  })
+
+  it('says an edit workspace has no committed-file diff', async () => {
+    renderView({ scope: scopeFor('workspace:w1'), list: [{ path: 'docs/x.md', committedVsMain: true }] })
+    expect(await screen.findByText(NO_WORKSPACE_COMMIT_DIFF)).toBeInTheDocument()
+    expect(rpc.readFile).not.toHaveBeenCalled()
   })
 })
