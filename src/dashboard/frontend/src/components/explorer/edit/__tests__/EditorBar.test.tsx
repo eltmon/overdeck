@@ -1,22 +1,47 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { EditWorkspaceChanges, EditWorkspacePr, EditWorkspaceStatus } from '@overdeck/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ ensureEditRoot: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  ensureEditRoot: vi.fn(),
+  leaveEditWorkspace: vi.fn(),
+  mergeEditWorkspace: vi.fn(),
+  discardEditWorkspace: vi.fn(),
+  createEditWorkspacePr: vi.fn(),
+  toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn() }),
+}))
 
+vi.mock('sonner', () => ({ toast: mocks.toast }))
 vi.mock('../edit-workspace-switch', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../edit-workspace-switch')>()),
   ensureEditRoot: mocks.ensureEditRoot,
+  leaveEditWorkspace: mocks.leaveEditWorkspace,
 }))
+vi.mock('../edit-workspace-http', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../edit-workspace-http')>()),
+  mergeEditWorkspace: mocks.mergeEditWorkspace,
+  discardEditWorkspace: mocks.discardEditWorkspace,
+  createEditWorkspacePr: mocks.createEditWorkspacePr,
+}))
+// The changes query watches the edit root; no watch stream in unit tests.
+vi.mock('../../watch/explorer-watch-hub', () => ({ subscribeExplorerWatch: () => () => {} }))
 
+import { draftKey, useCodeDrafts } from '../../code/code-drafts'
+import { PR_STATUS_REFETCH_MS, shouldPollPr } from '../edit-workspace-http'
 import { usePanesStore } from '../../../../lib/panesStore'
-import { CREATING_EDIT_NOTE, EditorBar, MAIN_CHECKOUT_SENTENCE } from '../EditorBar'
+import { CREATING_EDIT_NOTE, EditorBar, MAIN_CHECKOUT_SENTENCE, UNCOMMITTED_REASON, UNSAVED_REASON } from '../EditorBar'
 import { useEditWorkspaceStore } from '../edit-workspace-store'
 
 const DECK = 'p'
 const sentence = () => screen.getByTestId('editor-bar-sentence').textContent
 
 beforeEach(() => {
-  mocks.ensureEditRoot.mockReset()
+  for (const fn of [mocks.ensureEditRoot, mocks.leaveEditWorkspace, mocks.mergeEditWorkspace, mocks.discardEditWorkspace, mocks.createEditWorkspacePr]) fn.mockReset()
+  mocks.toast.mockReset()
+  mocks.toast.success.mockReset()
+  mocks.toast.error.mockReset()
+  useCodeDrafts.setState({ drafts: {} })
   mocks.ensureEditRoot.mockResolvedValue('workspace:w1')
   useEditWorkspaceStore.setState({ creating: {}, active: {}, pending: {}, landed: {} })
   usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} })
@@ -24,6 +49,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 
 describe('EditorBar on a project root (PAN-5290 FR-8, FR-11)', () => {
@@ -92,5 +119,294 @@ describe('EditorBar on a project root (PAN-5290 FR-8, FR-11)', () => {
   it('renders nothing on an issue root', () => {
     const { container } = render(<EditorBar rootId="issue:PAN-1" deckKey={DECK} paneId="c1" />)
     expect(container.textContent).toBe('')
+  })
+})
+
+// ─── Edit-workspace root (PAN-5290 FR-9, FR-10; ported from EditWorkspaceBanner and PrStatusRow tests) ───
+
+const ROOT = 'workspace:w1'
+
+function pr(over: Partial<EditWorkspacePr> = {}): EditWorkspacePr {
+  return {
+    url: 'https://github.com/o/r/pull/7', number: 7, state: 'OPEN', isDraft: false, mergeable: 'MERGEABLE',
+    mergeStateStatus: 'CLEAN', headSha: 'abc', canMerge: true, reason: null, ...over,
+  }
+}
+
+function status(p: EditWorkspacePr | null = null, over: Partial<EditWorkspaceStatus> = {}): EditWorkspaceStatus {
+  return {
+    workspace: {
+      id: 'w1', rootId: ROOT, name: 'edit-1113-1405', branch: 'scratch/edit-1113-1405',
+      projectKey: 'p', defaultBranch: 'main', path: '/p/workspaces/scratch-edit-1113-1405',
+    },
+    pr: p,
+    unpushedCommits: false,
+    prSupport: { available: true, reason: null },
+    pipelineSupport: { available: true, reason: null },
+    ...over,
+  }
+}
+
+function changes(over: Partial<EditWorkspaceChanges> = {}): EditWorkspaceChanges {
+  return {
+    base: 'abc',
+    files: [
+      { path: 'README.md', status: 'M', additions: 4, deletions: 2, binary: false },
+      { path: 'docs/new.md', status: 'A', additions: 2, deletions: 0, binary: false },
+    ],
+    additions: 6,
+    deletions: 2,
+    uncommittedPaths: [],
+    ...over,
+  }
+}
+
+type Answer = { body: unknown; status?: number }
+let statusAnswer: Answer
+let changesAnswer: Answer
+let fetchMock: ReturnType<typeof vi.fn>
+
+function stubServer(s: Answer, c: Answer = { body: changes() }) {
+  statusAnswer = s
+  changesAnswer = c
+  fetchMock = vi.fn(async (url: string) => {
+    const answer = url.endsWith('/changes') ? changesAnswer : statusAnswer
+    return new Response(JSON.stringify(answer.body), { status: answer.status ?? 200 })
+  })
+  vi.stubGlobal('fetch', fetchMock)
+}
+
+const statusCalls = () => fetchMock.mock.calls.filter(([url]) => !String(url).endsWith('/changes')).length
+
+function renderWorkspaceBar(props: { onStale?: () => void; paneId?: string } = {}) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={client}>
+      <EditorBar rootId={ROOT} deckKey={DECK} {...props} />
+    </QueryClientProvider>,
+  )
+}
+
+function dirty(path = 'README.md') {
+  const key = draftKey(ROOT, path)
+  useCodeDrafts.getState().loaded(key, 'one\n', 'sig-one')
+  useCodeDrafts.getState().edited(key, 'two\n')
+}
+
+describe('EditorBar on an edit workspace without a PR', () => {
+  it('names the workspace and branch with the files, +/− and save state, Discard… and a primary Create PR', async () => {
+    stubServer({ body: status() })
+    renderWorkspaceBar()
+    await waitFor(() => expect(sentence()).toBe('Editing in edit-1113-1405 on scratch/edit-1113-1405 · 2 files changed +6 −2 · All edits saved'))
+    expect(screen.getByRole('button', { name: 'Discard…' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Create PR' }).className).toContain('bg-primary')
+    expect(screen.queryByRole('button', { name: 'Close tab' })).toBeNull()
+  })
+
+  it('reads Saving… while a draft on the edit root is unsaved', async () => {
+    stubServer({ body: status() })
+    dirty()
+    renderWorkspaceBar()
+    await waitFor(() => expect(sentence()).toContain('· Saving…'))
+  })
+
+  it('renders nothing for a workspace that is not an edit workspace', async () => {
+    stubServer({ body: { error: 'Workspace notes is not an explorer edit workspace.', code: 'NOT_AN_EDIT_WORKSPACE' }, status: 409 })
+    const { container } = renderWorkspaceBar()
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    await waitFor(() => expect(container.innerHTML).toBe(''))
+  })
+
+  it('shows the error with Retry for any other failure', async () => {
+    stubServer({ body: { error: 'git exploded', code: 'GIT_FAILED' }, status: 500 })
+    renderWorkspaceBar()
+    await waitFor(() => expect(sentence()).toBe("Couldn't read this edit workspace: git exploded"))
+    const before = statusCalls()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    await waitFor(() => expect(statusCalls()).toBeGreaterThan(before))
+  })
+
+  it('calls onStale when the status answers ROOT_NOT_FOUND', async () => {
+    const onStale = vi.fn()
+    stubServer({ body: { error: 'Workspace w1 not found.', code: 'ROOT_NOT_FOUND' }, status: 404 })
+    renderWorkspaceBar({ onStale })
+    await waitFor(() => expect(onStale).toHaveBeenCalled())
+  })
+
+  it('calls onStale when the changes query answers ROOT_NOT_FOUND', async () => {
+    const onStale = vi.fn()
+    stubServer({ body: status() }, { body: { error: 'Workspace w1 not found.', code: 'ROOT_NOT_FOUND' }, status: 404 })
+    renderWorkspaceBar({ onStale })
+    await waitFor(() => expect(onStale).toHaveBeenCalled())
+  })
+
+  it('refuses to open Create PR while a draft is unsaved', async () => {
+    stubServer({ body: status() })
+    dirty()
+    renderWorkspaceBar()
+    fireEvent.click(await screen.findByRole('button', { name: 'Create PR' }))
+    expect(mocks.toast.error).toHaveBeenCalledWith('Save or discard your unsaved edits first: README.md.')
+    expect(screen.queryByTestId('create-pr-dialog')).toBeNull()
+  })
+
+  it('sets the discarded note and leaves the edit workspace after a discard', async () => {
+    stubServer({ body: status() })
+    mocks.discardEditWorkspace.mockResolvedValue({ removed: true, prClosed: false })
+    renderWorkspaceBar()
+    fireEvent.click(await screen.findByRole('button', { name: 'Discard…' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
+    await waitFor(() => expect(mocks.leaveEditWorkspace).toHaveBeenCalledWith(ROOT, 'p'))
+    expect(mocks.toast).toHaveBeenCalledWith('Discarded edit workspace edit-1113-1405.')
+    expect(useEditWorkspaceStore.getState().landed.p).toEqual({ kind: 'discarded', workspaceName: 'edit-1113-1405' })
+  })
+
+  it('sets the pipeline note and leaves the edit workspace after a pipeline send', async () => {
+    stubServer({ body: status() })
+    mocks.createEditWorkspacePr.mockResolvedValue({
+      mode: 'pipeline', issueId: 'PAN-77', issueUrl: 'https://github.com/o/r/issues/77', prUrl: 'https://github.com/o/r/pull/88', prNumber: 88,
+    })
+    renderWorkspaceBar()
+    fireEvent.click(await screen.findByRole('button', { name: 'Create PR' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Send through pipeline' }))
+    await waitFor(() => expect(mocks.leaveEditWorkspace).toHaveBeenCalledWith(ROOT, 'p'))
+    const message = String(mocks.toast.success.mock.calls[0]?.[0])
+    expect(message).toContain('PAN-77')
+    expect(message).toContain('#88')
+    expect(useEditWorkspaceStore.getState().landed.p).toEqual({ kind: 'pipeline', issueId: 'PAN-77', prNumber: 88, prUrl: 'https://github.com/o/r/pull/88' })
+  })
+
+  it('names a closed PR before the editing sentence and offers Create PR again', async () => {
+    stubServer({ body: status(pr({ state: 'CLOSED', canMerge: false, reason: 'closed' })) })
+    renderWorkspaceBar()
+    await waitFor(() => expect(sentence()).toMatch(/^PR #7 was closed\. Editing in edit-1113-1405/))
+    expect(screen.getByRole('button', { name: 'Create PR' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Discard…' })).toBeInTheDocument()
+  })
+})
+
+describe('EditorBar with a PR', () => {
+  it('reads the blocked reason and disables Merge titled by it', async () => {
+    stubServer({ body: status(pr({ mergeStateStatus: 'BLOCKED', canMerge: false, reason: 'Required checks or reviews are not met' })) })
+    renderWorkspaceBar()
+    await waitFor(() => expect(sentence()).toBe('PR #7 is open · Required checks or reviews are not met.'))
+    const merge = screen.getByRole('button', { name: 'Merge' })
+    expect(merge).toBeDisabled()
+    expect(merge).toHaveAttribute('title', 'Required checks or reviews are not met')
+    expect(screen.getByRole('link', { name: 'View on GitHub' })).toHaveAttribute('href', 'https://github.com/o/r/pull/7')
+  })
+
+  it('disables Merge with the verdict reason for a DIRTY PR', async () => {
+    stubServer({ body: status(pr({ mergeable: 'CONFLICTING', mergeStateStatus: 'DIRTY', canMerge: false, reason: 'Conflicts with the base branch' })) })
+    renderWorkspaceBar()
+    const merge = await screen.findByRole('button', { name: 'Merge' })
+    expect(merge).toBeDisabled()
+    expect(merge).toHaveAttribute('title', 'Conflicts with the base branch')
+    expect(screen.getByTestId('edit-pr-merge-reason').textContent).toBe('Conflicts with the base branch.')
+  })
+
+  it('reads no conflicts with an enabled primary Merge when GitHub allows it and nothing is uncommitted', async () => {
+    stubServer({ body: status(pr()) })
+    renderWorkspaceBar()
+    await waitFor(() => expect(sentence()).toBe('PR #7 · no conflicts. Merging squashes it into main.'))
+    const merge = screen.getByRole('button', { name: 'Merge' })
+    expect(merge).toBeEnabled()
+    expect(merge.className).toContain('bg-primary')
+    expect(screen.queryByRole('button', { name: 'Push changes' })).toBeNull()
+  })
+
+  it('disables Merge and offers Push changes while there are uncommitted changes', async () => {
+    stubServer({ body: status(pr()) }, { body: changes({ uncommittedPaths: ['README.md'] }) })
+    renderWorkspaceBar()
+    await waitFor(() => expect(screen.getByTestId('edit-pr-merge-reason').textContent).toBe(UNCOMMITTED_REASON))
+    expect(screen.getByRole('button', { name: 'Merge' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Push changes' }))
+    expect(screen.getByTestId('create-pr-dialog')).toBeInTheDocument()
+  })
+
+  it('offers Push changes and blocks Merge when the branch has unpushed commits', async () => {
+    stubServer({ body: status(pr(), { unpushedCommits: true }) })
+    renderWorkspaceBar()
+    await waitFor(() => expect(screen.getByTestId('edit-pr-merge-reason').textContent).toBe(UNCOMMITTED_REASON))
+    expect(screen.getByRole('button', { name: 'Push changes' })).toBeInTheDocument()
+  })
+
+  it('blocks Merge while a draft on the edit root is unsaved', async () => {
+    stubServer({ body: status(pr()) })
+    dirty()
+    renderWorkspaceBar()
+    expect(await screen.findByRole('button', { name: 'Merge' })).toBeDisabled()
+    expect(screen.getByTestId('edit-pr-merge-reason').textContent).toBe(UNSAVED_REASON)
+    expect(mocks.mergeEditWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('Refresh reads the status again', async () => {
+    stubServer({ body: status(pr()) })
+    renderWorkspaceBar()
+    await screen.findByRole('button', { name: 'Merge' })
+    const before = statusCalls()
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    await waitFor(() => expect(statusCalls()).toBeGreaterThan(before))
+  })
+
+  it('after a merge shows the toast, sets the merged note and leaves the edit workspace', async () => {
+    stubServer({ body: status(pr()) })
+    mocks.mergeEditWorkspace.mockResolvedValue({ merged: true })
+    renderWorkspaceBar()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Merge' })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: 'Merge' }))
+    await waitFor(() => expect(mocks.leaveEditWorkspace).toHaveBeenCalledWith(ROOT, 'p'))
+    expect(mocks.mergeEditWorkspace).toHaveBeenCalledWith('w1')
+    expect(mocks.toast.success).toHaveBeenCalledWith('Merged PR #7. The edit workspace was removed.')
+    expect(useEditWorkspaceStore.getState().landed.p).toEqual({ kind: 'merged', prNumber: 7, defaultBranch: 'main' })
+  })
+
+  it('reads a PR merged on GitHub with Discard… and no Merge', async () => {
+    stubServer({ body: status(pr({ state: 'MERGED', canMerge: false, reason: 'Already merged' })) })
+    renderWorkspaceBar()
+    await waitFor(() => expect(sentence()).toBe('PR #7 was merged on GitHub.'))
+    expect(screen.queryByRole('button', { name: 'Merge' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Discard…' })).toBeInTheDocument()
+  })
+
+  it('names a draft PR as a draft', async () => {
+    stubServer({ body: status(pr({ isDraft: true, canMerge: false, reason: 'This PR is a draft' })) })
+    renderWorkspaceBar()
+    await waitFor(() => expect(sentence()).toBe('PR #7 is a draft · This PR is a draft.'))
+  })
+})
+
+describe('shouldPollPr (PAN-5290 C-D6)', () => {
+  it('polls only while GitHub is still deciding an open, non-draft PR', () => {
+    const blocked = { canMerge: false, reason: 'x' }
+    expect(shouldPollPr(pr({ ...blocked, mergeable: 'UNKNOWN', mergeStateStatus: 'UNKNOWN' }))).toBe(true)
+    expect(shouldPollPr(pr({ ...blocked, mergeStateStatus: 'BLOCKED' }))).toBe(true)
+    expect(shouldPollPr(pr({ ...blocked, isDraft: true, mergeStateStatus: 'BLOCKED' }))).toBe(false)
+    expect(shouldPollPr(pr({ ...blocked, mergeable: 'CONFLICTING', mergeStateStatus: 'DIRTY' }))).toBe(false)
+    expect(shouldPollPr(pr({ ...blocked, mergeStateStatus: 'BEHIND' }))).toBe(false)
+    expect(shouldPollPr(pr())).toBe(false)
+    expect(shouldPollPr(pr({ ...blocked, state: 'MERGED' }))).toBe(false)
+    expect(shouldPollPr(null)).toBe(false)
+  })
+
+  it('refetches the status after 15 000 ms for a BLOCKED PR', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: false })
+    stubServer({ body: status(pr({ mergeStateStatus: 'BLOCKED', canMerge: false, reason: 'Required checks or reviews are not met' })) })
+    renderWorkspaceBar()
+    await act(() => vi.advanceTimersByTimeAsync(10))
+    expect(statusCalls()).toBe(1)
+    await act(() => vi.advanceTimersByTimeAsync(PR_STATUS_REFETCH_MS - 100))
+    expect(statusCalls()).toBe(1)
+    await act(() => vi.advanceTimersByTimeAsync(200))
+    expect(statusCalls()).toBe(2)
+  })
+
+  it('never refetches the status for a DIRTY PR', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: false })
+    stubServer({ body: status(pr({ mergeable: 'CONFLICTING', mergeStateStatus: 'DIRTY', canMerge: false, reason: 'Conflicts with the base branch' })) })
+    renderWorkspaceBar()
+    await act(() => vi.advanceTimersByTimeAsync(10))
+    expect(statusCalls()).toBe(1)
+    await act(() => vi.advanceTimersByTimeAsync(PR_STATUS_REFETCH_MS * 3))
+    expect(statusCalls()).toBe(1)
   })
 })

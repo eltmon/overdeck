@@ -3,8 +3,10 @@
  *
  * The calls under /api/explorer/edit-workspaces/:workspaceId. POSTs send
  * the dashboard CSRF header. A non-2xx answer throws ExplorerHttpError with
- * the server's `{ error, code }`. The status query never polls: the banner
- * refreshes it after a push, a merge attempt and on Refresh. The changes
+ * the server's `{ error, code }`. The status query polls only for the editor
+ * bar, every 15 s, and only while GitHub is still deciding whether an open PR
+ * can merge (PAN-5290 C-D6); otherwise it is refreshed after a push, a merge
+ * attempt and on Refresh. The changes
  * query (what will land, PAN-5290 C-D5) refetches on every explorer watch
  * batch of the edit root; its route never calls gh.
  */
@@ -12,6 +14,7 @@ import type {
   EditWorkspaceChanges,
   EditWorkspaceCreatePrInput,
   EditWorkspaceCreatePrResult,
+  EditWorkspacePr,
   EditWorkspaceStatus,
 } from '@overdeck/contracts'
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
@@ -60,13 +63,26 @@ export function discardEditWorkspace(workspaceId: string, closePr: boolean): Pro
 
 export const editWorkspaceStatusKey = (workspaceId: string) => ['explorer', 'edit-workspace', workspaceId] as const
 
-export function useEditWorkspaceStatus(workspaceId: string) {
+/** Each status read calls gh, so 15 s is the floor (PAN-5290 C-D6). */
+export const PR_STATUS_REFETCH_MS = 15_000
+
+/**
+ * True while GitHub is still deciding whether an open PR can merge. A draft,
+ * conflicting (DIRTY) or out-of-date (BEHIND) PR cannot change by itself.
+ */
+export function shouldPollPr(pr: EditWorkspacePr | null | undefined): boolean {
+  if (!pr || pr.state !== 'OPEN' || pr.isDraft || pr.canMerge) return false
+  return pr.mergeable === 'UNKNOWN' || pr.mergeStateStatus === 'UNKNOWN' || pr.mergeStateStatus === 'BLOCKED'
+}
+
+export function useEditWorkspaceStatus(workspaceId: string, { poll = false }: { poll?: boolean } = {}) {
   return useQuery({
     queryKey: editWorkspaceStatusKey(workspaceId),
     queryFn: () => fetchEditWorkspaceStatus(workspaceId),
     staleTime: Infinity,
     refetchOnWindowFocus: false,
     retry: false,
+    refetchInterval: (query) => (poll && shouldPollPr(query.state.data?.pr) ? PR_STATUS_REFETCH_MS : false),
   })
 }
 

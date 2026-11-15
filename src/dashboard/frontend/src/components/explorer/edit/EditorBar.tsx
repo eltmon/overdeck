@@ -10,18 +10,43 @@
  * it shows the landed note from edit-workspace-store instead, with Dismiss
  * and Close tab.
  *
+ * On an edit-workspace root it names the workspace and branch with what will
+ * land (files, +/−) and the save state, and offers Discard… and Create PR.
+ * Once a PR is open it follows it: the merge verdict's reason while GitHub
+ * blocks it (the status refetches every 15 s while GitHub is still deciding,
+ * C-D6), then an enabled Merge. Merge, a pipeline send and a discard set the
+ * project's landed note and move the panes back to main
+ * (leaveEditWorkspace). A workspace that is not an edit workspace gets no
+ * bar; one that no longer exists calls `onStale` (C-D13b).
+ *
  * `paneId` is set by a code pane; the Files tab mounts the bar without it,
  * so Close tab renders only in a code pane.
  */
-import type { EditWorkspaceStatus } from '@overdeck/contracts'
+import type { EditWorkspaceChanges, EditWorkspaceCreatePrResult, EditWorkspacePr, EditWorkspaceStatus } from '@overdeck/contracts'
+import { useQueryClient } from '@tanstack/react-query'
 import { Lock } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { toast } from 'sonner'
 
 import { usePanesStore } from '../../../lib/panesStore'
-import { parseRootId } from '../explorer-rpc'
-import { useEditWorkspaceStatus, workspaceIdOf } from './edit-workspace-http'
+import { draftKey, isDraftDirty, useCodeDrafts, type CodeDraft } from '../code/code-drafts'
+import { ExplorerHttpError } from '../explorer-http'
+import { explorerErrorMessage, parseRootId } from '../explorer-rpc'
+import { CreatePrDialog } from './CreatePrDialog'
+import { DiscardDialog } from './DiscardDialog'
+import {
+  editWorkspaceChangesKey,
+  mergeEditWorkspace,
+  refreshEditWorkspaceStatus,
+  useEditWorkspaceChanges,
+  useEditWorkspaceStatus,
+  workspaceIdOf,
+} from './edit-workspace-http'
 import { useEditWorkspaceStore, type LandedNote } from './edit-workspace-store'
-import { ensureEditRoot } from './edit-workspace-switch'
+import { ensureEditRoot, leaveEditWorkspace } from './edit-workspace-switch'
+
+export const UNCOMMITTED_REASON = 'Commit and push your changes first.'
+export const UNSAVED_REASON = 'Save or discard your unsaved edits first.'
 
 export const MAIN_CHECKOUT_SENTENCE =
   'This is the main checkout. Start typing and Overdeck moves your edits to a new edit workspace, so main never changes until a PR merges.'
@@ -172,9 +197,257 @@ function ProjectBar({ projectKey, rootId, deckKey, paneId }: { projectKey: strin
   )
 }
 
-export function EditorBar({ rootId, deckKey, paneId }: EditorBarProps) {
+export function prStateWord(pr: EditWorkspacePr): string {
+  if (pr.state === 'MERGED') return 'Merged'
+  if (pr.state === 'CLOSED') return 'Closed'
+  return pr.isDraft ? 'Draft' : 'Open'
+}
+
+/** Root paths with unsaved drafts on `rootId`. */
+export function unsavedPathsIn(drafts: Record<string, CodeDraft>, rootId: string): string[] {
+  const prefix = draftKey(rootId, '')
+  return Object.entries(drafts)
+    .filter(([key, draft]) => key.startsWith(prefix) && isDraftDirty(draft))
+    .map(([key]) => key.slice(prefix.length))
+}
+
+function hasCode(error: unknown, code: string): boolean {
+  return error instanceof ExplorerHttpError && error.code === code
+}
+
+function sentenceEnd(text: string): string {
+  return text.replace(/\.+$/, '') + '.'
+}
+
+function FilesChanged({ changes }: { changes: EditWorkspaceChanges | undefined }) {
+  if (!changes) return null
+  const n = changes.files.length
+  return (
+    <>
+      {' · '}
+      {n} {n === 1 ? 'file' : 'files'} changed{' '}
+      <span className="font-mono text-foreground">
+        +{changes.additions} −{changes.deletions}
+      </span>
+    </>
+  )
+}
+
+function EditingSentence({ status, changes, saving }: { status: EditWorkspaceStatus; changes: EditWorkspaceChanges | undefined; saving: boolean }) {
+  return (
+    <>
+      Editing in <Strong>{status.workspace.name}</Strong> on <Mono>{status.workspace.branch}</Mono>
+      <FilesChanged changes={changes} />
+      {' · '}
+      {saving ? 'Saving…' : 'All edits saved'}
+    </>
+  )
+}
+
+function WorkspaceBar({ rootId, workspaceId, onStale }: { rootId: string; workspaceId: string; onStale?: () => void }) {
+  const queryClient = useQueryClient()
+  const status = useEditWorkspaceStatus(workspaceId, { poll: true })
+  const changes = useEditWorkspaceChanges(workspaceId)
+  const [dialog, setDialog] = useState<'pr' | 'discard' | null>(null)
+  const [merging, setMerging] = useState(false)
+  // Unsaved code-pane edits never reach a commit, and leaving the edit workspace drops
+  // its drafts, so merge, Create PR and Push changes wait until they are saved.
+  const unsavedList = useCodeDrafts((s) => unsavedPathsIn(s.drafts, rootId).join('\n'))
+  const unsavedPaths = unsavedList === '' ? [] : unsavedList.split('\n')
+  const stale = hasCode(status.error, 'ROOT_NOT_FOUND') || hasCode(changes.error, 'ROOT_NOT_FOUND')
+  useEffect(() => {
+    if (stale) onStale?.()
+  }, [stale, onStale])
+
+  const refresh = () => {
+    void refreshEditWorkspaceStatus(queryClient, workspaceId)
+    void queryClient.invalidateQueries({ queryKey: editWorkspaceChangesKey(workspaceId), exact: true })
+  }
+
+  if (stale || status.isPending) return null
+  if (status.isError) {
+    if (hasCode(status.error, 'NOT_AN_EDIT_WORKSPACE')) return null
+    return (
+      <BarRow
+        lead={<StatusDot dot="rest" />}
+        actions={
+          <button type="button" className={BUTTON} onClick={refresh}>
+            Retry
+          </button>
+        }
+      >
+        Couldn't read this edit workspace: {explorerErrorMessage(status.error)}
+      </BarRow>
+    )
+  }
+
+  const data = status.data
+  const projectKey = data.workspace.projectKey
+  const defaultBranch = data.workspace.defaultBranch
+  const pr = data.pr
+  const landed = useEditWorkspaceStore.getState().setLanded
+  const leave = () => leaveEditWorkspace(rootId, projectKey)
+  const uncommitted = changes.data?.uncommittedPaths ?? []
+  const needsPush = uncommitted.length > 0 || data.unpushedCommits
+
+  const openPrDialog = () => {
+    if (unsavedPaths.length > 0) {
+      toast.error(`Save or discard your unsaved edits first: ${unsavedPaths.join(', ')}.`)
+      return
+    }
+    setDialog('pr')
+  }
+
+  const merge = async () => {
+    if (!pr || unsavedPaths.length > 0) return
+    setMerging(true)
+    try {
+      await mergeEditWorkspace(workspaceId)
+      toast.success(`Merged PR #${pr.number}. The edit workspace was removed.`)
+      landed(projectKey, { kind: 'merged', prNumber: pr.number, defaultBranch })
+      leave()
+    } catch (error) {
+      toast.error(explorerErrorMessage(error))
+      refresh()
+    } finally {
+      setMerging(false)
+    }
+  }
+
+  const onPrDone = (result: EditWorkspaceCreatePrResult) => {
+    setDialog(null)
+    if (result.mode === 'direct') {
+      toast.success(result.created ? `Opened PR #${result.number}.` : `Pushed your changes to PR #${result.number}.`)
+      refresh()
+      return
+    }
+    toast.success(
+      `Created ${result.issueId} and opened PR #${result.prNumber}. Overdeck is setting up its pipeline workspace and will start review.`,
+      { action: { label: 'Open PR', onClick: () => window.open(result.prUrl, '_blank', 'noopener') } },
+    )
+    landed(projectKey, { kind: 'pipeline', issueId: result.issueId, prNumber: result.prNumber, prUrl: result.prUrl })
+    leave()
+  }
+
+  const onDiscarded = () => {
+    setDialog(null)
+    toast(`Discarded edit workspace ${data.workspace.name}.`)
+    landed(projectKey, { kind: 'discarded', workspaceName: data.workspace.name })
+    leave()
+  }
+
+  const discardButton = (
+    <button type="button" className={BUTTON} onClick={() => setDialog('discard')}>
+      Discard…
+    </button>
+  )
+  const createButton = (
+    <button type="button" className={PRIMARY_BUTTON} onClick={openPrDialog}>
+      Create PR
+    </button>
+  )
+  const viewButton = pr ? (
+    <a href={pr.url} target="_blank" rel="noreferrer" className={`${BUTTON} inline-flex items-center`}>
+      View on GitHub
+    </a>
+  ) : null
+  const refreshButton = (
+    <button type="button" className={BUTTON} onClick={refresh}>
+      Refresh
+    </button>
+  )
+
+  let row: ReactNode
+  if (pr?.state === 'OPEN') {
+    const blocked = !pr.canMerge
+      ? (pr.reason ?? 'GitHub does not allow this merge.')
+      : unsavedPaths.length > 0
+        ? UNSAVED_REASON
+        : needsPush
+          ? UNCOMMITTED_REASON
+          : null
+    row = (
+      <BarRow
+        lead={<StatusDot dot={blocked ? 'live' : 'done'} />}
+        actions={
+          <>
+            {viewButton}
+            {needsPush ? (
+              <button type="button" className={BUTTON} onClick={openPrDialog}>
+                Push changes
+              </button>
+            ) : null}
+            {refreshButton}
+            {discardButton}
+            <button
+              type="button"
+              className={blocked ? BUTTON : PRIMARY_BUTTON}
+              disabled={blocked !== null || merging}
+              title={blocked ?? undefined}
+              onClick={() => void merge()}
+            >
+              {merging ? 'Merging…' : 'Merge'}
+            </button>
+          </>
+        }
+      >
+        {blocked ? (
+          <>
+            PR <Strong>#{pr.number}</Strong> is {pr.isDraft ? 'a draft' : 'open'} · <span data-testid="edit-pr-merge-reason">{sentenceEnd(blocked)}</span>
+          </>
+        ) : (
+          <>
+            PR <Strong>#{pr.number}</Strong> · no conflicts. Merging squashes it into <Mono>{defaultBranch}</Mono>.
+          </>
+        )}
+      </BarRow>
+    )
+  } else if (pr?.state === 'MERGED') {
+    row = (
+      <BarRow lead={<StatusDot dot="done" />} actions={<>{viewButton}{discardButton}</>}>
+        PR <Strong>#{pr.number}</Strong> was merged on GitHub.
+      </BarRow>
+    )
+  } else {
+    row = (
+      <BarRow lead={<StatusDot dot="editing" />} actions={<>{discardButton}{createButton}</>}>
+        {pr?.state === 'CLOSED' ? (
+          <>
+            PR <Strong>#{pr.number}</Strong> was closed.{' '}
+          </>
+        ) : null}
+        <EditingSentence status={data} changes={changes.data} saving={unsavedPaths.length > 0} />
+      </BarRow>
+    )
+  }
+
+  return (
+    <>
+      {row}
+      {dialog === 'pr' && (
+        <CreatePrDialog
+          status={data}
+          changedPaths={changes.data?.files.map((f) => f.path) ?? []}
+          onClose={() => setDialog(null)}
+          onDone={onPrDone}
+        />
+      )}
+      {dialog === 'discard' && (
+        <DiscardDialog
+          status={data}
+          uncommittedPaths={uncommitted}
+          unsavedPaths={unsavedPaths}
+          onClose={() => setDialog(null)}
+          onDiscarded={onDiscarded}
+        />
+      )}
+    </>
+  )
+}
+
+export function EditorBar({ rootId, deckKey, paneId, onStale }: EditorBarProps) {
   const parsed = parseRootId(rootId)
   if (parsed?.kind === 'project') return <ProjectBar projectKey={parsed.key} rootId={rootId} deckKey={deckKey} paneId={paneId} />
-  if (parsed?.kind === 'workspace') return <EditWorkspaceNote rootId={rootId} />
+  if (parsed?.kind === 'workspace') return <WorkspaceBar rootId={rootId} workspaceId={parsed.key} onStale={onStale} />
   return null
 }
