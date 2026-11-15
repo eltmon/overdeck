@@ -4,17 +4,17 @@
     "created": "2026-11-15T02:33:50Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5289: Workflow redesign B: Files/Changes/Search dock replaces the explorer tab; global shortcuts; Go to file ranking",
-    "updated": "2026-11-15T02:44:40.802Z"
+    "updated": "2026-11-15T02:58:05.781Z"
   },
   "plan": {
     "id": "pan-5289",
     "title": "Workflow redesign B: Files/Changes/Search dock replaces the explorer tab; global shortcuts; Go to file ranking",
-    "status": "proposed",
+    "status": "running",
     "uid": "064c2fe6-ed3e-4428-95f5-2af9e85792b3",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T02:33:50Z",
-    "updated": "2026-11-15T02:44:40.802Z",
+    "updated": "2026-11-15T02:58:05.781Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5289",
@@ -2347,5 +2347,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
