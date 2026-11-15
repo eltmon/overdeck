@@ -31,6 +31,7 @@ import remarkGfm from 'remark-gfm';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 import type { Components, ExtraProps } from 'react-markdown';
 import { resolveMarkdownFileLinkMeta, shouldPreserveMarkdownFileLinkHref, splitMarkdownTextFileLinks, type MarkdownFileLinkMeta } from '../../markdown-links';
+import { isDocumentRelativeHref } from '../../lib/markdownDocLinks';
 import { MarkdownFileLink } from './MarkdownFileLink';
 import { useFilePathExists } from '../../hooks/useFilePathExists';
 import { useTheme } from '../../hooks/useTheme';
@@ -404,6 +405,12 @@ function makeComponents(isStreaming: boolean, cwd: string | undefined, issueId: 
             fallback={children}
           />
         );
+      }
+
+      // PAN-5337: a relative href nothing above resolved must never reach the
+      // browser — it would resolve against the current /conv/<id> URL and 404.
+      if (isDocumentRelativeHref(href)) {
+        return <span data-testid="markdown-inert-link">{children}</span>;
       }
 
       // Block javascript: and data: URIs to prevent XSS from assistant markdown
