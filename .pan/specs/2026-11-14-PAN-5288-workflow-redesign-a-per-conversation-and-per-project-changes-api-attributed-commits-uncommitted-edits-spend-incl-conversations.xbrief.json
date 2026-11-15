@@ -4,17 +4,17 @@
     "created": "2026-11-14T23:59:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5288: Workflow redesign A: per-conversation and per-project changes API (attributed commits, uncommitted edits, spend incl. conversations)",
-    "updated": "2026-11-14T23:56:37.913Z"
+    "updated": "2026-11-14T23:57:50.572Z"
   },
   "plan": {
     "id": "pan-5288",
     "title": "Workflow redesign A: per-conversation and per-project changes API (attributed commits, uncommitted edits, spend incl. conversations)",
-    "status": "proposed",
+    "status": "running",
     "uid": "2938be01-94c5-4637-aef5-5e0d29be1ad4",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-14T23:59:00Z",
-    "updated": "2026-11-14T23:56:37.913Z",
+    "updated": "2026-11-14T23:57:50.572Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5288",
@@ -801,5 +801,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
