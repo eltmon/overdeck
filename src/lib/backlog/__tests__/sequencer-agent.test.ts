@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildSequencerPrompt } from '../sequencer-agent.js';
-import type { CollectOpenBacklogResult } from '../backlog-input.js';
+import { backlogManifestKey, buildSequencerPrompt, manifestKeyFromText } from '../sequencer-agent.js';
+import type { BacklogManifestEntry, CollectOpenBacklogResult } from '../backlog-input.js';
 
 const MANIFEST_ENTRY = {
   id: 'PAN-1',
@@ -103,5 +103,51 @@ describe('buildSequencerPrompt', () => {
     });
     expect(prompt).toContain('NEVER inline the entire backlog');
     expect(prompt).toContain('read them batch by batch');
+  });
+});
+
+describe('backlogManifestKey (PAN-5357)', () => {
+  const ENTRY_A: BacklogManifestEntry = {
+    id: 'PAN-1', title: 'A', labels: ['x', 'y'], priority: 1, ageMs: 1000,
+    inPipeline: false, hasPrd: false, ready: false, updatedAt: '2026-06-19T00:00:00Z', isEpic: false,
+  };
+  const ENTRY_B: BacklogManifestEntry = {
+    id: 'PAN-2', title: 'B', labels: ['z'], priority: 2, ageMs: 2000,
+    inPipeline: true, hasPrd: true, ready: true, updatedAt: '2026-06-18T00:00:00Z', isEpic: true, partOf: 'PAN-9',
+  };
+
+  it('ignores ageMs, entry order and label order', () => {
+    const base = backlogManifestKey([ENTRY_A, ENTRY_B]);
+    const differentAge = backlogManifestKey([{ ...ENTRY_A, ageMs: 999_999 }, ENTRY_B]);
+    const reorderedEntries = backlogManifestKey([ENTRY_B, ENTRY_A]);
+    const reorderedLabels = backlogManifestKey([{ ...ENTRY_A, labels: ['y', 'x'] }, ENTRY_B]);
+
+    expect(differentAge).toBe(base);
+    expect(reorderedEntries).toBe(base);
+    expect(reorderedLabels).toBe(base);
+  });
+
+  it('changes when updatedAt changes', () => {
+    const base = backlogManifestKey([ENTRY_A, ENTRY_B]);
+    const changed = backlogManifestKey([{ ...ENTRY_A, updatedAt: '2026-06-20T00:00:00Z' }, ENTRY_B]);
+    expect(changed).not.toBe(base);
+  });
+});
+
+describe('manifestKeyFromText (PAN-5357)', () => {
+  it('returns null for non-JSON text', () => {
+    expect(manifestKeyFromText('not json')).toBeNull();
+  });
+
+  it('returns null for a JSON object (non-array)', () => {
+    expect(manifestKeyFromText('{"id":"PAN-1"}')).toBeNull();
+  });
+
+  it('returns the manifest key for a JSON array', () => {
+    const entries: BacklogManifestEntry[] = [{
+      id: 'PAN-1', title: 'A', labels: [], priority: undefined, ageMs: 0,
+      inPipeline: false, hasPrd: false, ready: false, updatedAt: '2026-06-19T00:00:00Z', isEpic: false,
+    }];
+    expect(manifestKeyFromText(JSON.stringify(entries))).toBe(backlogManifestKey(entries));
   });
 });
