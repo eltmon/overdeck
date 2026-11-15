@@ -514,7 +514,10 @@ const isDoneOrCanceled = (state: IssueActionState) => {
   const canonical = canonicalState(state);
   return canonical === 'done' || canonical === 'canceled';
 };
-const isMerged = (state: IssueActionState) => state.isMerged === true || state.derived?.state === 'merged';
+// PAN-5279: an open epic's merged PR is one slice (`derived.mergedSlice`), so
+// it never counts as merged here — Close out stays off and the next slice can start.
+const isMerged = (state: IssueActionState) =>
+  !state.derived?.mergedSlice && (state.isMerged === true || state.derived?.state === 'merged');
 const derivedState = (state: IssueActionState) => state.derived?.state;
 const canPlan = (state: IssueActionState) => hasStoppedAgent(state) && !state.hasPlan && !isMerged(state) && !isDoneOrCanceled(state);
 const canFinalizePlanning = (state: IssueActionState) => state.hasPlan && state.agent?.role === 'plan' && hasStoppedAgent(state) && !isMerged(state);

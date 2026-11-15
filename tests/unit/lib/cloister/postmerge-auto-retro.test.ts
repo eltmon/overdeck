@@ -94,6 +94,11 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
   killSessionAsync: vi.fn().mockResolvedValue(undefined),
 }));
 
+// PAN-5279: the post-merge epic check reads the tracker; keep these tests offline.
+vi.mock('../../../../src/lib/overdeck/derived-issue-state.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../src/lib/overdeck/derived-issue-state.js')>()),
+  readIssueFromTracker: async () => null,
+}));
 vi.mock('../../../../src/lib/tracker-utils.js', () => ({
   resolveGitHubIssue: vi.fn().mockReturnValue({ isGitHub: true, owner: 'test', repo: 'test', number: 2468 }),
   resolveTrackerType: vi.fn().mockReturnValue('github'),

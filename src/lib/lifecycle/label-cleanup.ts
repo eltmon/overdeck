@@ -5,7 +5,7 @@
  * Labels are cleaned even if the issue close step fails.
  *
  * Removes: in-review, in-progress, merge-agent
- * Adds:    merged
+ * Adds:    merged (unless `addMergedLabel: false` — an open epic's slice merge, PAN-5279)
  */
 
 import { exec } from 'child_process';
@@ -21,13 +21,22 @@ const MERGED_LABEL = 'merged';
 const MERGED_COLOR = '0e8a16'; // green
 const LABELS_TO_REMOVE = ['in-review', 'in-progress', 'merge-agent'];
 
+export interface CleanupMergedLabelsOptions {
+  /**
+   * PAN-5279: false for an open epic's slice merge. The workflow labels are
+   * still removed, but `merged` is not added: the epic did not land.
+   */
+  readonly addMergedLabel?: boolean;
+}
+
 /**
  * Remove workflow labels and apply 'merged' label.
  * Non-fatal: label management failure does not block the merge lifecycle.
  */
-export function cleanupMergedLabels(ctx: LifecycleContext): Effect.Effect<StepResult> {
+export function cleanupMergedLabels(ctx: LifecycleContext, opts: CleanupMergedLabelsOptions = {}): Effect.Effect<StepResult> {
+  const addMerged = opts.addMergedLabel !== false;
   return Effect.tryPromise({
-    try: () => cleanupMergedLabelsImpl(ctx),
+    try: () => cleanupMergedLabelsImpl(ctx, addMerged),
     catch: (err) => err,
   }).pipe(
     Effect.catch((err) =>
@@ -36,38 +45,40 @@ export function cleanupMergedLabels(ctx: LifecycleContext): Effect.Effect<StepRe
   );
 }
 
-async function cleanupMergedLabelsImpl(ctx: LifecycleContext): Promise<StepResult> {
+async function cleanupMergedLabelsImpl(ctx: LifecycleContext, addMerged: boolean): Promise<StepResult> {
   const step = 'label-cleanup:merged';
 
   if (ctx.github) {
-    return cleanupLabelsGitHub(ctx);
+    return cleanupLabelsGitHub(ctx, addMerged);
   }
 
   const linearApiKey = await getLinearApiKey();
   if (linearApiKey) {
-    return cleanupLabelsLinear(ctx, linearApiKey);
+    return cleanupLabelsLinear(ctx, linearApiKey, addMerged);
   }
 
   return stepSkipped(step, ['No tracker available for label cleanup']);
 }
 
-async function cleanupLabelsGitHub(ctx: LifecycleContext): Promise<StepResult> {
+async function cleanupLabelsGitHub(ctx: LifecycleContext, addMerged: boolean): Promise<StepResult> {
   const step = 'label-cleanup:merged';
   if (!ctx.github) return stepSkipped(step);
   const { owner, repo, number } = ctx.github;
 
   try {
-    // Ensure merged label exists
-    await execAsync(
-      `gh label create "${MERGED_LABEL}" --repo ${owner}/${repo} --color "${MERGED_COLOR}" --description "Merged to main" --force 2>/dev/null || true`,
-      { encoding: 'utf-8' },
-    );
+    if (addMerged) {
+      // Ensure merged label exists
+      await execAsync(
+        `gh label create "${MERGED_LABEL}" --repo ${owner}/${repo} --color "${MERGED_COLOR}" --description "Merged to main" --force 2>/dev/null || true`,
+        { encoding: 'utf-8' },
+      );
 
-    // Add merged label
-    await execAsync(
-      `gh issue edit ${number} --repo ${owner}/${repo} --add-label "${MERGED_LABEL}"`,
-      { encoding: 'utf-8' },
-    );
+      // Add merged label
+      await execAsync(
+        `gh issue edit ${number} --repo ${owner}/${repo} --add-label "${MERGED_LABEL}"`,
+        { encoding: 'utf-8' },
+      );
+    }
 
     // Fetch current labels to avoid 404 spam from removing non-existent labels (PAN-925)
     let currentLabels: string[] = [];
@@ -96,7 +107,7 @@ async function cleanupLabelsGitHub(ctx: LifecycleContext): Promise<StepResult> {
       : 'No workflow labels to remove';
 
     return stepOk(step, [
-      `Applied '${MERGED_LABEL}' label on GitHub #${number}`,
+      addMerged ? `Applied '${MERGED_LABEL}' label on GitHub #${number}` : `Left '${MERGED_LABEL}' off GitHub #${number} (open epic: a slice merged)`,
       removedDesc,
     ]);
   } catch (err) {
@@ -104,7 +115,7 @@ async function cleanupLabelsGitHub(ctx: LifecycleContext): Promise<StepResult> {
   }
 }
 
-async function cleanupLabelsLinear(ctx: LifecycleContext, apiKey: string): Promise<StepResult> {
+async function cleanupLabelsLinear(ctx: LifecycleContext, apiKey: string, addMerged: boolean): Promise<StepResult> {
   const step = 'label-cleanup:merged';
   try {
     const { LinearClient } = await import('@linear/sdk');
@@ -128,6 +139,17 @@ async function cleanupLabelsLinear(ctx: LifecycleContext, apiKey: string): Promi
     }
 
     const issue = results.nodes[0];
+
+    if (!addMerged) {
+      // PAN-5279: an open epic's slice merge — strip workflow labels only.
+      const existingLabels = await issue.labels();
+      const keptIds = existingLabels.nodes.filter(l => !LABELS_TO_REMOVE.includes(l.name)).map(l => l.id);
+      if (keptIds.length !== existingLabels.nodes.length) await issue.update({ labelIds: keptIds });
+      return stepOk(step, [
+        `Left '${MERGED_LABEL}' off Linear ${ctx.issueId} (open epic: a slice merged)`,
+        `Removed: ${LABELS_TO_REMOVE.join(', ')}`,
+      ]);
+    }
 
     // Find or create merged label
     const labelSearch = await client.issueLabels({ filter: { name: { eq: MERGED_LABEL } } });

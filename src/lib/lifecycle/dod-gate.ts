@@ -18,6 +18,7 @@ import {
   hasRequiredChecksGreen,
   requiredChecksOutcome,
 } from './dod-later-green.js';
+import { hasEpicLabel } from '../backlog/pickup.js';
 import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
 import { readVerificationArtifact, type VerificationArtifact } from '../cloister/verification-artifact.js';
 import {
@@ -253,7 +254,31 @@ export interface EvaluateDodGateDeps {
   trackerClosed?: (issueId: string) => Awaitable<boolean>;
   /** PAN-5209: repo landing evidence for rows 1/2 on a non-GitHub-tracked issue. */
   forgeMerge?: (issueId: string) => Promise<RepoLandingEvidence>;
+  /** PAN-5279: the issue is open and labeled `epic`; `readIsOpenEpic` by default. */
+  openEpic?: (issueId: string) => Awaitable<boolean>;
   now: () => string;
+}
+
+/**
+ * PAN-5279: the tracker says the issue is open and labeled `epic`. A tracker
+ * that does not answer reads as "not an epic", so the gate behaves as it did
+ * before this check existed; the other rows still guard the close-out.
+ */
+export async function readIsOpenEpic(issueId: string): Promise<boolean> {
+  try {
+    const { readIssueFromTracker } = await import('../overdeck/derived-issue-state.js');
+    const issue = await readIssueFromTracker(issueId);
+    return issue !== null && issue.open && hasEpicLabel(issue.labels);
+  } catch {
+    return false;
+  }
+}
+
+/** PAN-5279: row 4's observed text when the issue is an open epic. */
+export function openEpicMergedObserved(issueId: string, observed: string): string {
+  return `${issueId} is an open epic: a merged PR is one slice, not the epic landing. `
+    + 'Close an epic out only after its last slice lands, with --accept-merged as an explicit operator override; '
+    + `merge evidence: ${observed}`;
 }
 
 const defaultEvaluateDodGateDeps: EvaluateDodGateDeps = {
@@ -267,6 +292,7 @@ const defaultEvaluateDodGateDeps: EvaluateDodGateDeps = {
   deploy: checkDeployRow,
   trackerClosed: isTrackerIssueClosed,
   forgeMerge: readRepoLandingEvidence,
+  openEpic: readIsOpenEpic,
   now: () => new Date().toISOString(),
 };
 
@@ -805,6 +831,13 @@ export async function evaluateDodGate(
       mainVerifyRowStatus: mainVerify.status,
     }),
   ]);
+  // PAN-5279: an open epic's merged PR is a slice. Row 4 is flipped only now,
+  // after the rows that read landed-work evidence, so they stay honest; the
+  // miss needs the operator's --accept-merged (the Flywheel cannot accept).
+  if (await (deps.openEpic ?? defaultEvaluateDodGateDeps.openEpic!)(ctx.issueId)) {
+    merged.status = 'miss';
+    merged.observed = openEpicMergedObserved(ctx.issueId, merged.observed);
+  }
   const rows = [review, tests, verification, merged, postMerge, mainVerify, ship, deploy];
   for (const row of rows) {
     if (row.status === 'miss' && acceptedRows.has(row.id)) {

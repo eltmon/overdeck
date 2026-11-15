@@ -140,4 +140,30 @@ describe('HappenedFeed', () => {
 
     expect(screen.getByText(/finished its coding session/)).toBeTruthy()
   })
+
+  // PAN-5279: an open epic's merged PR is one slice, never the epic shipping.
+  it('says a slice merged, never Shipped, for an open epic with a merged slice', () => {
+    queryMocks.derivedIssue = {
+      issueId: 'PAN-2598',
+      state: 'planned',
+      mergedSlice: { number: 5254, url: 'https://example.test/pr/5254' },
+    }
+    queryMocks.activityQuery.data.sections = [
+      {
+        type: 'work',
+        sessionId: 'agent-pan-2598',
+        model: 'gpt-5.5',
+        startedAt: '2026-07-13T00:00:00Z',
+        duration: 300,
+        status: 'stopped',
+        endedAt: '2026-07-13T00:05:00Z',
+      },
+    ]
+
+    renderHappenedFeed()
+
+    expect(screen.getByText(/Slice #5254 merged to main — more slices to land/)).toBeTruthy()
+    expect(screen.queryByText(/Shipped/)).toBeNull()
+    expect(screen.queryByText(/All checks passed/)).toBeNull()
+  })
 })

@@ -23,6 +23,10 @@
  *   L6-spec  xBRIEF exists   · durable plan in the plan home's `.pan/specs/`
  *   L7-record  close-out record  · pipeline.closedOut === true via the record door
  *
+ * PAN-5279: an open issue labeled `epic` lands in slices, so a merged PR (or
+ * landed branch work) on it is a merged slice. It resolves to `planned_backlog`,
+ * never `post_merge_limbo` — nothing should close an epic out on a slice merge.
+ *
  * L5 (agents / DB / state.json) is a *liveness accelerator* only — it can
  * annotate "is an agent running right now," but it NEVER decides membership.
  */
@@ -64,6 +68,8 @@ export interface IssueLensSignals {
   hasXbriefSpec: boolean;
   /** Durable Definition-of-Ready signal from the issue's `ready` label. */
   explicitlyReady: boolean;
+  /** PAN-5279: the issue carries the `epic` label, so a merged PR is a slice, not the issue landing. */
+  isEpic?: boolean;
 }
 
 export interface PipelineMembership {
@@ -147,6 +153,9 @@ export function resolvePipelineMembership(s: IssueLensSignals): PipelineMembersh
   // Open issue:
   if (s.hasOpenPr) {
     return result('in_flight', 'open issue with an open PR — active work');
+  }
+  if (s.isEpic === true && (s.hasMergedPr || (s.hasConventionBranch && s.hasMergedBranchWork))) {
+    return result('planned_backlog', 'open epic with a merged slice — more slices to land; an epic is never closed out on a slice merge');
   }
   if (s.hasMergedPr) {
     return result('post_merge_limbo', 'open issue with a merged PR — merged but never closed out; run close-out');

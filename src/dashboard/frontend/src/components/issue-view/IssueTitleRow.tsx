@@ -3,8 +3,9 @@
  *
  * Issue id, title, derived state badge, spend, the action strip and shell
  * trailing chrome, in that order. The drawer renders it in its header (h2,
- * never wraps); the Stage tab renders it as the page's subject (h1, wraps in
- * a narrow pane, breadcrumb in `leading`).
+ * never wraps, title truncates); the Stage tab renders it as the page's
+ * subject (h1, wraps in a narrow pane, title wraps to at most 3 lines,
+ * breadcrumb in `leading`).
  */
 import type { ReactNode } from 'react';
 
@@ -42,8 +43,9 @@ export function IssueTitleRow({ issueId, title, titleStatus, agents, trackerStat
       {leading}
       <span className="shrink-0 font-mono-ui text-[12px] text-muted-foreground">{issueId}</span>
       <Heading title={title ?? undefined} className={cn(
-        'truncate font-display text-[15px] font-semibold leading-[1.3] tracking-[-0.012em] text-foreground',
-        wrap ? 'min-w-[200px] flex-1' : 'min-w-0 flex-initial',
+        'font-display text-[15px] font-semibold leading-[1.3] tracking-[-0.012em] text-foreground',
+        // PAN-5279: the Stage title wraps (up to 3 lines); the fixed-height drawer row truncates.
+        wrap ? 'line-clamp-3 min-w-[200px] flex-1 break-words' : 'min-w-0 flex-initial truncate',
       )}>
         <IssueHeaderTitle issueId={issueId} title={title} status={titleStatus} />
       </Heading>
