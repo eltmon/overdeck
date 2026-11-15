@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5353",
   "created": "2026-11-15T14:41:35.965Z",
-  "updated": "2026-11-15T14:53:08.956Z",
+  "updated": "2026-11-15T14:53:14.815Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
     "agent-door.ac5": {
       "status": "completed",
       "doneAt": "2026-11-15T14:53:08.956Z"
+    },
+    "conversation-door": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5353",
+      "claimedAt": "2026-11-15T14:53:14.815Z"
     }
   }
 }
