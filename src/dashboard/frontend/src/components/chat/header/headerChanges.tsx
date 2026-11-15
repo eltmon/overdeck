@@ -74,8 +74,8 @@ export function HeaderDockButtons({ changes }: { changes: HeaderChanges }) {
         <FileDiff size={14} />
         <span>Changes</span>
         {showNumbers && (
-          <span className="tabular-nums">
-            <span className="text-success-foreground">+{additions}</span>{' '}
+          <span className="inline-flex gap-1 tabular-nums">
+            <span className="text-success-foreground">+{additions}</span>
             <span className="text-destructive-foreground">{'−'}{deletions}</span>
           </span>
         )}
