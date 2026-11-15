@@ -38,6 +38,17 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 #     (the known-bad 0.81.0 scores 126 on the same runner)
 #   Linux PID net 10, 5, 6, 8 -> min(30, 30) = 30
 #     (after the systemctl fix, #5181; 15 and 16 before it)
+# PAN-5361 recalibration 2026-11-15 (same D14 rule) for the min-of-3 Linux
+# measure, from 20 plain runs of the temporary bare-host-calibration workflow
+# against @overdeck/core@0.86.0 (workflow run 43734201237; see "Calibration
+# evidence" in .pan/drafts/pan-5361.md for the full table):
+#   Linux PID net (min(idle)-min(baseline)): 27, 10, 6, 23, 12, 9, 24, 13, 26,
+#     8, 13, 13, 14, 9, 2, 13, 13, 10, 24, 12 -> max(10, min(30, 3x27)) = 30
+#     (unchanged; two --idle-spawner-ms 500 canary runs net 82 and 70, both
+#     correctly failing and attributed to the dashboard tree)
+#   macOS unchanged (one window per side, traced-cost): the 0.86.0 leg passed
+#     at cost 25 with windowsPerSide 1; the 0.81.0 known-bad leg failed at
+#     cost 127 with the expected tmux forbidden-tool lines.
 IDLE_BUDGET_MACOS=30
 IDLE_BUDGET_LINUX=30
 BARE_PATH_ENTRIES=6
