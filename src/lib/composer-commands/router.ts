@@ -5,6 +5,8 @@
  * harness-specific stage: native compact handling, attachment transformation,
  * prompt-memory injection, and delivery. Returning early here guarantees that
  * `/pan` operator commands cannot become harness prompts or transcript rows.
+ * Bare `/pan` and its help spellings return the command list without
+ * spawning anything (PAN-5348).
  */
 import type {
   ComposerCommandPolicy,
@@ -19,7 +21,9 @@ import {
 import { runDetachedCommand } from './detached.js';
 import { runComposerReload } from './reload.js';
 import { runCapturedCommand } from './executors.js';
+import { buildComposerHelpResult } from './help.js';
 import {
+  COMPOSER_HELP_ENTRY,
   parseOverdeckComposerCommand,
   type ParsedOverdeckComposerCommand,
 } from './parser.js';
@@ -99,6 +103,8 @@ export async function handleComposerCommand({
   target,
   confirmation,
 }: HandleComposerCommandInput, dependencies: ComposerCommandRouterDependencies = {}): Promise<ComposerCommandResult> {
+  if (parsed.entry === COMPOSER_HELP_ENTRY) return buildComposerHelpResult();
+
   const policy = (dependencies.resolvePolicy ?? resolvePolicy)(parsed.entry.path);
   if (policy.safety !== 'safe') {
     const confirmationStore = dependencies.confirmationStore ?? composerConfirmationStore;
