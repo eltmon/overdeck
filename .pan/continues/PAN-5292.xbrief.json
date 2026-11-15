@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5292",
   "created": "2026-11-15T01:03:44.357Z",
-  "updated": "2026-11-15T01:24:50.976Z",
+  "updated": "2026-11-15T01:24:52.405Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -176,6 +176,11 @@
     "crumb-and-labels.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T01:24:50.976Z"
+    },
+    "home-page-counts": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5292",
+      "claimedAt": "2026-11-15T01:24:52.405Z"
     }
   }
 }
