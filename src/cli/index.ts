@@ -273,6 +273,9 @@ program
   .option('--new-tab', 'Open in a new browser tab instead of the focused dashboard tab')
   .action(lazyAction(() => import('./commands/open.js'), 'openCommand'));
 
+// pan integrate file-manager — right-click "Open in Overdeck" (PAN-5349)
+await groups.register('integrate');
+
 await groups.register('review');
 
 program.command('staffing <id>').description('Show the work model and swarm policy in effect for an issue').action(lazyAction(() => import('./commands/staffing.js'), 'staffingCommand'));

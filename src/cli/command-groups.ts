@@ -214,6 +214,11 @@ export const COMMAND_GROUPS = {
     load: () => import('./commands/cost.js'),
     register: (mod, program) => { program.addCommand(mod.createCostCommand()); },
   }),
+  integrate: group({
+    names: ['integrate'],
+    load: () => import('./commands/integrate.js'),
+    register: (mod, program) => mod.registerIntegrateCommands(program),
+  }),
 };
 
 export type CommandGroupKey = keyof typeof COMMAND_GROUPS;
