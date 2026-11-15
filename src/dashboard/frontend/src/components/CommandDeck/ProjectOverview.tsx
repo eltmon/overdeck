@@ -1,19 +1,20 @@
 import { useMemo, type Ref } from 'react';
 import { useDashboardStore } from '../../lib/store';
-import { PHASE_BY_DERIVED_STATE, type PipelineIssuePhase } from '../../lib/pipeline-state';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
-import type { CanonicalState, DerivedIssueState } from '../../types';
+import type { DerivedIssueState } from '../../types';
 import {
   type BucketedFeature,
   type IssueCostBreakdown,
+  bucketFeaturePhase,
   groupPipelineEntries,
-  hasActiveAgentSignal,
-  hasWorkSession,
 } from './pipeline-helpers';
 import { PipelineSection } from './PipelineSection';
 import { MergeTrain } from '../merge-train/train/MergeTrain';
 
 export type { IssueCostBreakdown };
+// PAN-5294: the phase rule lives in pipeline-helpers so ProjectHome can read it
+// without importing this component; this re-export keeps existing callers.
+export { bucketFeaturePhase };
 
 interface ProjectOverviewProps {
   projectName: string;
@@ -29,42 +30,6 @@ interface ProjectOverviewProps {
   inReviewRef?: Ref<HTMLDivElement>;
 }
 
-/**
- * PAN-3917: the lane comes from the derived issue state. When the server has
- * not derived one yet, the tracker's own state (an owner, never a record)
- * places the row so the tree does not collapse every feature into Todo.
- */
-function featureState(feature: ProjectFeature): CanonicalState | undefined {
-  const raw = `${feature.status} ${feature.stateLabel}`.toLowerCase();
-  if (raw.includes('close-out')) return 'done';
-  if (raw.includes('review')) return 'in_review';
-  if (raw.includes('progress') || hasActiveAgentSignal(feature)) return 'in_progress';
-  if (raw.includes('done') || raw.includes('complete')) return 'done';
-  if (raw.includes('cancel')) return 'canceled';
-  return feature.status as CanonicalState | undefined;
-}
-
-function trackerPhase(feature: ProjectFeature): PipelineIssuePhase {
-  switch (featureState(feature)) {
-    case 'done':
-    case 'canceled':
-      return 'ship';
-    case 'in_review':
-      return 'review';
-    case 'in_progress':
-      return 'work';
-    default:
-      return feature.hasPlanning && !hasWorkSession(feature) ? 'plan' : 'todo';
-  }
-}
-
-export function bucketFeaturePhase(
-  feature: ProjectFeature,
-  derived: DerivedIssueState | undefined,
-): PipelineIssuePhase {
-  return derived ? PHASE_BY_DERIVED_STATE[derived.state] : trackerPhase(feature);
-}
-
 function derivedForFeature(
   feature: ProjectFeature,
   derivedByIssueId: Record<string, DerivedIssueState>,
@@ -72,32 +37,6 @@ function derivedForFeature(
   return derivedByIssueId[feature.issueId] ??
     derivedByIssueId[feature.issueId.toUpperCase()] ??
     derivedByIssueId[feature.issueId.toLowerCase()];
-}
-
-/**
- * Project lifetime spend (PAN-1589). `issueCosts` is a GLOBAL map (every issue
- * across all projects, keyed by both `PAN-1` and a lowercased alias). We scope
- * it to this project by the issue prefix(es) of its features, and sum ALL
- * matching issues — including closed/historical ones, not just active features.
- * Counting only the canonical (non-lowercased) keys avoids double-counting the
- * alias entries. Shared by the cockpit Spend metric and the Home cost chip so
- * the two always agree.
- */
-export function projectTotalCost(
-  issueCosts: Record<string, number>,
-  features: { issueId: string }[],
-): number {
-  const prefixes = new Set(
-    features.map(f => f.issueId.split('-')[0]?.toUpperCase()).filter(Boolean),
-  );
-  if (prefixes.size === 0) return 0;
-  let sum = 0;
-  for (const [key, value] of Object.entries(issueCosts)) {
-    if (key !== key.toUpperCase()) continue; // skip lowercased aliases
-    const prefix = key.split('-')[0]?.toUpperCase();
-    if (prefix && prefixes.has(prefix)) sum += value;
-  }
-  return sum;
 }
 
 function openBoard() {

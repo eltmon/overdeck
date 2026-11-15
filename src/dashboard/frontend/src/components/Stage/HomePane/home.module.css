@@ -143,3 +143,19 @@
   padding: 8px;
   font-family: var(--font-body, inherit);
 }
+
+/* ProjectHome layout (PAN-5294 §5a): one scrolling column, max 1120px wide. */
+.scroll {
+  height: 100%;
+  overflow: auto;
+  background: var(--background);
+}
+
+.inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 26px 36px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}

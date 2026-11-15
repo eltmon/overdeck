@@ -1,6 +1,6 @@
 import type { SessionNode } from '@overdeck/contracts';
-import type { DerivedIssueState } from '../../types';
-import type { PipelineIssuePhase } from '../../lib/pipeline-state';
+import type { CanonicalState, DerivedIssueState } from '../../types';
+import { PHASE_BY_DERIVED_STATE, type PipelineIssuePhase } from '../../lib/pipeline-state';
 import { compactModelName } from '../../lib/model-names';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 
@@ -449,4 +449,40 @@ export function formatAge(ms: number | null | undefined): string {
   if (ms < HOUR_MS) return `${Math.floor(ms / MINUTE_MS)} m`;
   if (ms < 48 * HOUR_MS) return `${Math.floor(ms / HOUR_MS)} h`;
   return `${Math.floor(ms / (24 * HOUR_MS))} d`;
+}
+
+/**
+ * PAN-3917: the lane comes from the derived issue state. When the server has
+ * not derived one yet, the tracker's own state (an owner, never a record)
+ * places the row so the tree does not collapse every feature into Todo.
+ */
+function featureState(feature: ProjectFeature): CanonicalState | undefined {
+  const raw = `${feature.status} ${feature.stateLabel}`.toLowerCase();
+  if (raw.includes('close-out')) return 'done';
+  if (raw.includes('review')) return 'in_review';
+  if (raw.includes('progress') || hasActiveAgentSignal(feature)) return 'in_progress';
+  if (raw.includes('done') || raw.includes('complete')) return 'done';
+  if (raw.includes('cancel')) return 'canceled';
+  return feature.status as CanonicalState | undefined;
+}
+
+function trackerPhase(feature: ProjectFeature): PipelineIssuePhase {
+  switch (featureState(feature)) {
+    case 'done':
+    case 'canceled':
+      return 'ship';
+    case 'in_review':
+      return 'review';
+    case 'in_progress':
+      return 'work';
+    default:
+      return feature.hasPlanning && !hasWorkSession(feature) ? 'plan' : 'todo';
+  }
+}
+
+export function bucketFeaturePhase(
+  feature: ProjectFeature,
+  derived: DerivedIssueState | undefined,
+): PipelineIssuePhase {
+  return derived ? PHASE_BY_DERIVED_STATE[derived.state] : trackerPhase(feature);
 }
