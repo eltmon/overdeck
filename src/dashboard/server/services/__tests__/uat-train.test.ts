@@ -44,6 +44,26 @@ const mocks = vi.hoisted(() => ({
   evaluateIssueMergeGate: vi.fn(),
   getDerivedIssueState: vi.fn(),
   mergePathOwner: vi.fn(),
+  requireUat: vi.fn(() => false),
+  cachedIssueLabels: vi.fn((): readonly string[] => []),
+  appendPipelineEntry: vi.fn(),
+}));
+
+// PAN-4753 WI-9: the promote stack gate reads the global UAT setting, the cached
+// issue labels, and journals an override; pin all three so no host state leaks in.
+vi.mock('../../../../lib/overdeck/control-settings.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../../lib/overdeck/control-settings.js')>(),
+  isFlywheelRequireUatBeforeMerge: () => mocks.requireUat(),
+}));
+
+vi.mock('../auto-merge-door-policy.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../auto-merge-door-policy.js')>(),
+  cachedIssueLabels: (issueId: string) => mocks.cachedIssueLabels(issueId),
+}));
+
+vi.mock('../../../../lib/cloister/pipeline-journal.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../../lib/cloister/pipeline-journal.js')>(),
+  appendPipelineEntry: (...args: unknown[]) => mocks.appendPipelineEntry(...args),
 }));
 
 vi.mock('../../../../lib/cloister/merge-gate.js', async (importOriginal) => ({
@@ -697,6 +717,8 @@ describe('UAT train project root and startup gate', () => {
 describe('postUatGenerationPromotePayload', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.requireUat.mockReturnValue(false);
+    mocks.cachedIssueLabels.mockReturnValue([]);
     mocks.findProjectByPath.mockReturnValue(null);
     mocks.buildUatPromoteGitDeps.mockReturnValue({ git: 'deps' });
     mocks.buildUatGenerationStore.mockReturnValue({ listChain: vi.fn(), update: vi.fn() });
@@ -771,6 +793,83 @@ describe('postUatGenerationPromotePayload', () => {
     expect(mocks.evaluateIssueMergeGate).not.toHaveBeenCalled();
     expect(mocks.getDerivedIssueState).not.toHaveBeenCalled();
     expect(mocks.promoteUatGeneration).not.toHaveBeenCalled();
+  });
+});
+
+/** PAN-4753 WI-9 (#3176): promote refuses an unhealthy UAT stack when UAT is required. */
+describe('postUatGenerationPromotePayload stack-health gate', () => {
+  const success: PromoteResult = {
+    success: true, generation: 'uat/pan-cobalt-0703', mergeSha: 'abc', members: ['PAN-1', 'PAN-2'], postMergeStarted: [], invalidated: [],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.requireUat.mockReturnValue(false);
+    mocks.cachedIssueLabels.mockReturnValue([]);
+    mocks.findProjectByPath.mockReturnValue({ name: 'myn', path: '/myn', auto_merge_default: 'hold' });
+    mocks.buildUatPromoteGitDeps.mockReturnValue({ git: 'deps' });
+    mocks.buildUatGenerationStore.mockReturnValue({ listChain: vi.fn(), update: vi.fn() });
+    mocks.getUatGeneration.mockReturnValue({ ...gen([]), name: 'uat/pan-cobalt-0703', members: [{ issueId: 'PAN-1' }, { issueId: 'pan-2' }] });
+    mocks.evaluateIssueMergeGate.mockResolvedValue({ ready: true });
+    mocks.getDerivedIssueState.mockImplementation(async (issueId: string) => ({ issueId, state: 'ready' }));
+    mocks.promoteUatGeneration.mockResolvedValue(success);
+    mocks.getWorkspaceInfoForIssue.mockImplementation((issueId: string) => ({ exists: true, isRemote: false, localPath: `/myn/workspaces/feature-${issueId.toLowerCase()}` }));
+  });
+
+  it.each(['degraded', 'unknown', 'absent'] as const)('a %s stack in a hold project refuses with stack-unhealthy before any forge read', async (status) => {
+    mocks.probeUatStack.mockResolvedValue({ status, frontendUrl: 'http://uat' });
+
+    const result = await postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn());
+
+    expect(result).toEqual({
+      success: false,
+      reason: 'stack-unhealthy',
+      message: `UAT stack is ${status}; start it and test, or merge anyway with a reason`,
+    });
+    expect(mocks.evaluateIssueMergeGate).not.toHaveBeenCalled();
+    expect(mocks.promoteUatGeneration).not.toHaveBeenCalled();
+    expect(mocks.appendPipelineEntry).not.toHaveBeenCalled();
+  });
+
+  it('a running stack promotes', async () => {
+    mocks.probeUatStack.mockResolvedValue({ status: 'running', frontendUrl: 'http://uat' });
+    await expect(postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn())).resolves.toBe(success);
+    expect(mocks.appendPipelineEntry).not.toHaveBeenCalled();
+  });
+
+  it('an override with a reason promotes and journals each member', async () => {
+    mocks.probeUatStack.mockResolvedValue({ status: 'degraded', frontendUrl: 'http://uat' });
+
+    const result = await postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn(), undefined, { reason: 'tested on a teammate stack' });
+
+    expect(result).toBe(success);
+    expect(mocks.appendPipelineEntry).toHaveBeenCalledTimes(2);
+    for (const issueId of ['PAN-1', 'PAN-2']) {
+      expect(mocks.appendPipelineEntry).toHaveBeenCalledWith(`/myn/workspaces/feature-${issueId.toLowerCase()}`, {
+        type: 'merge.attempted',
+        issueId,
+        source: 'batch-promote',
+        data: { batch: 'uat/pan-cobalt-0703', overrideStackHealth: true, reason: 'tested on a teammate stack', stackStatus: 'degraded' },
+      });
+    }
+  });
+
+  it('an auto project with no Hold member skips the probe, even with the global setting on', async () => {
+    mocks.requireUat.mockReturnValue(true);
+    mocks.findProjectByPath.mockReturnValue({ name: 'overdeck', path: '/repo', auto_merge_default: 'auto' });
+
+    await expect(postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn())).resolves.toBe(success);
+    expect(mocks.probeUatStack).not.toHaveBeenCalled();
+  });
+
+  it('an auto project with a Hold member probes, and refuses an absent stack', async () => {
+    mocks.findProjectByPath.mockReturnValue({ name: 'overdeck', path: '/repo', auto_merge_default: 'auto' });
+    mocks.cachedIssueLabels.mockImplementation((issueId: string) => (issueId === 'PAN-2' ? ['hold-for-uat'] : []));
+    mocks.probeUatStack.mockResolvedValue({ status: 'absent', frontendUrl: 'http://uat' });
+
+    const result = await postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn());
+
+    expect(result).toMatchObject({ success: false, reason: 'stack-unhealthy' });
   });
 });
 

@@ -57,7 +57,11 @@ Each card has:
   ready (with **Merge**). In an auto project with the train on, a line says
   when the next batch assembles. Expand a row for its branch, PR link, how
   long it has been ready, its merge policy, every blocker, the reviewer's UAT
-  notes, and a nine-step merge tracker.
+  notes, and a nine-step merge tracker. On a GitHub-tracked project the merge
+  policy is an **Auto / Hold** toggle: clicking one sets the issue's
+  `auto-merge` or `hold-for-uat` label, and clicking the pressed one removes
+  it so the issue follows the project again. On other trackers the toggle is
+  read-only and tells you to set the label in the tracker.
 - **Recent merges**: "Last merged: PAN-… · 22m ago · show 5". The list says how
   each one landed: auto-merge, a batch, an Overdeck merge button, or outside
   the train. A PR merged outside the train is noted, never refused; when it
@@ -173,6 +177,19 @@ now, which voids the batch; the confirmation names the batch, and its other
 members wait for the next one. Merging a strike before its bot review asks
 first too. There is no opaque "Ship batch" button: a batch builds itself,
 and nothing reaches `main` until you say so.
+
+**Merge batch** refuses when the batch needs UAT and its UAT stack is not
+running. A batch needs UAT when its project holds for UAT, or when any member
+is set to **Hold**. The card then says the stack's state, for example "UAT
+stack is degraded; start it and test, or merge anyway with a reason". Start
+the stack and test, or choose **Merge anyway…** and type why: the batch
+merges, and each member's history records your reason. A batch of an
+auto-merge project with no Hold member never checks the stack.
+
+The **Auto / Hold** policy toggle and the Merge anyway override are operator
+controls. Agents cannot set the `auto-merge` or `hold-for-uat` labels: the
+dashboard refuses a request that carries an agent's token, and the agent `gh`
+wrapper refuses the label change too.
 
 <Card title="Engineering reference" icon="book" href="https://github.com/eltmon/overdeck/blob/main/docs/MERGE-TRAIN.md">
 The route rule, batch statuses and reasons, the board read model, and the

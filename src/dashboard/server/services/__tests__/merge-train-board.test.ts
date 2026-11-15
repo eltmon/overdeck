@@ -181,11 +181,11 @@ describe('getMergeTrainBoard cars (PAN-4753 WI-7)', () => {
     expect(byId['PAN-3']).toMatchObject({ route: 'auto-merge', policy: 'auto' });
   });
 
-  it('policyWritable is false for a non-GitHub tracker, and for GitHub until the WI-8 route ships', async () => {
+  it('policyWritable is true for a GitHub tracker and false for any other (R9, WI-8)', async () => {
     const linear = await onlyCar({ trackerType: 'linear', open: [open('PAN-1')], facts: { 'PAN-1': facts('PAN-1') } });
     expect(linear.policyWritable).toBe(false);
     const github = await onlyCar({ trackerType: 'github', open: [open('PAN-1')], facts: { 'PAN-1': facts('PAN-1') } });
-    expect(github.policyWritable).toBe(false);
+    expect(github.policyWritable).toBe(true);
   });
 
   it('finds a marker-approved PR the forge shows no decision for, through its journaled verdict', async () => {

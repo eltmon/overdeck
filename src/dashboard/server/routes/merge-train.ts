@@ -423,11 +423,21 @@ const postMergeTrainGenerationPromoteRoute = HttpRouter.add(
     const parsed = yield* readUnknownJsonBody;
     if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
     if (!isJsonObject(parsed.body)) {
-      return jsonResponse({ error: 'body must be a JSON object: { shipVersion? }' }, { status: 400 });
+      return jsonResponse({ error: 'body must be a JSON object: { shipVersion?, overrideStackHealth?, overrideReason? }' }, { status: 400 });
     }
     const rawShipVersion = parsed.body['shipVersion'];
     if (rawShipVersion !== undefined && (typeof rawShipVersion !== 'string' || !/^\d+\.\d+\.\d+$/.test(rawShipVersion))) {
       return jsonResponse({ error: 'shipVersion must look like 48.8.0' }, { status: 400 });
+    }
+    // PAN-4753 WI-9 (#3176): merging past an unhealthy UAT stack needs a reason.
+    const rawOverride = parsed.body['overrideStackHealth'];
+    if (rawOverride !== undefined && typeof rawOverride !== 'boolean') {
+      return jsonResponse({ error: 'overrideStackHealth must be a boolean' }, { status: 400 });
+    }
+    const rawReason = parsed.body['overrideReason'];
+    const overrideReason = typeof rawReason === 'string' ? rawReason.trim() : '';
+    if (rawOverride === true && !overrideReason) {
+      return jsonResponse({ error: 'overrideReason is required when overrideStackHealth is true' }, { status: 400 });
     }
     const params = yield* HttpRouter.params;
     const name = uatGenerationNameFromParam(params['name'] ?? '');
@@ -437,6 +447,7 @@ const postMergeTrainGenerationPromoteRoute = HttpRouter.add(
       name,
       firePostMergeLifecycle,
       rawShipVersion,
+      rawOverride === true ? { reason: overrideReason } : undefined,
     ));
     if (!result.success) {
       const status = result.reason === 'not-found' ? 404 : result.reason === 'merge-failed' ? 500 : 409;

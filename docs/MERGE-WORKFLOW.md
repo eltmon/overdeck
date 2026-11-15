@@ -208,6 +208,12 @@ is the merge control. It renders on the Flywheel rail and on Awaiting Merge
    inline. That lands exactly the tree you tested. Older batches stay listed
    as one line each, superseded or voided, with the stored reason.
 
+   When the batch needs UAT (a hold project, or any member set to Hold) and
+   its UAT stack is not running, the merge is refused with `stack-unhealthy`
+   (409). **Merge anyway…** re-posts with a required reason, which each
+   member's pipeline journal records (#3176; "Promote stack-health gate" in
+   [MERGE-TRAIN.md](MERGE-TRAIN.md)).
+
    The checklist is each member's xBRIEF acceptance criteria. Because a
    member's spec is committed on its feature branch and reaches `main` only
    when its PR merges, the lookup tries the batch worktree first (every

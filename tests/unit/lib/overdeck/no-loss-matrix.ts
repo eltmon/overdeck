@@ -685,6 +685,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   // ── merge-train-lanes.ts (PAN-4753) ──
   { surface: 'POST /api/merge-train/strikes/:issueId/merge',        kind: 'http', disposition: 'WRITE',       door: 'Operator-started strike merge (buildStrikeMergeRequest + triggerMerge kind strike; head approval waived only here, PAN-4750)' },
   { surface: 'GET /api/merge-train/board',                          kind: 'http', disposition: 'AGGREGATE',   door: 'Merge-train board: cars, strikes, batches with status reason, recent merges per project (getMergeTrainBoard, PAN-4753)' },
+  { surface: 'POST /api/merge-train/policy/:issueId',                kind: 'http', disposition: 'WRITE',       door: 'Per-issue merge policy via tracker labels auto-merge / hold-for-uat (IssueLifecycle.addLabel/removeLabel; 501 off GitHub), PAN-4753' },
 
   // ── merge-train.ts (PAN-3917 W6: the /api/flywheel auto-merge/config surface moved here, no flywheel run) ──
   { surface: 'GET /api/merge-train/auto-merge',                     kind: 'http', disposition: 'READ',        door: 'getAutoMergePolicyPayload — derived issue state (approvals + green checks + forge mergeability, FR-9/D3), no flywheel run' },
