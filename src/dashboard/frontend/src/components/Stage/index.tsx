@@ -529,12 +529,10 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
           const conv = conversations.find((c) => c.name === p.conversationId)
           const title = conv?.title?.trim()
           // The server seeds untitled chats with the literal title "New
-          // conversation"; treat that as untitled and disambiguate by a short
-          // id so a row of brand-new chats isn't a wall of identical tabs.
+          // conversation"; an untitled chat's tab reads exactly that (PAN-5295
+          // D2-18) — the full label is in the tab's title and the "N tabs" list.
           const isPlaceholder = !title || title.toLowerCase() === 'new conversation'
-          const label = isPlaceholder
-            ? `Chat ${(p.conversationId ?? '').split('-').pop() ?? ''}`.trim()
-            : title
+          const label = isPlaceholder ? 'New conversation' : title
           return label === p.label ? p : { ...p, label }
         }),
     [panes, conversations, resolveSession],
