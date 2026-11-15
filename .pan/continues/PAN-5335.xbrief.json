@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5335",
   "created": "2026-11-15T15:36:24.641Z",
-  "updated": "2026-11-15T18:07:41.628Z",
+  "updated": "2026-11-15T18:07:50.001Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,11 @@
     "new-conversation-model-line.ac5": {
       "status": "completed",
       "doneAt": "2026-11-15T18:07:41.627Z"
+    },
+    "project-marks": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5335",
+      "claimedAt": "2026-11-15T18:07:50.001Z"
     }
   }
 }
