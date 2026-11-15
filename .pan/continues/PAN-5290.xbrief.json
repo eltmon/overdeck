@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5290",
   "created": "2026-11-15T11:24:24.576Z",
-  "updated": "2026-11-15T11:26:11.859Z",
+  "updated": "2026-11-15T11:26:24.405Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
     "stage-conversation-beside.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T11:26:11.858Z"
+    },
+    "code-header": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5290",
+      "claimedAt": "2026-11-15T11:26:24.405Z"
     }
   }
 }
