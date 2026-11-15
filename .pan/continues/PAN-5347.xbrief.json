@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5347",
   "created": "2026-11-15T13:35:45.395Z",
-  "updated": "2026-11-15T14:23:00.631Z",
+  "updated": "2026-11-15T14:39:16.079Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,9 @@
     "docs-skills-in-composer.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T14:23:00.630Z"
+    },
+    "frontend-footer-conversation-prop.ac3": {
+      "status": "cancelled"
     }
   }
 }
