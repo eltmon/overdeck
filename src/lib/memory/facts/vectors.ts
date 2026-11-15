@@ -11,9 +11,19 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { loadConfigSync, type NormalizedDocsConfig } from '../../config-yaml.js';
-import { bufferToFloat32Array, embedText, float32ArrayToBuffer } from '../../docs/index-builder.js';
 import { getOverdeckHome } from '../../paths.js';
 import { isActiveFact, readMemoryFactsSync, type MemoryFact, type MemoryFactScope } from './store.js';
+
+/**
+ * Dynamic, not static: index-builder.js's module graph (docs/corpus.js) reads
+ * the docs config at import time. A static import here would make every
+ * importer of this module (e.g. `pan sync`, via memory-sync.ts) eagerly load
+ * that whole chain, which breaks test suites that mock config-yaml.js without
+ * `getDefaultDocsConfig` and never actually exercise fact vectors.
+ */
+function loadIndexBuilder(): Promise<typeof import('../../docs/index-builder.js')> {
+  return import('../../docs/index-builder.js');
+}
 
 export const FACT_VECTOR_REFRESH_TIMEOUT_MS = 30_000;
 
@@ -84,6 +94,7 @@ export async function readFactVectors(config: DocsEmbeddingConfig): Promise<Map<
   if (!raw) return map;
   if (raw.provider !== config.provider || raw.model !== config.model || raw.dimensions !== config.dimensions) return map;
 
+  const { bufferToFloat32Array } = await loadIndexBuilder();
   for (const [hash, base64] of Object.entries(raw.vectors)) {
     try {
       map.set(hash, bufferToFloat32Array(Buffer.from(base64, 'base64'), config.dimensions));
@@ -122,7 +133,10 @@ export async function refreshFactVectors(input: {
   config: DocsEmbeddingConfig;
   embed?: (text: string) => Promise<Float32Array>;
 }): Promise<{ embedded: number; reused: number }> {
-  const embed = input.embed ?? ((text: string) => embedText(text, input.config));
+  const embed = input.embed ?? (async (text: string) => {
+    const { embedText } = await loadIndexBuilder();
+    return embedText(text, input.config);
+  });
   const vectors = new Map(await readFactVectors(input.config));
 
   let embedded = 0;
@@ -137,6 +151,7 @@ export async function refreshFactVectors(input: {
     embedded += 1;
   }
 
+  const { float32ArrayToBuffer } = await loadIndexBuilder();
   await writeCacheAtomic({
     version: CACHE_VERSION,
     provider: input.config.provider,
