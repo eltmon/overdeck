@@ -180,6 +180,29 @@ describe('listConversationCommits', () => {
     expect([...local.shas]).toEqual([second.sha]);
   });
 
+  it('counts a commit on a remote-tracking ref as pushed when HEAD is detached', async () => {
+    const first = commitFile('a.txt', 'a\n', 'first', ['--trailer', 'Overdeck-Conversation: conv-detached']);
+
+    const origin = join(root, 'origin.git');
+    git(['init', '--quiet', '--bare', origin], root);
+    git(['remote', 'add', 'origin', origin]);
+    git(['push', '--quiet', '-u', 'origin', 'main']);
+    const second = commitFile('b.txt', 'b\n', 'second', ['--trailer', 'Overdeck-Conversation: conv-detached']);
+    git(['checkout', '--quiet', '--detach']);
+
+    const local = await listLocalShas(repo);
+    expect(local.hasUpstream).toBe(true);
+    expect([...local.shas]).toEqual([second.sha]);
+
+    const { commits } = await listConversationCommits({
+      repoRoot: repo, sessionName: 'conv-detached', since: SINCE, parsed: null,
+    });
+    expect(commits.map((c) => [c.sha, c.pushed])).toEqual([
+      [second.sha, false],
+      [first.sha, true],
+    ]);
+  });
+
   it('maps a tool-output commit to the turn of its tool entry', async () => {
     const made = commitFile('a.txt', 'a\n', 'in turn two');
     const messages: ConversationDiffParseResult['messages'] = [
