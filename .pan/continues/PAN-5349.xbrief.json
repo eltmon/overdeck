@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5349",
   "created": "2026-11-15T15:32:54.289Z",
-  "updated": "2026-11-15T17:16:19.879Z",
+  "updated": "2026-11-15T17:19:39.812Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -344,9 +344,26 @@
       "doneAt": "2026-11-15T17:16:13.269Z"
     },
     "docs-open-in-overdeck": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5349",
-      "claimedAt": "2026-11-15T17:16:19.879Z"
+      "claimedAt": "2026-11-15T17:16:19.879Z",
+      "doneAt": "2026-11-15T17:19:39.811Z"
+    },
+    "docs-open-in-overdeck.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:19:39.811Z"
+    },
+    "docs-open-in-overdeck.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:19:39.811Z"
+    },
+    "docs-open-in-overdeck.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:19:39.811Z"
+    },
+    "docs-open-in-overdeck.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:19:39.811Z"
     }
   }
 }
