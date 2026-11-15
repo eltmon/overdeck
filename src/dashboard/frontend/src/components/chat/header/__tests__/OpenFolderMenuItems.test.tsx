@@ -15,6 +15,7 @@ vi.mock('../../../../lib/wsTransport', () => ({
 }));
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
+import { toast } from 'sonner';
 import { OpenFolderMenuItems } from '../OpenFolderMenuItems';
 import type { Conversation } from '../../../CommandDeck/ConversationList';
 
@@ -44,6 +45,8 @@ beforeEach(() => {
     [WS_METHODS.getAvailableEditors]: wsTransportMock.getAvailableEditors,
     [WS_METHODS.shellOpenInEditor]: wsTransportMock.shellOpenInEditor,
   }));
+  vi.mocked(toast.error).mockClear();
+  vi.mocked(toast.success).mockClear();
   fetchMock = vi.fn(async () => Response.json({ ok: true, commandLine: 'code --remote ssh-remote+desk /home/desk/p' }));
   vi.stubGlobal('fetch', fetchMock);
 });
@@ -87,6 +90,22 @@ describe('OpenFolderMenuItems', () => {
     expect(url).toBe('/api/linked-conversations/open-in-editor');
     expect((init as RequestInit).method).toBe('POST');
     expect(JSON.parse(String((init as RequestInit).body))).toEqual({ conversation: '@desk/conv-x', editor: 'vscode' });
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders nothing for a Session Vault copy, whose folder is not on this machine', () => {
+    const { container } = render(<OpenFolderMenuItems conversation={{ ...CONVERSATION, origin: 'vault' } as Conversation} onDone={vi.fn()} />);
+    expect(container).toBeEmptyDOMElement();
+    expect(wsTransportMock.getAvailableEditors).not.toHaveBeenCalled();
+  });
+
+  it('toasts and still closes the menu when the remote launch request fails', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const onDone = vi.fn();
+    render(<OpenFolderMenuItems conversation={{ ...CONVERSATION, name: '@desk/conv-x', origin: 'linked' } as Conversation} onDone={onDone} />);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open folder in VS Code (remote SSH)' }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Could not open in VS Code: Failed to fetch'));
+    expect(toast.success).not.toHaveBeenCalled();
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 

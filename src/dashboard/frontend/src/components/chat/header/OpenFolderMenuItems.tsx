@@ -25,6 +25,9 @@ export interface OpenFolderMenuItemsProps {
 }
 
 export function OpenFolderMenuItems({ conversation, onDone }: OpenFolderMenuItemsProps) {
+  // A Session Vault browse copy belongs to another machine and is read-only:
+  // its cwd is not a folder on this machine, and it has no remote SSH route.
+  if (conversation.origin === 'vault') return null;
   return conversation.origin === 'linked'
     ? <LinkedOpenFolderItems conversation={conversation.name} onDone={onDone} />
     : <LocalOpenFolderItems cwd={conversation.cwd ?? null} onDone={onDone} />;

@@ -98,6 +98,10 @@ export function PaneLayoutView(props: PaneLayoutViewProps) {
         className={styles.splitPanel}
         style={{ flex: '1 1 0', minWidth: 0, minHeight: 0 }}
         onMouseDownCapture={() => onFocus(paneId)}
+        // Keyboard focus activates the pane too, so a Tab-then-Enter on a
+        // pane's control (e.g. the conversation header's Changes) acts on
+        // that pane, as a click would (PAN-5291).
+        onFocusCapture={() => { if (focusedPaneId !== paneId) onFocus(paneId) }}
       >
         {showHeaders && (
           <div className={`${styles.splitHeader} ${focused ? styles.splitHeaderFocused : ''}`}>

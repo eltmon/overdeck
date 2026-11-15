@@ -85,11 +85,17 @@ export async function openFolderInEditor(cwd: string, editor: EditorId): Promise
 
 /** Open a linked conversation's checkout in a local editor over remote SSH; returns the command line, or null after a failure toast. */
 export async function openLinkedFolderInEditor(conversation: string, editor: EditorId): Promise<string | null> {
-  const response = await fetch('/api/linked-conversations/open-in-editor', {
-    method: 'POST',
-    headers: await dashboardMutationJsonHeaders(),
-    body: JSON.stringify({ conversation, editor }),
-  });
+  let response: Response;
+  try {
+    response = await fetch('/api/linked-conversations/open-in-editor', {
+      method: 'POST',
+      headers: await dashboardMutationJsonHeaders(),
+      body: JSON.stringify({ conversation, editor }),
+    });
+  } catch (err) {
+    toast.error(`Could not open in ${EDITOR_LABELS[editor]}: ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
   const body = (await response.json().catch(() => null)) as { commandLine?: string; error?: string } | null;
   if (!response.ok) {
     toast.error(`Could not open in ${EDITOR_LABELS[editor]}: ${body?.error ?? `HTTP ${response.status}`}`);

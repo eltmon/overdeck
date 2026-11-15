@@ -69,7 +69,7 @@ export function ConversationHeader({
   const queryClient = useQueryClient();
   const native = isNativeShell(); // The phone app (PAN-4837): hide what its phone token cannot do.
   // ⌘⇧O / Ctrl+Shift+O opens the folder in the favorite editor with the ⋯ menu closed (D1-5).
-  useEditorOpenFavoriteShortcut(native || conversation.origin === 'linked' ? null : (conversation.cwd ?? null));
+  useEditorOpenFavoriteShortcut(native || conversation.origin === 'linked' || conversation.origin === 'vault' ? null : (conversation.cwd ?? null));
   const [menuOpen, setMenuOpen] = useState(false);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const [editingTitle, setEditingTitle] = useState(false);
