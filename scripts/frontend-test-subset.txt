@@ -329,7 +329,6 @@ src/components/CommandDeck/__tests__/ProjectOverview.test.tsx
 src/components/AwaitingMergePage.test.tsx
 src/components/flywheel/__tests__/FlywheelHeadlineStrip.test.tsx
 src/components/issue-view/useIssueView.test.tsx
-src/components/merge-train/__tests__/MergeTrainView.test.tsx
 src/components/mobile/__tests__/AppearanceChoice.test.tsx
 src/components/mobile/__tests__/LogoSting.test.tsx
 src/components/mobile/__tests__/MobileApp.test.tsx
