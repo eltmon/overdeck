@@ -68,6 +68,13 @@ describe('ExplorerTree', () => {
     expect(item('lib')).toHaveAttribute('aria-expanded', 'false')
   })
 
+  it('shows an extension label in place of the generic file glyph (PAN-5289)', () => {
+    renderTree({ rows: [row('x.ts'), row('notes')] })
+    expect(item('x.ts').textContent).toContain('TS')
+    expect(item('x.ts').querySelector('svg')).toBeNull()
+    expect(item('notes').querySelector('svg')).not.toBeNull()
+  })
+
   it('colors a modified file with its letter and its folder in the warning color', () => {
     renderTree({
       decorations: buildDecorations({ entries: [{ path: 'src/a.ts', status: 'modified', staged: false }], committed: [] }),

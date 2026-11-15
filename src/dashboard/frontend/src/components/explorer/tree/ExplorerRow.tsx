@@ -1,9 +1,9 @@
 // One explorer tree row (PAN-5186, WI-B7). Folders show their dominant git
 // color; files show the color and a one-letter badge (D-B10). Ignored rows
 // are italic and dimmed. Badges are plain monospace letters, never pills.
+// Files show a neutral extension label or glyph from fileIcons (PAN-5289).
 
 import { memo, type DragEvent, type MouseEvent } from 'react'
-import { File, FileSymlink, Folder, FolderOpen } from 'lucide-react'
 
 import {
   COMMITTED_ONLY_BADGE_CLASS,
@@ -14,6 +14,7 @@ import {
   type FolderDecoration,
 } from '../git/git-decoration'
 import type { TreeRow } from './explorer-tree-model'
+import { fileIconFor } from './fileIcons'
 
 export const ROW_HEIGHT = 22
 export const INDENT_PX = 12
@@ -54,7 +55,8 @@ export const ExplorerRow = memo(function ExplorerRow({
   dropTarget = false,
 }: ExplorerRowProps) {
   const isDir = row.kind === 'dir'
-  const Icon = isDir ? (row.expanded ? FolderOpen : Folder) : row.kind === 'symlink' ? FileSymlink : File
+  const { Icon, label } = fileIconFor(row.name, row.kind, row.expanded)
+  const iconTone = row.ignored ? 'text-faint-foreground' : 'text-muted-foreground'
   const letter = !isDir && decoration ? STATUS_LETTER[decoration.status] : null
   const letterClass = decoration
     ? decoration.committedOnly
@@ -81,7 +83,13 @@ export const ExplorerRow = memo(function ExplorerRow({
       onDoubleClick={() => onDoubleClick(row)}
       onContextMenu={() => onContextMenu(row)}
     >
-      <Icon className={`h-3.5 w-3.5 shrink-0 ${row.ignored ? 'text-faint-foreground' : 'text-muted-foreground'}`} aria-hidden />
+      {label ? (
+        <span className={`flex h-4 w-4 shrink-0 items-center justify-center font-mono text-[9px] font-medium leading-none tracking-tighter ${iconTone}`} aria-hidden>
+          {label}
+        </span>
+      ) : (
+        <Icon className={`h-3.5 w-3.5 shrink-0 ${iconTone}`} aria-hidden />
+      )}
       <span className={`min-w-0 flex-1 truncate ${nameClass(row, decoration)}`}>{row.name}</span>
       {letter && (
         <span className={`shrink-0 font-mono text-[11px] ${letterClass}`} aria-label={`git ${decoration?.status}`}>
