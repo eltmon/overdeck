@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5295",
   "created": "2026-11-15T19:39:19.043Z",
-  "updated": "2026-11-15T20:07:25.154Z",
+  "updated": "2026-11-15T20:07:33.525Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -194,6 +194,11 @@
     "toolbar-order.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T20:07:25.153Z"
+    },
+    "turn-card": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5295",
+      "claimedAt": "2026-11-15T20:07:33.525Z"
     }
   }
 }
