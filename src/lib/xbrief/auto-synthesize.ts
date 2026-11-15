@@ -1,9 +1,12 @@
 import { randomUUID } from 'crypto';
+import { existsSync, realpathSync } from 'node:fs';
+import { basename, join, resolve } from 'node:path';
 import { Effect } from 'effect';
 
-import type { FsError } from '../errors.js';
+import { FsError } from '../errors.js';
 import { writeSpecForIssue } from '../pan-dir/specs.js';
 import { generateXBriefFilename } from './lifecycle.js';
+import { issueIdFromWorkspacePath } from './io.js';
 import type { XBriefDocument, XBriefSubItem } from './types.js';
 
 export interface AutoSynthesizeIssueInput {
@@ -15,8 +18,7 @@ export interface AutoSynthesizeIssueInput {
 
 export interface AutoSynthesizeResult {
   document: XBriefDocument;
-  workspaceSpecPath: string;
-  projectSpecPath: string;
+  specPath: string;
   canonicalFilename: string;
 }
 
@@ -131,32 +133,59 @@ export function synthesizeMinimalXBrief(issue: AutoSynthesizeIssueInput): XBrief
 
 /**
  * Synthesize and durably persist a proposed spec through the canonical write
- * door. The returned workspace path is the canonical spec path because
- * workspace-local spec copies are migration compatibility only.
+ * door. Writes into the issue's own workspace plan home — never the primary
+ * checkout (PAN-5316) — so `pan start --plan skip` and the other auto-start
+ * callers never leave the primary tree dirty.
  */
 export const writeAutoStartXBrief = (
-  projectRoot: string,
-  _workspacePath: string,
+  workspacePath: string,
   issue: AutoSynthesizeIssueInput,
 ): Effect.Effect<AutoSynthesizeResult, FsError> =>
   Effect.gen(function* () {
+    const expectedIssueId = issue.issueId.toUpperCase();
+    if (issueIdFromWorkspacePath(workspacePath) !== expectedIssueId) {
+      return yield* Effect.fail(new FsError({
+        path: workspacePath,
+        operation: 'writeAutoStartXBrief',
+        cause: new Error(`workspace path does not belong to ${expectedIssueId}`),
+      }));
+    }
+    if (!existsSync(workspacePath)) {
+      return yield* Effect.fail(new FsError({
+        path: workspacePath,
+        operation: 'writeAutoStartXBrief',
+        cause: new Error('workspace does not exist'),
+      }));
+    }
+    const expectedWorkspacePath = join(
+      realpathSync(resolve(workspacePath, '..', '..')),
+      'workspaces',
+      basename(workspacePath),
+    );
+    if (realpathSync(workspacePath) !== expectedWorkspacePath) {
+      return yield* Effect.fail(new FsError({
+        path: workspacePath,
+        operation: 'writeAutoStartXBrief',
+        cause: new Error('workspace path is not a real workspaces/feature-<id> directory'),
+      }));
+    }
+
     const document = synthesizeMinimalXBrief(issue);
     const canonicalFilename = document.plan.metadata?.canonicalFilename as string;
-    const projectDocument: XBriefDocument = {
+    const workspaceDocument: XBriefDocument = {
       ...document,
       plan: { ...document.plan, status: 'proposed' },
     };
     const written = yield* writeSpecForIssue(
-      projectRoot,
-      projectDocument,
+      workspacePath,
+      workspaceDocument,
       'proposed',
       canonicalFilename,
     );
 
     return {
       document,
-      workspaceSpecPath: written.path,
-      projectSpecPath: written.path,
+      specPath: written.path,
       canonicalFilename,
     };
   });

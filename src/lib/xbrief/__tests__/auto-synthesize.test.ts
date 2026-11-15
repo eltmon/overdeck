@@ -1,7 +1,7 @@
-import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -41,21 +41,6 @@ async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
-}
-
-function git(cwd: string, args: string[]): string {
-  return execFileSync('git', args, { cwd, encoding: 'utf-8' }).trim();
-}
-
-async function initializeGitRepo(root: string, branch: string): Promise<void> {
-  await mkdir(root, { recursive: true });
-  git(root, ['init', '--quiet']);
-  git(root, ['config', 'user.email', 'test@example.com']);
-  git(root, ['config', 'user.name', 'Test']);
-  git(root, ['branch', '-m', branch]);
-  await writeFile(join(root, '.gitkeep'), 'initial\n');
-  git(root, ['add', '.gitkeep']);
-  git(root, ['commit', '--quiet', '-m', 'initial']);
 }
 
 describe('extractAcceptanceCriteriaFromIssue', () => {
@@ -150,33 +135,31 @@ describe('synthesizeMinimalXBrief', () => {
 });
 
 describe('writeAutoStartXBrief', () => {
-  it('writes workspace and canonical project specs', async () => {
+  it('writes the spec into the workspace plan home, never the primary checkout', async () => {
     await withTempDir(async (root) => {
       const projectRoot = join(root, 'project');
       const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-1071');
-      await initializeGitRepo(projectRoot, 'main');
+      await mkdir(workspacePath, { recursive: true });
 
-      const result = await Effect.runPromise(writeAutoStartXBrief(projectRoot, workspacePath, {
+      const result = await Effect.runPromise(writeAutoStartXBrief(workspacePath, {
         issueId: 'PAN-1071',
         title: 'Auto start work agents',
         body: '- [ ] Start from an issue body',
       }));
 
-      const workspaceDoc = JSON.parse(await readFile(result.workspaceSpecPath, 'utf-8'));
-      const projectDoc = JSON.parse(await readFile(result.projectSpecPath, 'utf-8'));
+      const doc = JSON.parse(await readFile(result.specPath, 'utf-8'));
 
       expect(result.canonicalFilename).toMatch(/PAN-1071/);
-      expect(workspaceDoc.xBRIEFInfo.version).toBe('0.8');
-      expect(workspaceDoc.vBRIEFInfo).toBeUndefined();
-      expect(workspaceDoc.plan.status).toBe('proposed');
-      expect(projectDoc.xBRIEFInfo.version).toBe('0.8');
-      expect(projectDoc.vBRIEFInfo).toBeUndefined();
-      expect(projectDoc.plan.status).toBe('proposed');
-      expect(projectDoc.plan.metadata.canonicalFilename).toBe(result.canonicalFilename);
+      expect(result.specPath).toBe(join(workspacePath, '.pan', 'specs', result.canonicalFilename));
+      expect(doc.xBRIEFInfo.version).toBe('0.8');
+      expect(doc.vBRIEFInfo).toBeUndefined();
+      expect(doc.plan.status).toBe('proposed');
+      expect(doc.plan.metadata.canonicalFilename).toBe(result.canonicalFilename);
+      expect(existsSync(join(projectRoot, '.pan', 'specs'))).toBe(false);
     });
   });
 
-  it('writes a registered project spec into <planHome>/.pan/specs where findPlanSync resolves it', async () => {
+  it('writes a registered project spec into <workspace>/.pan/specs where findPlanSync resolves it', async () => {
     await withTempDir(async (root) => {
       const previousOverdeckHome = process.env['OVERDECK_HOME'];
       process.env['OVERDECK_HOME'] = root;
@@ -187,18 +170,19 @@ describe('writeAutoStartXBrief', () => {
           key: 'registered-project',
           config: { name: 'Registered project', path: projectRoot },
         }];
-        await mkdir(projectRoot, { recursive: true });
+        await mkdir(workspacePath, { recursive: true });
 
-        const result = await Effect.runPromise(writeAutoStartXBrief(projectRoot, workspacePath, {
+        const result = await Effect.runPromise(writeAutoStartXBrief(workspacePath, {
           issueId: 'PAN-1072',
           title: 'Auto start work agents',
           body: '- [ ] Start from a registered project',
         }));
 
-        // PAN-3917: the plan home is the project checkout itself — no state
-        // worktree, no migration marker, nothing under ~/.overdeck/state.
-        expect(result.projectSpecPath).toBe(join(projectRoot, '.pan', 'specs', result.canonicalFilename));
-        expect(findPlanSync(workspacePath)).toBe(result.projectSpecPath);
+        // PAN-5316: the workspace is the plan home — the primary checkout
+        // never gets a .pan/specs directory from auto-start synthesis.
+        expect(result.specPath).toBe(join(workspacePath, '.pan', 'specs', result.canonicalFilename));
+        expect(findPlanSync(workspacePath)).toBe(result.specPath);
+        expect(existsSync(join(projectRoot, '.pan', 'specs'))).toBe(false);
       } finally {
         if (previousOverdeckHome === undefined) delete process.env['OVERDECK_HOME'];
         else process.env['OVERDECK_HOME'] = previousOverdeckHome;
