@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5292",
   "created": "2026-11-15T01:03:44.357Z",
-  "updated": "2026-11-15T01:53:18.870Z",
+  "updated": "2026-11-15T01:53:20.081Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -234,6 +234,11 @@
     "count-agreement-test.ac2": {
       "status": "completed",
       "doneAt": "2026-11-15T01:53:18.870Z"
+    },
+    "ci-subset": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5292",
+      "claimedAt": "2026-11-15T01:53:20.081Z"
     }
   }
 }
