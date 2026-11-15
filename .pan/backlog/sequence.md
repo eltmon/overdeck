@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T15:57:49.262682Z · model: claude-opus-5-5 · open: 906_
+_Last sequenced: 2026-11-15T15:59:24.981422Z · model: claude-opus-5-5 · open: 907_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -399,6 +399,7 @@ _Last sequenced: 2026-11-15T15:57:49.262682Z · model: claude-opus-5-5 · open: 
 | 389 | PAN-2395 | S | medium | ok |  |  | one invalid tiered_execution enum poisons every config read |
 | 390 | PAN-2381 | S | medium | ok |  |  | three event types missing from DomainEvent schema union poison the RPC stream |
 | 391 | PAN-2287 | S | medium | ok |  |  | every supervisor.log line written twice |
+| 392 | PAN-5372 | XS | medium | ok |  |  | First split in a Stage deck remounts the open pane, silently dropping an unsaved editor draft; fix with a stable key per paneId. |
 | 393 | PAN-3661 | XS | medium | ok |  |  | Secure review-mode dispatch dropped the HTTP-200 semantic-rejection surface; two frontend tests fail locally while CI stays green. |
 | 394 | PAN-3288 | XS | medium | ok |  |  | Dev-checkout preflight: after a git pull that adds a dep, the CLI dies with ERR_MODULE_NOT_FOUND instead of saying 'run bun install'. |
 | 395 | PAN-5353 | S | medium | ok |  |  | Send now: flush a queued message into a running Claude Code turn via the Ctrl+X Ctrl+S chord. PRD written, chord live-probed. |
@@ -1241,10 +1242,10 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T15:57:49.262682Z",
+  "generatedAt": "2026-11-15T15:59:24.981422Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 906,
+  "openCount": 907,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -12528,6 +12529,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "why": "Fix already applied: terminal-dialog toast now navigates to the agent's terminal tab. Verify and close.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-5372",
+      "rank": 392,
+      "size": "XS",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "First split in a Stage deck remounts the open pane, silently dropping an unsaved editor draft; fix with a stable key per paneId.",
+      "rationale": "New issue: small, well-located data-loss bug in PaneLayoutView, ranked with the other medium XS correctness fixes in the free rank-392 slot.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13811,6 +13825,13 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-5337",
+      "to": "PAN-5372",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
