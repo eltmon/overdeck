@@ -151,6 +151,20 @@ Refresh embeddings and the local search index.
 - Writes sorted shard lines to `embeddings/<profile>.okfe.jsonl`.
 - Rebuilds `.okf-index/`, which is derived and gitignored.
 
+## `/okf publish --out <dir> [--check]`
+
+Build a public static site from the bundle's public concepts.
+
+```bash
+python3 <okf-skill-dir>/scripts/publish.py --bundle . --check
+python3 <okf-skill-dir>/scripts/publish.py --bundle . --out _site
+```
+
+- Run `--check` first. It exits 2 when a redaction rule matches text in a public concept, and names the rule and line but never the matched text.
+- Only concepts with `x_visibility: public`, or covered by `x_visibility_default: public` in root `schema.md`, are published. The default is private.
+- Links to private or missing concepts render as plain text. `log.md` and non-Markdown files are never published.
+- Redaction rules come from built-in defaults plus `okf-publish.yaml`; see `references/publish.md`. Deploying the site is outside the skill.
+
 ## Model Ladder
 
 For `author`, `sync`, `study`, and `retro`, `--model <model>` is a hard request:

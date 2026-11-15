@@ -36,6 +36,7 @@ The bundle is the source of truth. Keep changes small, cited, and PR-gated. Dete
 | `/okf validate [--strict]` | Run the deterministic conformance gate. | `references/conformance.md` |
 | `/okf lint` | Run advisory semantic patrol for stale or weak knowledge. | `references/lint-prompt.md`, `references/conformance.md` |
 | `/okf embed [--profile <name>]` | Update shareable embedding shards and rebuild the local index. | `references/workflow.md` |
+| `/okf publish --out <dir> [--check]` | Build a public static site from public concepts, with redaction. | `references/publish.md` |
 
 ## Guardrails
 
@@ -184,3 +185,14 @@ Refresh embeddings.
 - Re-embed only concepts whose normalized content hash changed.
 - Write sorted JSONL shards under `embeddings/`.
 - Rebuild the local `.okf-index/` cache, which is derived and gitignored.
+
+## `/okf publish --out <dir> [--check]`
+
+Build a public static site from the bundle.
+
+- Run `python3 <okf-skill-dir>/scripts/publish.py --bundle <bundle> --check` first; it exits 2 when a redaction rule matches text in a public concept and names the rule and line, never the matched text.
+- Then run `python3 <okf-skill-dir>/scripts/publish.py --bundle <bundle> --out <dir>`.
+- Only concepts with `x_visibility: public`, or covered by `x_visibility_default: public` in root `schema.md`, are published. The default is private.
+- Links to private or missing concepts render as plain text. `log.md` and non-Markdown files are never published.
+- Redaction rules come from built-in defaults plus `okf-publish.yaml`; see `references/publish.md`.
+- Never mark a concept public or edit a redaction profile without the user's request. Deploying the site is outside this skill.

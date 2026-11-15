@@ -24,7 +24,7 @@ require_grep() {
   return 1
 }
 
-for command in init author convert sync study retro extract validate lint embed; do
+for command in init author convert sync study retro extract validate lint embed publish; do
   require_grep "^## \`/okf ${command}" "$SKILL" "SKILL.md documents /okf ${command}"
 done
 
