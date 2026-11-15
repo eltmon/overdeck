@@ -239,6 +239,7 @@ src/components/chat/__tests__/composerHeldMessages.test.tsx
 src/components/chat/__tests__/composerPathDrop.test.ts
 src/components/chat/__tests__/conversationHistory.test.ts
 src/components/chat/__tests__/conversationMachineState.test.ts
+src/components/chat/__tests__/diffWindow.test.ts
 src/components/chat/__tests__/heldKickoff.test.tsx
 src/components/chat/__tests__/queuedPromptSend.test.ts
 src/components/chat/__tests__/remarkConversationReferences.test.ts

@@ -766,6 +766,32 @@ describe('ConversationPanel rename flow', () => {
     openSpy.mockRestore();
   });
 
+  it('⋯ → Full diff in a new window opens /popout/diff with the conversation\'s prefix (PAN-5295)', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    renderPanel();
+
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Full diff in a new window' }));
+
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    const [url, target, features] = openSpy.mock.calls[0];
+    expect(String(url)).toMatch(/^\/popout\/diff\?/);
+    const params = new URLSearchParams(String(url).split('?')[1]);
+    expect(params.get('diff')).toBe('1');
+    expect(params.get('prefix')).toBe('/api/conversations/test-conv/diffs');
+    expect(target).toBe('_blank');
+    expect(features).toBe('width=1000,height=800');
+    openSpy.mockRestore();
+  });
+
+  it('hides Full diff in a new window for a linked conversation (PAN-5295)', () => {
+    renderPanel({ ...mockConversation, origin: 'linked' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    expect(screen.getByRole('menuitem', { name: 'Open in new window' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Full diff in a new window' })).toBeNull();
+  });
+
   it('hides the ⋯ menu when the panel is embedded', () => {
     renderPanel(mockConversation, { embedded: true });
     expect(screen.queryByRole('button', { name: 'More conversation actions' })).toBeNull();
