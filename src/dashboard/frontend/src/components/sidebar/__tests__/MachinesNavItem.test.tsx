@@ -34,11 +34,11 @@ afterEach(() => {
   vi.mocked(requestSettingsSection).mockClear();
 });
 
-function renderItem(collapsed: boolean, onOpenSettings = vi.fn()) {
+function renderItem(collapsed: boolean, onOpenSettings = vi.fn(), variant?: 'nav' | 'footer') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <MachinesNavItem collapsed={collapsed} onOpenSettings={onOpenSettings} />
+      <MachinesNavItem collapsed={collapsed} onOpenSettings={onOpenSettings} variant={variant} />
     </QueryClientProvider>,
   );
   return { onOpenSettings };
@@ -82,5 +82,18 @@ describe('MachinesNavItem (PAN-4869)', () => {
     await waitFor(() => expect(button.getAttribute('title')).toBe('Machines · 2 online'));
     expect(screen.queryByText('Machines')).toBeNull();
     expect(screen.queryByTestId('sidebar-machines-online')).toBeNull();
+  });
+
+  it('footer variant keeps the test id, names the online count in its title and opens Settings → Anywhere (PAN-5293 F-D19)', async () => {
+    machinesBody = { self: { environmentId: 'env-self', label: 'studio', fingerprint: 'x', shareConversations: true }, links: [link('online')], inbound: [] };
+    const user = userEvent.setup();
+    const { onOpenSettings } = renderItem(false, vi.fn(), 'footer');
+    const button = await screen.findByTestId('sidebar-machines');
+    expect(button).toHaveTextContent('Machines');
+    await waitFor(() => expect(button.getAttribute('title')).toBe('Machines · 1 online'));
+    expect(screen.queryByTestId('sidebar-machines-online')).toBeNull();
+    await user.click(button);
+    expect(requestSettingsSection).toHaveBeenCalledWith('anywhere');
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
   });
 });

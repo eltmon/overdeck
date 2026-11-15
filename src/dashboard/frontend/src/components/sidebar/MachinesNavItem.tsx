@@ -14,13 +14,34 @@ export function useOnlineMachineCount(): number {
   return Array.isArray(data?.links) ? data.links.filter((l) => l.state === 'online').length : 0;
 }
 
-export function MachinesNavItem({ collapsed, onOpenSettings }: { collapsed: boolean; onOpenSettings: () => void }) {
+export function MachinesNavItem({ collapsed, onOpenSettings, variant = 'nav' }: {
+  collapsed: boolean;
+  onOpenSettings: () => void;
+  /** PAN-5293 F-D19: 'footer' is the left column footer's compact ghost button. */
+  variant?: 'nav' | 'footer';
+}) {
   const online = useOnlineMachineCount();
+  const open = () => { requestSettingsSection('anywhere'); onOpenSettings(); };
+  if (variant === 'footer') {
+    return (
+      <button
+        type="button"
+        data-testid="sidebar-machines"
+        onClick={open}
+        title={online > 0 ? `Machines · ${online} online` : 'Machines'}
+        aria-label="Machines"
+        className="list-row flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground"
+      >
+        <Network aria-hidden className="h-3.5 w-3.5 shrink-0" />
+        {!collapsed && <span>Machines</span>}
+      </button>
+    );
+  }
   return (
     <button
       type="button"
       data-testid="sidebar-machines"
-      onClick={() => { requestSettingsSection('anywhere'); onOpenSettings(); }}
+      onClick={open}
       title={collapsed ? (online > 0 ? `Machines · ${online} online` : 'Machines') : undefined}
       className={`
         w-full flex items-center gap-3 transition-colors duration-150 text-sm font-medium
