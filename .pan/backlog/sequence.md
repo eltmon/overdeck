@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T13:35:56.604163Z · model: claude-opus-5-5 · open: 894_
+_Last sequenced: 2026-11-15T13:37:05.373189Z · model: claude-opus-5-5 · open: 895_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -26,6 +26,7 @@ _Last sequenced: 2026-11-15T13:35:56.604163Z · model: claude-opus-5-5 · open: 
 | 18 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
 | 19 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
 | 20 | PAN-5104 | XS | high | ok |  |  | Stale cost hook bundle prices Fable 5.1/5.2 at Fable 5 rates; reconciler never corrects it. Unblocked: PAN-5103 merged. |
+| 21 | PAN-5347 | S | medium | ok |  |  | In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group |
 | 22 | PAN-5339 | S | medium | ok |  |  | In pipeline: conversation names, conv N forms and /conv URLs in messages become clickable links. |
 | 22 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 23 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
@@ -986,6 +987,10 @@ New flaky-test bug: a background membership-snapshot write races the test's tear
 
 Its only dependency, PAN-5103 (Fable 5.2 rollout), closed as completed, so the XS rebuild is unblocked; rank held at 20 because it is a cost-accuracy fix, not pipeline substrate.
 
+### PAN-5347 (rank 21)
+
+New in-pipeline discoverability fix: skills never reach the composer slash menu, so operators cannot find skill-only workflows. Pinned in the free rank-21 slot beside the other in-pipeline work; it reuses the existing skills route and category grouping.
+
 ### PAN-5339 (rank 22)
 
 New in-pipeline enhancement, pinned at the freed rank-22 slot. It is self-contained in ChatMarkdown and the existing /conv route.
@@ -1218,10 +1223,6 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
 
 New substrate bug placed in a freed high-tier slot. With several workspace stacks up, browser checks hit the wrong backend and flake, which corrupts verification.
 
-### PAN-3234 (rank 79)
-
-Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1229,10 +1230,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T13:35:56.604163Z",
+  "generatedAt": "2026-11-15T13:37:05.373189Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 894,
+  "openCount": 895,
   "nodes": [
     {
       "issue": "PAN-5290",
@@ -12354,6 +12355,19 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "condition": "ok",
       "dependsOn": [],
       "why": "Record of two UI fixes made inline on main (orbiting logo, unclipped Home project menu). Verify and close.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5347",
+      "rank": 21,
+      "size": "S",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group",
+      "rationale": "New in-pipeline discoverability fix: skills never reach the composer slash menu, so operators cannot find skill-only workflows. Pinned in the free rank-21 slot beside the other in-pipeline work; it reuses the existing skills route and category grouping.",
       "gate": "auto",
       "planning": "auto"
     }
