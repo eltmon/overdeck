@@ -11,6 +11,7 @@ import { Activity, BookOpen, Home, MoreHorizontal, type LucideIcon } from 'lucid
 import type { Tab } from '../Header';
 import { fetchExperimentalFeaturesEnabled, isExperimentalTab } from '../../lib/experimentalFeatures';
 import { useFlywheelRunning } from '../../lib/flywheelApi';
+import { selectActivePane, usePanesStore } from '../../lib/panesStore';
 import { MenuItemButton, MenuOverlay, MenuSurface } from '../shared/ContextMenu';
 import { MORE_GROUPS } from './navGroups';
 
@@ -74,7 +75,10 @@ export function LeftNav({ activeTab, selectedProject, onTabChange, onOpenProject
       .filter((group) => group.items.length > 0),
     [experimentalFeaturesEnabled],
   );
-  const moreActive = visibleMoreGroups.some((group) => group.items.some((item) => item.id === activeTab));
+  const activePane = usePanesStore(selectActivePane(selectedProject ?? ''));
+  const homeActive = activeTab === 'command-deck' && (activePane === null || activePane.paneType === 'home');
+  const moreActive = activeTab !== 'settings'
+    && visibleMoreGroups.some((group) => group.items.some((item) => item.id === activeTab));
 
   return (
     <nav aria-label="Primary" className="flex flex-col gap-0.5" data-testid="left-nav">
@@ -83,7 +87,7 @@ export function LeftNav({ activeTab, selectedProject, onTabChange, onOpenProject
           testId="left-nav-project-home"
           label="Project home"
           icon={Home}
-          active={activeTab === 'command-deck'}
+          active={homeActive}
           collapsed={collapsed}
           onClick={onOpenProjectHome}
         />
