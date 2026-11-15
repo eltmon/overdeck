@@ -65,13 +65,15 @@ export function installEffortDefaultFetchMock() {
 
 /**
  * PAN-5289: every Stage mounts the work dock, whose root context asks
- * `GET /api/registered-projects` and `GET /api/workspace-registry`. Answers only
- * those two requests, with no projects and no workspaces.
+ * `GET /api/registered-projects` and `GET /api/workspace-registry`, and whose
+ * Live tab asks `GET /api/conversations/pending-input`. Answers only those
+ * three requests, with no projects, no workspaces and no pending input.
  */
 export function installWorkDockFetchMock() {
   return installStrictFetchMock(({ method, url }) => {
     if (method === 'GET' && url === '/api/registered-projects') return Response.json([]);
     if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+    if (method === 'GET' && url === '/api/conversations/pending-input') return Response.json([]);
     return undefined;
   });
 }

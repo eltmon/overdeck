@@ -1,13 +1,15 @@
 /**
- * PAN-2908 · C-CONVO — the conversation dock rail (level 2 · talk).
+ * PAN-2908 · C-CONVO — the conversation dock panels (level 2 · talk).
  *
- * Persistent right rail on every surface: open conversations as panels, each
- * with the agent's live feed (memory observations) and a steering composer.
- * Needs-you items pin to the top in amber. Deep-dive remains the issue
- * drawer — one renderer family, three depths (peek → dock → detail).
+ * Open conversations as panels, each with the agent's live feed and a
+ * steering composer. Needs-you items pin to the top in amber. Deep-dive
+ * remains the issue drawer — one renderer family, three depths (peek → dock
+ * → detail). PAN-5289 (PAN-5284 D-17): the floating rail is gone; the work
+ * dock's Live tab renders this panel list, and `useLiveDockItems` tells it
+ * whether there is anything to show.
  */
 import { useMemo, useState } from 'react';
-import { X, MessageSquare } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useConvoDock } from '../../lib/convoDock';
 import { useDashboardStore } from '../../lib/store';
 import { usePendingInputSubjects } from '../../lib/useDecisions';
@@ -75,16 +77,17 @@ function DockPanel({ item, needsYou, onClose }: { item: { type: 'issue'; issueId
   );
 }
 
-type DockItem = { type: 'issue'; issueId: string; agents: Agent[] } | { type: 'conversation'; conversationName: string; issueId: string };
+export type DockItem = { type: 'issue'; issueId: string; agents: Agent[] } | { type: 'conversation'; conversationName: string; issueId: string };
 
-export function ConversationDock() {
-  const { items, expanded, remove, setExpanded } = useConvoDock();
+/** The Live items (docked issues and pending conversations), needs-you first, and the needs-you issue ids (lowercased). */
+export function useLiveDockItems(): { items: DockItem[]; needsYouIds: Set<string> } {
+  const { items } = useConvoDock();
   const pendingSubjects = usePendingInputSubjects();
   const agentsById = useDashboardStore((s) => s.agentsById);
   const issuesRaw = useDashboardStore((s) => s.issuesRaw);
 
   const needsYouIds = useMemo(
-    () => new Set((pendingSubjects ?? []).map((s) => s.issueId?.toLowerCase()).filter(Boolean)),
+    () => new Set((pendingSubjects ?? []).map((s) => s.issueId?.toLowerCase()).filter((id): id is string => Boolean(id))),
     [pendingSubjects],
   );
 
@@ -169,60 +172,38 @@ export function ConversationDock() {
     [allDockItems, needsYouIds],
   );
 
-  if (!expanded) {
-    return (
-      <button
-        type="button"
-        onClick={() => setExpanded(true)}
-        data-component="conversation-dock-handle"
-        className="fixed bottom-6 right-0 z-40 flex items-center gap-1.5 rounded-l-lg border border-r-0 border-border bg-card px-2.5 py-2 text-[11px] text-muted-foreground shadow-lg hover:text-foreground"
-      >
-        <MessageSquare size={13} />
-        {allDockItems.length > 0 && <span className="font-mono text-[10px]">{allDockItems.length}</span>}
-      </button>
-    );
-  }
+  return { items: ordered, needsYouIds };
+}
+
+/** The Live tab body: one panel per Live item, or the empty-state sentence. */
+export function ConversationDock() {
+  const { remove } = useConvoDock();
+  const { items: ordered, needsYouIds } = useLiveDockItems();
 
   return (
-    <aside
-      data-component="conversation-dock"
-      className="fixed bottom-0 right-0 top-12 z-40 flex w-[340px] flex-col border-l border-border bg-background/95 shadow-[-16px_0_48px_rgb(0_0_0/30%)] backdrop-blur"
-    >
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <h2 className="text-[13px] font-medium">Conversations</h2>
-        {needsYouIds.size > 0 && (
-          <span className="rounded-sm border border-warning/30 bg-warning/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-warning-foreground">
-            {needsYouIds.size} needs you
-          </span>
-        )}
-        <button onClick={() => setExpanded(false)} className="ml-auto text-muted-foreground hover:text-foreground" aria-label="Collapse dock">
-          <X size={14} />
-        </button>
-      </div>
-      <div className="flex-1 space-y-2 overflow-y-auto p-2.5">
-        {ordered.length === 0 && (
-          <div className="rounded-xl border border-dashed border-border p-4 text-center text-[11px] text-muted-foreground">
-            Nothing docked. Hover an issue and "pop into dock" — conversations stay with you while you navigate.
-          </div>
-        )}
-        {ordered.map((item) => {
-          const issueId = item.type === 'issue' ? item.issueId : item.issueId;
-          const key = item.type === 'conversation' ? `${item.issueId}-${item.conversationName}` : item.issueId;
-          return (
-            <DockPanel
-              key={key}
-              item={item}
-              needsYou={needsYouIds.has(issueId.toLowerCase())}
-              onClose={() => {
-                if (item.type === 'issue') {
-                  remove(item.issueId);
-                }
-                // Conversation-only items are removed by NeedsYouStrip answer action
-              }}
-            />
-          );
-        })}
-      </div>
-    </aside>
+    <div className="flex-1 space-y-2 overflow-y-auto p-2.5">
+      {ordered.length === 0 && (
+        <div className="rounded-xl border border-dashed border-border p-4 text-center text-[11px] text-muted-foreground">
+          Nothing docked. Hover an issue and "pop into dock" — conversations stay with you while you navigate.
+        </div>
+      )}
+      {ordered.map((item) => {
+        const issueId = item.type === 'issue' ? item.issueId : item.issueId;
+        const key = item.type === 'conversation' ? `${item.issueId}-${item.conversationName}` : item.issueId;
+        return (
+          <DockPanel
+            key={key}
+            item={item}
+            needsYou={needsYouIds.has(issueId.toLowerCase())}
+            onClose={() => {
+              if (item.type === 'issue') {
+                remove(item.issueId);
+              }
+              // Conversation-only items are removed by NeedsYouStrip answer action
+            }}
+          />
+        );
+      })}
+    </div>
   );
 }

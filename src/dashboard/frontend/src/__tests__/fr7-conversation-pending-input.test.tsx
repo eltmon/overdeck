@@ -1,6 +1,7 @@
 /**
  * FR-7: Conversation-only pending input surfaces.
- * Tests that NeedsYouStrip and ConversationDock:
+ * Tests that NeedsYouStrip and ConversationDock (the work dock's Live tab panel
+ * list since PAN-5289; it ignores `expanded`):
  * 1. Materialize conversation-only entries with empty agent store (AC-1)
  * 2. Preserve agent-backed pending input entries (AC-3)
  * 3. Handle multiple conversations per docked issue (regression from cycle 13)
