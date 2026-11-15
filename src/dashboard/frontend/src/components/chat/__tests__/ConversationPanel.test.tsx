@@ -433,13 +433,14 @@ describe('ConversationPanel rename flow', () => {
       streaming: false,
       subagents: [subagent('a1'), subagent('b2')],
     } as Parameters<typeof makeClient>[0]);
-    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
+    // PAN-5295 D2-15: with nothing stored the rail starts as the collapsed strip.
+    expect(screen.getByRole('button', { name: 'Show agents rail' })).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Conversation agents' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
     const item = screen.getByRole('menuitem', { name: /^Subagents/ });
     expect(item).toHaveTextContent(/Subagents\s*2/);
     fireEvent.click(item);
-    expect(screen.queryByRole('complementary', { name: 'Conversation agents' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Show agents rail' })).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
   });
 
   it('keeps About, Tools and Bookmarks out of row 1 (PAN-5291)', () => {
