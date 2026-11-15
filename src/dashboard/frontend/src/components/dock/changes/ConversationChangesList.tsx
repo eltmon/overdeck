@@ -12,7 +12,7 @@ import type { ChangeCommit, ChangeScope, ChangedFile, ConversationChanges, Uncom
 import type { Conversation } from '../../CommandDeck/ConversationList'
 import { useExplorerStore } from '../../explorer/explorerStore'
 import { useStageDeck } from '../../Stage/StageDeckContext'
-import { toRootPath } from '../changes-model'
+import { diffTargetOf, diffTargetsOf, toRootPath } from '../changes-model'
 import type { DockScope } from '../dockScope'
 import { useConversationChanges } from '../useConversationChanges'
 import { useWorkDockStore, type DockDiffTarget } from '../workDockStore'
@@ -64,21 +64,8 @@ export function ConversationChangesList({ deckKey, scope, conversation }: Conver
   const data = query.data
   const rootPathOf = (repoPath: string): string | null => (data && rootId ? toRootPath(data.repoRoot, rootAbs, repoPath) : null)
 
-  const targetOf = (file: ChangedFile, commit?: ChangeCommit): DockDiffTarget => {
-    const rootPath = rootPathOf(file.path)
-    const target: DockDiffTarget = { path: rootPath ?? file.path, repoPath: file.path }
-    if (data) target.repoRoot = data.repoRoot
-    if (commit) {
-      target.sha = commit.sha
-      target.pushed = commit.pushed
-    }
-    if (rootPath === null) target.outsideRoot = true
-    return target
-  }
   // Every row in display order, for the diff view's i/N and previous/next.
-  const targets: DockDiffTarget[] = data
-    ? [...data.uncommitted.map((f) => targetOf(f)), ...data.commits.flatMap((c) => c.files.map((f) => targetOf(f, c)))]
-    : []
+  const targets: DockDiffTarget[] = data ? diffTargetsOf(data, rootPathOf) : []
 
   const row = (file: ChangedFile, commit: ChangeCommit | undefined, note?: string | null) => {
     const rootPath = rootPathOf(file.path)
@@ -90,7 +77,10 @@ export function ConversationChangesList({ deckKey, scope, conversation }: Conver
         additions={file.additions}
         deletions={file.deletions}
         rootPath={rootPath}
-        onDiff={() => useWorkDockStore.getState().openDock(deckKey, { tab: 'changes', diff: targetOf(file, commit), diffList: targets, changesScope: chip })}
+        onDiff={() => {
+          // Rows render only once the changes have loaded.
+          if (data) useWorkDockStore.getState().openDock(deckKey, { tab: 'changes', diff: diffTargetOf(data, file, commit, rootPathOf), diffList: targets, changesScope: chip })
+        }}
         onOpenBeside={() => {
           if (rootId && rootPath) deck?.openBeside?.({ rootId, path: rootPath })
         }}
