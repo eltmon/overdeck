@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5364",
   "created": "2026-11-15T15:42:11.052Z",
-  "updated": "2026-11-15T16:14:22.598Z",
+  "updated": "2026-11-15T16:20:22.536Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,9 +84,26 @@
       "doneAt": "2026-11-15T16:14:15.759Z"
     },
     "outcome-hero": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5364",
-      "claimedAt": "2026-11-15T16:14:22.598Z"
+      "claimedAt": "2026-11-15T16:14:22.598Z",
+      "doneAt": "2026-11-15T16:20:22.536Z"
+    },
+    "outcome-hero.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:20:22.536Z"
+    },
+    "outcome-hero.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:20:22.536Z"
+    },
+    "outcome-hero.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:20:22.536Z"
+    },
+    "outcome-hero.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:20:22.536Z"
     }
   }
 }
