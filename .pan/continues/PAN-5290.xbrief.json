@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5290",
   "created": "2026-11-15T11:24:24.576Z",
-  "updated": "2026-11-15T13:30:32.586Z",
+  "updated": "2026-11-15T13:30:38.806Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -230,6 +230,11 @@
     "create-pr-dialog.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T13:30:32.586Z"
+    },
+    "stale-tabs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5290",
+      "claimedAt": "2026-11-15T13:30:38.805Z"
     }
   },
   "agentModel": "claude-opus-5-5"
