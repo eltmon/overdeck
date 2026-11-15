@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5295",
   "created": "2026-11-15T19:39:19.043Z",
-  "updated": "2026-11-15T19:42:31.797Z",
+  "updated": "2026-11-15T19:42:35.970Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,6 +46,11 @@
     "turn-grouping.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T19:42:31.797Z"
+    },
+    "dock-files-filter": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5295",
+      "claimedAt": "2026-11-15T19:42:35.969Z"
     }
   }
 }
