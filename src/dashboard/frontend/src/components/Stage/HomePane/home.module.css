@@ -1,0 +1,145 @@
+/*
+ * PAN-5294 — the rebuilt project Home (mockup screen 2, the "home" CSS block).
+ * Broadsheet tokens only; no hex values and no Tailwind opacity modifiers on
+ * var() tokens. Stage/stage.module.css is not edited (PAN-5295 owns it).
+ */
+
+/* Header: title row (title, repo subtitle, rename, Settings) + metadata line. */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--foreground);
+}
+
+.subtitle {
+  color: var(--faint-foreground, var(--muted-foreground));
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.renameInput {
+  font: inherit;
+  color: inherit;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 6px;
+  outline: none;
+  min-width: 0;
+}
+
+.renameInput:focus {
+  border-color: var(--ring);
+}
+
+.renameButton {
+  align-self: center;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted-foreground);
+}
+
+.renameButton:hover {
+  color: var(--foreground);
+}
+
+.renameError {
+  align-self: center;
+  font-size: 12px;
+  color: var(--destructive);
+}
+
+.settingsButton {
+  margin-left: auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.settingsButton:hover {
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+/* Metadata line: mono 11.5px muted, segments joined by a middle dot. Empty
+   segments (a chip that renders nothing) take no separator. */
+.metaLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 2px;
+  font-family: var(--font-mono-ui, var(--font-mono));
+  font-size: 11.5px;
+  color: var(--muted-foreground);
+}
+
+.metaItem {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+}
+
+.metaItem:empty {
+  display: none;
+}
+
+.metaItem:not(:empty) ~ .metaItem:not(:empty)::before {
+  content: '·';
+  padding: 0 8px;
+  color: var(--muted-foreground);
+}
+
+.metaButton {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.metaButton:hover {
+  text-decoration: underline;
+}
+
+.releasePopover {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 1000;
+  margin-top: 4px;
+  width: 520px;
+  max-width: calc(100vw - 32px);
+  padding: 8px;
+  font-family: var(--font-body, inherit);
+}
