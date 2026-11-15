@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5339",
   "created": "2026-11-15T11:44:33.269Z",
-  "updated": "2026-11-15T16:45:17.701Z",
+  "updated": "2026-11-15T16:45:24.611Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -142,6 +142,11 @@
     "chatmarkdown-wiring.ac5": {
       "status": "completed",
       "doneAt": "2026-11-15T16:45:17.700Z"
+    },
+    "docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5339",
+      "claimedAt": "2026-11-15T16:45:24.611Z"
     }
   },
   "agentModel": "claude-sonnet-5"
