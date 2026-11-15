@@ -4,17 +4,17 @@
     "created": "2026-11-15T15:30:26Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5364: Merge train board: a voided rebuild sits on top while the batch that merged is buried, and voided batches never age out",
-    "updated": "2026-11-15T15:37:55.074Z"
+    "updated": "2026-11-15T15:41:45.494Z"
   },
   "plan": {
     "id": "pan-5364",
     "title": "Merge train board: a voided rebuild sits on top while the batch that merged is buried, and voided batches never age out",
-    "status": "proposed",
+    "status": "running",
     "uid": "4c8f53a5-5fc4-48e7-9b08-4bb2d2ecfd85",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T15:30:26Z",
-    "updated": "2026-11-15T15:37:55.074Z",
+    "updated": "2026-11-15T15:41:45.494Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5364",
@@ -596,5 +596,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
