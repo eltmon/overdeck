@@ -694,6 +694,88 @@ describe('SlashMenu filter', () => {
     expect(match?.textContent?.toLowerCase()).toContain('file');
     expect(match).toHaveClass('slashMenuMatch');
   });
+
+  it('ranks the /pan entry first for the filter pan', () => {
+    render(
+      <SlashMenu
+        commands={getSlashCommands('claude-code')}
+        filter="pan"
+        selectedIndex={0}
+        onSelect={noop}
+        onClose={noop}
+        anchorRect={null}
+      />,
+    );
+
+    const selected = document.querySelector('[aria-selected="true"]');
+    expect(selected?.querySelector('.slashMenuLabel')?.textContent).toBe('/pan');
+    const firstHeading = document.querySelector('.slashMenu > div > div');
+    expect(firstHeading?.textContent).toBe('Overdeck');
+  });
+
+  it('keeps description-only matches after label matches', () => {
+    const commands: SlashCommand[] = [
+      ...TEST_COMMANDS,
+      { id: 'x', label: '/zzz', description: 'model helper', insert: '/zzz' },
+    ];
+    render(
+      <SlashMenu
+        commands={commands}
+        filter="model"
+        selectedIndex={0}
+        onSelect={noop}
+        onClose={noop}
+        anchorRect={null}
+      />,
+    );
+
+    const options = screen.getAllByRole('option');
+    expect(options[0].textContent).toContain('/model');
+  });
+
+  it('keeps the highlighted row in on-screen order for a mixed filter', () => {
+    const commands = getSlashCommands('claude-code');
+    for (const selectedIndex of [0, 1]) {
+      const { unmount } = render(
+        <SlashMenu
+          commands={commands}
+          filter="co"
+          selectedIndex={selectedIndex}
+          onSelect={noop}
+          onClose={noop}
+          anchorRect={null}
+        />,
+      );
+      const options = screen.getAllByRole('option');
+      expect(options[selectedIndex]).toHaveAttribute('aria-selected', 'true');
+      unmount();
+    }
+
+    const { unmount } = render(
+      <SlashMenu
+        commands={commands}
+        filter="co"
+        selectedIndex={0}
+        onSelect={noop}
+        onClose={noop}
+        anchorRect={null}
+      />,
+    );
+    const lastIndex = screen.getAllByRole('option').length - 1;
+    unmount();
+    render(
+      <SlashMenu
+        commands={commands}
+        filter="co"
+        selectedIndex={lastIndex}
+        onSelect={noop}
+        onClose={noop}
+        anchorRect={null}
+      />,
+    );
+    const options = screen.getAllByRole('option');
+    expect(options[lastIndex]).toHaveAttribute('aria-selected', 'true');
+  });
 });
 
 describe('ComposerPromptEditor Enter keys (PAN-4292)', () => {
