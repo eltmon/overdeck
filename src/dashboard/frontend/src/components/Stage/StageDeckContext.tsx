@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { OpenDockInput } from '../dock/workDockStore'
+import type { Conversation } from '../CommandDeck/ConversationList'
 
 export type { OpenDockInput } from '../dock/workDockStore'
 
@@ -40,6 +41,8 @@ export interface StageDeckContextValue {
   openBeside?: (input: OpenBesideInput) => string
   /** Open the dock on a tab, optionally revealing a path or a diff (PAN-5284 §6.2). Writes workDockStore only. */
   openDock?: (input: OpenDockInput) => void
+  /** The conversation in the first other layout leaf (PAN-5290 C-D3); null when not split or none is a conversation. */
+  conversationBeside?: (paneId: string) => Conversation | null
 }
 
 const StageDeckContext = createContext<StageDeckContextValue | null>(null)

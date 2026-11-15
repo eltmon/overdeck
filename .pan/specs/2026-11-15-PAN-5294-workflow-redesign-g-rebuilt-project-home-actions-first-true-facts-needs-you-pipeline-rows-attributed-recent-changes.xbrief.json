@@ -1,0 +1,1009 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T11:40:49Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5294: Workflow redesign G: rebuilt project Home (actions first, true facts, needs you, pipeline rows, attributed recent changes)",
+    "updated": "2026-11-15T11:49:29.360Z"
+  },
+  "plan": {
+    "id": "pan-5294",
+    "title": "Workflow redesign G: rebuilt project Home (actions first, true facts, needs you, pipeline rows, attributed recent changes)",
+    "status": "running",
+    "uid": "b9ce88d5-77b7-40fd-8d37-e9ed8952b503",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T11:40:49Z",
+    "updated": "2026-11-15T11:49:29.360Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5294",
+        "label": "PAN-5294",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5294/.pan/drafts/pan-5294.md",
+        "label": "PRD draft (.pan/drafts/pan-5294.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5284",
+        "label": "PAN-5284 parent epic",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "project-home",
+      "workflow-redesign"
+    ],
+    "metadata": {
+      "sizeJustification": "Parent D-13 requires the dashboard to stay usable when this child merges alone, so the old Home pieces (Launcher, StatChips, HeroBillboard, CI card, WorkspaceHeader, HomePane scaffold) can only be removed in the same PR that ships their replacements. The surface is frontend-only (CommandDeck pipeline files, Stage/HomePane, docs) and is split into twelve reviewable items; the extra files are mostly one-component-one-test pairs and deletions.",
+      "canonicalFilename": "2026-11-15-PAN-5294-workflow-redesign-g-rebuilt-project-home-actions-first-true-facts-needs-you-pipeline-rows-attributed-recent-changes.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Project Home puts its launchers three screens down, shows an Agents tile that counts only work sessions (0 while conversations work), spend that disagrees with the top bar, a card-style pipeline with unexplained avatar badges, and nothing that says who changed main.",
+      "Proposal": "Rebuild Stage/ProjectHome.tsx to mockup screen 2 as one layout: header with title, Settings modal and a metadata line (path, branch, release, CI word, deploy, identity); an action row first (New conversation split button, Files, Changes on main, Terminal, Open in editor, Start an issue…, More ▾); five facts from the shared useAgentsWorking/useNeedsYouItems selectors, the project changes API and the costs summary; a Needs you panel; the pipeline as full-width lane rows (Building / In review / Ready to merge / Stalled) with tag, who and age; and recent commits on main labelled with the conversation or agent that made them. Old pieces are removed in the same PR with a home for every function (PRD G-D14).",
+      "NonGoals": "- No edits to CommandDeck/index.tsx, ProjectTree/ProjectNode.tsx, the left column, the top bar, the dock, or any server route\n- No projects.yaml description field\n- No refactor of the existing /api/agents start copies (IssueComposer, ZoneBActionStrip, useIssueSessionActions)\n- No change to pipelineChipFor, isNeedsYouFeature or StackCard\n- No change to IssueOverview or home/HomeComposer (they keep Launcher, AgentDock, ActionDock, Timeline)\n- No per-row cost or session-count columns and no stage-entered timestamp on derived state\n- No new poll faster than 60 seconds\n- Home does not register the N shortcut (the left column owns it)\n- No real agent start or real GitHub calls in tests"
+    },
+    "autoDecisions": [
+      {
+        "summary": "One Home layout with three states (no project, registered without issues, with issues) replaces the cockpit/sparse split.",
+        "rationale": "The mockup shows one layout for DFAI (no issues) and overdeck; parent §6.8 lists sections, not two modes."
+      },
+      {
+        "summary": "The Launcher prompt box, AgentDock pills, Timeline and StatChips leave Home; their functions move to the New conversation caret, the action row, More ▾ and the left column (PRD G-D14).",
+        "rationale": "Mockup screen 2 has none of them; parent D-14 requires each function to have a home, which the G-local no-loss table gives."
+      },
+      {
+        "summary": "Pipeline lanes: Building = plan+work, In review = review, Ready to merge = derived 'ready', Stalled when present; todo/queued/merged are left to the board.",
+        "rationale": "The mockup lists planning rows under Building and shows exactly these lanes; the board keeps the full lifecycle."
+      },
+      {
+        "summary": "Row 'needs you' tags come from useNeedsYouItems keys, not isNeedsYouFeature.",
+        "rationale": "Parent D-8 makes the selector the one source; using it keeps tags, the Needs-you fact and the panel in agreement."
+      },
+      {
+        "summary": "Age is time since last activity (lastActivityAt), because derived issue state has no stage-entered timestamp.",
+        "rationale": "Verified in packages/contracts/src/derived-issue-state.ts; adding a timestamp is server scope outside G."
+      },
+      {
+        "summary": "Start an issue… plans an unplanned issue through the existing PlanDialog and starts a planned one with POST /api/agents, mirroring pan start.",
+        "rationale": "No create/start-issue dialog exists; /api/agents rejects unplanned issues, and pan start plans first."
+      },
+      {
+        "summary": "Spend uses the registered project's issue prefix (linearTeam); projects without one show '—' with 'needs an issue prefix'.",
+        "rationale": "/api/costs/summary scopes by prefix only; extending the route is server work outside G."
+      },
+      {
+        "summary": "The subtitle is the GitHub/GitLab repo slug because projects.yaml has no description field.",
+        "rationale": "A true fact beats an invented description; adding a config field is out of scope."
+      },
+      {
+        "summary": "The CI/deploy/identity chips are added to the Home metadata line and left in the left column's Issues header.",
+        "rationale": "ProjectNode.tsx is not in G's file list (parent §8); duplicating a true fact is harmless."
+      },
+      {
+        "summary": "Terminal shows a keycap only on macOS (⌘T); the mockup's 'Ctrl `' is not shown.",
+        "rationale": "stage.toggle-terminal is unbound off macOS per the shortcut table in docs/DASHBOARD-ARCHITECTURE.md."
+      },
+      {
+        "summary": "Changelog file is changelog.d/pan-5294.md, not 5294.md as the child stub said.",
+        "rationale": "changelog.d/README.md and every existing entry use pan-<n>.md."
+      }
+    ],
+    "items": [
+      {
+        "id": "pipeline-lanes",
+        "title": "Rewrite the pipeline lanes and rows (Building / In review / Ready to merge / Stalled)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5294",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/pipeline-helpers.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/PipelineSection.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/PipelineRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/pipeline-helpers.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/pipeline-helpers.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/__tests__/pipeline-helpers.test.ts src/components/CommandDeck/pipeline-helpers.test.ts src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ],
+          "foundationFor": [
+            "pipeline-panel",
+            "home-assembly"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1, decisions G-D5..G-D8. In pipeline-helpers.ts rewrite groupPipelineEntries to return lanes keyed building/review/ready/stalled. Claim precedence: an entry that isStalledFeature claims first and appears only in Stalled. Array and render order: building, review, ready, then stalled (stalled only when non-empty; Building = phase plan|work; In review = phase review; Ready to merge = derived.state === 'ready'; todo, queued-ready, merged, closed not listed; Building/In review/Ready to merge always present; rows sorted by sortByLastActivity). Delete stageDisplayName, sessionCountFor, formatPipelineCost. Add exported homeStageTag(entry, needsYou), homeWhoFor(entry), formatAge(ms) exactly per G-D6/G-D7. Do NOT change pipelineChipFor or isNeedsYouFeature (StackCard and other callers use them). PipelineSection gains optional needsYouIssueIds?: ReadonlySet<string> (default an empty set, so ProjectOverview still compiles before item pipeline-panel) and optional inReviewRef, renders one bordered card (keeps data-testid=pipeline-section, which tests/pan2450-pipeline-overview.spec.ts reads) with a lane bar '<title> · <count>' per lane and data-phase-group=<key>. PipelineRow uses grid '92px minmax(0,1fr) 150px 170px 80px' (id, full title, tag, who, age), whole row is the button, title attribute = sublineFor(entry) plus ' · spent $X' when issueCosts has the issue; remove the initialsFor avatar, cost and session columns; keep data-testid=pipeline-row, data-issue-id, add data-lane, keep data-needs-you from the prop. Update the existing groupPipelineEntries tests in place (never delete) and the ProjectOverview.test.tsx row tests that PRD §7 assigns to WI-1 (rows/ids/title/tag/who/age, onSelectFeature click, active planning session has no needs-you tag, blocked tag with stuck reason tooltip); the needs-you and plan-approval row tests belong to pipeline-panel because ProjectOverview gains needsYouIssueIds there. Broadsheet tokens only; no Tailwind opacity modifier on var() tokens in new classes."
+        },
+        "items": [
+          {
+            "id": "pipeline-lanes.ac1",
+            "title": "Given entries in phases plan, work, review and backlog plus one with derived state 'ready', when groupPipelineEntries runs, then it returns lanes building, review, ready in that order and omits the backlog entry; given a stalled entry too, it returns stalled as the fourth lane and that entry in no other lane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-lanes.ac2",
+            "title": "Given a review entry that the needs-you set names and that is also blocked, when homeStageTag runs, then it returns the 'needs you' tag; without the needs-you flag it returns 'blocked'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-lanes.ac3",
+            "title": "Given a review entry with derived.pr { number: 5127, checks: 'green' }, homeWhoFor returns 'PR #5127 · checks green'; given a work entry with an active session and taskTotals 4/7 it returns '<compact model> · 4 of 7 items'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-lanes.ac4",
+            "title": "formatAge returns '59 m' for 59 minutes, '47 h' for 47 hours, '2 d' for 48 hours and '—' for an unknown time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-lanes.ac5",
+            "title": "PipelineRow renders no initials avatar: grep -n initialsFor PipelineRow.tsx prints nothing, and the rendered row shows id, title, tag, who and age cells",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipeline-panel",
+        "title": "Reduce ProjectOverview to the Pipeline panel and merge train",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview-merge-train.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/__tests__/ProjectOverview.test.tsx src/components/CommandDeck/__tests__/ProjectOverview-merge-train.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 and §5a. ProjectOverview renders <section aria-label=\"Pipeline\">: header h3 'Pipeline', muted '<n> issues' (entries listed in lanes), ghost 'Open the board' that pushes { tab: 'kanban' } to '/board' and dispatches popstate; then PipelineSection (passing needsYouIssueIds, inReviewRef, issueCosts, issueCostDetails, onSelectFeature); then MergeTrain placement=\"project\" unchanged. Remove HeroBillboard, ProjectCiHealthSection, HealthTile, the New workspace button, ProjectSettingsDisclosure, the recent-spend useQuery, projectTotalCost and formatCost, and the onOpenCosts/onOpenAgents/onNewWorkspace props. Keep bucketFeaturePhase and the tracker fallback exported unchanged and keep re-exporting IssueCostBreakdown. New props: needsYouIssueIds and inReviewRef (both optional), passed through to PipelineSection. Also move here the two needs-you row tests from PRD §7 (an issue named by needsYouIssueIds renders the 'needs you' tag inside its lane; a plan-approval-pending issue not named renders in Building without that tag). Replace the hero/CI/new-workspace tests per PRD §7 (the three new-workspace tests move to HomeActions in item home-actions; here add the Stalled-lane and Open-the-board tests so the file's test count does not fall); update ProjectOverview-merge-train.test.tsx so it asserts the merge train renders after the pipeline lanes and drops the ProjectSettingsDisclosure mock."
+        },
+        "items": [
+          {
+            "id": "pipeline-panel.ac1",
+            "title": "Given four features in work, review and ready states, when ProjectOverview renders, then the header reads 'Pipeline' with '<n> issues' and the Building, In review and Ready to merge lane bars show their counts; given needsYouIssueIds naming one review issue, that row renders the 'needs you' tag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-panel.ac2",
+            "title": "Clicking 'Open the board' pushes '/board' to history and dispatches a popstate event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-panel.ac3",
+            "title": "grep -nE \"HeroBillboard|ProjectCiHealthSection|project-overview-new-workspace|ProjectSettingsDisclosure\" ProjectOverview.tsx prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-panel.ac4",
+            "title": "The merge-train test renders the MergeTrain card after the last lane of the pipeline card",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-header",
+        "title": "Home header: title with rename, Settings modal and metadata line",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/HomePane/HomeHeader.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/HomeMetaLine.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/home.module.css",
+            "src/dashboard/frontend/src/components/Stage/HomePane/HomeHeader.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/HomeHeader.rename.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/HomeMetaLine.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/HomePane/HomeHeader.test.tsx src/components/Stage/HomePane/HomeHeader.rename.test.tsx src/components/Stage/HomePane/HomeMetaLine.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3, G-D2, G-D3. Create HomePane/HomeHeader.tsx (title in display-lg with the rename input/pencil behaving exactly like WorkspaceHeader's project variant minus the '#', faint subtitle, ghost Settings button that opens components/shared/Modal titled 'Project settings' (wide) containing ProjectSettingsSection; no Settings without projectKey; a meta slot). Create HomePane/HomeMetaLine.tsx rendering path (abbreviateHome) · branch · release segment (query key ['projectReleaseStatus', projectKey]; texts per G-D3; when available the segment opens a popover holding the unchanged ProjectReleasePanel) · CI word from selectProjectCi + deriveProjectCi ('CI passing' / 'CI failing' / 'CI running k/n' / 'CI unknown', link opens href in a new tab) · ProjectDeployChip · ProjectIdentityChip. Create HomePane/home.module.css for every new Home style (do not add to Stage/stage.module.css). In CommandDeck/ProjectSettingsDisclosure.tsx add only the word export before function ProjectSettingsSection. Port every it() of WorkspaceHeader.rename.test.tsx to HomeHeader.rename.test.tsx with the same assertions against HomeHeader."
+        },
+        "items": [
+          {
+            "id": "home-header.ac1",
+            "title": "Given a projectKey, when the Settings button is clicked, then a dialog named 'Project settings' renders and Escape closes it; without a projectKey no Settings button renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-header.ac2",
+            "title": "Given project CI records in the store with states success, failure, in_progress (1 of 3) and none, the metadata line renders 'CI passing', 'CI failing', 'CI running 1/3' and 'CI unknown'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-header.ac3",
+            "title": "Given a release status with a completed successful run tagged v1.2.0, the segment renders 'v1.2.0 released …' and clicking it shows the element with data-testid project-release-panel; given available=false it renders 'no releases'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-header.ac4",
+            "title": "HomeHeader.rename.test.tsx accepts a new name on Enter and cancels on Escape with the same assertions the WorkspaceHeader rename tests made",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-actions",
+        "title": "Home action row with New conversation split button and More menu",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/HomePane/HomeActions.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/HomeActions.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/HomePane/HomeActions.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "HomeActions.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4, G-D4. Create HomePane/HomeActions.tsx as a pure component with props { projectKey?, projectPath?, hasIssuePrefix, busy, errorText?, onNewConversation, onSelectAgent, onFiles?, onChanges?, onTerminal, onWebPage, onStartIssue?, onNewWorkspace? }; it calls useAvailableEditors and useOpenMainCheckout itself. Order: New conversation (primary split: main part onNewConversation, keycap 'N', caret menu Claude Code / Codex -> onSelectAgent(id), separator, 'New conversation with options…' -> openNewConversationDialog({ projectKey })); Files (keycap from formatSpec Meta+Shift+E / Ctrl+Shift+E by currentPlatform()); Changes on main; Terminal (keycap ⌘T on mac only); Open in <EDITOR_LABELS[preferred]> -> openFolderInEditor(projectPath, preferred) (hidden with no editor or no path); Start an issue… (only when hasIssuePrefix and onStartIssue); More ▾ menu: Web page, Main checkout (only with projectKey, disabled while opening), New workspace (onNewWorkspace?.(key) else pushState '/workspaces/new?project=<encoded>' + popstate; only with projectKey). Do NOT register the N shortcut (NewConversationButton owns deck.new-conversation). Use MenuOverlay/PopoverSurface from components/shared/ContextMenu. Use Tailwind utilities and existing global classes (keycap, list-row, badge-*); do not edit HomePane/home.module.css (only home-header and home-assembly own it)."
+        },
+        "items": [
+          {
+            "id": "home-actions.ac1",
+            "title": "When each of New conversation, Files, Changes on main, Terminal and More ▾ → Web page is clicked, then its handler receives exactly one call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-actions.ac2",
+            "title": "When the caret opens, it renders 'Claude Code', 'Codex' and 'New conversation with options…'; choosing Codex calls onSelectAgent('codex')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-actions.ac3",
+            "title": "Given no projectKey, the row renders no Files, Changes on main, Main checkout or New workspace control; given hasIssuePrefix false it renders no 'Start an issue…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-actions.ac4",
+            "title": "More ▾ → New workspace calls onNewWorkspace('overdeck') when given, otherwise pushes '/workspaces/new?project=overdeck'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-issue-dialog",
+        "title": "Start an issue dialog that plans or starts through the existing paths",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/HomePane/StartIssueDialog.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/startIssue.ts",
+            "src/dashboard/frontend/src/components/Stage/HomePane/StartIssueDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/HomePane/StartIssueDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "StartIssueDialog.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5, G-D9. Create HomePane/startIssue.ts exporting startIssueAgent(issueId, { acknowledged }) that POSTs /api/agents { issueId, guardrailAcknowledged? } with Content-Type application/json and returns a tagged result: 'started' | 'needs-ack' (with warning messages) | 'codex-blocked' (after setPendingCodexSpawn(body)) | 'recovery' (openRecoveryForStartBlock returned true) | 'error' (message). Create HomePane/StartIssueDialog.tsx (components/shared/Modal): Issue text input (placeholder '<PREFIX>-123'), up to 12 startable features (derived state backlog, planned or undefined, no active work session), newest id first, clicking fills the input. Primary label 'Start <ID>' when that feature's derived state is 'planned', else 'Plan <ID>…'. Plan: find the Issue in useDashboardStore.getState().issuesRaw by identifier (case-insensitive) else synthesize the minimal Issue exactly as handleOpenPlanDialog in frame/deck/useIssueSessionActions.ts, call useDeckDialogs.getState().setPlanDialogIssue(issue), close. Start: needs-ack shows the warnings inside the dialog with a 'Start anyway' button that retries with acknowledged true (never window.confirm); recovery closes the dialog; error shows the message inline; started -> toast.success('Started <ID>'), refreshDashboardState(queryClient), close. Do not refactor IssueComposer, ZoneBActionStrip or useIssueSessionActions."
+        },
+        "items": [
+          {
+            "id": "start-issue-dialog.ac1",
+            "title": "Given feature WFX-2 with derived state 'planned', when 'Start WFX-2' is clicked, then one POST /api/agents with body { issueId: 'WFX-2' } is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-issue-dialog.ac2",
+            "title": "Given unplanned WFX-1, when 'Plan WFX-1…' is clicked, then useDeckDialogs.planDialogIssue becomes an Issue with identifier WFX-1 and no /api/agents request is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-issue-dialog.ac3",
+            "title": "Given a 409 response with requiresAcknowledgement and one warning, the dialog renders the warning text and 'Start anyway' re-posts with guardrailAcknowledged: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-issue-dialog.ac4",
+            "title": "Given a start-block 409 that openRecoveryForStartBlock accepts, the dialog closes and the recovery request is set; given a 500 with error 'boom', the dialog shows 'boom'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-data-hooks",
+        "title": "Data hooks for project changes and project spend",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/HomePane/useHomeData.ts",
+            "src/dashboard/frontend/src/components/Stage/HomePane/__tests__/useHomeData.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/HomePane/__tests__/useHomeData.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useHomeData.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6, G-D13. Create HomePane/useHomeData.ts exporting useProjectChanges(projectKey?: string) -> useQuery({ queryKey: ['project-changes', projectKey, '7d'], queryFn: fetch `/api/projects/${encodeURIComponent(projectKey)}/changes?since=7d` (throw on !ok), enabled: !!projectKey, refetchInterval: 60_000 }) typed ProjectChanges from @overdeck/contracts; and useProjectSpend(prefix?: string | null) -> useQuery({ queryKey: ['project-recent-spend', prefix], queryFn: fetch `/api/costs/summary?project=${encodeURIComponent(prefix)}`, enabled: !!prefix, refetchInterval: 60_000 }) whose data is mapped to { week: week.totalCost ?? 0, today: today.totalCost ?? 0 }. No poll faster than 60 s."
+        },
+        "items": [
+          {
+            "id": "home-data-hooks.ac1",
+            "title": "Given projectKey 'my proj', useProjectChanges requests '/api/projects/my%20proj/changes?since=7d' and returns the parsed ProjectChanges",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-data-hooks.ac2",
+            "title": "Given no projectKey, useProjectChanges sends no request; given no prefix, useProjectSpend sends no request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-data-hooks.ac3",
+            "title": "Given a summary response { week: { totalCost: 412 }, today: { totalCost: 43 } } for prefix 'PAN', useProjectSpend returns { week: 412, today: 43 } from '/api/costs/summary?project=PAN'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-facts",
+        "title": "The five Home facts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/HomePane/HomeFacts.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/HomeFacts.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/HomePane/HomeFacts.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "HomeFacts.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7, G-D10. Create HomePane/HomeFacts.tsx, a pure component: one bordered grid of five button facts (Agents working, Needs you, In review, Landed this week, Spend this week) with the values, sublines, dots, colors and click handlers of G-D10. Props { agents: AgentsWorking; needsYou: NeedsYouItem[]; inReview: { count; prNumbers: number[] }; changes: { data?: ProjectChanges; isLoading; isError }; spend: { week; today } | null; spendUnavailable: boolean; onAgents; onNeedsYou; onInReview; onLanded; onSpend }. Export landedSummary(commits) -> { count, viaPrs (subjects matching /\\(#\\d+\\)$/), capped (count === 500) } and formatCost (moved verbatim from ProjectOverview.tsx). Role words: planning, building, reviewing, testing, conversation(s), other; zero agents -> 'none right now'. Spend value uses the cyan money class (text-signal-cost-foreground). Use Tailwind utilities and global classes; do not edit HomePane/home.module.css."
+        },
+        "items": [
+          {
+            "id": "home-facts.ac1",
+            "title": "Given agents { count: 3, byRole: { planning: 1, building: 2 } }, the Agents working fact renders value 3 and subline '1 planning · 2 building' (the test is named 'counts agents working per D-9')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-facts.ac2",
+            "title": "Given 500 commits of which 3 subjects end in '(#n)', the Landed fact renders '500+' and '3 via PRs'; given 2 commits with no PR suffix it renders '2' and 'commits go to main'; given isError it renders '—' and 'unavailable'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-facts.ac3",
+            "title": "Given spend { week: 412, today: 43 }, the Spend fact renders '$412' with the cyan money class and '$43 today'; given spendUnavailable it renders '—' and 'needs an issue prefix'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-facts.ac4",
+            "title": "When each fact is clicked, then its handler receives exactly one call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-needs-you",
+        "title": "Home Needs you panel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/HomePane/HomeNeedsYou.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/HomeNeedsYou.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/HomePane/HomeNeedsYou.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "HomeNeedsYou.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8, G-D12. Create HomePane/HomeNeedsYou.tsx (forwardRef to its section), pure: renders nothing for an empty list; otherwise a header with an amber dot and 'Needs you', then an amber-bordered card with one row per NeedsYouItem: id (the part after 'issue:' for issue keys), title, tag by kind (pending-input 'waiting on you', issue 'needs you', flywheel 'flywheel', decision 'decision'), the ask, and one button (Answer / Open / Open Flywheel / Decide) that calls item.open(). Use Tailwind utilities and global classes; do not edit HomePane/home.module.css."
+        },
+        "items": [
+          {
+            "id": "home-needs-you.ac1",
+            "title": "Given one item of each kind, the panel renders four rows whose buttons read Answer, Open, Open Flywheel and Decide",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-needs-you.ac2",
+            "title": "When a row's button is clicked, then that item's open() receives exactly one call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-needs-you.ac3",
+            "title": "Given an empty list, the component renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "recent-changes",
+        "title": "Recent changes on main with attribution",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/HomePane/RecentChanges.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/RecentChanges.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/HomePane/RecentChanges.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "RecentChanges.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9, G-D11. Create HomePane/RecentChanges.tsx, pure: props { changes: { data?: ProjectChanges; isLoading; isError; error? }; conversations: Conversation[]; features: ProjectFeature[]; onOpenConversation(name, title); onSelectFeature(feature); onAllChanges? }. Rows = commits authored since local midnight when there are at least 10 (cap 50), else the first 10; header 'Recent changes on main' with 'who changed what, today' or 'the last 10 commits' and an 'All changes' ghost button. Row grid '80px minmax(0,1fr) 210px 60px': shortSha button copying the full sha (navigator.clipboard.writeText + toast 'Copied <shortSha>'), subject, who, time (HH:MM today, else 'MMM D'). Who/click by by.kind per G-D11 (conversation: current title from conversations, clickable only when present, else title attribute explains; agent: by.title, opens the matching feature else navigateToIssue; unattributed: muted, not clickable). Empty -> 'No commits on <branch> in the last 7 days.'; error -> 'Recent changes are unavailable: <message>'. Tests fix 'now' with vi.useFakeTimers(). Use Tailwind utilities and global classes; do not edit HomePane/home.module.css."
+        },
+        "items": [
+          {
+            "id": "recent-changes.ac1",
+            "title": "Given 12 commits today and 5 older, the panel renders exactly the 12 today rows and 'who changed what, today'; given 3 today and 20 older it renders the first 10 and 'the last 10 commits'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recent-changes.ac2",
+            "title": "Given a conversation commit whose by.id is in conversations, clicking the row calls onOpenConversation(name, current title); when the conversation is absent the row has no click handler",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recent-changes.ac3",
+            "title": "Given an agent commit with by.title 'WFX-1' and a matching feature, clicking calls onSelectFeature with that feature; with no feature it calls navigateToIssue('WFX-1')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recent-changes.ac4",
+            "title": "An unattributed commit renders 'unattributed'; an empty list renders 'No commits on main in the last 7 days.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-assembly",
+        "title": "Assemble the new ProjectHome and remove the old Home pieces",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:49Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5294",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
+            "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/StatChips.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/StatChips.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/HomePane.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/WorkspaceHeader.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/WorkspaceHeader.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/WorkspaceHeader.rename.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/home.module.css",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/ProjectHome.test.tsx src/components/CommandDeck/CommandDeck.test.tsx src/components/Stage/IssueOverview.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "the three vitest files pass",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-6",
+            "FR-10",
+            "NFR-2",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "home-e2e",
+            "home-docs"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10, §5a, G-D1, G-D14, G-D15. Rewrite Stage/ProjectHome.tsx with the ProjectHomeProps interface unchanged (CommandDeck/index.tsx and CommandDeck.test.tsx are not edited). Inside: registered project via useQuery(['registered-projects'], fetchRegisteredProjects) matched on key === projectKey (name, path, githubRepo/gitlabRepo, linearTeam); useAgentsWorking({ projectKey }) and useNeedsYouItems({ projectKey }) called unconditionally, results ignored without projectKey; useProjectChanges(projectKey); useProjectSpend(linearTeam ?? single feature prefix); useCreateConversation(api.deckKey).create(deckProjectKey) for New conversation, where deckProjectKey = api.deckKey !== NO_PROJECT_KEY ? api.deckKey : undefined — exactly what the left column's NewConversationButton does with selectedProject (it is the deck key, and createForAgent uses it too); openNewConversationDialog gets the same deckProjectKey; today's onAgentSelected logic for the caret agents; entries = features bucketed with bucketFeaturePhase + derivedIssueStateByIssueId, groupPipelineEntries -> In review lane for the fact; needsYouIssueIds = upper-cased ids of 'issue:' keys; refs for scrolling the Needs you panel and In review lane. Render per §5a in a scroll container with inner max-width 1120px and padding 26px 36px 60px (home.module.css), sections per the three states of G-D1, StartIssueDialog when opened. Delete HomePane/StatChips.tsx, StatChips.test.tsx, HomePane/index.tsx, HomePane.test.tsx, WorkspaceHeader.tsx, WorkspaceHeader.test.tsx, WorkspaceHeader.rename.test.tsx; do not edit Stage/stage.module.css (child D2 edits it in parallel; its now-unused Home classes are left for a later cleanup). Remove projectTotalCost and every import of a removed piece. Add every new test file from the home-* items and recent-changes to scripts/frontend-test-subset.txt. Rewrite ProjectHome.test.tsx per PRD §7 so no test is lost."
+        },
+        "items": [
+          {
+            "id": "home-assembly.ac1",
+            "title": "Given ProjectHome with projectKey 'overdeck', the mocked useAgentsWorking and useNeedsYouItems are called with { projectKey: 'overdeck' } and the Agents working fact shows the mocked count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-assembly.ac2",
+            "title": "Given no projectKey, ProjectHome renders the title 'No project', the New conversation, Terminal and More ▾ actions, and no facts, Needs you, Pipeline or Recent changes sections",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-assembly.ac3",
+            "title": "Given a registered project with zero features, ProjectHome renders facts and Recent changes but no element with aria-label 'Pipeline'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-assembly.ac4",
+            "title": "The files StatChips.tsx, HomePane/index.tsx and WorkspaceHeader.tsx no longer exist and grep -rn \"Launcher\\|Timeline\\|StatChips\" Stage/ProjectHome.tsx prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-assembly.ac5",
+            "title": "Choosing Claude Code in the caret creates a claude-code conversation and opens its pane (an error renders inline; a second click while pending sends nothing); given api.deckKey 'overdeck', the New conversation main part calls the mocked useCreateConversation('overdeck').create('overdeck'), the same deck the left column uses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-e2e",
+        "title": "Browser check and NFR-6 screenshots of the new Home",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-5294-project-home.spec.ts",
+            "docs/screenshots/pan-5294/home-dark.png",
+            "docs/screenshots/pan-5294/home-light.png",
+            "docs/screenshots/pan-5294/conversation-dark.png",
+            "docs/screenshots/pan-5294/conversation-light.png"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-5294-project-home.spec.ts"
+          ],
+          "expected_outputs": [
+            "build completes without errors",
+            "the playwright spec passes and writes the four PNGs under docs/screenshots/pan-5294/"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. Create src/dashboard/frontend/tests/pan-5294-project-home.spec.ts copying the setup of tests/pan-5289-work-dock.spec.ts (startIsolatedDashboard, temp OVERDECK_HOME, fake HOME, scripts/dev/seed-workflow-fixture.ts, viewport 1920x1000, theme via localStorage overdeck.ui.theme, isolated browser context — never the operator's :3011 dashboard or another agent's browser). After seeding, push the fixture repo's local trailer commit to its bare origin (git -C <repo> push origin HEAD:main) in the test-owned temp repo. Route fixed answers like tests/pan-5293-left-column.spec.ts: /api/issues/resource-allocated -> four WFX-* features (two 'In Progress' with a work session, one 'In Review', one 'Todo'); GET /api/conversations -> route.fetch() then isWorking: true on fixture-1; POST /api/conversations and POST /api/agents -> fixed JSON (never start a real agent). Assert the New conversation button's bounding box bottom < 1000, the five fact labels, the Agents working value equals the number in the left column's project-status-Workflow fixture text, a Recent changes row whose who shows the fixture conversation's title, and two rows in the Building lane. Take the two conversation screenshots before pushing the trailer commit, then push and take the Home screenshots. Save docs/screenshots/pan-5294/home-dark.png, home-light.png, conversation-dark.png, conversation-light.png; inspect them against mockup screen 2 and attach them to the PR description. Do not add the spec to test:playwright (it seeds git repositories). Run npm run build before the spec."
+        },
+        "items": [
+          {
+            "id": "home-e2e.ac1",
+            "title": "Given the isolated dashboard seeded with the workflow fixture at 1920x1000, when project Home opens, then the New conversation button's bounding box bottom is under 1000 px",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-e2e.ac2",
+            "title": "Given fixture-1 marked working, the Agents working fact renders the same number the left column's project switcher shows for Workflow fixture",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-e2e.ac3",
+            "title": "The Recent changes panel renders a row attributed to the fixture conversation's title after the trailer commit is pushed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-e2e.ac4",
+            "title": "When the spec finishes, it saves home-dark.png, home-light.png, conversation-dark.png and conversation-light.png under docs/screenshots/pan-5294/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-docs",
+        "title": "Document the new project Home",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/mission-control.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5294.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. In features/mission-control.mdx replace the '## Release / Publish Indicator' section with '## Project home' covering, in order: header and metadata line (path, branch, release with its popover keeping the npm/GitHub Release/partial-failure detail, CI word, deploy, identity), the action row (each action, its keycap, More ▾ items), the five facts and what each counts (Agents working includes conversations and matches the project switcher; spend includes conversations and needs an issue prefix; Landed counts first-parent default-branch commits in 7 days, '500+' at the cap), the Needs you panel, the pipeline lanes (which issues each lists, tags, who, age = last activity), and Recent changes (attribution from commit trailers, click behavior); keep the projects.yaml publish paragraph. In docs/DASHBOARD-ARCHITECTURE.md add '## Project home (PAN-5294)' with a file table (ProjectHome.tsx, each HomePane/* file, ProjectOverview.tsx, PipelineSection.tsx, PipelineRow.tsx, pipeline-helpers.ts), the data sources (useAgentsWorking, useNeedsYouItems, /api/projects/:key/changes?since=7d, /api/costs/summary?project=, release status, project CI record), the lane rules and the three states. Add changelog.d/pan-5294.md per changelog.d/README.md (one '#### Improved' bullet linking #5294; write &#36; for dollar signs)."
+        },
+        "items": [
+          {
+            "id": "home-docs.ac1",
+            "title": "features/mission-control.mdx contains a '## Project home' section that names Agents working, Needs you, In review, Landed this week and Spend this week and states that Agents working includes conversations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-docs.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a '## Project home (PAN-5294)' section whose file table lists HomeFacts.tsx, RecentChanges.tsx and pipeline-helpers.ts and names /api/projects/:key/changes?since=7d",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-docs.ac3",
+            "title": "changelog.d/pan-5294.md exists with one '#### Improved' bullet linking https://github.com/eltmon/overdeck/issues/5294 and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pipeline-lanes",
+        "to": "pipeline-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "pipeline-panel",
+        "to": "home-assembly",
+        "type": "blocks"
+      },
+      {
+        "from": "home-header",
+        "to": "home-assembly",
+        "type": "blocks"
+      },
+      {
+        "from": "home-actions",
+        "to": "home-assembly",
+        "type": "blocks"
+      },
+      {
+        "from": "start-issue-dialog",
+        "to": "home-assembly",
+        "type": "blocks"
+      },
+      {
+        "from": "home-data-hooks",
+        "to": "home-assembly",
+        "type": "blocks"
+      },
+      {
+        "from": "home-facts",
+        "to": "home-assembly",
+        "type": "blocks"
+      },
+      {
+        "from": "home-needs-you",
+        "to": "home-assembly",
+        "type": "blocks"
+      },
+      {
+        "from": "recent-changes",
+        "to": "home-assembly",
+        "type": "blocks"
+      },
+      {
+        "from": "home-assembly",
+        "to": "home-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "home-assembly",
+        "to": "home-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -61,6 +61,20 @@ describe('agent message composer routing', () => {
     expect(agentMocks.messageAgent).not.toHaveBeenCalled();
   });
 
+  it('answers bare /pan with the command list and skips messageAgent', async () => {
+    const response = await handleAgentMessage('agent-pan-42', '/pan');
+    const body = decodeJsonResponse(response);
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      kind: 'captured',
+      status: 'completed',
+      command: '/pan help',
+    });
+    expect(agentMocks.messageAgent).not.toHaveBeenCalled();
+    expect(agentMocks.runCapturedCommand).not.toHaveBeenCalled();
+  });
+
   it('returns shared parser errors without messaging the agent', async () => {
     const response = await handleAgentMessage('agent-pan-42', '/pan bogus');
 

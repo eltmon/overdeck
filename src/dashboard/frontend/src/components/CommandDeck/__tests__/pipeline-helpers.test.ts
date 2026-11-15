@@ -1,8 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProjectFeature } from '../ProjectTree/ProjectNode';
 import type { DerivedIssueState } from '../../../types';
 import {
+  formatAge,
   groupPipelineEntries,
+  homeStageTag,
+  homeWhoFor,
   isNeedsYouFeature,
   isStalledFeature,
   lastActivityAt,
@@ -58,8 +61,9 @@ describe('needs-you classification', () => {
     expect(isNeedsYouFeature({ ...base, pipelineBucket: 'zombie_pr' }, undefined)).toBe(false);
     expect(isNeedsYouFeature({ ...base, pipelineBucket: 'clean_terminal' }, undefined)).toBe(false);
 
+    // PAN-5294: the pipeline has no Needs-you group; the entry stays in its phase lane.
     const groups = groupPipelineEntries([makeBucket({ ...base, pipelineBucket: 'zombie_pr' })]);
-    expect(groups.some(group => group.key === 'needs-you')).toBe(false);
+    expect(groups.find(group => group.key === 'building')?.entries).toHaveLength(1);
   });
 
   it('labels a canonical plan approval instead of claiming checks passed', () => {
@@ -101,8 +105,9 @@ describe('pr-outside-pipeline classification (PAN-4605)', () => {
 
     expect(isNeedsYouFeature(feature, derived)).toBe(true);
     expect(sublineFor(makeBucket(feature, derived))).toBe(`review never started — ${fix}`);
+    // PAN-5294: a needs-you issue stays in its phase lane (the Needs you panel lists it).
     const groups = groupPipelineEntries([makeBucket(feature, derived)]);
-    expect(groups[0]?.key).toBe('needs-you');
+    expect(groups[0]?.key).toBe('building');
     expect(groups[0]?.entries).toHaveLength(1);
   });
 });
@@ -256,10 +261,10 @@ describe('groupPipelineEntries stalled bucket', () => {
     });
     const groups = groupPipelineEntries([makeBucket(feature)]);
 
-    expect(groups.map(g => g.key)).toEqual(['stalled']);
-    expect(groups[0].phase).toBe('stalled');
-    expect(groups[0].entries[0].phase).toBe('stalled');
-    expect(pipelineChipFor(groups[0].entries[0]).label).toBe('stalled — has work, no live agent');
+    expect(groups.map(g => g.key)).toEqual(['building', 'review', 'ready', 'stalled']);
+    const stalled = groups.find(g => g.key === 'stalled')!;
+    expect(stalled.entries[0].phase).toBe('stalled');
+    expect(pipelineChipFor(stalled.entries[0]).label).toBe('stalled — has work, no live agent');
   });
 
   it('keeps a recently-active artifact-bearing feature out of stalled', () => {
@@ -268,7 +273,8 @@ describe('groupPipelineEntries stalled bucket', () => {
     });
     const groups = groupPipelineEntries([makeBucket(feature)]);
 
-    expect(groups.map(g => g.key)).toEqual(['work']);
+    expect(groups.map(g => g.key)).toEqual(['building', 'review', 'ready']);
+    expect(groups[0].entries).toHaveLength(1);
     expect(groups.some(g => g.key === 'stalled')).toBe(false);
   });
 
@@ -287,18 +293,21 @@ describe('groupPipelineEntries stalled bucket', () => {
     });
     const groups = groupPipelineEntries([makeBucket(feature)]);
 
-    expect(groups.map(g => g.key)).toEqual(['work']);
+    expect(groups.map(g => g.key)).toEqual(['building', 'review', 'ready']);
+    expect(groups[0].entries).toHaveLength(1);
     expect(groups.some(g => g.key === 'stalled')).toBe(false);
   });
 
-  it('prefers needs-you over stalled when both apply', () => {
+  // PAN-5294 G-D5: Stalled claims first, so a stalled entry appears in no other lane.
+  it('lets stalled claim an entry before its ready lane', () => {
     const feature = makeFeature({
       taskTotals: { total: 4, closed: 2, inProgress: 0, lastUpdated: '2026-05-13T00:00:00Z' },
     });
     const groups = groupPipelineEntries([makeBucket(feature, derivedState('ready'))]);
 
-    expect(groups.map(g => g.key)).toEqual(['needs-you']);
-    expect(groups.some(g => g.key === 'stalled')).toBe(false);
+    expect(groups.map(g => g.key)).toEqual(['building', 'review', 'ready', 'stalled']);
+    expect(groups.find(g => g.key === 'ready')?.entries).toHaveLength(0);
+    expect(groups.find(g => g.key === 'stalled')?.entries).toHaveLength(1);
   });
 
   it('does not duplicate a stalled feature into its original phase group', () => {
@@ -308,7 +317,7 @@ describe('groupPipelineEntries stalled bucket', () => {
     const groups = groupPipelineEntries([makeBucket(feature)]);
 
     expect(groups.filter(g => g.key === 'stalled')).toHaveLength(1);
-    expect(groups.filter(g => g.key === 'work')).toHaveLength(0);
+    expect(groups.find(g => g.key === 'building')?.entries).toHaveLength(0);
   });
 });
 
@@ -348,5 +357,158 @@ describe('pipelineChipFor reads the derived state', () => {
 
     expect(chip.key).toBe('blocked');
     expect(chip.label).toBe('blocked');
+  });
+});
+
+// PAN-5294 G-D5: the Home lanes, their order and which phases they list.
+describe('groupPipelineEntries Home lanes (PAN-5294)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-13T00:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function bucket(issueId: string, phase: BucketPhase, derived?: DerivedIssueState) {
+    return { feature: makeFeature({ issueId }), derived, phase };
+  }
+
+  it('returns building, review and ready in order and omits backlog, queued and merged entries', () => {
+    const groups = groupPipelineEntries([
+      bucket('PAN-1', 'plan'),
+      bucket('PAN-2', 'work'),
+      bucket('PAN-3', 'review'),
+      bucket('PAN-4', 'todo'),
+      bucket('PAN-5', 'ship', derivedState('ready')),
+      bucket('PAN-6', 'ready'),
+      bucket('PAN-7', 'ship', derivedState('merged')),
+    ]);
+
+    expect(groups.map(g => g.key)).toEqual(['building', 'review', 'ready']);
+    expect(groups.map(g => g.title)).toEqual(['Building', 'In review', 'Ready to merge']);
+    expect(groups[0].entries.map(e => e.feature.issueId).sort()).toEqual(['PAN-1', 'PAN-2']);
+    expect(groups[1].entries.map(e => e.feature.issueId)).toEqual(['PAN-3']);
+    expect(groups[2].entries.map(e => e.feature.issueId)).toEqual(['PAN-5']);
+    const listed = groups.flatMap(g => g.entries.map(e => e.feature.issueId));
+    expect(listed).not.toContain('PAN-4');
+    expect(listed).not.toContain('PAN-6');
+    expect(listed).not.toContain('PAN-7');
+  });
+
+  it('always renders the three main lanes, even with nothing in them', () => {
+    const groups = groupPipelineEntries([]);
+    expect(groups.map(g => [g.key, g.entries.length])).toEqual([['building', 0], ['review', 0], ['ready', 0]]);
+  });
+
+  it('adds stalled as the fourth lane and lists a stalled entry in no other lane', () => {
+    const stalled = {
+      feature: makeFeature({
+        issueId: 'PAN-9',
+        taskTotals: { total: 4, closed: 2, inProgress: 0, lastUpdated: '2026-05-13T00:00:00Z' },
+      }),
+      derived: derivedState('in-review'),
+      phase: 'review' as const,
+    };
+    const groups = groupPipelineEntries([bucket('PAN-1', 'work'), stalled]);
+
+    expect(groups.map(g => g.key)).toEqual(['building', 'review', 'ready', 'stalled']);
+    const lanesWithPan9 = groups.filter(g => g.entries.some(e => e.feature.issueId === 'PAN-9')).map(g => g.key);
+    expect(lanesWithPan9).toEqual(['stalled']);
+  });
+});
+
+type BucketPhase = 'plan' | 'work' | 'review' | 'todo' | 'ship' | 'ready';
+
+describe('homeStageTag (PAN-5294 G-D6)', () => {
+  const blockedReview = {
+    feature: makeFeature(),
+    derived: derivedState('in-review', {
+      pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'approved', checks: 'red', mergeable: true },
+    }),
+    phase: 'review' as const,
+  };
+
+  it('puts needs you ahead of blocked', () => {
+    const tag = homeStageTag(blockedReview, true);
+    expect(tag.key).toBe('needs-you');
+    expect(tag.label).toBe('needs you');
+    expect(tag.className).toContain('text-state-needs-you');
+  });
+
+  it('says blocked without the needs-you flag', () => {
+    const tag = homeStageTag(blockedReview, false);
+    expect(tag.label).toBe('blocked');
+    expect(tag.className).toContain('text-destructive');
+  });
+
+  it('names the lane word otherwise', () => {
+    expect(homeStageTag({ feature: makeFeature(), derived: undefined, phase: 'plan' }, false).label).toBe('planning');
+    expect(homeStageTag({ feature: makeFeature(), derived: undefined, phase: 'work' }, false).label).toBe('building');
+    expect(homeStageTag({ feature: makeFeature(), derived: derivedState('in-review'), phase: 'review' }, false).label).toBe('in review');
+    expect(homeStageTag({ feature: makeFeature(), derived: derivedState('changes-requested'), phase: 'review' }, false).label)
+      .toBe('changes requested');
+    const ready = homeStageTag({ feature: makeFeature(), derived: derivedState('ready'), phase: 'ship' }, false);
+    expect(ready.label).toBe('ready');
+    expect(ready.className).toContain('text-state-done');
+    expect(homeStageTag({ feature: makeFeature(), derived: undefined, phase: 'stalled' }, false).label).toBe('stalled');
+  });
+});
+
+describe('homeWhoFor (PAN-5294 G-D7)', () => {
+  it('names the pull request and its checks for an In review row', () => {
+    const who = homeWhoFor({
+      feature: makeFeature(),
+      derived: derivedState('in-review', {
+        pr: { url: 'https://example.com/pr/5127', number: 5127, reviewState: 'approved', checks: 'green', mergeable: true },
+      }),
+      phase: 'review',
+    });
+    expect(who).toBe('PR #5127 · checks green');
+  });
+
+  it('says running and failing for pending and red checks', () => {
+    const pr = (checks: 'pending' | 'red') => derivedState('ready', {
+      pr: { url: 'https://example.com/pr/7', number: 7, reviewState: 'approved', checks, mergeable: true },
+    });
+    expect(homeWhoFor({ feature: makeFeature(), derived: pr('pending'), phase: 'ship' })).toBe('PR #7 · checks running');
+    expect(homeWhoFor({ feature: makeFeature(), derived: pr('red'), phase: 'ship' })).toBe('PR #7 · checks failing');
+  });
+
+  it('names the active session model and item progress for a work row', () => {
+    const who = homeWhoFor({
+      feature: makeFeature({
+        taskTotals: { total: 7, closed: 4, inProgress: 1, lastUpdated: null },
+        sessions: [
+          { type: 'work', presence: 'ended', model: 'claude-haiku-4-5' } as any,
+          { type: 'work', presence: 'active', model: 'claude-sonnet-4-6' } as any,
+        ],
+      }),
+      derived: derivedState('working'),
+      phase: 'work',
+    });
+    expect(who).toBe('sonnet-4-6 · 4 of 7 items');
+  });
+
+  it('says no agent when the issue has no sessions', () => {
+    expect(homeWhoFor({ feature: makeFeature(), derived: undefined, phase: 'work' })).toBe('no agent');
+  });
+});
+
+describe('formatAge (PAN-5294 G-D7)', () => {
+  const MINUTE = 60 * 1000;
+  const HOUR = 60 * MINUTE;
+
+  it('uses minutes under an hour, hours under 48 hours and days after', () => {
+    expect(formatAge(59 * MINUTE)).toBe('59 m');
+    expect(formatAge(47 * HOUR)).toBe('47 h');
+    expect(formatAge(48 * HOUR)).toBe('2 d');
+  });
+
+  it('shows a dash for an unknown time', () => {
+    expect(formatAge(undefined)).toBe('—');
+    expect(formatAge(0)).toBe('—');
+    expect(formatAge(Number.NaN)).toBe('—');
   });
 });

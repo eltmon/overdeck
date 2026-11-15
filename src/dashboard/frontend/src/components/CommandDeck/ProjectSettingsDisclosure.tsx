@@ -311,7 +311,7 @@ function VersionShipSettings({ projectKey }: { projectKey: string }) {
 }
 
 /** PAN-1693/1695: per-project settings in the cockpit — currently the auto-merge default. */
-function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
+export function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
   const queryClient = useQueryClient();
   const { data } = useQuery({
     queryKey: ['project-auto-merge-default', projectKey],

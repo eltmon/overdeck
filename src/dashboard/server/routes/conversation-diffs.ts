@@ -5,12 +5,14 @@
  * GET /api/conversations/:name/diffs/vs-main  — conversation repo vs the project's default branch
  * GET /api/conversations/:name/diffs/:turnId  — one turn
  * GET /api/conversations/:name/changes        — commits and uncommitted edits (PAN-5288)
+ * GET /api/conversations/:name/changes/lines  — lines the conversation changed in one file (PAN-5290)
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { getConversationDiffs, getConversationDiffFull, getConversationDiffTurn, getConversationDiffVsMain } from '../../../lib/overdeck/conversation-diffs.js';
 import { getCachedMessages, peekCachedMessages, resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
 import { getConversationChanges, type ConversationChangesDependencies } from '../../../lib/overdeck/conversation-changes.js';
+import { getConversationChangedLines } from '../../../lib/overdeck/conversation-change-lines.js';
 import { listConversations } from '../../../lib/overdeck/conversations.js';
 import type { ChangeScope } from '@overdeck/contracts';
 import { diffOptionsFromSearchParams } from '../../../lib/diffs/diff-output.js';
@@ -138,10 +140,32 @@ const getConversationChangesRoute = HttpRouter.add(
   }),
 );
 
+const getConversationChangedLinesRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/:name/changes/lines',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const reqUrl = new URL(request.url, 'http://localhost');
+    // A missing file is passed through as '' so getConversationChangedLines answers 400.
+    const file = reqUrl.searchParams.get('file') ?? '';
+    return yield* Effect.promise(async () => {
+      const response = await getConversationChangedLines(name, file, conversationChangesDependencies);
+      return jsonResponse(response.body, { status: response.status });
+    });
+  }),
+);
+
 export const conversationDiffRoutes = Layer.mergeAll(
   getConversationDiffsRoute,
   getConversationDiffFullRoute,
   getConversationDiffVsMainRoute,
   getConversationDiffTurnRoute,
   getConversationChangesRoute,
+  getConversationChangedLinesRoute,
 );

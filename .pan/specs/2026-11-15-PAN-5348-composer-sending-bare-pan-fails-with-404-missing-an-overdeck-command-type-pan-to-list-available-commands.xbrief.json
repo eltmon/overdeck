@@ -1,0 +1,589 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T13:29:21Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5348: Composer: sending bare /pan fails with 404 'Missing an Overdeck command... Type /pan to list available commands'",
+    "updated": "2026-11-15T13:34:29.733Z"
+  },
+  "plan": {
+    "id": "pan-5348",
+    "title": "Composer: sending bare /pan fails with 404 'Missing an Overdeck command... Type /pan to list available commands'",
+    "status": "running",
+    "uid": "99cf6435-e589-4f72-9785-98f0a7db97ed",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T13:29:21Z",
+    "updated": "2026-11-15T13:34:29.733Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5348",
+        "label": "PAN-5348",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "composer",
+      "slash-commands",
+      "dashboard",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "Sending bare /pan in a conversation composer fails with HTTP 404 'Missing an Overdeck command after /pan. Type /pan to list available commands.' because resolveEntry in src/lib/composer-commands/parser.ts throws for an empty token list, and both message routes map unknown-command to 404. The error tells the operator to do what they just did. /pan help fails the same way because the CLI registry excludes Commander's implicit help. Separately, typing /pan and pressing Enter in the slash picker of a Claude Code conversation inserts /context, whose description contains 'expand'.",
+      "Proposal": "The parser maps /pan, /pan help, /pan --help and /pan -h to a dashboard-owned COMPOSER_HELP_ENTRY. The router answers that entry before any policy or executor with a captured result (command '/pan help') whose output is built in-process from the manifest and the policy overlay: composer-runnable commands first, then every other top-level command grouped by manifest category as 'pan <syntax>'. The existing captured-result row renders it, so no contract or component change is needed. The slash picker gains a static /pan entry and ranks exact and label matches before description-only matches, so /pan + Enter picks /pan. Docs, changelog and the CI frontend subset are updated. Full detail: .pan/drafts/PAN-5348.md.",
+      "NonGoals": "- No new ComposerCommandResult kind and no change to CommandResultRow.tsx or isComposerCommandResult\n- No per-command help for /pan help <verb>; it is rejected with the existing 'Unexpected token' error\n- No change to the policy overlay (which commands run in the composer)\n- No listing of subcommands; only top-level commands appear\n- No edit to composer-commands.generated.ts, scripts/slash-commands-curation.json or the generator\n- No fix for the case mismatch between the frontend /pan regex (case-insensitive) and the server's case-sensitive isComposerCommandMessage\n- No --help support after a subcommand (/pan show --help still answers 422 unknown flag)\n- The help list never spawns pan --help or any child process"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Answer bare /pan on the server, not with a frontend shortcut",
+        "rationale": "Both message routes already intercept /pan before delivery, and MCP send_message and pan tell use the same routes, so one server fix covers every client and keeps the message out of the agent."
+      },
+      {
+        "summary": "Reuse kind 'captured' for the help result",
+        "rationale": "The captured row already renders multi-line output with a 200 status; a new kind would need the contracts type, the strict isComposerCommandResult switch, statusSentence and the row to change together, and an unrecognized 200 body is silently treated as an acknowledged prompt."
+      },
+      {
+        "summary": "Group by manifest category",
+        "rationale": "pan --help prints a flat Commander list with no group headings, so the only grouping the CLI registry defines is the category assigned in scripts/slash-commands-curation.json."
+      },
+      {
+        "summary": "List top-level commands only, with composer-runnable ones in a first section",
+        "rationale": "pan --help lists top-level commands; only 8 of 92 run in the composer and the rest answer 422, so separating them keeps the list truthful about what can be typed here."
+      },
+      {
+        "summary": "Accept /pan, /pan help, /pan --help and /pan -h; reject /pan help <verb>",
+        "rationale": "Commander accepts all three help forms so operators type them by habit; per-command help is extra scope the issue did not ask for."
+      },
+      {
+        "summary": "Include the slash-picker ranking fix",
+        "rationale": "The issue asks that typing /pan use the picker; without ranking, /pan + Enter in a Claude Code conversation inserts /context because its description contains 'expand', so the keyboard path stays broken."
+      }
+    ],
+    "items": [
+      {
+        "id": "parser-help-entry",
+        "title": "Parser maps bare /pan and help spellings to COMPOSER_HELP_ENTRY",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T13:29:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5348",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/composer-commands/parser.ts",
+            "src/lib/composer-commands/__tests__/parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/composer-commands/__tests__/parser.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "parser.test.ts passes including the four new cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work Item 1 in .pan/drafts/PAN-5348.md: in src/lib/composer-commands/parser.ts export COMPOSER_HELP_ENTRY (id pan-help, path ['help'], display '/pan help', args/options/aliases empty, category Core) and HELP_TOKENS {'help','--help','-h'}; export expectedSyntax; in resolveEntry return the help entry with pathLength 0 for an empty token list and pathLength 1 when tokens[0] is a help token, before the manifest lookup; replace the unknown-command ternary with the single message 'Unknown Overdeck command \"<token>\". Type /pan to list available commands.' Do not touch the generated manifest or the policy overlay. Add the four parser tests named in the PRD."
+        },
+        "items": [
+          {
+            "id": "parser-help-entry.ac1",
+            "title": "Given each of '/pan', '/pan help', '/pan --help', '/pan -h' and '/pan   ', when parseOverdeckComposerCommand runs, then it returns entry.id 'pan-help' and argv ['help'] (parser.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parser-help-entry.ac2",
+            "title": "Given '/pan help start', when parsed, then it throws ComposerCommandParseError with code 'unknown-command', token 'start' and message 'Unexpected token \"start\" for /pan help. Expected syntax: /pan help.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parser-help-entry.ac3",
+            "title": "Given '/pan frobnicate', when parsed, then the thrown message equals 'Unknown Overdeck command \"frobnicate\". Type /pan to list available commands.' and grep for 'Missing an Overdeck command' in parser.ts returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parser-help-entry.ac4",
+            "title": "A parser test asserts COMPOSER_COMMAND_MANIFEST contains no entry whose path[0] is 'help', and it passes against the committed manifest",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "help-list-builder",
+        "title": "Build the grouped /pan help list in-process from the manifest and policy overlay",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T13:29:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5348",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/composer-commands/help.ts",
+            "src/lib/composer-commands/__tests__/help.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/composer-commands/__tests__/help.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "help.test.ts passes all five cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work Item 2: create src/lib/composer-commands/help.ts exporting buildComposerHelpOutput() and buildComposerHelpResult(). The output is exactly the format in the PRD: header 'Overdeck commands', a 'Run in this composer (type /pan <command>):' section listing every manifest entry whose resolvePolicy(path).mode is not 'terminal-only' with expectedSyntax, then 'Run in a terminal (type pan <command> in a shell):' followed by one section per manifest category (first-appearance order) of top-level (path.length === 1) terminal-only entries written as 'pan <syntax>', syntax column padded to the longest syntax capped at 36, and the footer 'Run pan <command> --help in a terminal for subcommands and options.' The result is a captured completed result with command '/pan help' and truncated false. Never spawn a process. Add help.test.ts with the five tests named in the PRD."
+        },
+        "items": [
+          {
+            "id": "help-list-builder.ac1",
+            "title": "buildComposerHelpResult() returns { kind: 'captured', status: 'completed', command: '/pan help', truncated: false } and two calls return deep-equal results (help.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "help-list-builder.ac2",
+            "title": "The output contains '/pan start <id>' and '/pan status' before the line 'Run in a terminal (type pan <command> in a shell):'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "help-list-builder.ac3",
+            "title": "The output contains a line exactly 'Lifecycle' and a line starting '  pan doctor', and no line starts with '  /pan doctor' or '  pan plan finalize'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "help-list-builder.ac4",
+            "title": "The count of output lines starting with '  pan ' or '  /pan ' equals the number of top-level terminal-only manifest entries plus the number of composer-runnable entries, and grep for 'spawn' in help.ts returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "router-help-dispatch",
+        "title": "Router answers the help entry with the command list on both message routes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T13:29:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5348",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/composer-commands/router.ts",
+            "src/lib/composer-commands/__tests__/router.test.ts",
+            "src/dashboard/server/routes/__tests__/agents-messaging.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/composer-commands/__tests__/router.test.ts src/dashboard/server/routes/__tests__/agents-messaging.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "router.test.ts and agents-messaging.test.ts pass including the new bare /pan cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work Item 3: make the first statement of handleComposerCommand in src/lib/composer-commands/router.ts return buildComposerHelpResult() when parsed.entry === COMPOSER_HELP_ENTRY, before resolvePolicy, confirmation or any executor; import COMPOSER_HELP_ENTRY from ./parser.js and buildComposerHelpResult from ./help.js and add the PAN-5348 sentence to the module header. Do not change conversation-message.ts or messaging.ts. Add the conversation-route it.each test to router.test.ts and the agent-route test to agents-messaging.test.ts as named in the PRD."
+        },
+        "items": [
+          {
+            "id": "router-help-dispatch.ac1",
+            "title": "Given the conversation route, when '/pan', '/pan help' or '/pan --help' is sent, then it returns HTTP 200 with kind 'captured', command '/pan help' and output containing 'Run in this composer', and runCapturedCommand, runDetachedCommand, deliverAgentMessage and deliverControl are not called (router.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "router-help-dispatch.ac2",
+            "title": "Given the agent route, when handleAgentMessage('agent-pan-42', '/pan') runs, then it returns HTTP 200 with kind 'captured' and messageAgent and runCapturedCommand are not called (agents-messaging.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "router-help-dispatch.ac3",
+            "title": "The existing '/pan bogus' router test still returns 404 with an error containing 'Type /pan to list available commands'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "router-help-dispatch.ac4",
+            "title": "Given a dashboard conversation in an isolated Playwright browser profile, when the operator types '/pan' and clicks Send, then a command result row shows '/pan help completed successfully.' with the command list, and no toast and no 'Command request failed' bubble appears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "picker-pan-entry",
+        "title": "Add a static /pan entry to the slash picker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T13:29:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5348",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/slashCommands.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ComposerPromptEditor.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ComposerPromptEditor.test.tsx passes including the two new cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work Item 4: in src/dashboard/frontend/src/components/chat/slashCommands.ts add OVERDECK_HELP_SLASH_COMMAND { id 'pan-help', label '/pan', description 'List the available Overdeck commands', insert '/pan', category 'Overdeck' } and return it in getSlashCommands after STATIC_SLASH_COMMANDS and before the generated Overdeck entries. Add the two ComposerPromptEditor.test.tsx tests named in the PRD (entry present before pan-init, and filter 'pan ' shows no Claude Code native group)."
+        },
+        "items": [
+          {
+            "id": "picker-pan-entry.ac1",
+            "title": "getSlashCommands('claude-code') returns an entry { id: 'pan-help', label: '/pan', insert: '/pan', category: 'Overdeck' } at a lower index than the 'pan-init' entry (ComposerPromptEditor.test.tsx)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "picker-pan-entry.ac2",
+            "title": "Given SlashMenu with getSlashCommands('claude-code') and filter 'pan ', when it renders, then it shows '/pan start' and does not render the 'Claude Code native' group heading",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "picker-match-ranking",
+        "title": "Rank exact and label matches before description-only matches in the slash picker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T13:29:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5348",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ComposerPromptEditor.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ComposerPromptEditor.test.tsx passes including the three ranking cases and all existing SlashMenu filter cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work Item 5: in filterCommands in src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx, when the normalized filter is non-empty, rank each match (0 exact label match '/'+filter or '/'+aliasFilter, 1 label contains filter or alias filter, 2 description-only) and keep the result category-contiguous via a module-local rankWithinCategories: group by cmd.category || 'Commands', order groups by best member rank then first appearance, order members by rank then source index, concatenate. Leave the empty-filter order unchanged. This keeps the flat order equal to the grouped on-screen order so ArrowUp/ArrowDown move row by row. Add the three ranking tests named in the PRD to ComposerPromptEditor.test.tsx."
+        },
+        "items": [
+          {
+            "id": "picker-match-ranking.ac1",
+            "title": "Given SlashMenu with getSlashCommands('claude-code'), filter 'pan' and selectedIndex 0, when it renders, then the option with aria-selected true has label '/pan' and the first rendered group heading is 'Overdeck'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "picker-match-ranking.ac2",
+            "title": "Given TEST_COMMANDS plus a '/zzz' command whose description is 'model helper' and filter 'model', when SlashMenu renders, then the first option is '/model'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "picker-match-ranking.ac3",
+            "title": "Given getSlashCommands('claude-code') and the mixed filter 'co', when SlashMenu renders with selectedIndex 0, 1 and the last index, then getAllByRole('option')[i] is the element marked aria-selected true each time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "picker-match-ranking.ac4",
+            "title": "Given an empty filter, when SlashMenu renders, then commands keep their source order and the existing 'SlashMenu filter' tests pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-frontend-subset",
+        "title": "List the extended frontend test files in the CI frontend subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T13:29:21Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-5348",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'ComposerPromptEditor.test.tsx\\|CommandResultRow.test.tsx' scripts/frontend-test-subset.txt",
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ComposerPromptEditor.test.tsx src/components/chat/messagesTimeline/__tests__/CommandResultRow.test.tsx"
+          ],
+          "expected_outputs": [
+            "grep prints 2",
+            "both test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work Item 6: add src/components/chat/__tests__/ComposerPromptEditor.test.tsx and src/components/chat/messagesTimeline/__tests__/CommandResultRow.test.tsx to scripts/frontend-test-subset.txt, each in its sorted position (paths relative to src/dashboard/frontend). Change no other line."
+        },
+        "items": [
+          {
+            "id": "ci-frontend-subset.ac1",
+            "title": "scripts/frontend-test-subset.txt contains the line 'src/components/chat/__tests__/ComposerPromptEditor.test.tsx' between the last ComposerFooter line and 'src/components/chat/__tests__/ConversationAboutDrawer.test.tsx'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-frontend-subset.ac2",
+            "title": "scripts/frontend-test-subset.txt contains the line 'src/components/chat/messagesTimeline/__tests__/CommandResultRow.test.tsx' in sorted position, and git diff of the file shows exactly two added lines and no removed lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "result-row-help-test",
+        "title": "Component test that the /pan help captured result renders as a command result row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T13:29:21Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-5348",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/__tests__/CommandResultRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/messagesTimeline/__tests__/CommandResultRow.test.tsx"
+          ],
+          "expected_outputs": [
+            "CommandResultRow.test.tsx passes including the new /pan help case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work Item 7: add the test 'renders the /pan help list as captured output' to CommandResultRow.test.tsx, rendering a captured completed result with command '/pan help' and a short multi-line list output; do not change CommandResultRow.tsx."
+        },
+        "items": [
+          {
+            "id": "result-row-help-test.ac1",
+            "title": "Given a captured completed result with command '/pan help', when CommandResultRow renders, then it shows '/pan help completed successfully.' and a pre block whose text contains 'Run in this composer'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "result-row-help-test.ac2",
+            "title": "The rendered row has data-command-result 'completed' and contains no element with role 'alert', and git diff shows no change to CommandResultRow.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-bare-pan-help",
+        "title": "Document bare /pan listing in the composer docs, harness page and changelog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T13:29:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5348",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/COMPOSER-SLASH-COMMANDS.md",
+            "configuration/harnesses.mdx",
+            "changelog.d/pan-5348.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'Listing commands' docs/COMPOSER-SLASH-COMMANDS.md"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "grep prints the new section heading"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work Item 8: in docs/COMPOSER-SLASH-COMMANDS.md add the static /pan entry sentence to the curation section, add the '## Listing commands' section after 'Routing order' with the PRD text, and add the unknown-command sentence to 'Routing order'; append the PRD sentence to the paragraph at configuration/harnesses.mdx line 38; create changelog.d/pan-5348.md with the PRD's '#### Fixed' entry."
+        },
+        "items": [
+          {
+            "id": "docs-bare-pan-help.ac1",
+            "title": "docs/COMPOSER-SLASH-COMMANDS.md contains a '## Listing commands' section that names '/pan', '/pan help', '/pan --help', '/pan -h', COMPOSER_HELP_ENTRY and src/lib/composer-commands/help.ts, and states the list never spawns pan --help",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-bare-pan-help.ac2",
+            "title": "configuration/harnesses.mdx contains the sentence 'Type `/pan` alone and send it to list the Overdeck commands; the ones that run in the composer come first.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-bare-pan-help.ac3",
+            "title": "changelog.d/pan-5348.md exists with a '#### Fixed' heading and a bullet linking issue #5348, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "parser-help-entry",
+        "to": "help-list-builder",
+        "type": "blocks"
+      },
+      {
+        "from": "parser-help-entry",
+        "to": "router-help-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "help-list-builder",
+        "to": "router-help-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "picker-pan-entry",
+        "to": "picker-match-ranking",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-15-PAN-5348-composer-sending-bare-pan-fails-with-404-missing-an-overdeck-command-type-pan-to-list-available-commands.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}
