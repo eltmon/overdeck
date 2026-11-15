@@ -4,17 +4,17 @@
     "created": "2026-11-15T17:43:43Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5369: Dashboard main thread pinned at 100%: the /clear-orphan scan re-queries SQLite for 4000 transcripts every poll tick",
-    "updated": "2026-11-15T17:52:07.930Z"
+    "updated": "2026-11-15T17:54:23.304Z"
   },
   "plan": {
     "id": "pan-5369",
     "title": "Dashboard main thread pinned at 100%: the /clear-orphan scan re-queries SQLite for 4000 transcripts every poll tick",
-    "status": "proposed",
+    "status": "running",
     "uid": "2f9012b6-668c-4705-95a8-c940f32c00ca",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T17:43:43Z",
-    "updated": "2026-11-15T17:52:07.930Z",
+    "updated": "2026-11-15T17:54:23.304Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5369",
@@ -549,5 +549,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
