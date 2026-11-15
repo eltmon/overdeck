@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5334",
+  "created": "2026-11-15T10:33:35.496Z",
+  "updated": "2026-11-15T10:33:35.496Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "push-fallback": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5334",
+      "claimedAt": "2026-11-15T10:33:35.496Z"
+    }
+  }
+}
