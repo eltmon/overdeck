@@ -1,12 +1,24 @@
 name: PAN-5361 bare-host calibration (temporary)
 
-# PAN-5361 exploratory mapping run (review cycles fa257f60, 8f9a2499): finds
-# the full timeline of the directly started dashboard's post-boot probe
-# activity, using WINDOWS_PER_SIDE_LINUX=10 (set in bare-host-smoke.sh, WIP)
-# to cover about 21-321 s after boot in one run. 10 plain Linux legs only --
-# no macOS, no spawner legs -- since this pass is about mapping the
-# timeline, not the full WI-5 evidence set. Deleted once the final 26-leg
-# evidence run replaces it.
+# PAN-5361: gathers the live evidence WI-5 needs to set IDLE_BUDGET_LINUX by
+# the D14 rule before pan done opens the PR (ci.yml only runs on PRs and on
+# main, and its concurrency group cancels a superseded run). Deleted once the
+# calibration evidence is recorded in .pan/drafts/pan-5361.md.
+#
+# bare-host-smoke.sh's WINDOWS_PER_SIDE_LINUX is temporarily 10 (a superset):
+# the review cycles (fa257f60, 8f9a2499) found the dashboard runs post-boot
+# probe bursts and a permanent 60 s periodic docker/git check, so every other
+# 30 s window is structurally elevated and the previous min-of-3 was
+# effectively min-of-2. This run captures 10 windows per side so the final
+# window count can be chosen offline (the smallest N whose burst-injection
+# replay shows zero flips), then re-run once at that final N for the
+# permanent CI jobs' sake before this workflow is deleted.
+#
+# 20 plain Linux runs, 2 Linux runs with a 2000 ms idle spawner, 2 with a
+# 500 ms idle spawner, one plain macOS run, and one known-bad macOS run
+# (@overdeck/core@0.81.0, the last release with the PAN-5168/5169/5170 bugs).
+# Every leg installs the published @overdeck/core from npm, so it needs no
+# build job.
 on:
   push:
     branches: [feature/pan-5361]
@@ -30,6 +42,22 @@ jobs:
           - { rep: linux-08, os: ubuntu-latest, version: '0.86.0', spawnerMs: '' }
           - { rep: linux-09, os: ubuntu-latest, version: '0.86.0', spawnerMs: '' }
           - { rep: linux-10, os: ubuntu-latest, version: '0.86.0', spawnerMs: '' }
+          - { rep: linux-11, os: ubuntu-latest, version: '0.86.0', spawnerMs: '' }
+          - { rep: linux-12, os: ubuntu-latest, version: '0.86.0', spawnerMs: '' }
+          - { rep: linux-13, os: ubuntu-latest, version: '0.86.0', spawnerMs: '' }
+          - { rep: linux-14, os: ubuntu-latest, version: '0.86.0', spawnerMs: '' }
+          - { rep: linux-15, os: ubuntu-latest, version: '0.86.0', spawnerMs: '' }
+          - { rep: linux-16, os: ubuntu-latest, version: '0.86.0', spawnerMs: '' }
+          - { rep: linux-17, os: ubuntu-latest, version: '0.86.0', spawnerMs: '' }
+          - { rep: linux-18, os: ubuntu-latest, version: '0.86.0', spawnerMs: '' }
+          - { rep: linux-19, os: ubuntu-latest, version: '0.86.0', spawnerMs: '' }
+          - { rep: linux-20, os: ubuntu-latest, version: '0.86.0', spawnerMs: '' }
+          - { rep: linux-2000-a, os: ubuntu-latest, version: '0.86.0', spawnerMs: '2000' }
+          - { rep: linux-2000-b, os: ubuntu-latest, version: '0.86.0', spawnerMs: '2000' }
+          - { rep: linux-500-a, os: ubuntu-latest, version: '0.86.0', spawnerMs: '500' }
+          - { rep: linux-500-b, os: ubuntu-latest, version: '0.86.0', spawnerMs: '500' }
+          - { rep: macos-plain, os: macos-latest, version: '0.86.0', spawnerMs: '' }
+          - { rep: macos-known-bad, os: macos-latest, version: '0.81.0', spawnerMs: '' }
     steps:
       - uses: actions/checkout@v4
 
