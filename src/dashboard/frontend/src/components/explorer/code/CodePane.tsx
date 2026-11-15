@@ -29,11 +29,13 @@ import { ExternalChangeBanner } from './ExternalChangeBanner'
 import { useCodePaneSave } from './useCodePaneSave'
 import { ChangedLineMarks } from './useChangedLineMarks'
 import { registerCodeEditor, takeViewState } from './view-state-registry'
+import { isRootNotFound, StaleCodeTab } from './StaleCodeTab'
 import { readDisk, useExternalChange } from './useExternalChange'
 
 type LoadState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
+  | { status: 'stale' }
   | { status: 'ready'; result: ExplorerReadFileResult }
 
 // PAN-5188's viewer host: images, PDFs, audio, fonts, tables, archives and
@@ -79,6 +81,9 @@ function CodePaneForFile({
   const diffEditor = useRef<CodeEditorInstance | null>(null)
   const carriedPosition = useRef<CodePosition | null>(null)
   const [editor, setEditor] = useState<CodeEditorInstance | null>(null)
+  // The editor bar found the edit workspace gone (C-D13b). A retarget remounts the pane, so it resets.
+  const [statusStale, setStatusStale] = useState(false)
+  const markStale = useCallback(() => setStatusStale(true), [])
   const text = useCodeDrafts((s) => s.drafts[key]?.text)
   const external = useExternalChange(rootId, path)
   const { setState: setExternal } = external
@@ -104,6 +109,11 @@ function CodePaneForFile({
       })
       .catch((error: unknown) => {
         if (cancelled) return
+        // PAN-5290 FR-13: the root is gone (a merged or discarded edit workspace).
+        if (isRootNotFound(error)) {
+          setLoad({ status: 'stale' })
+          return
+        }
         const message =
           explorerErrorCode(error) === 'NOT_FOUND' ? 'This file no longer exists.' : explorerErrorMessage(error)
         setLoad({ status: 'error', message })
@@ -264,6 +274,9 @@ function CodePaneForFile({
     [saveNow],
   )
 
+  if (load.status === 'stale' || statusStale) {
+    return <StaleCodeTab rootId={rootId} path={path} deckKey={workspaceId} paneId={pane.paneId} />
+  }
   if (load.status === 'loading') return <Placeholder title="Loading…" testId="code-pane-loading" />
   if (load.status === 'error') return <Placeholder title="Couldn’t open file" hint={load.message} testId="code-pane-error" />
   const { result } = load
@@ -313,7 +326,7 @@ function CodePaneForFile({
       />
       {/* PAN-5290 C-D9: the editor bar on project and edit-workspace roots only. */}
       {isProjectRoot || rootRef?.kind === 'workspace' ? (
-        <EditorBar rootId={rootId} deckKey={workspaceId} path={path} paneId={pane.paneId} />
+        <EditorBar rootId={rootId} deckKey={workspaceId} path={path} paneId={pane.paneId} onStale={markStale} />
       ) : null}
       {diff === 'head' || diskDiff !== undefined ? (
         <div className="min-h-0 flex-1" data-testid="code-pane-changes">

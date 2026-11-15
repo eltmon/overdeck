@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { PanRpcError, type ExplorerReadFileResult } from '@overdeck/contracts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspacePane } from '../../../../lib/panesStore'
+import type { ReactNode } from 'react'
 
 const mocks = vi.hoisted(() => ({
   readFile: vi.fn(),
@@ -66,6 +67,13 @@ const { CREATING_EDIT_NOTE, MAIN_CHECKOUT_SENTENCE } = await import('../../edit/
 const { useEditWorkspaceStore } = await import('../../edit/edit-workspace-store')
 const { draftKey, useCodeDrafts } = await import('../code-drafts')
 const { CodePaneSlot } = await import('../CodePaneSlot')
+const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
+const { installStrictFetchMock } = await import('../../../../test-utils/strictFetchMock')
+
+function withQueryClient(children: ReactNode) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+}
 const { carryViewStates, registerCodeEditor, resetViewStateRegistryForTests } = await import('../view-state-registry')
 const { StageDeckProvider } = await import('../../../Stage/StageDeckContext')
 const { usePanesStore } = await import('../../../../lib/panesStore')
@@ -170,6 +178,37 @@ describe('CodePane', () => {
     mocks.readFile.mockRejectedValue(new PanRpcError({ code: 'NOT_FOUND', message: 'gone' }))
     render(<CodePane pane={pane()} ctx={ctx} />)
     expect((await screen.findByTestId('code-pane-error')).textContent).toContain('This file no longer exists.')
+  })
+
+  it('shows the stale tab, not "Couldn’t open file", when the root is gone (PAN-5290 FR-13)', async () => {
+    mocks.readFile.mockRejectedValue(new PanRpcError({ code: 'ROOT_NOT_FOUND', message: 'Explorer root workspace:w1 not found' }))
+    const guard = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/registered-projects') return Response.json([{ key: 'PAN-1', name: 'Overdeck', path: '/p' }])
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] })
+      return undefined
+    })
+    render(withQueryClient(<CodePane pane={pane({ explorerRootId: 'workspace:w1' })} ctx={ctx} />))
+    expect((await screen.findByTestId('code-pane-stale')).textContent).toContain('This edit workspace was merged or discarded.')
+    expect(screen.queryByTestId('code-pane-error')).toBeNull()
+    await guard.assertNoUnexpectedRequests()
+    vi.unstubAllGlobals()
+  })
+
+  it('shows the stale tab when the editor bar finds the edit workspace gone (PAN-5290 C-D13b)', async () => {
+    mocks.readFile.mockResolvedValue(textRead())
+    const guard = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url.startsWith('/api/explorer/edit-workspaces/w1')) {
+        return Response.json({ error: 'Workspace w1 not found.', code: 'ROOT_NOT_FOUND' }, { status: 404 })
+      }
+      if (method === 'GET' && url === '/api/registered-projects') return Response.json([])
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] })
+      return undefined
+    })
+    render(withQueryClient(<CodePane pane={pane({ explorerRootId: 'workspace:w1' })} ctx={ctx} />))
+    expect(await screen.findByTestId('code-pane-stale')).toBeInTheDocument()
+    expect(screen.queryByTestId('monaco')).toBeNull()
+    await guard.assertNoUnexpectedRequests()
+    vi.unstubAllGlobals()
   })
 
   it('renders "No file" without a path', () => {

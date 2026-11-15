@@ -278,6 +278,7 @@ src/components/explorer/code/__tests__/CodePane.save.test.tsx
 src/components/explorer/code/__tests__/CodePane.test.tsx
 src/components/explorer/code/__tests__/CodePaneHeader.test.tsx
 src/components/explorer/code/__tests__/ExternalChangeBanner.test.tsx
+src/components/explorer/code/__tests__/StaleCodeTab.test.tsx
 src/components/explorer/code/__tests__/autosave.test.ts
 src/components/explorer/code/__tests__/changed-lines.test.ts
 src/components/explorer/code/__tests__/changes-view.test.tsx
