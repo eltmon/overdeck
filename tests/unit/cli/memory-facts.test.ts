@@ -238,6 +238,44 @@ describe('pan memory curated-fact commands (PAN-3957)', () => {
       expect(output).not.toContain('active-fact');
     });
 
+    it('list hides a superseded fact by default and shows it with --all and a [superseded by x] suffix', async () => {
+      const dir = join(projectRoot, '.overdeck', 'memory');
+      writeFact(dir, 'new-rule', '---\ntype: project\ndescription: New rule.\nsupersedes: [old-rule]\n---\nBody.\n');
+      writeFact(dir, 'old-rule', '---\ntype: project\ndescription: Old rule.\nstatus: superseded\nsuperseded_by: new-rule\n---\nBody.\n');
+      writeFact(dir, 'dead-rule', '---\ntype: project\ndescription: Dead rule.\nstatus: retired\n---\nBody.\n');
+
+      await memoryFactListCommand({});
+      const plain = logSpy.mock.calls.flat().join('\n');
+      expect(plain).toContain('project/new-rule  New rule.');
+      expect(plain).not.toContain('old-rule');
+      expect(plain).not.toContain('dead-rule');
+
+      logSpy.mockClear();
+      await memoryFactListCommand({ all: true });
+      const all = logSpy.mock.calls.flat().join('\n');
+      expect(all).toContain('project/new-rule  New rule.');
+      expect(all).toContain('project/old-rule  Old rule. [superseded by new-rule]');
+      expect(all).toContain('project/dead-rule  Dead rule. [retired]');
+    });
+
+    it('list --review shows only review-marked facts, not superseded ones', async () => {
+      const dir = join(projectRoot, '.overdeck', 'memory');
+      writeFact(dir, 'marked-fact', '---\ntype: feedback\ndescription: Marked one.\nreview: [unindexed]\n---\nBody.\n');
+      writeFact(dir, 'old-rule', '---\ntype: project\ndescription: Old rule.\nstatus: superseded\nsuperseded_by: new-rule\n---\nBody.\n');
+
+      await memoryFactListCommand({ review: true });
+
+      const output = logSpy.mock.calls.flat().join('\n');
+      expect(output).toContain('feedback/marked-fact  Marked one. [review: unindexed]');
+      expect(output).not.toContain('old-rule');
+    });
+
+    it('list --review --all exits 1', async () => {
+      await expect(memoryFactListCommand({ review: true, all: true })).rejects.toThrow();
+      expect(exitCodes).toEqual([1]);
+      expect(errorSpy.mock.calls.flat().join('\n')).toContain('--review and --all are mutually exclusive');
+    });
+
     it('filters by --type and --query', async () => {
       const dir = join(projectRoot, '.overdeck', 'memory');
       writeFact(dir, 'fb-fact', '---\ntype: feedback\ndescription: Decide fast.\n---\nBody.\n');

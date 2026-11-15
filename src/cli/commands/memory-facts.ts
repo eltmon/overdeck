@@ -153,10 +153,25 @@ export interface MemoryFactListOptions extends FactTargetFlags {
   type?: MemoryFactType;
   query?: string;
   review?: boolean;
+  /** PAN-5360: list every parsed fact, including superseded and retired ones. */
+  all?: boolean;
   json?: boolean;
 }
 
+/** PAN-5360 D13: why a listed fact is not active, as a line suffix; '' for an active fact. */
+function inactiveSuffix(fact: MemoryFact): string {
+  if (fact.supersededBy !== null) return ` [superseded by ${fact.supersededBy}]`;
+  if (fact.status !== 'active') return ` [${fact.status}]`;
+  if (fact.review.length > 0) return ` [review: ${fact.review.join(', ')}]`;
+  return '';
+}
+
 export async function memoryFactListCommand(options: MemoryFactListOptions): Promise<void> {
+  if (options.review && options.all) {
+    console.error(chalk.red('--review and --all are mutually exclusive'));
+    return exitCli(1);
+  }
+
   let target: FactTarget;
   try {
     target = resolveFactTarget(options, 'read');
@@ -169,12 +184,13 @@ export async function memoryFactListCommand(options: MemoryFactListOptions): Pro
   let facts = allFacts;
   if (options.type) facts = facts.filter((fact) => fact.type === options.type);
   if (options.query) facts = matchMemoryFacts(facts, options.query);
-  facts = options.review ? facts.filter((fact) => !isActiveFact(fact)) : facts.filter(isActiveFact);
+  if (options.review) facts = facts.filter((fact) => fact.review.length > 0);
+  else if (!options.all) facts = facts.filter(isActiveFact);
 
   if (options.json) {
     console.log(JSON.stringify({ scope: target.scope, dir: target.dir, facts, problems }, null, 2));
   } else {
-    for (const fact of facts) console.log(`${fact.type}/${fact.id}  ${fact.description}`);
+    for (const fact of facts) console.log(`${fact.type}/${fact.id}  ${fact.description}${inactiveSuffix(fact)}`);
     if (problems.length > 0) {
       console.log(chalk.red('Problems:'));
       for (const problem of problems) console.log(chalk.red(`  ${problem.file}: ${problem.reason}`));
@@ -458,6 +474,7 @@ export function registerMemoryFactCommands(memory: Command): void {
     .option('--type <type>', `Filter by fact type (${MEMORY_FACT_TYPES.join('|')})`)
     .option('--query <q>', 'Filter by a fact-matching query (see pan memory search)')
     .option('--review', 'Show only facts carrying a review marker (default: active facts only)')
+    .option('--all', 'List every fact, including superseded and retired ones')
     .option('--project <key>', 'Project key (defaults to the project owning the cwd)')
     .option('--user', 'List the operator store (travels with you; synced when set up)')
     .option('--machine', 'List the machine store (this machine only)')
