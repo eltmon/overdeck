@@ -891,6 +891,8 @@ if (isPeerDashboard) {
 
   // Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
   await processPendingLifecycle();
+  // PAN-5396: finish post-merge lifecycles the last restart cut short (delayed, not awaited).
+  (await import('../../lib/cloister/merged-agent-recovery.js')).scheduleMergedAgentRecovery();
   await processPendingFeedbackDeliveries();
 }
 

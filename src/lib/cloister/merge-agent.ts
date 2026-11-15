@@ -160,6 +160,7 @@ import { hasEpicLabel } from '../backlog/pickup.js';
 import { cleanupStaleLocks } from '../git-utils.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { verifyMergedBeforeLifecycle, type PostMergeLifecycleOptions } from './merge-verification.js';
+import { releaseMergedIssueAgents } from './post-merge-agent-release.js';
 
 /**
  * Context for a merge conflict resolution request
@@ -278,6 +279,11 @@ export async function postMergeLifecycle(
       }
     } catch { /* journalling must never block the lifecycle */ }
 
+    // PAN-5396: free the merged agents before any Docker or tracker step. A
+    // failed tracker transition, or a server restart mid-lifecycle, used to
+    // skip this and leave the merged work agent alive and idle.
+    await releaseMergedIssueAgents(issueId, logActivity);
+
     // PAN-3917: nothing is stamped here. The forge already says the PR merged —
     // that IS the merge state, and every reader derives it.
     // Eager Docker cleanup must run before any fatal post-merge handoff step.
@@ -355,72 +361,6 @@ export async function postMergeLifecycle(
     triggerPostMergeReleaseIfConfigured(issueId, projectPath).catch((err) => {
       console.warn(`[merge-agent] Async post-merge release trigger failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
     });
-
-    // 3. Pause work/planning/strike agents and close their terminals to free resources.
-    try {
-      const { setAgentPaused, getAgentState, markAgentStoppedState, saveAgentState } = await import('../agents.js');
-      // A failed backend close must never skip pausing the remaining agents.
-      const closeAgentTerminal = async (agentId: string): Promise<boolean> => {
-        try {
-          const { closeAgentPane } = await import('../terminal-backends/launch.js');
-          return await closeAgentPane(agentId);
-        } catch (err) {
-          console.warn(`[merge-agent] Could not close ${agentId} terminal: ${err}`);
-          return false;
-        }
-      };
-      const issueLower = issueId.toLowerCase();
-      const reason = 'awaiting close-out (verify on main)';
-      for (const agentId of [`agent-${issueLower}`, `planning-${issueLower}`, `strike-${issueLower}`]) {
-        // Pause, then VERIFY the gate actually persisted to state.json. A server
-        // restart mid-lifecycle (the PAN-1723 deploy re-runs this from
-        // pending-post-merge.json) or a concurrent deacon read-modify-write on
-        // state.json can silently drop the pause. An unpaused merged work agent
-        // sits idle at its prompt yet still counts against the PAN-1665 work
-        // ceiling, throttling dispatch for every live issue (PAN-1726). Assert
-        // paused=true after the write; retry once, then fail loudly.
-        const initial = await Effect.runPromise(setAgentPaused(agentId, reason, true));
-        if (initial === null) {
-          // No state.json for this agent — nothing to pause (e.g. planning never ran).
-          continue;
-        }
-        let verify = getAgentState(agentId);
-        if (verify?.paused !== true) {
-          await Effect.runPromise(setAgentPaused(agentId, reason, true));
-          verify = getAgentState(agentId);
-        }
-        if (verify?.paused === true) {
-          console.log(`[merge-agent] ✓ Paused ${agentId}: ${reason}`);
-        } else {
-          console.error(
-            `[merge-agent] ✗ FAILED to persist pause for ${agentId} after merge — state.json paused=${verify?.paused}. ` +
-            `Idle merged work agent may hold a PAN-1665 work slot and throttle dispatch (PAN-1726).`,
-          );
-          logActivity('agent_pause_failed', `Could not persist pause for ${agentId} after merge — may throttle dispatch (PAN-1726)`);
-        }
-        // PAN-3947: close through the terminal backend — `kill-session` on
-        // tmux, `pane.close` on Herdr. A tmux-only kill left every Herdr pane
-        // (and the idle harness in it) alive, so close-out's DoD row 5 still
-        // saw a running work agent.
-        if (await closeAgentTerminal(agentId)) {
-          console.log(`[merge-agent] ✓ Closed ${agentId} terminal to free resources`);
-          logActivity('agent_session_killed', `Freed resources: closed terminal for ${agentId}`);
-          // PAN-5112: this close is the agent's stop. Record it, or the crash
-          // watcher sees a running agent with no pane and pushes a false crash.
-          try {
-            const closed = getAgentState(agentId);
-            if (closed) {
-              markAgentStoppedState(closed, 'system');
-              await Effect.runPromise(saveAgentState(closed));
-            }
-          } catch (err) {
-            console.warn(`[merge-agent] Could not record ${agentId} as stopped: ${err}`);
-          }
-        }
-      }
-    } catch (err) {
-      console.warn(`[merge-agent] Could not pause or kill agent sessions: ${err}`);
-    }
 
     // 5a. Kill canonical reviewer/synthesis sessions (PAN-915).
     // Sessions persist across review rounds to preserve reviewer context, so the

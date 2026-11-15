@@ -636,6 +636,19 @@ responding" alert (PAN-5112). This must run **at most once per
 merge** — a concurrency guard prevents the handoff from re-triggering itself
 (a missing guard caused a 24,626-call tracker API loop, PAN-328).
 
+The handoff frees the agents first, before the Docker teardown, the label
+cleanup and the `verifying_on_main` transition
+([`post-merge-agent-release.ts`](../src/lib/cloister/post-merge-agent-release.ts)),
+so a failed tracker write cannot leave a merged agent running. When a close
+fails for an agent whose pane is still live, the handoff logs an error and
+retries the close once. Nothing records that a handoff is in flight, so a
+dashboard restart part-way through one used to lose the rest of it (PAN-5396).
+At boot, the primary dashboard waits 30 s and then runs
+[`merged-agent-recovery.ts`](../src/lib/cloister/merged-agent-recovery.ts) once.
+For each live work or planning agent whose PR merged after the agent started or
+last resumed, it runs the handoff again. An agent started after the merge (a
+reopened issue) is left alone.
+
 A merged **strike** also cleans up after itself (PAN-3981). When the
 `pull_request` webhook reports a `strike/<issue>` PR merged, it runs
 `finishStrike`
