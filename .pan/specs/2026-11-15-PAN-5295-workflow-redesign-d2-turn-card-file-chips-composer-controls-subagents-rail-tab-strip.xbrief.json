@@ -4,17 +4,17 @@
     "created": "2026-11-15T19:36:10Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5295: Workflow redesign D2: turn card, file chips, composer controls, subagents rail, tab strip",
-    "updated": "2026-11-15T19:36:17.725Z"
+    "updated": "2026-11-15T19:37:18.284Z"
   },
   "plan": {
     "id": "pan-5295",
     "title": "Workflow redesign D2: turn card, file chips, composer controls, subagents rail, tab strip",
-    "status": "proposed",
+    "status": "running",
     "uid": "c0ce1282-4e8b-4bf8-81ff-5bd40cd49e06",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T19:36:10Z",
-    "updated": "2026-11-15T19:36:17.725Z",
+    "updated": "2026-11-15T19:37:18.284Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5295",
@@ -1477,5 +1477,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
