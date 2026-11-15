@@ -1047,7 +1047,7 @@ describe('head-of-line fairness (PAN-5285)', () => {
       const onWaiting = vi.fn()
       const promise = acquireQualityGateAdmission(mid, { ...configured, onWaiting })
       const settled = settledFlag(promise)
-      await drive(10)
+      await drive(200, () => onWaiting.mock.calls.length > 0)
       // 16 - 5 = 11 GiB is under the 12 GiB reserve.
       expect(settled()).toBe(false)
       expect(onWaiting).toHaveBeenCalledWith(expect.objectContaining({ kind: 'memory', softReserveBytes: 12 * GiB }))
