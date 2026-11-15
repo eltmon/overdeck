@@ -1,16 +1,17 @@
-// Pane-scoped explorer shortcuts (PAN-5186, WI-B13; D-B11; PAN-5287 S-D10).
+// The four global work-dock shortcuts (PAN-5289 WI-2, §6.7, B-D4).
 //
-// Quick open (⌘P on macOS, Ctrl+P elsewhere) and content search (⌘⇧F / Ctrl+Shift+F)
-// are global registry shortcuts whose when() holds only while focus is inside this
-// explorer pane's root. As capture-phase shortcuts they win over Monaco. With no
-// explorer pane focused the keys keep the browser default. The registry calls
-// preventDefault(), which stops the print dialog.
+// Files (⌘⇧E / Ctrl+Shift+E), Changes (⌘⇧G / Ctrl+Shift+G), content search
+// (⌘⇧F / Ctrl+Shift+F) and Go to file (⌘P / Ctrl+P) are `global` registry
+// shortcuts with no when(): they run wherever focus is, including a textarea or
+// Monaco, because the registry's capture-phase listener runs first (PAN-5284
+// D-7). The registry calls preventDefault(), which stops the print dialog. The
+// mounted WorkDock passes the handlers; null registers nothing.
 //
 // isQuickOpenKey / isContentSearchKey stay exported for later callers; the hook
-// no longer uses them (they accept either modifier on every platform).
+// does not use them (they accept either modifier on every platform).
 
-import { useEffect, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react'
-import { focusElementOf, registerShortcut, type ShortcutDef } from '../../../lib/shortcuts/registry'
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { registerShortcut, type ShortcutDef } from '../../../lib/shortcuts/registry'
 
 type KeyLike = Pick<ReactKeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>
 
@@ -22,46 +23,33 @@ export function isContentSearchKey(e: KeyLike): boolean {
   return (e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f'
 }
 
-export function useExplorerShortcuts({
-  rootRef,
-  onQuickOpen,
-  onContentSearch,
-}: {
-  rootRef: RefObject<HTMLElement | null>
+export interface DockShortcutHandlers {
+  onFiles(): void
+  onChanges(): void
+  onSearch(): void
   onQuickOpen(): void
-  onContentSearch(): void
-}): void {
-  const handlers = useRef({ onQuickOpen, onContentSearch })
-  handlers.current = { onQuickOpen, onContentSearch }
+}
 
-  const defs = useMemo((): ShortcutDef[] => {
-    const focusInside = (event: KeyboardEvent) => !!rootRef.current?.contains(focusElementOf(event))
-    return [
-      {
-        id: 'explorer.quick-open',
-        keys: { mac: 'Meta+P', other: 'Ctrl+P' },
-        scope: 'global',
-        label: 'Go to file (in the explorer)',
-        group: 'Files',
-        when: focusInside,
-        run: () => handlers.current.onQuickOpen(),
-      },
-      {
-        id: 'explorer.content-search',
-        keys: { mac: 'Meta+Shift+F', other: 'Ctrl+Shift+F' },
-        scope: 'global',
-        label: 'Search file contents (in the explorer)',
-        group: 'Files',
-        when: focusInside,
-        run: () => handlers.current.onContentSearch(),
-      },
-    ]
-  }, [rootRef])
+const DOCK_SHORTCUTS: ReadonlyArray<Omit<ShortcutDef, 'run' | 'scope' | 'group'> & { handler: keyof DockShortcutHandlers }> = [
+  { id: 'dock.files', keys: { mac: 'Meta+Shift+E', other: 'Ctrl+Shift+E' }, label: 'Show or hide Files', handler: 'onFiles' },
+  { id: 'dock.changes', keys: { mac: 'Meta+Shift+G', other: 'Ctrl+Shift+G' }, label: 'Show or hide Changes', handler: 'onChanges' },
+  { id: 'explorer.content-search', keys: { mac: 'Meta+Shift+F', other: 'Ctrl+Shift+F' }, label: 'Search file contents', handler: 'onSearch' },
+  { id: 'explorer.quick-open', keys: { mac: 'Meta+P', other: 'Ctrl+P' }, label: 'Go to file', handler: 'onQuickOpen' },
+]
+
+export function useExplorerShortcuts(handlers: DockShortcutHandlers | null): void {
+  // Handlers live in a ref so a re-render with new callbacks does not re-register.
+  const ref = useRef(handlers)
+  ref.current = handlers
+  const enabled = handlers !== null
 
   useEffect(() => {
-    const unregister = defs.map((def) => registerShortcut(def))
+    if (!enabled) return undefined
+    const unregister = DOCK_SHORTCUTS.map(({ handler, ...def }) =>
+      registerShortcut({ ...def, scope: 'global', group: 'Files', run: () => ref.current?.[handler]() }),
+    )
     return () => {
       for (const off of unregister) off()
     }
-  }, [defs])
+  }, [enabled])
 }

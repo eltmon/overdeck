@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, onTestFinished } from 'vitest'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { PanRpcError, type ExplorerEntry, type ExplorerListDirResult, type ExplorerWatchBatch } from '@overdeck/contracts'
 
 vi.mock('@tanstack/react-virtual', () => ({
@@ -36,7 +36,7 @@ vi.mock('../explorer-rpc', async (importOriginal) => {
 import { DialogProvider } from '../../DialogProvider'
 import { StageDeckProvider } from '../../Stage/StageDeckContext'
 import { ExplorerPane, PREVIEW_OPEN_DELAY_MS } from '../ExplorerPane'
-import { installShortcutListener, resetShortcutsForTests } from '../../../lib/shortcuts/registry'
+import { resetShortcutsForTests, useShortcutList } from '../../../lib/shortcuts/registry'
 import { useExplorerStore } from '../explorerStore'
 import { usePanesStore, selectPanesForWorkspace } from '../../../lib/panesStore'
 import type { WorkspacePane } from '../../../lib/panesStore'
@@ -183,25 +183,15 @@ describe('ExplorerPane', () => {
     expect(screen.getByRole('button', { name: 'Changed' })).toHaveAttribute('title', 'Not a git repository')
   })
 
-  it('opens quick open on Ctrl+P and content search on Ctrl+Shift+F', async () => {
-    // PAN-5287: the explorer keys are shortcut-registry entries scoped to the pane.
-    const platform = vi.spyOn(navigator, 'platform', 'get').mockReturnValue('Linux x86_64')
-    const uninstall = installShortcutListener()
-    onTestFinished(() => {
-      platform.mockRestore()
-      uninstall()
-      resetShortcutsForTests()
-    })
+  it('registers no explorer-scoped shortcuts', async () => {
+    // PAN-5289: the dock owns Ctrl+P and Ctrl+Shift+F; the pane registers neither.
+    onTestFinished(() => resetShortcutsForTests())
     renderPane()
     await screen.findByText('README.md')
-    const tree = screen.getByRole('tree')
-    fireEvent.keyDown(tree, { key: 'p', ctrlKey: true })
-    expect(screen.getByRole('dialog', { name: 'Quick open' })).toBeInTheDocument()
-    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Escape' })
-    expect(screen.queryByRole('dialog', { name: 'Quick open' })).toBeNull()
-    fireEvent.keyDown(tree, { key: 'F', ctrlKey: true, shiftKey: true })
-    expect(screen.getByRole('textbox', { name: 'Search in files' })).toBeInTheDocument()
-    expect(screen.getByRole('tree')).toBeInTheDocument()
+    const { result } = renderHook(() => useShortcutList())
+    const ids = result.current.map((d) => d.id)
+    expect(ids).not.toContain('explorer.quick-open')
+    expect(ids).not.toContain('explorer.content-search')
   })
 
   it('opens content search scoped to a folder from Find in folder', async () => {

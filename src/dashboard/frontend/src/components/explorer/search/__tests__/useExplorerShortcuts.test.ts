@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { isContentSearchKey, isQuickOpenKey, useExplorerShortcuts } from '../useExplorerShortcuts'
-import { installShortcutListener, resetShortcutsForTests } from '../../../../lib/shortcuts/registry'
+import { installShortcutListener, resetShortcutsForTests, useShortcutList } from '../../../../lib/shortcuts/registry'
 
 const key = (k: string, mods: Partial<Record<'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey', boolean>> = {}) => ({
   key: k,
@@ -27,23 +27,27 @@ describe('shortcut predicates', () => {
   })
 })
 
-describe('useExplorerShortcuts (registry, PAN-5287)', () => {
-  let root: HTMLDivElement
-  let outside: HTMLInputElement
+describe('useExplorerShortcuts (global dock shortcuts, PAN-5289)', () => {
+  let uninstall: () => void
+  let textarea: HTMLTextAreaElement
+  let monacoHost: HTMLDivElement
 
   beforeEach(() => {
     vi.spyOn(navigator, 'platform', 'get').mockReturnValue('Linux x86_64')
-    installShortcutListener()
-    root = document.createElement('div')
-    root.appendChild(document.createElement('button'))
-    outside = document.createElement('input')
-    document.body.append(root, outside)
+    uninstall = installShortcutListener()
+    textarea = document.createElement('textarea')
+    monacoHost = document.createElement('div')
+    monacoHost.className = 'monaco-editor'
+    const inner = document.createElement('textarea')
+    monacoHost.appendChild(inner)
+    document.body.append(textarea, monacoHost)
   })
 
   afterEach(() => {
+    uninstall()
     resetShortcutsForTests()
-    root.remove()
-    outside.remove()
+    textarea.remove()
+    monacoHost.remove()
     vi.restoreAllMocks()
   })
 
@@ -53,35 +57,73 @@ describe('useExplorerShortcuts (registry, PAN-5287)', () => {
     return e
   }
 
-  it('runs the matching handler while focus is inside the root, and stops the browser default', () => {
-    const onQuickOpen = vi.fn()
-    const onContentSearch = vi.fn()
-    renderHook(() => useExplorerShortcuts({ rootRef: { current: root }, onQuickOpen, onContentSearch }))
-    const button = root.querySelector('button') as HTMLButtonElement
-    button.focus()
-    const p = press(button, { key: 'p', ctrlKey: true })
-    expect(onQuickOpen).toHaveBeenCalledTimes(1)
-    expect(p.defaultPrevented).toBe(true)
-    press(button, { key: 'F', ctrlKey: true, shiftKey: true })
-    expect(onContentSearch).toHaveBeenCalledTimes(1)
+  function handlers() {
+    return { onFiles: vi.fn(), onChanges: vi.fn(), onSearch: vi.fn(), onQuickOpen: vi.fn() }
+  }
+
+  it('runs each handler once from a textarea and stops the browser default', () => {
+    const h = handlers()
+    renderHook(() => useExplorerShortcuts(h))
+    textarea.focus()
+    const events = [
+      press(textarea, { key: 'E', ctrlKey: true, shiftKey: true }),
+      press(textarea, { key: 'G', ctrlKey: true, shiftKey: true }),
+      press(textarea, { key: 'F', ctrlKey: true, shiftKey: true }),
+      press(textarea, { key: 'p', ctrlKey: true }),
+    ]
+    expect(h.onFiles).toHaveBeenCalledTimes(1)
+    expect(h.onChanges).toHaveBeenCalledTimes(1)
+    expect(h.onSearch).toHaveBeenCalledTimes(1)
+    expect(h.onQuickOpen).toHaveBeenCalledTimes(1)
+    for (const e of events) expect(e.defaultPrevented).toBe(true)
   })
 
-  it('leaves the keys untouched while focus is outside the root', () => {
-    const onQuickOpen = vi.fn()
-    const onContentSearch = vi.fn()
-    renderHook(() => useExplorerShortcuts({ rootRef: { current: root }, onQuickOpen, onContentSearch }))
-    outside.focus()
-    const p = press(outside, { key: 'p', ctrlKey: true })
-    expect(onQuickOpen).not.toHaveBeenCalled()
-    expect(p.defaultPrevented).toBe(false)
+  it('runs Go to file with focus inside Monaco and on the body', () => {
+    const h = handlers()
+    renderHook(() => useExplorerShortcuts(h))
+    const inner = monacoHost.querySelector('textarea') as HTMLTextAreaElement
+    inner.focus()
+    press(inner, { key: 'p', ctrlKey: true })
+    expect(h.onQuickOpen).toHaveBeenCalledTimes(1)
+    inner.blur()
+    press(document.body, { key: 'p', ctrlKey: true })
+    expect(h.onQuickOpen).toHaveBeenCalledTimes(2)
   })
 
   it('follows the platform modifier: Meta+P does nothing on Linux', () => {
-    const onQuickOpen = vi.fn()
-    renderHook(() => useExplorerShortcuts({ rootRef: { current: root }, onQuickOpen, onContentSearch: vi.fn() }))
-    const button = root.querySelector('button') as HTMLButtonElement
-    button.focus()
-    press(button, { key: 'p', metaKey: true })
-    expect(onQuickOpen).not.toHaveBeenCalled()
+    const h = handlers()
+    renderHook(() => useExplorerShortcuts(h))
+    const e = press(document.body, { key: 'p', metaKey: true })
+    expect(h.onQuickOpen).not.toHaveBeenCalled()
+    expect(e.defaultPrevented).toBe(false)
+  })
+
+  it('uses the latest handlers without re-registering', () => {
+    const first = handlers()
+    const second = handlers()
+    const { rerender, result } = renderHook(
+      ({ h }) => {
+        useExplorerShortcuts(h)
+        return useShortcutList()
+      },
+      { initialProps: { h: first } },
+    )
+    const before = result.current
+    rerender({ h: second })
+    expect(result.current).toBe(before)
+    press(document.body, { key: 'E', ctrlKey: true, shiftKey: true })
+    expect(first.onFiles).not.toHaveBeenCalled()
+    expect(second.onFiles).toHaveBeenCalledTimes(1)
+  })
+
+  it('registers nothing for null handlers', () => {
+    const { result } = renderHook(() => {
+      useExplorerShortcuts(null)
+      return useShortcutList()
+    })
+    const ids = result.current.map((d) => d.id)
+    for (const id of ['dock.files', 'dock.changes', 'explorer.content-search', 'explorer.quick-open']) {
+      expect(ids).not.toContain(id)
+    }
   })
 })
