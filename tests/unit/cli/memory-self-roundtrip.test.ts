@@ -30,6 +30,13 @@ vi.mock('../../../src/lib/memory/cli.js', async (importOriginal) => {
   return { ...actual, searchMemory: vi.fn().mockResolvedValue([]) };
 });
 
+// PAN-5358 D12: memoryFactAddCommand refreshes fact vectors best-effort by
+// default; this test drives it through the real CLI argv parser (no way to
+// inject a refreshVectors stub via a flag), so mock the module instead.
+vi.mock('../../../src/lib/memory/facts/vectors.js', () => ({
+  refreshStoreVectorsBestEffort: vi.fn().mockResolvedValue({ ok: true, embedded: 0, reused: 0 }),
+}));
+
 import type { SelfCallerDeps } from '../../../src/dashboard/server/self-caller.js';
 import type { DashboardCredential } from '../../../src/dashboard/server/routes/dashboard-auth.js';
 import { createSelfJobs, type SelfJobRunInput, type SelfJobRunResult } from '../../../src/dashboard/server/services/self-jobs.js';

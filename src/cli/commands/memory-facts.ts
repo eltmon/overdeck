@@ -26,6 +26,7 @@ import {
   syncOperatorMemory,
   type OperatorMemorySyncOutcome,
 } from '../../lib/memory/facts/operator-sync.js';
+import { refreshStoreVectorsBestEffort } from '../../lib/memory/facts/vectors.js';
 import { findProjectByPath, getProjectSync } from '../../lib/projects.js';
 import { resolvePlanHome } from '../../lib/pan-dir/paths.js';
 import { exitCli } from '../exit.js';
@@ -177,6 +178,8 @@ export interface MemoryFactAddOptions extends FactTargetFlags {
   checkIgnored?: (root: string, relativePath: string) => Promise<boolean>;
   /** Injectable for tests; defaults to `syncOperatorMemory` (PAN-4578 D11.4). */
   syncOperator?: () => Promise<OperatorMemorySyncOutcome>;
+  /** Injectable for tests; defaults to `refreshStoreVectorsBestEffort` (PAN-5358 FR-13). */
+  refreshVectors?: typeof refreshStoreVectorsBestEffort;
 }
 
 function parseTags(tags: string | undefined): string[] {
@@ -232,10 +235,23 @@ export async function memoryFactAddCommand(id: string, options: MemoryFactAddOpt
     return exitCli(1);
   }
 
+  const refreshResult = await (options.refreshVectors ?? refreshStoreVectorsBestEffort)({
+    stores: [{ dir: target.dir, scope: target.scope }],
+  });
+  warnIfVectorRefreshFailed(refreshResult);
+
   const sync = await syncAfterUserWrite(target, options.syncOperator);
   printWriteResult(file, 'Wrote', options.json, sync);
-  if (options.json) return;
-  if (target.scope === 'project') console.log(`  Commit it: git -C ${target.root} add ${PROJECT_MEMORY_RELATIVE}/${id}.md`);
+  if (!options.json && target.scope === 'project') {
+    console.log(`  Commit it: git -C ${target.root} add ${PROJECT_MEMORY_RELATIVE}/${id}.md`);
+  }
+  if (!refreshResult.ok && refreshResult.timedOut) return exitCli(0);
+}
+
+function warnIfVectorRefreshFailed(result: Awaited<ReturnType<typeof refreshStoreVectorsBestEffort>>): void {
+  if (!result.ok) {
+    console.error(chalk.yellow(`vector index not refreshed: ${result.reason}; run pan memory reindex`));
+  }
 }
 
 export interface MemoryFactEditOptions extends FactTargetFlags {
@@ -250,6 +266,8 @@ export interface MemoryFactEditOptions extends FactTargetFlags {
   json?: boolean;
   /** Injectable for tests; defaults to `syncOperatorMemory` (PAN-4578 D11.4). */
   syncOperator?: () => Promise<OperatorMemorySyncOutcome>;
+  /** Injectable for tests; defaults to `refreshStoreVectorsBestEffort` (PAN-5358 FR-13). */
+  refreshVectors?: typeof refreshStoreVectorsBestEffort;
 }
 
 export async function memoryFactEditCommand(id: string, options: MemoryFactEditOptions): Promise<void> {
@@ -303,7 +321,13 @@ export async function memoryFactEditCommand(id: string, options: MemoryFactEditO
     return exitCli(1);
   }
 
+  const refreshResult = await (options.refreshVectors ?? refreshStoreVectorsBestEffort)({
+    stores: [{ dir: target.dir, scope: target.scope }],
+  });
+  warnIfVectorRefreshFailed(refreshResult);
+
   printWriteResult(file, 'Wrote', options.json, await syncAfterUserWrite(target, options.syncOperator));
+  if (!refreshResult.ok && refreshResult.timedOut) return exitCli(0);
 }
 
 export interface MemoryFactRetireOptions extends FactTargetFlags {
