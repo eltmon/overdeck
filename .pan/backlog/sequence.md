@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T13:35:05.228360Z · model: claude-opus-5-5 · open: 895_
+_Last sequenced: 2026-11-15T13:35:56.604163Z · model: claude-opus-5-5 · open: 894_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -400,7 +400,6 @@ _Last sequenced: 2026-11-15T13:35:05.228360Z · model: claude-opus-5-5 · open: 
 | 392 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
 | 393 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 394 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
-| 395 | PAN-5347 | S | medium | ok |  |  | Composer / menu lists no skills; add a labeled Skills group from /api/skills/overrides so operators can discover skills. |
 | 396 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
 | 397 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
 | 398 | PAN-1918 | XS | medium | ok |  |  | full frontend vitest suite runs in no CI path |
@@ -1230,10 +1229,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T13:35:05.228360Z",
+  "generatedAt": "2026-11-15T13:35:56.604163Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 895,
+  "openCount": 894,
   "nodes": [
     {
       "issue": "PAN-5290",
@@ -6215,19 +6214,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "condition": "ok",
       "dependsOn": [],
       "why": "Resumed conversations wedge without writing transcripts when dashboard is black-holed",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5347",
-      "rank": 395,
-      "size": "S",
-      "importance": "medium",
-      "score": 57,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Composer / menu lists no skills; add a labeled Skills group from /api/skills/overrides so operators can discover skills.",
-      "rationale": "New issue: clear AC and a self-contained discoverability fix (operator priority), ranked with other medium score-57 UX work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13566,13 +13552,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     {
       "from": "PAN-5250",
       "to": "PAN-5312",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.3
-    },
-    {
-      "from": "PAN-660",
-      "to": "PAN-5347",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.3
