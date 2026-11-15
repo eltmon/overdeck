@@ -4,17 +4,17 @@
     "created": "2026-11-15T15:11:29Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5361: bare-host-linux idle check fails ~3% of runs: pid-net counts machine-wide runner bursts that one 30 s baseline cannot cancel",
-    "updated": "2026-11-15T15:28:35.357Z"
+    "updated": "2026-11-15T15:31:56.129Z"
   },
   "plan": {
     "id": "pan-5361",
     "title": "bare-host-linux idle check fails ~3% of runs: pid-net counts machine-wide runner bursts that one 30 s baseline cannot cancel",
-    "status": "proposed",
+    "status": "running",
     "uid": "1cba09be-41ee-49c5-bfae-98bc57f569b2",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T15:11:29Z",
-    "updated": "2026-11-15T15:28:35.357Z",
+    "updated": "2026-11-15T15:31:56.129Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5361",
@@ -628,5 +628,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
