@@ -170,6 +170,42 @@ describe('pan memory curated-fact commands (PAN-3957)', () => {
       expect(logSpy.mock.calls.flat().join('\n')).toContain('Only in this workspace.');
     });
 
+    it('show prints Attribution, Created, Status and Supersedes lines', async () => {
+      const dir = join(projectRoot, '.overdeck', 'memory');
+      writeFact(
+        dir,
+        'mid-rule',
+        '---\ntype: project\ndescription: Mid rule.\ncreated: 2026-11-01\nsource: twitch:alice 2026-11-10 14:20\nstatus: superseded\nsupersedes:\n  - old-a\n  - old-b\nsuperseded_by: top-rule\n---\n\nBody.\n',
+      );
+
+      await memoryFactShowCommand('mid-rule', {});
+
+      const lines = logSpy.mock.calls.map((call) => String(call[0]));
+      expect(lines.slice(0, 5)).toEqual([
+        `Source: ${join(dir, 'mid-rule.md')}`,
+        'Attribution: twitch:alice 2026-11-10 14:20',
+        'Created: 2026-11-01',
+        'Status: superseded by top-rule',
+        'Supersedes: old-a, old-b',
+      ]);
+      expect(lines[5]).toContain('description: Mid rule.');
+    });
+
+    it('show of a plain fact prints no Attribution line', async () => {
+      const dir = join(projectRoot, '.overdeck', 'memory');
+      writeFact(dir, 'plain-rule', '---\ntype: project\ndescription: Plain.\n---\n\nBody.\n');
+
+      await memoryFactShowCommand('plain-rule', {});
+
+      const lines = logSpy.mock.calls.map((call) => String(call[0]));
+      expect(lines[0]).toBe(`Source: ${join(dir, 'plain-rule.md')}`);
+      const output = lines.join('\n');
+      expect(output).not.toContain('Attribution:');
+      expect(output).not.toContain('Status:');
+      expect(output).not.toContain('Supersedes:');
+      expect(output).not.toContain('Created:');
+    });
+
     it('errors when the fact does not exist', async () => {
       await expect(memoryFactShowCommand('missing', {})).rejects.toThrow();
       expect(errorSpy).toHaveBeenCalled();

@@ -13,6 +13,7 @@ import {
   matchMemoryFacts,
   MEMORY_FACT_TYPES,
   type MemoryFact,
+  parseMemoryFact,
   type MemoryFactScope,
   type MemoryFactType,
   projectMemoryDir,
@@ -134,8 +135,18 @@ export async function memoryFactShowCommand(id: string, options: MemoryFactShowO
     console.error(chalk.red(`no fact "${id}" in ${target.dir}`));
     return exitCli(1);
   }
+  const raw = readFileSync(file, 'utf8');
   console.log(`Source: ${file}`);
-  console.log(readFileSync(file, 'utf8'));
+  // PAN-5360 FR-7: attribution and links, each only when set; an unparseable file still prints raw.
+  const parsed = parseMemoryFact(file, raw, target.scope);
+  if (!('reason' in parsed)) {
+    if (parsed.source !== null) console.log(`Attribution: ${parsed.source}`);
+    if (parsed.created !== null) console.log(`Created: ${parsed.created}`);
+    if (parsed.supersededBy !== null) console.log(`Status: superseded by ${parsed.supersededBy}`);
+    else if (parsed.status !== 'active') console.log(`Status: ${parsed.status}`);
+    if (parsed.supersedes.length > 0) console.log(`Supersedes: ${parsed.supersedes.join(', ')}`);
+  }
+  console.log(raw);
 }
 
 export interface MemoryFactListOptions extends FactTargetFlags {
