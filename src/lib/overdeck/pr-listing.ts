@@ -50,12 +50,14 @@ export interface GhPrRow {
   closedAt?: string | null;
   author?: { login?: string } | null;
   headRefOid?: string | null;
+  /** Closed listing only (PAN-4753): the merge commit the recent-merges strip names. */
+  mergeCommit?: { oid?: string | null } | null;
 }
 
 const GH_PR_FIELDS = 'number,url,title,state,mergedAt,mergeable,headRefName,headRefOid,baseRefName,isDraft,reviewDecision,reviewRequests,statusCheckRollup,updatedAt,closedAt,author';
 
 /** The closed-PR read drops the three fields only an open PR's status needs. */
-const GH_CLOSED_PR_FIELDS = 'number,url,title,state,mergedAt,headRefName,headRefOid,baseRefName,isDraft,reviewDecision,updatedAt,closedAt,author';
+const GH_CLOSED_PR_FIELDS = 'number,url,title,state,mergedAt,mergeCommit,headRefName,headRefOid,baseRefName,isDraft,reviewDecision,updatedAt,closedAt,author';
 
 interface SettledListing {
   readonly rows: readonly GhPrRow[];
@@ -239,6 +241,38 @@ async function loadClosedPullRequests(projectPath: string): Promise<ClosedListin
     logPrListingFailure(projectPath, 'closed', error);
     return null;
   }
+}
+
+/**
+ * PAN-5310: the merged PR for one branch, for an issue older than the closed
+ * listing reaches (~100 PRs). A settled answer — a row or null — never
+ * changes for a closed issue, so it is kept for the process lifetime; a
+ * failed read is not kept and reads as null.
+ */
+const mergedPrByBranch = new Map<string, Promise<GhPrRow | null>>();
+export function readMergedPullRequestForBranch(projectPath: string, branch: string): Promise<GhPrRow | null> {
+  const key = `${projectPath}\0${branch}`;
+  let pending = mergedPrByBranch.get(key);
+  if (!pending) {
+    pending = (async () => {
+      if (!(await shouldListPullRequests(projectPath))) return null;
+      const { stdout } = await runGh([
+        'pr', 'list', '--state', 'merged', '--head', branch, '--limit', '1', '--json', GH_CLOSED_PR_FIELDS,
+      ], { caller: 'pr-cache', cwd: projectPath, timeout: 20_000 });
+      return (JSON.parse(stdout || '[]') as GhPrRow[])[0] ?? null;
+    })().catch((error) => {
+      mergedPrByBranch.delete(key);
+      logPrListingFailure(projectPath, 'closed', error);
+      return null;
+    });
+    mergedPrByBranch.set(key, pending);
+  }
+  return pending;
+}
+
+/** Test-only: drop every cached `readMergedPullRequestForBranch` answer. */
+export function resetMergedPullRequestCacheForTests(): void {
+  mergedPrByBranch.clear();
 }
 
 /**

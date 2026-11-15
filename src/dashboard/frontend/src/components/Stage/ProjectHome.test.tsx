@@ -179,12 +179,12 @@ describe('ProjectHome', () => {
         return Response.json({ config: null, lastOutcome: null })
       }
       // PAN-1696: the settings panel also reads the per-project merge-train
-      // override and the aggregate endpoints behind its summary line.
+      // override, and (PAN-4753) the merge-train board behind its summary line.
       if (url === '/api/projects/myn/merge-train') {
         return Response.json({ value: null, effective: true })
       }
-      if (url === '/api/merge-train/queues' || url === '/api/merge-train/generations') {
-        return Response.json([])
+      if (url === '/api/merge-train/board?project=myn') {
+        return Response.json({ masterEnabled: true, projects: [] })
       }
       throw new Error(`Unexpected request: ${url}`)
     })
@@ -202,7 +202,8 @@ describe('ProjectHome', () => {
     )
 
     expect(await screen.findAllByText('Project settings')).not.toHaveLength(0)
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6))
+    // One board read replaced the queues + generations pair (PAN-4753 WI-12).
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5))
   })
 
   it('opens Files on the project explorer root (PAN-5186)', () => {

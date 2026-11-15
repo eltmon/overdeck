@@ -57,4 +57,19 @@ describe('ShipProgress component', () => {
     expect(container.querySelector('[data-section="ship-progress-facts"]')).toBeTruthy();
     expect(container.querySelector('[data-section="ship-progress-summary"]')).toBeTruthy();
   });
+
+  // PAN-5310 (ac4): a closed issue with no pull request says so plainly,
+  // never "No pull request yet" (which reads like work has not started).
+  it('says the issue is closed with no pull request linked', () => {
+    const { container } = render(<ShipProgress ship={makeShip({ status: 'closed' })} />);
+    expect(container.querySelector('[data-section="ship-progress-summary"]')?.textContent)
+      .toBe('Closed — no pull request is linked');
+    expect(container.querySelector('[data-ship-status]')).toHaveAttribute('data-ship-status', 'closed');
+    expect(screen.getByText('closed')).toBeTruthy();
+  });
+
+  it('renders nothing compact for a closed issue with no pull request', () => {
+    const { container } = render(<ShipProgress ship={makeShip({ status: 'closed' })} compact />);
+    expect(container.firstChild).toBeNull();
+  });
 });

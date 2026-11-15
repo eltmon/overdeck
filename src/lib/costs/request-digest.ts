@@ -65,10 +65,16 @@ export interface UsageWindows {
   month: UsageWindow;
 }
 
-/** The three window starts `GET /api/costs/summary` uses (UTC dates). */
+/** Midnight of the server's local calendar day, as an ISO UTC instant (PAN-5288 D-10). */
+export function localDayStartIso(now: number = Date.now()): string {
+  const d = new Date(now);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString();
+}
+
+/** The three window starts `GET /api/costs/summary` uses: local-day "today", UTC dates for week and month. */
 export function usageWindowStarts(now: number = Date.now()): { today: string; week: string; month: string } {
   const day = (ms: number) => new Date(ms).toISOString().split('T')[0]!;
-  return { today: day(now), week: day(now - 7 * 24 * 60 * 60 * 1000), month: day(now - MONTH_MS) };
+  return { today: localDayStartIso(now), week: day(now - 7 * 24 * 60 * 60 * 1000), month: day(now - MONTH_MS) };
 }
 
 /** Which windows an event at `ts` (ISO or ms) falls in. */

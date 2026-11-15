@@ -1,7 +1,6 @@
 /**
- * Thin fetch helpers for the merge-train view's `/api/merge-train/*` reads
- * and mutations (moved out of MergeTrainView.tsx, PAN-4970, no behavior
- * change — file-size extraction only).
+ * Thin fetch helpers for the merge-train component's `/api/merge-train/*`
+ * reads and mutations (PAN-4970; used by `train/` since PAN-4753).
  */
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 

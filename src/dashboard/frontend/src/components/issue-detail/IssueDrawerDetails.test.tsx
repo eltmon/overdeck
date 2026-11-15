@@ -70,7 +70,7 @@ function renderDetails(props: Partial<IssueDrawerDetailsProps> = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const onOpenAgentConversation = vi.fn();
   const onOpenTab = vi.fn();
-  render(
+  const { unmount } = render(
     <QueryClientProvider client={queryClient}>
       <IssueDrawerDetails
         issueId="PAN-1"
@@ -84,7 +84,7 @@ function renderDetails(props: Partial<IssueDrawerDetailsProps> = {}) {
       />
     </QueryClientProvider>,
   );
-  return { onOpenAgentConversation, onOpenTab };
+  return { onOpenAgentConversation, onOpenTab, unmount };
 }
 
 beforeEach(() => {
@@ -103,6 +103,7 @@ afterEach(() => {
     agentsById: {},
     derivedIssueStateByIssueId: {},
     backendPanesById: {},
+    issuesRaw: [],
   } as Parameters<typeof useDashboardStore.setState>[0]);
 });
 
@@ -279,6 +280,30 @@ describe('IssueDrawerDetails', () => {
     renderDetails();
     expect(screen.getByTestId('drawer-details-diff')).toBeInTheDocument();
     expect(screen.queryByTestId('drawer-details-create-pr')).toBeNull();
+  });
+
+  // PAN-5310: a closed issue has nothing left to open a PR for or to
+  // release — Create PR and the pickup controls both disappear.
+  it('hides Create PR and the pickup controls for a tracker-done, derived-closed issue (ac1, ac2)', () => {
+    useDashboardStore.setState({
+      issuesRaw: [{
+        id: 'issue-1', identifier: 'PAN-1', title: 'x', status: 'Done', state: 'done',
+        priority: 0, labels: [], url: '', createdAt: '', updatedAt: '',
+      }],
+      derivedIssueStateByIssueId: { 'PAN-1': { issueId: 'PAN-1', state: 'closed' } },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    const { unmount } = renderDetails();
+    expect(screen.queryByTestId('drawer-details-create-pr')).toBeNull();
+    expect(screen.queryByTestId('drawer-pickup-section')).toBeNull();
+    expect(screen.getByTestId('drawer-details-status')).toHaveTextContent('Closed');
+    for (const label of ['Plan…', 'Start work', 'Release', 'Create PR']) {
+      expect(screen.queryByText(label)).toBeNull();
+    }
+    // Unmount before the shared afterEach clears `issuesRaw`: otherwise a
+    // still-mounted tree re-renders on that reset, flips its issue-record
+    // query back to enabled, and fires a real fetch into the next test's
+    // guarded-fetch assertion.
+    unmount();
   });
 
   it('renders no linked conversations without a pull request', () => {

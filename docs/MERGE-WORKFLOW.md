@@ -194,37 +194,42 @@ is never scheduled: it waits for the operator's strike Merge button,
 operator-started strike merge is the only merge that skips the head-approval
 rule; every automatic merge, strike or feature, still needs it.
 
-### Merging from the Flywheel UAT card (PAN-4598)
+### Merging from the merge train card (PAN-4598, PAN-4753)
 
-The Flywheel page's UAT BATCHES card (`MergeTrainView`) is the merge control.
+The merge train card (`MergeTrain`, `src/dashboard/frontend/src/components/merge-train/train/`)
+is the merge control. It renders on the Flywheel rail and on Awaiting Merge
+(all projects) and on each project's Home (one project), from
+`GET /api/merge-train/board`. The model behind it is in
+[MERGE-TRAIN.md](MERGE-TRAIN.md).
 
-1. **A batch exists.** Ready features gather into a UAT batch. Click
-   **Start & open UAT frontend** to run the batch's test stack, work through
-   its "What to UAT" checklist, then click **Merge batch (N) to main**. That
-   lands exactly the tree you tested. The small "Merge one feature to main…"
-   escape hatch stays below the rows for the rare case where one feature must
-   go first.
+1. **A batch exists.** The card shows it at the top. Click **Start & open**
+   (or **Open UAT** when its stack runs) to test the batch, work through its
+   "What to UAT" checklist, then click **Merge batch (N) to main** and confirm
+   inline. That lands exactly the tree you tested. Older batches stay listed
+   as one line each, superseded or voided, with the stored reason.
 
    The checklist is each member's xBRIEF acceptance criteria. Because a
    member's spec is committed on its feature branch and reaches `main` only
    when its PR merges, the lookup tries the batch worktree first (every
    member merged in), then the member's own feature workspace, then the
    project root, so an already-merged member still resolves there (PAN-4799).
-   A member with no spec anywhere shows "Plan not found for \<ID>".
-2. **No tested batch exists.** This covers a batch that is still assembling,
-   a lone feature in a project that does not hold for UAT, and a failed
-   assembly. Each ready row then shows its own **Merge** button. It posts
+   A member with no spec anywhere shows "Plan not found: no acceptance
+   criteria."
+2. **Merge one feature.** A **Ready** or **Waiting for batch** row has its own
+   **Merge** button. A member of a live batch has **Merge alone…** on its chip,
+   whose confirmation names the batch it voids. Both post
    `/api/merge-train/merge-next` with `{ n: 1, project, issueId }`, so the
    merge gate re-checks that one feature and the issue closes out through the
    normal post-merge flow. An `issueId` outside the project's ready set gets
-   a 409. When every ready feature in the project owns its own merge path
-   through the per-PR auto-merge train (PAN-4970), the card says so instead
-   and offers no **Retry batch assembly** button — a forced reassembly could
-   not build anything from that set.
-3. **The last assembly failed.** The card names the failed batch and its time
-   instead of promising a batch. It offers **Retry batch assembly**, which is
-   a forced `/api/merge-train/assemble` for that project, next to the row
-   Merge buttons.
+   a 409.
+3. **Rebuild and Retry batch assembly.** **Rebuild** on a ready batch, and
+   **Retry batch assembly** on the card when the newest batch failed and no
+   testable batch exists, are a forced `/api/merge-train/assemble` for that
+   project. Both confirm first.
+
+The Merge and Merge alone buttons show only while the train is on for the
+project: `/api/merge-train/merge-next` refuses with 409 while it is off. The
+issue page's Merge button (`POST /api/issues/:issueId/merge`) still works then.
 
 A promote of a batch that is no longer `ready` or `superseded` (PAN-4970)
 returns 409 `wrong-status` before any forge read; the card shows the refusal
@@ -357,6 +362,14 @@ bypasses it.
 Content failures — red CI, a closed or draft PR, unresolved conflicts — are
 visible directly on the PR; there is no separate failure status to set.
 
+### Merges outside the train
+
+A PR merged on the forge directly (the GitHub or GitLab UI, `gh pr merge`) is
+merged outside the train. Overdeck never refuses or reverts it. The card's
+recent merges strip notes it as "outside the train", and when an auto-merge
+was still scheduled for that PR, it says how many minutes before the cooldown
+ended it merged. The auto-merge row itself ends `blocked: PR is already merged`.
+
 ## Auto-merge rows: `failed` vs `blocked` (PAN-4540)
 
 Each scheduled auto-merge is a `pending_auto_merges` row. Two of its end
@@ -401,6 +414,9 @@ gate; strikes now open their own PR (PAN-3973), so the queue no longer looks
 for strike branches.
 
 ## What makes a PR "ready" (Awaiting Merge, Merge to main)
+
+The merge train card shows the same readiness per car; see
+[MERGE-TRAIN.md](MERGE-TRAIN.md) for how the board derives each car's state.
 
 The Awaiting Merge page lists every issue whose derived state is `ready`.
 The issue view offers **Merge to main** for the same state (`canMerge` in
@@ -815,8 +831,9 @@ assembles as before. Before any of that, the reconciler drops every feature
 PAN-4970) assigns to the per-PR auto-merge train from its ready set, so it
 never bundles a feature the train already owns. A live batch that already
 holds such a feature is invalidated with the reason "\<ID> merges through
-the per-PR auto-merge train", not "left the ready queue" — the feature
-never left the ready queue, it just merges through a different path.
+the per-PR auto-merge train", not "\<ID> is no longer ready to merge" —
+the feature is still ready, it just merges through a different path. The
+reason is stored as the batch's `status_reason` ([MERGE-TRAIN.md](MERGE-TRAIN.md)).
 
 ## Deploy progress on the project row
 

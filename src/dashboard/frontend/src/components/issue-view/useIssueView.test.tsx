@@ -254,7 +254,7 @@ describe('buildIssueViewModel', () => {
     ];
     const model = buildIssueViewModel(
       'PAN-2499', undefined, undefined, undefined,
-      makeDerived('closed', { pr: { ...GREEN_PR, mergeable: null } }),
+      makeDerived('closed', { pr: { ...GREEN_PR, mergeable: null, merged: true } }),
       undefined, undefined, makeActivity(sessions), {},
     );
     expect(model.ship.status).toBe('merged');
@@ -269,6 +269,8 @@ describe('buildIssueViewModel', () => {
     expect(model.operator.needsYouItems).toEqual([]);
   });
 
+  // PAN-5310: a closed issue with no PR at all gets its own `closed` ship
+  // status, not the misleading `pending` ("No pull request yet").
   it('does not report a cancelled issue (closed, no PR) as shipped', () => {
     const sessions = [makeSession({ type: 'work', sessionId: 'agent-pan-2499', status: 'stopped', presence: 'ended' })];
     const model = buildIssueViewModel(
@@ -276,10 +278,45 @@ describe('buildIssueViewModel', () => {
       makeDerived('closed'),
       undefined, undefined, makeActivity(sessions), {},
     );
-    expect(model.ship.status).toBe('pending');
+    expect(model.ship.status).toBe('closed');
     expect(model.pipeline.ship.done).toBe(false);
     expect(model.narrative.now).toBe('Closed');
     expect(model.operator.needsYouItems).toEqual([]);
+  });
+
+  // PAN-5310 (ac1): the Now text names the still-open PR instead of implying
+  // the issue is merged or that nothing has happened.
+  it('names the still-open pull request in the Now text for a closed issue', () => {
+    const model = buildIssueViewModel(
+      'PAN-2499', undefined, undefined, undefined,
+      makeDerived('closed', { pr: { ...GREEN_PR, number: 614, mergeable: false } }),
+      undefined, undefined, undefined, {},
+    );
+    expect(model.narrative.now).toBe('Closed, but pull request #614 is still open');
+  });
+
+  // PAN-5310 (ac2, ac3): a closed issue's plan can never be "waiting for
+  // release" — the issue is done, not pending pickup.
+  it('drops the pickup_gate needs-you item once the tracker reports the issue closed', () => {
+    const issue = {
+      id: 'issue-1', identifier: 'PAN-2499', title: 'x', status: 'Done', state: 'done' as const,
+      priority: 0, labels: ['ready'], url: '', createdAt: '', updatedAt: '', hasPlan: true,
+    };
+    const model = buildIssueViewModel(
+      'PAN-2499', undefined, undefined, undefined, undefined, undefined, undefined, undefined, {}, issue,
+    );
+    expect(model.operator.needsYouItems.some((item) => item.kind === 'pickup_gate')).toBe(false);
+  });
+
+  it('keeps the pickup_gate needs-you item while the tracker still shows the issue in progress', () => {
+    const issue = {
+      id: 'issue-1', identifier: 'PAN-2499', title: 'x', status: 'In Progress', state: 'in_progress' as const,
+      priority: 0, labels: ['ready'], url: '', createdAt: '', updatedAt: '', hasPlan: true,
+    };
+    const model = buildIssueViewModel(
+      'PAN-2499', undefined, undefined, undefined, undefined, undefined, undefined, undefined, {}, issue,
+    );
+    expect(model.operator.needsYouItems.some((item) => item.kind === 'pickup_gate')).toBe(true);
   });
 
   it('derives the blocker reason from the forge when the PR is not mergeable', () => {

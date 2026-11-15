@@ -638,6 +638,23 @@ conversation to try an alternative approach, keep the original intact, compare
 both, and continue with the one you like. Cheaper than restarting from scratch,
 and the original's context is never lost.
 
+## What a conversation changed
+
+Overdeck can list the commits and uncommitted edits each conversation made.
+Commits are tied to a conversation exactly by the `Overdeck-Conversation`
+trailer that Overdeck adds to every commit a conversation makes. Older commits,
+made before the trailer existed, are found from the `git commit` output in the
+conversation's own shell.
+
+Uncommitted edits are best effort. Claude Code conversations get per-line
+counts, for example "4 of 6 uncommitted lines in this file are from this
+conversation", and the other lines name the conversation that wrote them when
+that conversation was opened recently. Conversations on other harnesses list
+the file only. Edits made only through shell commands are not shown.
+
+A project's spend on its Home page now includes its conversations, and
+"today" follows the clock of the machine the dashboard runs on.
+
 ## Pull requests on conversations
 
 A conversation shows the pull request its work lives on. A badge next to the

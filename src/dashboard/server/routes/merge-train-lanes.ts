@@ -7,7 +7,9 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
+import { getProjectSync } from '../../../lib/projects.js';
 import { jsonResponse } from '../http-helpers.js';
+import { getMergeTrainBoard } from '../services/merge-train-board.js';
 import { postStrikeMergePayload } from '../services/strike-merge.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { httpHandler } from './http-handler.js';
@@ -29,4 +31,19 @@ const postStrikeMergeRoute = HttpRouter.add(
   })),
 );
 
-export const mergeTrainLanesRouteLayer = Layer.mergeAll(postStrikeMergeRoute);
+// GET /api/merge-train/board[?project=<key>] — PAN-4753 WI-7: everything the MergeTrain component renders.
+const getMergeTrainBoardRoute = HttpRouter.add(
+  'GET',
+  '/api/merge-train/board',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const projectKey = new URL(request.url, 'http://localhost').searchParams.get('project')?.trim() || undefined;
+    if (projectKey && !getProjectSync(projectKey)) {
+      return jsonResponse({ error: `Unknown project: ${projectKey}` }, { status: 404 });
+    }
+    const board = yield* Effect.promise(() => getMergeTrainBoard({ projectKey }));
+    return jsonResponse(board);
+  })),
+);
+
+export const mergeTrainLanesRouteLayer = Layer.mergeAll(postStrikeMergeRoute, getMergeTrainBoardRoute);

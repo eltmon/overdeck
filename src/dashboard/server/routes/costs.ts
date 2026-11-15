@@ -40,6 +40,10 @@ import {
   getBackgroundCostBySource,
 } from '../../../lib/overdeck/cost-sync.js';
 import { syncWalFromAllProjects } from '../../../lib/costs/sync-wal.js';
+import { usageWindowStarts } from '../../../lib/costs/request-digest.js';
+import { listArchivedConversations, listConversations } from '../../../lib/overdeck/conversations.js';
+import { listProjectsAsync } from '../../../lib/projects.js';
+import { conversationSessionsForProject, inProjectSpend, projectKeysForPrefix } from '../services/project-spend.js';
 import { httpHandler } from './http-handler.js';
 // PAN-1938: overdeck read door — CostResolver replaces direct DB calls for read endpoints.
 // CostWriter is deferred until CostArchiveLive is wired (write endpoints stay on legacy path).
@@ -62,13 +66,14 @@ const getCostsSummaryRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const today = new Date().toISOString().split('T')[0];
-        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        // PAN-5288 D-10: "today" starts at the server's local midnight, the same
+        // windows GET /api/fleet/usage uses.
+        const starts = usageWindowStarts(Date.now());
 
         type Entry = {
           ts?: string;
           issueId?: string;
+          agentId?: string;
           cost?: number;
           input?: number;
           output?: number;
@@ -76,17 +81,24 @@ const getCostsSummaryRoute = HttpRouter.add(
           cacheWrite?: number;
           model?: string;
         };
-        const scope = (entries: Entry[]) =>
-          projectPrefix
-            ? entries.filter((e) => typeof e.issueId === 'string' && e.issueId.toUpperCase().startsWith(`${projectPrefix}-`))
-            : entries;
+        // PAN-5288 A-D17: a project's spend includes its conversations' events.
+        let scope = (entries: Entry[]) => entries;
+        if (projectPrefix) {
+          const projects = await listProjectsAsync();
+          const sessions = conversationSessionsForProject(
+            projectKeysForPrefix(projectPrefix, projects),
+            projects,
+            [...listConversations(), ...listArchivedConversations()],
+          );
+          scope = (entries) => entries.filter((e) => inProjectSpend(e, projectPrefix, sessions));
+        }
 
         // PAN-4543: one async scan of the month window; week and today are
         // subsets. Three sync full-log scans stalled the event loop ~4.8 s.
-        const monthEntries = scope(await readEventsSince(monthAgo));
+        const monthEntries = scope(await readEventsSince(starts.month));
         const since = (start: string) => (e: Entry) => e.ts === undefined || e.ts >= start;
-        const weekEntries = monthEntries.filter(since(weekAgo));
-        const todayEntries = weekEntries.filter(since(today));
+        const weekEntries = monthEntries.filter(since(starts.week));
+        const todayEntries = weekEntries.filter(since(starts.today));
 
         const summarize = (entries: Entry[]) => ({
           totalCost: entries.reduce((sum, e) => sum + (e.cost || 0), 0),

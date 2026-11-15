@@ -19,6 +19,7 @@ import { PHASES, phaseLabel, type Phase, type PhaseStepState } from '../../lib/s
 import { isEndedAgent } from '../../lib/agentConversation';
 import { useAgentSessionOutcome } from '../../lib/useSessionOutcome';
 import { SESSION_ENDED_FALLBACK } from '../../lib/sessionOutcome';
+import { isClosedIssue } from '../../lib/pipeline-state';
 import { useBackendPanes } from '../../lib/store';
 import { useSharedTick } from '../../lib/useSharedTick';
 import { useIssueData } from '../drawer/useDrawerData';
@@ -207,6 +208,8 @@ export function IssueDrawerDetails({
   const pr = usePrQuery(issueId).data?.pr ?? null;
   const mergeOid = typeof pr?.mergeCommit === 'string' ? pr.mergeCommit : pr?.mergeCommit?.oid;
   const createPrHref = githubCompareUrl(trackerIssueUrl(issueId, issue?.url), derived?.branch?.name ?? `feature/${issueId.toLowerCase()}`);
+  // PAN-5310: a closed issue has nothing left to open a PR for or to release.
+  const issueClosed = derived?.state === 'closed' || (issue ? isClosedIssue(issue) : false);
 
   return (
     <div data-testid="drawer-tab-panel-overview" className="@container">
@@ -313,7 +316,7 @@ export function IssueDrawerDetails({
               <span className="text-success-foreground">+{pr.additions}</span> <span className="text-destructive-foreground">−{pr.deletions}</span> · {pr.changedFiles} file{pr.changedFiles === 1 ? '' : 's'}
               {mergeOid ? <> · merged as <span className="font-mono-ui text-foreground">{mergeOid}</span></> : null}
             </p>
-          ) : createPrHref ? (
+          ) : createPrHref && !issueClosed ? (
             <a data-testid="drawer-details-create-pr" href={createPrHref} target="_blank" rel="noreferrer" className="mt-[6px] inline-block text-[12px] text-primary-ink hover:underline">Create PR</a>
           ) : null}
           <DeftDeliveryChip issueId={issueId} />
@@ -338,12 +341,14 @@ export function IssueDrawerDetails({
       </div>
 
       <div data-section="Awareness rail" className="min-w-0 space-y-[22px]">
-        <section>
-          <h3 className={HEADING_CLASS}>Pickup controls</h3>
-          <div data-section="PickupGateCard" className="contents">
-            <div data-section="DrawerPickupSection / PickupGateControls"><PickupSection issueId={issueId} /></div>
-          </div>
-        </section>
+        {!issueClosed ? (
+          <section>
+            <h3 className={HEADING_CLASS}>Pickup controls</h3>
+            <div data-section="PickupGateCard" className="contents">
+              <div data-section="DrawerPickupSection / PickupGateControls"><PickupSection issueId={issueId} /></div>
+            </div>
+          </section>
+        ) : null}
         <div data-section="DrawerVerificationGates"><VerificationGates issueId={issueId} /></div>
         <div data-section="DrawerWorkspaceSection">
           <WorkspaceSection issueId={issueId} />

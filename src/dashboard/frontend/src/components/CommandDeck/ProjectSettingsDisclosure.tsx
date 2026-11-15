@@ -2,7 +2,9 @@ import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight } from 'lucide-react';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
-import { shortName, useMergeTrainData } from '../merge-train/MergeTrainView';
+import { shortName } from '../merge-train/mergeTrainCopy';
+import type { BoardProject, UatGenerationPayload } from '../merge-train/train/boardTypes';
+import { useMergeTrainBoard } from '../merge-train/train/useMergeTrainBoard';
 import { ProjectSkillsSection } from '../skills/SkillOverridesSections';
 
 interface VersionSyncConfig {
@@ -440,7 +442,7 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
           effective field. An explicit Enabled/Disabled needs no gloss. */}
       {mergeTrainData && mergeTrainData.value === null && (
         <span className="text-[11px] text-muted-foreground" data-testid="merge-train-effective">
-          Following the global default — currently {mergeTrainData.effective ? 'on' : 'off'} for this project.
+          {mergeTrainData.effective ? 'Global default: on while the merge train is on for all projects' : 'Off for this project'}
         </span>
       )}
       </div>
@@ -451,11 +453,33 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
   );
 }
 
-/** SPA navigation to a tab: the router keys off the path and listens for popstate. */
-function goToAwaitingMerge(event: React.MouseEvent): void {
+/**
+ * PAN-4753: scroll to the project's merge train card on the same page. The
+ * sparse project Home (no features) renders no card, so the link then opens
+ * Awaiting Merge, which always shows the merge train.
+ */
+function scrollToMergeTrain(event: React.MouseEvent): void {
   event.preventDefault();
+  const card = document.getElementById('merge-train');
+  if (card) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
   window.history.pushState({}, '', '/awaiting-merge');
   window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
+/** The project's board card and its newest testable batch (ready, then assembling, then superseded). */
+function useProjectTrain(projectKey: string): { card: BoardProject | undefined; current: UatGenerationPayload | undefined; waiting: number; isLoading: boolean } {
+  const { data, isLoading } = useMergeTrainBoard({ projectKey, active: false });
+  const card = data?.projects.find((p) => p.projectKey === projectKey);
+  const batches = card?.batches ?? [];
+  const current = batches.find((g) => g.status === 'ready')
+    ?? batches.find((g) => g.status === 'assembling')
+    ?? batches.find((g) => g.status === 'superseded');
+  const liveNames = new Set(batches.filter((g) => g.status === 'ready' || g.status === 'assembling').map((g) => g.name));
+  const waiting = (card?.cars ?? []).filter((car) => !car.liveBatch || !liveNames.has(car.liveBatch)).length;
+  return { card, current, waiting, isLoading };
 }
 
 /**
@@ -470,14 +494,7 @@ function MergeTrainSummary({ projectKey }: { projectKey: string }) {
   // the same react-query keys: duplicate definitions on one key mean whichever
   // component mounts first decides the fetcher and the polling interval, and the
   // two copies disagreed on error handling. One hook, one contract.
-  const { sections, isLoading } = useMergeTrainData(false);
-  const section = sections.find((s) => s.projectKey === projectKey);
-  const readyCount = section?.queue.length ?? 0;
-  const chain = section?.generations ?? [];
-  // Newest testable batch first — the same precedence the merge-train view uses.
-  const current = chain.find((g) => g.status === 'ready')
-    ?? chain.find((g) => g.status === 'assembling')
-    ?? chain.find((g) => g.status === 'superseded');
+  const { current, waiting: readyCount, isLoading } = useProjectTrain(projectKey);
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-[11px]" data-testid="merge-train-summary">
@@ -507,8 +524,7 @@ function ProjectSettingsSummary({ projectKey }: { projectKey: string }) {
   // PAN-1696 ac3: the merge-train state has to be legible while the disclosure is
   // COLLAPSED. The expanded panel's summary is invisible until the operator opens
   // it, so "the cockpit shows the ready-feature count" was only half true.
-  const { sections } = useMergeTrainData(false);
-  const trainSection = sections.find((sec) => sec.projectKey === projectKey);
+  const { card: trainSection, current: currentBatch, waiting: readyCount } = useProjectTrain(projectKey);
 
   if (!data || !swarmData) return null;
 
@@ -525,10 +541,6 @@ function ProjectSettingsSummary({ projectKey }: { projectKey: string }) {
         ? 'Swarm always'
         : 'Swarm inherit';
 
-  const readyCount = trainSection?.queue.length ?? 0;
-  const currentBatch = trainSection?.generations.find((g) => g.status === 'ready')
-    ?? trainSection?.generations.find((g) => g.status === 'assembling')
-    ?? trainSection?.generations.find((g) => g.status === 'superseded');
   // ac3 wants the ready count AND the current generation's STATUS legible without
   // opening the disclosure — a batch name alone does not say whether it is ready to
   // test, still assembling, or superseded.
@@ -545,11 +557,12 @@ function ProjectSettingsSummary({ projectKey }: { projectKey: string }) {
           anything inside a <summary> toggles the disclosure, so stop propagation
           as well as the default navigation. */}
       <a
-        href="/awaiting-merge"
-        onClick={(event) => { event.stopPropagation(); goToAwaitingMerge(event); }}
+        href="#merge-train"
+        onClick={(event) => { event.stopPropagation(); scrollToMergeTrain(event); }}
         className="shrink-0 font-medium text-primary hover:underline"
+        data-testid="project-settings-merge-train-link"
       >
-        Awaiting Merge →
+        Merge train ↓
       </a>
     </span>
   );

@@ -1,0 +1,786 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T22:31:40Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5310: Issue view says 'writing code' or 'planning' and 'No pull request yet' for every issue closed more than 14 days ago",
+    "updated": "2026-11-14T22:38:44.800Z"
+  },
+  "plan": {
+    "id": "pan-5310",
+    "title": "Issue view says 'writing code' or 'planning' and 'No pull request yet' for every issue closed more than 14 days ago",
+    "status": "running",
+    "uid": "4f5b0c1f-8b01-4178-accf-bf01a70af715",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-14T22:31:40Z",
+    "updated": "2026-11-14T22:38:44.800Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5310",
+        "label": "PAN-5310",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-5310.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "issue-view",
+      "derived-state",
+      "backfill",
+      "frontend",
+      "cli"
+    ],
+    "narratives": {
+      "Problem": "Issues closed more than issues.closedWindowDays (14) days ago reach the server only through backfillIssue(), but pushUpdated() schedules the derived-state refresh only for the tracker poll rows, so a backfilled issue has no derived state and every issue-view section renders its 'nothing happened yet' default (writing code / planning / No pull request yet / Plan, Start work, Release). Even with a derived state the repo PR listing reaches only ~100 closed PRs (~9 days), so an aged-out merged PR is lost; deriveNarrative has no closed branch; isShipped treats closed + open PR as shipped; derivePipelineState returns 'generic' (Not started) without derived state; header primary actions ignore closed state; and readIssueFromTracker never tries GitHub when trackers.primary is linear, so pan show cannot see a closed GitHub issue.",
+      "Proposal": "Server: include backfilledIssues in the derived refresh scheduled by pushUpdated (net-zero lines, file at cap) and read a backfilled issue's merged PR once per branch through a memoized, metered gh pr list --state merged --head call. CLI/lib: readIssueFromTracker reads GitHub first for an id resolveGitHubIssue maps. Frontend: deriveNarrative gets three closed cases (Shipped / Closed, but PR #N is still open — close or merge it / Closed); isShipped requires pr.merged; deriveShip shows the open PR with the zombie reason and a 'closed' status without a PR; derivePipelineState falls back to done for a tracker-done issue; closed issues get Reopen as the only primary action and no Release needs-you, Create PR link or pickup section. Document the rules in docs/ISSUE-VIEW.md and changelog.d/pan-5310.md.",
+      "NonGoals": "- Do not close or modify eltmon/lexerra#614; the operator closes it after verification.\n- Do not widen the per-issue merged-PR read to issues inside the poll window (closed 9-14 days ago) or to non-backfilled issues.\n- Do not change getCachedTrackerIssues() or the membership trigger's inputs.\n- Do not widen the issuesRaw snapshot to rows the cycle filter drops.\n- Do not add a new PipelinePhase member.\n- Do not raise scripts/file-size-allowlist.txt or grow issue-data-service.ts past 1754 lines.\n- Do not change pan show's output format; only its tracker read changes.\n- Do not change pan show's CV outcome rule (deriveCvOutcome in src/cli/commands/show.ts still counts closed + any PR as success); the docs must not claim it reads pr.merged."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Schedule backfilled rows at the pushUpdated call site instead of changing getCachedTrackerIssues()",
+        "rationale": "getCachedTrackerIssues() feeds the PAN-5261 membership trigger, which must see raw tracker rows only."
+      },
+      {
+        "summary": "Read a merged PR per branch only for backfilled issues, memoized for the process lifetime",
+        "rationale": "The closed PR listing covers ~9 days (measured: oldest 2026-11-05), so aged-out merged PRs are otherwise invisible; limiting to backfilled ids keeps GitHub quota cost to issues an operator opened."
+      },
+      {
+        "summary": "Use gh pr list --state merged (not --state all) for the per-branch read",
+        "rationale": "Open PRs are already in the open listing and closed-unmerged PRs are dropped by prFromGhRow, so only a merged row changes the answer."
+      },
+      {
+        "summary": "Closed issues get Reopen as their only primary action, implemented in getPhasePrimaryActions without a new PipelinePhase",
+        "rationale": "Required behaviour 4 keeps Reopen available; the MERGED phase's Close out primary is wrong for a closed issue, and new phase names would ripple through Kanban and badge maps."
+      },
+      {
+        "summary": "readIssueFromTracker tries GitHub first for a GitHub-resolved id, then the configured trackers",
+        "rationale": "resolveGitHubIssue is an id-specific prefix mapping, which is more specific than the global tracker order."
+      },
+      {
+        "summary": "Hide the whole Details pickup section for a closed issue, and add a 'closed' ship status for a closed issue with no PR",
+        "rationale": "Ready/Park/Release have no meaning for a closed issue, and 'No pull request yet' is false for a closed issue."
+      }
+    ],
+    "items": [
+      {
+        "id": "server-backfill-derived-refresh",
+        "title": "Derived refresh schedules backfilled rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T22:31:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5310",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/issue-data-service.ts",
+            "src/dashboard/server/services/__tests__/issue-data-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/issue-data-service.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "issue-data-service.test.ts passes including the three new PAN-5310 backfill cases",
+            "lint-file-size.sh exits 0 with issue-data-service.ts at or under 1754 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/pan-5310.md). In IssueDataService.pushUpdated() (issue-data-service.ts ~line 795) change the single line `this.scheduleDerivedStateRefreshForIssues(cachedIssues);` to `this.scheduleDerivedStateRefreshForIssues([...cachedIssues, ...this.backfilledIssues.values()]); // PAN-5310: backfilled rows too`. Net zero lines: the file is at its 1754-line allowlist cap and the cap must never be raised. Do NOT change getCachedTrackerIssues() (it feeds the PAN-5261 membership trigger with raw tracker rows), schedulePlanningRefreshForIssues, or the boot path at line 780. Add the three tests named in PRD WI-1 to the existing `describe('IssueDataService.backfillIssue (PAN-3659)')` block, whose makeService() already spies on scheduleDerivedStateRefreshForIssues. Also add `refreshDerivedStates uses the backfilled tracker row`: after backfilling closed PAN-2925 and mocking loadIssueStatesForProject to return { issueId: 'PAN-2925', state: 'closed' }, `await (svc as any).refreshDerivedStates(['PAN-2925'])` passes issues['PAN-2925'] with open false to the loader and svc.getDerivedState('PAN-2925') returns state closed."
+        },
+        "items": [
+          {
+            "id": "server-backfill-derived-refresh.ac1",
+            "title": "Given a closed GitHub issue PAN-2925 resolved by resolveMissingIssue, when backfillIssue('PAN-2925') completes, then scheduleDerivedStateRefreshForIssues is called with an array containing a row whose identifier is PAN-2925",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-backfill-derived-refresh.ac2",
+            "title": "Given a backfilled PAN-2925, when pushUpdated() runs again later, then scheduleDerivedStateRefreshForIssues again receives the PAN-2925 row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-backfill-derived-refresh.ac3",
+            "title": "Given a backfilled PAN-2925, getCachedTrackerIssues() returns no PAN-2925 row (raw tracker rows only, PAN-5261 FR-6 preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-backfill-derived-refresh.ac4",
+            "title": "Given a backfilled closed PAN-2925, when refreshDerivedStates(['PAN-2925']) runs, then the loader receives issues['PAN-2925'] with open false and getDerivedState('PAN-2925') returns state closed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-backfill-derived-refresh.ac5",
+            "title": "bash scripts/lint-file-size.sh exits 0 and `wc -l` of issue-data-service.ts reports at most 1754 lines; scripts/file-size-allowlist.txt is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-github-tracker-first",
+        "title": "readIssueFromTracker reads GitHub first for a GitHub-resolved id",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T22:31:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5310",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/derived-issue-state.ts",
+            "src/lib/overdeck/__tests__/derived-issue-state-tracker-order.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/derived-issue-state-tracker-order.test.ts src/dashboard/server/services/__tests__/auto-merge-executor.test.ts tests/unit/lib/flywheel/derive-status.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "derived-issue-state-tracker-order.test.ts passes its four cases",
+            "auto-merge-executor and derive-status tests still pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In readIssueFromTracker (derived-issue-state.ts ~line 680) replace `const order = [trackers.primary, ...(trackers.secondary ? [trackers.secondary] : [])];` with a `configured` list plus `const order = gh.isGitHub ? ['github' as const, ...configured.filter((type) => type !== 'github')] : configured;` and the PAN-5310 comment from the PRD. Keep the loop body. Update the doc comment above the function to say a GitHub-resolved id is read from GitHub first. Create the new test file with mocks of ../../config.js, ../../tracker/factory.js and ../../tracker-utils.js exactly as PRD WI-3 lists, plus the getDerivedIssueState case proving a closed tracker answer gives state closed and no pr-outside-pipeline attention. Other callers (auto-merge-executor.ts, flywheel/derive-status.ts, services/derived-issue-state.ts) see the new answers; run their tests."
+        },
+        "items": [
+          {
+            "id": "cli-github-tracker-first.ac1",
+            "title": "Given trackers.primary 'linear' and resolveGitHubIssue('LEX-609') returning eltmon/lexerra, when readIssueFromTracker('LEX-609') runs, then createTracker is called with type github, owner eltmon, repo lexerra and the function returns open false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-github-tracker-first.ac2",
+            "title": "Given the GitHub tracker getIssue fails, readIssueFromTracker falls back to the configured linear tracker and returns its answer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-github-tracker-first.ac3",
+            "title": "Given resolveGitHubIssue returns isGitHub false, createTracker is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-github-tracker-first.ac4",
+            "title": "Given readIssue returns open false and readPr returns an open PR, getDerivedIssueState returns state closed with no attention and no prOutsidePipeline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merged-pr-read-for-backfilled",
+        "title": "Per-branch merged-PR read for backfilled issues",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T22:31:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5310",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/pr-listing.ts",
+            "src/lib/overdeck/derived-issue-state.ts",
+            "src/dashboard/server/services/issue-data-service.ts",
+            "src/lib/overdeck/__tests__/pr-listing-merged-branch.test.ts",
+            "src/lib/overdeck/__tests__/derived-issue-state-batch.test.ts",
+            "src/dashboard/server/services/__tests__/issue-data-service.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/pr-listing-merged-branch.test.ts src/lib/overdeck/__tests__/derived-issue-state-batch.test.ts src/dashboard/server/services/__tests__/issue-data-service.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "the three vitest files pass",
+            "typecheck completes without errors",
+            "lint-file-size.sh exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. (1) pr-listing.ts: add exported readMergedPullRequestForBranch(projectPath, branch) exactly as the PRD snippet: an in-flight/settled promise Map keyed by projectPath+branch, one runGh(['pr','list','--state','merged','--head',branch,'--limit','1','--json',GH_CLOSED_PR_FIELDS], {caller:'pr-cache', cwd: projectPath, timeout: 20_000}) call, settled answers (row or null) kept for the process lifetime, failures deleted from the map, logged via logPrListingFailure(projectPath,'closed',error) and resolved null. Clear the map in the file's existing test-reset helper, or export resetMergedPullRequestCacheForTests(). (2) derived-issue-state.ts: loadIssueStatesForProject deps gain perIssuePrIds?: ReadonlySet<string> and readMergedPr?: (issueId, projectPath) => Promise<LoadedPr|null>; add readMergedPrForIssue (featureBranchFor + prFromGhRow); the per-issue read runs only for GitHub projects, only when the listing has no PR, and only for ids in perIssuePrIds. (3) issue-data-service.ts refreshDerivedStates: modify the existing loadIssueStatesForProject call line to add `perIssuePrIds: new Set(this.backfilledIssues.keys())` with no added line (file is at its 1754 cap). Put the new pr-listing test at src/lib/overdeck/__tests__/pr-listing-merged-branch.test.ts (mock src/lib/github-quota/run-gh.js and pr-cache-policy.js the way tests/unit/lib/overdeck/pr-listing-failure.test.ts does)."
+        },
+        "items": [
+          {
+            "id": "merged-pr-read-for-backfilled.ac1",
+            "title": "Given an empty repo listing, a tracker row open false, perIssuePrIds containing PAN-1 and readMergedPr returning merged PR #9, loadIssueStatesForProject returns state closed with pr.merged true and pr.number 9",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-pr-read-for-backfilled.ac2",
+            "title": "Given no perIssuePrIds, or a listing that already has the PR, readMergedPr is never called (no extra gh call for non-backfilled issues)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-pr-read-for-backfilled.ac3",
+            "title": "readMergedPullRequestForBranch runs gh with --state merged --head feature/pan-1 --limit 1 once and a second call for the same branch runs no gh; an empty answer resolves null and is memoized",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-pr-read-for-backfilled.ac4",
+            "title": "Given runGh rejects, readMergedPullRequestForBranch resolves null and the next call runs gh again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-pr-read-for-backfilled.ac5",
+            "title": "refreshDerivedStates passes a third argument to loadIssueStatesForProject whose perIssuePrIds has the backfilled id, and issue-data-service.ts stays at most 1754 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-pipeline-state-tracker-closed",
+        "title": "derivePipelineState falls back to the tracker's done",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T22:31:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5310",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/issuePipelineState.ts",
+            "src/dashboard/frontend/src/lib/__tests__/issue-pipeline-state.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/issue-pipeline-state.test.ts src/lib/__tests__/simple-derive.test.ts",
+            "node scripts/run-frontend-test-subset.mjs --dry-run"
+          ],
+          "expected_outputs": [
+            "issue-pipeline-state.test.ts passes including the PAN-5310 fallback cases",
+            "simple-derive.test.ts still passes",
+            "the dry-run file list includes src/lib/__tests__/issue-pipeline-state.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In derivePipelineState (issuePipelineState.ts ~line 50) compute canonical once, keep the canceled early return, and return 'done' instead of 'generic' when derived is missing and canonical === 'done'. Add the tests listed in PRD WI-4, including the userFacingDisplay projection (import from ../simple/userFacingState) so the simple page and peek popover read Done, never Not started. CI runs only the frontend tests listed in scripts/frontend-test-subset.txt (paths relative to src/dashboard/frontend, sorted; the file is merge=union so parallel additions merge cleanly): add src/lib/__tests__/issue-pipeline-state.test.ts in sorted position if absent. Run the file first on the unmodified tree; if it already fails on main for reasons unrelated to PAN-5310, report that instead of registering a red file."
+        },
+        "items": [
+          {
+            "id": "fe-pipeline-state-tracker-closed.ac1",
+            "title": "derivePipelineState({ derived: null, issueCanonicalState: 'done' }) returns 'done', and 'Done' also returns 'done'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-pipeline-state-tracker-closed.ac2",
+            "title": "derivePipelineState({ derived: null, issueCanonicalState: 'in_progress' }) still returns 'generic'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-pipeline-state-tracker-closed.ac3",
+            "title": "userFacingDisplay for a derived-less tracker-done issue returns title 'Done', state 'done', and a primaryAction other than 'Start work'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-actions-closed-reopen-only",
+        "title": "Closed issues offer Reopen as the only primary action",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T22:31:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5310",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/issueActions.ts",
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.menu-by-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/issueActions.menu-by-state.test.ts src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.parity.test.tsx src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.c-actions.test.ts"
+          ],
+          "expected_outputs": [
+            "all four issueActions test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. (1) isDoneOrCanceled (issueActions.ts ~line 513) also returns true when state.derived?.state === 'closed'. (2) getPhasePrimaryActions (~line 663) takes `state` (rename from `_state`) and returns the reopen entry alone when isDoneOrCanceled(state), else PHASE_PRIMARY_KEYS[phase] as today. Do not add a PipelinePhase member. Add the three tests listed in PRD WI-5 using the menu-by-state test's state builder. The reopen entry's phasePrimary is [] (phasePrimary('reopen') maps no phase); if issueActions.parity or c-actions tests assert that every primary action lists its phase, keep them green by asserting the closed-issue override separately, not by adding reopen to PHASE_PRIMARY_KEYS."
+        },
+        "items": [
+          {
+            "id": "fe-actions-closed-reopen-only.ac1",
+            "title": "Given a tracker-done issue with no derived state, hasPlan and hasTasks true, getPhasePrimaryActions returns exactly the reopen action and getEnabledActions contains none of plan, startAgent, closeOut",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-actions-closed-reopen-only.ac2",
+            "title": "Given derived state closed with an open PR and a lagging tracker canonical in_progress, the primary actions are exactly [reopen] and reopen is enabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-actions-closed-reopen-only.ac3",
+            "title": "Given derived state merged with an open tracker issue, the primary actions remain [closeOut]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-ship-merged-only",
+        "title": "Ship reads pr.merged; closed-with-open-PR and closed-without-PR",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T22:31:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5310",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/derivations.ts",
+            "src/dashboard/frontend/src/components/issue-view/types.ts",
+            "src/dashboard/frontend/src/components/issue-view/ShipProgress.tsx",
+            "src/dashboard/frontend/src/components/issue-view/derivations.test.ts",
+            "src/dashboard/frontend/src/components/issue-view/ShipProgress.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/issue-view/derivations.test.ts src/components/issue-view/ShipProgress.test.tsx",
+            "npm run typecheck",
+            "node scripts/run-frontend-test-subset.mjs --dry-run"
+          ],
+          "expected_outputs": [
+            "derivations.test.ts and ShipProgress.test.tsx pass",
+            "typecheck completes without errors (frontend strict tsc runs on CI)",
+            "the dry-run file list includes src/components/issue-view/derivations.test.ts, src/components/issue-view/ShipProgress.test.tsx"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. isShipped = state merged, or state closed with derived.pr?.merged === true (update its comment). IssueShipModel.status gains 'closed'. deriveShip: merged if shipped, ready if ready, 'closed' for closed with no PR, else pending; a closed issue with a PR gets blockerReason 'The issue is closed, but this pull request is still open — close or merge it'; other pending rows keep stuckReason. ShipProgress.summary returns 'Closed — no pull request is linked' first for status closed. Run `git grep -n \"ship.status\\|IssueShipModel\" src/dashboard/frontend/src` and confirm no consumer treats the new value as merged. Create derivations.test.ts and extend ShipProgress.test.tsx with the PRD WI-6 cases. CI runs only the frontend tests listed in scripts/frontend-test-subset.txt (paths relative to src/dashboard/frontend, sorted; the file is merge=union so parallel additions merge cleanly): add src/components/issue-view/derivations.test.ts, src/components/issue-view/ShipProgress.test.tsx in sorted position if absent. Run the file first on the unmodified tree; if it already fails on main for reasons unrelated to PAN-5310, report that instead of registering a red file."
+        },
+        "items": [
+          {
+            "id": "fe-ship-merged-only.ac1",
+            "title": "isShipped returns false for state closed with an open PR (no merged flag) and true for state closed with pr.merged true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-ship-merged-only.ac2",
+            "title": "deriveShip for closed + open PR #614 returns status pending, prNumber 614 and blockerReason 'The issue is closed, but this pull request is still open — close or merge it'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-ship-merged-only.ac3",
+            "title": "deriveShip for closed with no PR returns status closed and no prUrl; for closed with a merged PR it returns status merged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-ship-merged-only.ac4",
+            "title": "ShipProgress full view for status closed renders 'Closed — no pull request is linked' in the ship-progress-summary paragraph and 'closed' in the data-ship-status badge; the compact view renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-issue-view-closed-now-release",
+        "title": "useIssueView: closed Now text and no Release needs-you",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T22:31:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5310",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/useIssueView.ts",
+            "src/dashboard/frontend/src/components/issue-view/useIssueView.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/issue-view/useIssueView.test.tsx",
+            "node scripts/run-frontend-test-subset.mjs --dry-run"
+          ],
+          "expected_outputs": [
+            "useIssueView.test.tsx passes including the PAN-5310 cases",
+            "the dry-run file list includes src/components/issue-view/useIssueView.test.tsx"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In deriveNowText (useIssueView.ts ~line 279) the closed case returns 'Merged and closed out' when isShipped, 'Closed, but pull request #N is still open' when derived.pr exists, else 'Closed'. In the needs-you builder (~line 446) compute issueClosed = derived?.state === 'closed' || (issue ? isClosedIssue(issue) : false) (import isClosedIssue from ../../lib/pipeline-state) and require !issueClosed for needsRelease. Add the PRD WI-7 tests. CI runs only the frontend tests listed in scripts/frontend-test-subset.txt (paths relative to src/dashboard/frontend, sorted; the file is merge=union so parallel additions merge cleanly): add src/components/issue-view/useIssueView.test.tsx in sorted position if absent. Run the file first on the unmodified tree; if it already fails on main for reasons unrelated to PAN-5310, report that instead of registering a red file."
+        },
+        "items": [
+          {
+            "id": "fe-issue-view-closed-now-release.ac1",
+            "title": "Given derived state closed with open PR #614, the narrative now text is 'Closed, but pull request #614 is still open'; with a merged PR it is 'Merged and closed out'; with no PR it is 'Closed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-issue-view-closed-now-release.ac2",
+            "title": "Given hasPlan true, label ready and tracker state done, needsYouItems contains no pickup_gate item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-issue-view-closed-now-release.ac3",
+            "title": "Given the same issue with tracker state in_progress, needsYouItems still contains a pickup_gate item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-status-narrative-closed",
+        "title": "Status narrative reads closed in plain words",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T22:31:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5310",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/StatusNarrative.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/StatusNarrative.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/cockpit/StatusNarrative.test.ts",
+            "npm run typecheck",
+            "node scripts/run-frontend-test-subset.mjs --dry-run"
+          ],
+          "expected_outputs": [
+            "StatusNarrative.test.ts passes its five cases",
+            "typecheck completes without errors",
+            "the dry-run file list includes src/components/Stage/cockpit/StatusNarrative.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. deriveNarrative gains optional trackerClosed; a first branch returns early for issue?.state === 'closed' || trackerClosed: merged PR -> 'Shipped — this change is on main' / 'The issue is closed. Nothing needs you.' / needsYou false; open PR #N -> 'Closed, but pull request #N is still open — close or merge it' / 'The issue is closed but its pull request is still open. Close the pull request, or merge it if the change is still wanted.' / needsYou true; no PR -> 'Closed' / 'This issue is closed. Nothing needs you.' / needsYou false. No ' Nothing needs you yet.' suffix on these. The StatusNarrative component reads the issue row from useDashboardStore and passes trackerClosed = isClosedIssue(row). Match the file's no-semicolon style. Create StatusNarrative.test.ts with the five PRD WI-8 cases. CI runs only the frontend tests listed in scripts/frontend-test-subset.txt (paths relative to src/dashboard/frontend, sorted; the file is merge=union so parallel additions merge cleanly): add src/components/Stage/cockpit/StatusNarrative.test.ts in sorted position if absent. Run the file first on the unmodified tree; if it already fails on main for reasons unrelated to PAN-5310, report that instead of registering a red file."
+        },
+        "items": [
+          {
+            "id": "fe-status-narrative-closed.ac1",
+            "title": "deriveNarrative for derived closed with pr.merged true returns headline 'Shipped — this change is on main' and needsYou false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-status-narrative-closed.ac2",
+            "title": "deriveNarrative for derived closed with open PR #614 returns headline 'Closed, but pull request #614 is still open — close or merge it' and needsYou true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-status-narrative-closed.ac3",
+            "title": "deriveNarrative for derived closed with no PR, workRunning true and plan 0 of 13 returns headline 'Closed', never 'The crew is writing code'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-status-narrative-closed.ac4",
+            "title": "deriveNarrative with issue undefined, trackerClosed true and hasPlan false returns headline 'Closed', never 'Planning what to build'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-status-narrative-closed.ac5",
+            "title": "deriveNarrative for derived working with workRunning true still returns a headline starting 'The crew is writing code'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-details-closed-no-create-pr",
+        "title": "Details tab hides Create PR and pickup controls for a closed issue",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T22:31:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5310",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDrawerDetails.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/issue-detail/IssueDrawerDetails.test.tsx"
+          ],
+          "expected_outputs": [
+            "IssueDrawerDetails.test.tsx passes including the PAN-5310 cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. In IssueDrawerDetails compute issueClosed = derived?.state === 'closed' || (issue ? isClosedIssue(issue) : false) after createPrHref (~line 209), guard the Create PR link (~line 316) with !issueClosed, and render the pickup section wrapper (~line 344) only when !issueClosed. Add the PRD WI-9 tests with the file's existing mocks. Also assert the Status section (drawer-details-status) renders text containing 'Closed' for the closed issue; this relies on fe-status-narrative-closed."
+        },
+        "items": [
+          {
+            "id": "fe-details-closed-no-create-pr.ac1",
+            "title": "Given a tracker-done issue with no PR and derived state closed, Details renders no drawer-details-create-pr link and no drawer-pickup-section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-details-closed-no-create-pr.ac2",
+            "title": "Given the same closed issue, Details renders no button or link with text 'Plan…', 'Start work', 'Release' or 'Create PR'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-details-closed-no-create-pr.ac3",
+            "title": "Given an open issue with no PR, Details still renders the drawer-details-create-pr link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-closed-issue-view",
+        "title": "Document the closed-issue view and add the changelog entry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T22:31:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5310",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ISSUE-VIEW.md",
+            "changelog.d/pan-5310.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. Edit docs/ISSUE-VIEW.md: the isShipped paragraph (~line 34) now states isShipped is merged, or closed with pr.merged, and that a closed issue with an open PR reads 'Closed, but pull request #N is still open — close or merge it'; add that a backfilled issue gets its derived state and a per-branch merged-PR read because the repo listing reaches about 100 closed PRs. The Details tab paragraph (~line 125) says Create PR and the pickup controls are hidden for a closed issue. The action table (~line 324) gains a sentence that a closed issue's header strip offers Reopen as its one primary action. Create changelog.d/pan-5310.md with the #### Fixed bullet from the PRD. Keep the line-34 sentence about pan show's CV outcome accurate: deriveCvOutcome (src/cli/commands/show.ts) is unchanged by PAN-5310 and still treats closed with any PR as shipped, so say the issue view's rule changed and the CV rule did not."
+        },
+        "items": [
+          {
+            "id": "docs-closed-issue-view.ac1",
+            "title": "docs/ISSUE-VIEW.md contains the rule that isShipped requires pr.merged for a closed issue and quotes the 'still open — close or merge it' Status wording",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-closed-issue-view.ac2",
+            "title": "docs/ISSUE-VIEW.md states that a closed issue shows no Create PR link or pickup controls and offers Reopen as its only primary header action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-closed-issue-view.ac3",
+            "title": "changelog.d/pan-5310.md contains one #### Fixed section with one bullet linking issue #5310, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "server-backfill-derived-refresh",
+        "to": "merged-pr-read-for-backfilled",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-github-tracker-first",
+        "to": "merged-pr-read-for-backfilled",
+        "type": "blocks"
+      },
+      {
+        "from": "fe-ship-merged-only",
+        "to": "fe-issue-view-closed-now-release",
+        "type": "blocks"
+      },
+      {
+        "from": "fe-status-narrative-closed",
+        "to": "fe-details-closed-no-create-pr",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-14-PAN-5310-issue-view-says-writing-code-or-planning-and-no-pull-request-yet-for-every-issue-closed-more-than-14-days-ago.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

@@ -282,6 +282,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/conversations/:name/diffs',                       kind: 'http', disposition: 'RELOCATE',    door: 'Diffs' },
   { surface: 'GET /api/conversations/:name/diffs/full',                  kind: 'http', disposition: 'RELOCATE',    door: 'Diffs' },
   { surface: 'GET /api/conversations/:name/diffs/:turnId',               kind: 'http', disposition: 'RELOCATE',    door: 'Diffs' },
+  { surface: 'GET /api/conversations/:name/changes',                     kind: 'http', disposition: 'RELOCATE',    door: 'Diffs' },
+  { surface: 'GET /api/projects/:projectKey/changes',                    kind: 'http', disposition: 'READ',        door: 'getProjectChanges (PAN-5288)' },
   { surface: 'GET /api/conversations/:name/diffs/vs-main',               kind: 'http', disposition: 'RELOCATE',    door: 'Diffs' },
   { surface: 'POST /api/conversations/:name/retitle',                    kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.retitle' },
   { surface: 'POST /api/conversations/:id/pi-ask-answer',                kind: 'http', disposition: 'RELOCATE',    door: 'handleConversationPiAskAnswer — answerPiAskModal keystroke drive (PAN-3766)' },
@@ -678,10 +680,11 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/merge-train/generations/:name/promote',     kind: 'http', disposition: 'WRITE',       door: 'UAT promote write door (postUatGenerationPromotePayload + firePostMergeLifecycle) — supersedes POST /api/flywheel/uat-generations/:name/promote' },
   { surface: 'POST /api/merge-train/generations/:name/ship',        kind: 'http', disposition: 'WRITE',       door: 'Batch-scoped version ship runner plus durable per-member ship record write door' },
   { surface: 'POST /api/merge-train/assemble',                      kind: 'http', disposition: 'WRITE',       door: 'Forced UAT reconcile for one project or all — supersedes POST /api/flywheel/assemble-uat' },
-  { surface: 'POST /api/merge-train/merge-next',                    kind: 'http', disposition: 'WRITE',       door: 'Escape-hatch batch merge from a named project ready set — supersedes POST /api/flywheel/merge-next' },
+  { surface: 'POST /api/merge-train/merge-next',                    kind: 'http', disposition: 'WRITE',       door: 'Merge one or N ready features from a named project\'s ready set (per-row Merge, PAN-4598) — supersedes POST /api/flywheel/merge-next' },
 
   // ── merge-train-lanes.ts (PAN-4753) ──
   { surface: 'POST /api/merge-train/strikes/:issueId/merge',        kind: 'http', disposition: 'WRITE',       door: 'Operator-started strike merge (buildStrikeMergeRequest + triggerMerge kind strike; head approval waived only here, PAN-4750)' },
+  { surface: 'GET /api/merge-train/board',                          kind: 'http', disposition: 'AGGREGATE',   door: 'Merge-train board: cars, strikes, batches with status reason, recent merges per project (getMergeTrainBoard, PAN-4753)' },
 
   // ── merge-train.ts (PAN-3917 W6: the /api/flywheel auto-merge/config surface moved here, no flywheel run) ──
   { surface: 'GET /api/merge-train/auto-merge',                     kind: 'http', disposition: 'READ',        door: 'getAutoMergePolicyPayload — derived issue state (approvals + green checks + forge mergeability, FR-9/D3), no flywheel run' },

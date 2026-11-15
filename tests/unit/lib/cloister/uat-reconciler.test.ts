@@ -298,7 +298,7 @@ describe('PAN-3083 passed and ready review intents', () => {
 
     expect(result.invalidated).toEqual([current.name]);
     expect(deps.rows.get(current.name)?.status).toBe('invalidated');
-    expect(log).toHaveBeenCalledWith(expect.stringContaining('PAN-1 left the ready queue'));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('PAN-1 is no longer ready to merge'));
   });
 });
 

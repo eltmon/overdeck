@@ -145,6 +145,8 @@ describe('promoteUatGeneration — success', () => {
     if (!result.success) return;
     expect(result.invalidated).toEqual(['uat/pan-newest-0610']);
     expect(deps.map.get('uat/pan-newest-0610')!.status).toBe('invalidated');
+    // PAN-4753 WI-3: the sibling says why.
+    expect(deps.map.get('uat/pan-newest-0610')!.statusReason).toBe('uat/pan-older-0610 was merged to main');
     expect(deps.map.get('uat/pan-older-0610')!.status).toBe('promoted');
     // already-invalidated rows untouched
     expect(deps.map.get('uat/pan-dead-0610')!.status).toBe('invalidated');

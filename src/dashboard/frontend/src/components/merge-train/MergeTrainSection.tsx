@@ -1,4 +1,4 @@
-import { MergeTrainView } from './MergeTrainView';
+import { MergeTrain } from './train/MergeTrain';
 import { useMergeTrainConfig, useMergeTrainConfigMutation } from './config';
 
 /**
@@ -49,7 +49,7 @@ export function MergeTrainSection() {
           {enabled ? 'On' : 'Off'}
         </button>
       </div>
-      <MergeTrainView active />
+      <MergeTrain placement="all-projects" active />
     </section>
   );
 }

@@ -86,7 +86,7 @@ import { readOpenOperatorDecision } from '../cloister/operator-decision.js';
 import { isDeftPipelineIssue } from '../deft/issue-pipeline.js';
 import { deriveWorkStart, readWorkStartFacts, type WorkStartFacts } from './work-start-state.js';
 import { pipelineBranchFor, readPrOutsidePipeline } from './pr-outside-pipeline.js';
-import { type GhPrRow, listRepoPullRequests, PR_CACHE_TTL_MS, readOpenRepoPullRequests } from './pr-listing.js';
+import { type GhPrRow, listRepoPullRequests, PR_CACHE_TTL_MS, readMergedPullRequestForBranch, readOpenRepoPullRequests } from './pr-listing.js';
 
 export {
   type GhPrRow,
@@ -409,6 +409,12 @@ async function readPrWithGh(_issueId: string, projectPath: string, branch: strin
   return choosePrForBranch(await listRepoPullRequests(projectPath), branch);
 }
 
+/** PAN-5310: the per-issue merged-PR read for a backfilled issue the repo listing missed. */
+async function readMergedPrForIssue(issueId: string, projectPath: string): Promise<LoadedPr | null> {
+  const row = await readMergedPullRequestForBranch(projectPath, featureBranchFor(issueId));
+  return row ? prFromGhRow(row) : null;
+}
+
 // ─── GitLab ──────────────────────────────────────────────────────────────────
 
 export interface GlabMrRow {
@@ -424,6 +430,10 @@ export interface GlabMrRow {
   approvals_required?: number;
   approved?: boolean;
   sha?: string;
+  /** PAN-4753: read by the merge-train board (titles, recent merges). */
+  title?: string;
+  merged_at?: string | null;
+  merge_commit_sha?: string | null;
 }
 
 const cachedRepoMergeRequests = createSettledTtlPromiseCache<string, readonly GlabMrRow[]>(PR_CACHE_TTL_MS);
@@ -682,8 +692,9 @@ export async function listPanesWithBackend(now: number): Promise<readonly Backen
 
 /**
  * The tracker row, from whichever configured tracker knows this issue —
- * GitHub, Linear, GitLab or Rally, in the order the config lists them. `null`
- * when none of them answered: unknown, never "open".
+ * GitHub, Linear, GitLab or Rally. A GitHub-resolved id is read from GitHub
+ * first, ahead of the configured tracker order; otherwise the config order
+ * applies. `null` when none of them answered: unknown, never "open".
  */
 export async function readIssueFromTracker(issueId: string): Promise<TrackerIssueFacts | null> {
   const { loadConfigSync } = await import('../config.js');
@@ -714,7 +725,10 @@ export async function readIssueFromTracker(issueId: string): Promise<TrackerIssu
   // configured repo would answer about a different issue entirely.
   const gh = resolveGitHubIssue(issueId);
 
-  const order = [trackers.primary, ...(trackers.secondary ? [trackers.secondary] : [])];
+  const configured = [trackers.primary, ...(trackers.secondary ? [trackers.secondary] : [])];
+  // PAN-5310: the id's prefix maps it to a GitHub repo, which outranks the
+  // global tracker order — a Linear-primary machine still reads LEX-609 from GitHub.
+  const order = gh.isGitHub ? ['github' as const, ...configured.filter((type) => type !== 'github')] : configured;
   for (const type of order) {
     try {
       if (type === 'github' && !gh.isGitHub) continue;
@@ -886,6 +900,10 @@ export async function loadIssueStatesForProject(
     readonly issues?: Readonly<Record<string, TrackerIssueFacts | null>>;
     /** The repo's PR listing; `listRepoPullRequests` when omitted. */
     readonly listPullRequests?: (projectPath: string) => Promise<readonly GhPrRow[]>;
+    /** PAN-5310: ids (upper-case) whose merged PR is read one at a time when the listing has none — backfilled issues. */
+    readonly perIssuePrIds?: ReadonlySet<string>;
+    /** The per-issue merged-PR read; `readMergedPrForIssue` when omitted. */
+    readonly readMergedPr?: (issueId: string, projectPath: string) => Promise<LoadedPr | null>;
   } = {},
 ): Promise<Map<string, DerivedIssueState>> {
   const now = (deps.now ?? Date.now)();
@@ -930,7 +948,11 @@ export async function loadIssueStatesForProject(
   for (const raw of issueIds) {
     const issueId = raw.toUpperCase();
     const pr = prByIssue.get(issueId)
-      ?? (gitlab ? await (deps.readPr ?? forgeReader(projectPath))(issueId, projectPath, featureBranchFor(issueId)) : null);
+      ?? (gitlab
+        ? await (deps.readPr ?? forgeReader(projectPath))(issueId, projectPath, featureBranchFor(issueId))
+        : deps.perIssuePrIds?.has(issueId)
+          ? await (deps.readMergedPr ?? readMergedPrForIssue)(issueId, projectPath)
+          : null);
     const branch = pr
       ? null
       : await (deps.readBranch ?? readBranchBatched)(projectPath, featureBranchFor(issueId));
