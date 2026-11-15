@@ -140,6 +140,32 @@ describe('CloisterStatusBar TTS health badge', () => {
     const modal = screen.getByRole('dialog', { name: 'Restart agents with current config' });
     expect(modal).toHaveAttribute('aria-modal', 'true');
     expect(modal).toHaveClass('fixed', 'inset-0');
+    // Above the health-dot popover (z-[200]) that hosts this bar.
+    expect(modal).toHaveClass('z-[300]');
+  });
+
+  it('moves focus into the restart-config modal, keeps Tab inside, and restores focus on Escape', async () => {
+    mockFetch({ ttsEnabled: false });
+    renderStatusBar();
+
+    const trigger = await screen.findByTitle('Restart agents with current config');
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const modal = screen.getByRole('dialog', { name: 'Restart agents with current config' });
+    const close = screen.getByRole('button', { name: 'Close' });
+    expect(close).toHaveFocus();
+
+    const cancel = screen.getByRole('button', { name: 'Cancel' });
+    cancel.focus();
+    fireEvent.keyDown(cancel, { key: 'Tab' });
+    expect(close).toHaveFocus();
+    fireEvent.keyDown(close, { key: 'Tab', shiftKey: true });
+    expect(cancel).toHaveFocus();
+
+    fireEvent.keyDown(modal, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Restart agents with current config' })).toBeNull();
+    expect(trigger).toHaveFocus();
   });
 });
 

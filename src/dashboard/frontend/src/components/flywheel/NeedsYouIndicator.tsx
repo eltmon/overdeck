@@ -17,6 +17,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNeedsYouItems, type NeedsYouItem } from '../../lib/selectors/needsYou';
 import { fetchRegisteredProjects } from '../CommandDeck/UnknownProjectState';
 import { MenuItemButton, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
+import { decisionResponseCard } from '../DecisionsPanel';
 
 const OTHER_GROUP = 'Other';
 
@@ -113,7 +114,27 @@ export function NeedsYouIndicator() {
             groups.map((group) => (
               <div key={group.name} role="group" aria-label={group.name} data-testid="needs-you-group">
                 <div className="px-3 pb-0.5 pt-1.5 text-[11px] text-muted-foreground">{group.name}</div>
-                {group.items.map((item) => (
+                {group.items.map((item) => {
+                  // A disk alert, backend restart, agent request and the like has no
+                  // subject to open: it is answered on its own card, as in the
+                  // decisions panel, so the card renders here instead of a row.
+                  const card = item.decision ? decisionResponseCard(item.decision) : null;
+                  if (card) {
+                    return (
+                      <div
+                        key={item.key}
+                        role="none"
+                        data-testid="needs-you-card"
+                        className="px-1 py-1"
+                        // The menu's arrow/Home/End handling would steal keys from the
+                        // card's own controls (the agent-request field); Escape still closes.
+                        onKeyDown={(event) => { if (event.key !== 'Escape') event.stopPropagation(); }}
+                      >
+                        {card}
+                      </div>
+                    );
+                  }
+                  return (
                   <MenuItemButton
                     key={item.key}
                     data-testid="needs-you-row"
@@ -128,7 +149,8 @@ export function NeedsYouIndicator() {
                       <span className="block truncate text-[11.5px] text-muted-foreground">{item.ask}</span>
                     </span>
                   </MenuItemButton>
-                ))}
+                  );
+                })}
               </div>
             ))
           )}

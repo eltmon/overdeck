@@ -29,7 +29,8 @@ export interface ModalProps {
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-function focusableElements(container: HTMLElement): HTMLElement[] {
+/** The focusable controls inside a container, in DOM order (shared with hand-rolled dialogs). */
+export function focusableElements(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
     (element) => !element.closest('[hidden]'),
   );

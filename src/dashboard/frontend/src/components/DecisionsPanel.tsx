@@ -11,6 +11,7 @@
  * status left-border plus exactly one colored badge (its kind); red is spent
  * only on genuinely stopped agents.
  */
+import type { ReactElement } from 'react';
 import { useAskUserQuestionUiStore } from '../lib/askUserQuestionUiStore';
 import { useDecisions, type Decision } from '../lib/useDecisions';
 import { describePendingInput } from '../lib/pendingInput';
@@ -138,6 +139,30 @@ function DecisionRow({ decision, onOpenSubject }: { decision: Decision; onOpenSu
   );
 }
 
+/**
+ * The response card a decision renders in place of a plain row, or null when it
+ * has none. The decisions panel and the top bar's Needs-you menu (PAN-5292) both
+ * use it: these decisions have no subject to navigate to, so the card is how the
+ * operator answers them.
+ */
+export function decisionResponseCard(d: Decision): ReactElement | null {
+  // PAN-5093 — the disk alert has its own card, checked first: it is never an agent waiting on an answer.
+  if (d.diskAlert) return <DiskAlertCard key="disk-alert" decision={d} />;
+  // PAN-5111 — a linked machine this machine cannot reach; nothing to answer here.
+  if (d.unreachableMachine) return <UnreachableMachineCard key={`unreachable:${d.id}`} decision={d} />;
+  // PAN-5108 — a failed harness update has its own card: nothing to answer or open.
+  if (d.harnessUpdate) return <HarnessUpdateCard key={`harness-update:${d.id}`} decision={d} />;
+  // PAN-5091: conversations a terminal-backend restart stopped, with Resume all.
+  if (d.backendRestart) return <BackendRestartCard key="backend-restart" decision={d} />;
+  // PAN-5070 — a connector-paired notice has its own card, checked before mcpSignIn.
+  if (d.connectorNotice) return <ConnectorNoticeCard key={`connector-notice:${d.id}`} decision={d} />;
+  // PAN-4946 — an MCP sign-in has its own card, checked before agentRequest.
+  if (d.mcpSignIn) return <McpSignInCard key={`mcp-sign-in:${d.id}`} decision={d} />;
+  // PAN-4941 (D-9) — a secret request has its own card and never the generic Answer button.
+  if (d.agentRequest) return <AgentRequestCard key={`request:${d.id}`} decision={d} />;
+  return null;
+}
+
 function Group({ title, hint, decisions, onOpenSubject }: { title: string; hint: string; decisions: Decision[]; onOpenSubject?: (d: Decision) => void }) {
   if (decisions.length === 0) return null;
   return (
@@ -147,31 +172,7 @@ function Group({ title, hint, decisions, onOpenSubject }: { title: string; hint:
         <span className={styles.groupCount}>{decisions.length}</span>
         <span className={styles.groupHint}>{hint}</span>
       </header>
-      {decisions.map((d) => (
-        // PAN-5093 — the disk alert has its own card, checked first: it is
-        // never an agent waiting on an answer.
-        d.diskAlert
-          ? <DiskAlertCard key="disk-alert" decision={d} />
-          // PAN-5111 — a linked machine this machine cannot reach; nothing to answer here.
-          : d.unreachableMachine
-          ? <UnreachableMachineCard key={`unreachable:${d.id}`} decision={d} />
-          // PAN-5108 — a failed harness update has its own card: nothing to answer or open.
-          : d.harnessUpdate
-          ? <HarnessUpdateCard key={`harness-update:${d.id}`} decision={d} />
-          // PAN-5091: conversations a terminal-backend restart stopped, with Resume all.
-          : d.backendRestart
-          ? <BackendRestartCard key="backend-restart" decision={d} />
-          // PAN-5070 — a connector-paired notice has its own card, checked before mcpSignIn.
-          : d.connectorNotice
-          ? <ConnectorNoticeCard key={`connector-notice:${d.id}`} decision={d} />
-          // PAN-4946 — an MCP sign-in has its own card, checked before agentRequest.
-          : d.mcpSignIn
-          ? <McpSignInCard key={`mcp-sign-in:${d.id}`} decision={d} />
-          // PAN-4941 (D-9) — a secret request has its own card and never the generic Answer button.
-          : d.agentRequest
-          ? <AgentRequestCard key={`request:${d.id}`} decision={d} />
-          : <DecisionRow key={`${d.source}:${d.id}`} decision={d} onOpenSubject={onOpenSubject} />
-      ))}
+      {decisions.map((d) => decisionResponseCard(d) ?? <DecisionRow key={`${d.source}:${d.id}`} decision={d} onOpenSubject={onOpenSubject} />)}
     </section>
   );
 }

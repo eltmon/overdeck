@@ -6,7 +6,8 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bell, BellOff, AlertTriangle, StopCircle, Settings, Zap, RefreshCw } from 'lucide-react';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { focusableElements } from './shared/Modal';
 import { createPortal } from 'react-dom';
 import { useDashboardStore, selectAgents } from '../lib/store';
 import { EMERGENCY_STOP_HOTKEY_LABEL, runEmergencyStop } from './EmergencyStopOverlay';
@@ -124,6 +125,44 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
   const [selectedForRestart, setSelectedForRestart] = useState<Set<string>>(new Set());
   const popoverRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const restartConfigPanelRef = useRef<HTMLDivElement>(null);
+
+  // The restart-config modal is aria-modal, so it owns focus while open: focus
+  // moves inside, Tab stays inside, and focus returns to the trigger on close.
+  useEffect(() => {
+    if (!showRestartConfigModal) return;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const panel = restartConfigPanelRef.current;
+    ((panel && focusableElements(panel)[0]) ?? panel)?.focus();
+    return () => {
+      if (previouslyFocused && document.contains(previouslyFocused)) previouslyFocused.focus();
+    };
+  }, [showRestartConfigModal]);
+
+  const onRestartConfigKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      // Close only this modal, not the health popover hosting the bar.
+      event.stopPropagation();
+      setShowRestartConfigModal(false);
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const panel = restartConfigPanelRef.current;
+    if (!panel) return;
+    const items = focusableElements(panel);
+    if (items.length === 0) return;
+    const first = items[0]!;
+    const last = items[items.length - 1]!;
+    const active = document.activeElement;
+    if (!event.shiftKey && (active === last || !panel.contains(active))) {
+      event.preventDefault();
+      first.focus();
+    } else if (event.shiftKey && (active === first || !panel.contains(active))) {
+      event.preventDefault();
+      last.focus();
+    }
+  };
   const [popoverPos, setPopoverPos] = useState<{ left: number; top: number } | null>(null);
   const queryClient = useQueryClient();
 
@@ -444,14 +483,16 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
 
         {/* Restart with Current Config Modal */}
         {showRestartConfigModal && createPortal(
-          <div role="dialog" aria-modal="true" aria-label="Restart agents with current config" className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-            <div className="bg-card border border-border rounded-lg shadow-lg max-w-2xl max-h-96 overflow-auto w-96">
+          // z-[300]: above the health-dot popover (z-[200]) that hosts this bar.
+          <div role="dialog" aria-modal="true" aria-label="Restart agents with current config" onKeyDown={onRestartConfigKeyDown} className="fixed inset-0 bg-black/50 z-[300] flex items-center justify-center">
+            <div ref={restartConfigPanelRef} tabIndex={-1} className="bg-card border border-border rounded-lg shadow-lg max-w-2xl max-h-96 overflow-auto w-96">
               <div className="px-4 py-3 border-b border-border flex justify-between items-center">
                 <h3 className="text-sm font-semibold text-foreground">
                   Restart Agents with Current Config
                 </h3>
                 <button
                   onClick={() => setShowRestartConfigModal(false)}
+                  aria-label="Close"
                   className="text-muted-foreground hover:text-foreground text-lg leading-none"
                 >
                   ×

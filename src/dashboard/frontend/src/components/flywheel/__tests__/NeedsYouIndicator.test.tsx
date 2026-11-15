@@ -20,7 +20,14 @@ vi.mock('../../../lib/selectors/needsYou', async (importOriginal) => {
   };
 });
 
+// The response cards themselves are covered by DecisionsPanel's tests; here a marker stands in.
+vi.mock('../../DecisionsPanel', () => ({
+  decisionResponseCard: (d: { id: string; agentRequest?: unknown }) =>
+    d.agentRequest ? <div data-testid="mock-response-card"><button type="button">Provide secret {d.id}</button></div> : null,
+}));
+
 import { NeedsYouIndicator } from '../NeedsYouIndicator';
+import type { Decision } from '../../../lib/useDecisions';
 
 const PROJECTS = [
   { key: 'panopticon-cli', name: 'overdeck', path: '/p/overdeck' },
@@ -95,6 +102,26 @@ describe('NeedsYouIndicator (PAN-5292 WI-E2)', () => {
       'DFAI',
       'Other',
     ]);
+  });
+
+  it('renders a decision that has a response card as that card, not a row that opens nothing', () => {
+    const request = item('decision:req-1', {
+      kind: 'decision',
+      title: 'Secret request',
+      decision: { id: 'req-1', source: 'agent', agentRequest: { id: 'req-1', kind: 'secret' } } as unknown as Decision,
+    });
+    const plain = item('issue:PAN-1', { title: 'PAN-1 — Plain' });
+    renderIndicator([request, plain]);
+    fireEvent.click(screen.getByTestId('flywheel-needs-you-indicator'));
+
+    const menu = screen.getByTestId('needs-you-menu');
+    expect(within(menu).getByTestId('mock-response-card')).toHaveTextContent('Provide secret req-1');
+    expect(within(menu).getAllByTestId('needs-you-row')).toHaveLength(1);
+    expect(within(menu).getByTestId('needs-you-row')).toHaveTextContent('PAN-1 — Plain');
+
+    fireEvent.click(within(menu).getByRole('button', { name: 'Provide secret req-1' }));
+    expect(request.open).not.toHaveBeenCalled();
+    expect(screen.getByTestId('needs-you-menu')).toBeInTheDocument();
   });
 
   it('says nothing needs you at zero and opens Activity from the footer', () => {

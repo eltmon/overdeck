@@ -89,7 +89,11 @@ export function AgentsMenu() {
     const conversationByName = new Map(
       (Array.isArray(conversations) ? conversations : []).map((c: Conversation) => [c.name, c]),
     );
-    const issueTitle = new Map(issues.map((issue) => [issue.identifier.toUpperCase(), issue.title]));
+    // Store issue rows arrive untyped from the snapshot; skip any without a string identifier.
+    const issueTitle = new Map<string, string>();
+    for (const issue of issues) {
+      if (typeof issue?.identifier === 'string') issueTitle.set(issue.identifier.toUpperCase(), issue.title);
+    }
 
     return working.rows
       .map((row): MenuRow => {
