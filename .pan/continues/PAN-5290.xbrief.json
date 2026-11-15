@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5290",
   "created": "2026-11-15T11:24:24.576Z",
-  "updated": "2026-11-15T13:25:18.944Z",
+  "updated": "2026-11-15T13:27:48.240Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -192,9 +192,22 @@
       "doneAt": "2026-11-15T13:25:11.701Z"
     },
     "files-tab-banner-out": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5290",
-      "claimedAt": "2026-11-15T13:25:18.943Z"
+      "claimedAt": "2026-11-15T13:25:18.943Z",
+      "doneAt": "2026-11-15T13:27:48.239Z"
+    },
+    "files-tab-banner-out.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:27:48.239Z"
+    },
+    "files-tab-banner-out.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:27:48.239Z"
+    },
+    "files-tab-banner-out.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:27:48.239Z"
     }
   },
   "agentModel": "claude-opus-5-5"
