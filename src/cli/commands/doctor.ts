@@ -28,6 +28,7 @@ import { checkDeployedHooksDrift } from './doctor-hooks-drift.js';
 import { checkSyncSourceCheckout } from './doctor-sync-source-freshness.js';
 import { checkCliGenerationLink } from './doctor-cli-generation.js';
 import { checkPanOnPath } from './doctor-pan-path.js';
+import { checkFileManagerIntegration } from './doctor-file-manager.js';
 import { checkInotify } from './doctor-inotify.js';
 import { checkAgentTmp } from './doctor-agent-tmp.js';
 import { checkTraefikPortBinding } from './doctor-traefik.js';
@@ -751,6 +752,8 @@ export async function collectDoctorChecks(options: DoctorOptions = {}): Promise<
   for (const c of await checkSemgrep({ config: loadYamlConfig().config })) checks.push(c); // PAN-4585: silent unless security.semgrep.enabled
   for (const c of await checkFlyToken()) checks.push(c); // PAN-4748: silent unless remote is enabled or a Fly machine exists
   for (const c of await checkAnywhereRelay()) checks.push(c); // PAN-5242: silent unless signed in with the relay plan
+  const fileManager = await checkFileManagerIntegration(); // PAN-5349: silent unless pan integrate file-manager ran
+  if (fileManager) checks.push(fileManager);
   try {
     for (const c of await checkHerdr()) checks.push(c); // PAN-3956: terminal backend + Herdr
   } catch (error) {
