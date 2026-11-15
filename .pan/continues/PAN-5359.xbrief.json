@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5359",
   "created": "2026-11-15T15:42:47.790Z",
-  "updated": "2026-11-15T17:11:54.648Z",
+  "updated": "2026-11-15T17:12:05.437Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,11 @@
     "claude-registration-test.ac1": {
       "status": "completed",
       "doneAt": "2026-11-15T17:11:54.648Z"
+    },
+    "docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5359",
+      "claimedAt": "2026-11-15T17:12:05.436Z"
     }
   }
 }
