@@ -423,6 +423,147 @@ describe('messageAgent', () => {
     expect(pending).toEqual([]);
   });
 
+  it('falls back to tmux delivery for a codex agent when the app-server reports closed', async () => {
+    // 'closed' is not a live state — the app-server branch must not claim it;
+    // the legacy liveness path delivers instead.
+    mocks.getAgentState.mockReturnValue({
+      id: 'agent-pan-2701',
+      issueId: 'PAN-2701',
+      status: 'running',
+      workspace: '/repo',
+      harness: 'codex',
+    });
+    mocks.getCodexAppServerStatus.mockResolvedValue({ state: 'closed' });
+
+    const outcome = await messageAgent('agent-pan-2701', 'review feedback', 'pan-tell');
+
+    expect(outcome.delivered).toBe(true);
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
+      'agent-pan-2701',
+      'review feedback',
+      'messageAgent:pan-tell',
+      undefined,
+    );
+  });
+
+  it('falls back to tmux delivery for a codex agent when the app-server reports error', async () => {
+    mocks.getAgentState.mockReturnValue({
+      id: 'agent-pan-2701',
+      issueId: 'PAN-2701',
+      status: 'running',
+      workspace: '/repo',
+      harness: 'codex',
+    });
+    mocks.getCodexAppServerStatus.mockResolvedValue({ state: 'error' });
+
+    const outcome = await messageAgent('agent-pan-2701', 'review feedback', 'pan-tell');
+
+    expect(outcome.delivered).toBe(true);
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
+      'agent-pan-2701',
+      'review feedback',
+      'messageAgent:pan-tell',
+      undefined,
+    );
+  });
+
+  it('falls back to tmux delivery for a codex agent when the app-server probe throws', async () => {
+    // The default beforeEach rejection (no socket/token on disk) is the exact
+    // shape a target with no app-server at all presents — the catch in
+    // messageAgent must route it through the legacy liveness path, same as
+    // an explicit closed/error state.
+    mocks.getAgentState.mockReturnValue({
+      id: 'agent-pan-2701',
+      issueId: 'PAN-2701',
+      status: 'running',
+      workspace: '/repo',
+      harness: 'codex',
+    });
+
+    const outcome = await messageAgent('agent-pan-2701', 'review feedback', 'pan-tell');
+
+    expect(outcome.delivered).toBe(true);
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
+      'agent-pan-2701',
+      'review feedback',
+      'messageAgent:pan-tell',
+      undefined,
+    );
+  });
+
+  it('resumes a zombie codex agent when the app-server is closed and the tmux runtime is gone', async () => {
+    mocks.getAgentState.mockReturnValue({
+      id: 'agent-pan-2701',
+      issueId: 'PAN-2701',
+      status: 'running',
+      workspace: '/repo',
+      harness: 'codex',
+    });
+    mocks.getCodexAppServerStatus.mockResolvedValue({ state: 'closed' });
+    mocks.findAgentRuntimePidInSubtree.mockResolvedValue(null);
+    mocks.resumeAgent.mockResolvedValue({ success: true, messageDelivered: true });
+
+    const outcome = await messageAgent('agent-pan-2701', 'review feedback', 'pan-tell');
+
+    expect(mocks.resumeAgent).toHaveBeenCalledWith('agent-pan-2701', 'review feedback');
+    expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
+    expect(outcome).toEqual({ delivered: true, queuedToMail: false });
+  });
+
+  it('passes the dedup key through the app-server delivery path', async () => {
+    mocks.getAgentState.mockReturnValue({
+      id: 'agent-pan-2701',
+      issueId: 'PAN-2701',
+      status: 'running',
+      workspace: '/repo',
+      harness: 'codex',
+    });
+    mocks.getCodexAppServerStatus.mockResolvedValue({ state: 'running' });
+
+    const outcome = await messageAgent('agent-pan-2701', 'review feedback', 'pan-tell', { dedupKey: 'key-1' });
+
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
+      'agent-pan-2701',
+      'review feedback',
+      'messageAgent:pan-tell',
+      undefined,
+      { dedupKey: 'key-1' },
+    );
+    expect(outcome).toEqual({ delivered: true, queuedToMail: true });
+  });
+
+  it('surfaces the delivery failure reason when the app-server rejects the message', async () => {
+    mocks.getAgentState.mockReturnValue({
+      id: 'agent-pan-2701',
+      issueId: 'PAN-2701',
+      status: 'running',
+      workspace: '/repo',
+      harness: 'codex',
+    });
+    mocks.getCodexAppServerStatus.mockResolvedValue({ state: 'running' });
+    mocks.deliverAgentMessage.mockResolvedValue({ ok: false, failure: 'transport refused' });
+
+    const outcome = await messageAgent('agent-pan-2701', 'review feedback', 'pan-tell');
+
+    expect(outcome).toEqual({ delivered: false, queuedToMail: true, reason: 'transport refused' });
+  });
+
+  it('falls back to tmux delivery for a codex conversation when the app-server is closed', async () => {
+    mocks.getAgentState.mockReturnValue(undefined);
+    mocks.getConversationByName.mockReturnValue({ name: 'conv-20260716-1234', harness: 'codex' });
+    mocks.getCodexAppServerStatus.mockResolvedValue({ state: 'closed' });
+
+    const outcome = await messageAgent('conv-20260716-1234', 'operator message', 'pan-tell');
+
+    expect(outcome).toEqual({ delivered: true, queuedToMail: true, confirmed: false });
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
+      'conv-20260716-1234',
+      'operator message',
+      'messageAgent:pan-tell',
+      undefined,
+    );
+  });
+
   it('detects a codex conversation through app-server without agent state', async () => {
     mocks.getAgentState.mockReturnValue(undefined);
     mocks.getCodexAppServerStatus.mockResolvedValue({ state: 'ready' });
