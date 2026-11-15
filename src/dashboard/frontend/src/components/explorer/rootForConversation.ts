@@ -112,22 +112,30 @@ export function issueTitleMap(issues: readonly unknown[]): Map<string, string> {
   return titles
 }
 
-/** The label for `rootId` from the shared project, workspace and issue queries; null for a null root. */
-export function useRootLabel(rootId: string | null): string | null {
+/** The registered projects and workspace registry from the shared queries (empty until they load). */
+export function useRootContext(): RootContext {
   const { data: projects } = useQuery({ queryKey: ['registered-projects'], queryFn: fetchRegisteredProjects })
   const { data: workspaces } = useQuery({
     queryKey: ['workspace-registry'],
     queryFn: fetchWorkspaceRegistry,
     refetchInterval: 10000,
   })
+  return useMemo(
+    () => ({
+      projects: Array.isArray(projects) ? projects : [],
+      workspaces: Array.isArray(workspaces) ? workspaces : [],
+    }),
+    [projects, workspaces],
+  )
+}
+
+/** The label for `rootId` from the shared project, workspace and issue queries; null for a null root. */
+export function useRootLabel(rootId: string | null): string | null {
+  const rootContext = useRootContext()
   const issues = useDashboardStore(selectIssues)
   const issueTitles = useMemo(() => issueTitleMap(issues), [issues])
   return useMemo(() => {
     if (rootId === null) return null
-    return rootLabelFor(rootId, {
-      projects: Array.isArray(projects) ? projects : [],
-      workspaces: Array.isArray(workspaces) ? workspaces : [],
-      issueTitles,
-    })
-  }, [rootId, projects, workspaces, issueTitles])
+    return rootLabelFor(rootId, { ...rootContext, issueTitles })
+  }, [rootId, rootContext, issueTitles])
 }
