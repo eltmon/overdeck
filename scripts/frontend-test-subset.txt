@@ -68,6 +68,7 @@ src/components/frame/deck/__tests__/deckNavigation.test.tsx
 src/components/frame/deck/__tests__/useCreateConversation.test.tsx
 src/components/frame/deck/__tests__/useDeckProjects.test.tsx
 src/components/frame/deck/__tests__/useIssueSessionActions.test.tsx
+src/components/frame/deck/__tests__/useOpenConversation.test.tsx
 src/components/frame/deck/__tests__/useProjectScope.test.ts
 src/components/palette/__tests__/fileProvider.test.tsx
 src/components/StaleBuildChip.test.tsx
@@ -201,6 +202,7 @@ src/components/__tests__/palette-anywhere-actions.test.ts
 src/components/__tests__/palette-fleet-hits.test.tsx
 src/components/backlog/__tests__/PickupGateControls.test.tsx
 src/components/chat/SubagentRail.test.tsx
+src/components/chat/__tests__/ChatMarkdown.conversation-links.test.tsx
 src/components/chat/__tests__/ChatMarkdown.issue-links.test.tsx
 src/components/chat/__tests__/ChatMarkdown.pull-request-links.test.tsx
 src/components/chat/__tests__/ChatMarkdown.relative-links.test.tsx
@@ -217,6 +219,7 @@ src/components/chat/__tests__/ConversationAboutDrawer.test.tsx
 src/components/chat/__tests__/ConversationMachineBanner.test.tsx
 src/components/chat/__tests__/ConversationPanel.native.test.tsx
 src/components/chat/__tests__/ConversationPanel.test.tsx
+src/components/chat/__tests__/ConversationReferenceLink.test.tsx
 src/components/chat/__tests__/ConversationScheduleDialog.test.tsx
 src/components/chat/__tests__/EffortPicker.test.tsx
 src/components/chat/__tests__/HandoffNotice.test.tsx
@@ -236,11 +239,13 @@ src/components/chat/__tests__/conversationHistory.test.ts
 src/components/chat/__tests__/conversationMachineState.test.ts
 src/components/chat/__tests__/heldKickoff.test.tsx
 src/components/chat/__tests__/queuedPromptSend.test.ts
+src/components/chat/__tests__/remarkConversationReferences.test.ts
 src/components/chat/__tests__/resetClippedScroll.test.ts
 src/components/chat/__tests__/scheduledMessages.test.ts
 src/components/chat/__tests__/skillSlashCommands.test.ts
 src/components/chat/__tests__/slashCommands.skills.test.ts
 src/components/chat/__tests__/useComposerRestoreTarget.test.tsx
+src/components/chat/__tests__/useConversationReferences.test.tsx
 src/components/chat/__tests__/useFloatingPickerPosition.test.tsx
 src/components/chat/__tests__/useOlderHistory.test.ts
 src/components/chat/bookmarks/__tests__/BookmarksDrawer.test.tsx
@@ -476,6 +481,7 @@ src/lib/__tests__/composerDraft.test.ts
 src/lib/__tests__/composerSendQueue.test.ts
 src/lib/__tests__/composerSendNow.test.ts
 src/lib/__tests__/connectionState.test.ts
+src/lib/__tests__/conversationReferences.test.ts
 src/lib/__tests__/explorer-drag-paths.test.ts
 src/lib/__tests__/flywheelNeedsYou.test.ts
 src/lib/__tests__/flywheelNeedsYouLinks.test.ts

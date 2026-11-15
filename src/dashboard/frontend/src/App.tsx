@@ -70,6 +70,7 @@ import { AppChrome } from './App/AppChrome';
 import { DeckNavigationProvider, deckNavigationActions, type DeckNavigation, type DeckTarget } from './components/frame/deck/deckNavigation';
 import { UiCommandsHost } from './components/open/UiCommandsHost';
 import { OpenPathHost } from './components/open/OpenPathHost';
+import { ConversationLinkOpenerProvider } from './components/chat/ConversationLinkOpener';
 import { useUiMode } from './lib/simple/uiMode';
 import { AppLiveStoreHost, countRunningAgents } from './App/AppLiveStoreHost';
 
@@ -806,6 +807,7 @@ export default function App() {
           data-drawer-open={drawerOpen ? 'true' : undefined}
           className="relative flex-1 flex overflow-hidden data-[drawer-open=true]:before:pointer-events-none data-[drawer-open=true]:before:absolute data-[drawer-open=true]:before:inset-0 data-[drawer-open=true]:before:z-[80] data-[drawer-open=true]:before:bg-primary/[0.04] data-[drawer-open=true]:before:backdrop-blur-[2px]"
         >
+          <ConversationLinkOpenerProvider>
           <AppRoutes
             activeTab={activeTab}
             selectedConvId={selectedConvId}
@@ -835,6 +837,7 @@ export default function App() {
             keyboardShortcutsDisabled={isSearchOpen || isPaletteOpen}
             onOpenConversationMessage={handleOpenConversationMessage}
           />
+          </ConversationLinkOpenerProvider>
         </main>
         <UiCommandsHost />
         <OpenPathHost />

@@ -87,9 +87,11 @@
   `node:child_process` boundary. Install it in `vi.hoisted`, before the subject is imported, never
   `vi.mock` `child_process` in the same file, and `restore()` in `afterAll` (`docs/TESTING.md`,
   PAN-5176).
-- Bare-host CI: `scripts/bare-host-smoke.sh` runs in the `bare-host-linux`, `bare-host-macos` and
-  `bare-host-macos-known-bad` jobs (`ci.yml`) and gates the release (`release.yml`
-  `bare-host-macos`); macOS asserts the traced spawn cost, Linux the PID net (PAN-5176).
+- Bare-host CI: `scripts/bare-host-smoke.sh` runs in the `bare-host-linux`, `bare-host-macos`,
+  `bare-host-macos-known-bad` and `bare-host-linux-spawner-canary` jobs (`ci.yml`) and gates the
+  release (`release.yml` `bare-host-macos`); macOS asserts the single-window traced spawn cost,
+  Linux the min-of-5 PID net `min(idle) - min(baseline)` (2 of the 5 windows are structurally
+  elevated by the dashboard's own post-boot probes and a permanent periodic check, PAN-5176, PAN-5361).
 - Root `setupFiles` (`vitest.config.ts`) run in order: `tests/setup/overdeck-home.ts`,
   `tests/setup/no-real-home-writes.ts`, `tests/setup/no-worker-signals.ts`, `tests/setup.ts`; the
   latter two guards throw `[test-guard]` errors (PAN-4925).
