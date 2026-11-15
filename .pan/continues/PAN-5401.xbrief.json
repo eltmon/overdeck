@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5401",
   "created": "2026-11-15T23:18:04.233Z",
-  "updated": "2026-11-15T23:26:14.920Z",
+  "updated": "2026-11-15T23:29:28.457Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,9 +36,26 @@
       "doneAt": "2026-11-15T23:26:06.779Z"
     },
     "dod-review-comment-rejection": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5401",
-      "claimedAt": "2026-11-15T23:26:14.920Z"
+      "claimedAt": "2026-11-15T23:26:14.920Z",
+      "doneAt": "2026-11-15T23:29:28.457Z"
+    },
+    "dod-review-comment-rejection.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:29:28.457Z"
+    },
+    "dod-review-comment-rejection.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:29:28.457Z"
+    },
+    "dod-review-comment-rejection.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:29:28.457Z"
+    },
+    "dod-review-comment-rejection.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:29:28.457Z"
     }
   }
 }
