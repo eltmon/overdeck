@@ -1,6 +1,5 @@
 import { Circle } from 'lucide-react';
 import type { Conversation } from '../../CommandDeck/ConversationList';
-import { PanOpenInPicker } from '../../PanOpenInPicker';
 import { ConversationMachineChip } from '../ConversationMachineBanner';
 import { ConversationBranchMeta } from '../ConversationBranchMeta';
 import type { HeaderChanges } from './headerChanges';
@@ -16,7 +15,7 @@ export interface ConversationStatusLineProps {
 }
 
 /** Row 2 of the conversation header — read-only metadata. */
-export function ConversationStatusLine({ conversation, status, native }: ConversationStatusLineProps) {
+export function ConversationStatusLine({ conversation, status }: ConversationStatusLineProps) {
   return (
     <div className={styles.conversationMetaRow}>
       <span className={styles.conversationTerminalStatus}>
@@ -25,7 +24,6 @@ export function ConversationStatusLine({ conversation, status, native }: Convers
       </span>
       <ConversationBranchMeta conversation={conversation} />
       <ConversationMachineChip conversation={conversation} />
-      {!native && <><span className={styles.conversationMetaSep} aria-hidden>·</span><PanOpenInPicker openInCwd={conversation.cwd} remote={conversation.origin === 'linked' ? { conversation: conversation.name } : undefined} /></>}
       {conversation.totalCost !== undefined && conversation.totalCost > 0 && (
         <>
           <span className={styles.conversationMetaSep} aria-hidden>·</span>

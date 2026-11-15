@@ -113,6 +113,13 @@ vi.mock('../../CommandDeck/styles/command-deck.module.css', () => ({
   },
 }));
 
+// PAN-5291: the header keeps the favorite-editor shortcut once the picker leaves the status line.
+const keybindingsMock = vi.hoisted(() => ({ useEditorOpenFavoriteShortcut: vi.fn() }));
+vi.mock('../../../lib/keybindings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../lib/keybindings')>()),
+  useEditorOpenFavoriteShortcut: keybindingsMock.useEditorOpenFavoriteShortcut,
+}));
+
 // Import the mock so we can assert on it
 import { updateConversationTitle } from '../../CommandDeck/ConversationList';
 import { toast } from 'sonner';
@@ -353,6 +360,12 @@ describe('ConversationPanel rename flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
     expect(screen.getByRole('menuitemcheckbox', { name: /Show tool calls/ })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('menuitemcheckbox', { name: /Show tool calls/ })).toHaveTextContent(/off$/);
+  });
+
+  it('registers the favorite-editor shortcut for the conversation cwd with the menu closed (PAN-5291)', () => {
+    renderPanel();
+    expect(screen.queryByRole('menu', { name: 'Conversation actions' })).toBeNull();
+    expect(keybindingsMock.useEditorOpenFavoriteShortcut).toHaveBeenLastCalledWith(mockConversation.cwd);
   });
 
   it('keeps About, Tools and Bookmarks out of row 1 (PAN-5291)', () => {

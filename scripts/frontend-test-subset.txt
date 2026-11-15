@@ -212,6 +212,7 @@ src/components/chat/continueOnDevice/__tests__/ContinueOnDeviceDialog.test.tsx
 src/components/chat/continueOnDevice/__tests__/HandOffTab.test.tsx
 src/components/chat/continueOnDevice/__tests__/OpenOnScreenTab.test.tsx
 src/components/chat/continueOnDevice/__tests__/continueOnDeviceStore.test.ts
+src/components/chat/header/__tests__/OpenFolderMenuItems.test.tsx
 src/components/chat/header/__tests__/headerChanges.test.tsx
 src/components/chat/messagesTimeline/__tests__/UserMessageAttachments.test.tsx
 src/components/chat/messagesTimeline/__tests__/attachmentRefs.test.ts

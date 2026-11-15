@@ -7,6 +7,7 @@ import { updateConversationTitle } from '../../CommandDeck/ConversationList';
 import type { useConversationMutations } from '../../CommandDeck/useConversationMutations';
 import { ViewToggle } from '../../shared/ViewToggle';
 import { isNativeShell } from '../../../lib/nativeShell';
+import { useEditorOpenFavoriteShortcut } from '../../../lib/keybindings';
 import { conversationMachineState, isLiveMachineState, RemoteHeaderActions } from '../ConversationMachineBanner';
 import type { ViewMode } from '../useNeedsTerminalAutoSwitch';
 import { ConversationHeaderMenu } from './ConversationHeaderMenu';
@@ -62,6 +63,8 @@ export function ConversationHeader({
 }: ConversationHeaderProps) {
   const queryClient = useQueryClient();
   const native = isNativeShell(); // The phone app (PAN-4837): hide what its phone token cannot do.
+  // ⌘⇧O / Ctrl+Shift+O opens the folder in the favorite editor with the ⋯ menu closed (D1-5).
+  useEditorOpenFavoriteShortcut(native || conversation.origin === 'linked' ? null : (conversation.cwd ?? null));
   const [menuOpen, setMenuOpen] = useState(false);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const [editingTitle, setEditingTitle] = useState(false);

@@ -9,6 +9,7 @@ import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../../s
 import { PullHereButton, runsHere } from '../ConversationMachineBanner';
 import { ShareConversationMenuItem } from '../sharing/ShareDialog';
 import { BookmarksMenuItem } from '../bookmarks/BookmarksDrawer';
+import { OpenFolderMenuItems } from './OpenFolderMenuItems';
 import { continueTargetOf, openContinueOnDevice } from '../continueOnDevice/continueOnDeviceStore';
 import { fetchFullTranscript, type MessagesResponse } from '../messagesQuery';
 import type { ViewMode } from '../useNeedsTerminalAutoSwitch';
@@ -199,6 +200,7 @@ export function ConversationHeaderMenu({
 
         {/* Group 2 — copy and open (visible in the phone app too). */}
         <MenuSeparator />
+        {!native && <OpenFolderMenuItems conversation={conversation} onDone={onClose} />}
         <MenuItemButton onClick={() => { copyText(conversation.name, 'Copied conversation id'); onClose(); }}>
           <Hash size={14} />
           <span>Copy conversation id</span>
