@@ -4,17 +4,17 @@
     "created": "2026-11-15T11:40:49Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5294: Workflow redesign G: rebuilt project Home (actions first, true facts, needs you, pipeline rows, attributed recent changes)",
-    "updated": "2026-11-15T11:48:17.953Z"
+    "updated": "2026-11-15T11:49:29.360Z"
   },
   "plan": {
     "id": "pan-5294",
     "title": "Workflow redesign G: rebuilt project Home (actions first, true facts, needs you, pipeline rows, attributed recent changes)",
-    "status": "proposed",
+    "status": "running",
     "uid": "b9ce88d5-77b7-40fd-8d37-e9ed8952b503",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T11:40:49Z",
-    "updated": "2026-11-15T11:48:17.953Z",
+    "updated": "2026-11-15T11:49:29.360Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5294",
@@ -1005,5 +1005,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
