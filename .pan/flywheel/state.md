@@ -765,3 +765,4 @@ B (PAN-5289) live check produced PAN-5329 (B follow-up). PAN-5290 C prereqs now 
 - 2026-11-15 08:2x UTC: PAN-5329 live check PASSED; GO for PAN-5290 C, queued for the next free book slot (F and D1 hold both).
 - 2026-11-15 10:3x UTC: D1 (PAN-5291) live check PASSED; PAN-5334 (D1 follow-up) started in the free slot; PAN-5290 C takes the next free slot (when F or 5334 merges).
 - 2026-11-15 11:0x UTC: F (PAN-5293) live check PASSED; PAN-5290 C started in the free slot; PAN-5335 (F follow-up) runs in the slot PAN-5334 frees. Ping owner when PAN-5334 or C is live.
+- 2026-11-15 11:3x UTC: PAN-5334 live check PASSED. PAN-5294 G started in the free slot (owner GO; files do not overlap PAN-5335). PAN-5335 held until owner says its PRD (with operator left-column tweaks) is final; it then takes the next free slot.
