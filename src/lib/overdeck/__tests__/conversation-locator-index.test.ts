@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import { rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,6 +9,7 @@ const TEST_HOME = join(tmpdir(), `locator-index-${Date.now()}-${Math.random().to
 process.env.OVERDECK_HOME = TEST_HOME;
 
 const { getOverdeckDatabase, closeOverdeckDatabase } = await import('../infra.js');
+const { createConversation, getConversationByClaudeSessionId } = await import('../conversations.js');
 
 afterAll(() => {
   closeOverdeckDatabase();
@@ -34,5 +35,47 @@ describe('conv_files_locator_idx', () => {
 
     closeOverdeckDatabase();
     expect(hasLocatorIndex()).toBe(true);
+  });
+});
+
+describe('getConversationByClaudeSessionId', () => {
+  it('returns the first-created (lowest rowid) conversation when two share a locator', () => {
+    createConversation({
+      name: 'locator-rewrite-a',
+      tmuxSession: 'conv-locator-rewrite-a',
+      cwd: TEST_HOME,
+      claudeSessionId: 'shared',
+    });
+    const convB = createConversation({
+      name: 'locator-rewrite-b',
+      tmuxSession: 'conv-locator-rewrite-b',
+      cwd: TEST_HOME,
+    });
+    const bId = getOverdeckDatabase()
+      .prepare('SELECT id FROM conversations WHERE rowid = ?')
+      .get(convB.id) as { id: string };
+    getOverdeckDatabase()
+      .prepare('INSERT INTO conversation_files (conversation_id, harness, locator, created_at) VALUES (?, ?, ?, ?)')
+      .run(bId.id, 'claude-code', 'shared', Date.now());
+
+    const result = getConversationByClaudeSessionId('shared');
+    expect(result?.name).toBe('locator-rewrite-a');
+  });
+
+  it('drives the lookup from the locator index, not a conversation_files table scan', () => {
+    const db = getOverdeckDatabase();
+    const prepareSpy = vi.spyOn(db, 'prepare');
+    getConversationByClaudeSessionId('shared');
+    const call = prepareSpy.mock.calls.find(([sql]) => typeof sql === 'string' && sql.includes('cf.locator = ?'));
+    prepareSpy.mockRestore();
+    expect(call).toBeDefined();
+
+    const plan = db.prepare(`EXPLAIN QUERY PLAN ${call![0] as string}`).all('shared') as Array<{ detail: string }>;
+    expect(plan.some((row) => row.detail.includes('conv_files_locator_idx'))).toBe(true);
+    expect(plan.some((row) => row.detail === 'SCAN c')).toBe(false);
+  });
+
+  it('returns null for a locator no conversation owns', () => {
+    expect(getConversationByClaudeSessionId('no-such-locator')).toBeNull();
   });
 });

@@ -617,10 +617,10 @@ export function getConversationById(id: number): LegacyConversation | null {
 export function getConversationByClaudeSessionId(claudeSessionId: string): LegacyConversation | null {
   const row = overdeckDb()
     .prepare(`${LEGACY_CONVERSATION_SELECT}
-      WHERE EXISTS (
-        SELECT 1 FROM conversation_files cf
-        WHERE cf.conversation_id = c.id AND cf.locator = ?
-      )`)
+      WHERE c.id IN (
+        SELECT cf.conversation_id FROM conversation_files cf WHERE cf.locator = ?
+      )
+      ORDER BY c.rowid LIMIT 1`)
     .get(claudeSessionId) as LegacyConversationRow | undefined;
   return row ? rowToLegacyConversation(row) : null;
 }
