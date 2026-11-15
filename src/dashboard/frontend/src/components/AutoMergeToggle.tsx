@@ -8,8 +8,8 @@
  * label, then the project default, then the global `require_uat_before_merge`
  * (PAN-3917 D3). The effective key is read from GET /api/merge-train/auto-merge.
  *
- * PAN-4753 WI-10: with `writable`, the toggle is editable (read-only by
- * default until the WI-8 write route ships). Auto and Hold are buttons; clicking
+ * PAN-4753 WI-10: the toggle is editable by default (the WI-8 write route
+ * shipped in PAN-5321). Auto and Hold are buttons; clicking
  * one writes its label through `POST /api/merge-train/policy/:issueId`
  * (WI-8), and clicking the pressed button when it is the label value clears
  * the label (`default`, follow the project). The update is optimistic and
@@ -81,9 +81,10 @@ export interface AutoMergeToggleProps {
   /** The effective policy when the caller knows it; otherwise read from the shared policy map. */
   effectivePolicy?: MergePolicy;
   /**
-   * True makes the toggle editable. Defaults to false until the write route
-   * `POST /api/merge-train/policy/:issueId` (PAN-4753 WI-8) is deployed;
-   * the train rows pass the board's `policyWritable`.
+   * False renders the read-only indicator. Defaults to true: the write route
+   * `POST /api/merge-train/policy/:issueId` (PAN-4753 WI-8) answers 501 for a
+   * tracker without the labels, and the toggle then falls back to read-only.
+   * The train rows pass the board's `policyWritable` (GitHub only).
    */
   writable?: boolean;
 }
@@ -97,7 +98,7 @@ export function AutoMergeToggle({
   className = '',
   policy,
   effectivePolicy,
-  writable = false,
+  writable = true,
 }: AutoMergeToggleProps) {
   const queryClient = useQueryClient();
   const mapValue = useAutoMergePolicy(issueId);

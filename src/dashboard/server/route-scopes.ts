@@ -240,6 +240,9 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/explorer/edit-workspaces/:workspaceId/pr', scope: 'admin' },
   { method: 'POST', path: '/api/explorer/edit-workspaces/:workspaceId/merge', scope: 'admin' },
   { method: 'POST', path: '/api/explorer/edit-workspaces/:workspaceId/discard', scope: 'admin' },
+  // PAN-5321: POST /api/merge-train/policy/:issueId has no row on purpose. It writes the
+  // operator grant labels auto-merge / hold-for-uat, so it keeps the admin default, which no
+  // agent token holds. Never add a row that gives it an agent scope.
 ];
 
 /** `/ws/terminal` needs `operate`; every other WebSocket path keeps the `admin` default. */

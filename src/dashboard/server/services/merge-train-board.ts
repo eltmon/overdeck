@@ -107,8 +107,6 @@ const STEP_KEYS: readonly MergeStepKey[] = [
   'verifying', 'reporting-statuses', 'squash-merging', 'post-merge-cleanup',
 ];
 const LIVE_IN_BATCH = new Set(['assembling', 'ready']);
-/** Flip when `POST /api/merge-train/policy/:issueId` (PAN-4753 WI-8) ships. */
-const POLICY_WRITE_ROUTE_AVAILABLE = false;
 const LIVE_BATCH = new Set(['assembling', 'ready', 'superseded']);
 const CAR_ORDER: readonly CarState[] = ['merging', 'cooldown', 'ready', 'held', 'failed', 'blocked'];
 
@@ -260,9 +258,8 @@ async function boardProject(
     if (deps.projectKeyOfIssue(id) === key) candidates.add(id);
   }
 
-  // R9 plus WI-8: the labels are writable only on GitHub, and only once the
-  // write route exists. Until PAN-4753 WI-8 ships, the toggle stays read-only.
-  const policyWritable = POLICY_WRITE_ROUTE_AVAILABLE && deps.trackerType(config) === 'github';
+  // R9: `POST /api/merge-train/policy/:issueId` (WI-8) writes the labels only on GitHub.
+  const policyWritable = deps.trackerType(config) === 'github';
   const cars: TrainCar[] = [];
   const waitingSince: number[] = [];
   for (const issueId of candidates) {
@@ -440,6 +437,11 @@ export async function getMergeTrainBoard(
 
 const BOARD_CACHE_TTL_MS = 5_000;
 const boardCache = createSettledTtlPromiseCache<string, MergeTrainBoard>(BOARD_CACHE_TTL_MS);
+
+/** Drop every cached board, so a write (WI-8 policy) shows on the next read. */
+export function invalidateMergeTrainBoardCache(): void {
+  boardCache.invalidate(undefined, { includeInFlight: true });
+}
 
 async function readBoard(options: { projectKey?: string }, d: BoardDeps): Promise<MergeTrainBoard> {
   const master = d.masterEnabled();
