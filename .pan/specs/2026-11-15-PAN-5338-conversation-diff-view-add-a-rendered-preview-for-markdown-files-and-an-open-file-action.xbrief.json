@@ -1,0 +1,738 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T11:35:05.415Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5338: Conversation diff view: add a rendered Preview for Markdown files and an Open file action",
+    "updated": "2026-11-15T11:36:11.788Z"
+  },
+  "plan": {
+    "id": "pan-5338",
+    "title": "Conversation diff view: add a rendered Preview for Markdown files and an Open file action",
+    "status": "running",
+    "uid": "4c281a67-2162-4488-81fc-cd76b01ef964",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T11:35:05.415Z",
+    "updated": "2026-11-15T11:36:11.788Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5338",
+        "label": "PAN-5338",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5338.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "diff-panel",
+      "markdown"
+    ],
+    "narratives": {
+      "Problem": "The conversation diff panel shows a Markdown file only as raw source lines and has no control to open the file, so reading a document a conversation wrote means finding it again in the Files dock.",
+      "Proposal": "Add a DiffPanel-owned file bar above the patch with a Diff | Preview switch for Markdown files and an Open file action (openBeside). Preview renders the after side with the existing MarkdownTab: an added file from its patch text, other files through the explorer read (working tree for All turns and turns, HEAD for vs main, the working tree with the note \"Showing the current file\" for Compare). Relative links render as plain text until #5337. The pop-out window gets the switch through a root URL param. No server change.",
+      "NonGoals": "- No change to DockDiffView (the dock Changes diff view).\n- No resolution of relative Markdown links to files (that is #5337); only the interim plain-text guard.\n- No new HTTP route and no server change.\n- No exact after side for Compare or older agent-route turns; they show the current file with the note.\n- No Preview for non-Markdown viewer types (CSV, SVG).\n- No persistence of the Diff/Preview choice in the URL or preferences.\n- No Open file button in the pop-out window.\n- No second Markdown renderer.\n- No polyrepo path mapping beyond PRD D-8."
+    },
+    "autoDecisions": [
+      {
+        "summary": "After side for All turns and one turn = the working-tree file read through the explorer; vs main = HEAD; added files = patch text",
+        "rationale": "Verified in conversation-diffs.ts and checkpoint-manager.ts: the conversation routes diff base→working tree and vs-main diffs base...HEAD, so these reads are exact; the patch of a new file holds all its lines."
+      },
+      {
+        "summary": "Compare and older agent-route turns read the working tree and show \"Showing the current file\"",
+        "rationale": "The issue names this fallback; the explorer read supports only the working tree and HEAD, and Compare is not in the issue's scope list."
+      },
+      {
+        "summary": "Open file uses the existing openBeside seam (PAN-5287) with no Stage-tab fallback, and is hidden where no Stage deck exists (pop-out)",
+        "rationale": "openBeside is on main and already used by DockDiffView's \"Open beside chat\"; the pop-out window has no deck to open into."
+      },
+      {
+        "summary": "Relative links: opt-in plainRelativeLinks prop on ChatMarkdown/MarkdownTab, passed only by the diff preview; use #5337's seam instead if it has merged",
+        "rationale": "Requirement 7 needs a guard before #5337; an opt-in prop leaves chat and the file pane unchanged and keeps the overlap with #5337 small."
+      },
+      {
+        "summary": "The Diff/Preview choice is per file, resets when the file changes, and is not stored in the URL",
+        "rationale": "Requirement 4 says the choice applies to the file being viewed; Diff stays the default."
+      },
+      {
+        "summary": "Fix the pre-existing All turns file selection (diffFilePath dropped without diffTurnId) inside this issue",
+        "rationale": "Requirement 2 names All turns; without the two-line fix a Markdown file can never be previewed in that scope."
+      },
+      {
+        "summary": "DockDiffView is out of scope",
+        "rationale": "The issue names DiffPanel and the pop-out; the new preview component is reusable for a follow-up."
+      },
+      {
+        "summary": "No server change: no repoRoot added to the full/turn responses",
+        "rationale": "Root folder equals the repo top level for issue workspaces and normal projects; vs-main already returns repoRoot; a polyrepo mismatch degrades to an explicit message."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-15-PAN-5338-conversation-diff-view-add-a-rendered-preview-for-markdown-files-and-an-open-file-action.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "preview-source-helpers",
+        "title": "Add pure Markdown preview source helpers (WI-1)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:35:05.415Z",
+        "metadata": {
+          "issueLabel": "pan-5338",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "preview-body",
+            "diffpanel-wire"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/diff/markdownPreviewSource.ts",
+            "src/dashboard/frontend/src/components/diff/__tests__/markdownPreviewSource.test.ts"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/diff/__tests__/markdownPreviewSource.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "markdownPreviewSource.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Create components/diff/markdownPreviewSource.ts exactly as PRD .pan/drafts/PAN-5338.md WI-1 specifies: constants SHOWING_CURRENT_FILE, NO_ROOT_PREVIEW, OUTSIDE_ROOT_PREVIEW; addedFileText(file) (type new → additionLines joined, each line ending in \\n); isDeletedDiffFile(file, listKind); types PreviewScope and PreviewSource; markdownPreviewSource(input) with the 7-step order of PRD decision D-1; diffPathToRootPath(repoPath, { repoRoot, rootAbs, cwd }) per PRD D-8 (null when cwd and rootAbs are known and cwd is not at/under rootAbs; repo path unchanged when repoRoot or rootAbs is null; else toRootPath from components/dock/changes-model.ts). Pure functions only, no React. Write the named unit tests."
+        },
+        "items": [
+          {
+            "id": "preview-source-helpers.ac1",
+            "title": "Given a parsePatchFiles result for a \"new file mode\" patch of docs/a.md with lines \"# Title\", \"\", \"body\", when markdownPreviewSource runs for any scope, then it returns { kind: \"patch\", text: \"# Title\\n\\nbody\\n\" }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preview-source-helpers.ac2",
+            "title": "Given a modified file with rootId \"issue:PAN-1\", markdownPreviewSource returns kind \"read\" with ref \"HEAD\" for vs-main, note true for compare, note true for an agent-route turn that is not newest, and note false without ref for full scope",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preview-source-helpers.ac3",
+            "title": "Given rootId null it returns { kind: \"unavailable\", message: NO_ROOT_PREVIEW }; given rootPath null it returns OUTSIDE_ROOT_PREVIEW",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preview-source-helpers.ac4",
+            "title": "isDeletedDiffFile returns true for a file of type \"deleted\" and for list kind \"D\", diffPathToRootPath returns the repo path unchanged when repoRoot or rootAbs is null, and returns null for cwd \"/other/dir\" with rootAbs \"/ws/feature-pan-1\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relative-links-guard",
+        "title": "Render relative links as plain text in the diff preview (WI-2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:35:05.415Z",
+        "metadata": {
+          "issueLabel": "pan-5338",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ChatMarkdown.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/MarkdownTab.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.relative-links.test.tsx"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ChatMarkdown.relative-links.test.tsx src/components/chat/__tests__/ChatMarkdown.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ChatMarkdown.relative-links.test.tsx and ChatMarkdown.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implementation checkpoint first (PRD D-11): if #5337 has merged and MarkdownTab accepts a file location or resolveLink handler, use that seam instead and say so in the commit message. Otherwise: export isRelativeMarkdownHref(href) from components/chat/ChatMarkdown.tsx (false for empty, \"#…\", \"/…\", http:, https:, mailto:; true otherwise); add plainRelativeLinks?: boolean (default false) to ChatMarkdownProps, thread it into makeComponents and its useMemo deps; in makeComponents().a, after the file-link-chip branch and before TranscriptLink, render <span className={styles.mdLink} data-relative-link=\"\">{children}</span> when plainRelativeLinks && isRelativeMarkdownHref(href). Add plainRelativeLinks?: boolean to MarkdownTab and pass it to ChatMarkdown. Do not change any existing caller or existing test."
+        },
+        "items": [
+          {
+            "id": "relative-links-guard.ac1",
+            "title": "Given plainRelativeLinks, when ChatMarkdown renders \"[fort3d](fort3d.md)\", then no element with role link exists and the text \"fort3d\" renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relative-links-guard.ac2",
+            "title": "Given plainRelativeLinks, \"[x](https://example.com)\" still renders an anchor with target \"_blank\" and \"[h](#top)\" still renders an anchor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relative-links-guard.ac3",
+            "title": "Without plainRelativeLinks, \"[fort3d](fort3d.md)\" still renders an anchor, and the existing ChatMarkdown.test.tsx passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "preview-body",
+        "title": "Add the DiffMarkdownPreview body component (WI-3)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:35:05.415Z",
+        "metadata": {
+          "issueLabel": "pan-5338",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/diff/DiffMarkdownPreview.tsx",
+            "src/dashboard/frontend/src/components/diff/__tests__/DiffMarkdownPreview.test.tsx"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/diff/__tests__/DiffMarkdownPreview.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "DiffMarkdownPreview.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Create components/diff/DiffMarkdownPreview.tsx per PRD WI-3: props { source: PreviewSource }; patch → <MarkdownTab body={text} plainRelativeLinks />; unavailable → a muted <p> with the message; read → useQuery([\"diff-md-preview\", rootId, path, ref ?? \"worktree\"], () => readFile(rootId, path, ref), staleTime 4000) from components/explorer/explorer-rpc.ts; pending → MarkdownTab isLoading; error → \"Couldn't read this file: \" + explorerErrorMessage(error); kind !== \"text\" → \"This file is too large to preview.\"; text → optional data-testid=\"diff-preview-note\" line \"Showing the current file\" when note, then MarkdownTab with plainRelativeLinks. Root element data-testid=\"diff-markdown-preview\". Use the one Markdown renderer only."
+        },
+        "items": [
+          {
+            "id": "preview-body.ac1",
+            "title": "Given a patch source with text \"# Title\", the component renders an h1 with text \"Title\" and calls readFile zero times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preview-body.ac2",
+            "title": "Given a read source { rootId: \"issue:PAN-1\", path: \"docs/a.md\", ref: \"HEAD\" }, it calls readFile(\"issue:PAN-1\", \"docs/a.md\", \"HEAD\") and renders the returned text as Markdown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preview-body.ac3",
+            "title": "Given note true, it renders the line \"Showing the current file\"; given a large-text result it renders \"This file is too large to preview.\"; given a rejected read it renders text starting \"Couldn't read this file:\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "file-bar",
+        "title": "Add the DiffFileBar row with the Diff | Preview switch and Open file (WI-4)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:35:05.415Z",
+        "metadata": {
+          "issueLabel": "pan-5338",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/diff/DiffFileBar.tsx",
+            "src/dashboard/frontend/src/components/diff/__tests__/DiffFileBar.test.tsx"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/diff/__tests__/DiffFileBar.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "DiffFileBar.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create components/diff/DiffFileBar.tsx per PRD WI-4: props { path, previewable, view: \"diff\"|\"preview\", onView, onOpenFile? }; a data-testid=\"diff-file-bar\" row with the path (font-mono, title=path), a role=\"tablist\" aria-label=\"View\" holding role=\"tab\" buttons \"Diff\" and \"Preview\" with aria-selected (styles.subTab/subTabActive from ../Stage/stage.module.css) only when previewable, and an \"Open file\" button (lucide FileText icon, aria-label \"Open file\") only when onOpenFile is given. Follow the dashboard style guide (no pills, no decorative color)."
+        },
+        "items": [
+          {
+            "id": "file-bar.ac1",
+            "title": "Given previewable false, the bar renders the path and no tablist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-bar.ac2",
+            "title": "Given previewable true and view \"diff\", the tabs \"Diff\" (aria-selected true) and \"Preview\" render, and clicking \"Preview\" calls onView(\"preview\")",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-bar.ac3",
+            "title": "Given no onOpenFile no \"Open file\" button renders; given onOpenFile, clicking \"Open file\" calls it once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "diffpanel-wire",
+        "title": "Wire the file bar, preview and Open file into DiffPanel (WI-5)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:35:05.415Z",
+        "metadata": {
+          "issueLabel": "pan-5338",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/DiffPanel.tsx",
+            "src/dashboard/frontend/src/components/__tests__/DiffPanel.preview.test.tsx"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/__tests__/DiffPanel.preview.test.tsx src/components/__tests__/DiffPanel.test.tsx src/components/__tests__/DiffPanel.compare.test.tsx",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "DiffPanel.preview.test.tsx, DiffPanel.test.tsx and DiffPanel.compare.test.tsx pass",
+            "typecheck completes without errors",
+            "lint-file-size reports no violation for DiffPanel.tsx"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5 steps 1–10 in components/DiffPanel.tsx: add prop explorerRootId?: string | null; per-file view state (D-4); parse the selected file with getRenderablePatch/resolveFileDiffPath from ./diff/PatchFiles; listKind from the turn or response file list; previewable = Markdown && patch resolved && !isDeletedDiffFile; rootPath via diffPathToRootPath(path, { repoRoot from the vs-main response, rootAbs from useExplorerStore, cwd: repoPath }); Open file via useStageDeck()?.openBeside({ rootId: explorerRootId, path: rootPath }) only when deck.openBeside, explorerRootId and rootPath exist; scope/agentRoute mapping for markdownPreviewSource; render DiffFileBar above the patch viewport whenever a file is selected, and DiffMarkdownPreview instead of PatchFiles when previewable and view is preview; the pop-out button adds params.set(\"root\", explorerRootId) when set. Keep DiffPanel.tsx under 1000 lines. Write DiffPanel.preview.test.tsx with the seven cases listed in the PRD (select files via defaultView vs-main or a turn chip)."
+        },
+        "items": [
+          {
+            "id": "diffpanel-wire.ac1",
+            "title": "Given a selected Markdown file whose patch adds \"# Title\", the Preview tab renders, and clicking it renders an h1 \"Title\" and no [data-diff-file-path] element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diffpanel-wire.ac2",
+            "title": "Given a selected .ts file, or a Markdown file whose patch has \"deleted file mode\", no tablist renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diffpanel-wire.ac3",
+            "title": "Given a StageDeckProvider with openBeside and explorerRootId \"issue:PAN-1\", clicking \"Open file\" on docs/a.md calls openBeside with { rootId: \"issue:PAN-1\", path: \"docs/a.md\" }; without a StageDeckProvider no \"Open file\" button renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diffpanel-wire.ac4",
+            "title": "Given Preview chosen on docs/a.md, when docs/b.md is selected, then the diff renders and no diff-markdown-preview element exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diffpanel-wire.ac5",
+            "title": "Given explorerRootId \"issue:PAN-1\", the pop-out button calls window.open with a /popout/diff URL whose root param equals \"issue:PAN-1\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-root",
+        "title": "Pass the conversation explorer root to the inline DiffPanel (WI-6)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:35:05.415Z",
+        "metadata": {
+          "issueLabel": "pan-5338",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "medium",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationPanel.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Checkpoint (PRD WI-6): if #5295 already deleted the inline <DiffPanel mount, cancel this item with that reason. Otherwise in components/chat/ConversationPanel.tsx call useRootContext() and useMemo(() => rootIdForConversation(conversation, rootContext)) at component top level (from ../explorer/rootForConversation) and pass explorerRootId to the inline <DiffPanel>. In ConversationPanel.test.tsx change the DiffPanel mock to render data-root={props.explorerRootId ?? \"\"} and add a test using the file's existing diff-open pattern."
+        },
+        "items": [
+          {
+            "id": "conversation-root.ac1",
+            "title": "Given a conversation with issueId \"PAN-1\" and the diff open, the mocked DiffPanel renders with data-root \"issue:PAN-1\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-root.ac2",
+            "title": "Given the existing ConversationPanel tests, they pass with the new mock",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "popout-root",
+        "title": "Pass the root param into the pop-out DiffPanel (WI-7)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:35:05.415Z",
+        "metadata": {
+          "issueLabel": "pan-5338",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/App/StandaloneRoutes.tsx",
+            "src/dashboard/frontend/src/App/__tests__/StandaloneDiffPopoutRoute.test.tsx"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/App/__tests__/StandaloneDiffPopoutRoute.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "StandaloneDiffPopoutRoute.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In StandaloneDiffPopoutRoute (App/StandaloneRoutes.tsx) read search.get(\"root\") and pass explorerRootId to <DiffPanel>. Write App/__tests__/StandaloneDiffPopoutRoute.test.tsx per PRD WI-7 (summaries fetch returns turn t1 with docs/a.md kind A; turn fetch returns a new-file patch). Browser checkpoint D-12 in an isolated Playwright profile: a pop-out of a modified Markdown file shows rendered Preview; if the explorer read fails there, apply the D-12 fallback inside StandaloneRoutes.tsx only (pass no explorerRootId) and change the item test to assert the D-9 sentence for a modified file."
+        },
+        "items": [
+          {
+            "id": "popout-root.ac1",
+            "title": "Given /popout/diff?diff=1&prefix=/api/conversations/c1/diffs&diffTurnId=t1&diffFilePath=docs/a.md&root=issue:PAN-1 and a new-file patch \"# Title\", the route renders the Preview tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "popout-root.ac2",
+            "title": "When the Preview tab is clicked, the route renders an h1 with text \"Title\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "all-turns-file-select",
+        "title": "Let the All turns picker select one file (WI-10)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:35:05.415Z",
+        "metadata": {
+          "issueLabel": "pan-5338",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/diffRouteSearch.ts",
+            "src/dashboard/frontend/src/lib/__tests__/diffRouteSearch.test.ts",
+            "src/dashboard/frontend/src/components/DiffPanel.tsx",
+            "src/dashboard/frontend/src/components/__tests__/DiffPanel.test.tsx"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/diffRouteSearch.test.ts src/components/__tests__/DiffPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "diffRouteSearch.test.ts and DiffPanel.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D-14 / WI-10: in lib/diffRouteSearch.ts change `const diffFilePath = diff && diffTurnId ? …` to `const diffFilePath = diff ? normalizeSearchString(search.diffFilePath) : undefined`; in components/DiffPanel.tsx change `const selectedFilePath = selectedTurnId !== null ? (effectiveParams.diffFilePath ?? null) : null` to `const selectedFilePath = effectiveParams.diffFilePath ?? null`. Nothing else. Add the named tests."
+        },
+        "items": [
+          {
+            "id": "all-turns-file-select.ac1",
+            "title": "parseDiffRouteSearch({ diff: \"1\", diffFilePath: \"a.md\" }) returns { diff: \"1\", diffFilePath: \"a.md\" }, and without diff it returns {}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "all-turns-file-select.ac2",
+            "title": "Given zero turn summaries and isolateSelection, clicking x.ts in the All turns picker fetches /api/conversations/c1/diffs/full?file=x.ts and the picker is replaced by the file diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Document Preview and Open file in the diff panel docs and changelog (WI-8)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:35:05.415Z",
+        "metadata": {
+          "issueLabel": "pan-5338",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "features/conversations.mdx",
+            "changelog.d/pan-5338.md"
+          ],
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "FR-6",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In features/conversations.mdx section \"## Reviewing changes in the diff panel\" add the paragraph PRD WI-8 describes (Diff and Preview for Markdown files, after side per scope, Compare note \"Showing the current file\", no Preview for deleted files, Open file opens beside the chat and is absent in the pop-out, relative links render as plain text for now). Create changelog.d/pan-5338.md in the changelog.d/README.md format with a \"#### New\" heading and one bullet linking #5338."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "Given the edited page, features/conversations.mdx \"Reviewing changes in the diff panel\" contains the Diff and Preview tabs, the Open file action and the exact note \"Showing the current file\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "changelog.d/pan-5338.md exists with a \"#### New\" heading and a bullet linking https://github.com/eltmon/overdeck/issues/5338, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "register-frontend-tests",
+        "title": "Register the new frontend test files in the CI subset (WI-9)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:35:05.415Z",
+        "metadata": {
+          "issueLabel": "pan-5338",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "trivial",
+          "kind": "test",
+          "requiresInspection": false,
+          "files_scope": [
+            "scripts/frontend-test-subset.txt"
+          ],
+          "verify_commands": [
+            "node scripts/run-frontend-test-subset.mjs --dry-run"
+          ],
+          "expected_outputs": [
+            "dry-run output lists the six new test files"
+          ],
+          "traces": [
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the six new test paths from PRD WI-9 to scripts/frontend-test-subset.txt, one per line in sorted position (paths relative to src/dashboard/frontend). If the conversation-root item was cancelled, nothing changes here (it adds no new file)."
+        },
+        "items": [
+          {
+            "id": "register-frontend-tests.ac1",
+            "title": "node scripts/run-frontend-test-subset.mjs --dry-run prints args that contain src/components/diff/__tests__/markdownPreviewSource.test.ts, DiffMarkdownPreview.test.tsx, DiffFileBar.test.tsx, src/components/__tests__/DiffPanel.preview.test.tsx, src/components/chat/__tests__/ChatMarkdown.relative-links.test.tsx and src/App/__tests__/StandaloneDiffPopoutRoute.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-frontend-tests.ac2",
+            "title": "Given the edited list, each added line appears exactly once and in sorted position",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "preview-source-helpers",
+        "to": "preview-body",
+        "type": "blocks"
+      },
+      {
+        "from": "relative-links-guard",
+        "to": "preview-body",
+        "type": "blocks"
+      },
+      {
+        "from": "preview-source-helpers",
+        "to": "diffpanel-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "preview-body",
+        "to": "diffpanel-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "file-bar",
+        "to": "diffpanel-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "all-turns-file-select",
+        "to": "diffpanel-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "diffpanel-wire",
+        "to": "conversation-root",
+        "type": "blocks"
+      },
+      {
+        "from": "diffpanel-wire",
+        "to": "popout-root",
+        "type": "blocks"
+      },
+      {
+        "from": "diffpanel-wire",
+        "to": "register-frontend-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "popout-root",
+        "to": "register-frontend-tests",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

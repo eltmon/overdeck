@@ -1,0 +1,161 @@
+{
+  "version": "1",
+  "issueId": "PAN-5348",
+  "created": "2026-11-15T13:34:43.139Z",
+  "updated": "2026-11-15T14:16:37.708Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "parser-help-entry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5348",
+      "claimedAt": "2026-11-15T13:34:43.139Z",
+      "doneAt": "2026-11-15T13:39:07.611Z"
+    },
+    "parser-help-entry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:39:07.611Z"
+    },
+    "parser-help-entry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:39:07.611Z"
+    },
+    "parser-help-entry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:39:07.611Z"
+    },
+    "parser-help-entry.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:39:07.611Z"
+    },
+    "help-list-builder": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5348",
+      "claimedAt": "2026-11-15T13:39:17.708Z",
+      "doneAt": "2026-11-15T13:42:53.506Z"
+    },
+    "help-list-builder.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:42:53.506Z"
+    },
+    "help-list-builder.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:42:53.506Z"
+    },
+    "help-list-builder.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:42:53.506Z"
+    },
+    "help-list-builder.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:42:53.506Z"
+    },
+    "router-help-dispatch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5348",
+      "claimedAt": "2026-11-15T13:43:00.305Z",
+      "doneAt": "2026-11-15T13:49:17.434Z"
+    },
+    "router-help-dispatch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:49:17.434Z"
+    },
+    "router-help-dispatch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:49:17.434Z"
+    },
+    "router-help-dispatch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:49:17.434Z"
+    },
+    "picker-pan-entry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5348",
+      "claimedAt": "2026-11-15T13:49:25.304Z",
+      "doneAt": "2026-11-15T13:54:34.145Z"
+    },
+    "picker-pan-entry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:54:34.145Z"
+    },
+    "picker-pan-entry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:54:34.145Z"
+    },
+    "picker-match-ranking": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5348",
+      "claimedAt": "2026-11-15T13:54:42.439Z",
+      "doneAt": "2026-11-15T14:00:07.471Z"
+    },
+    "picker-match-ranking.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:00:07.471Z"
+    },
+    "picker-match-ranking.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:00:07.471Z"
+    },
+    "picker-match-ranking.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:00:07.471Z"
+    },
+    "picker-match-ranking.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:00:07.471Z"
+    },
+    "result-row-help-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5348",
+      "claimedAt": "2026-11-15T14:00:17.325Z",
+      "doneAt": "2026-11-15T14:01:24.694Z"
+    },
+    "result-row-help-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:01:24.694Z"
+    },
+    "result-row-help-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:01:24.694Z"
+    },
+    "ci-frontend-subset": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5348",
+      "claimedAt": "2026-11-15T14:01:29.458Z",
+      "doneAt": "2026-11-15T14:02:19.975Z"
+    },
+    "ci-frontend-subset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:02:19.975Z"
+    },
+    "ci-frontend-subset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:02:19.975Z"
+    },
+    "docs-bare-pan-help": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5348",
+      "claimedAt": "2026-11-15T14:02:24.605Z",
+      "doneAt": "2026-11-15T14:03:22.177Z"
+    },
+    "docs-bare-pan-help.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:03:22.177Z"
+    },
+    "docs-bare-pan-help.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:03:22.177Z"
+    },
+    "docs-bare-pan-help.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:03:22.177Z"
+    },
+    "router-help-dispatch.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:16:37.708Z"
+    }
+  }
+}

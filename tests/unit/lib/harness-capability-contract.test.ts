@@ -163,6 +163,16 @@ describe('every registered runtime declares its capabilities (PAN-4562 AC1)', ()
   });
 });
 
+describe('composer skill commands (PAN-5347)', () => {
+  it('only claude-code declares skillSlashCommands', () => {
+    const value = (harness: string) => contracts.getRuntimeBehavior(harness as never).capabilities.skillSlashCommands;
+    expect(value('claude-code')).toBe(true);
+    for (const harness of ['codex', 'pi', 'ohmypi', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', 'grok']) {
+      expect(value(harness), harness).toBe(false);
+    }
+  });
+});
+
 describe('harness update data (PAN-4654 D-6)', () => {
   it('update data: claude, codex, kimi and opencode declare an update argv; muse, prime-agent and ohmypi declare none', () => {
     const update = (harness: string) => {

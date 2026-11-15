@@ -1,80 +1,73 @@
 import { cn } from '../../lib/utils';
-import { initialsFor } from '../../lib/model-names';
+import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import {
-  formatPipelineCost,
-  isNeedsYouFeature,
-  pipelineChipFor,
-  sessionCountFor,
+  formatAge,
+  homeStageTag,
+  homeWhoFor,
+  lastActivityAt,
   sublineFor,
-  whoLineFor,
   type BucketedFeature,
   type IssueCostBreakdown,
+  type PipelineLaneKey,
 } from './pipeline-helpers';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 
 export interface PipelineRowProps {
   entry: BucketedFeature;
+  lane: PipelineLaneKey;
+  needsYou: boolean;
   issueCosts: Record<string, number>;
   issueCostDetails?: Record<string, IssueCostBreakdown>;
   onSelectFeature: (feature: ProjectFeature) => void;
 }
 
-export function PipelineRow({ entry, issueCosts, onSelectFeature }: PipelineRowProps) {
-  const { feature, derived } = entry;
-  const chip = pipelineChipFor(entry);
+/**
+ * PAN-5294 G-D8 — one full-width Home pipeline row: id, title, tag, who, age.
+ * The stuck reason and per-issue spend stay one hover away in `title`.
+ */
+export function PipelineRow({ entry, lane, needsYou, issueCosts, onSelectFeature }: PipelineRowProps) {
+  const { feature } = entry;
+  const tag = homeStageTag(entry, needsYou);
   const cost = issueCosts[feature.issueId];
-  const needsYou = isNeedsYouFeature(feature, derived);
-  const primaryModel = feature.sessions?.find(session => session.presence === 'active')?.model
-    ?? feature.sessions?.[0]?.model;
-  const avatar = initialsFor(primaryModel ?? feature.issueId);
+  const tooltip = cost === undefined ? sublineFor(entry) : `${sublineFor(entry)} · spent $${cost.toFixed(2)}`;
+  const last = lastActivityAt(entry);
+  const now = Date.now();
+  const age = last > 0 ? formatAge(now - last) : '—';
 
   return (
     <div
       role="button"
       tabIndex={0}
+      title={tooltip}
       data-testid="pipeline-row"
       data-issue-id={feature.issueId}
+      data-lane={lane}
       data-phase={entry.phase}
       data-needs-you={needsYou}
       onClick={() => onSelectFeature(feature)}
-      className={cn(
-        'group grid cursor-pointer items-center gap-3 rounded-[10px] border bg-card/40 px-3 py-2.5 transition-colors hover:border-[#2c3547] hover:bg-accent/40',
-        needsYou ? 'border-warning/[0.32]' : 'border-border',
-      )}
-      style={{ gridTemplateColumns: '78px 1fr 74px 34px' }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onSelectFeature(feature);
+        }
+      }}
+      className="grid cursor-pointer items-center gap-3 border-b border-border px-3.5 py-2 last:border-b-0 hover:bg-accent"
+      style={{ gridTemplateColumns: '92px minmax(0,1fr) 150px 170px 80px' }}
     >
-      <span className="truncate font-mono text-[11.5px] text-muted-foreground">{feature.issueId}</span>
-
-      <span className="min-w-0">
-        <span className="block truncate text-[13px] font-semibold text-foreground">{feature.title}</span>
-        <span className="mt-[3px] flex min-w-0 items-center gap-1.5 overflow-hidden text-[10.5px] text-muted-foreground">
-          <span
-            className={cn(
-              'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-0.5 text-[10px]',
-              chip.bgClass,
-              chip.textClass,
-              chip.ringClass,
-            )}
-          >
-            <span className={cn('h-[7px] w-[7px] shrink-0 rounded-full', chip.dotClass, chip.animate && 'animate-pulse')} />
-            {chip.label}
-          </span>
-          <span className="truncate">{[sublineFor(entry), whoLineFor(entry)].filter(Boolean).join(' · ')}</span>
+      <span className="truncate font-mono text-[12px] text-muted-foreground" data-cell="id">{feature.issueId}</span>
+      <span className="truncate text-[13px] text-foreground" data-cell="title">{feature.title}</span>
+      <span className="min-w-0" data-cell="tag">
+        <span className={cn('inline-block max-w-full truncate rounded-md border px-2 py-0.5 text-[11px]', tag.className)}>
+          {tag.label}
         </span>
       </span>
-
-      <span className="min-w-0 text-right">
-        <span className="block truncate text-[12.5px] font-semibold text-foreground">{formatPipelineCost(cost)}</span>
-        <span className="block truncate text-[9.5px] text-muted-foreground">{sessionCountFor(feature)} sessions</span>
-      </span>
-
+      <span className="truncate text-[12px] text-muted-foreground" data-cell="who">{homeWhoFor(entry)}</span>
       <span
-        className={cn(
-          'flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] border-[1.5px] bg-muted text-[10.5px] font-semibold text-foreground',
-          chip.ringClass,
-        )}
+        className="text-right font-mono text-[12px] text-muted-foreground"
+        data-cell="age"
+        title={last > 0 ? `last activity ${formatRelativeTime(new Date(last), new Date(now))}` : 'no recorded activity'}
       >
-        {avatar}
+        {age}
       </span>
     </div>
   );

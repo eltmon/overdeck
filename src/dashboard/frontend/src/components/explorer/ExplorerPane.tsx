@@ -28,7 +28,8 @@ import { explorerErrorMessage, listDir, parseRootId } from './explorer-rpc'
 import { useExplorerStore, type RootState, type SelectMode } from './explorerStore'
 import { useExplorerGitStatus } from './git/useExplorerGitStatus'
 import { ExplorerContextMenu, type ExplorerMenuTarget } from './menu/ExplorerContextMenu'
-import { EditWorkspaceBanner } from './edit/EditWorkspaceBanner'
+import { EditorBar } from './edit/EditorBar'
+import { openNewEditWorkspace } from './edit/edit-workspace-switch'
 import { useEditWorkspaceStore } from './edit/edit-workspace-store'
 import { openCodePane, type CodePaneTarget } from './openCodePane'
 import { useRootContext, useRootLabel } from './rootForConversation'
@@ -249,6 +250,19 @@ function RootMenu({ deckKey, label }: { deckKey: string; label: string }) {
                   </MenuItemButton>
                 )
               })}
+              {deckProject && (
+                <>
+                  <MenuSeparator />
+                  <MenuItemButton
+                    onClick={() => {
+                      close()
+                      void openNewEditWorkspace(deckProject.key, deckKey).catch(() => {}) // ensureEditRoot shows the toast
+                    }}
+                  >
+                    New edit workspace
+                  </MenuItemButton>
+                </>
+              )}
             </MenuSurface>
           </>,
           document.body,
@@ -442,12 +456,6 @@ export function ExplorerFiles({ rootId, deckKey, changedPaths: scopeChangedPaths
     [cancelPreview, openFile, rootId],
   )
 
-  // PAN-5191: the edit-workspace banner's inputs, from this root's git status.
-  const uncommittedPaths = useMemo(() => (git.result?.entries ?? []).map((e) => e.path), [git.result])
-  const changedPaths = useMemo(
-    () => [...new Set([...uncommittedPaths, ...(git.result?.committed ?? []).map((e) => e.path)])],
-    [uncommittedPaths, git.result],
-  )
   const creatingEdit = useEditWorkspaceStore((s) => (parsed?.kind === 'project' ? s.creating[parsed.key] === true : false))
   // PAN-5191: project roots are writable through an edit workspace; the Changed filter still hides write actions.
   const writable = !changedOnly
@@ -688,16 +696,8 @@ export function ExplorerFiles({ rootId, deckKey, changedPaths: scopeChangedPaths
       {git.result?.truncated && (
         <div className="border-b border-border px-3 py-1 text-[11px] text-muted-foreground">Git status shows the first 20,000 changes.</div>
       )}
-      {parsed?.kind === 'workspace' && (
-        <EditWorkspaceBanner
-          rootId={rootId}
-          deckKey={deckKey}
-          changedPaths={changedPaths}
-          hasChanges={uncommittedPaths.length > 0}
-          uncommittedPaths={uncommittedPaths}
-          onGitChanged={git.refresh}
-        />
-      )}
+      {/* PAN-5290 C-D10: the same editor bar a code tab shows, without Close tab. */}
+      {parsed?.kind === 'workspace' && <EditorBar rootId={rootId} deckKey={deckKey} onGitChanged={git.refresh} />}
       {rootKind === 'project' && creatingEdit && (
         <div className="border-b border-border px-3 py-1.5 text-xs text-muted-foreground" data-testid="explorer-creating-edit">
           Creating edit workspace…

@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   setSkillOverride: vi.fn(),
   listLowerLevelOverrides: vi.fn(),
   listLowerLevelPackOverrides: vi.fn(),
+  listConversationSkillStates: vi.fn(),
 }));
 
 vi.mock('../../../../lib/skill-overrides/store.js', async importOriginal => ({
@@ -19,6 +20,9 @@ vi.mock('../../../../lib/skill-overrides/store.js', async importOriginal => ({
   setSkillOverride: mocks.setSkillOverride,
   listLowerLevelOverrides: mocks.listLowerLevelOverrides,
   listLowerLevelPackOverrides: mocks.listLowerLevelPackOverrides,
+}));
+vi.mock('../../../../lib/skill-overrides/conversation-scope.js', () => ({
+  listConversationSkillStates: mocks.listConversationSkillStates,
 }));
 
 import { SkillOverrideError } from '../../../../lib/skill-overrides/store.js';
@@ -53,6 +57,7 @@ beforeEach(() => {
   mocks.listLowerLevelOverrides.mockResolvedValue({ grilling: { projects: ['tst'], issues: ['TST-1'] } });
   mocks.listLowerLevelPackOverrides.mockResolvedValue({ mattpocock: { projects: ['tst'], issues: [] } });
   mocks.setSkillOverride.mockResolvedValue({ committed: true, sha: 'abc', pushed: true });
+  mocks.listConversationSkillStates.mockResolvedValue({ project: 'tst', issue: 'TST-1', skills: [grilling] });
 });
 
 describe('GET /api/skills/overrides', () => {
@@ -86,6 +91,30 @@ describe('GET /api/skills/overrides', () => {
     mocks.listSkillStates.mockRejectedValue(new SkillOverrideError('unknown-issue', 'no registered project owns issue ZZZ-1'));
     const result = await request('/api/skills/overrides?issue=ZZZ-1');
     expect(result).toEqual({ status: 404, body: { error: 'no registered project owns issue ZZZ-1', code: 'unknown-issue' } });
+  });
+
+  describe('conversation scope (PAN-5347)', () => {
+    it('resolves via the conversation when conversation, cwd and issue are all given', async () => {
+      const result = await request('/api/skills/overrides?conversation=c1&cwd=%2Fw&issue=TST-1');
+      expect(mocks.listConversationSkillStates).toHaveBeenCalledWith({ conversationName: 'c1', cwd: '/w', issueId: 'TST-1' });
+      expect(result).toEqual({ status: 200, body: { project: 'tst', issue: 'TST-1', skills: [grilling] } });
+      expect(result.body.overriddenBelow).toBeUndefined();
+      expect(mocks.listLowerLevelOverrides).not.toHaveBeenCalled();
+      expect(mocks.listSkillStates).not.toHaveBeenCalled();
+    });
+
+    it('takes the same path with only cwd given', async () => {
+      const result = await request('/api/skills/overrides?cwd=%2Fw');
+      expect(mocks.listConversationSkillStates).toHaveBeenCalledWith({ conversationName: undefined, cwd: '/w', issueId: undefined });
+      expect(result.status).toBe(200);
+      expect(mocks.listSkillStates).not.toHaveBeenCalled();
+    });
+
+    it('maps an unknown conversation to 404', async () => {
+      mocks.listConversationSkillStates.mockRejectedValue(new SkillOverrideError('unknown-conversation', 'unknown conversation: c1'));
+      const result = await request('/api/skills/overrides?conversation=c1');
+      expect(result).toEqual({ status: 404, body: { error: 'unknown conversation: c1', code: 'unknown-conversation' } });
+    });
   });
 
   describe('slow-request logging (PAN-5238)', () => {

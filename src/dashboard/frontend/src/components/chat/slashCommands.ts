@@ -18,6 +18,15 @@ const STATIC_SLASH_COMMANDS: SlashCommand[] = [
   },
 ];
 
+/** Dashboard-owned `/pan` help entry (PAN-5348): the CLI registry excludes `help`. */
+const OVERDECK_HELP_SLASH_COMMAND: SlashCommand = {
+  id: 'pan-help',
+  label: '/pan',
+  description: 'List the available Overdeck commands',
+  insert: '/pan',
+  category: 'Overdeck',
+};
+
 const OVERDECK_SLASH_COMMANDS: SlashCommand[] = COMPOSER_COMMAND_MANIFEST.map(entry => {
   const commandPath = entry.path.join(' ');
   return {
@@ -38,7 +47,7 @@ const CURATED_OVERDECK_VARIANTS: SlashCommand[] = COMPOSER_COMMAND_VARIANTS.map(
   category: 'Overdeck',
 }));
 
-export function getSlashCommands(harness: HarnessName): SlashCommand[] {
+export function getSlashCommands(harness: HarnessName, skillCommands: readonly SlashCommand[] = []): SlashCommand[] {
   const behavior = getHarnessBehavior(harness);
   const nativeCommands = (behavior.nativeCommands ?? []).map(command => ({
     id: `native-${harness}-${command.name.slice(1)}`,
@@ -50,8 +59,10 @@ export function getSlashCommands(harness: HarnessName): SlashCommand[] {
   return [
     ...nativeCommands,
     ...STATIC_SLASH_COMMANDS,
+    OVERDECK_HELP_SLASH_COMMAND,
     ...OVERDECK_SLASH_COMMANDS,
     ...CURATED_OVERDECK_VARIANTS,
+    ...(behavior.capabilities.skillSlashCommands ? skillCommands : []),
   ];
 }
 

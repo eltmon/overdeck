@@ -12,6 +12,12 @@ vi.mock('../../terminal/TerminalDrawer', () => ({ TerminalDrawer: () => <div dat
 vi.mock('../../explorer/git/useExplorerGitStatus', () => ({
   useExplorerGitStatus: () => ({ result: null, decorations: { files: new Map(), folders: new Map() }, errorCode: undefined, errorMessage: undefined, refresh: () => {} }),
 }))
+// Go to file searches over the explorer RPC; one result is enough to pick (PAN-5290 C-D1 audit).
+const rpc = vi.hoisted(() => ({ searchFiles: vi.fn(async () => ({ paths: ['src/a.ts'] })) }))
+vi.mock('../../explorer/explorer-rpc', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../explorer/explorer-rpc')>()),
+  searchFiles: rpc.searchFiles,
+}))
 vi.mock('../../explorer/ExplorerPane', () => ({
   ExplorerFiles: ({ rootId, changedPaths }: { rootId: string; changedPaths: ReadonlySet<string> }) => (
     <div data-testid="explorer-files" data-changed={[...changedPaths].join(',')}>
@@ -220,6 +226,18 @@ describe('WorkDock', () => {
     expect(toast).toHaveBeenCalledWith('No project files to search here.')
     expect(useWorkDockStore.getState().byDeck[NO_PROJECT_KEY].quickOpen).toBe(false)
     expect(screen.queryByRole('dialog', { name: 'Quick open' })).toBeNull()
+  })
+
+  it('opens a Go to file pick beside the chat', async () => {
+    const deck = deckValue()
+    render(wrap(<WorkDock {...props({ activePane: chatPane, conversations: [conv({ name: 'c1' })] })} />, deck))
+    // Go to file closes itself while no root is known, so wait for the scope to settle.
+    await waitFor(() => expect(useActiveDock.getState().current?.rootId).toBe('project:p'))
+    act(() => useWorkDockStore.getState().setQuickOpen(DECK, true))
+    const input = await screen.findByRole('combobox')
+    fireEvent.change(input, { target: { value: 'a.ts' } })
+    fireEvent.click(await screen.findByRole('option', { name: /a\.ts/ }))
+    expect(deck.openBeside).toHaveBeenCalledWith({ rootId: 'project:p', path: 'src/a.ts' })
   })
 
   it('publishes activeDock with the active pane and clears it on unmount', async () => {
