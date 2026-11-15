@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5290",
   "created": "2026-11-15T11:24:24.576Z",
-  "updated": "2026-11-15T11:40:30.401Z",
+  "updated": "2026-11-15T11:40:36.095Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,11 @@
     "gutter-marks.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T11:40:30.401Z"
+    },
+    "edit-changes-route": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5290",
+      "claimedAt": "2026-11-15T11:40:36.095Z"
     }
   }
 }
