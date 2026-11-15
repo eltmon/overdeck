@@ -90,6 +90,21 @@ describe('GET /api/conversations/:name/changes', () => {
   });
 });
 
+describe('GET /api/conversations/:name/changes/lines', () => {
+  it('returns 200 with the path and its lines', async () => {
+    const response = await get(conversationDiffRoutes, '/api/conversations/routes-conv/changes/lines?file=a.txt');
+    expect(response).toEqual({ status: 200, body: { path: 'a.txt', lines: [] } });
+  });
+
+  it('returns 400 for a missing or escaping file and 404 for an unknown conversation', async () => {
+    expect(await get(conversationDiffRoutes, '/api/conversations/routes-conv/changes/lines'))
+      .toEqual({ status: 400, body: { error: 'Invalid file' } });
+    expect(await get(conversationDiffRoutes, '/api/conversations/routes-conv/changes/lines?file=..%2Fx'))
+      .toEqual({ status: 400, body: { error: 'Invalid file' } });
+    expect((await get(conversationDiffRoutes, '/api/conversations/nobody/changes/lines?file=a.txt')).status).toBe(404);
+  });
+});
+
 describe('GET /api/projects/:projectKey/changes', () => {
   it('returns 200 with the project key and its attributed commits', async () => {
     const response = await get(projectChangesRouteLayer, '/api/projects/routes-fixture/changes?since=7d');
@@ -108,6 +123,7 @@ describe('GET /api/projects/:projectKey/changes', () => {
 describe('route scopes', () => {
   it('reads conversation changes with read:conversations and keeps project changes admin', () => {
     expect(requiredScopeFor('GET', '/api/conversations/x/changes')).toBe('read:conversations');
+    expect(requiredScopeFor('GET', '/api/conversations/x/changes/lines')).toBe('read:conversations');
     expect(requiredScopeFor('GET', '/api/projects/x/changes')).toBe('admin');
   });
 });

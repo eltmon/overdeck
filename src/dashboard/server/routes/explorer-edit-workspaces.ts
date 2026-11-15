@@ -5,6 +5,11 @@
  *     The edit workspace, its PR with the merge verdict, and PR and pipeline
  *     support (EditWorkspaceStatus).
  *
+ *   GET /api/explorer/edit-workspaces/:workspaceId/changes
+ *     What the edit workspace will land against its merge base with
+ *     origin/<default branch>: files with +/−, totals and the uncommitted
+ *     paths (EditWorkspaceChanges, PAN-5290). Never calls gh.
+ *
  *   POST /api/explorer/edit-workspaces/:workspaceId/pr
  *     Body EditWorkspaceCreatePrInput. `direct` commits, pushes the edit
  *     branch and opens (or pushes to) its PR; `pipeline` creates a GitHub
@@ -31,6 +36,8 @@ import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/u
 
 import { jsonResponse } from '../http-helpers.js';
 import { EditWorkspaceError } from '../services/explorer/edit-workspace-errors.js';
+import { getEditWorkspaceChanges } from '../services/explorer/edit-workspace-changes.js';
+import type { EditWorkspaceDeps } from '../services/explorer/edit-workspace.js';
 import {
   createDirectPr,
   discardEditWorkspace,
@@ -94,6 +101,20 @@ export async function handleEditWorkspaceStatus(
   if (authError) return authError;
   try {
     return jsonResponse(await getEditWorkspaceStatus(workspaceId, deps));
+  } catch (error) {
+    return editWorkspaceErrorResponse(error);
+  }
+}
+
+export async function handleEditWorkspaceChanges(
+  request: HttpServerRequest.HttpServerRequest,
+  workspaceId: string,
+  deps: EditWorkspaceDeps = {},
+): Promise<HttpServerResponse.HttpServerResponse> {
+  const authError = rejectUnauthorizedDashboardRequest(request);
+  if (authError) return authError;
+  try {
+    return jsonResponse(await getEditWorkspaceChanges(workspaceId, deps));
   } catch (error) {
     return editWorkspaceErrorResponse(error);
   }
@@ -168,6 +189,19 @@ const statusRoute = HttpRouter.add(
   })),
 );
 
+// ─── GET /api/explorer/edit-workspaces/:workspaceId/changes ───────────────────
+
+const changesRoute = HttpRouter.add(
+  'GET',
+  '/api/explorer/edit-workspaces/:workspaceId/changes',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const params = yield* HttpRouter.params;
+    const workspaceId = params['workspaceId'] ?? '';
+    return yield* Effect.promise(() => handleEditWorkspaceChanges(request, workspaceId));
+  })),
+);
+
 // ─── POST /api/explorer/edit-workspaces/:workspaceId/pr ───────────────────────
 
 const createPrRoute = HttpRouter.add(
@@ -209,4 +243,4 @@ const discardRoute = HttpRouter.add(
 
 // ─── Layer composition ────────────────────────────────────────────────────────
 
-export const explorerEditWorkspacesRouteLayer = Layer.mergeAll(statusRoute, createPrRoute, mergeRoute, discardRoute);
+export const explorerEditWorkspacesRouteLayer = Layer.mergeAll(statusRoute, changesRoute, createPrRoute, mergeRoute, discardRoute);

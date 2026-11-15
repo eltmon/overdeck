@@ -214,10 +214,13 @@ test('the diff view renders an uncommitted and a committed file from the real se
 });
 
 test('the keys leave typed text alone in a composer', async ({ page }) => {
-  // The fixture conversations have ended (they show Resume Session), so this uses
-  // the project Home composer, the same kind of textarea.
+  // The fixture conversations have ended (they show Resume Session), and the
+  // project Home has no composer since PAN-5294, so this uses the New
+  // conversation dialog's First message field, the same kind of textarea.
   await openDeck(page);
-  const composer = page.getByPlaceholder(/Ask, run, or search/);
+  await page.getByRole('button', { name: 'New conversation options' }).last().click();
+  await page.getByRole('menuitem', { name: 'New conversation with options…' }).click();
+  const composer = page.getByPlaceholder('Sent as soon as the conversation starts');
   await composer.click();
   await composer.fill('draft text');
   await page.keyboard.press('Control+Shift+G');

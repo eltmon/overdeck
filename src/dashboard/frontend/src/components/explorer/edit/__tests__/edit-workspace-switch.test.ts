@@ -19,6 +19,7 @@ import { useEditWorkspaceStore } from '../edit-workspace-store'
 import { ensureEditRoot, leaveEditWorkspace, openNewEditWorkspace, switchRoot } from '../edit-workspace-switch'
 import { useWorkDockStore } from '../../../dock/workDockStore'
 import { useActiveDock, type ActiveDock } from '../../../dock/activeDock'
+import { registerCodeEditor, resetViewStateRegistryForTests, takeViewState } from '../../code/view-state-registry'
 
 const DECK = 'deck-1'
 const PROJECT = 'project:p'
@@ -54,9 +55,24 @@ beforeEach(() => {
   useEditWorkspaceStore.setState({ creating: {}, active: {}, pending: {} })
   useWorkDockStore.setState({ byDeck: {} })
   useActiveDock.setState({ current: null })
+  resetViewStateRegistryForTests()
 })
 
 describe('switchRoot', () => {
+  it("carries a live editor's view state and focus to the same file on the new root (PAN-5290 C-D12)", () => {
+    const viewState = { cursorState: [{ position: { lineNumber: 12, column: 4 } }] }
+    registerCodeEditor(draftKey(PROJECT, 'docs/a.md'), {
+      saveViewState: () => viewState,
+      restoreViewState: () => {},
+      hasTextFocus: () => true,
+      focus: () => {},
+    } as unknown as Parameters<typeof registerCodeEditor>[1])
+
+    switchRoot(PROJECT, EDIT)
+
+    expect(takeViewState(draftKey(EDIT, 'docs/a.md'))).toEqual({ viewState, focused: true })
+  })
+
   it('re-keys a dirty draft, marks a pending save and retargets the explorer and code panes', () => {
     const oldKey = dirtyDraft(PROJECT, 'README.md', 'edited\n')
     const files = openPane('files', PROJECT)

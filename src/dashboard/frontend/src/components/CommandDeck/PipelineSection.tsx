@@ -1,43 +1,60 @@
-import { useMemo } from 'react';
+import { useMemo, type Ref } from 'react';
 import { groupPipelineEntries, type BucketedFeature, type IssueCostBreakdown } from './pipeline-helpers';
 import { PipelineRow } from './PipelineRow';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
+
+const NO_NEEDS_YOU: ReadonlySet<string> = new Set();
 
 export interface PipelineSectionProps {
   entries: readonly BucketedFeature[];
   issueCosts: Record<string, number>;
   issueCostDetails?: Record<string, IssueCostBreakdown>;
   onSelectFeature: (feature: ProjectFeature) => void;
+  /** Upper-cased issue ids the Needs-you list names (PAN-5294 G-D6). */
+  needsYouIssueIds?: ReadonlySet<string>;
+  /** Attached to the In review lane so the In review fact can scroll to it. */
+  inReviewRef?: Ref<HTMLDivElement>;
 }
 
-export function PipelineSection({ entries, issueCosts, issueCostDetails, onSelectFeature }: PipelineSectionProps) {
+/**
+ * PAN-5294 G-D5 — the Home pipeline: one bordered card with a lane bar per
+ * lane (Building, In review, Ready to merge, then Stalled when non-empty).
+ */
+export function PipelineSection({
+  entries,
+  issueCosts,
+  issueCostDetails,
+  onSelectFeature,
+  needsYouIssueIds = NO_NEEDS_YOU,
+  inReviewRef,
+}: PipelineSectionProps) {
   const groups = useMemo(() => groupPipelineEntries(entries), [entries]);
-  if (groups.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-3" data-testid="pipeline-section">
+    <div className="overflow-hidden rounded-[10px] border border-border bg-card" data-testid="pipeline-section">
       {groups.map((group) => (
-        <section
+        <div
           key={group.key}
-          aria-label={`${group.title.toLowerCase()} pipeline stage`}
+          role="region"
+          aria-label={`${group.title} lane`}
           data-phase-group={group.key}
+          ref={group.key === 'review' ? inReviewRef : undefined}
         >
-          <div className="mb-1.5 flex items-baseline gap-2.5">
-            <h3 className="text-[13px] font-semibold text-foreground">{group.title}</h3>
-            <span className="text-[11px] text-muted-foreground">{group.entries.length} {group.subtitle}</span>
+          <div className="border-b border-border bg-muted px-3.5 py-1.5 text-[12px] text-muted-foreground">
+            {group.title} · {group.entries.length}
           </div>
-          <div className="flex flex-col gap-2">
-            {group.entries.map((entry) => (
-              <PipelineRow
-                key={entry.feature.issueId}
-                entry={entry}
-                issueCosts={issueCosts}
-                issueCostDetails={issueCostDetails}
-                onSelectFeature={onSelectFeature}
-              />
-            ))}
-          </div>
-        </section>
+          {group.entries.map((entry) => (
+            <PipelineRow
+              key={entry.feature.issueId}
+              entry={entry}
+              lane={group.key}
+              needsYou={needsYouIssueIds.has(entry.feature.issueId.toUpperCase())}
+              issueCosts={issueCosts}
+              issueCostDetails={issueCostDetails}
+              onSelectFeature={onSelectFeature}
+            />
+          ))}
+        </div>
       ))}
     </div>
   );

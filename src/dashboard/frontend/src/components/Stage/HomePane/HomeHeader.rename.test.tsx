@@ -1,7 +1,7 @@
 import { afterEach, describe, it, expect, vi } from 'vitest'
 import { cleanup, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { WorkspaceHeader } from './WorkspaceHeader'
+import { HomeHeader } from './HomeHeader'
 import { useProjectRename } from './useProjectRename'
 
 vi.mock('../../../lib/wsTransport', () => ({
@@ -11,14 +11,18 @@ vi.mock('../../../lib/wsTransport', () => ({
   })),
 }))
 
+vi.mock('../../CommandDeck/ProjectSettingsDisclosure', () => ({
+  ProjectSettingsSection: () => <div data-testid="project-settings-section" />,
+}))
+
 /**
- * PAN-3156 — the project rename affordance now lives on the `# <project>`
- * title. These are the rename behaviours previously exercised through
- * ProjectOverview's hero billboard, plus the variant gate.
+ * PAN-5294 — the project rename affordance moved from WorkspaceHeader's
+ * project variant onto the Home header title. Same behaviours as the
+ * PAN-3156 WorkspaceHeader rename tests.
  */
 function Harness({ projectName, projectKey }: { projectName: string; projectKey?: string }) {
   const rename = useProjectRename(projectName, projectKey)
-  return <WorkspaceHeader variant="project" name={projectName} branch="main" rename={rename} />
+  return <HomeHeader title={projectName} rename={rename} />
 }
 
 function render(ui: Parameters<typeof rtlRender>[0]) {
@@ -31,8 +35,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('WorkspaceHeader rename affordance', () => {
-  it('renders the pencil for the project variant only', () => {
+describe('HomeHeader rename affordance', () => {
+  it('renders the pencil only when rename controls are given', () => {
     const rename = {
       editing: false,
       draftName: '',
@@ -44,13 +48,10 @@ describe('WorkspaceHeader rename affordance', () => {
       commit: vi.fn(),
       cancel: vi.fn(),
     }
-    const { rerender } = rtlRender(<WorkspaceHeader variant="project" name="Overdeck" rename={rename} />)
+    const { rerender } = rtlRender(<HomeHeader title="Overdeck" rename={rename} />)
     expect(screen.getByRole('button', { name: 'Rename Overdeck' })).toBeInTheDocument()
 
-    rerender(<WorkspaceHeader variant="issue" name="Overdeck" rename={rename} />)
-    expect(screen.queryByRole('button', { name: 'Rename Overdeck' })).not.toBeInTheDocument()
-
-    rerender(<WorkspaceHeader variant="project" name="Overdeck" />)
+    rerender(<HomeHeader title="Overdeck" />)
     expect(screen.queryByRole('button', { name: 'Rename Overdeck' })).not.toBeInTheDocument()
   })
 
