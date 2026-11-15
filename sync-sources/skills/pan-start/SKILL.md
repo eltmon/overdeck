@@ -63,6 +63,9 @@ The default planning mode comes from `planning.default_mode` in `~/.overdeck/con
 the shipped default is `auto`. The legacy `--auto` flag is deprecated and is now an alias
 for `--plan skip`.
 
+`--plan skip` writes the synthesized spec into the issue workspace's `.pan/specs/`, on
+the feature branch, never into the primary checkout.
+
 `--model` and `--harness` apply to this run only (PAN-3917: the per-issue policy
 record they used to persist to is gone, and nothing is derivable from it). When
 this start also kicks off planning, the auto-start handoff — including the
