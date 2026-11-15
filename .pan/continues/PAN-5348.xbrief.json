@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5348",
   "created": "2026-11-15T13:34:43.139Z",
-  "updated": "2026-11-15T14:01:24.694Z",
+  "updated": "2026-11-15T14:01:29.458Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,11 @@
     "result-row-help-test.ac2": {
       "status": "completed",
       "doneAt": "2026-11-15T14:01:24.694Z"
+    },
+    "ci-frontend-subset": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5348",
+      "claimedAt": "2026-11-15T14:01:29.458Z"
     }
   }
 }
