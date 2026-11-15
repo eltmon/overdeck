@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5353",
+  "created": "2026-11-15T14:41:35.965Z",
+  "updated": "2026-11-15T14:41:35.965Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "pane-chord": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5353",
+      "claimedAt": "2026-11-15T14:41:35.965Z"
+    }
+  }
+}
