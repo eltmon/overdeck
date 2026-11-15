@@ -1,9 +1,13 @@
 /**
  * Explorer search (PAN-5183, FR-6).
  *
- * `searchFiles` fuzzy-matches file names over `git ls-files` (tracked plus
- * untracked, non-ignored), cached per root for 30 s. `searchContent` runs
- * `git grep` and converts its byte columns to UTF-16 columns.
+ * `searchFiles` matches file paths over `git ls-files` (tracked plus
+ * untracked, non-ignored), cached per root for 30 s. Results rank by match
+ * tier (PAN-5289 §6.6, B-D6): an exact file name, a name prefix, a name
+ * substring, a path substring, then the fuzzy fallback. The client's
+ * `fileMatchTier` (frontend explorer/search/fileMatch.ts) uses the same table,
+ * and one JSON case table tests both. `searchContent` runs `git grep` and
+ * converts its byte columns to UTF-16 columns.
  */
 import type { ExplorerSearchContentMatch, ExplorerSearchContentResult } from '@overdeck/contracts';
 import { explorerError } from './errors.js';
@@ -64,6 +68,28 @@ export function fuzzyScore(path: string, query: string): number | null {
   return score;
 }
 
+export type FileMatchTier = 0 | 1 | 2 | 3 | 4;
+
+/**
+ * The match tier of `path` for `query` (first true wins; q = query trimmed and
+ * lowercased, base = the text after the last '/'): 0 base === q, 1 base starts
+ * with q, 2 base contains q (tiers 0-2 only when q has no '/'), 3 the path
+ * contains q, 4 fuzzyScore matches. Null for no match or an empty query.
+ */
+export function fileMatchTier(path: string, query: string): FileMatchTier | null {
+  const q = query.trim().toLowerCase();
+  if (q === '') return null;
+  const p = path.toLowerCase();
+  if (!q.includes('/')) {
+    const base = p.slice(p.lastIndexOf('/') + 1);
+    if (base === q) return 0;
+    if (base.startsWith(q)) return 1;
+    if (base.includes(q)) return 2;
+  }
+  if (p.includes(q)) return 3;
+  return fuzzyScore(path, query) !== null ? 4 : null;
+}
+
 function clampLimit(limit: number): number {
   if (!Number.isFinite(limit)) return MAX_LIMIT;
   return Math.min(MAX_LIMIT, Math.max(1, Math.floor(limit)));
@@ -76,12 +102,20 @@ export async function searchFiles(
   opts: SearchClock = {},
 ): Promise<{ paths: string[] }> {
   const paths = await fileList(root, (opts.now ?? Date.now)());
-  const scored: Array<{ path: string; score: number }> = [];
+  const scored: Array<{ path: string; tier: FileMatchTier; score: number }> = [];
   for (const path of paths) {
-    const score = fuzzyScore(path, query);
-    if (score !== null) scored.push({ path, score });
+    const tier = fileMatchTier(path, query);
+    if (tier === null) continue;
+    scored.push({ path, tier, score: tier === 4 ? (fuzzyScore(path, query) ?? 0) : 0 });
   }
-  scored.sort((a, b) => b.score - a.score || a.path.length - b.path.length || a.path.localeCompare(b.path));
+  // Tier first; tiers 0-3 then shorter paths; the fuzzy tier keeps its score order.
+  scored.sort(
+    (a, b) =>
+      a.tier - b.tier ||
+      (a.tier === 4 ? b.score - a.score : 0) ||
+      a.path.length - b.path.length ||
+      a.path.localeCompare(b.path),
+  );
   return { paths: scored.slice(0, clampLimit(limit)).map((s) => s.path) };
 }
 
