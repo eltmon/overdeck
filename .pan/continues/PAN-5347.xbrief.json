@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5347",
   "created": "2026-11-15T13:35:45.395Z",
-  "updated": "2026-11-15T13:59:02.261Z",
+  "updated": "2026-11-15T14:05:06.930Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,9 +80,22 @@
       "doneAt": "2026-11-15T13:58:38.794Z"
     },
     "frontend-get-slash-commands-skills": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5347",
-      "claimedAt": "2026-11-15T13:59:02.261Z"
+      "claimedAt": "2026-11-15T13:59:02.261Z",
+      "doneAt": "2026-11-15T14:05:06.930Z"
+    },
+    "frontend-get-slash-commands-skills.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:05:06.930Z"
+    },
+    "frontend-get-slash-commands-skills.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:05:06.930Z"
+    },
+    "frontend-get-slash-commands-skills.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:05:06.930Z"
     }
   }
 }
