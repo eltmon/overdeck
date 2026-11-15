@@ -181,7 +181,10 @@ describe('remote request gate (PAN-3762)', () => {
   });
 
   it('applies require_token_mint after invalidation without a restart', async () => {
-    const loopbackMint = () => rejectUnauthorizedDashboardSessionMintRequest(makeRequest('POST', '/api/dashboard/session', { peer: '127.0.0.1' }));
+    // A forwarded loopback mint is the shape the toggle changes; a plain local one always mints (PAN-5344).
+    const loopbackMint = () => rejectUnauthorizedDashboardSessionMintRequest(
+      makeRequest('POST', '/api/dashboard/session', { peer: '127.0.0.1', headers: { 'x-forwarded-for': '203.0.113.9' } }),
+    );
 
     await setRequireTokenMint(false);
     expect(loopbackMint()).toBeNull();

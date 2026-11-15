@@ -411,12 +411,12 @@ describe('AccessTokensSection — require_token_mint toggle row (PAN-4435 WI-6)'
     });
   });
 
-  it('renders the "a new browser on this machine then needs" sentence', async () => {
+  it('says a browser on this machine always signs in (PAN-5344)', async () => {
     mockFetch();
     renderSection();
     await screen.findByText('ci-bot');
 
-    expect(screen.getByText(/a new browser on this machine then needs/)).toBeInTheDocument();
+    expect(screen.getByText(/A browser on this machine always signs in/)).toBeInTheDocument();
   });
 
   it('renders the toggle aria-checked="false" when formData has no dashboard key', async () => {

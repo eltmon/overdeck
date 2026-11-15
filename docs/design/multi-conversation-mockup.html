@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en" data-theme="broadsheet">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overdeck multi-conversation mockup</title>
+<style>
+@font-face { font-family: 'Geist Variable'; font-weight: 100 900; src: url('../../src/dashboard/frontend/public/fonts/Geist-Variable.woff2') format('woff2'); }
+@font-face { font-family: 'Geist Mono Variable'; font-weight: 100 900; src: url('../../src/dashboard/frontend/public/fonts/GeistMono-Variable.woff2') format('woff2'); }
+:root {
+  --background: hsl(0 0% 96.5%); --foreground: hsl(35 10% 14%);
+  --card: hsl(30 8% 94.5%); --popover: hsl(30 8% 97%);
+  --muted-foreground: hsl(35 5% 42%); --border: hsl(30 4% 88.5%);
+  --body-foreground: hsl(35 8% 28%); --faint-foreground: hsl(35 3% 62%);
+  --primary: oklch(0.488 0.217 264); --primary-ink: oklch(0.42 0.19 264);
+  --accent: color-mix(in srgb, black 4.5%, transparent);
+  --signal-cost: #0891b2; --add-fg: #047857; --del-fg: #b91c1c;
+  --state-live: #2563eb; --state-needs-you: #d97706; --state-done: #059669; --state-idle: hsl(35 3% 62%);
+  --radius: 6px; --surface: hsl(0 0% 99%);
+  --shadow-floating: 0 12px 32px -8px rgb(0 0 0 / 0.18), 0 2px 6px rgb(0 0 0 / 0.08);
+  --font-body: 'Geist Variable', system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+}
+html.dark {
+  --background: hsl(0 0% 12.5%); --foreground: hsl(30 8% 94%);
+  --card: hsl(0 0% 17%); --popover: hsl(0 0% 18.5%);
+  --muted-foreground: hsl(30 2% 66%); --border: hsl(0 0% 22.7%);
+  --body-foreground: hsl(30 2% 88%); --faint-foreground: hsl(30 1% 48%);
+  --primary: oklch(0.588 0.217 264); --primary-ink: oklch(0.7 0.19 264);
+  --accent: color-mix(in srgb, white 7%, transparent);
+  --signal-cost: #22d3ee; --add-fg: #6ee7b7; --del-fg: #fca5a5;
+  --state-live: #3b82f6; --state-needs-you: #f59e0b; --state-done: #10b981; --state-idle: hsl(30 1% 48%);
+  --surface: hsl(0 0% 14.5%);
+  --shadow-floating: 0 16px 40px -8px rgb(0 0 0 / 0.6), 0 2px 8px rgb(0 0 0 / 0.4);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { font-family: var(--font-body); font-size: 13px; line-height: 1.55; color: var(--foreground); background: var(--background); -webkit-font-smoothing: antialiased; overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+textarea { font: inherit; color: inherit; }
+.mono { font-family: var(--font-mono); }
+.muted { color: var(--muted-foreground); }
+.faint { color: var(--faint-foreground); }
+svg.i { width: 15px; height: 15px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+svg.i.sm { width: 13px; height: 13px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
+.kbd { font-family: var(--font-mono); font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--accent); color: var(--muted-foreground); border: 1px solid var(--border); line-height: 18px; white-space: nowrap; }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); font-size: 12.5px; white-space: nowrap; }
+.btn:hover { background: var(--accent); }
+.btn.icon { width: 28px; padding: 0; justify-content: center; }
+.btn.ghost { border-color: transparent; background: transparent; }
+.eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.num { font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }
+.num b { color: var(--add-fg); font-weight: 500; } .num i { color: var(--del-fg); font-style: normal; }
+.cost { color: var(--signal-cost); font-family: var(--font-mono); font-size: 11px; }
+.pmark { width: 18px; height: 18px; border-radius: 5px; display: inline-grid; place-items: center; font-weight: 600; font-size: 9.5px; color: white; flex: none; }
+.pmark.lg { width: 26px; height: 26px; font-size: 12px; border-radius: 6px; }
+
+/* frame */
+.app { display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-rows: 44px minmax(0, 1fr); height: 100vh; }
+.top { grid-column: 1 / -1; display: grid; grid-template-columns: 280px 1fr auto; align-items: center; border-bottom: 1px solid var(--border); }
+.brand { display: flex; align-items: center; gap: 8px; padding-left: 16px; font-weight: 600; font-size: 14.5px; }
+.top-mid { display: flex; align-items: center; gap: 6px; padding-left: 14px; color: var(--muted-foreground); }
+.top-mid b { color: var(--foreground); font-weight: 500; }
+.top-right { display: flex; align-items: center; gap: 6px; padding: 0 10px; }
+.pill { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); font-size: 12.5px; }
+.pill.needs { border-color: color-mix(in srgb, var(--state-needs-you) 45%, var(--border)); background: color-mix(in srgb, var(--state-needs-you) 9%, var(--surface)); }
+
+/* left column */
+.left { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+.proj-switch { margin: 10px 10px 4px; display: flex; align-items: center; gap: 9px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); text-align: left; }
+.proj-switch .nm { font-weight: 600; font-size: 13.5px; }
+.proj-switch .path { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); }
+.nav { padding: 2px 8px; }
+.nav a { display: flex; align-items: center; gap: 9px; height: 28px; padding: 0 9px; border-radius: var(--radius); color: var(--body-foreground); cursor: pointer; }
+.nav a:hover { background: var(--accent); }
+.nav a .r { margin-left: auto; font-size: 11.5px; color: var(--muted-foreground); }
+.newconv { margin: 6px 10px; display: flex; border: 1px solid var(--border); border-radius: var(--radius); }
+.newconv .main { flex: 1; display: flex; flex-direction: column; padding: 5px 9px; text-align: left; }
+.newconv .main .l1 { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.newconv .main .l2 { padding-left: 23px; font-size: 11px; color: var(--muted-foreground); display: flex; align-items: center; gap: 5px; }
+.newconv .caret { width: 30px; border-left: 1px solid var(--border); display: grid; place-items: center; color: var(--muted-foreground); }
+.sect { display: flex; align-items: center; gap: 8px; padding: 12px 14px 4px; }
+.scope { display: flex; margin: 2px 10px 4px; padding: 3px; border: 1px solid var(--border); border-radius: var(--radius); }
+.scope button { flex: 1; font-size: 12px; padding: 3px 8px; border-radius: 4px; color: var(--muted-foreground); }
+.scope button.on { background: var(--card); color: var(--foreground); box-shadow: 0 0 0 1px var(--border); }
+.seg2 { margin-left: auto; display: flex; gap: 2px; }
+.seg2 button { font-size: 11.5px; padding: 2px 8px; border-radius: 4px; color: var(--muted-foreground); }
+.seg2 button.on { background: var(--card); color: var(--foreground); box-shadow: 0 0 0 1px var(--border); }
+.list { overflow: auto; flex: 1; padding: 0 6px 10px; }
+.pgroup { display: flex; align-items: center; gap: 7px; padding: 10px 8px 3px; font-size: 11.5px; color: var(--muted-foreground); }
+.pgroup b { color: var(--foreground); font-weight: 500; }
+.pgroup .r { margin-left: auto; }
+.row { padding: 5px 8px 6px; border-radius: var(--radius); cursor: pointer; position: relative; display: flex; gap: 8px; }
+.row:hover { background: var(--accent); }
+.row.on { background: var(--card); }
+.row .body { min-width: 0; flex: 1; }
+.row .t { display: flex; align-items: center; gap: 7px; font-weight: 500; white-space: nowrap; overflow: hidden; }
+.row .t span.x { overflow: hidden; text-overflow: ellipsis; }
+.row .m { display: flex; gap: 6px; align-items: center; padding-left: 14px; font-size: 11.5px; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; }
+.row .slot { flex: none; font-family: var(--font-mono); font-size: 10.5px; line-height: 16px; height: 18px; min-width: 18px; text-align: center; border-radius: 4px; border: 1px solid color-mix(in srgb, var(--primary) 40%, var(--border)); color: var(--primary-ink); margin-top: 1px; }
+.row .hov { position: absolute; right: 6px; top: 6px; display: none; gap: 2px; }
+.row:hover .hov { display: flex; }
+.hov button { height: 24px; padding: 0 8px; border-radius: 4px; font-size: 11px; color: var(--muted-foreground); background: var(--popover); border: 1px solid var(--border); display: inline-flex; align-items: center; gap: 4px; }
+.hov button:hover { color: var(--foreground); }
+.left-foot { border-top: 1px solid var(--border); display: flex; align-items: center; gap: 4px; padding: 6px 8px; }
+
+/* stage */
+.stage { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.tabs { display: flex; align-items: stretch; height: 38px; border-bottom: 1px solid var(--border); padding-left: 4px; }
+.tab { display: flex; align-items: center; gap: 7px; padding: 0 10px; max-width: 240px; color: var(--muted-foreground); border-bottom: 2px solid transparent; white-space: nowrap; }
+.tab .l { overflow: hidden; text-overflow: ellipsis; }
+.tab.on { color: var(--foreground); border-bottom-color: var(--foreground); }
+.tabs .spacer { flex: 1; }
+.layout { display: flex; align-items: center; gap: 2px; padding: 0 8px; position: relative; }
+.layout .lbl { font-size: 11.5px; color: var(--muted-foreground); margin-right: 4px; }
+.lay { width: 30px; height: 26px; border-radius: 5px; display: grid; place-items: center; color: var(--muted-foreground); }
+.lay:hover { background: var(--accent); color: var(--foreground); }
+.lay.on { background: var(--card); color: var(--foreground); box-shadow: 0 0 0 1px var(--border); }
+.lay svg { width: 18px; height: 14px; }
+.grid { flex: 1; min-height: 0; display: grid; gap: 0; }
+.grid.n1 { grid-template-columns: 1fr; }
+.grid.n2 { grid-template-columns: 1fr 1fr; }
+.grid.n3 { grid-template-columns: 1fr 1fr 1fr; }
+.grid.n4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); position: relative; }
+.pane.focus { box-shadow: inset 0 2px 0 var(--primary); }
+.ph { padding: 8px 12px 7px; border-bottom: 1px solid var(--border); }
+.ph-row { display: flex; align-items: center; gap: 7px; }
+.ph-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ph-acts { margin-left: auto; display: flex; gap: 2px; color: var(--muted-foreground); }
+.ph-acts button { width: 24px; height: 24px; border-radius: 4px; display: grid; place-items: center; }
+.ph-acts button:hover { background: var(--accent); color: var(--foreground); }
+.ph-meta { display: flex; align-items: center; gap: 0; font-size: 11.5px; color: var(--muted-foreground); margin-top: 1px; white-space: nowrap; overflow: hidden; }
+.ph-meta > * + *::before { content: '·'; margin: 0 6px; color: var(--faint-foreground); }
+.tx { flex: 1; overflow: auto; padding: 12px 14px; font-size: 13px; color: var(--body-foreground); }
+.tx .u { margin: 0 0 10px auto; max-width: 85%; width: fit-content; background: var(--card); border: 1px solid var(--border); border-radius: 9px; padding: 6px 10px; }
+.tx p { margin: 0 0 9px; }
+.tx .wk { font-size: 11.5px; color: var(--muted-foreground); margin-bottom: 8px; }
+.pane.compact .tx { font-size: 12.5px; }
+.cmp { margin: 0 10px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 7px 10px; display: flex; align-items: center; gap: 8px; color: var(--faint-foreground); }
+.pane.focus .cmp { border-color: color-mix(in srgb, var(--primary) 55%, var(--border)); }
+.cmp .send { margin-left: auto; width: 26px; height: 26px; border-radius: 7px; background: var(--primary); color: white; display: grid; place-items: center; }
+.needs-banner { margin: 8px 10px 0; padding: 6px 9px; border-radius: 6px; font-size: 12px; border: 1px solid color-mix(in srgb, var(--state-needs-you) 45%, var(--border)); background: color-mix(in srgb, var(--state-needs-you) 8%, var(--surface)); display: flex; gap: 8px; align-items: center; }
+.drop { position: absolute; inset: 0; display: none; pointer-events: none; }
+.show-drop .drop { display: grid; grid-template-columns: 1fr 1fr; }
+.drop div { margin: 10px; border: 2px dashed color-mix(in srgb, var(--primary) 60%, transparent); border-radius: 10px; background: color-mix(in srgb, var(--primary) 7%, transparent); display: grid; place-items: center; color: var(--primary-ink); font-weight: 500; }
+.drop div.hot { background: color-mix(in srgb, var(--primary) 16%, transparent); border-style: solid; }
+.ghostrow { position: absolute; z-index: 30; width: 250px; padding: 6px 10px; border-radius: 8px; background: var(--popover); border: 1px solid var(--border); box-shadow: var(--shadow-floating); font-weight: 500; display: none; }
+.show-drop .ghostrow { display: block; }
+.menu { position: absolute; z-index: 40; min-width: 250px; padding: 4px; background: var(--popover); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-floating); display: none; }
+.menu.on { display: block; }
+.menu .item { display: flex; align-items: center; gap: 9px; width: 100%; padding: 6px 9px; border-radius: 5px; text-align: left; }
+.menu .item:hover, .menu .item.hl { background: var(--accent); }
+.menu .item .kbd { margin-left: auto; }
+.menu .sep { height: 1px; background: var(--border); margin: 4px 2px; }
+
+/* scene switcher + notes */
+.scenes { position: fixed; left: 12px; bottom: 12px; z-index: 60; background: #1d1d1f; color: #f5f5f7; border-radius: 12px; padding: 10px; width: 520px; box-shadow: 0 16px 40px rgb(0 0 0 / .4); font-size: 12.5px; }
+.scenes .hd { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-weight: 600; }
+.scenes .hd button { margin-left: auto; font-size: 11px; padding: 2px 8px; border: 1px solid #555; border-radius: 6px; }
+.scenes .btns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.scenes .btns button { padding: 6px 4px; border-radius: 8px; background: #2c2c2e; text-align: center; line-height: 1.3; }
+.scenes .btns button.on { background: #3a3a5c; box-shadow: inset 0 0 0 1px #7c7cff; }
+.scenes .note { margin-top: 8px; color: #c7c7cc; line-height: 1.5; }
+.scenes .note b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="brand"><svg class="i" viewBox="0 0 24 24" style="color:var(--primary)"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/></svg>Overdeck</div>
+    <div class="top-mid" id="crumbs"></div>
+    <div class="top-right">
+      <span class="pill"><span class="dot" style="background:var(--state-live)"></span>5 agents working</span>
+      <span class="pill needs"><span class="dot" style="background:var(--state-needs-you)"></span>Needs you · 2</span>
+      <button class="btn icon ghost" id="themeBtn" title="Theme"><svg class="i" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+    </div>
+  </div>
+
+  <aside class="left">
+    <button class="proj-switch" id="projSwitch"></button>
+    <div class="nav">
+      <a id="navHome"><svg class="i" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span id="navHomeLabel">Project home</span></a>
+      <a><svg class="i" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Flywheel<span class="r">running</span></a>
+      <a><svg class="i" viewBox="0 0 24 24"><path d="M4 5h7v14H4zM13 5h7v14h-7z"/></svg>Order books</a>
+      <a><svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>More</a>
+    </div>
+    <div class="newconv">
+      <button class="main"><span class="l1"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New conversation<span class="kbd" style="margin-left:auto">N</span></span>
+      <span class="l2"><span style="color:#d97757">✳</span>Opus 5.5 · High</span></button>
+      <button class="caret"><svg class="i sm" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+    </div>
+    <div class="sect"><span class="eyebrow">Conversations</span>
+      <div class="seg2"><button class="on" id="fActive">Active</button><button id="fAll">All</button></div>
+    </div>
+    <div class="scope"><button id="scopeProj">This project</button><button id="scopeAll">All projects</button></div>
+    <div class="list" id="list"></div>
+    <div class="left-foot muted">
+      <button class="btn icon ghost" title="Settings"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg></button>
+      <button class="btn icon ghost" title="Machines"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="6" rx="1"/><rect x="3" y="14" width="18" height="6" rx="1"/></svg></button>
+      <span class="mono" style="font-size:11px;margin-left:4px">v0.86.0</span>
+      <span style="margin-left:auto" class="kbd">?</span>
+    </div>
+  </aside>
+
+  <main class="stage" id="stage">
+    <div class="tabs">
+      <div class="tab" id="homeTab"><svg class="i sm" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></svg><span class="l" id="homeTabLabel">Home</span></div>
+      <div class="tab on"><svg class="i sm" viewBox="0 0 24 24"><rect x="3" y="4" width="8" height="16" rx="1"/><rect x="13" y="4" width="8" height="16" rx="1"/></svg><span class="l" id="viewTabLabel">Side by side</span></div>
+      <div class="spacer"></div>
+      <div class="layout" id="layoutBar">
+        <span class="lbl">Layout</span>
+        <button class="lay" data-n="1" title="One (Ctrl+Alt+1 focuses a pane)"><svg viewBox="0 0 18 14" fill="none" stroke="currentColor"><rect x=".5" y=".5" width="17" height="13" rx="2"/></svg></button>
+        <button class="lay" data-n="2" title="Two side by side"><svg viewBox="0 0 18 14" fill="none" stroke="currentColor"><rect x=".5" y=".5" width="17" height="13" rx="2"/><path d="M9 1v12"/></svg></button>
+        <button class="lay" data-n="3" title="Three columns"><svg viewBox="0 0 18 14" fill="none" stroke="currentColor"><rect x=".5" y=".5" width="17" height="13" rx="2"/><path d="M6.2 1v12M11.8 1v12"/></svg></button>
+        <button class="lay" data-n="4" title="Grid of four"><svg viewBox="0 0 18 14" fill="none" stroke="currentColor"><rect x=".5" y=".5" width="17" height="13" rx="2"/><path d="M9 1v12M1 7h16"/></svg></button>
+      </div>
+    </div>
+    <div class="grid" id="grid"></div>
+  </main>
+</div>
+
+<div class="ghostrow" id="ghostrow"></div>
+<div class="menu" id="rowMenu">
+  <button class="item hl"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="8" height="16" rx="1"/><rect x="13" y="4" width="8" height="16" rx="1"/></svg>Open beside<span class="kbd">Ctrl+Click</span></button>
+  <button class="item"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/></svg>Open here (replace focused pane)<span class="kbd">Click</span></button>
+  <button class="item"><svg class="i" viewBox="0 0 24 24"><path d="M14 4h6v6M10 14L20 4M20 14v6H4V4h6"/></svg>Open in its project</button>
+  <div class="sep"></div>
+  <button class="item"><svg class="i" viewBox="0 0 24 24"><path d="M12 17l-5 3 1-6-4-4 6-1 2-5 2 5 6 1-4 4 1 6z"/></svg>Favorite</button>
+  <button class="item muted">… the rest of today's row menu</button>
+</div>
+
+<div class="scenes">
+  <div class="hd">Multi-conversation mockup<button id="notesBtn">hide notes</button></div>
+  <div class="btns">
+    <button data-scene="list">1 · List all<br>projects</button>
+    <button data-scene="two">2 · Two side<br>by side</button>
+    <button data-scene="four">3 · Grid of<br>four</button>
+    <button data-scene="open">4 · How you open<br>one beside</button>
+  </div>
+  <div class="note" id="note"></div>
+</div>
+
+<script>
+const P = {
+  overdeck: { name: 'overdeck', mark: 'OV', color: '#4f46e5', path: '~/Projects/overdeck' },
+  dfai: { name: 'DFAI', mark: 'DF', color: '#b45309', path: '~/Projects/dfai' },
+  myn: { name: 'mind-your-now', mark: 'MY', color: '#0f766e', path: '~/Projects/myn' },
+  botland: { name: 'botland', mark: 'BO', color: '#7c3aed', path: '~/Projects/botland' },
+};
+const CONVS = [
+  { id: 1, p: 'overdeck', title: 'Overdeck dashboard redesign', state: 'working', meta: ['Working', 'no file changes'], cost: '$32.47', branch: 'main' },
+  { id: 2, p: 'overdeck', title: 'Implement safe Overdeck shutdown', state: 'idle', meta: ['Idle 4m', '+212 −40'], cost: '$8.10', branch: 'feature/pan-5301' },
+  { id: 3, p: 'overdeck', title: 'Flywheel', state: 'working', meta: ['Working', '20 handoffs · 3 working'], cost: '$630.39', branch: 'main' },
+  { id: 4, p: 'dfai', title: 'Fort 3D pop-in fixes and camera smoothing', state: 'needs', meta: ['Needs you', '+86 −1', '1 not committed'], cost: '$43.06', branch: 'main', ask: 'Approve the camera smoothing change?' },
+  { id: 5, p: 'dfai', title: 'Fort #23 Overseer', state: 'working', meta: ['Working', 'Codex', '+612 −3'], cost: '$12.80', branch: 'main' },
+  { id: 6, p: 'myn', title: 'Habit streak notifications', state: 'idle', meta: ['Idle 12m', '+44 −9'], cost: '$5.21', branch: 'feature/min-1102' },
+  { id: 7, p: 'botland', title: 'Twitch extension review status', state: 'needs', meta: ['Needs you', 'no file changes'], cost: '$1.90', branch: 'main', ask: 'Take the new config-panel screenshot for Twitch?' },
+];
+const DOT = { working: 'var(--state-live)', needs: 'var(--state-needs-you)', idle: 'var(--state-idle)' };
+const TX = {
+  1: ['Check F against the mockup and file fixes.', 'F is live on 062bf28. The left column replaces the sidebar, deck column and Awareness…', 'Ran 6 commands · read 4 files'],
+  2: ['Make pan down stop agents before the dashboard.', 'Done: pan down now drains agents first, then stops the dashboard. Tests pass.', 'Edited 3 files · made 1 commit'],
+  3: ['(loop) tick the order books', 'Tick 834: PAN-5294 G planning in slot A, PAN-5290 C building in slot B.', 'Ran 12 commands'],
+  4: ['Eltmon is walking in place during the check-in. Fix it.', 'The quicksave started the same second the 3D view went on air. The viewer now holds the last pose…', 'Edited 3 files · made 2 commits'],
+  5: ['Keep the overseer loop running tonight.', 'Overseer tick 41: two forts healthy, one stalled on a trade caravan; restarted its pathing.', 'Ran 9 commands'],
+  6: ['Streak notifications should respect quiet hours.', 'Quiet hours now gate the push send; added a test for the 22:00–07:00 window.', 'Edited 2 files'],
+  7: ['Where is the extension review?', 'Twitch replied: the review needs a new screenshot of the config panel. Want me to take it?', 'Read 1 file'],
+};
+const state = { scope: 'all', filter: 'active', n: 2, panes: [1, 4], focus: 0, scene: 'two', theme: 'light', drop: false, menu: false };
+
+function el(h) { const t = document.createElement('template'); t.innerHTML = h.trim(); return t.content.firstChild; }
+function pm(k, lg) { const p = P[k]; return `<span class="pmark${lg ? ' lg' : ''}" style="background:${p.color}">${p.mark}</span>`; }
+
+function renderSwitch() {
+  const s = document.getElementById('projSwitch');
+  if (state.scope === 'all') {
+    s.innerHTML = `<span class="pmark lg" style="background:var(--muted-foreground)">✱</span><div><div class="nm">All projects</div><div class="path">4 projects · 7 active</div></div><span style="margin-left:auto" class="muted">⌄</span>`;
+  } else {
+    s.innerHTML = `${pm('overdeck', true)}<div><div class="nm">overdeck</div><div class="path">~/Projects/overdeck</div></div><span style="margin-left:auto" class="muted">⌄</span>`;
+  }
+  document.getElementById('scopeAll').classList.toggle('on', state.scope === 'all');
+  document.getElementById('scopeProj').classList.toggle('on', state.scope === 'project');
+  document.getElementById('navHome').style.display = state.scope === 'all' ? 'none' : '';
+  document.getElementById('homeTab').style.display = state.scope === 'all' ? 'none' : '';
+  document.getElementById('crumbs').innerHTML = state.scope === 'all'
+    ? `<b>All projects</b> / ${state.n === 1 ? 'Conversation' : state.n + ' conversations side by side'}`
+    : `<b>overdeck</b> / ${state.n === 1 ? 'Conversation' : state.n + ' conversations side by side'}`;
+  document.getElementById('viewTabLabel').textContent = state.n === 1 ? (CONVS.find(c => c.id === state.panes[0])?.title ?? 'Conversation') : 'Side by side · ' + state.n;
+}
+
+function rowHtml(c) {
+  const slot = state.panes.slice(0, state.n).indexOf(c.id);
+  return `<div class="row${slot >= 0 ? ' on' : ''}" data-id="${c.id}">
+    <div class="body"><div class="t"><span class="dot" style="background:${DOT[c.state]}"></span><span class="x">${c.title}</span></div>
+    <div class="m">${c.meta.map(m => m.startsWith('+') ? `<span class="num"><b>${m.split(' ')[0]}</b> <i>${m.split(' ')[1]}</i></span>` : `<span${m === 'Needs you' ? ' style="color:var(--state-needs-you)"' : ''}>${m}</span>`).join('<span class="faint">·</span>')}<span class="faint">·</span><span class="cost">${c.cost}</span></div></div>
+    ${slot >= 0 && state.n > 1 ? `<span class="slot" title="Shown in pane ${slot + 1}">${slot + 1}</span>` : ''}
+    <div class="hov"><button data-beside="${c.id}" title="Open beside (Ctrl+Click)">⊞ Beside</button></div>
+  </div>`;
+}
+
+function renderList() {
+  const list = document.getElementById('list');
+  let convs = CONVS;
+  if (state.scope === 'project') convs = convs.filter(c => c.p === 'overdeck');
+  if (state.filter === 'active') convs = convs.filter(c => c.state !== 'done');
+  const needs = convs.filter(c => c.state === 'needs');
+  let html = '';
+  if (state.scope === 'all') {
+    if (needs.length) {
+      html += `<div class="pgroup"><span class="dot" style="background:var(--state-needs-you)"></span><b>Needs you</b><span class="r">${needs.length}</span></div>`;
+      html += needs.map(c => rowHtml(c).replace('<div class="body">', `<div class="body" style="position:relative">`).replace('<span class="x">', `${pm(c.p)}<span class="x">`)).join('');
+    }
+    for (const k of Object.keys(P)) {
+      const cs = convs.filter(c => c.p === k && c.state !== 'needs');
+      if (!cs.length) continue;
+      const working = cs.filter(c => c.state === 'working').length;
+      html += `<div class="pgroup">${pm(k)}<b>${P[k].name}</b><span class="r">${working ? working + ' working' : 'idle'}</span></div>`;
+      html += cs.map(rowHtml).join('');
+    }
+  } else {
+    html = convs.map(rowHtml).join('');
+  }
+  list.innerHTML = html;
+}
+
+function paneHtml(id, idx) {
+  const c = CONVS.find(x => x.id === id); const t = TX[id];
+  const compact = state.n >= 3;
+  return `<section class="pane${idx === state.focus ? ' focus' : ''}${compact ? ' compact' : ''}" data-idx="${idx}">
+    <div class="ph"><div class="ph-row">${pm(c.p)}<span class="ph-title">${c.title}</span>
+      <div class="ph-acts"><button title="Changes">±</button><button title="Files">▤</button><button title="Make this the only pane">⤢</button><button title="Close pane">✕</button></div></div>
+      <div class="ph-meta"><span style="color:${DOT[c.state]}">● ${c.state === 'needs' ? 'Needs you' : c.state === 'working' ? 'Working' : 'Idle'}</span><span class="mono">${P[c.p].path}</span>${compact ? '' : `<span class="mono">${c.branch}</span>`}<span class="cost">${c.cost}</span></div></div>
+    ${c.state === 'needs' ? `<div class="needs-banner"><span class="dot" style="background:var(--state-needs-you)"></span>Waiting for your answer: ${c.ask}<button class="btn" style="margin-left:auto;height:22px">Answer</button></div>` : ''}
+    <div class="tx"><div class="u">${t[0]}</div><div class="wk">▸ ${t[2]}</div><p>${t[1]}</p>${compact ? '' : '<p class="faint">…</p>'}</div>
+    <div class="cmp">Message ${P[c.p].name}…<span class="send">↑</span></div>
+  </section>`;
+}
+
+function renderGrid() {
+  const g = document.getElementById('grid');
+  g.className = 'grid n' + state.n + (state.drop ? ' show-drop' : '');
+  g.innerHTML = state.panes.slice(0, state.n).map(paneHtml).join('');
+  if (state.drop) {
+    const target = g.querySelector('.pane');
+    target.appendChild(el(`<div class="drop"><div>Replace this pane</div><div class="hot">Drop to open beside →</div></div>`));
+  }
+  document.querySelectorAll('.lay').forEach(b => b.classList.toggle('on', +b.dataset.n === state.n));
+}
+
+const NOTES = {
+  list: `<b>List every active conversation.</b> The Conversations section gets a <b>This project / All projects</b> switch. All projects groups rows by project (mark, name, working count), and anything waiting on you is lifted into a <b>Needs you</b> group at the top. Active / All still filters. The project switcher then reads "All projects", and Project home hides because there is no single project. Click a row to show it; rows already on screen carry their pane number.`,
+  two: `<b>Two conversations side by side</b>, from different projects. Each pane has its own compact header (project mark, title, state, folder, cost) and its <b>own composer</b>, so you can type into either one. The focused pane has a blue top edge; the top bar, the dock (Ctrl+Shift+E/G) and Ctrl+Alt+1..9 follow it. The <b>Layout</b> buttons switch 1 / 2 / 3 / 2×2.`,
+  four: `<b>Grid of four</b> for when you are juggling. Panes go compact (one meta line, shorter transcript), but each keeps its composer and a <b>Needs you</b> banner with an Answer button, so a blocked agent is visible without opening it. ⤢ makes a pane the only one; ✕ closes it and the others reflow.`,
+  open: `<b>Opening one beside another</b>, three ways: <b>Ctrl+Click</b> a row (Cmd+Click on Mac), the row's hover <b>⊞ Beside</b> button, or <b>drag</b> the row onto a pane: the right half opens beside it, the left half replaces it. A plain click shows the conversation in the focused pane. The row menu adds <b>Open beside</b> and <b>Open in its project</b> (back to the project's own deck). The layout is remembered per browser, so your 2 or 4 conversations are still there after a reload.`,
+};
+
+function render() {
+  document.documentElement.classList.toggle('dark', state.theme === 'dark');
+  renderSwitch(); renderList(); renderGrid();
+  document.querySelectorAll('.scenes .btns button').forEach(b => b.classList.toggle('on', b.dataset.scene === state.scene));
+  document.getElementById('note').innerHTML = NOTES[state.scene];
+  document.getElementById('fActive').classList.toggle('on', state.filter === 'active');
+  document.getElementById('fAll').classList.toggle('on', state.filter === 'all');
+  const gr = document.getElementById('ghostrow'), menu = document.getElementById('rowMenu');
+  gr.style.display = state.drop ? 'block' : 'none';
+  menu.classList.toggle('on', state.menu);
+  if (state.drop) {
+    const g = document.getElementById('grid').getBoundingClientRect();
+    gr.style.left = (g.left + g.width * 0.62) + 'px'; gr.style.top = (g.top + 220) + 'px';
+    gr.innerHTML = `${pm('myn')} Habit streak notifications`;
+  }
+  if (state.menu) {
+    const row = document.querySelector('.row[data-id="2"]');
+    if (row) { const r = row.getBoundingClientRect(); menu.style.left = (r.right - 20) + 'px'; menu.style.top = (r.top + 4) + 'px'; }
+  }
+}
+
+const SCENES = {
+  list: () => Object.assign(state, { scope: 'all', n: 1, panes: [4, 1, 5, 7], focus: 0, drop: false, menu: false }),
+  two: () => Object.assign(state, { scope: 'all', n: 2, panes: [1, 4, 5, 7], focus: 0, drop: false, menu: false }),
+  four: () => Object.assign(state, { scope: 'all', n: 4, panes: [1, 4, 5, 7], focus: 1, drop: false, menu: false }),
+  open: () => Object.assign(state, { scope: 'all', n: 1, panes: [1, 4, 5, 7], focus: 0, drop: true, menu: true }),
+};
+
+document.querySelectorAll('.scenes .btns button').forEach(b => b.onclick = () => { state.scene = b.dataset.scene; SCENES[state.scene](); render(); });
+document.getElementById('notesBtn').onclick = (e) => { const n = document.getElementById('note'); const hide = n.style.display !== 'none'; n.style.display = hide ? 'none' : ''; e.target.textContent = hide ? 'show notes' : 'hide notes'; };
+document.getElementById('themeBtn').onclick = () => { state.theme = state.theme === 'dark' ? 'light' : 'dark'; render(); };
+document.getElementById('scopeAll').onclick = () => { state.scope = 'all'; render(); };
+document.getElementById('scopeProj').onclick = () => { state.scope = 'project'; render(); };
+document.getElementById('fActive').onclick = () => { state.filter = 'active'; render(); };
+document.getElementById('fAll').onclick = () => { state.filter = 'all'; render(); };
+document.querySelectorAll('.lay').forEach(b => b.onclick = () => { state.n = +b.dataset.n; state.focus = Math.min(state.focus, state.n - 1); state.drop = false; state.menu = false; render(); });
+document.getElementById('list').addEventListener('click', (e) => {
+  const beside = e.target.closest('[data-beside]');
+  const row = e.target.closest('.row'); if (!row) return;
+  const id = +(beside ? beside.dataset.beside : row.dataset.id);
+  state.drop = false; state.menu = false;
+  const shown = state.panes.slice(0, state.n);
+  if (beside || e.ctrlKey || e.metaKey) {
+    if (!shown.includes(id)) { state.panes = [...shown, id, ...state.panes.slice(state.n).filter(x => x !== id)]; state.n = Math.min(4, state.n + 1); }
+    state.focus = state.panes.indexOf(id);
+  } else if (shown.includes(id)) {
+    state.focus = shown.indexOf(id);
+  } else {
+    state.panes[state.focus] = id;
+  }
+  render();
+});
+document.getElementById('grid').addEventListener('click', (e) => {
+  const p = e.target.closest('.pane'); if (!p) return;
+  const idx = +p.dataset.idx;
+  if (e.target.closest('button[title="Close pane"]')) { state.panes.splice(idx, 1); state.n = Math.max(1, state.n - 1); state.focus = 0; }
+  else if (e.target.closest('button[title="Make this the only pane"]')) { const id = state.panes[idx]; state.panes = [id, ...state.panes.filter(x => x !== id)]; state.n = 1; state.focus = 0; }
+  else state.focus = idx;
+  state.drop = false; state.menu = false; render();
+});
+window.addEventListener('resize', render);
+SCENES.two(); render();
+</script>
+</body>
+</html>

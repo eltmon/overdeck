@@ -1,20 +1,21 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-11T07:56:13.901772Z · model: claude-opus-5-5 · open: 869_
+_Last sequenced: 2026-11-15T14:29:34.895404Z · model: claude-opus-5-5 · open: 896_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-5071 | S | medium | ok |  |  | In pipeline: device-flow /activate page becomes one Authorize click naming bot and machine; adds migration 0003 names. |
-| 2 | PAN-5125 | XS | medium | ok |  |  | In review (PR #5102): TTS daemon retries a runaway Qwen3-TTS take once, then trims it to 4s+len/9 and logs both cases. |
-| 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
-| 4 | PAN-5090 | XS | critical | ok |  |  | Herdr unit lacks OOMPolicy=continue: one OOM-killed pane child stops the service and kills every conversation; seen twice. |
-| 5 | PAN-4995 | S | high | ok |  |  | pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs |
+| 1 | PAN-5290 | L | high | ok |  |  | In pipeline: workflow redesign C — code opens beside the chat; edit-workspace bar, Create PR and PR status in the editor. |
+| 2 | PAN-5294 | L | high | ok |  |  | In pipeline: workflow redesign G — rebuilt project Home with actions first, needs-you, pipeline rows, recent changes. |
+| 3 | PAN-5348 | S | high | ok |  |  | In pipeline: bare /pan in the composer 404s with an error telling you to type /pan; make it list commands locally |
+| 4 | PAN-5337 | S | high | ok |  |  | In pipeline: every relative link in a Markdown preview opens a 404 /conv/<file> URL instead of the linked file. |
+| 5 | PAN-5338 | M | medium | ok |  |  | In pipeline: conversation diff view gets a rendered Markdown Preview and an Open file action. |
+| 5 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 6 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 7 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
 | 8 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 9 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
-| 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
+| 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; seen on MYN and now overdeck (PAN-5232). |
 | 11 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
 | 12 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 13 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
@@ -25,8 +26,9 @@ _Last sequenced: 2026-11-11T07:56:13.901772Z · model: claude-opus-5-5 · open: 
 | 18 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
 | 19 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
 | 20 | PAN-5104 | XS | high | ok |  |  | Stale cost hook bundle prices Fable 5.1/5.2 at Fable 5 rates; reconciler never corrects it. Unblocked: PAN-5103 merged. |
-| 21 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
-| 22 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
+| 21 | PAN-5347 | S | medium | ok |  |  | In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group |
+| 22 | PAN-5339 | S | medium | ok |  |  | In pipeline: conversation names, conv N forms and /conv URLs in messages become clickable links. |
+| 22 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 23 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
 | 24 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 25 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
@@ -48,13 +50,13 @@ _Last sequenced: 2026-11-11T07:56:13.901772Z · model: claude-opus-5-5 · open: 
 | 41 | PAN-3554 | M | critical | needs-refinement |  |  | Red main has no mechanical owner: it hid for ~5h because the merge gate renders red main as an empty queue, not an alarm. |
 | 42 | PAN-3532 | S | critical | ok |  |  | CI runs only a hand-picked slice of the frontend suite, so main stayed red on frontend for hours while every run reported green. |
 | 43 | PAN-4241 | XS | high | ok |  |  | computeWorkspaceRepoRoots joins an absolute repoPath, so polyrepo repos named unlike their path (fe/frontend) are skipped by pan task done. |
-| 44 | PAN-5091 | M | high | needs-refinement |  |  | No CLI/MCP verb or auto path resumes conversations after a Herdr restart; verb is concrete, auto-recovery needs a design call. |
+| 44 | PAN-5167 | S | critical | ok |  |  | Post-merge lifecycle refuses forever on one transient GitHub fetch failure; agent stays running and close-out is blocked. |
 | 45 | PAN-4396 | XS | critical | ok |  |  | test-skip gate fails closed on any branch diff over 1 MiB (execFile default maxBuffer); one-line fix unblocks big PRs |
 | 46 | PAN-3085 | XS | critical | needs-refinement |  |  | Review feedback is written to .overdeck/feedback but agents and the deacon merge gate are pointed at a nonexistent .pan/feedback. |
 | 47 | PAN-3653 | M | critical | ok |  |  | A strike blocked on red main has no owner that wakes it when main goes green; the session stays alive so recover refuses it. |
 | 48 | PAN-3630 | M | critical | ok |  |  | pan tell reported three deliveries to a live agent, moved all three to read/, and the agent received none — the delivery door lies. |
 | 49 | PAN-3805 | S | critical | needs-refinement |  |  | Codex idle poke spawns codex exec instead of the app-server door; failed sends still tick the counter and pause healthy agents |
-| 50 | PAN-5095 | S | high | ok |  |  | pan tell to a Codex app-server conversation always queues to mail and is never delivered; fix: post through app-server in every state. |
+| 50 | PAN-5139 | M | critical | ok |  |  | pan reload refuses both generations when the pan shim points at the non-live generation; deploys stall. |
 | 51 | PAN-3560 | M | critical | ok |  |  | PTY supervisor overloads under concurrent review convoys; fleet-wide 502 'input echo confirmation failed' kills resumes and feedback. |
 | 52 | PAN-3520 | S | critical | ok |  |  | Test gate records 'failed' for load-induced timeouts; retry timeout-only failures in isolation before writing a verdict. |
 | 53 | PAN-4439 | S | high | ok |  |  | CI relay has no backstop for webhooks missed during pan reload; red test jobs never reach the agent, PRs stall |
@@ -67,29 +69,29 @@ _Last sequenced: 2026-11-11T07:56:13.901772Z · model: claude-opus-5-5 · open: 
 | 60 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
 | 61 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
 | 62 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
-| 63 | PAN-4374 | S | high | ok |  |  | Memory extraction has no working provider on subscription-only hosts; nothing extracted since 2026-08-13. Add claude-cli |
+| 63 | PAN-5228 | S | high | ok |  |  | Advisory CodeRabbit journal entries land last and hide stalled reviews from recoverStalledReviews and other last-entry readers. |
 | 64 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
 | 65 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
 | 66 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
-| 67 | PAN-4622 | M | high | ok |  |  | Restart after consuming a verification result, or a dirty tree at boot, still re-runs 25-45 min of passed gates. PAN-4532 merged |
+| 67 | PAN-5193 | XS | high | ok |  |  | PRD-first gate reads a short main stub before the full workspace draft and refuses finalize for epic children. |
 | 68 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 69 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 70 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
-| 71 | PAN-4624 | S | high | ok |  |  | Polyrepo ci-mode test gate reads CI verdict for the wrapper HEAD, never the member repo PR head, so red CI is silently missed. |
+| 71 | PAN-5133 | M | high | ok |  |  | pan pause cannot hold a planned issue whose deferred work-agent start is retried; no operator door to stop it. |
 | 72 | PAN-4792 | S | high | ok |  |  | Paste guard only knows numbered menus; a failed paste presses Enter into unnumbered selects, silently setting defaultMode=auto. |
 | 73 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
 | 74 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
 | 75 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
 | 76 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
 | 77 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
-| 78 | PAN-4623 | XS | high | ok |  |  | deacon-lite stalled-review fallback calls a starter never registered in the deacon child, so stranded reviews stay stranded. TENET-10 |
+| 78 | PAN-5330 | S | high | ok |  |  | Workspace devcontainers share the 'server' DNS alias on the overdeck network, so a frontend can proxy to another workspace. |
 | 79 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
 | 80 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
 | 81 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
 | 82 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
 | 83 | PAN-3100 | S | critical | ok |  |  | The test role evaluates the dirty working tree, so a live work agent's uncommitted edits are recorded as the issue's test failure. |
 | 84 | PAN-4213 | M | high | ok |  |  | Merge-train follow-ups from #4066 (merged): stamp-vs-pin mismatch, reset --keep can strand agent commits, fetch retry, tests |
-| 85 | PAN-4753 | XL | high | needs-refinement | ✓ |  | Epic: restore merge trains (MergeTrain component, strike fast lane); PAN-4750 merged; PRD being written, no children yet; handoff. |
+| 85 | PAN-5263 | M | high | ok |  |  | Pipeline membership sees zero open overdeck issues: the App token lacks issues permission and the gh fallback never runs. |
 | 86 | PAN-3096 | S | critical | ok |  |  | pan done blocks on generated .devcontainer/ and dev, and agents resolve it by deleting workspace infrastructure or inventing gitignores. |
 | 87 | PAN-3084 | S | critical | needs-refinement |  |  | A review session spawned but never briefed sits at zero context forever, and restart 'preserves' the zombie that blocks its replacement. |
 | 88 | PAN-3043 | S | critical | needs-refinement |  |  | Provider health is probed only at spawn, so a mid-run 403 quota refusal leaves an agent 'running' for days holding a slot. |
@@ -179,7 +181,7 @@ _Last sequenced: 2026-11-11T07:56:13.901772Z · model: claude-opus-5-5 · open: 
 | 172 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
 | 173 | PAN-4577 | M | high | ok |  |  | Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked. |
 | 174 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
-| 175 | PAN-4634 | M | medium | needs-refinement |  |  | Terra unserved on claude-code route: no CLIProxy release (to v8.0.44) lists it; bump pin, add to GPT_56_MODELS. Aliases also broken. |
+| 175 | PAN-5250 | M | high | ok |  |  | Idle workspace frontend and dev containers never stop while an agent lives; ~9 GB held by unviewed Vite containers. |
 | 176 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
 | 177 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 178 | PAN-4847 | S | high | ok |  |  | Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open. |
@@ -207,7 +209,7 @@ _Last sequenced: 2026-11-11T07:56:13.901772Z · model: claude-opus-5-5 · open: 
 | 200 | PAN-3050 | XS | high | ok |  |  | Idle-stack reaper's regex only matches overdeck-feature-*-server|frontend, so MYN stacks run for hours after their agents are gone. |
 | 201 | PAN-4365 | S | medium | ok |  |  | Stale defaults: workhorses.expensive is Opus 4.8 and the flywheel role is a literal that ignores the slot; evals now unblocked |
 | 202 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard reads the shared working tree, so another session's uncommitted edits block an unrelated, guard-clean push. |
-| 203 | PAN-5124 | M | medium | ok |  |  | Operator-decided default swap: mid workhorse to Opus 5.5, cheap/background to Haiku 5.5; spec names every file. Pairs with PAN-4365. |
+| 203 | PAN-5295 | L | high | ok |  |  | Workflow redesign D2: turn card, file chips, composer controls, subagents rail and tab strip per mockup screen 1. |
 | 204 | PAN-3769 | S | high | needs-refinement |  |  | Red main 707089c5→e4b280b3 blocked deploys ~14h: missing no-loss lock entry + stale OpenRouter expectation. Verify still reproducing. |
 | 205 | PAN-3760 | S | high | ok |  |  | permissionMode 'auto' undocumented as non-bypass, launcher can emit invalid --permission-mode, invalid values drop silently. |
 | 206 | PAN-3629 | M | high | ok |  |  | No sanctioned door to re-scope a live agent; the operator must violate pan tell doctrine or let the rejected design land. |
@@ -219,7 +221,7 @@ _Last sequenced: 2026-11-11T07:56:13.901772Z · model: claude-opus-5-5 · open: 
 | 212 | PAN-3186 | XS | high | ok |  |  | One configured non-git member (auricle/infra) blanks pipeline membership for the whole project the resolver claims it can answer. |
 | 213 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
 | 214 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
-| 215 | PAN-3176 | S | high | ok |  |  | UAT promote consults no stack health, so a batch whose stack was never exercised can be promoted from a success-green control. |
+| 215 | PAN-5335 | M | high | ok |  |  | Workflow redesign F follow-up: collapse handoff groups, unclipped cost, footer label, one current nav item, keep project. |
 | 216 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
 | 217 | PAN-3047 | XS | high | ok |  |  | Strike-branch teardown uses --is-ancestor, which cannot see a squash merge, so all 96 strike/* branches survive as residue. |
 | 218 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
@@ -230,7 +232,7 @@ _Last sequenced: 2026-11-11T07:56:13.901772Z · model: claude-opus-5-5 · open: 
 | 223 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 224 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 225 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
-| 226 | PAN-5087 | S | high | ok |  |  | Attachment messages on every non-Claude harness never match their transcript echo and land in the failed outbox after 4 min. |
+| 226 | PAN-5284 | XL | high | ok | ✓ |  | Epic: workflow redesign — one left column, Files/Changes/Search dock, code beside chat, rebuilt Home. Open children: C, G, D2, F+, H. |
 | 227 | PAN-5116 | S | high | ok |  |  | restart-all closes the pane but the launcher ignores SIGHUP, so the old ACP host and agent child keep running; stop runtime first. |
 | 228 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 229 | PAN-4909 | S | high | ok |  |  | Mac set up with connect: Safari on localhost:3011 gets HTTP 401 from the loopback session mint, so the Mac's own dashboard won't load. |
@@ -369,13 +371,13 @@ _Last sequenced: 2026-11-11T07:56:13.901772Z · model: claude-opus-5-5 · open: 
 | 362 | PAN-2664 | S | medium | ok |  |  | auto-commit completes unresolved merge with conflict markers |
 | 363 | PAN-2663 | S | medium | ok |  |  | health probe can accept old dashboard after replacement EADDRINUSE |
 | 364 | PAN-2649 | S | medium | ok |  |  | Ctrl+K conversation search indexes Claude transcripts only |
-| 365 | PAN-2580 | S | medium | ok |  |  | pan tell cannot deliver to codex (GPT) conversations |
+| 365 | PAN-2580 | S | medium | needs-refinement |  |  | pan tell to codex (GPT) conversations; PAN-5095 (closed) added app-server delivery, so verify whether this is fixed. |
 | 366 | PAN-2572 | M | medium | ok |  |  | Noisy EBADENGINE + deprecation warnings on npx/npm install make a healthy install look broken |
 | 367 | PAN-2563 | S | medium | ok |  |  | npm-flavor desktop (npx @overdeck/desktop) lacks node_modules for the server's externalized deps |
 | 368 | PAN-2554 | S | medium | ok |  |  | clicking a project doesn't update the browser URL |
 | 369 | PAN-2550 | XS | medium | ok |  |  | npm test exits 0 despite root-suite failures |
 | 370 | PAN-2547 | S | medium | ok |  |  | pan restart --health-timeout parses seconds as milliseconds |
-| 371 | PAN-2546 | S | medium | ok |  |  | pan tell is codex-conversation-unaware |
+| 371 | PAN-2546 | S | medium | needs-refinement |  |  | pan tell is codex-conversation-unaware; PAN-5095 (closed) added app-server delivery, so verify whether this is fixed. |
 | 372 | PAN-4303 | S | medium | needs-refinement |  |  | Steer busy Codex app-server turns via turn/steer; verify first whether turn/start already steers. Needs PAN-4292's steerKind. |
 | 373 | PAN-3003 | XS | medium | ok |  |  | Generated launcher.sh files omit the OVERDECK_AGENT_ID export the PTY supervisor requires, so manual re-launch dies instantly. |
 | 374 | PAN-2501 | S | medium | ok |  |  | deleteResourceVenvEffect's HttpRouter.schemaParams call fails typecheck under the root tsconfig (masked by src/dashboard/** exclusion) |
@@ -399,503 +401,532 @@ _Last sequenced: 2026-11-11T07:56:13.901772Z · model: claude-opus-5-5 · open: 
 | 392 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
 | 393 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 394 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
-| 395 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
-| 396 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
-| 397 | PAN-1918 | XS | medium | ok |  |  | full frontend vitest suite runs in no CI path |
-| 398 | PAN-1912 | XS | medium | ok |  |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
-| 399 | PAN-4208 | M | medium | ok |  |  | #4205 follow-ups: Effect-free config read for telemetry to hit <100ms pan --version; CI import test for lazy command targets |
-| 400 | PAN-1846 | S | medium | needs-refinement |  |  | unbounded log growth |
-| 401 | PAN-1830 | S | medium | ok |  |  | Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY |
-| 402 | PAN-1816 | S | medium | ok |  |  | Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry |
-| 403 | PAN-1795 | S | medium | ok |  |  | Codebase map bootstrapped in planning worktree is never promoted to main |
-| 404 | PAN-1774 | S | medium | ok |  |  | workspace server container crashloops when dist/dashboard/server.js is missing |
-| 405 | PAN-1769 | S | medium | ok |  |  | Supervisor echo-confirm false negative on long messages → triple-paste delivery (rewrite ×2 + tmux fallback); resumed-conv message stil… |
-| 406 | PAN-1761 | S | medium | ok |  |  | conversations endpoints fetched via relative /api path |
-| 407 | PAN-1755 | S | medium | ok |  |  | uat stuck-assembly cap (30m) kills slow-but-alive assemblies and leaves orphaned conflict agents racing the next generation |
-| 408 | PAN-3516 | XS | medium | ok |  |  | Repo .claude/skills holds stale duplicates of pan-handoff, pan-flywheel and okf, so overdeck-dev sessions load outdated skill text. |
-| 409 | PAN-3455 | XS | medium | ok |  |  | cliproxy --version exits 2, so the up-to-date check always returns false and every ensure re-downloads the pinned release. |
-| 410 | PAN-3117 | XS | medium | ok |  |  | A deterministic 400 renders as the generic 'Failed to send' bubble with a Retry that can never succeed. |
-| 411 | PAN-3036 | XS | medium | ok |  |  | Pane-idle detection reads a completed strike's idle composer as a pending question, so a finished strike shows '! INPUT'. |
-| 412 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
-| 413 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
-| 414 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
-| 415 | PAN-5028 | M | medium | ok |  |  | list_pending_input loses a conversation's AskUserQuestion after the PAN-1520 deny hook, contrary to the existing test's contract. |
-| 416 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
-| 417 | PAN-5088 | XS | medium | ok |  |  | A long failed-outbox message shrinks the timeline to 40px and hides Retry/Discard; only a refresh recovers. |
-| 418 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
-| 419 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
-| 420 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr… |
-| 421 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
-| 422 | PAN-3901 | S | medium | ok |  |  | test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification |
-| 423 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
-| 424 | PAN-5131 | L | medium | ok |  |  | God View honesty pass: real event rates and ages, effects never mutate orbs, fix mislabeled orbs and stale field guide. |
-| 425 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
-| 426 | PAN-1572 | M | medium | needs-refinement |  |  | Settings permission-mode can desync from the resolved mode; body cites the removed DSP flag and a renamed symbol — rewrite first |
-| 427 | PAN-4627 | S | medium | ok |  |  | Homebrew Claude Code installs get a copy-only upgrade banner; make the brew plan runnable and auto-upgrade outdated runnable installs. |
-| 428 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
-| 429 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
-| 430 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
-| 431 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
-| 432 | PAN-1449 | S | medium | ok |  |  | Memory extraction still failing; the live symptom PAN-4370 closed and PAN-4374 adds a working provider; layout half remains |
-| 433 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
-| 434 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
-| 435 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
-| 436 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
-| 437 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
-| 438 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
-| 439 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
-| 440 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
-| 441 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
-| 442 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
-| 443 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
-| 444 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
-| 445 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
-| 446 | PAN-4971 | S | medium | ok |  |  | Viewer header shows only host + count; roster of all participants with host/controller marked. Frontend-only, payload exists. |
-| 447 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
-| 448 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
-| 449 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
-| 450 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
-| 451 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
-| 452 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
-| 453 | PAN-5057 | XS | medium | ok |  |  | Restart hold is not checked at the gate claim route, so a hold set within ~5 s of approval still lets one restart go ahead. |
-| 454 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
-| 455 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
-| 456 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
-| 457 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
-| 458 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
-| 459 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
-| 460 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
-| 461 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
-| 462 | PAN-3938 | M | medium | needs-refinement |  |  | Run Muse Spark under Claude Code via cliproxy — only the paid Zen model is routable; free tier is OpenCode-client gated; needs credit… |
-| 463 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
-| 464 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
-| 465 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
-| 466 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
-| 467 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
-| 468 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
-| 469 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
-| 470 | PAN-3732 | S | medium | ok |  |  | Codex handoff serializes a large rollout twice (~286MB peak RSS on 50MB); serialize once or stream. |
-| 471 | PAN-3700 | M | medium | ok |  |  | pan acp serve would let Zed and other ACP clients drive Overdeck conversations through canonical doors. PRD written. |
-| 472 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
-| 473 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
-| 474 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
-| 475 | PAN-2659 | S | medium | ok |  |  | acquireRecordLock survives for the planning auto-start consent lock; an ownerless lock after a crash is never reclaimed. |
-| 476 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
-| 477 | PAN-4779 | S | medium | ok |  |  | Docs on main: 2 MDX parse errors hide pages from Mintlify + 15 broken vision.mdx links; mint broken-links can't gate |
-| 478 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
-| 479 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
-| 480 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
-| 481 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
-| 482 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
-| 483 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
-| 484 | PAN-4568 | XS | medium | ok |  |  | Codex sub-agent turn start shows thread: not sub: label; adoption lands one frame late. PAN-4563 replay test has landed. |
-| 485 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals read as a broken button. |
-| 486 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers instead of the documented /ws/rpc event contract. |
-| 487 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding so a 1.1MB/227-item plan stops making every finalize failure whole-plan-fatal. |
-| 488 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
-| 489 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
-| 490 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
-| 491 | PAN-4918 | M | medium | ok |  |  | Six Anywhere UI bugs seen while filming: Codex keeps Claude model, Zen models listed first, chip wrap, Pull-here state, no remote archive. |
-| 492 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
-| 493 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
-| 494 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
-| 495 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
-| 496 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
-| 497 | PAN-646 | XS | medium | needs-refinement |  |  | Cancel no longer clears beads or a record; a Recover workflow now means reopening the tracker issue and re-planning |
-| 498 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
-| 499 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
-| 500 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
-| 501 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
-| 502 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
-| 503 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
-| 504 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
-| 505 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
-| 506 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
-| 507 | PAN-3735 | S | medium | ok |  |  | Sandboxed pan CLI reports 'dashboard down, run pan up' when the real cause is no network; sends agents down the wrong path. |
-| 508 | PAN-3335 | XS | medium | ok |  |  | A pasted screenshot can't be viewed anywhere in the dashboard: thumbnail has no click handler and the sent form is a file-link chip. |
-| 509 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix, redesigned 2026-09-29 as E6 of the model-routing PRD; its medians feed PAN-4364 and PAN-4367 |
-| 510 | PAN-2977 | M | medium | ok |  | PAN-2976 | Settings surface that detects installed ACP CLIs, renders the capability checklist, and guides login without a manual terminal. |
-| 511 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
-| 512 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
-| 513 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
-| 514 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
-| 515 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
-| 516 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
-| 517 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
-| 518 | PAN-4924 | S | medium | ok |  |  | linked-machines.mdx promises switch model for running conversations; dashboard disables it. Fix docs or add the control. |
-| 519 | PAN-4367 | M | medium | ok |  |  | Replace inherited capability scores for Sonnet 5.5, GPT-6 Sol/Luna with measured ones; eval harness has closed |
-| 520 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
-| 521 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
-| 522 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
-| 523 | PAN-2392 | M | medium | needs-refinement |  |  | Standing Crew survives; panel becomes a cost view from cost_events + tier-metrics; verdict/escalation columns need a new source. |
-| 524 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
-| 525 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
-| 526 | PAN-3767 | S | medium | ok |  |  | Model switch could hang at 'Saving…'; onError toast landed, remaining work is reproducing the hang on a healthy server. |
-| 527 | PAN-3615 | S | medium | needs-refinement |  |  | TTS silent 9+ days from four stacked failures; three already fixed, only follow-ups remain — rescope to what is left. |
-| 528 | PAN-3558 | S | medium | ok |  |  | Subagent rail shows no model or provider, so mixed-model orchestration needs a transcript open per row to see what it is running. |
-| 529 | PAN-3469 | S | medium | ok |  |  | NewProjectModal violates the PAN-3410 page-not-modal doctrine; migrate the create-project flow to a routed page. |
-| 530 | PAN-3333 | M | medium | ok |  |  | Model pickers show $/1M, which says nothing under a subscription; show relative plan-quota drain among sibling models. |
-| 531 | PAN-3058 | M | medium | ok |  |  | Ship named crew presets that populate the whole tiered_execution block so operators don't hand-build the crew table. |
-| 532 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
-| 533 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
-| 534 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
-| 535 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
-| 536 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
-| 537 | PAN-4366 | M | medium | ok |  |  | Plan the Haiku 4.5 successor and give workhorse:cheap a consumer or drop it; gated on E4 summary-faithfulness |
-| 538 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
-| 539 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
-| 540 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
-| 541 | PAN-4393 | XS | medium | ok |  |  | ac-eval-fixtures requires observable:false >= 8 but honest labeling of all specs yields 6; lower the floor |
-| 542 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
-| 543 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
-| 544 | PAN-1967 | M | medium | needs-refinement |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
-| 545 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
-| 546 | PAN-1937 | M | medium | ok |  |  | feat: data export |
-| 547 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
-| 548 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
-| 549 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
-| 550 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
-| 551 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
-| 552 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
-| 553 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
-| 554 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
-| 555 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
-| 556 | PAN-3706 | L | medium | ok |  |  | Broadsheet shipped typography only; color, surface, elevation and texture still on Ledger values, so it doesn't read like Subspace. |
-| 557 | PAN-3539 | XS | medium | needs-refinement |  |  | OOMPolicy=continue fix landed with the issue; re-scope to whatever hardening remains or close it out. |
-| 558 | PAN-3502 | XS | medium | needs-refinement |  |  | tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify. |
-| 559 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
-| 560 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
-| 561 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
-| 562 | PAN-4878 | XS | low | ok |  |  | Delete dead ox curl installer in prereqs registry; PAN-4852 builds ox from the pinned fork commit, so ~/.local/bin/ox is never used. |
-| 563 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
-| 564 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
-| 565 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
-| 566 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
-| 567 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
-| 568 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
-| 569 | PAN-1676 | M | medium | ok |  |  | harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
-| 570 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
-| 571 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
-| 572 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
-| 573 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
-| 574 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
-| 575 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
-| 576 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
-| 577 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
-| 578 | PAN-1550 | M | medium | ok |  |  | feat: FilesPane + BrowserPane |
-| 579 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
-| 580 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
-| 581 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
-| 582 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
-| 583 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
-| 584 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
-| 585 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
-| 586 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
-| 587 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
-| 588 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
-| 589 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
-| 590 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
-| 591 | PAN-4360 | S | medium | ok |  |  | Add pan claude upgrade and offer the Claude Code upgrade in pan install / pan sync; PAN-4359 has closed |
-| 592 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
-| 593 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
-| 594 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
-| 595 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
-| 596 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
-| 597 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
-| 598 | PAN-5067 | M | medium | ok |  |  | Skill overrides: bad-YAML issue file is overwritten on write (data loss), license detection gaps, Pi ignores --pack silently. |
-| 599 | PAN-4908 | S | low | ok |  |  | Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint(). |
-| 600 | PAN-5130 | S | medium | ok |  |  | pan project add gains --issue-prefix for any tracker; --linear-team becomes a deprecated alias. Follow-up to closed PAN-51. |
-| 601 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
-| 602 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
-| 603 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
-| 604 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
-| 605 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
-| 606 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
-| 607 | PAN-4308 | S | medium | ok |  |  | Settle reaped Fly remote transcripts into the Session Vault; PAN-4295 auto-reap landed, still blocked by PAN-2609 (engine). |
-| 608 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
-| 609 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
-| 610 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
-| 611 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
-| 612 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
-| 613 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
-| 614 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
-| 615 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
-| 616 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
-| 617 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
-| 618 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
-| 619 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
-| 620 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
-| 621 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
-| 622 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
-| 623 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
-| 624 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
-| 625 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
-| 626 | PAN-3441 | L | low | ok |  |  | God View 'River' WebGL pipeline visualization fed by the live hook-event stream; PRD and mockup exist. |
-| 627 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
-| 628 | PAN-2941 | M | low | stale |  |  | Superseded by OKF v0.2: drafts plus human verify replace the PR gate (eltmon/okf#6); semantic pass is eltmon/okf#7 |
-| 629 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
-| 630 | PAN-4373 | M | medium | ok |  |  | Optional Jev relevance filter for prompt-time memory injection candidates; both prerequisites have closed |
-| 631 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
-| 632 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
-| 633 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
-| 634 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
-| 635 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
-| 636 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
-| 637 | PAN-5066 | M | medium | ok |  |  | Project skills in .pan/skills skip the CLI workspace fallback, never refresh, lose to bundled skills, and never reach Codex/Pi. |
-| 638 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
-| 639 | PAN-4350 | M | medium | needs-refinement |  |  | Re-dispatch budget for foreman items; issue itself flags an unresolved conflict with the no-stored-state rule |
-| 640 | PAN-4003 | L | medium | ok |  |  | Parked: delete the ohmypi/omp harness, keep Pi; obsoletes 10 open ohmypi issues and shrinks PAN-3958's CH-7 scope |
-| 641 | PAN-4368 | S | medium | ok |  |  | Operator-run checklist: verify Sonnet 5.5 across switch-model, fork and compaction (model-locked thinking blocks) |
-| 642 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
-| 643 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
-| 644 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
-| 645 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
-| 646 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
-| 647 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
-| 648 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
-| 649 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
-| 650 | PAN-4769 | XS | low | ok |  |  | Two-sentence wording fix in features/skill-packs.mdx; PAN-4759 created the page and closed, so this is unblocked. |
-| 651 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
-| 652 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
-| 653 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
-| 654 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 655 | PAN-4823 | XL | medium | ok | ✓ |  | Epic: Capacitor phone client for Anywhere without Tailscale; 15 children filed (#4828-4843); OD-1 settled; PAN-4774 done. |
-| 656 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
-| 657 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
-| 658 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
-| 659 | PAN-5082 | XL | medium | ok |  |  | Move every MCP surface to SDK v2 for the 2026-07-28 spec while keeping 2025-11-25 clients; time it on PAN-5083 data. |
-| 660 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
-| 661 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
-| 662 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
-| 663 | PAN-5070 | M | medium | ok |  |  | Connect a bot: one-click 'Copy for <bot>' message, pending connector requests under Bots, and a connected notice. |
-| 664 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
-| 665 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
-| 666 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
-| 667 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
-| 668 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
-| 669 | PAN-2046 | M | low | stale |  |  | Conversation view does not surface terminal command responses |
-| 670 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
-| 671 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
-| 672 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
-| 673 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
-| 674 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
-| 675 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
-| 676 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
-| 677 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
-| 678 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 679 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
-| 680 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
-| 681 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
-| 682 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
-| 683 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
-| 684 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
-| 685 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
-| 686 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
-| 687 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
-| 688 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
-| 689 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
-| 690 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
-| 691 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
-| 692 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
-| 693 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
-| 694 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
-| 695 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
-| 696 | PAN-4352 | XS | low | ok |  |  | Operator verification: skill packs in a managed interactive Claude Code launch now that PAN-4334 has shipped |
-| 697 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
-| 698 | PAN-4298 | XL | low | needs-refinement |  | PAN-4294, PAN-1676 | Anywhere paid tier: run agents on hosted Fly capacity; tenant isolation, credentials, metering open; PAN-4294 and PAN-1676 unbuilt |
-| 699 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
-| 700 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
-| 701 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
-| 702 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
-| 703 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
-| 704 | PAN-4248 | L | medium | ok |  |  | List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; PAN-1641 sidecar has merged. |
-| 705 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
-| 706 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
-| 707 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
-| 708 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
-| 709 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
-| 710 | PAN-3971 | L | low | ok |  |  | Overdeck-native artifact pages (pan artifact publish + state door + dashboard listing); body says backlog only, Claude artifacts work today |
-| 711 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
-| 712 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
-| 713 | PAN-2983 | M | low | stale |  |  | Superseded by the OKF v0.2 redesign: write modes and drafts (eltmon/okf#6) and the advisory semantic pass (eltmon/okf#7) |
-| 714 | PAN-3824 | XS | low | needs-refinement |  |  | Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior |
-| 715 | PAN-3823 | XS | low | needs-refinement |  |  | Image-only report titled "pan sync issue"; needs the command, output text, and expected behavior |
-| 716 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
-| 717 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
-| 718 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
-| 719 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
-| 720 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
-| 721 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
-| 722 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
-| 723 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
-| 724 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
-| 725 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
-| 726 | PAN-4347 | S | low | ok |  |  | pan done appends continue.json decisions to the PR body so significant decisions outlive the workspace |
-| 727 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
-| 728 | PAN-4275 | S | low | ok |  |  | Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. PAN-1641 has merged. |
-| 729 | PAN-2836 | M | low | needs-refinement |  |  | Placement presets now belong on eltmon/okf#4 after the OKF v0.2 redesign; migrate verb collides; re-scope or move upstream |
-| 730 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
-| 731 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
-| 732 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
-| 733 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
-| 734 | PAN-3456 | XS | low | ok |  |  | Already fixed in 4117c9a777 with a regression test; open only pending close-out. |
-| 735 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
-| 736 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
-| 737 | PAN-772 | M | low | stale |  |  | Auto-resume ladder paths it names are gone; terminal-stack consistency now means the Herdr/tmux contract in TERMINAL-BACKENDS.md |
-| 738 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
-| 739 | PAN-769 | M | low | stale |  | PAN-750 | Phase-transition history no longer accumulates in a record; a churn metric would be rebuilt from PR review cycles or the pipeline journal |
-| 740 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
-| 741 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
-| 742 | PAN-4425 | M | low | ok |  |  | Deft fork work in eltmon/directive (env off switch, external-orchestrator mode); outside the overdeck pipeline |
-| 743 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
-| 744 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
-| 745 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
-| 746 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
-| 747 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
-| 748 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
-| 749 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
-| 750 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
-| 751 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
-| 752 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
-| 753 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
-| 754 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
-| 755 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
-| 756 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
-| 757 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
-| 758 | PAN-604 | M | low | ok |  |  | Hide planning agent from workspace detail pane |
-| 759 | PAN-603 | M | low | ok |  |  | Plan review loop with configurable reviewer model |
-| 760 | PAN-591 | XS | low | ok |  |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
-| 761 | PAN-589 | XS | low | ok |  |  | Review and update commands-skills.md with all available Panopticon skills |
-| 762 | PAN-576 | M | low | ok |  |  | Global / search should include conversations in addition to workspace features |
-| 763 | PAN-571 | XS | low | ok |  |  | Add OpenRouter credits/plan status endpoint and UI |
-| 764 | PAN-568 | M | low | ok |  |  | Kanban: Show workspace and tmux session counts in stats |
-| 765 | PAN-565 | M | low | ok |  |  | Handle CTRL-Z to undo accidental conversation archival |
-| 766 | PAN-564 | M | low | ok |  |  | Slash menu positioned incorrectly |
-| 767 | PAN-554 | M | low | ok |  |  | Add kanban board deeplinks for issue URLs |
-| 768 | PAN-543 | M | low | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
-| 769 | PAN-483 | M | low | ok |  |  | Unify Resume Agent UX |
-| 770 | PAN-480 | M | low | needs-refinement |  |  | Planning-agent --effort; likely covered by merged PAN-4249 resolver and PAN-4258 (plan effort), confirm or close |
-| 771 | PAN-476 | M | low | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
-| 772 | PAN-468 | M | low | ok |  |  | Agent test conversations pollute production database |
-| 773 | PAN-461 | M | low | ok |  |  | Deep-wipe multi-step progress dialog |
-| 774 | PAN-459 | M | low | ok |  |  | Planning setup screen with SSE progress streaming |
-| 775 | PAN-407 | XS | low | ok |  |  | Run Panopticon from a main workspace for development isolation |
-| 776 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
-| 777 | PAN-2346 | XS | low | ok |  |  | docs: refresh AGENT_TYPES_INDEX.md to the post-Cut taxonomy in ROLES.md (xBRIEF items, foreman, conv-flywheel, worker role). |
-| 778 | PAN-2345 | XS | low | ok |  |  | docs: rewrite pan-done.md against done.ts + done-preflight.ts; fix continue path; point MERGE link at MERGE-WORKFLOW.md. |
-| 779 | PAN-2344 | XS | low | ok |  |  | docs: rewrite KANBAN-MODEL.md for derived issue state, pipeline-membership buckets, PR reviews; drop Inspect and beads. |
-| 780 | PAN-2343 | XS | low | ok |  |  | docs: rewrite MISSION-CONTROL.md: state label from deriveStateLabel, membership, liveness.ts; review_status table is gone. |
-| 781 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
-| 782 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
-| 783 | PAN-2068 | XS | low | ok |  |  | docs: add user-facing page for Caveman (agent output compression) |
-| 784 | PAN-2067 | XS | low | ok |  |  | docs: add user-facing page for RTK (Bash output compression) |
-| 785 | PAN-1684 | XS | low | ok |  |  | build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
-| 786 | PAN-1683 | XS | low | ok |  |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) |
-| 787 | PAN-1474 | M | low | ok |  |  | Add ACKNOWLEDGEMENTS doc |
-| 788 | PAN-1469 | M | low | ok |  |  | End-to-end review and consolidation of all project documentation |
-| 789 | PAN-674 | XS | low | ok |  |  | docs: add glossary of Panopticon domain terms |
-| 790 | PAN-634 | M | low | ok |  |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
-| 791 | PAN-2908 | M | low | ok |  |  | Make overdeck not suck |
-| 792 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
-| 793 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
-| 794 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
-| 795 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
-| 796 | PAN-324 | XS | medium | needs-refinement |  |  | Approval is now a PR review or the dashboard MERGE button; verify whether the agent detail pane already surfaces MERGE post-cut |
-| 797 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
-| 798 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
-| 799 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
-| 800 | PAN-4332 | M | low | ok |  |  | Interop: continue t3code sessions in Overdeck and back via native transcripts; PAN-2609 Phase A has closed |
-| 801 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
-| 802 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
-| 803 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
-| 804 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
-| 805 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
-| 806 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
-| 807 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
-| 808 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
-| 809 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
-| 810 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
-| 811 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
-| 812 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
-| 813 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
-| 814 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 815 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 816 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 817 | PAN-5072 | M | medium | ok |  | PAN-5070 | Integrations READMEs and shared SKILL.md lead with the one-paste connect flow; Grok Bot moves to the connector. Needs PAN-5070. |
-| 818 | PAN-5033 | XS | medium | ok |  |  | OpenClaw Connect a bot snippet omits hooks.allowConversationAccess, so the needs-you summary stays off with no message. |
-| 819 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 820 | PAN-5043 | S | medium | ok |  |  | Commit the phone-app iOS Simulator harness (Miniflare connect stand-in, stub account service, rig steps) built twice by hand. |
-| 821 | PAN-5065 | L | medium | ok |  |  | Opt-in mode where a project's agents and gates stop seeing ~/.overdeck.env keys the project did not list. |
-| 822 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 823 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
-| 824 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
-| 825 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
-| 826 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
-| 827 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
-| 828 | PAN-283 | M | low | stale |  |  | Reset should sync workspace feature branch with latest main |
-| 829 | PAN-271 | M | low | stale |  |  | Auto-assign Linear project from project config when creating issues |
-| 830 | PAN-265 | M | low | stale |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
-| 831 | PAN-249 | XS | low | stale |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
-| 832 | PAN-228 | M | low | stale |  |  | Shift-left post-edit diagnostics |
-| 833 | PAN-227 | M | low | stale |  |  | Phase gate validation |
-| 834 | PAN-198 | M | low | stale |  |  | Structured audit trail for agent actions |
-| 835 | PAN-190 | M | low | stale |  |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
-| 836 | PAN-180 | M | low | stale |  |  | PAN-180: Cross-terminal file locking for concurrent agents |
-| 837 | PAN-177 | M | low | stale |  |  | PAN-177: Iteration limits with escalation for autonomous agents |
-| 838 | PAN-175 | M | low | stale |  |  | PAN-175: Pre-compact auto-save hook for agent sessions |
-| 839 | PAN-155 | L | low | stale |  |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
-| 840 | PAN-146 | M | low | stale |  |  | PAN-146: Refine light mode theming across all dashboard pages |
-| 841 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
-| 842 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
-| 843 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
-| 844 | PAN-3536 | S | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): pan tell can not reach ohmypi conversations; fix dies with the harness |
-| 845 | PAN-2027 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): routing kimi-k2 through ohmypi needs a different home once OMP is gone |
-| 846 | PAN-2035 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): Copilot provider routing via omp |
-| 847 | PAN-2034 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): end-to-end test for ohmypi tool-call rendering |
-| 848 | PAN-2033 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi message-delivery latency benchmark |
-| 849 | PAN-2032 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): local Ollama review role via omp |
-| 850 | PAN-2030 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): version-pin the ohmypi extension |
-| 851 | PAN-2029 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi-parser thinking_tokens capture |
-| 852 | PAN-2028 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): per-provider cost grouping keyed on omp |
-| 853 | PAN-2024 | XS | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi conversation Tools-toggle |
-| 854 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
-| 855 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
-| 856 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
-| 857 | PAN-4590 | L | medium | ok |  |  | Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config. |
-| 858 | PAN-4591 | L | medium | ok |  |  | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable. |
-| 859 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
-| 860 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
-| 861 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
-| 862 | PAN-5022 | L | medium | ok |  |  | Phone app: relay notification preferences to offline machines via the directory, and drop muted pushes on the phone. |
-| 863 | PAN-5021 | M | low | needs-refinement |  |  | PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded. |
-| 864 | PAN-5029 | M | medium | needs-refinement |  |  | Grok Build Tailscale reach can't work: pan mcp serve verifies tokens only against its own machine. Needs a design choice. |
-| 865 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
-| 866 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
-| 867 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
-| 868 | PAN-5122 | S | high | ok |  |  | Terminal tab says 'not running' for every Codex/OpenCode conv on Herdr: companion owner check is tmux-only. Add Herdr host. |
-| 872 | PAN-5123 | XS | low | ok |  |  | Docs only: add the five Skills-page named classes to STYLE-GUIDE.md and the pan-style-guide skill so new pages reuse them. |
+| 395 | PAN-5353 | S | medium | ok |  |  | Send now: flush a queued message into a running Claude Code turn via the Ctrl+X Ctrl+S chord. PRD written, chord live-probed. |
+| 396 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
+| 397 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
+| 398 | PAN-1918 | XS | medium | ok |  |  | full frontend vitest suite runs in no CI path |
+| 399 | PAN-1912 | XS | medium | ok |  |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
+| 400 | PAN-4208 | M | medium | ok |  |  | #4205 follow-ups: Effect-free config read for telemetry to hit <100ms pan --version; CI import test for lazy command targets |
+| 401 | PAN-1846 | S | medium | needs-refinement |  |  | unbounded log growth |
+| 402 | PAN-1830 | S | medium | ok |  |  | Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY |
+| 403 | PAN-1816 | S | medium | ok |  |  | Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry |
+| 404 | PAN-1795 | S | medium | ok |  |  | Codebase map bootstrapped in planning worktree is never promoted to main |
+| 405 | PAN-1774 | S | medium | ok |  |  | workspace server container crashloops when dist/dashboard/server.js is missing |
+| 406 | PAN-1769 | S | medium | ok |  |  | Supervisor echo-confirm false negative on long messages → triple-paste delivery (rewrite ×2 + tmux fallback); resumed-conv message stil… |
+| 407 | PAN-1761 | S | medium | ok |  |  | conversations endpoints fetched via relative /api path |
+| 408 | PAN-1755 | S | medium | ok |  |  | uat stuck-assembly cap (30m) kills slow-but-alive assemblies and leaves orphaned conflict agents racing the next generation |
+| 409 | PAN-3516 | XS | medium | ok |  |  | Repo .claude/skills holds stale duplicates of pan-handoff, pan-flywheel and okf, so overdeck-dev sessions load outdated skill text. |
+| 410 | PAN-3455 | XS | medium | ok |  |  | cliproxy --version exits 2, so the up-to-date check always returns false and every ensure re-downloads the pinned release. |
+| 411 | PAN-3117 | XS | medium | ok |  |  | A deterministic 400 renders as the generic 'Failed to send' bubble with a Retry that can never succeed. |
+| 412 | PAN-3036 | XS | medium | ok |  |  | Pane-idle detection reads a completed strike's idle composer as a pending question, so a finished strike shows '! INPUT'. |
+| 413 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
+| 414 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
+| 415 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
+| 416 | PAN-5028 | M | medium | ok |  |  | list_pending_input loses a conversation's AskUserQuestion after the PAN-1520 deny hook, contrary to the existing test's contract. |
+| 417 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
+| 418 | PAN-5227 | S | medium | ok |  |  | Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle. |
+| 419 | PAN-5349 | L | medium | ok |  |  | pan open <path> opens files/folders in the dashboard; opt-in OS file-manager 'Open in Overdeck'. PRD in .pan/drafts/pan-5349.md |
+| 420 | PAN-5342 | L | medium | ok |  |  | Safe shutdown: drain agents at a tool boundary before reboot; PRD landed; item 16 of workflow-redesign order book. |
+| 421 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
+| 422 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
+| 423 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr… |
+| 424 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
+| 425 | PAN-3901 | S | medium | ok |  |  | test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification |
+| 426 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
+| 427 | PAN-5343 | L | medium | ok |  | PAN-5335, PAN-5290, PAN-5295, PAN-5294 | Workflow redesign H: All projects deck listing conversations across projects, 1-4 side by side. Waits on four siblings. |
+| 428 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
+| 429 | PAN-1572 | M | medium | needs-refinement |  |  | Settings permission-mode can desync from the resolved mode; body cites the removed DSP flag and a renamed symbol — rewrite first |
+| 430 | PAN-4627 | S | medium | ok |  |  | Homebrew Claude Code installs get a copy-only upgrade banner; make the brew plan runnable and auto-upgrade outdated runnable installs. |
+| 431 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
+| 432 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
+| 433 | PAN-5312 | S | medium | ok |  |  | Quality-gate admission: a head that can never fit alone serializes every gate behind it. |
+| 434 | PAN-5241 | L | medium | ok |  |  | Spill work agents to linked machines, then Fly, when this machine is full, up to operator caps. |
+| 435 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
+| 436 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
+| 437 | PAN-1449 | S | medium | ok |  |  | Memory extraction still failing; the live symptom PAN-4370 closed and PAN-4374 adds a working provider; layout half remains |
+| 438 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
+| 439 | PAN-5180 | M | medium | ok |  |  | Tab-open REST burst (~45 requests) delays every client 1.0-1.4 s; uncached prerequisite and status probes. |
+| 440 | PAN-5264 | M | medium | ok |  |  | Attribute the app-rest GitHub caller (1,422 untraced App REST calls/hour), then cut the largest path. |
+| 441 | PAN-5340 | S | medium | ok |  | PAN-5337 | A Preview link to another Markdown file should open it in Preview, not Edit. Follows PAN-5337. |
+| 442 | PAN-5341 | S | medium | ok |  | PAN-5338 | Dock Changes diff view gets the Markdown Preview switch from PAN-5338; matters once D2 moves diffs to the dock. |
+| 443 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
+| 444 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
+| 445 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
+| 446 | PAN-5322 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5319: unguarded identifier.toUpperCase(), modal focus, needs-you rows that open nothing. |
+| 447 | PAN-5317 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5127: route live Codex app-server sends correctly; no replayable mail for keyed sends. |
+| 448 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
+| 449 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
+| 450 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
+| 451 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
+| 452 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
+| 453 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
+| 454 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
+| 455 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
+| 456 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
+| 457 | PAN-4971 | S | medium | ok |  |  | Viewer header shows only host + count; roster of all participants with host/controller marked. Frontend-only, payload exists. |
+| 458 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
+| 459 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
+| 460 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
+| 461 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
+| 462 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
+| 463 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
+| 464 | PAN-5174 | XS | medium | ok |  |  | Flaky CI test: share/rate-limit.test.ts flips 201/429 under CI timing; quarantine or make deterministic. |
+| 465 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
+| 466 | PAN-5346 | S | medium | ok |  |  | Auth docs misstate #overdeck_token delivery, the Origin rule and 401 troubleshooting; PAN-5344 fix has landed. |
+| 467 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
+| 468 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
+| 469 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
+| 470 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
+| 471 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
+| 472 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
+| 473 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
+| 474 | PAN-3938 | M | medium | needs-refinement |  |  | Run Muse Spark under Claude Code via cliproxy — only the paid Zen model is routable; free tier is OpenCode-client gated; needs credit… |
+| 475 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
+| 476 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
+| 477 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
+| 478 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
+| 479 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
+| 480 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
+| 481 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
+| 482 | PAN-3732 | S | medium | ok |  |  | Codex handoff serializes a large rollout twice (~286MB peak RSS on 50MB); serialize once or stream. |
+| 483 | PAN-3700 | M | medium | ok |  |  | pan acp serve would let Zed and other ACP clients drive Overdeck conversations through canonical doors. PRD written. |
+| 484 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
+| 485 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
+| 486 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
+| 487 | PAN-2659 | S | medium | ok |  |  | acquireRecordLock survives for the planning auto-start consent lock; an ownerless lock after a crash is never reclaimed. |
+| 488 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
+| 489 | PAN-4779 | S | medium | ok |  |  | Docs on main: 2 MDX parse errors hide pages from Mintlify + 15 broken vision.mdx links; mint broken-links can't gate |
+| 490 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
+| 491 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
+| 492 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
+| 493 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
+| 494 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
+| 495 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
+| 496 | PAN-4568 | XS | medium | ok |  |  | Codex sub-agent turn start shows thread: not sub: label; adoption lands one frame late. PAN-4563 replay test has landed. |
+| 497 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals read as a broken button. |
+| 498 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers instead of the documented /ws/rpc event contract. |
+| 499 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding so a 1.1MB/227-item plan stops making every finalize failure whole-plan-fatal. |
+| 500 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
+| 501 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
+| 502 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
+| 503 | PAN-4918 | M | medium | ok |  |  | Six Anywhere UI bugs seen while filming: Codex keeps Claude model, Zen models listed first, chip wrap, Pull-here state, no remote archive. |
+| 504 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
+| 505 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
+| 506 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
+| 507 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
+| 508 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
+| 509 | PAN-646 | XS | medium | needs-refinement |  |  | Cancel no longer clears beads or a record; a Recover workflow now means reopening the tracker issue and re-planning |
+| 510 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
+| 511 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
+| 512 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
+| 513 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
+| 514 | PAN-5231 | S | medium | ok |  |  | Explorer: retrying Send through pipeline after a partial failure creates a second issue and branch. |
+| 515 | PAN-5204 | S | medium | ok |  |  | Voice: mixed 16/24 kHz sample rates on /ws/voice, and dictation turns leak into AutoPreso as errors. |
+| 516 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
+| 517 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
+| 518 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
+| 519 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
+| 520 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
+| 521 | PAN-3735 | S | medium | ok |  |  | Sandboxed pan CLI reports 'dashboard down, run pan up' when the real cause is no network; sends agents down the wrong path. |
+| 522 | PAN-3335 | XS | medium | ok |  |  | A pasted screenshot can't be viewed anywhere in the dashboard: thumbnail has no click handler and the sent form is a file-link chip. |
+| 523 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix, redesigned 2026-09-29 as E6 of the model-routing PRD; its medians feed PAN-4364 and PAN-4367 |
+| 524 | PAN-2977 | M | medium | ok |  | PAN-2976 | Settings surface that detects installed ACP CLIs, renders the capability checklist, and guides login without a manual terminal. |
+| 525 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
+| 526 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
+| 527 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
+| 528 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
+| 529 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
+| 530 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
+| 531 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
+| 532 | PAN-4924 | S | medium | ok |  |  | linked-machines.mdx promises switch model for running conversations; dashboard disables it. Fix docs or add the control. |
+| 533 | PAN-4367 | M | medium | ok |  |  | Replace inherited capability scores for Sonnet 5.5, GPT-6 Sol/Luna with measured ones; eval harness has closed |
+| 534 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
+| 535 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
+| 536 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
+| 537 | PAN-5145 | S | medium | ok |  |  | CLIProxy oauth-model-alias hides gpt-6-sol, gpt-5.6-terra and gpt-5.6-luna by their own ids on claude-code. |
+| 538 | PAN-5201 | XL | medium | ok |  |  | Speaker-aware STT: diarizing engines (Speechmatics, AssemblyAI, Muse, Voxtral, NeMo) and one VoiceSettings contract. |
+| 539 | PAN-2392 | M | medium | needs-refinement |  |  | Standing Crew survives; panel becomes a cost view from cost_events + tier-metrics; verdict/escalation columns need a new source. |
+| 540 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
+| 541 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
+| 542 | PAN-3767 | S | medium | ok |  |  | Model switch could hang at 'Saving…'; onError toast landed, remaining work is reproducing the hang on a healthy server. |
+| 543 | PAN-3615 | S | medium | needs-refinement |  |  | TTS silent 9+ days from four stacked failures; three already fixed, only follow-ups remain — rescope to what is left. |
+| 544 | PAN-3558 | S | medium | ok |  |  | Subagent rail shows no model or provider, so mixed-model orchestration needs a transcript open per row to see what it is running. |
+| 545 | PAN-3469 | S | medium | ok |  |  | NewProjectModal violates the PAN-3410 page-not-modal doctrine; migrate the create-project flow to a routed page. |
+| 546 | PAN-3333 | M | medium | ok |  |  | Model pickers show $/1M, which says nothing under a subscription; show relative plan-quota drain among sibling models. |
+| 547 | PAN-3058 | M | medium | ok |  |  | Ship named crew presets that populate the whole tiered_execution block so operators don't hand-build the crew table. |
+| 548 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
+| 549 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
+| 550 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
+| 551 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
+| 552 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
+| 553 | PAN-4366 | M | medium | ok |  |  | Plan the Haiku 4.5 successor and give workhorse:cheap a consumer or drop it; gated on E4 summary-faithfulness |
+| 554 | PAN-5314 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5313 (CLIProxy pool): body-read timeout, cache-miss coalescing, reset timestamps. |
+| 555 | PAN-5267 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5266: escalation limit and caching transient GraphQL errors as missing issues. |
+| 556 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
+| 557 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
+| 558 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
+| 559 | PAN-4393 | XS | medium | ok |  |  | ac-eval-fixtures requires observable:false >= 8 but honest labeling of all specs yields 6; lower the floor |
+| 560 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
+| 561 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
+| 562 | PAN-1967 | M | medium | needs-refinement |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
+| 563 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
+| 564 | PAN-1937 | M | medium | ok |  |  | feat: data export |
+| 565 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
+| 566 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
+| 567 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
+| 568 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
+| 569 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
+| 570 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
+| 571 | PAN-5202 | XL | medium | ok |  | PAN-5201 | Flux: experimental live meeting page capturing open items, ticket proposals and diagrams. Depends on PAN-5201. |
+| 572 | PAN-5141 | M | medium | ok |  |  | Reviewer pairing code: multi-day, reusable, restart-safe code so app store review can pair unattended. |
+| 573 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
+| 574 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
+| 575 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
+| 576 | PAN-3706 | L | medium | ok |  |  | Broadsheet shipped typography only; color, surface, elevation and texture still on Ledger values, so it doesn't read like Subspace. |
+| 577 | PAN-3539 | XS | medium | needs-refinement |  |  | OOMPolicy=continue fix landed with the issue; re-scope to whatever hardening remains or close it out. |
+| 578 | PAN-3502 | XS | medium | needs-refinement |  |  | tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify. |
+| 579 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
+| 580 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
+| 581 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
+| 582 | PAN-4878 | XS | low | ok |  |  | Delete dead ox curl installer in prereqs registry; PAN-4852 builds ox from the pinned fork commit, so ~/.local/bin/ox is never used. |
+| 583 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
+| 584 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
+| 585 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
+| 586 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
+| 587 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
+| 588 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
+| 589 | PAN-1676 | M | medium | ok |  |  | Harden Fly remote workspaces + pan workspace move; work-agent spill policy now specified in PAN-5241. |
+| 590 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
+| 591 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
+| 592 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
+| 593 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
+| 594 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
+| 595 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
+| 596 | PAN-5309 | S | low | ok |  |  | CodeRabbit minor findings on the PAN-5283 Flywheel page redesign; verify each against main before fixing. |
+| 597 | PAN-5308 | S | low | ok |  |  | CodeRabbit findings on the PAN-5282 CLIProxy v8 upgrade: config-write ordering, Windows upgrade staging. |
+| 598 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
+| 599 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
+| 600 | PAN-1550 | M | medium | ok |  |  | BrowserPane half only; the FilesPane half is superseded by the PAN-5183 file explorer, whose children have all closed. |
+| 601 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
+| 602 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
+| 603 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
+| 604 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
+| 605 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
+| 606 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
+| 607 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
+| 608 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
+| 609 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
+| 610 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
+| 611 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
+| 612 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
+| 613 | PAN-4360 | S | medium | ok |  |  | Add pan claude upgrade and offer the Claude Code upgrade in pan install / pan sync; PAN-4359 has closed |
+| 614 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
+| 615 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
+| 616 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
+| 617 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
+| 618 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
+| 619 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
+| 620 | PAN-5067 | M | medium | ok |  |  | Skill overrides: bad-YAML issue file is overwritten on write (data loss), license detection gaps, Pi ignores --pack silently. |
+| 621 | PAN-4908 | S | low | ok |  |  | Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint(). |
+| 622 | PAN-5130 | S | medium | ok |  |  | pan project add gains --issue-prefix for any tracker; --linear-team becomes a deprecated alias. Follow-up to closed PAN-51. |
+| 623 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
+| 624 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
+| 625 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
+| 626 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
+| 627 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
+| 628 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
+| 629 | PAN-4308 | S | medium | ok |  |  | Settle reaped Fly remote transcripts into the Session Vault; PAN-4295 auto-reap landed, still blocked by PAN-2609 (engine). |
+| 630 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
+| 631 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
+| 632 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
+| 633 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
+| 634 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
+| 635 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
+| 636 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
+| 637 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
+| 638 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
+| 639 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
+| 640 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
+| 641 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
+| 642 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
+| 643 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
+| 644 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
+| 645 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
+| 646 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
+| 647 | PAN-5154 | L | low | needs-refinement |  |  | GitHub account, token and host per owner (work accounts, GHES). Not scheduled; needs a PRD first. |
+| 648 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
+| 649 | PAN-3441 | L | low | ok |  |  | God View 'River' WebGL pipeline visualization fed by the live hook-event stream; PRD and mockup exist. |
+| 650 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
+| 651 | PAN-2941 | M | low | stale |  |  | Superseded by OKF v0.2: drafts plus human verify replace the PR gate (eltmon/okf#6); semantic pass is eltmon/okf#7 |
+| 652 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
+| 653 | PAN-4373 | M | medium | ok |  |  | Optional Jev relevance filter for prompt-time memory injection candidates; both prerequisites have closed |
+| 654 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
+| 655 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
+| 656 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
+| 657 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
+| 658 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
+| 659 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
+| 660 | PAN-5066 | M | medium | ok |  |  | Project skills in .pan/skills skip the CLI workspace fallback, never refresh, lose to bundled skills, and never reach Codex/Pi. |
+| 661 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
+| 662 | PAN-4350 | M | medium | needs-refinement |  |  | Re-dispatch budget for foreman items; issue itself flags an unresolved conflict with the no-stored-state rule |
+| 663 | PAN-4003 | L | medium | ok |  |  | Parked: delete the ohmypi/omp harness, keep Pi; obsoletes 10 open ohmypi issues and shrinks PAN-3958's CH-7 scope |
+| 664 | PAN-4368 | S | medium | ok |  |  | Operator-run checklist: verify Sonnet 5.5 across switch-model, fork and compaction (model-locked thinking blocks) |
+| 665 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
+| 666 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
+| 667 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
+| 668 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
+| 669 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
+| 670 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
+| 671 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
+| 672 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
+| 673 | PAN-4769 | XS | low | ok |  |  | Two-sentence wording fix in features/skill-packs.mdx; PAN-4759 created the page and closed, so this is unblocked. |
+| 674 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
+| 675 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
+| 676 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
+| 677 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
+| 678 | PAN-4823 | XL | medium | ok | ✓ |  | Epic: Capacitor phone client for Anywhere without Tailscale; 15 children filed (#4828-4843); OD-1 settled; PAN-4774 done. |
+| 679 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
+| 680 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
+| 681 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
+| 682 | PAN-5082 | XL | medium | ok |  |  | Move every MCP surface to SDK v2 for the 2026-07-28 spec while keeping 2025-11-25 clients; time it on PAN-5083 data. |
+| 683 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
+| 684 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
+| 685 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
+| 686 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
+| 687 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
+| 688 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
+| 689 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
+| 690 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
+| 691 | PAN-2046 | M | low | stale |  |  | Conversation view does not surface terminal command responses |
+| 692 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
+| 693 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
+| 694 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
+| 695 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
+| 696 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
+| 697 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
+| 698 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
+| 699 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
+| 700 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
+| 701 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
+| 702 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
+| 703 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
+| 704 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
+| 705 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
+| 706 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
+| 707 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
+| 708 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
+| 709 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
+| 710 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
+| 711 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
+| 712 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
+| 713 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
+| 714 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
+| 715 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
+| 716 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
+| 717 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
+| 718 | PAN-4352 | XS | low | ok |  |  | Operator verification: skill packs in a managed interactive Claude Code launch now that PAN-4334 has shipped |
+| 719 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
+| 720 | PAN-4298 | XL | low | needs-refinement |  | PAN-4294, PAN-1676 | Anywhere paid tier: run agents on hosted Fly capacity; tenant isolation, credentials, metering open; PAN-4294 and PAN-1676 unbuilt |
+| 721 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
+| 722 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
+| 723 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
+| 724 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
+| 725 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
+| 726 | PAN-4248 | L | medium | ok |  |  | List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; PAN-1641 sidecar has merged. |
+| 727 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
+| 728 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
+| 729 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
+| 730 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
+| 731 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
+| 732 | PAN-3971 | L | low | ok |  |  | Overdeck-native artifact pages (pan artifact publish + state door + dashboard listing); body says backlog only, Claude artifacts work today |
+| 733 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
+| 734 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
+| 735 | PAN-2983 | M | low | stale |  |  | Superseded by the OKF v0.2 redesign: write modes and drafts (eltmon/okf#6) and the advisory semantic pass (eltmon/okf#7) |
+| 736 | PAN-3824 | XS | low | needs-refinement |  |  | Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior |
+| 737 | PAN-3823 | XS | low | needs-refinement |  |  | Image-only report titled "pan sync issue"; needs the command, output text, and expected behavior |
+| 738 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
+| 739 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
+| 740 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
+| 741 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
+| 742 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
+| 743 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
+| 744 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
+| 745 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
+| 746 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
+| 747 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
+| 748 | PAN-4347 | S | low | ok |  |  | pan done appends continue.json decisions to the PR body so significant decisions outlive the workspace |
+| 749 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
+| 750 | PAN-4275 | S | low | ok |  |  | Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. PAN-1641 has merged. |
+| 751 | PAN-2836 | M | low | needs-refinement |  |  | Placement presets now belong on eltmon/okf#4 after the OKF v0.2 redesign; migrate verb collides; re-scope or move upstream |
+| 752 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
+| 753 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
+| 754 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
+| 755 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
+| 756 | PAN-3456 | XS | low | ok |  |  | Already fixed in 4117c9a777 with a regression test; open only pending close-out. |
+| 757 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
+| 758 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
+| 759 | PAN-772 | M | low | stale |  |  | Auto-resume ladder paths it names are gone; terminal-stack consistency now means the Herdr/tmux contract in TERMINAL-BACKENDS.md |
+| 760 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
+| 761 | PAN-769 | M | low | stale |  | PAN-750 | Phase-transition history no longer accumulates in a record; a churn metric would be rebuilt from PR review cycles or the pipeline journal |
+| 762 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
+| 763 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
+| 764 | PAN-4425 | M | low | ok |  |  | Deft fork work in eltmon/directive (env off switch, external-orchestrator mode); outside the overdeck pipeline |
+| 765 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
+| 766 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
+| 767 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
+| 768 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
+| 769 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
+| 770 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
+| 771 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
+| 772 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
+| 773 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
+| 774 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
+| 775 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
+| 776 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
+| 777 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
+| 778 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
+| 779 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
+| 780 | PAN-604 | M | low | ok |  |  | Hide planning agent from workspace detail pane |
+| 781 | PAN-603 | M | low | ok |  |  | Plan review loop with configurable reviewer model |
+| 782 | PAN-591 | XS | low | ok |  |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
+| 783 | PAN-589 | XS | low | ok |  |  | Review and update commands-skills.md with all available Panopticon skills |
+| 784 | PAN-576 | M | low | ok |  |  | Global / search should include conversations in addition to workspace features |
+| 785 | PAN-571 | XS | low | ok |  |  | Add OpenRouter credits/plan status endpoint and UI |
+| 786 | PAN-568 | M | low | ok |  |  | Kanban: Show workspace and tmux session counts in stats |
+| 787 | PAN-565 | M | low | ok |  |  | Handle CTRL-Z to undo accidental conversation archival |
+| 788 | PAN-564 | M | low | ok |  |  | Slash menu positioned incorrectly |
+| 789 | PAN-554 | M | low | ok |  |  | Add kanban board deeplinks for issue URLs |
+| 790 | PAN-543 | M | low | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
+| 791 | PAN-483 | M | low | ok |  |  | Unify Resume Agent UX |
+| 792 | PAN-480 | M | low | needs-refinement |  |  | Planning-agent --effort; likely covered by merged PAN-4249 resolver and PAN-4258 (plan effort), confirm or close |
+| 793 | PAN-476 | M | low | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
+| 794 | PAN-468 | M | low | ok |  |  | Agent test conversations pollute production database |
+| 795 | PAN-461 | M | low | ok |  |  | Deep-wipe multi-step progress dialog |
+| 796 | PAN-459 | M | low | ok |  |  | Planning setup screen with SSE progress streaming |
+| 797 | PAN-407 | XS | low | ok |  |  | Run Panopticon from a main workspace for development isolation |
+| 798 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
+| 799 | PAN-2346 | XS | low | ok |  |  | docs: refresh AGENT_TYPES_INDEX.md to the post-Cut taxonomy in ROLES.md (xBRIEF items, foreman, conv-flywheel, worker role). |
+| 800 | PAN-2345 | XS | low | ok |  |  | docs: rewrite pan-done.md against done.ts + done-preflight.ts; fix continue path; point MERGE link at MERGE-WORKFLOW.md. |
+| 801 | PAN-2344 | XS | low | ok |  |  | docs: rewrite KANBAN-MODEL.md for derived issue state, pipeline-membership buckets, PR reviews; drop Inspect and beads. |
+| 802 | PAN-2343 | XS | low | ok |  |  | docs: rewrite MISSION-CONTROL.md: state label from deriveStateLabel, membership, liveness.ts; review_status table is gone. |
+| 803 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
+| 804 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
+| 805 | PAN-2068 | XS | low | ok |  |  | docs: add user-facing page for Caveman (agent output compression) |
+| 806 | PAN-2067 | XS | low | ok |  |  | docs: add user-facing page for RTK (Bash output compression) |
+| 807 | PAN-1684 | XS | low | ok |  |  | build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
+| 808 | PAN-1683 | XS | low | ok |  |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) |
+| 809 | PAN-1474 | M | low | ok |  |  | Add ACKNOWLEDGEMENTS doc |
+| 810 | PAN-1469 | M | low | ok |  |  | End-to-end review and consolidation of all project documentation |
+| 811 | PAN-674 | XS | low | ok |  |  | docs: add glossary of Panopticon domain terms |
+| 812 | PAN-634 | M | low | ok |  |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
+| 813 | PAN-2908 | M | low | ok |  |  | Make overdeck not suck |
+| 814 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
+| 815 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
+| 816 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
+| 817 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
+| 818 | PAN-324 | XS | medium | needs-refinement |  |  | Approval is now a PR review or the dashboard MERGE button; verify whether the agent detail pane already surfaces MERGE post-cut |
+| 819 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
+| 820 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
+| 821 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
+| 822 | PAN-4332 | M | low | ok |  |  | Interop: continue t3code sessions in Overdeck and back via native transcripts; PAN-2609 Phase A has closed |
+| 823 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
+| 824 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
+| 825 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
+| 826 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
+| 827 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
+| 828 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
+| 829 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
+| 830 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
+| 831 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
+| 832 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
+| 833 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
+| 834 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
+| 835 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
+| 836 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 837 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 838 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 839 | PAN-5033 | XS | medium | ok |  |  | OpenClaw Connect a bot snippet omits hooks.allowConversationAccess, so the needs-you summary stays off with no message. |
+| 840 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 841 | PAN-5043 | S | medium | ok |  |  | Commit the phone-app iOS Simulator harness (Miniflare connect stand-in, stub account service, rig steps) built twice by hand. |
+| 842 | PAN-5065 | L | medium | ok |  |  | Opt-in mode where a project's agents and gates stop seeing ~/.overdeck.env keys the project did not list. |
+| 843 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 844 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
+| 845 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
+| 846 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
+| 847 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
+| 848 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
+| 849 | PAN-283 | M | low | stale |  |  | Reset should sync workspace feature branch with latest main |
+| 850 | PAN-271 | M | low | stale |  |  | Auto-assign Linear project from project config when creating issues |
+| 851 | PAN-265 | M | low | stale |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
+| 852 | PAN-249 | XS | low | stale |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
+| 853 | PAN-228 | M | low | stale |  |  | Shift-left post-edit diagnostics |
+| 854 | PAN-227 | M | low | stale |  |  | Phase gate validation |
+| 855 | PAN-198 | M | low | stale |  |  | Structured audit trail for agent actions |
+| 856 | PAN-190 | M | low | stale |  |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
+| 857 | PAN-180 | M | low | stale |  |  | PAN-180: Cross-terminal file locking for concurrent agents |
+| 858 | PAN-177 | M | low | stale |  |  | PAN-177: Iteration limits with escalation for autonomous agents |
+| 859 | PAN-175 | M | low | stale |  |  | PAN-175: Pre-compact auto-save hook for agent sessions |
+| 860 | PAN-155 | L | low | stale |  |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
+| 861 | PAN-146 | M | low | stale |  |  | PAN-146: Refine light mode theming across all dashboard pages |
+| 862 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
+| 863 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
+| 864 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
+| 865 | PAN-3536 | S | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): pan tell can not reach ohmypi conversations; fix dies with the harness |
+| 866 | PAN-2027 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): routing kimi-k2 through ohmypi needs a different home once OMP is gone |
+| 867 | PAN-2035 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): Copilot provider routing via omp |
+| 868 | PAN-2034 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): end-to-end test for ohmypi tool-call rendering |
+| 869 | PAN-2033 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi message-delivery latency benchmark |
+| 870 | PAN-2032 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): local Ollama review role via omp |
+| 871 | PAN-2030 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): version-pin the ohmypi extension |
+| 872 | PAN-2029 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi-parser thinking_tokens capture |
+| 873 | PAN-2028 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): per-provider cost grouping keyed on omp |
+| 874 | PAN-2024 | XS | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi conversation Tools-toggle |
+| 875 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
+| 876 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
+| 877 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
+| 878 | PAN-4590 | L | medium | ok |  |  | Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config. |
+| 879 | PAN-4591 | L | medium | ok |  |  | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable. |
+| 880 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
+| 881 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
+| 882 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
+| 883 | PAN-5022 | L | medium | ok |  |  | Phone app: relay notification preferences to offline machines via the directory, and drop muted pushes on the phone. |
+| 884 | PAN-5021 | M | low | needs-refinement |  |  | PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded. |
+| 885 | PAN-5029 | M | medium | needs-refinement |  |  | Grok Build Tailscale reach can't work: pan mcp serve verifies tokens only against its own machine. Needs a design choice. |
+| 886 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
+| 887 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
+| 888 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
+| 889 | PAN-5207 | L | low | needs-refinement |  | PAN-5202 | Parked by the operator: Flux meeting bots for Zoom, Teams, Meet, Slack as a paid integration. Do not start. |
+| 890 | PAN-5183 | XS | low | ok | ✓ |  | Parent of the file explorer; all children PAN-5185..5191 are closed. Verify and close. |
+| 891 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
+| 892 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
+| 893 | PAN-5235 | XS | low | ok |  |  | Fix already applied: terminal-dialog toast now navigates to the agent's terminal tab. Verify and close. |
+| 894 | PAN-5280 | XS | low | ok |  |  | Record of two UI fixes made inline on main (orbiting logo, unclipped Home project menu). Verify and close. |
 
 ## Rationale detail
 
-### PAN-5071 (rank 1)
+### PAN-5290 (rank 1)
 
-New in-pipeline issue since the prior run, pinned at the top free rank. It is a self-contained account-service change (migration, device-code fields, one-click confirm page) whose sibling PAN-5069 already supplies the connector side, so no open dependency blocks it.
+New in-pipeline child C of the PAN-5284 workflow redesign, pinned at a freed top slot. It is one of four prerequisites for PAN-5343.
 
-### PAN-5125 (rank 2)
+### PAN-5294 (rank 2)
 
-New since the prior run and already in the pipeline with a written fix in review, so it takes the free rank 2 slot without displacing any existing rank.
+New in-pipeline child G of the PAN-5284 workflow redesign, pinned at a freed top slot. It is a prerequisite for PAN-5343.
 
-### PAN-5013 (rank 3)
+### PAN-5348 (rank 3)
+
+New in-pipeline bug: the composer parser throws on bare /pan, so every send of the help command fails with a 404 and a self-contradicting error. Pinned in the free rank-3 slot beside the other in-pipeline work; the fix is a small parser change plus a local command result.
+
+### PAN-5337 (rank 4)
+
+New in-pipeline bug, pinned at a freed top slot. All 93 links in a measured docs index were dead; PAN-5340 builds on its fix.
+
+### PAN-5338 (rank 5)
+
+New in-pipeline enhancement, pinned at a freed top slot. Its reusable preview body is what PAN-5341 reuses in the dock diff view.
+
+### PAN-5013 (rank 5)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
-
-### PAN-5090 (rank 4)
-
-New substrate bug with a one-line, verified fix: the generated overdeck-herdr.service inherits systemd's default OOMPolicy=stop, so a single OOM-killed pane process (here an OBS page) tears down the whole unit and every conversation in every project. It recurred on 2026-10-30 and 2026-11-06. The tmux unit already carries the fix from PAN-3539; porting OOMPolicy=continue and ManagedOOMPreference=avoid to renderHerdrUnit is XS and applies live via daemon-reload, so it ranks at the top of the free slots.
-
-### PAN-4995 (rank 5)
-
-New substrate-improvement issue, placed in the open rank-3 slot so no other rank moves. Every handoff that opens a PR and then runs pan review request (the order the handoff brief prescribes) can race the PR-opened adoption: verification merges origin/main into the workspace before adoption's final head check, so adoption journals workspace-head-mismatch and the issue shows a false needs pr-outside-pipeline. Nothing is stranded, but each occurrence costs operator attention. The issue names the cause and picks the fix (await an in-flight adoptPrAndStartReview from the request-review path), so it is small and ready to plan.
 
 ### PAN-4636 (rank 6)
 
@@ -915,7 +946,7 @@ New issue, ranked into the rank-10 slot beside PAN-4554. When pan start --plan a
 
 ### PAN-4554 (rank 10)
 
-New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it.
+New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it. A 2026-11-14 comment adds an overdeck instance (PAN-5232), so it is not polyrepo-only; rank and importance unchanged because a second pan start still works.
 
 ### PAN-4666 (rank 11)
 
@@ -957,13 +988,17 @@ New flaky-test bug: a background membership-snapshot write races the test's tear
 
 Its only dependency, PAN-5103 (Fable 5.2 rollout), closed as completed, so the XS rebuild is unblocked; rank held at 20 because it is a cost-accuracy fix, not pipeline substrate.
 
-### PAN-4572 (rank 21)
+### PAN-5347 (rank 21)
+
+New in-pipeline discoverability fix: skills never reach the composer slash menu, so operators cannot find skill-only workflows. Pinned in the free rank-21 slot beside the other in-pipeline work; it reuses the existing skills route and category grouping.
+
+### PAN-5339 (rank 22)
+
+New in-pipeline enhancement, pinned at the freed rank-22 slot. It is self-contained in ChatMarkdown and the existing /conv route.
+
+### PAN-4572 (rank 22)
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
-
-### PAN-4625 (rank 22)
-
-New issue since the prior run. The same-head debounce in ci-failure-feedback.ts drops a second failed check (e.g. a test shard after lint), so the work agent fixes lint and never learns which test failed, which costs a full extra CI and verification cycle per occurrence. It is a small, well-specified fix with clear ACs, but it edits the same relay code that in-pipeline PAN-4534 is rewriting, so it is sequenced right behind that work rather than ahead of it; it sits beside PAN-4439 (the missed-webhook backstop) as the second gap in CI failure delivery.
 
 ### PAN-4586 (rank 23)
 
@@ -1049,9 +1084,9 @@ New this pass. The CI test job runs root npm test, whose frontend leg is a hand-
 
 New this pass. computeWorkspaceRepoRoots builds its fallback candidate by joining the workspace path with an absolute repoPath, so any polyrepo repo whose configured name differs from its directory is never found. That makes pan task done refuse valid Item trailers and also affects head snapshots and merge completeness for MYN. The fix is a one-line candidate change plus a test, and a symlink workaround exists, so it ranks high rather than critical.
 
-### PAN-5091 (rank 44)
+### PAN-5167 (rank 44)
 
-New recovery gap exposed by the PAN-5090 OOM stop: after a terminal-backend restart every conversation stays dead until resumed one by one from the dashboard. Item 1 (a pan conversations resume verb and an MCP resume_conversation tool over the existing route) is well specified; item 2 (supervised auto-resume throttled by memory pressure) needs a design call, hence needs-refinement. Ranked in the high tier behind PAN-5090, which removes the most common trigger.
+New substrate bug placed in a freed critical-tier slot. One transient fetch failure leaves a merged issue in_review with a live agent and needs manual kill plus pan close --force, the same failure class as PAN-4675.
 
 ### PAN-4396 (rank 45)
 
@@ -1073,9 +1108,9 @@ New this pass. pan tell reported successful delivery three times to a live, hear
 
 Idle remediation is now deacon-lite nudge routines; triage asks to verify the Codex app-server delivery bypass against that implementation. The persistent-session invariant still forbids codex exec; rank held.
 
-### PAN-5095 (rank 50)
+### PAN-5139 (rank 50)
 
-New this pass. messageAgent delivers to an app-server target only when a turn-completed marker exists, but Codex app-server never runs the notify hook that writes it, so every pan tell to such a conversation is queued to mail that nothing drains (1,224 strandings on one conversation). The fix is small and well evidenced: post through the app-server unconditionally, as the composer route and MCP send_message already do. Ranked beside the other delivery-door bugs (PAN-3630, PAN-3805) because agent messaging is substrate every orchestrator depends on.
+New substrate bug placed in a freed critical-tier slot. Any launch from the non-live generation repoints the shim, after which every pan reload refuses, so merged fixes stop shipping.
 
 ### PAN-3560 (rank 51)
 
@@ -1125,9 +1160,9 @@ Synthesis fires 42s after spawn and mislabels reviewers-with-reports-on-disk as 
 
 Triage: verify whether a never-kicked-off test session can still absorb dispatch under the current liveness model. Rank held.
 
-### PAN-4374 (rank 63)
+### PAN-5228 (rank 63)
 
-New issue split out of the now-closed PAN-4370. No memory observation has been extracted on the operator's host since 2026-08-13 because neither provider can authenticate, so the memory substrate is silently dead; it informs PAN-1449.
+New pipeline bug placed in a freed critical-tier slot. Reviews whose reviewers die after a CodeRabbit post are never re-dispatched, and PAN-5218 widened the masking.
 
 ### PAN-4344 (rank 64)
 
@@ -1141,9 +1176,9 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
 
 Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.
 
-### PAN-4622 (rank 67)
+### PAN-5193 (rank 67)
 
-Rank held: its only dependency, PAN-4532, closed 2026-10-24, so this follow-up is now unblocked and workable; the residual cases still recover via deacon-lite, so it stays below the active verification bundle.
+New planning bug placed in a freed high-tier slot. It blocks pan plan finalize for every epic child with a stub draft on main; the fix is a candidate-order change plus one test.
 
 ### PAN-2940 (rank 68)
 
@@ -1157,9 +1192,9 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
 
 New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
 
-### PAN-4624 (rank 71)
+### PAN-5133 (rank 71)
 
-New issue: a silent verification-gate bypass for polyrepo projects in ci tests mode; scoped fix with clear AC, placed beside the other polyrepo pipeline bugs and after PAN-4527, which touches the same head-resolution code.
+New substrate bug placed in a freed high-tier slot. Under memory pressure the operator has no supported way to stop a deferred start, and the Flywheel had to write the journal directly.
 
 ### PAN-4792 (rank 72)
 
@@ -1185,17 +1220,9 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 
 Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
 
-### PAN-4623 (rank 78)
+### PAN-5330 (rank 78)
 
-New since the prior run (filed by the PAN-4532 plan critic). recoverStalledReviews falls back to getRequestReviewStarter(), which is only registered by the dashboard route module the forked deacon child never loads, so the fallback is a silent no-op in production and a journaled-but-undispatched review with no parent state stays stranded. The fix is a one-call swap to requestReviewThroughRoute, which undispatched-review-recovery already uses. Placed beside PAN-3278 (review never dispatched) because it closes the same throughput hole; it is review-recovery machinery, so it goes through a supervised handoff.
-
-### PAN-3234 (rank 79)
-
-Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
-
-### PAN-3205 (rank 80)
-
-New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
+New substrate bug placed in a freed high-tier slot. With several workspace stacks up, browser checks hit the wrong backend and flake, which corrupts verification.
 
 
 <!-- machine-readable; do not hand-edit below this line -->
@@ -1204,40 +1231,79 @@ New this pass. The deployment gate's queue message is unusually good — it name
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-11T07:56:13.901772Z",
+  "generatedAt": "2026-11-15T14:29:34.895404Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 869,
+  "openCount": 896,
   "nodes": [
     {
-      "issue": "PAN-5071",
+      "issue": "PAN-5290",
       "rank": 1,
-      "size": "S",
-      "importance": "medium",
-      "score": 62,
+      "size": "L",
+      "importance": "high",
+      "score": 80,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In pipeline: device-flow /activate page becomes one Authorize click naming bot and machine; adds migration 0003 names.",
-      "rationale": "New in-pipeline issue since the prior run, pinned at the top free rank. It is a self-contained account-service change (migration, device-code fields, one-click confirm page) whose sibling PAN-5069 already supplies the connector side, so no open dependency blocks it.",
+      "why": "In pipeline: workflow redesign C — code opens beside the chat; edit-workspace bar, Create PR and PR status in the editor.",
+      "rationale": "New in-pipeline child C of the PAN-5284 workflow redesign, pinned at a freed top slot. It is one of four prerequisites for PAN-5343.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-5125",
+      "issue": "PAN-5294",
       "rank": 2,
-      "size": "XS",
-      "importance": "medium",
-      "score": 60,
+      "size": "L",
+      "importance": "high",
+      "score": 78,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In review (PR #5102): TTS daemon retries a runaway Qwen3-TTS take once, then trims it to 4s+len/9 and logs both cases.",
-      "rationale": "New since the prior run and already in the pipeline with a written fix in review, so it takes the free rank 2 slot without displacing any existing rank.",
+      "why": "In pipeline: workflow redesign G — rebuilt project Home with actions first, needs-you, pipeline rows, recent changes.",
+      "rationale": "New in-pipeline child G of the PAN-5284 workflow redesign, pinned at a freed top slot. It is a prerequisite for PAN-5343.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5348",
+      "rank": 3,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: bare /pan in the composer 404s with an error telling you to type /pan; make it list commands locally",
+      "rationale": "New in-pipeline bug: the composer parser throws on bare /pan, so every send of the help command fails with a 404 and a self-contradicting error. Pinned in the free rank-3 slot beside the other in-pipeline work; the fix is a small parser change plus a local command result.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5337",
+      "rank": 4,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: every relative link in a Markdown preview opens a 404 /conv/<file> URL instead of the linked file.",
+      "rationale": "New in-pipeline bug, pinned at a freed top slot. All 93 links in a measured docs index were dead; PAN-5340 builds on its fix.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5338",
+      "rank": 5,
+      "size": "M",
+      "importance": "medium",
+      "score": 66,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: conversation diff view gets a rendered Markdown Preview and an Open file action.",
+      "rationale": "New in-pipeline enhancement, pinned at a freed top slot. Its reusable preview body is what PAN-5341 reuses in the dock diff view.",
       "gate": "auto",
       "planning": "auto"
     },
     {
       "issue": "PAN-5013",
-      "rank": 3,
+      "rank": 5,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1245,32 +1311,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned.",
       "rationale": "Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5090",
-      "rank": 4,
-      "size": "XS",
-      "importance": "critical",
-      "score": 90,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Herdr unit lacks OOMPolicy=continue: one OOM-killed pane child stops the service and kills every conversation; seen twice.",
-      "rationale": "New substrate bug with a one-line, verified fix: the generated overdeck-herdr.service inherits systemd's default OOMPolicy=stop, so a single OOM-killed pane process (here an OBS page) tears down the whole unit and every conversation in every project. It recurred on 2026-10-30 and 2026-11-06. The tmux unit already carries the fix from PAN-3539; porting OOMPolicy=continue and ManagedOOMPreference=avoid to renderHerdrUnit is XS and applies live via daemon-reload, so it ranks at the top of the free slots.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4995",
-      "rank": 5,
-      "size": "S",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs",
-      "rationale": "New substrate-improvement issue, placed in the open rank-3 slot so no other rank moves. Every handoff that opens a PR and then runs pan review request (the order the handoff brief prescribes) can race the PR-opened adoption: verification merges origin/main into the workspace before adoption's final head check, so adoption journals workspace-head-mismatch and the issue shows a false needs pr-outside-pipeline. Nothing is stranded, but each occurrence costs operator attention. The issue names the cause and picks the fix (await an in-flight adoptPrAndStartReview from the request-review path), so it is small and ready to plan.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1334,8 +1374,8 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "score": 80,
       "condition": "ok",
       "dependsOn": [],
-      "why": "pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues",
-      "rationale": "New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it.",
+      "why": "pan start --plan auto finalizes planning but never spawns the work agent; seen on MYN and now overdeck (PAN-5232).",
+      "rationale": "New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it. A 2026-11-14 comment adds an overdeck instance (PAN-5232), so it is not polyrepo-only; rank and importance unchanged because a second pan start still works.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1470,8 +1510,21 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
+      "issue": "PAN-5339",
+      "rank": 22,
+      "size": "S",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: conversation names, conv N forms and /conv URLs in messages become clickable links.",
+      "rationale": "New in-pipeline enhancement, pinned at the freed rank-22 slot. It is self-contained in ChatMarkdown and the existing /conv route.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4572",
-      "rank": 21,
+      "rank": 22,
       "size": "M",
       "importance": "medium",
       "score": 58,
@@ -1479,19 +1532,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs.",
       "rationale": "PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4625",
-      "rank": 22,
-      "size": "S",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file)",
-      "rationale": "New issue since the prior run. The same-head debounce in ci-failure-feedback.ts drops a second failed check (e.g. a test shard after lint), so the work agent fixes lint and never learns which test failed, which costs a full extra CI and verification cycle per occurrence. It is a small, well-specified fix with clear ACs, but it edits the same relay code that in-pipeline PAN-4534 is rewriting, so it is sequenced right behind that work rather than ahead of it; it sits beside PAN-4439 (the missed-webhook backstop) as the second gap in CI failure delivery.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1771,15 +1811,15 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-5091",
+      "issue": "PAN-5167",
       "rank": 44,
-      "size": "M",
-      "importance": "high",
-      "score": 72,
-      "condition": "needs-refinement",
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
       "dependsOn": [],
-      "why": "No CLI/MCP verb or auto path resumes conversations after a Herdr restart; verb is concrete, auto-recovery needs a design call.",
-      "rationale": "New recovery gap exposed by the PAN-5090 OOM stop: after a terminal-backend restart every conversation stays dead until resumed one by one from the dashboard. Item 1 (a pan conversations resume verb and an MCP resume_conversation tool over the existing route) is well specified; item 2 (supervised auto-resume throttled by memory pressure) needs a design call, hence needs-refinement. Ranked in the high tier behind PAN-5090, which removes the most common trigger.",
+      "why": "Post-merge lifecycle refuses forever on one transient GitHub fetch failure; agent stays running and close-out is blocked.",
+      "rationale": "New substrate bug placed in a freed critical-tier slot. One transient fetch failure leaves a merged issue in_review with a live agent and needs manual kill plus pan close --force, the same failure class as PAN-4675.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1849,15 +1889,15 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-5095",
+      "issue": "PAN-5139",
       "rank": 50,
-      "size": "S",
-      "importance": "high",
-      "score": 82,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
       "condition": "ok",
       "dependsOn": [],
-      "why": "pan tell to a Codex app-server conversation always queues to mail and is never delivered; fix: post through app-server in every state.",
-      "rationale": "New this pass. messageAgent delivers to an app-server target only when a turn-completed marker exists, but Codex app-server never runs the notify hook that writes it, so every pan tell to such a conversation is queued to mail that nothing drains (1,224 strandings on one conversation). The fix is small and well evidenced: post through the app-server unconditionally, as the composer route and MCP send_message already do. Ranked beside the other delivery-door bugs (PAN-3630, PAN-3805) because agent messaging is substrate every orchestrator depends on.",
+      "why": "pan reload refuses both generations when the pan shim points at the non-live generation; deploys stall.",
+      "rationale": "New substrate bug placed in a freed critical-tier slot. Any launch from the non-live generation repoints the shim, after which every pan reload refuses, so merged fixes stop shipping.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2018,15 +2058,15 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-4374",
+      "issue": "PAN-5228",
       "rank": 63,
       "size": "S",
       "importance": "high",
-      "score": 78,
+      "score": 82,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Memory extraction has no working provider on subscription-only hosts; nothing extracted since 2026-08-13. Add claude-cli",
-      "rationale": "New issue split out of the now-closed PAN-4370. No memory observation has been extracted on the operator's host since 2026-08-13 because neither provider can authenticate, so the memory substrate is silently dead; it informs PAN-1449.",
+      "why": "Advisory CodeRabbit journal entries land last and hide stalled reviews from recoverStalledReviews and other last-entry readers.",
+      "rationale": "New pipeline bug placed in a freed critical-tier slot. Reviews whose reviewers die after a CodeRabbit post are never re-dispatched, and PAN-5218 widened the masking.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2070,15 +2110,15 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-4622",
+      "issue": "PAN-5193",
       "rank": 67,
-      "size": "M",
+      "size": "XS",
       "importance": "high",
-      "score": 72,
+      "score": 80,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Restart after consuming a verification result, or a dirty tree at boot, still re-runs 25-45 min of passed gates. PAN-4532 merged",
-      "rationale": "Rank held: its only dependency, PAN-4532, closed 2026-10-24, so this follow-up is now unblocked and workable; the residual cases still recover via deacon-lite, so it stays below the active verification bundle.",
+      "why": "PRD-first gate reads a short main stub before the full workspace draft and refuses finalize for epic children.",
+      "rationale": "New planning bug placed in a freed high-tier slot. It blocks pan plan finalize for every epic child with a stub draft on main; the fix is a candidate-order change plus one test.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2122,15 +2162,15 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-4624",
+      "issue": "PAN-5133",
       "rank": 71,
-      "size": "S",
+      "size": "M",
       "importance": "high",
       "score": 78,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Polyrepo ci-mode test gate reads CI verdict for the wrapper HEAD, never the member repo PR head, so red CI is silently missed.",
-      "rationale": "New issue: a silent verification-gate bypass for polyrepo projects in ci tests mode; scoped fix with clear AC, placed beside the other polyrepo pipeline bugs and after PAN-4527, which touches the same head-resolution code.",
+      "why": "pan pause cannot hold a planned issue whose deferred work-agent start is retried; no operator door to stop it.",
+      "rationale": "New substrate bug placed in a freed high-tier slot. Under memory pressure the operator has no supported way to stop a deferred start, and the Flywheel had to write the journal directly.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2213,15 +2253,15 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-4623",
+      "issue": "PAN-5330",
       "rank": 78,
-      "size": "XS",
+      "size": "S",
       "importance": "high",
-      "score": 82,
+      "score": 76,
       "condition": "ok",
       "dependsOn": [],
-      "why": "deacon-lite stalled-review fallback calls a starter never registered in the deacon child, so stranded reviews stay stranded. TENET-10",
-      "rationale": "New since the prior run (filed by the PAN-4532 plan critic). recoverStalledReviews falls back to getRequestReviewStarter(), which is only registered by the dashboard route module the forked deacon child never loads, so the fallback is a silent no-op in production and a journaled-but-undispatched review with no parent state stays stranded. The fix is a one-call swap to requestReviewThroughRoute, which undispatched-review-recovery already uses. Placed beside PAN-3278 (review never dispatched) because it closes the same throughput hole; it is review-recovery machinery, so it goes through a supervised handoff.",
+      "why": "Workspace devcontainers share the 'server' DNS alias on the overdeck network, so a frontend can proxy to another workspace.",
+      "rationale": "New substrate bug placed in a freed high-tier slot. With several workspace stacks up, browser checks hit the wrong backend and flake, which corrupts verification.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2304,18 +2344,17 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-4753",
+      "issue": "PAN-5263",
       "rank": 85,
-      "size": "XL",
+      "size": "M",
       "importance": "high",
-      "score": 78,
-      "condition": "needs-refinement",
+      "score": 74,
+      "condition": "ok",
       "dependsOn": [],
-      "why": "Epic: restore merge trains (MergeTrain component, strike fast lane); PAN-4750 merged; PRD being written, no children yet; handoff.",
-      "rationale": "Rank held: its strike-lane dependency PAN-4750 merged and is verifying on main, so that blocker is cleared; the epic still has no children.",
+      "why": "Pipeline membership sees zero open overdeck issues: the App token lacks issues permission and the gh fallback never runs.",
+      "rationale": "New bug placed in a freed high-tier slot. Phase labels are ignored for overdeck and every gather refetches ~492 numbers; the fix needs care because it raises candidate count.",
       "gate": "auto",
-      "planning": "auto",
-      "isEpic": true
+      "planning": "auto"
     },
     {
       "issue": "PAN-3096",
@@ -3457,15 +3496,15 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "skip"
     },
     {
-      "issue": "PAN-4634",
+      "issue": "PAN-5250",
       "rank": 175,
       "size": "M",
-      "importance": "medium",
-      "score": 66,
-      "condition": "needs-refinement",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
       "dependsOn": [],
-      "why": "Terra unserved on claude-code route: no CLIProxy release (to v8.0.44) lists it; bump pin, add to GPT_56_MODELS. Aliases also broken.",
-      "rationale": "Prerequisite PAN-4633 (Terra on codex) merged and closed, so the dependency is dropped; rank holds because no known CLIProxy release serves gpt-6.1-terra yet and the 7.x to 8.x jump is still unscoped.",
+      "why": "Idle workspace frontend and dev containers never stop while an agent lives; ~9 GB held by unviewed Vite containers.",
+      "rationale": "New substrate item placed in a freed high-tier slot; it frees memory the governor and the live stream need.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3808,15 +3847,15 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-5124",
+      "issue": "PAN-5295",
       "rank": 203,
-      "size": "M",
-      "importance": "medium",
-      "score": 64,
+      "size": "L",
+      "importance": "high",
+      "score": 72,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Operator-decided default swap: mid workhorse to Opus 5.5, cheap/background to Haiku 5.5; spec names every file. Pairs with PAN-4365.",
-      "rationale": "New issue; ranked beside PAN-4365 (stale model defaults) since both edit the same built-in default tables and are cheap, operator-decided config work.",
+      "why": "Workflow redesign D2: turn card, file chips, composer controls, subagents rail and tab strip per mockup screen 1.",
+      "rationale": "New child of the PAN-5284 epic, placed in a freed high-tier slot; it is a prerequisite for PAN-5343 and reshapes where PAN-5341 matters.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3954,14 +3993,15 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-3176",
+      "issue": "PAN-5335",
       "rank": 215,
-      "size": "S",
+      "size": "M",
       "importance": "high",
-      "score": 74,
+      "score": 70,
       "condition": "ok",
       "dependsOn": [],
-      "why": "UAT promote consults no stack health, so a batch whose stack was never exercised can be promoted from a success-green control.",
+      "why": "Workflow redesign F follow-up: collapse handoff groups, unclipped cost, footer label, one current nav item, keep project.",
+      "rationale": "New follow-up to the merged child F of PAN-5284, placed in a freed high-tier slot; it is a prerequisite for PAN-5343.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4093,17 +4133,18 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-5087",
+      "issue": "PAN-5284",
       "rank": 226,
-      "size": "S",
+      "size": "XL",
       "importance": "high",
-      "score": 72,
+      "score": 70,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Attachment messages on every non-Claude harness never match their transcript echo and land in the failed outbox after 4 min.",
-      "rationale": "Affects every Codex, Pi and Kimi conversation that sends an attachment: the message was delivered but the UI says it failed, which invites duplicate resends. Cause and fix location are verified.",
+      "why": "Epic: workflow redesign — one left column, Files/Changes/Search dock, code beside chat, rebuilt Home. Open children: C, G, D2, F+, H.",
+      "rationale": "New epic placed beside its children; scored on its open children (PAN-5290, 5294, 5295, 5335, 5343), which the Flywheel's order book drives.",
       "gate": "auto",
-      "planning": "auto"
+      "planning": "auto",
+      "isEpic": true
     },
     {
       "issue": "PAN-5116",
@@ -5818,9 +5859,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "size": "S",
       "importance": "medium",
       "score": 61,
-      "condition": "ok",
+      "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "pan tell cannot deliver to codex (GPT) conversations",
+      "why": "pan tell to codex (GPT) conversations; PAN-5095 (closed) added app-server delivery, so verify whether this is fixed.",
+      "rationale": "Rank unchanged; the informing issue PAN-5095 closed with Codex app-server delivery, so this may already be resolved and needs a re-check.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5890,9 +5932,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "size": "S",
       "importance": "medium",
       "score": 60,
-      "condition": "ok",
+      "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "pan tell is codex-conversation-unaware",
+      "why": "pan tell is codex-conversation-unaware; PAN-5095 (closed) added app-server delivery, so verify whether this is fixed.",
+      "rationale": "Rank unchanged; the informing issue PAN-5095 closed with Codex app-server delivery, so this may already be resolved and needs a re-check.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6178,7 +6221,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2197",
-      "rank": 395,
+      "rank": 396,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6190,7 +6233,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2069",
-      "rank": 396,
+      "rank": 397,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6202,7 +6245,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1918",
-      "rank": 397,
+      "rank": 398,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6214,7 +6257,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1912",
-      "rank": 398,
+      "rank": 399,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6226,7 +6269,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4208",
-      "rank": 399,
+      "rank": 400,
       "size": "M",
       "importance": "medium",
       "score": 58,
@@ -6239,7 +6282,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1846",
-      "rank": 400,
+      "rank": 401,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6252,7 +6295,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1830",
-      "rank": 401,
+      "rank": 402,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6264,7 +6307,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1816",
-      "rank": 402,
+      "rank": 403,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6276,7 +6319,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1795",
-      "rank": 403,
+      "rank": 404,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6288,7 +6331,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1774",
-      "rank": 404,
+      "rank": 405,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6300,7 +6343,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1769",
-      "rank": 405,
+      "rank": 406,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6312,7 +6355,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1761",
-      "rank": 406,
+      "rank": 407,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6324,7 +6367,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1755",
-      "rank": 407,
+      "rank": 408,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6336,7 +6379,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3516",
-      "rank": 408,
+      "rank": 409,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6348,7 +6391,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3455",
-      "rank": 409,
+      "rank": 410,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6360,7 +6403,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3117",
-      "rank": 410,
+      "rank": 411,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6372,7 +6415,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3036",
-      "rank": 411,
+      "rank": 412,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6384,7 +6427,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3016",
-      "rank": 412,
+      "rank": 413,
       "size": "M",
       "importance": "medium",
       "score": 56,
@@ -6396,7 +6439,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3890",
-      "rank": 413,
+      "rank": 414,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6409,7 +6452,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3822",
-      "rank": 414,
+      "rank": 415,
       "size": "L",
       "importance": "medium",
       "score": 56,
@@ -6422,7 +6465,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-5028",
-      "rank": 415,
+      "rank": 416,
       "size": "M",
       "importance": "medium",
       "score": 64,
@@ -6435,7 +6478,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1673",
-      "rank": 416,
+      "rank": 417,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6446,21 +6489,46 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-5088",
-      "rank": 417,
-      "size": "XS",
+      "issue": "PAN-5227",
+      "rank": 418,
+      "size": "S",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5349",
+      "rank": 419,
+      "size": "L",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan open <path> opens files/folders in the dashboard; opt-in OS file-manager 'Open in Overdeck'. PRD in .pan/drafts/pan-5349.md",
+      "rationale": "New feature with a PRD on main: needs a server-to-browser command channel plus per-OS file-manager integrations, so it is large but self-contained; ranked with other medium features of clear value.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5342",
+      "rank": 420,
+      "size": "L",
       "importance": "medium",
       "score": 60,
       "condition": "ok",
       "dependsOn": [],
-      "why": "A long failed-outbox message shrinks the timeline to 40px and hides Retry/Discard; only a refresh recovers.",
-      "rationale": "Small CSS fix with a measured repro; made worse by PAN-5087, which sends delivered attachment messages to the outbox.",
+      "why": "Safe shutdown: drain agents at a tool boundary before reboot; PRD landed; item 16 of workflow-redesign order book.",
+      "rationale": "PRD landed and the issue joined the workflow-redesign order book as its last item, so score rises slightly; rank holds beside its order-book neighbours.",
       "gate": "auto",
       "planning": "auto"
     },
     {
       "issue": "PAN-1669",
-      "rank": 418,
+      "rank": 421,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6472,7 +6540,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1668",
-      "rank": 419,
+      "rank": 422,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6484,7 +6552,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1627",
-      "rank": 420,
+      "rank": 423,
       "size": "M",
       "importance": "medium",
       "score": 55,
@@ -6496,7 +6564,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1624",
-      "rank": 421,
+      "rank": 424,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6508,7 +6576,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3901",
-      "rank": 422,
+      "rank": 425,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6521,7 +6589,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3852",
-      "rank": 423,
+      "rank": 426,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6533,21 +6601,25 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-5131",
-      "rank": 424,
+      "issue": "PAN-5343",
+      "rank": 427,
       "size": "L",
       "importance": "medium",
-      "score": 55,
+      "score": 58,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "God View honesty pass: real event rates and ages, effects never mutate orbs, fix mislabeled orbs and stale field guide.",
-      "rationale": "New operator-requested issue whose body is a full PRD with verified findings, work items and ACs, so it is ready to plan; it is self-contained dashboard work with no pipeline impact, so it ranks in the medium tier just ahead of comparable scored features.",
+      "dependsOn": [
+        "PAN-5335",
+        "PAN-5290",
+        "PAN-5295",
+        "PAN-5294"
+      ],
+      "why": "Workflow redesign H: All projects deck listing conversations across projects, 1-4 side by side. Waits on four siblings.",
       "gate": "auto",
       "planning": "auto"
     },
     {
       "issue": "PAN-3862",
-      "rank": 425,
+      "rank": 428,
       "size": "L",
       "importance": "medium",
       "score": 55,
@@ -6560,7 +6632,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1572",
-      "rank": 426,
+      "rank": 429,
       "size": "M",
       "importance": "medium",
       "score": 54,
@@ -6573,7 +6645,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4627",
-      "rank": 427,
+      "rank": 430,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6586,7 +6658,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1571",
-      "rank": 428,
+      "rank": 431,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6598,7 +6670,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1565",
-      "rank": 429,
+      "rank": 432,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6609,8 +6681,32 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
+      "issue": "PAN-5312",
+      "rank": 433,
+      "size": "S",
+      "importance": "medium",
+      "score": 54,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Quality-gate admission: a head that can never fit alone serializes every gate behind it.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5241",
+      "rank": 434,
+      "size": "L",
+      "importance": "medium",
+      "score": 54,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Spill work agents to linked machines, then Fly, when this machine is full, up to operator caps.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1530",
-      "rank": 430,
+      "rank": 435,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6622,7 +6718,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1461",
-      "rank": 431,
+      "rank": 436,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6634,7 +6730,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1449",
-      "rank": 432,
+      "rank": 437,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6646,7 +6742,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1446",
-      "rank": 433,
+      "rank": 438,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6657,8 +6753,60 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
+      "issue": "PAN-5180",
+      "rank": 439,
+      "size": "M",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Tab-open REST burst (~45 requests) delays every client 1.0-1.4 s; uncached prerequisite and status probes.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5264",
+      "rank": 440,
+      "size": "M",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Attribute the app-rest GitHub caller (1,422 untraced App REST calls/hour), then cut the largest path.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5340",
+      "rank": 441,
+      "size": "S",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5337"
+      ],
+      "why": "A Preview link to another Markdown file should open it in Preview, not Edit. Follows PAN-5337.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5341",
+      "rank": 442,
+      "size": "S",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5338"
+      ],
+      "why": "Dock Changes diff view gets the Markdown Preview switch from PAN-5338; matters once D2 moves diffs to the dock.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1445",
-      "rank": 434,
+      "rank": 443,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6670,7 +6818,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3616",
-      "rank": 435,
+      "rank": 444,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6682,7 +6830,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2982",
-      "rank": 436,
+      "rank": 445,
       "size": "XS",
       "importance": "medium",
       "score": 54,
@@ -6693,8 +6841,32 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
+      "issue": "PAN-5322",
+      "rank": 446,
+      "size": "S",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CodeRabbit follow-up on PR #5319: unguarded identifier.toUpperCase(), modal focus, needs-you rows that open nothing.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5317",
+      "rank": 447,
+      "size": "S",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CodeRabbit follow-up on PR #5127: route live Codex app-server sends correctly; no replayable mail for keyed sends.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2981",
-      "rank": 437,
+      "rank": 448,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6706,7 +6878,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2976",
-      "rank": 438,
+      "rank": 449,
       "size": "L",
       "importance": "medium",
       "score": 54,
@@ -6718,7 +6890,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1444",
-      "rank": 439,
+      "rank": 450,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6730,7 +6902,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2469",
-      "rank": 440,
+      "rank": 451,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6743,7 +6915,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1433",
-      "rank": 441,
+      "rank": 452,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6755,7 +6927,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1416",
-      "rank": 442,
+      "rank": 453,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6767,7 +6939,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1392",
-      "rank": 443,
+      "rank": 454,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -6780,7 +6952,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4151",
-      "rank": 444,
+      "rank": 455,
       "size": "L",
       "importance": "medium",
       "score": 46,
@@ -6794,7 +6966,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1330",
-      "rank": 445,
+      "rank": 456,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -6806,7 +6978,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4971",
-      "rank": 446,
+      "rank": 457,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -6819,7 +6991,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1226",
-      "rank": 447,
+      "rank": 458,
       "size": "L",
       "importance": "medium",
       "score": 52,
@@ -6831,7 +7003,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1173",
-      "rank": 448,
+      "rank": 459,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -6843,7 +7015,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1154",
-      "rank": 449,
+      "rank": 460,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -6855,7 +7027,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3354",
-      "rank": 450,
+      "rank": 461,
       "size": "XS",
       "importance": "medium",
       "score": 52,
@@ -6867,7 +7039,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3178",
-      "rank": 451,
+      "rank": 462,
       "size": "XL",
       "importance": "medium",
       "score": 52,
@@ -6880,7 +7052,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3017",
-      "rank": 452,
+      "rank": 463,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -6891,20 +7063,20 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-5057",
-      "rank": 453,
+      "issue": "PAN-5174",
+      "rank": 464,
       "size": "XS",
       "importance": "medium",
       "score": 56,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Restart hold is not checked at the gate claim route, so a hold set within ~5 s of approval still lets one restart go ahead.",
+      "why": "Flaky CI test: share/rate-limit.test.ts flips 201/429 under CI timing; quarantine or make deterministic.",
       "gate": "auto",
       "planning": "auto"
     },
     {
       "issue": "PAN-3873",
-      "rank": 454,
+      "rank": 465,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -6916,8 +7088,21 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
+      "issue": "PAN-5346",
+      "rank": 466,
+      "size": "S",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Auth docs misstate #overdeck_token delivery, the Origin rule and 401 troubleshooting; PAN-5344 fix has landed.",
+      "rationale": "Its only dependency, PAN-5344, closed as completed, so the dependency edge is dropped; rank holds with the other medium docs-accuracy work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1150",
-      "rank": 455,
+      "rank": 467,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6929,7 +7114,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1149",
-      "rank": 456,
+      "rank": 468,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6941,7 +7126,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1130",
-      "rank": 457,
+      "rank": 469,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6953,7 +7138,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1129",
-      "rank": 458,
+      "rank": 470,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6965,7 +7150,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1128",
-      "rank": 459,
+      "rank": 471,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6977,7 +7162,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1113",
-      "rank": 460,
+      "rank": 472,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6989,7 +7174,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1068",
-      "rank": 461,
+      "rank": 473,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7001,7 +7186,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3938",
-      "rank": 462,
+      "rank": 474,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7014,7 +7199,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-933",
-      "rank": 463,
+      "rank": 475,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7026,7 +7211,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-932",
-      "rank": 464,
+      "rank": 476,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7038,7 +7223,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-927",
-      "rank": 465,
+      "rank": 477,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7050,7 +7235,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-900",
-      "rank": 466,
+      "rank": 478,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7062,7 +7247,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-886",
-      "rank": 467,
+      "rank": 479,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7074,7 +7259,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-778",
-      "rank": 468,
+      "rank": 480,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7086,7 +7271,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-681",
-      "rank": 469,
+      "rank": 481,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7098,7 +7283,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3732",
-      "rank": 470,
+      "rank": 482,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7110,7 +7295,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3700",
-      "rank": 471,
+      "rank": 483,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7122,7 +7307,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3290",
-      "rank": 472,
+      "rank": 484,
       "size": "XS",
       "importance": "medium",
       "score": 50,
@@ -7134,7 +7319,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3132",
-      "rank": 473,
+      "rank": 485,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7146,7 +7331,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3909",
-      "rank": 474,
+      "rank": 486,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7159,7 +7344,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2659",
-      "rank": 475,
+      "rank": 487,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7172,7 +7357,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3831",
-      "rank": 476,
+      "rank": 488,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7185,7 +7370,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4779",
-      "rank": 477,
+      "rank": 489,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7198,7 +7383,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-538",
-      "rank": 478,
+      "rank": 490,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -7210,7 +7395,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1164",
-      "rank": 479,
+      "rank": 491,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7222,7 +7407,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3563",
-      "rank": 480,
+      "rank": 492,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7235,7 +7420,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1041",
-      "rank": 481,
+      "rank": 493,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7247,7 +7432,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-924",
-      "rank": 482,
+      "rank": 494,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -7259,7 +7444,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3770",
-      "rank": 483,
+      "rank": 495,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7271,7 +7456,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4568",
-      "rank": 484,
+      "rank": 496,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7284,7 +7469,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3731",
-      "rank": 485,
+      "rank": 497,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7296,7 +7481,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3530",
-      "rank": 486,
+      "rank": 498,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7308,7 +7493,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3131",
-      "rank": 487,
+      "rank": 499,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -7320,7 +7505,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3061",
-      "rank": 488,
+      "rank": 500,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7332,7 +7517,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3057",
-      "rank": 489,
+      "rank": 501,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -7345,7 +7530,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3892",
-      "rank": 490,
+      "rank": 502,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7358,7 +7543,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4918",
-      "rank": 491,
+      "rank": 503,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7371,7 +7556,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-863",
-      "rank": 492,
+      "rank": 504,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7383,7 +7568,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-817",
-      "rank": 493,
+      "rank": 505,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7395,7 +7580,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-802",
-      "rank": 494,
+      "rank": 506,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7407,7 +7592,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-713",
-      "rank": 495,
+      "rank": 507,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7419,7 +7604,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-700",
-      "rank": 496,
+      "rank": 508,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7431,7 +7616,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-646",
-      "rank": 497,
+      "rank": 509,
       "size": "XS",
       "importance": "medium",
       "score": 47,
@@ -7444,7 +7629,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-532",
-      "rank": 498,
+      "rank": 510,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7456,7 +7641,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2896",
-      "rank": 499,
+      "rank": 511,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7468,7 +7653,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2685",
-      "rank": 500,
+      "rank": 512,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7480,7 +7665,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2626",
-      "rank": 501,
+      "rank": 513,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7491,8 +7676,32 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
+      "issue": "PAN-5231",
+      "rank": 514,
+      "size": "S",
+      "importance": "medium",
+      "score": 46,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Explorer: retrying Send through pipeline after a partial failure creates a second issue and branch.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5204",
+      "rank": 515,
+      "size": "S",
+      "importance": "medium",
+      "score": 46,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Voice: mixed 16/24 kHz sample rates on /ws/voice, and dictation turns leak into AutoPreso as errors.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2625",
-      "rank": 502,
+      "rank": 516,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7504,7 +7713,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2608",
-      "rank": 503,
+      "rank": 517,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7516,7 +7725,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2582",
-      "rank": 504,
+      "rank": 518,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7528,7 +7737,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2566",
-      "rank": 505,
+      "rank": 519,
       "size": "L",
       "importance": "medium",
       "score": 46,
@@ -7542,7 +7751,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2565",
-      "rank": 506,
+      "rank": 520,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7555,7 +7764,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3735",
-      "rank": 507,
+      "rank": 521,
       "size": "S",
       "importance": "medium",
       "score": 46,
@@ -7567,7 +7776,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3335",
-      "rank": 508,
+      "rank": 522,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7579,7 +7788,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3054",
-      "rank": 509,
+      "rank": 523,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7591,7 +7800,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2977",
-      "rank": 510,
+      "rank": 524,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7605,7 +7814,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2557",
-      "rank": 511,
+      "rank": 525,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7617,7 +7826,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2553",
-      "rank": 512,
+      "rank": 526,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7629,7 +7838,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2521",
-      "rank": 513,
+      "rank": 527,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7641,7 +7850,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2493",
-      "rank": 514,
+      "rank": 528,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7653,7 +7862,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3772",
-      "rank": 515,
+      "rank": 529,
       "size": "XS",
       "importance": "medium",
       "score": 45,
@@ -7665,7 +7874,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3853",
-      "rank": 516,
+      "rank": 530,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7678,7 +7887,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3830",
-      "rank": 517,
+      "rank": 531,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7691,7 +7900,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4924",
-      "rank": 518,
+      "rank": 532,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7704,7 +7913,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4367",
-      "rank": 519,
+      "rank": 533,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7716,7 +7925,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2443",
-      "rank": 520,
+      "rank": 534,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7728,7 +7937,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2442",
-      "rank": 521,
+      "rank": 535,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7740,7 +7949,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2409",
-      "rank": 522,
+      "rank": 536,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7751,8 +7960,32 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "interactive"
     },
     {
+      "issue": "PAN-5145",
+      "rank": 537,
+      "size": "S",
+      "importance": "medium",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CLIProxy oauth-model-alias hides gpt-6-sol, gpt-5.6-terra and gpt-5.6-luna by their own ids on claude-code.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5201",
+      "rank": 538,
+      "size": "XL",
+      "importance": "medium",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Speaker-aware STT: diarizing engines (Speechmatics, AssemblyAI, Muse, Voxtral, NeMo) and one VoiceSettings contract.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2392",
-      "rank": 523,
+      "rank": 539,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7765,7 +7998,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2335",
-      "rank": 524,
+      "rank": 540,
       "size": "XS",
       "importance": "medium",
       "score": 44,
@@ -7777,7 +8010,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2295",
-      "rank": 525,
+      "rank": 541,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -7789,7 +8022,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3767",
-      "rank": 526,
+      "rank": 542,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7801,7 +8034,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3615",
-      "rank": 527,
+      "rank": 543,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7813,7 +8046,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3558",
-      "rank": 528,
+      "rank": 544,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7825,7 +8058,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3469",
-      "rank": 529,
+      "rank": 545,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7837,7 +8070,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3333",
-      "rank": 530,
+      "rank": 546,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7849,7 +8082,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3058",
-      "rank": 531,
+      "rank": 547,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7861,7 +8094,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2288",
-      "rank": 532,
+      "rank": 548,
       "size": "L",
       "importance": "medium",
       "score": 43,
@@ -7873,7 +8106,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2065",
-      "rank": 533,
+      "rank": 549,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -7885,7 +8118,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2031",
-      "rank": 534,
+      "rank": 550,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -7897,7 +8130,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2026",
-      "rank": 535,
+      "rank": 551,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7909,7 +8142,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2025",
-      "rank": 536,
+      "rank": 552,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7921,7 +8154,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4366",
-      "rank": 537,
+      "rank": 553,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7932,8 +8165,32 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
+      "issue": "PAN-5314",
+      "rank": 554,
+      "size": "S",
+      "importance": "medium",
+      "score": 42,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CodeRabbit follow-up on PR #5313 (CLIProxy pool): body-read timeout, cache-miss coalescing, reset timestamps.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5267",
+      "rank": 555,
+      "size": "S",
+      "importance": "medium",
+      "score": 42,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CodeRabbit follow-up on PR #5266: escalation limit and caching transient GraphQL errors as missing issues.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2004",
-      "rank": 538,
+      "rank": 556,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7945,7 +8202,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1995",
-      "rank": 539,
+      "rank": 557,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7957,7 +8214,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3739",
-      "rank": 540,
+      "rank": 558,
       "size": "S",
       "importance": "medium",
       "score": 42,
@@ -7969,7 +8226,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4393",
-      "rank": 541,
+      "rank": 559,
       "size": "XS",
       "importance": "medium",
       "score": 44,
@@ -7981,7 +8238,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1985",
-      "rank": 542,
+      "rank": 560,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -7993,7 +8250,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1968",
-      "rank": 543,
+      "rank": 561,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8005,7 +8262,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1967",
-      "rank": 544,
+      "rank": 562,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8018,7 +8275,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1965",
-      "rank": 545,
+      "rank": 563,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8030,7 +8287,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1937",
-      "rank": 546,
+      "rank": 564,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8042,7 +8299,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1926",
-      "rank": 547,
+      "rank": 565,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8054,7 +8311,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1916",
-      "rank": 548,
+      "rank": 566,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8066,7 +8323,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1854",
-      "rank": 549,
+      "rank": 567,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8078,7 +8335,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1853",
-      "rank": 550,
+      "rank": 568,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8090,7 +8347,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1852",
-      "rank": 551,
+      "rank": 569,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8102,7 +8359,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1844",
-      "rank": 552,
+      "rank": 570,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8113,8 +8370,34 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
+      "issue": "PAN-5202",
+      "rank": 571,
+      "size": "XL",
+      "importance": "medium",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5201"
+      ],
+      "why": "Flux: experimental live meeting page capturing open items, ticket proposals and diagrams. Depends on PAN-5201.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5141",
+      "rank": 572,
+      "size": "M",
+      "importance": "medium",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Reviewer pairing code: multi-day, reusable, restart-safe code so app store review can pair unattended.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1840",
-      "rank": 553,
+      "rank": 573,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8126,7 +8409,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1839",
-      "rank": 554,
+      "rank": 574,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8138,7 +8421,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1776",
-      "rank": 555,
+      "rank": 575,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8150,7 +8433,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3706",
-      "rank": 556,
+      "rank": 576,
       "size": "L",
       "importance": "medium",
       "score": 40,
@@ -8162,7 +8445,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3539",
-      "rank": 557,
+      "rank": 577,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8174,7 +8457,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3502",
-      "rank": 558,
+      "rank": 578,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8186,7 +8469,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4409",
-      "rank": 559,
+      "rank": 579,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8198,7 +8481,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4410",
-      "rank": 560,
+      "rank": 580,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8212,7 +8495,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2978",
-      "rank": 561,
+      "rank": 581,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -8227,7 +8510,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4878",
-      "rank": 562,
+      "rank": 582,
       "size": "XS",
       "importance": "low",
       "score": 30,
@@ -8240,7 +8523,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1754",
-      "rank": 563,
+      "rank": 583,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8252,7 +8535,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1751",
-      "rank": 564,
+      "rank": 584,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8264,7 +8547,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1750",
-      "rank": 565,
+      "rank": 585,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8276,7 +8559,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1748",
-      "rank": 566,
+      "rank": 586,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8288,7 +8571,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1691",
-      "rank": 567,
+      "rank": 587,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8300,7 +8583,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1685",
-      "rank": 568,
+      "rank": 588,
       "size": "XS",
       "importance": "medium",
       "score": 39,
@@ -8312,20 +8595,20 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1676",
-      "rank": 569,
+      "rank": 589,
       "size": "M",
       "importance": "medium",
       "score": 39,
       "condition": "ok",
       "dependsOn": [],
-      "why": "harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots)",
-      "rationale": "Dependency PAN-4295 closed (Fly auto-reap restored); rank unchanged pending its own refinement.",
+      "why": "Harden Fly remote workspaces + pan workspace move; work-agent spill policy now specified in PAN-5241.",
+      "rationale": "Rank unchanged; a 2026-11-14 comment moves the spill-to-remote policy into PAN-5241, which now informs this issue.",
       "gate": "auto",
       "planning": "auto"
     },
     {
       "issue": "PAN-1667",
-      "rank": 570,
+      "rank": 590,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8337,7 +8620,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1657",
-      "rank": 571,
+      "rank": 591,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8349,7 +8632,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1656",
-      "rank": 572,
+      "rank": 592,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8361,7 +8644,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1655",
-      "rank": 573,
+      "rank": 593,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8373,7 +8656,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1654",
-      "rank": 574,
+      "rank": 594,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -8385,7 +8668,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1653",
-      "rank": 575,
+      "rank": 595,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -8396,8 +8679,32 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
+      "issue": "PAN-5309",
+      "rank": 596,
+      "size": "S",
+      "importance": "low",
+      "score": 36,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CodeRabbit minor findings on the PAN-5283 Flywheel page redesign; verify each against main before fixing.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5308",
+      "rank": 597,
+      "size": "S",
+      "importance": "low",
+      "score": 36,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CodeRabbit findings on the PAN-5282 CLIProxy v8 upgrade: config-write ordering, Windows upgrade staging.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1623",
-      "rank": 576,
+      "rank": 598,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8409,7 +8716,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1561",
-      "rank": 577,
+      "rank": 599,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8421,19 +8728,20 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1550",
-      "rank": 578,
+      "rank": 600,
       "size": "M",
       "importance": "medium",
       "score": 37,
       "condition": "ok",
       "dependsOn": [],
-      "why": "feat: FilesPane + BrowserPane",
+      "why": "BrowserPane half only; the FilesPane half is superseded by the PAN-5183 file explorer, whose children have all closed.",
+      "rationale": "Rank unchanged; a 2026-11-13 comment narrows this issue to the BrowserPane, since PAN-5183 replaced the FilesPane design.",
       "gate": "auto",
       "planning": "auto"
     },
     {
       "issue": "PAN-1545",
-      "rank": 579,
+      "rank": 601,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -8445,7 +8753,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1542",
-      "rank": 580,
+      "rank": 602,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -8457,7 +8765,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1524",
-      "rank": 581,
+      "rank": 603,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8469,7 +8777,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1490",
-      "rank": 582,
+      "rank": 604,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8481,7 +8789,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1485",
-      "rank": 583,
+      "rank": 605,
       "size": "S",
       "importance": "medium",
       "score": 32,
@@ -8494,7 +8802,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1473",
-      "rank": 584,
+      "rank": 606,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8506,7 +8814,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1443",
-      "rank": 585,
+      "rank": 607,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -8519,7 +8827,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1442",
-      "rank": 586,
+      "rank": 608,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8531,7 +8839,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1432",
-      "rank": 587,
+      "rank": 609,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8543,7 +8851,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1223",
-      "rank": 588,
+      "rank": 610,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8555,7 +8863,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1165",
-      "rank": 589,
+      "rank": 611,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8567,7 +8875,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1151",
-      "rank": 590,
+      "rank": 612,
       "size": "XS",
       "importance": "medium",
       "score": 35,
@@ -8579,7 +8887,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4360",
-      "rank": 591,
+      "rank": 613,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8591,7 +8899,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1060",
-      "rank": 592,
+      "rank": 614,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8603,7 +8911,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1051",
-      "rank": 593,
+      "rank": 615,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8615,7 +8923,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1037",
-      "rank": 594,
+      "rank": 616,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8627,7 +8935,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-958",
-      "rank": 595,
+      "rank": 617,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8639,7 +8947,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-949",
-      "rank": 596,
+      "rank": 618,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8651,7 +8959,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3157",
-      "rank": 597,
+      "rank": 619,
       "size": "XS",
       "importance": "medium",
       "score": 42,
@@ -8664,7 +8972,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-5067",
-      "rank": 598,
+      "rank": 620,
       "size": "M",
       "importance": "medium",
       "score": 54,
@@ -8676,7 +8984,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4908",
-      "rank": 599,
+      "rank": 621,
       "size": "S",
       "importance": "low",
       "score": 34,
@@ -8689,7 +8997,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-5130",
-      "rank": 600,
+      "rank": 622,
       "size": "S",
       "importance": "medium",
       "score": 36,
@@ -8702,7 +9010,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-947",
-      "rank": 601,
+      "rank": 623,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8714,7 +9022,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-938",
-      "rank": 602,
+      "rank": 624,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8726,7 +9034,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-903",
-      "rank": 603,
+      "rank": 625,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8738,7 +9046,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-902",
-      "rank": 604,
+      "rank": 626,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -8750,7 +9058,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-901",
-      "rank": 605,
+      "rank": 627,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -8762,7 +9070,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-818",
-      "rank": 606,
+      "rank": 628,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8774,7 +9082,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4308",
-      "rank": 607,
+      "rank": 629,
       "size": "S",
       "importance": "medium",
       "score": 38,
@@ -8787,7 +9095,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3322",
-      "rank": 608,
+      "rank": 630,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -8799,7 +9107,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-678",
-      "rank": 609,
+      "rank": 631,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8811,7 +9119,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-675",
-      "rank": 610,
+      "rank": 632,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8824,7 +9132,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-654",
-      "rank": 611,
+      "rank": 633,
       "size": "L",
       "importance": "medium",
       "score": 33,
@@ -8836,7 +9144,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-649",
-      "rank": 612,
+      "rank": 634,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8848,7 +9156,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-637",
-      "rank": 613,
+      "rank": 635,
       "size": "XS",
       "importance": "medium",
       "score": 33,
@@ -8860,7 +9168,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-629",
-      "rank": 614,
+      "rank": 636,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8872,7 +9180,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-613",
-      "rank": 615,
+      "rank": 637,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8884,7 +9192,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-607",
-      "rank": 616,
+      "rank": 638,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8896,7 +9204,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-606",
-      "rank": 617,
+      "rank": 639,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8908,7 +9216,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-548",
-      "rank": 618,
+      "rank": 640,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8920,7 +9228,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-546",
-      "rank": 619,
+      "rank": 641,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8932,7 +9240,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-537",
-      "rank": 620,
+      "rank": 642,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8944,7 +9252,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-531",
-      "rank": 621,
+      "rank": 643,
       "size": "XS",
       "importance": "medium",
       "score": 32,
@@ -8956,7 +9264,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-452",
-      "rank": 622,
+      "rank": 644,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8968,7 +9276,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-450",
-      "rank": 623,
+      "rank": 645,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8980,7 +9288,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1126",
-      "rank": 624,
+      "rank": 646,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -8991,8 +9299,20 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
+      "issue": "PAN-5154",
+      "rank": 647,
+      "size": "L",
+      "importance": "low",
+      "score": 30,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "GitHub account, token and host per owner (work accounts, GHES). Not scheduled; needs a PRD first.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1066",
-      "rank": 625,
+      "rank": 648,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9004,7 +9324,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3441",
-      "rank": 626,
+      "rank": 649,
       "size": "L",
       "importance": "low",
       "score": 30,
@@ -9016,7 +9336,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2968",
-      "rank": 627,
+      "rank": 650,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9028,7 +9348,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2941",
-      "rank": 628,
+      "rank": 651,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9041,7 +9361,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2936",
-      "rank": 629,
+      "rank": 652,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9053,7 +9373,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4373",
-      "rank": 630,
+      "rank": 653,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -9065,7 +9385,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2868",
-      "rank": 631,
+      "rank": 654,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9077,7 +9397,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2767",
-      "rank": 632,
+      "rank": 655,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9089,7 +9409,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2679",
-      "rank": 633,
+      "rank": 656,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9101,7 +9421,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2662",
-      "rank": 634,
+      "rank": 657,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9113,7 +9433,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2645",
-      "rank": 635,
+      "rank": 658,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9125,7 +9445,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2635",
-      "rank": 636,
+      "rank": 659,
       "size": "XS",
       "importance": "low",
       "score": 28,
@@ -9137,7 +9457,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-5066",
-      "rank": 637,
+      "rank": 660,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -9149,7 +9469,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3443",
-      "rank": 638,
+      "rank": 661,
       "size": "L",
       "importance": "low",
       "score": 28,
@@ -9161,7 +9481,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4350",
-      "rank": 639,
+      "rank": 662,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -9173,7 +9493,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4003",
-      "rank": 640,
+      "rank": 663,
       "size": "L",
       "importance": "medium",
       "score": 30,
@@ -9186,7 +9506,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4368",
-      "rank": 641,
+      "rank": 664,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -9198,7 +9518,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2622",
-      "rank": 642,
+      "rank": 665,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9210,7 +9530,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2600",
-      "rank": 643,
+      "rank": 666,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9222,7 +9542,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2533",
-      "rank": 644,
+      "rank": 667,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9234,7 +9554,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2527",
-      "rank": 645,
+      "rank": 668,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9246,7 +9566,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2514",
-      "rank": 646,
+      "rank": 669,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9258,7 +9578,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2505",
-      "rank": 647,
+      "rank": 670,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9270,7 +9590,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2504",
-      "rank": 648,
+      "rank": 671,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9282,7 +9602,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2449",
-      "rank": 649,
+      "rank": 672,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9294,7 +9614,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4769",
-      "rank": 650,
+      "rank": 673,
       "size": "XS",
       "importance": "low",
       "score": 26,
@@ -9307,7 +9627,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3940",
-      "rank": 651,
+      "rank": 674,
       "size": "XL",
       "importance": "low",
       "score": 30,
@@ -9321,7 +9641,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2424",
-      "rank": 652,
+      "rank": 675,
       "size": "L",
       "importance": "low",
       "score": 26,
@@ -9335,7 +9655,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2406",
-      "rank": 653,
+      "rank": 676,
       "size": "S",
       "importance": "low",
       "score": 26,
@@ -9348,7 +9668,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2394",
-      "rank": 654,
+      "rank": 677,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9360,7 +9680,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4823",
-      "rank": 655,
+      "rank": 678,
       "size": "XL",
       "importance": "medium",
       "score": 32,
@@ -9374,7 +9694,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2353",
-      "rank": 656,
+      "rank": 679,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9387,7 +9707,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4294",
-      "rank": 657,
+      "rank": 680,
       "size": "L",
       "importance": "low",
       "score": 22,
@@ -9400,7 +9720,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3133",
-      "rank": 658,
+      "rank": 681,
       "size": "S",
       "importance": "low",
       "score": 26,
@@ -9412,7 +9732,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-5082",
-      "rank": 659,
+      "rank": 682,
       "size": "XL",
       "importance": "medium",
       "score": 50,
@@ -9424,7 +9744,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3011",
-      "rank": 660,
+      "rank": 683,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9439,7 +9759,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2282",
-      "rank": 661,
+      "rank": 684,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9451,7 +9771,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2091",
-      "rank": 662,
+      "rank": 685,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9462,20 +9782,8 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-5070",
-      "rank": 663,
-      "size": "M",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Connect a bot: one-click 'Copy for <bot>' message, pending connector requests under Bots, and a connected notice.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2085",
-      "rank": 664,
+      "rank": 686,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9487,7 +9795,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2084",
-      "rank": 665,
+      "rank": 687,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9499,7 +9807,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2083",
-      "rank": 666,
+      "rank": 688,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9514,7 +9822,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2082",
-      "rank": 667,
+      "rank": 689,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9526,7 +9834,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2074",
-      "rank": 668,
+      "rank": 690,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9538,7 +9846,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2046",
-      "rank": 669,
+      "rank": 691,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9551,7 +9859,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2006",
-      "rank": 670,
+      "rank": 692,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9563,7 +9871,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3919",
-      "rank": 671,
+      "rank": 693,
       "size": "S",
       "importance": "low",
       "score": 25,
@@ -9576,7 +9884,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2005",
-      "rank": 672,
+      "rank": 694,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9588,7 +9896,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2002",
-      "rank": 673,
+      "rank": 695,
       "size": "XS",
       "importance": "low",
       "score": 24,
@@ -9600,7 +9908,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1999",
-      "rank": 674,
+      "rank": 696,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9612,7 +9920,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1986",
-      "rank": 675,
+      "rank": 697,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9624,7 +9932,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1983",
-      "rank": 676,
+      "rank": 698,
       "size": "L",
       "importance": "low",
       "score": 24,
@@ -9636,7 +9944,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2672",
-      "rank": 677,
+      "rank": 699,
       "size": "S",
       "importance": "low",
       "score": 25,
@@ -9649,7 +9957,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1958",
-      "rank": 678,
+      "rank": 700,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9661,7 +9969,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1907",
-      "rank": 679,
+      "rank": 701,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9673,7 +9981,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1895",
-      "rank": 680,
+      "rank": 702,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9685,7 +9993,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1878",
-      "rank": 681,
+      "rank": 703,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9697,7 +10005,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1782",
-      "rank": 682,
+      "rank": 704,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9709,7 +10017,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1773",
-      "rank": 683,
+      "rank": 705,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9721,7 +10029,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1646",
-      "rank": 684,
+      "rank": 706,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9733,7 +10041,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1643",
-      "rank": 685,
+      "rank": 707,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9745,7 +10053,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1592",
-      "rank": 686,
+      "rank": 708,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9757,7 +10065,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1581",
-      "rank": 687,
+      "rank": 709,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9769,7 +10077,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1533",
-      "rank": 688,
+      "rank": 710,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9781,7 +10089,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1483",
-      "rank": 689,
+      "rank": 711,
       "size": "XS",
       "importance": "low",
       "score": 22,
@@ -9793,7 +10101,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1482",
-      "rank": 690,
+      "rank": 712,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9805,7 +10113,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1481",
-      "rank": 691,
+      "rank": 713,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9817,7 +10125,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1356",
-      "rank": 692,
+      "rank": 714,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9829,7 +10137,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1242",
-      "rank": 693,
+      "rank": 715,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9841,7 +10149,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1222",
-      "rank": 694,
+      "rank": 716,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9853,7 +10161,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1208",
-      "rank": 695,
+      "rank": 717,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9865,7 +10173,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4352",
-      "rank": 696,
+      "rank": 718,
       "size": "XS",
       "importance": "low",
       "score": 28,
@@ -9877,7 +10185,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1153",
-      "rank": 697,
+      "rank": 719,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9889,7 +10197,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4298",
-      "rank": 698,
+      "rank": 720,
       "size": "XL",
       "importance": "low",
       "score": 20,
@@ -9905,7 +10213,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1152",
-      "rank": 699,
+      "rank": 721,
       "size": "XS",
       "importance": "low",
       "score": 21,
@@ -9917,7 +10225,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1135",
-      "rank": 700,
+      "rank": 722,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9929,7 +10237,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1133",
-      "rank": 701,
+      "rank": 723,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9942,7 +10250,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1123",
-      "rank": 702,
+      "rank": 724,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -9954,7 +10262,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1121",
-      "rank": 703,
+      "rank": 725,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9966,7 +10274,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4248",
-      "rank": 704,
+      "rank": 726,
       "size": "L",
       "importance": "medium",
       "score": 24,
@@ -9979,7 +10287,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1117",
-      "rank": 705,
+      "rank": 727,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9991,7 +10299,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1116",
-      "rank": 706,
+      "rank": 728,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10003,7 +10311,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1065",
-      "rank": 707,
+      "rank": 729,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10015,7 +10323,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1064",
-      "rank": 708,
+      "rank": 730,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10027,7 +10335,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1063",
-      "rank": 709,
+      "rank": 731,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10040,7 +10348,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3971",
-      "rank": 710,
+      "rank": 732,
       "size": "L",
       "importance": "low",
       "score": 20,
@@ -10052,7 +10360,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3768",
-      "rank": 711,
+      "rank": 733,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10064,7 +10372,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3034",
-      "rank": 712,
+      "rank": 734,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10076,7 +10384,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2983",
-      "rank": 713,
+      "rank": 735,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10089,7 +10397,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3824",
-      "rank": 714,
+      "rank": 736,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10102,7 +10410,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3823",
-      "rank": 715,
+      "rank": 737,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10115,7 +10423,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1049",
-      "rank": 716,
+      "rank": 738,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10127,7 +10435,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-984",
-      "rank": 717,
+      "rank": 739,
       "size": "XS",
       "importance": "low",
       "score": 19,
@@ -10139,7 +10447,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-962",
-      "rank": 718,
+      "rank": 740,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10152,7 +10460,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-961",
-      "rank": 719,
+      "rank": 741,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10164,7 +10472,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-943",
-      "rank": 720,
+      "rank": 742,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10176,7 +10484,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-908",
-      "rank": 721,
+      "rank": 743,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10188,7 +10496,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-898",
-      "rank": 722,
+      "rank": 744,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10200,7 +10508,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-853",
-      "rank": 723,
+      "rank": 745,
       "size": "L",
       "importance": "low",
       "score": 19,
@@ -10212,7 +10520,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-833",
-      "rank": 724,
+      "rank": 746,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10224,7 +10532,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-832",
-      "rank": 725,
+      "rank": 747,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10237,7 +10545,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4347",
-      "rank": 726,
+      "rank": 748,
       "size": "S",
       "importance": "low",
       "score": 30,
@@ -10249,7 +10557,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-797",
-      "rank": 727,
+      "rank": 749,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10261,7 +10569,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4275",
-      "rank": 728,
+      "rank": 750,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -10274,7 +10582,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2836",
-      "rank": 729,
+      "rank": 751,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -10287,7 +10595,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-790",
-      "rank": 730,
+      "rank": 752,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -10299,7 +10607,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-786",
-      "rank": 731,
+      "rank": 753,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10311,7 +10619,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-777",
-      "rank": 732,
+      "rank": 754,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10323,7 +10631,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-775",
-      "rank": 733,
+      "rank": 755,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -10335,7 +10643,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3456",
-      "rank": 734,
+      "rank": 756,
       "size": "XS",
       "importance": "low",
       "score": 18,
@@ -10347,7 +10655,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-774",
-      "rank": 735,
+      "rank": 757,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -10359,7 +10667,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-773",
-      "rank": 736,
+      "rank": 758,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -10371,7 +10679,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-772",
-      "rank": 737,
+      "rank": 759,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10384,7 +10692,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-771",
-      "rank": 738,
+      "rank": 760,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10396,7 +10704,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-769",
-      "rank": 739,
+      "rank": 761,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10411,7 +10719,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-765",
-      "rank": 740,
+      "rank": 762,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10423,7 +10731,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-764",
-      "rank": 741,
+      "rank": 763,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10435,7 +10743,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4425",
-      "rank": 742,
+      "rank": 764,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -10447,7 +10755,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-752",
-      "rank": 743,
+      "rank": 765,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10459,7 +10767,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-751",
-      "rank": 744,
+      "rank": 766,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10471,7 +10779,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-750",
-      "rank": 745,
+      "rank": 767,
       "size": "L",
       "importance": "low",
       "score": 16,
@@ -10483,7 +10791,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-749",
-      "rank": 746,
+      "rank": 768,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10495,7 +10803,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-747",
-      "rank": 747,
+      "rank": 769,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10507,7 +10815,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-743",
-      "rank": 748,
+      "rank": 770,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10519,7 +10827,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-738",
-      "rank": 749,
+      "rank": 771,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10531,7 +10839,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-735",
-      "rank": 750,
+      "rank": 772,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10543,7 +10851,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-730",
-      "rank": 751,
+      "rank": 773,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10555,7 +10863,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-701",
-      "rank": 752,
+      "rank": 774,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10567,7 +10875,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-663",
-      "rank": 753,
+      "rank": 775,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10579,7 +10887,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-660",
-      "rank": 754,
+      "rank": 776,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10591,7 +10899,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-624",
-      "rank": 755,
+      "rank": 777,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10603,7 +10911,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-623",
-      "rank": 756,
+      "rank": 778,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10615,7 +10923,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-622",
-      "rank": 757,
+      "rank": 779,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10627,7 +10935,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-604",
-      "rank": 758,
+      "rank": 780,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10639,7 +10947,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-603",
-      "rank": 759,
+      "rank": 781,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10651,7 +10959,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-591",
-      "rank": 760,
+      "rank": 782,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10663,7 +10971,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-589",
-      "rank": 761,
+      "rank": 783,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10675,7 +10983,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-576",
-      "rank": 762,
+      "rank": 784,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10687,7 +10995,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-571",
-      "rank": 763,
+      "rank": 785,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10699,7 +11007,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-568",
-      "rank": 764,
+      "rank": 786,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10711,7 +11019,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-565",
-      "rank": 765,
+      "rank": 787,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10723,7 +11031,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-564",
-      "rank": 766,
+      "rank": 788,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10735,7 +11043,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-554",
-      "rank": 767,
+      "rank": 789,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10747,7 +11055,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-543",
-      "rank": 768,
+      "rank": 790,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10759,7 +11067,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-483",
-      "rank": 769,
+      "rank": 791,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10771,7 +11079,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-480",
-      "rank": 770,
+      "rank": 792,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10784,7 +11092,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-476",
-      "rank": 771,
+      "rank": 793,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10796,7 +11104,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-468",
-      "rank": 772,
+      "rank": 794,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10808,7 +11116,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-461",
-      "rank": 773,
+      "rank": 795,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10820,7 +11128,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-459",
-      "rank": 774,
+      "rank": 796,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10832,7 +11140,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-407",
-      "rank": 775,
+      "rank": 797,
       "size": "XS",
       "importance": "low",
       "score": 13,
@@ -10844,7 +11152,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2348",
-      "rank": 776,
+      "rank": 798,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10856,7 +11164,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2346",
-      "rank": 777,
+      "rank": 799,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10869,7 +11177,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2345",
-      "rank": 778,
+      "rank": 800,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10882,7 +11190,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2344",
-      "rank": 779,
+      "rank": 801,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10895,7 +11203,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2343",
-      "rank": 780,
+      "rank": 802,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10908,7 +11216,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2073",
-      "rank": 781,
+      "rank": 803,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10920,7 +11228,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2071",
-      "rank": 782,
+      "rank": 804,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10932,7 +11240,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2068",
-      "rank": 783,
+      "rank": 805,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10944,7 +11252,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2067",
-      "rank": 784,
+      "rank": 806,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10956,7 +11264,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1684",
-      "rank": 785,
+      "rank": 807,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10968,7 +11276,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1683",
-      "rank": 786,
+      "rank": 808,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10980,7 +11288,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1474",
-      "rank": 787,
+      "rank": 809,
       "size": "M",
       "importance": "low",
       "score": 9,
@@ -10992,7 +11300,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-1469",
-      "rank": 788,
+      "rank": 810,
       "size": "M",
       "importance": "low",
       "score": 9,
@@ -11004,7 +11312,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-674",
-      "rank": 789,
+      "rank": 811,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11016,7 +11324,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-634",
-      "rank": 790,
+      "rank": 812,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11028,7 +11336,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2908",
-      "rank": 791,
+      "rank": 813,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11040,7 +11348,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-106",
-      "rank": 792,
+      "rank": 814,
       "size": "M",
       "importance": "high",
       "score": 77,
@@ -11053,7 +11361,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-262",
-      "rank": 793,
+      "rank": 815,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -11065,7 +11373,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-176",
-      "rank": 794,
+      "rank": 816,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -11077,7 +11385,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-334",
-      "rank": 795,
+      "rank": 817,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11089,7 +11397,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-324",
-      "rank": 796,
+      "rank": 818,
       "size": "XS",
       "importance": "medium",
       "score": 49,
@@ -11102,7 +11410,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-304",
-      "rank": 797,
+      "rank": 819,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11114,7 +11422,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-245",
-      "rank": 798,
+      "rank": 820,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11126,7 +11434,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-244",
-      "rank": 799,
+      "rank": 821,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11138,7 +11446,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4332",
-      "rank": 800,
+      "rank": 822,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -11150,7 +11458,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-113",
-      "rank": 801,
+      "rank": 823,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -11162,7 +11470,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-49",
-      "rank": 802,
+      "rank": 824,
       "size": "XS",
       "importance": "medium",
       "score": 48,
@@ -11174,7 +11482,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-294",
-      "rank": 803,
+      "rank": 825,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -11186,7 +11494,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-293",
-      "rank": 804,
+      "rank": 826,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11198,7 +11506,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-277",
-      "rank": 805,
+      "rank": 827,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11210,7 +11518,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-258",
-      "rank": 806,
+      "rank": 828,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11222,7 +11530,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-255",
-      "rank": 807,
+      "rank": 829,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11234,7 +11542,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-252",
-      "rank": 808,
+      "rank": 830,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -11246,7 +11554,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-243",
-      "rank": 809,
+      "rank": 831,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11258,7 +11566,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-77",
-      "rank": 810,
+      "rank": 832,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -11270,7 +11578,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-54",
-      "rank": 811,
+      "rank": 833,
       "size": "L",
       "importance": "medium",
       "score": 31,
@@ -11282,7 +11590,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-38",
-      "rank": 812,
+      "rank": 834,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -11294,7 +11602,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-37",
-      "rank": 813,
+      "rank": 835,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -11307,7 +11615,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3248",
-      "rank": 814,
+      "rank": 836,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11320,7 +11628,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3244",
-      "rank": 815,
+      "rank": 837,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11333,7 +11641,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2775",
-      "rank": 816,
+      "rank": 838,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11345,22 +11653,8 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-5072",
-      "rank": 817,
-      "size": "M",
-      "importance": "medium",
-      "score": 46,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-5070"
-      ],
-      "why": "Integrations READMEs and shared SKILL.md lead with the one-paste connect flow; Grok Bot moves to the connector. Needs PAN-5070.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-5033",
-      "rank": 818,
+      "rank": 839,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -11372,7 +11666,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3505",
-      "rank": 819,
+      "rank": 840,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11385,7 +11679,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-5043",
-      "rank": 820,
+      "rank": 841,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -11397,7 +11691,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-5065",
-      "rank": 821,
+      "rank": 842,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -11409,7 +11703,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3321",
-      "rank": 822,
+      "rank": 843,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11422,7 +11716,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-736",
-      "rank": 823,
+      "rank": 844,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11435,7 +11729,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-762",
-      "rank": 824,
+      "rank": 845,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11448,7 +11742,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-299",
-      "rank": 825,
+      "rank": 846,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11460,7 +11754,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-298",
-      "rank": 826,
+      "rank": 847,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11472,7 +11766,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-297",
-      "rank": 827,
+      "rank": 848,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11484,7 +11778,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-283",
-      "rank": 828,
+      "rank": 849,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11496,7 +11790,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-271",
-      "rank": 829,
+      "rank": 850,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11508,7 +11802,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-265",
-      "rank": 830,
+      "rank": 851,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11520,7 +11814,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-249",
-      "rank": 831,
+      "rank": 852,
       "size": "XS",
       "importance": "low",
       "score": 12,
@@ -11532,7 +11826,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-228",
-      "rank": 832,
+      "rank": 853,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11544,7 +11838,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-227",
-      "rank": 833,
+      "rank": 854,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11556,7 +11850,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-198",
-      "rank": 834,
+      "rank": 855,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11568,7 +11862,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-190",
-      "rank": 835,
+      "rank": 856,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11580,7 +11874,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-180",
-      "rank": 836,
+      "rank": 857,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11592,7 +11886,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-177",
-      "rank": 837,
+      "rank": 858,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11604,7 +11898,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-175",
-      "rank": 838,
+      "rank": 859,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11616,7 +11910,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-155",
-      "rank": 839,
+      "rank": 860,
       "size": "L",
       "importance": "low",
       "score": 11,
@@ -11628,7 +11922,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-146",
-      "rank": 840,
+      "rank": 861,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11640,7 +11934,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-55",
-      "rank": 841,
+      "rank": 862,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11652,7 +11946,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-44",
-      "rank": 842,
+      "rank": 863,
       "size": "M",
       "importance": "low",
       "score": 10,
@@ -11664,7 +11958,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2070",
-      "rank": 843,
+      "rank": 864,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11677,7 +11971,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-3536",
-      "rank": 844,
+      "rank": 865,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -11690,7 +11984,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2027",
-      "rank": 845,
+      "rank": 866,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11703,7 +11997,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2035",
-      "rank": 846,
+      "rank": 867,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11716,7 +12010,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2034",
-      "rank": 847,
+      "rank": 868,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11729,7 +12023,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2033",
-      "rank": 848,
+      "rank": 869,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11742,7 +12036,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2032",
-      "rank": 849,
+      "rank": 870,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11755,7 +12049,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2030",
-      "rank": 850,
+      "rank": 871,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11768,7 +12062,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2029",
-      "rank": 851,
+      "rank": 872,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11781,7 +12075,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2028",
-      "rank": 852,
+      "rank": 873,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11794,7 +12088,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2024",
-      "rank": 853,
+      "rank": 874,
       "size": "XS",
       "importance": "low",
       "score": 8,
@@ -11807,7 +12101,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2883",
-      "rank": 854,
+      "rank": 875,
       "size": "M",
       "importance": "high",
       "score": 20,
@@ -11820,7 +12114,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-2995",
-      "rank": 855,
+      "rank": 876,
       "size": "XS",
       "importance": "high",
       "score": 20,
@@ -11833,7 +12127,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4555",
-      "rank": 856,
+      "rank": 877,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11846,7 +12140,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4590",
-      "rank": 857,
+      "rank": 878,
       "size": "L",
       "importance": "medium",
       "score": 50,
@@ -11859,7 +12153,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4591",
-      "rank": 858,
+      "rank": 879,
       "size": "L",
       "importance": "medium",
       "score": 45,
@@ -11872,7 +12166,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4592",
-      "rank": 859,
+      "rank": 880,
       "size": "M",
       "importance": "low",
       "score": 38,
@@ -11887,7 +12181,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4594",
-      "rank": 860,
+      "rank": 881,
       "size": "M",
       "importance": "low",
       "score": 36,
@@ -11902,7 +12196,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4593",
-      "rank": 861,
+      "rank": 882,
       "size": "L",
       "importance": "low",
       "score": 30,
@@ -11917,7 +12211,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-5022",
-      "rank": 862,
+      "rank": 883,
       "size": "L",
       "importance": "medium",
       "score": 42,
@@ -11929,7 +12223,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-5021",
-      "rank": 863,
+      "rank": 884,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -11942,7 +12236,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-5029",
-      "rank": 864,
+      "rank": 885,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -11954,7 +12248,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4842",
-      "rank": 865,
+      "rank": 886,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -11967,7 +12261,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4851",
-      "rank": 866,
+      "rank": 887,
       "size": "S",
       "importance": "low",
       "score": 15,
@@ -11980,7 +12274,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-4887",
-      "rank": 867,
+      "rank": 888,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -11992,28 +12286,103 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-5123",
-      "rank": 872,
-      "size": "XS",
+      "issue": "PAN-5207",
+      "rank": 889,
+      "size": "L",
       "importance": "low",
-      "score": 34,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs only: add the five Skills-page named classes to STYLE-GUIDE.md and the pan-style-guide skill so new pages reuse them.",
-      "rationale": "New issue; cosmetic design-system documentation with no pipeline impact, so it ranks at the tail.",
+      "score": 15,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-5202"
+      ],
+      "why": "Parked by the operator: Flux meeting bots for Zoom, Teams, Meet, Slack as a paid integration. Do not start.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-5122",
-      "rank": 868,
-      "size": "S",
-      "importance": "high",
-      "score": 72,
+      "issue": "PAN-5183",
+      "rank": 890,
+      "size": "XS",
+      "importance": "low",
+      "score": 10,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Terminal tab says 'not running' for every Codex/OpenCode conv on Herdr: companion owner check is tmux-only. Add Herdr host.",
-      "rationale": "Restored after the previous run dropped it from the manifest; it is in-pipeline with a live workspace, so it takes the free rank slot 868 instead of re-ranking 800 nodes. Importance and score carry over from its earlier rank-51 node: the companion-terminal host checks owner existence with tmux has-session only, so the native-CLI Terminal tab is broken on Herdr for every Codex and OpenCode conversation.",
+      "why": "Parent of the file explorer; all children PAN-5185..5191 are closed. Verify and close.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": true
+    },
+    {
+      "issue": "PAN-5181",
+      "rank": 891,
+      "size": "XS",
+      "importance": "low",
+      "score": 8,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5305",
+      "rank": 892,
+      "size": "XS",
+      "importance": "low",
+      "score": 8,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5235",
+      "rank": 893,
+      "size": "XS",
+      "importance": "low",
+      "score": 8,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Fix already applied: terminal-dialog toast now navigates to the agent's terminal tab. Verify and close.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5280",
+      "rank": 894,
+      "size": "XS",
+      "importance": "low",
+      "score": 8,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Record of two UI fixes made inline on main (orbiting logo, unclipped Home project menu). Verify and close.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5347",
+      "rank": 21,
+      "size": "S",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group",
+      "rationale": "New in-pipeline discoverability fix: skills never reach the composer slash menu, so operators cannot find skill-only workflows. Pinned in the free rank-21 slot beside the other in-pipeline work; it reuses the existing skills route and category grouping.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5353",
+      "rank": 395,
+      "size": "S",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Send now: flush a queued message into a running Claude Code turn via the Ctrl+X Ctrl+S chord. PRD written, chord live-probed.",
+      "rationale": "New issue since the prior run: a small, self-contained conversation-view feature with a PRD and a live-probed mechanism, placed in the free rank-395 slot among medium conversation UX work.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -12235,13 +12604,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.8
-    },
-    {
-      "from": "PAN-3176",
-      "to": "PAN-3179",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.75
     },
     {
       "from": "PAN-3113",
@@ -12881,13 +13243,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "confidence": 1
     },
     {
-      "from": "PAN-4374",
-      "to": "PAN-1449",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
       "from": "PAN-4344",
       "to": "PAN-4345",
       "type": "informs",
@@ -12965,13 +13320,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "confidence": 1
     },
     {
-      "from": "PAN-4439",
-      "to": "PAN-4625",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-4360",
       "to": "PAN-4627",
       "type": "informs",
@@ -13021,20 +13369,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "confidence": 0.5
     },
     {
-      "from": "PAN-3657",
-      "to": "PAN-4753",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-4213",
-      "to": "PAN-4753",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-4778",
       "to": "PAN-4817",
       "type": "unblocks",
@@ -13077,27 +13411,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "confidence": 0.6
     },
     {
-      "from": "PAN-4995",
-      "to": "PAN-4636",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-5070",
-      "to": "PAN-5072",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5087",
-      "to": "PAN-5088",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
       "from": "PAN-4666",
       "to": "PAN-5013",
       "type": "informs",
@@ -13119,55 +13432,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "confidence": 0.5
     },
     {
-      "from": "PAN-5090",
-      "to": "PAN-5091",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-3539",
-      "to": "PAN-5090",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-3314",
-      "to": "PAN-5090",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-5095",
-      "to": "PAN-2580",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-5095",
-      "to": "PAN-2546",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-5095",
-      "to": "PAN-4303",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-5097",
-      "to": "PAN-4624",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-5097",
       "to": "PAN-4391",
       "type": "informs",
@@ -13182,18 +13446,144 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "confidence": 0.4
     },
     {
-      "from": "PAN-4365",
-      "to": "PAN-5124",
+      "from": "PAN-5284",
+      "to": "PAN-5290",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5284",
+      "to": "PAN-5294",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5284",
+      "to": "PAN-5295",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5284",
+      "to": "PAN-5335",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5284",
+      "to": "PAN-5343",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5335",
+      "to": "PAN-5343",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5290",
+      "to": "PAN-5343",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5295",
+      "to": "PAN-5343",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5294",
+      "to": "PAN-5343",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5337",
+      "to": "PAN-5340",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5338",
+      "to": "PAN-5341",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5201",
+      "to": "PAN-5202",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5202",
+      "to": "PAN-5207",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5183",
+      "to": "PAN-1550",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5241",
+      "to": "PAN-1676",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5204",
+      "to": "PAN-5201",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5295",
+      "to": "PAN-5341",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-5227",
+      "to": "PAN-5264",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
     },
     {
-      "from": "PAN-5131",
-      "to": "PAN-3530",
+      "from": "PAN-5263",
+      "to": "PAN-5264",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-5250",
+      "to": "PAN-5312",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.3
     }
   ]
 }

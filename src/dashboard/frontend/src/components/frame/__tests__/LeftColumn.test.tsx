@@ -78,7 +78,7 @@ afterEach(() => {
 });
 
 describe('LeftColumn (PAN-5293 F-D18)', () => {
-  it('starts 264 px wide and its drag handle clamps to 400 and persists', () => {
+  it('starts 264 px wide and its drag handle clamps to 640 and persists', () => {
     renderShell();
     const column = screen.getByTestId('left-column');
     expect(column.style.width).toBe('264px');
@@ -86,10 +86,15 @@ describe('LeftColumn (PAN-5293 F-D18)', () => {
     fireEvent.mouseDown(screen.getByTestId('left-column-resize'), { clientX: 264 });
     fireEvent.mouseMove(window, { clientX: 500 });
     fireEvent.mouseUp(window);
-    expect(column.style.width).toBe('400px');
-    expect(localStorage.getItem(LEFT_COLUMN_WIDTH_KEY)).toBe('400');
+    expect(column.style.width).toBe('500px');
 
-    fireEvent.mouseDown(screen.getByTestId('left-column-resize'), { clientX: 400 });
+    fireEvent.mouseDown(screen.getByTestId('left-column-resize'), { clientX: 500 });
+    fireEvent.mouseMove(window, { clientX: 900 });
+    fireEvent.mouseUp(window);
+    expect(column.style.width).toBe('640px');
+    expect(localStorage.getItem(LEFT_COLUMN_WIDTH_KEY)).toBe('640');
+
+    fireEvent.mouseDown(screen.getByTestId('left-column-resize'), { clientX: 640 });
     fireEvent.mouseMove(window, { clientX: 100 });
     fireEvent.mouseUp(window);
     expect(column.style.width).toBe('240px');

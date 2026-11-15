@@ -175,6 +175,17 @@ export const MenuItemButton = forwardRef<HTMLButtonElement, MenuItemButtonProps>
   );
 });
 
+/**
+ * True when a captured `scroll` event came from inside an open menu. Menus that
+ * dismiss on page scroll (their fixed position cannot follow the trigger) must
+ * ignore their own scroll, or a menu taller than the viewport closes the moment
+ * the operator scrolls it to reach its last items.
+ */
+export function isScrollInsideMenu(event: Event): boolean {
+  const target = event.target;
+  return target instanceof Element && target.closest('[role="menu"]') !== null;
+}
+
 export function MenuSeparator({ className = '' }: { className?: string }) {
   return <div role="separator" className={classes('mx-1 my-1 h-px bg-border', className)} />;
 }

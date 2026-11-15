@@ -14,7 +14,7 @@ import type { ConversationMutations } from './useConversationMutations';
 import type { RegisteredProject } from './UnknownProjectState';
 import { resolveEffectiveProjectKey } from './projectsData';
 import { fallbackBadgeTone } from './fallbackBadge';
-import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
+import { isScrollInsideMenu, MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
 import { isOfflineLinked, LinkedMachineChip, LinkedOfflineMeta, LinkedRowMenuItems } from './LinkedConversationRow';
 import { PullRequestMenuItems } from './PullRequestMenuItems';
 import { ScheduleMenuItem } from '../chat/ConversationScheduleDialog';
@@ -195,13 +195,14 @@ export function ConversationRow({
   useEffect(() => {
     if (!menuOpen) { setMoveSubmenuOpen(false); return; }
     const dismiss = () => setMenuOpen(false);
+    const onScroll = (e: Event) => { if (!isScrollInsideMenu(e)) setMenuOpen(false); };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented) setMenuOpen(false); };
     window.addEventListener('keydown', onKey);
-    window.addEventListener('scroll', dismiss, true);
+    window.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', dismiss);
     return () => {
       window.removeEventListener('keydown', onKey);
-      window.removeEventListener('scroll', dismiss, true);
+      window.removeEventListener('scroll', onScroll, true);
       window.removeEventListener('resize', dismiss);
     };
   }, [menuOpen]);

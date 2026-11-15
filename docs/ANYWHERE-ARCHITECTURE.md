@@ -333,7 +333,8 @@ forwarded requests carry `x-overdeck-link-actor: agent:<id>` and a scope ceiling
 
 Any remote access (a trusted remote address, a paired device, a machine link or token)
 turns `require_token_mint` on by itself; YAML `false` cannot turn it off while remote access
-exists (D-4645-12). A plain-HTTP browser on another device gets the "Use HTTPS" page (D-4645-13).
+exists (D-4645-12). The toggle distrusts forwarded requests only: a browser on the machine
+itself still signs in with no token (PAN-5344). A plain-HTTP browser on another device gets the "Use HTTPS" page (D-4645-13).
 
 ## Phone credentials (PAN-4835)
 
