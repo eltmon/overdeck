@@ -49,11 +49,12 @@ describe('ProjectTrainCard', () => {
 
   it('the Train switch posts the project override', async () => {
     const fetchImpl = mockFetch({ 'POST /api/projects/overdeck/merge-train': { value: 'disabled', effective: false } });
-    renderCard(project());
+    const { client } = renderCard(project());
     fireEvent.click(screen.getByTestId('merge-train-switch-overdeck'));
     await waitFor(() => expect(callsTo(fetchImpl, 'POST', '/api/projects/overdeck/merge-train')).toHaveLength(1));
     const [, init] = callsTo(fetchImpl, 'POST', '/api/projects/overdeck/merge-train')[0]!;
     expect(JSON.parse(String(init?.body))).toEqual({ value: 'disabled' });
+    await waitFor(() => expect(client.getQueryData(['project-merge-train', 'overdeck'])).toEqual({ value: 'disabled', effective: false }));
   });
 
   it('turning the switch back on clears the override', async () => {

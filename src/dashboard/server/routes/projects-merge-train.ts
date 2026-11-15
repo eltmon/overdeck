@@ -1,4 +1,4 @@
-/** PAN-1696: Per-project merge-train override endpoints (GET/POST) */
+/** PAN-1696: Per-project merge-train override endpoints (GET/POST); the POST drops the board cache (PAN-5363). */
 
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -7,6 +7,7 @@ import { jsonResponse } from '../http-helpers.js';
 import { getProjectSync, setProjectMergeTrain } from '../../../lib/projects.js';
 import { readProjectJsonBody } from './projects.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
+import { invalidateMergeTrainBoardCache } from '../services/merge-train-board.js';
 
 // ─── Route: GET /api/projects/:projectKey/merge-train ────────────────
 // PAN-1696: get per-project merge-train override (enabled/disabled/null) and effective state.
@@ -47,6 +48,8 @@ const postProjectMergeTrainRoute = HttpRouter.add(
     }
     const { isMergeTrainEnabledForProject } = yield* Effect.promise(() => import('../../../lib/overdeck/merge-sync.js'));
     yield* Effect.promise(() => setProjectMergeTrain(key, v));
+    // PAN-5363: drop cached and in-flight board reads, so the next read starts after this write.
+    invalidateMergeTrainBoardCache();
     const updated = { ...project };
     if (v === null) delete updated.merge_train;
     else updated.merge_train = v;

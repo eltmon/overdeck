@@ -222,7 +222,9 @@ so the row's Auto/Hold toggle writes the issue policy through
 `POST /api/merge-train/policy/:issueId` (see "Issue policy writes" below). On
 any other tracker it is false, and the toggle is read-only and names the
 tracker labels to set instead. The board result is cached for 5 seconds per project key, so several tabs and
-placements share one read.
+placements share one read. Both writes that change what the board shows drop that cache, cached and
+in-flight reads alike: the issue-policy write and the project override write
+(`POST /api/projects/:projectKey/merge-train`, PAN-5363).
 
 **Blockers** (`merge-blocker-types.ts`): `failing_checks` (with the failing
 check names), `merge_conflict`, `not_mergeable`, `draft_pr`,
@@ -315,6 +317,19 @@ before any per-member forge read.
 An auto project with no Hold member never probes. Batch auto-promote takes
 that path with no override, so automatic window batches are never held here.
 
+## Project override writes
+
+The Train switch on a project's board card and the project settings
+disclosure's Merge train control both post `{ value: 'disabled' | 'enabled' | null }`
+to `POST /api/projects/:projectKey/merge-train` (PAN-5363). The route writes
+`projects.yaml`, then drops the board cache. The dashboard applies the
+answer — `{ value, effective }` — through `useApplyProjectTrainWrite`: it
+cancels in-flight board and settings reads (a board read that was already in
+flight is discarded, not applied over the confirmed write), patches
+`override`/`enabled` for that project in every cached board placement and the
+settings query, then refetches both. A write from the `pan` CLI in another
+process still shows after the 5 second board cache TTL.
+
 ## The master switch
 
 `isMergeTrainEnabledForProject` returns false whenever the global flag is off,
@@ -338,7 +353,7 @@ merge.
 | `GET /api/merge-train/auto-merge`, `/auto-merge/pending`, `/auto-merge/problems` | Per-issue policy map, cooldown queue, stuck rows |
 | `POST /api/merge-train/auto-merge/schedule`, `DELETE /api/merge-train/auto-merge/:issueId` | Schedule and cancel an auto-merge |
 | `GET /api/merge-train/merge-blockers`, `GET /api/merge-train/merge-backend` | Blocked approved PRs; which merge backend is available |
-| `GET/POST /api/projects/:projectKey/merge-train` | Read and set the project override |
+| `GET/POST /api/projects/:projectKey/merge-train` | Read and set the project override; the POST drops the board cache |
 
 ## File map
 
