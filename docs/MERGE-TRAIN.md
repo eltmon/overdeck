@@ -124,10 +124,11 @@ head), shown only once the PR is approved. A ready car the scheduler skipped
 carries "Not scheduled: <reason>" in its notes (PAN-4772); a project the pass
 skipped whole (PAN-5036) carries it in the card's `notices`.
 
-**Policy.** `policyWritable` is false until the per-issue policy write route
-(`POST /api/merge-train/policy/:issueId`, PAN-4753 WI-8) ships, so the row's
-Auto/Hold toggle is read-only and names the tracker labels to set instead.
-The board result is cached for 5 seconds per project key, so several tabs and
+**Policy.** `policyWritable` is true when the project's tracker is GitHub,
+so the row's Auto/Hold toggle writes the issue policy through
+`POST /api/merge-train/policy/:issueId` (see "Issue policy writes" below). On
+any other tracker it is false, and the toggle is read-only and names the
+tracker labels to set instead. The board result is cached for 5 seconds per project key, so several tabs and
 placements share one read.
 
 **Blockers** (`merge-blocker-types.ts`): `failing_checks` (with the failing
@@ -162,6 +163,64 @@ stored.
    before its cooldown it merged. Merges outside the train are noted, never
    refused or reverted.
 
+## Issue policy writes
+
+`POST /api/merge-train/policy/:issueId` with `{ policy: 'auto' | 'hold' | 'default' }`
+(`writeIssueMergePolicy`, `src/dashboard/server/services/merge-policy-write.ts`;
+PAN-4753 WI-8, PAN-5321) sets the issue policy by writing tracker labels
+through `IssueLifecycle`. Overdeck stores no copy (R9).
+
+| Policy | Label writes |
+| --- | --- |
+| `auto` | remove `hold-for-uat`, add `auto-merge` |
+| `hold` | remove `auto-merge`, add `hold-for-uat` |
+| `default` | remove both (follow the project) |
+
+- **Trackers.** A project whose tracker is not `github`, or an id that does
+  not resolve to a GitHub issue, gets 501 before any label call:
+  `IssueLifecycle.addLabel` is a silent no-op elsewhere, and a Linear project
+  with a `github_repo` would otherwise label an unrelated GitHub issue.
+- **Errors.** 400 for a bad id or body, 404 for an issue no registered
+  project owns, 502 / 429 for a tracker API error / rate limit.
+- **Refresh.** After the write the cached tracker row is patched with the new
+  labels when the cache holds it (`refreshed: true`), and the board cache is
+  dropped. An uncached issue converges on the next tracker poll
+  (`refreshed: false`).
+- **Response.** `{ issueId, policy, effectivePolicy, route, refreshed }`, with
+  `effectivePolicy` from the policy tiers and `route` from `mergeRouteFor`
+  over the new labels.
+- **Operator only.** `auto-merge` and `hold-for-uat` are operator grant
+  labels. The route has no row in `route-scopes.ts`, so it keeps the `admin`
+  default, which no agent token holds (`AGENT_TOKEN_SCOPES`): an agent token
+  gets 403 `insufficient_scope`. The agent `gh` shim refuses the same labels
+  (`launcher-git-guard.ts`). Neither is a sandbox: a process holding the
+  internal token, or an absolute `/usr/bin/gh`, is not stopped.
+
+`AutoMergeToggle` is editable by default and falls back to read-only on a 404
+or 501, so every render site (train rows, issue header, Awaiting Merge, merge
+policy roster) uses the same door.
+
+## Promote stack-health gate
+
+Promoting a batch (`POST /api/merge-train/generations/:name/promote`) checks
+its UAT stack first when UAT is required for it (PAN-4753 WI-9, #3176;
+`promoteStackHealthRefusal`, `src/dashboard/server/services/promote-stack-gate.ts`).
+UAT is required when the project holds for UAT (`projectHoldsForUat`) or any
+member's issue policy is Hold. The check runs after the status refusal and
+before any per-member forge read.
+
+- `probeUatStack` answers `running`: the promote continues.
+- Anything else (`degraded`, `unknown`, `absent`): the promote returns
+  `{ success: false, reason: 'stack-unhealthy', message: 'UAT stack is <status>; start it and test, or merge anyway with a reason' }`,
+  which the route maps to 409.
+- With `overrideStackHealth: true` and a non-empty `overrideReason` (400
+  without one), an unhealthy stack is merged past: each member's workspace
+  journal gets `merge.attempted` with `source: 'batch-promote'` and
+  `data: { batch, overrideStackHealth: true, reason, stackStatus }`.
+
+An auto project with no Hold member never probes. Batch auto-promote takes
+that path with no override, so automatic window batches are never held here.
+
 ## The master switch
 
 `isMergeTrainEnabledForProject` returns false whenever the global flag is off,
@@ -176,10 +235,11 @@ merge.
 | --- | --- |
 | `GET /api/merge-train/board` | The board read model (PAN-4753) |
 | `GET /api/merge-train/queues`, `GET /api/merge-train/generations` | Per-project ready queues and the batch chain (with `statusReason`) |
-| `POST /api/merge-train/generations/:name/stack`, `/promote`, `/ship` | Start a batch's UAT stack, merge the batch to main, ship its version |
+| `POST /api/merge-train/generations/:name/stack`, `/promote`, `/ship` | Start a batch's UAT stack, merge the batch to main (stack-health gate, `overrideStackHealth` + `overrideReason`), ship its version |
 | `POST /api/merge-train/assemble` | Assemble a batch now |
 | `POST /api/merge-train/merge-next` | Merge one or N ready features of a project (per-row Merge, Merge alone) |
 | `POST /api/merge-train/strikes/:issueId/merge` | The operator's strike merge door (PAN-4750) |
+| `POST /api/merge-train/policy/:issueId` | Set the issue policy (`auto`, `hold`, `default`) through tracker labels; operator only, 501 off GitHub (PAN-5321) |
 | `GET/POST /api/merge-train/config` | Policies: `merge_train_enabled`, `batch_size`, `batch_wait_minutes`, and the Flywheel switches |
 | `GET /api/merge-train/auto-merge`, `/auto-merge/pending`, `/auto-merge/problems` | Per-issue policy map, cooldown queue, stuck rows |
 | `POST /api/merge-train/auto-merge/schedule`, `DELETE /api/merge-train/auto-merge/:issueId` | Schedule and cancel an auto-merge |
@@ -194,7 +254,8 @@ merge.
 | Batch window | `src/lib/cloister/batch-window.ts`, `src/dashboard/server/services/merge-train-batching.ts` |
 | Scheduler and executor | `src/dashboard/server/services/auto-merge-scheduler.ts`, `auto-merge-executor.ts`, `auto-merge-door-policy.ts`, `merge-path-owner.ts` |
 | Reconciler and engines | `src/lib/cloister/uat-reconciler.ts`, `uat-generation-engine.ts`, `uat-polyrepo-engine.ts`, `src/dashboard/server/services/uat-train.ts` |
-| Promote and auto-promote | `src/lib/cloister/uat-promote.ts`, `src/dashboard/server/services/batch-auto-promote.ts` |
+| Promote and auto-promote | `src/lib/cloister/uat-promote.ts`, `src/dashboard/server/services/batch-auto-promote.ts`, `promote-stack-gate.ts` |
+| Issue policy write | `src/dashboard/server/services/merge-policy-write.ts`, `src/dashboard/server/routes/merge-train-lanes.ts` |
 | Board | `src/dashboard/server/services/merge-train-board.ts`, `merge-train-board-types.ts`, `recent-merges.ts`, `merged-issue-ids.ts`; `src/lib/cloister/merge-blocker-types.ts`, `unresolved-threads.ts` |
 | Strike merge | `src/dashboard/server/services/strike-merge.ts`, `src/dashboard/server/routes/merge-train-lanes.ts` |
 | UI | `src/dashboard/frontend/src/components/merge-train/train/` (`MergeTrain`, `ProjectTrainCard`, `BatchCard`, `TrainCarRow`, `StrikeLane`, `RecentMergesStrip`, …) |
