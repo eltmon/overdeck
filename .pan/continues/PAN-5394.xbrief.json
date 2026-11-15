@@ -1,0 +1,67 @@
+{
+  "version": "1",
+  "issueId": "PAN-5394",
+  "created": "2026-11-15T20:23:02.963Z",
+  "updated": "2026-11-15T20:27:06.294Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "soft-reserve-wait": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5394",
+      "claimedAt": "2026-11-15T20:23:02.963Z",
+      "doneAt": "2026-11-15T20:24:05.543Z"
+    },
+    "soft-reserve-wait.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:24:05.543Z"
+    },
+    "soft-reserve-wait.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:24:05.543Z"
+    },
+    "fairness-siblings-wait": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5394",
+      "claimedAt": "2026-11-15T20:24:19.320Z",
+      "doneAt": "2026-11-15T20:25:09.489Z"
+    },
+    "fairness-siblings-wait.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:25:09.489Z"
+    },
+    "fairness-siblings-wait.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:25:09.489Z"
+    },
+    "fairness-siblings-wait.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:25:09.489Z"
+    },
+    "memory-admission-wait": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5394",
+      "claimedAt": "2026-11-15T20:25:34.045Z",
+      "doneAt": "2026-11-15T20:27:06.294Z"
+    },
+    "memory-admission-wait.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:27:06.294Z"
+    },
+    "memory-admission-wait.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:27:06.294Z"
+    },
+    "memory-admission-wait.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:27:06.294Z"
+    },
+    "memory-admission-wait.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:27:06.294Z"
+    }
+  }
+}

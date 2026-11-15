@@ -1,0 +1,257 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T20:03:37Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5394: Flaky test: admission 're-reads the soft reserve' asserts after a fixed 10 ms drive",
+    "updated": "2026-11-15T20:22:47.616Z"
+  },
+  "plan": {
+    "id": "pan-5394",
+    "title": "Flaky test: admission 're-reads the soft reserve' asserts after a fixed 10 ms drive",
+    "status": "running",
+    "uid": "2e8120a7-d254-443c-aea2-dd9e0c299646",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T20:03:37Z",
+    "updated": "2026-11-15T20:22:47.616Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5394",
+        "label": "PAN-5394",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5394.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "test",
+      "flaky",
+      "quality-gate-admission"
+    ],
+    "metadata": {
+      "docsJustification": "Test-only change to tests/unit/lib/cloister/quality-gate-admission.test.ts. No doc, rule or user-facing page describes these tests or the drive helper, and the fake-timers rule it follows is already documented in sync-sources/rules/fake-timers-for-retry-tests.md. No changelog.d entry: users see no difference.",
+      "canonicalFilename": "2026-11-15-PAN-5394-flaky-test-admission-re-reads-the-soft-reserve-asserts-after-a-fixed-10-ms-drive.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Main CI went red at 6a6e5f38220 (run 43753714635, test-shard 2/4): the PAN-5285 test 're-reads the soft reserve every poll, so a lowered reserve unblocks a queued waiter' runs `await drive(10)` (about 10 ms of real time) and then asserts onWaiting was called. Before the admission loop first calls onWaiting it does several real fs operations on the libuv threadpool (ticket write, queue listing, footprint read, persistTicket) and awaits the mocked config load. On a loaded CI runner that takes longer than 10 ms, so the assertion sees zero calls. Six more sites in the same file have the same fixed-count-drive-then-positive-assertion shape.",
+      "Proposal": "At each of the seven sites, replace the fixed-count drive with `drive(200, predicate)` that returns as soon as the asserted condition holds (normally `onWaiting.mock.calls.length > 0`; Site D also waits for two waiter files). At Site C keep the existing `drive(10)` after the predicate drive so `toHaveBeenCalledTimes(1)` still proves no repeat report. Test-only; fake timers stay on; no new real delays. Exact before/after snippets per site are in .pan/drafts/PAN-5394.md.",
+      "NonGoals": "- No change to any file under src/ (the admission loop is correct; this is a test timing flake).\n- No change to the drive, driveUntil, driveUntilResolved or driveUntilRejected helpers.\n- No new real setTimeout waits, no disabling fake timers, no maxForks/retry/quarantine changes.\n- No removed, weakened, skipped (skipIf) or .only-marked assertions.\n- Do not change the negative-only fixed-count drives at lines 246, 308, 393, 412 (incl. `.not.toHaveBeenCalled()` at 414), 954, 972, 996, 1025.\n- Do not change the ordering-only drives at lines 252, 908, 926, or the already predicate-capped drive at line 683.\n- No changelog.d entry and no doc edits (test-only change)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Also fix the four memory-admission (PAN-5248) sites with the same fixed-count-then-positive-assertion shape, in their own item.",
+        "rationale": "The issue names only the fairness block, but these four sites have the same cause and the same one-line fix; leaving them would leave known flakes in the same file. A separate item keeps them reviewable on their own."
+      },
+      {
+        "summary": "Use `drive(200, () => <callback>.mock.calls.length > 0)` rather than driveUntil or an exact-argument predicate.",
+        "rationale": "The issue prescribes this form. drive() lets the following toHaveBeenCalledWith fail with a real argument diff, and with a fixed clock notifyWaiting only ever reports the first reason, so matching exact arguments in the predicate buys nothing."
+      },
+      {
+        "summary": "In 'waits on memory until MemAvailable recovers', count memory reads and wait for two more after the first report before asserting toHaveBeenCalledTimes(1).",
+        "rationale": "That assertion proves no repeat report only if later polls completed; a fixed drive(10) cannot prove that on a slow host (plan critique round 1)."
+      }
+    ],
+    "items": [
+      {
+        "id": "soft-reserve-wait",
+        "title": "Soft-reserve fairness test waits for onWaiting before asserting",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T20:03:37Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-5394",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "expected_outputs": [
+            "Vitest reports Tests 48 passed (48) for quality-gate-admission.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In tests/unit/lib/cloister/quality-gate-admission.test.ts, test 're-reads the soft reserve every poll, so a lowered reserve unblocks a queued waiter' (inside its try block, line ~1050), replace `await drive(10)` with `await drive(200, () => onWaiting.mock.calls.length > 0)`. Change nothing else. See WI-1 in .pan/drafts/PAN-5394.md for the exact before/after."
+        },
+        "items": [
+          {
+            "id": "soft-reserve-wait.ac1",
+            "title": "Given the soft-reserve test, the line directly before the comment `// 16 - 5 = 11 GiB is under the 12 GiB reserve.` reads `await drive(200, () => onWaiting.mock.calls.length > 0)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "soft-reserve-wait.ac2",
+            "title": "When `npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts` runs, it exits 0 and reports 48 passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fairness-siblings-wait",
+        "title": "FIFO and unfittable-head fairness tests wait for their callback before asserting",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T20:03:37Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-5394",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "expected_outputs": [
+            "Vitest reports Tests 48 passed (48) for quality-gate-admission.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In describe('head-of-line fairness (PAN-5285)'): (A) test 'keeps FIFO when the waiter ahead would fit' (line ~856): replace the `await drive(10)` right after `const secondSettled = settledFlag(secondPromise)` with `await drive(200, () => onWaiting.mock.calls.length > 0)`. (B) test 'admits an unfittable head alone once it is past the bound and the slots are empty' (line ~881): replace the `await drive(10)` right after `const secondSettled = settledFlag(secondPromise)` with `await drive(200, () => onSecondWaiting.mock.calls.length > 0)`. Leave every other drive in the block alone (see NonGoals). WI-2 in the PRD has exact snippets."
+        },
+        "items": [
+          {
+            "id": "fairness-siblings-wait.ac1",
+            "title": "Given 'keeps FIFO when the waiter ahead would fit', the drive between `settledFlag(secondPromise)` and the `secondSettled()` check reads `await drive(200, () => onWaiting.mock.calls.length > 0)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fairness-siblings-wait.ac2",
+            "title": "Given 'admits an unfittable head alone…', the drive between `settledFlag(secondPromise)` and the `headSettled()` check reads `await drive(200, () => onSecondWaiting.mock.calls.length > 0)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fairness-siblings-wait.ac3",
+            "title": "When the file runs under `npx vitest run`, it exits 0 with 48 passed, and the drives in the fairness tests 'never admits a head alone below the hard reserve…', 'counts the bound…', both 'passes an older-version head…' tests, 'clamps…', 'gives an alone slot back…' and 're-reads the estimate…' still read `await drive(N)` with no predicate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-admission-wait",
+        "title": "Memory-admission tests wait for their condition before positive assertions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T20:03:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5394",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts",
+            "git diff origin/main -- tests/unit/lib/cloister/quality-gate-admission.test.ts | grep '^-' | grep -c expect"
+          ],
+          "expected_outputs": [
+            "Vitest reports Tests 48 passed (48) for quality-gate-admission.test.ts",
+            "the grep count prints 0 (no expect line removed)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In describe('memory admission (PAN-5248)'), apply WI-3 from .pan/drafts/PAN-5394.md exactly. (C) 'waits on memory until MemAvailable recovers' (~545): add `let reads = 0`, change the memDeps available callback to `() => { reads++; return available }`, replace `await drive(10)` with `await drive(200, () => onWaiting.mock.calls.length > 0)`, then `const readsAtReport = reads`, `await drive(200, () => reads >= readsAtReport + 2)` and `expect(reads).toBeGreaterThanOrEqual(readsAtReport + 2)` before the existing `settled()` and `toHaveBeenCalledTimes(1)` checks, so the no-repeat check runs only after two more polls read memory. (D) 'replays the incident: a second gate waits on memory with a slot free' (~582): replace `await drive(20)` with `await drive(200, () => onWaiting.mock.calls.length > 0 && readdirSync(rootDir).filter((entry) => entry.startsWith('waiter-')).length === 2)`. (E) 'uses a recorded peak instead of the default estimate' second half (~609): replace `await drive(10)` with `await drive(200, () => onWaiting.mock.calls.length > 0)`. (F) 'subtracts an owner's growth above its baseline, unless it reserves fully' (~653, inside the for loop): replace `await drive(10)` with `await drive(200, () => onWaiting.mock.calls.length > 0)`. Do not touch the drive at ~683 (already predicate-capped)."
+        },
+        "items": [
+          {
+            "id": "memory-admission-wait.ac1",
+            "title": "Given 'waits on memory until MemAvailable recovers', when the test runs, `expect(reads).toBeGreaterThanOrEqual(readsAtReport + 2)` executes before `expect(onWaiting).toHaveBeenCalledTimes(1)`, where readsAtReport is the memory-read count captured once onWaiting first fires",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-admission-wait.ac2",
+            "title": "Given 'replays the incident…', the drive before `expect(secondSettled()).toBe(false)` returns only once onWaiting has a call AND exactly two `waiter-` files exist in rootDir",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-admission-wait.ac3",
+            "title": "Given 'uses a recorded peak…' and 'subtracts an owner's growth…', the drive before each `settled()` check reads `await drive(200, () => onWaiting.mock.calls.length > 0)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-admission-wait.ac4",
+            "title": "When the file runs under `npx vitest run`, it exits 0 with 48 passed, and `git diff origin/main --name-only` lists no file under src/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "soft-reserve-wait",
+        "to": "fairness-siblings-wait",
+        "type": "blocks"
+      },
+      {
+        "from": "fairness-siblings-wait",
+        "to": "memory-admission-wait",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
