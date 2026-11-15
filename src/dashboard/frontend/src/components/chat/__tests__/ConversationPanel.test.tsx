@@ -9,6 +9,7 @@ import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
 import { ConversationPanel } from '../ConversationPanel';
 import { DialogProvider } from '../../DialogProvider';
 import { MESSAGES_HTTP_FALLBACK_MS } from '../useMessagesHttpFallback';
+import { StageDeckProvider, type StageDeckContextValue } from '../../Stage/StageDeckContext';
 
 const streamTransportMock = vi.hoisted(() => ({
   listeners: new Map<string, (event: unknown) => void>(),
@@ -199,17 +200,21 @@ function renderPanel(
   conversation = mockConversation,
   props: Partial<React.ComponentProps<typeof ConversationPanel>> = {},
   messagesData?: Parameters<typeof makeClient>[0],
+  deck?: StageDeckContextValue,
 ) {
   const client = makeClient(messagesData);
+  const panel = (
+    <ConversationPanel
+      conversation={conversation}
+      viewMode="conversation"
+      onArchived={() => {}}
+      {...props}
+    />
+  );
   const view = render(
     <DialogProvider>
       <QueryClientProvider client={client}>
-        <ConversationPanel
-          conversation={conversation}
-          viewMode="conversation"
-          onArchived={() => {}}
-          {...props}
-        />
+        {deck ? <StageDeckProvider value={deck}>{panel}</StageDeckProvider> : panel}
       </QueryClientProvider>
     </DialogProvider>,
   );
@@ -243,6 +248,44 @@ describe('ConversationPanel rename flow', () => {
   it('renders the conversation title in the header', () => {
     renderPanel();
     expect(screen.getByText('My Panel Title')).toBeInTheDocument();
+  });
+
+  it('renders no Changes or Files button and asks for no change data outside a Stage (PAN-5291)', async () => {
+    renderPanel();
+    expect(screen.getByText('My Panel Title')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Files' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Changes/ })).not.toBeInTheDocument();
+    const urls = fetchControl.fetchMock.mock.calls.map(([input]) => String(input));
+    expect(urls.filter((url) => url.includes('/changes') || url === '/api/registered-projects' || url === '/api/workspace-registry')).toEqual([]);
+  });
+
+  it('shows Changes and Files inside a Stage and opens the dock from them (PAN-5291)', async () => {
+    vi.stubGlobal('navigator', {
+      platform: 'Linux x86_64',
+      clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/registered-projects') return Response.json([]);
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url === '/api/conversations/test-conv/changes?scope=conversation') {
+        return Response.json({
+          conversation: 'test-conv', repoRoot: '/home/user', rootId: null, branch: 'main', scope: 'conversation',
+          uncommitted: [], commits: [],
+          totals: { files: 2, additions: 86, deletions: 1, commitsPushed: 0, commitsLocal: 0, uncommittedFiles: 0 },
+        });
+      }
+      return defaultConversationResponse(method, url);
+    });
+    const openDock = vi.fn();
+    renderPanel(mockConversation, {}, undefined, {
+      deckKey: 'p', openOrFocusEditorPane: vi.fn(), openOrFocusAgentPane: vi.fn(), openDock,
+    });
+    const changes = await screen.findByRole('button', { name: 'Changes, 86 lines added, 1 removed' });
+    expect(changes).toHaveTextContent('+86');
+    fireEvent.click(changes);
+    expect(openDock).toHaveBeenLastCalledWith({ tab: 'changes', changesScope: 'conversation' });
+    fireEvent.click(screen.getByRole('button', { name: 'Files' }));
+    expect(openDock).toHaveBeenLastCalledWith({ tab: 'files' });
   });
 
   it('shows the effective pull request badge beside the branch in the header (PAN-3822)', () => {

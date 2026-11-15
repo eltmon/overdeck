@@ -3,6 +3,7 @@ import type { Conversation } from '../../CommandDeck/ConversationList';
 import { PanOpenInPicker } from '../../PanOpenInPicker';
 import { ConversationMachineChip } from '../ConversationMachineBanner';
 import { ConversationBranchMeta } from '../ConversationBranchMeta';
+import type { HeaderChanges } from './headerChanges';
 import styles from '../../CommandDeck/styles/command-deck.module.css';
 
 export interface ConversationStatusLineProps {
@@ -10,6 +11,8 @@ export interface ConversationStatusLineProps {
   status: { color: string; label: string; hollow: boolean };
   /** The phone app (PAN-4837): hide what its phone token cannot do. */
   native: boolean;
+  /** Change data inside a Stage, else null (D1-7); the status-line parts that use it land with WI-8. */
+  changes?: HeaderChanges | null;
 }
 
 /** Row 2 of the conversation header — read-only metadata. */

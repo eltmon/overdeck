@@ -12,6 +12,8 @@ import { BookmarksToggle } from '../bookmarks/BookmarksDrawer';
 import type { ViewMode } from '../useNeedsTerminalAutoSwitch';
 import { ConversationHeaderMenu } from './ConversationHeaderMenu';
 import { ConversationStatusLine } from './ConversationStatusLine';
+import { HeaderDockButtons, StageHeaderChanges, type HeaderChanges } from './headerChanges';
+import { useStageDeck } from '../../Stage/StageDeckContext';
 import styles from '../../CommandDeck/styles/command-deck.module.css';
 
 export interface ConversationHeaderProps {
@@ -169,17 +171,9 @@ export function ConversationHeader({
   const showPiAbort = isWorking && (conversation.harness === 'ohmypi' || conversation.harness === 'pi');
   const WorkingIcon = working.Icon;
 
-  return (
-    <div
-      className={`${styles.conversationHeaderShell} ${styles.conversationHeaderContainer}`} data-machine-state={machineState}
-      onContextMenu={(e) => {
-        // Right-click the header → open the ⋮ menu. Skip while renaming so
-        // the native copy/paste menu still works in the title input.
-        if (editingTitle) return;
-        e.preventDefault();
-        setMenuOpen(true);
-      }}
-    >
+  const deck = useStageDeck();
+  const renderRows = (changes: HeaderChanges | null) => (
+    <>
       {/* Row 1 — title + primary actions */}
       <div className={styles.conversationHeaderPrimary}>
         <span className={styles.conversationTerminalTitle}>
@@ -310,6 +304,8 @@ export function ConversationHeader({
             <ExternalLink size={14} />
           </button>
 
+          {changes && <HeaderDockButtons changes={changes} />}
+
           {/* Overflow menu — long-tail / prefs / config / destructive */}
           <div className={styles.headerMenuWrap}>
             <button
@@ -342,7 +338,24 @@ export function ConversationHeader({
       </div>
 
       {/* Row 2 — read-only metadata */}
-      <ConversationStatusLine conversation={conversation} status={status} native={native} />
+      <ConversationStatusLine conversation={conversation} status={status} native={native} changes={changes} />
+    </>
+  );
+
+  return (
+    <div
+      className={`${styles.conversationHeaderShell} ${styles.conversationHeaderContainer}`} data-machine-state={machineState}
+      onContextMenu={(e) => {
+        // Right-click the header → open the ⋮ menu. Skip while renaming so
+        // the native copy/paste menu still works in the title input.
+        if (editingTitle) return;
+        e.preventDefault();
+        setMenuOpen(true);
+      }}
+    >
+      {deck?.openDock
+        ? <StageHeaderChanges conversation={conversation} openDock={deck.openDock}>{renderRows}</StageHeaderChanges>
+        : renderRows(null)}
     </div>
   );
 }
