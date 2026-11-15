@@ -38,7 +38,7 @@ const CURATED_OVERDECK_VARIANTS: SlashCommand[] = COMPOSER_COMMAND_VARIANTS.map(
   category: 'Overdeck',
 }));
 
-export function getSlashCommands(harness: HarnessName): SlashCommand[] {
+export function getSlashCommands(harness: HarnessName, skillCommands: readonly SlashCommand[] = []): SlashCommand[] {
   const behavior = getHarnessBehavior(harness);
   const nativeCommands = (behavior.nativeCommands ?? []).map(command => ({
     id: `native-${harness}-${command.name.slice(1)}`,
@@ -52,6 +52,7 @@ export function getSlashCommands(harness: HarnessName): SlashCommand[] {
     ...STATIC_SLASH_COMMANDS,
     ...OVERDECK_SLASH_COMMANDS,
     ...CURATED_OVERDECK_VARIANTS,
+    ...(behavior.capabilities.skillSlashCommands ? skillCommands : []),
   ];
 }
 
