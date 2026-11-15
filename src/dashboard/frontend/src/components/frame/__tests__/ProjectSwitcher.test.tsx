@@ -72,6 +72,20 @@ describe('ProjectSwitcher (PAN-5293 F-D7)', () => {
     expect(screen.getByTestId('project-switcher')).toHaveTextContent('Choose a project');
   });
 
+  // PAN-5335 WI-9: every project row and the selected button carry a colored initials mark.
+  it('shows a colored initials mark on the selected button and on every menu row', () => {
+    renderSwitcher([project('Overdeck', 'eltmon/overdeck'), project('Krux', 'eltmon/krux')], 'Overdeck');
+    const trigger = screen.getByTestId('project-switcher');
+    const triggerMark = trigger.querySelector('[aria-hidden="true"]');
+    expect(triggerMark).toHaveTextContent('OV');
+    expect(triggerMark).toHaveStyle({ backgroundColor: '#4d7c0f' });
+
+    const krux = screen.getByTestId('project-switcher-row-Krux');
+    const kruxMark = krux.querySelector('[aria-hidden="true"]');
+    expect(kruxMark).toHaveTextContent('KR');
+    expect(kruxMark).toHaveStyle({ backgroundColor: '#0369a1' });
+  });
+
   it('collapses an owner group and remembers it across remounts', () => {
     const projects = [project('MYN', 'mindyournow/myn-cli'), project('Overdeck', 'eltmon/overdeck')];
     const first = renderSwitcher(projects);

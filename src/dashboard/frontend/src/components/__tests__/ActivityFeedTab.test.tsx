@@ -54,14 +54,32 @@ afterEach(() => {
 
 describe('ActivityPanel Feed tab (PAN-5293 F-D21)', () => {
   it('opens on Feed with the Awareness scopes', () => {
-    renderPanel({ experimental: true });
+    renderPanel({ experimental: true, selectedProjectKey: 'proj' });
     expect(screen.getByTestId('activity-stream-feed')).toHaveAttribute('aria-selected', 'true');
     const scopes = screen.getByRole('tablist', { name: 'Awareness scope' });
     for (const label of ['Needs you', 'Project', 'Global']) {
       expect(within(scopes).getByRole('tab', { name: new RegExp(label) })).toBeInTheDocument();
     }
-    expect(feedProps).toHaveBeenLastCalledWith(expect.objectContaining({ embedded: true, heading: 'Feed', scopeSwitcher: true }));
+    expect(feedProps).toHaveBeenLastCalledWith(expect.objectContaining({ embedded: true, hideHeader: true, scopeSwitcher: true, projectScopeAvailable: true }));
     expect(feedProps.mock.lastCall?.[0]).not.toHaveProperty('onClose', expect.anything());
+  });
+
+  // PAN-5335 WI-6: the tab header already names the view; the sidebar must not duplicate it.
+  it('has no duplicate "Feed" heading inside the tab', () => {
+    renderPanel({ experimental: true, selectedProjectKey: 'proj' });
+    expect(within(screen.getByTestId('activity-feed-tab')).queryByText('Feed')).not.toBeInTheDocument();
+  });
+
+  it('hides the Project scope and shows only Needs you and Global without a selected project', () => {
+    window.localStorage.setItem('overdeck.ui.awarenessScope', 'project');
+    renderPanel({ experimental: true, selectedProjectKey: null });
+
+    const scopes = screen.getByRole('tablist', { name: 'Awareness scope' });
+    expect(within(scopes).getByRole('tab', { name: /Needs you/ })).toBeInTheDocument();
+    expect(within(scopes).getByRole('tab', { name: /Global/ })).toBeInTheDocument();
+    expect(within(scopes).queryByRole('tab', { name: /Project/ })).not.toBeInTheDocument();
+    expect(within(scopes).getByRole('tab', { name: /Global/ })).toHaveAttribute('aria-selected', 'true');
+    expect(window.localStorage.getItem('overdeck.ui.awarenessScope')).toBe('project');
   });
 
   it('shows only the Feed, with no stream tabs, while experimental features are off', () => {

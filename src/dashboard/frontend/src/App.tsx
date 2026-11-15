@@ -11,6 +11,7 @@ import { SharedConversationRoute } from './components/chat/sharing/SharedConvers
 import { SearchModal } from './components/search/SearchModal';
 import { CommandPalette, type ConversationPaletteOpenRequest } from './components/CommandPalette';
 import { NO_PROJECT_KEY } from './components/CommandDeck/projectsData';
+import { clearLastProjectKey, initialProjectKey, isKnownProjectKey, readLastProjectKey, writeLastProjectKey } from './lib/lastProject';
 import { IssueDrawer } from './components/drawer/IssueDrawer';
 import { IssueDrawerAvailableContext } from './components/drawer/issueDrawerAvailableContext';
 import { ResumableSessionDialog } from './components/ResumableSessionDialog';
@@ -180,9 +181,27 @@ export default function App() {
   const [selectedConvId, setSelectedConvIdState] = useState<string | null>(() => initialConversationRoute.convId);
   // PAN-1561: the project whose deck is shown in the Command Deck, driven by the
   // sidebar's Projects rail.
+  // PAN-5335 WI-5: a fresh load of a non-project route (e.g. /activity) restores
+  // the last project selected, until the registered-projects query confirms it
+  // still exists. Computed once (not per render, which would re-read
+  // localStorage on every App render) in this lazy initializer.
+  const [initialProjectSelection] = useState(() => initialProjectKey({
+    routeProject: initialCockpitRoute?.project ?? initialProjectRoute,
+    pathname: window.location.pathname,
+    stored: readLastProjectKey(),
+  }));
   const [selectedProjectKey, setSelectedProjectKey] = useState<string | null>(
-    () => initialCockpitRoute?.project ?? initialProjectRoute,
+    () => initialProjectSelection.key,
   );
+  // The storage-derived key still pending validation, or null once validated
+  // (or there was nothing to validate). Captured so the effect below checks
+  // that exact key, not whatever the operator may have since picked.
+  const pendingStorageProjectKeyRef = useRef<string | null>(
+    initialProjectSelection.fromStorage ? initialProjectSelection.key : null,
+  );
+  useEffect(() => {
+    if (selectedProjectKey !== null) writeLastProjectKey(selectedProjectKey);
+  }, [selectedProjectKey]);
   const [conversationViewMode, setConversationViewModeState] = useState<ConversationViewMode>(
     () => initialConversationRoute.viewMode,
   );
@@ -704,7 +723,7 @@ export default function App() {
   // issue's tracker repo (e.g. "eltmon/panopticon-cli") to the dashboard deck key
   // (e.g. "panopticon-cli") so the cockpit opens in the deck whose conversations/tree
   // actually match (PAN-2005).
-  const { data: registeredProjects = [] } = useQuery<Array<{ key: string; name: string; path: string }>>({
+  const { data: registeredProjects = [], isSuccess: registeredProjectsLoaded, isError: registeredProjectsErrored } = useQuery<Array<{ key: string; name: string; path: string }>>({
     queryKey: ['registered-projects'],
     queryFn: async () => {
       const r = await fetch('/api/registered-projects');
@@ -713,6 +732,23 @@ export default function App() {
     },
     staleTime: 60_000,
   });
+  // PAN-5335 WI-5: validate a storage-restored project selection exactly once,
+  // as soon as the registered-projects list is in. Checks the captured
+  // storage-derived key, not whatever is currently selected, and only acts on
+  // it while it is still the live selection (an operator pick in the meantime
+  // wins). A query error gives up on validating rather than leaving the ref
+  // pending forever.
+  useEffect(() => {
+    const pendingKey = pendingStorageProjectKeyRef.current;
+    if (pendingKey === null) return;
+    if (!registeredProjectsLoaded && !registeredProjectsErrored) return;
+    pendingStorageProjectKeyRef.current = null;
+    if (registeredProjectsErrored) return;
+    if (selectedProjectKey === pendingKey && !isKnownProjectKey(pendingKey, registeredProjects)) {
+      clearLastProjectKey();
+      setSelectedProjectKey(null);
+    }
+  }, [registeredProjectsLoaded, registeredProjectsErrored, registeredProjects, selectedProjectKey]);
   const resolveDeckKey = useCallback((issueId: string): string | null => {
     const issue = (useDashboardStore.getState().issuesRaw as Issue[]).find((i) => i.identifier === issueId);
     const repo = issue?.sourceRepo || issue?.project?.name || '';

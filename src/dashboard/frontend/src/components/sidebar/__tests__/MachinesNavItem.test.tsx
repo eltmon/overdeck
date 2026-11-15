@@ -89,7 +89,8 @@ describe('MachinesNavItem (PAN-4869)', () => {
     const user = userEvent.setup();
     const { onOpenSettings } = renderItem(false, vi.fn(), 'footer');
     const button = await screen.findByTestId('sidebar-machines');
-    expect(button).toHaveTextContent('Machines');
+    expect(button).toHaveAccessibleName('Machines');
+    expect(button.textContent).toBe('');
     await waitFor(() => expect(button.getAttribute('title')).toBe('Machines · 1 online'));
     expect(screen.queryByTestId('sidebar-machines-online')).toBeNull();
     await user.click(button);

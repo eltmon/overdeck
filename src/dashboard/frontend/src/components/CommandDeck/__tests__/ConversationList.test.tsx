@@ -581,13 +581,13 @@ describe('ConversationList nesting (PAN-4223 WI-10)', () => {
     };
   }
 
-  function renderRows(rows: unknown[]) {
+  function renderRows(rows: unknown[], selectedConversation: string | null = null) {
     const client = makeClient();
     client.setQueryData(['conversations'], rows);
     render(
       <DialogProvider>
         <QueryClientProvider client={client}>
-          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+          <ConversationList selectedConversation={selectedConversation} onSelectConversation={() => {}} />
         </QueryClientProvider>
       </DialogProvider>,
     );
@@ -603,22 +603,26 @@ describe('ConversationList nesting (PAN-4223 WI-10)', () => {
 
   it('renders one toggle and three nested lanes; the toggle collapses them and persists the choice', () => {
     renderRows([parent, lane(11, { sessionAlive: true, status: 'active' }), lane(12), lane(13)]);
-    const toggle = screen.getByRole('button', { name: '▾ 3 lanes' });
+    expect(screen.getByRole('button', { name: '▸ 3 lanes' })).toBeInTheDocument();
+    expect(screen.queryByText('Lane 12')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '▸ 3 lanes' }));
     expect(screen.getByText('Lane 11')).toBeInTheDocument();
     expect(screen.getByText('Lane 12')).toBeInTheDocument();
     expect(screen.getByText('Lane 13')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '▾ 3 lanes' })).toHaveAttribute('aria-expanded', 'true');
 
-    fireEvent.click(toggle);
+    fireEvent.click(screen.getByRole('button', { name: '▾ 3 lanes' }));
     expect(screen.queryByText('Lane 12')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '▸ 3 lanes' })).toHaveAttribute('aria-expanded', 'false');
     expect(JSON.parse(localStorage.getItem('commandDeck.groups.collapsed') ?? '[]')).toEqual(['orchestrator']);
   });
 
-  it('expands a group with a working successor by default', () => {
+  it('collapses a group with a working successor by default', () => {
     const successor = { ...mockConversation, id: 20, name: 'successor', tmuxSession: 'conv-successor', title: 'Successor', parentConversationId: 10, sessionAlive: true, status: 'active', isWorking: true };
     renderRows([parent, successor]);
-    expect(screen.getByRole('button', { name: '▾ 1 successor · 1 working' })).toBeInTheDocument();
-    expect(screen.getByText('Successor')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '▸ 1 successor · 1 working' })).toBeInTheDocument();
+    expect(screen.queryByText('Successor')).not.toBeInTheDocument();
   });
 
   it('collapses a group whose descendants have all ended', () => {
@@ -631,9 +635,25 @@ describe('ConversationList nesting (PAN-4223 WI-10)', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
     renderRows([parent, lane(11, { sessionAlive: true, status: 'active' })]);
-    const toggle = screen.getByRole('button', { name: '▾ 1 lane' });
+    const toggle = screen.getByRole('button', { name: '▸ 1 lane' });
     fireEvent.click(toggle);
-    expect(screen.queryByText('Lane 11')).not.toBeInTheDocument();
+    expect(screen.getByText('Lane 11')).toBeInTheDocument();
+  });
+
+  it('expands a group with a successor that needs you', () => {
+    const successor = { ...mockConversation, id: 21, name: 'successor', tmuxSession: 'conv-successor', title: 'Successor', parentConversationId: 10, pendingInputCount: 1 };
+    renderRows([parent, successor]);
+    expect(screen.getByRole('button', { name: '▾ 1 successor · 1 needs you' })).toBeInTheDocument();
+    expect(screen.getByText('Successor')).toBeInTheDocument();
+  });
+
+  it('shows only the selected descendant when a collapsed group has a selection', () => {
+    const successorA = { ...mockConversation, id: 22, name: 'successor-a', tmuxSession: 'conv-successor-a', title: 'Successor A', parentConversationId: 10 };
+    const successorB = { ...mockConversation, id: 23, name: 'successor-b', tmuxSession: 'conv-successor-b', title: 'Successor B', parentConversationId: 10 };
+    renderRows([parent, successorA, successorB], 'successor-a');
+    expect(screen.getByRole('button', { name: '▸ 2 successors' })).toBeInTheDocument();
+    expect(screen.getByText('Successor A')).toBeInTheDocument();
+    expect(screen.queryByText('Successor B')).not.toBeInTheDocument();
   });
 });
 

@@ -15,8 +15,11 @@ import { NO_PROJECT_KEY } from '../CommandDeck/projectsData';
 import { NewConversationPickers } from '../CommandDeck/NewConversationPickers';
 import { openNewConversationDialog } from '../newConversation/newConversationDialogStore';
 import { MenuOverlay, MenuSeparator, PopoverSurface } from '../shared/ContextMenu';
+import { ProviderIcon } from '../shared/branding';
+import { useAvailableModels } from '../shared/ModelPicker';
 import { useCreateConversation } from './deck/useCreateConversation';
 import { useNewConversationDefaults } from './deck/newConversationDefaults';
+import { newConversationSummary, newConversationTitle } from './newConversationSummary';
 
 export interface NewConversationButtonProps {
   selectedProject: string | null;
@@ -32,6 +35,12 @@ export function NewConversationButton({ selectedProject, collapsed }: NewConvers
     model: d.model, harness: d.harness, effort: d.effort, setModel: d.setModel, setHarness: d.setHarness, setEffort: d.setEffort,
   })));
   const projectKey = selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined;
+  const { groups } = useAvailableModels();
+  const summary = useMemo(
+    () => newConversationSummary({ model: defaults.model, harness: defaults.harness, effort: defaults.effort, groups }),
+    [defaults.model, defaults.harness, defaults.effort, groups],
+  );
+  const title = newConversationTitle(summary);
 
   const quickCreate = useCallback(() => {
     void create(projectKey);
@@ -49,7 +58,7 @@ export function NewConversationButton({ selectedProject, collapsed }: NewConvers
         type="button"
         data-testid="new-conversation-button"
         onClick={quickCreate}
-        title="New conversation (N)"
+        title={title}
         aria-label="New conversation"
         className="list-row flex w-full items-center justify-center rounded-md py-2 text-body-foreground"
       >
@@ -64,12 +73,19 @@ export function NewConversationButton({ selectedProject, collapsed }: NewConvers
         type="button"
         data-testid="new-conversation-button"
         onClick={quickCreate}
+        title={title}
         aria-label="New conversation"
-        className="list-row flex flex-1 items-center gap-2 rounded-l-md px-2 py-1.5 text-left text-sm font-medium text-foreground"
+        className="list-row flex min-w-0 flex-1 flex-col items-stretch gap-0.5 rounded-l-md px-2 py-1.5 text-left text-sm font-medium text-foreground"
       >
-        <Plus aria-hidden className="h-4 w-4 text-muted-foreground" />
-        <span className="flex-1 truncate">New conversation</span>
-        <span className="keycap rounded-md px-1.5 font-mono text-xs text-muted-foreground" aria-hidden>N</span>
+        <span className="flex items-center gap-2">
+          <Plus aria-hidden className="h-4 w-4 text-muted-foreground" />
+          <span className="flex-1 truncate">New conversation</span>
+          <span className="keycap rounded-md px-1.5 font-mono text-xs text-muted-foreground" aria-hidden>N</span>
+        </span>
+        <span data-testid="new-conversation-summary" className="flex min-w-0 items-center gap-1 pl-6 text-[11px] text-muted-foreground">
+          {summary.provider && <ProviderIcon provider={summary.provider} label={summary.providerLabel} className="h-3 w-3 shrink-0" />}
+          <span className="truncate">{[summary.shortName, summary.harnessLabel, summary.effortLabel].filter(Boolean).join(' · ')}</span>
+        </span>
       </button>
       <button
         ref={caretRef}

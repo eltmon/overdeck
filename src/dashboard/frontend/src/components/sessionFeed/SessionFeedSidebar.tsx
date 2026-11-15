@@ -28,6 +28,8 @@ interface SessionFeedSidebarProps {
   unscoped?: boolean;
   /** Heading text (defaults to "Activity Feed"). */
   heading?: string;
+  /** PAN-5335 WI-6: skip the <header> block — the host renders its own. */
+  hideHeader?: boolean;
   /** Embedded as a deck column — fills its container, no close button. */
   embedded?: boolean;
   /**
@@ -43,6 +45,8 @@ interface SessionFeedSidebarProps {
    * resolveEffectiveProjectKey; scopes conversation and run entries in Project scope.
    */
   projectConversationIds?: ReadonlySet<number>;
+  /** PAN-5335 WI-6/D-6: false when there is no selected project — hides the Project chip. */
+  projectScopeAvailable?: boolean;
 }
 
 type FeedScope = 'needs' | 'project' | 'global';
@@ -69,7 +73,7 @@ const EMPTY_STATES: Record<VisibleSessionFeedTab, string> = {
 
 let loggedGitNavigationNoop = false;
 
-export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, now = new Date(), issueIds, unscoped, heading = 'Activity Feed', embedded = false, scopeSwitcher = false, projectIssueIds, projectConversationIds }: SessionFeedSidebarProps) {
+export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, now = new Date(), issueIds, unscoped, heading = 'Activity Feed', hideHeader = false, embedded = false, scopeSwitcher = false, projectIssueIds, projectConversationIds, projectScopeAvailable = true }: SessionFeedSidebarProps) {
   const [activeTab, setActiveTab] = useState<VisibleSessionFeedTab>(readStoredTab);
   const [scope, setScope] = useState<FeedScope>(readStoredScope);
 
@@ -88,45 +92,51 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
   const pendingSubjects = usePendingInputSubjects();
   const needsCount = scopeSwitcher ? pendingSubjects.length : 0;
 
+  // PAN-5335 D-6: a stored 'project' scope with no project available renders
+  // as Global, without ever overwriting the stored preference.
+  const effScope: FeedScope = !projectScopeAvailable && scope === 'project' ? 'global' : scope;
+
   // Resolve the effective scope of the underlying feed. Without the switcher we
   // honor the legacy issueIds/unscoped props verbatim (backward compatible).
-  const effIssueIds = scopeSwitcher ? (scope === 'project' ? projectIssueIds : undefined) : issueIds;
+  const effIssueIds = scopeSwitcher ? (effScope === 'project' ? projectIssueIds : undefined) : issueIds;
   const effUnscoped = scopeSwitcher ? false : unscoped;
-  const effConversationIds = scopeSwitcher && scope === 'project' ? projectConversationIds : undefined;
-  const showFeed = !scopeSwitcher || scope !== 'needs';
+  const effConversationIds = scopeSwitcher && effScope === 'project' ? projectConversationIds : undefined;
+  const showFeed = !scopeSwitcher || effScope !== 'needs';
 
   return (
     <aside className={`flex h-full min-h-0 flex-col bg-background ${embedded ? 'w-full' : 'w-80 shrink-0 border-l border-border'}`} aria-label="Session activity feed">
-      <header className="flex items-center justify-between border-b border-border px-3 py-2">
-        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          <History className="h-4 w-4" aria-hidden="true" />
-          {heading}
-        </div>
-        {onClose && (
-          <button
-            type="button"
-            className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            aria-label="Close activity feed"
-            onClick={onClose}
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </button>
-        )}
-      </header>
+      {!hideHeader && (
+        <header className="flex items-center justify-between border-b border-border px-3 py-2">
+          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <History className="h-4 w-4" aria-hidden="true" />
+            {heading}
+          </div>
+          {onClose && (
+            <button
+              type="button"
+              className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              aria-label="Close activity feed"
+              onClick={onClose}
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
+        </header>
+      )}
 
       {scopeSwitcher && (
-        <div role="tablist" aria-label="Awareness scope" className="grid grid-cols-3 gap-1 border-b border-border p-2">
+        <div role="tablist" aria-label="Awareness scope" className={`grid ${projectScopeAvailable ? 'grid-cols-3' : 'grid-cols-2'} gap-1 border-b border-border p-2`}>
           {([
             { id: 'needs', label: 'Needs you', badge: needsCount },
             { id: 'project', label: 'Project', badge: 0 },
             { id: 'global', label: 'Global', badge: 0 },
-          ] as const).map((s) => (
+          ] as const).filter((s) => projectScopeAvailable || s.id !== 'project').map((s) => (
             <button
               key={s.id}
               type="button"
               role="tab"
-              aria-selected={scope === s.id}
-              className={scope === s.id
+              aria-selected={effScope === s.id}
+              className={effScope === s.id
                 ? 'flex items-center justify-center gap-1.5 rounded-md bg-accent px-2 py-1 text-xs font-medium text-foreground'
                 : 'flex items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent/60 hover:text-foreground'}
               onClick={() => setScope(s.id)}
@@ -140,7 +150,7 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
         </div>
       )}
 
-      {scopeSwitcher && scope === 'needs' ? (
+      {scopeSwitcher && effScope === 'needs' ? (
         // The dedicated Decisions view: grouped by consequence, and deliberately
         // NOT filtered by dismissal — dismissing a dialog must never lose the
         // decision, which is the whole point of having somewhere to find it again.

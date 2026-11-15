@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LeftNav } from '../LeftNav';
 import { MORE_GROUPS } from '../navGroups';
 import { isExperimentalTab } from '../../../lib/experimentalFeatures';
+import { usePanesStore } from '../../../lib/panesStore';
 import type { Tab } from '../../Header';
 
 let flywheelRunning = false;
@@ -37,7 +38,10 @@ beforeEach(() => {
   onOpenProjectHome = vi.fn();
 });
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} });
+});
 
 describe('LeftNav (PAN-5293 F-D11)', () => {
   it('Project home calls onOpenProjectHome, and is hidden with no project', () => {
@@ -101,5 +105,52 @@ describe('LeftNav (PAN-5293 F-D11)', () => {
     renderNav({ experimental: true });
     fireEvent.click(screen.getByTestId('left-nav-more'));
     for (const id of experimentalIds) expect(screen.getByTestId(`sidebar-${id}`)).toBeInTheDocument();
+  });
+});
+
+describe('LeftNav current-state (PAN-5335 WI-4)', () => {
+  const home = { paneId: 'home-1', paneType: 'home' as const, label: 'Home', createdAt: 0, isPermanent: true };
+  const agent = { paneId: 'agent-1', paneType: 'agent' as const, label: 'Agent', createdAt: 1 };
+
+  it('neither Project home nor More is current when the active pane is an agent pane', () => {
+    usePanesStore.setState({
+      panesByWorkspace: { overdeck: [home, agent] },
+      activePaneByWorkspace: { overdeck: agent.paneId },
+    });
+    renderNav({ activeTab: 'command-deck' });
+    expect(screen.getByTestId('left-nav-project-home')).not.toHaveAttribute('aria-current');
+    expect(screen.getByTestId('left-nav-more')).not.toHaveAttribute('aria-current');
+  });
+
+  it('only Project home is current when the Home pane is active', () => {
+    usePanesStore.setState({
+      panesByWorkspace: { overdeck: [home, agent] },
+      activePaneByWorkspace: { overdeck: home.paneId },
+    });
+    renderNav({ activeTab: 'command-deck' });
+    expect(screen.getByTestId('left-nav-project-home')).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByTestId('left-nav-more')).not.toHaveAttribute('aria-current');
+  });
+
+  it('only Project home is current when no pane is recorded', () => {
+    renderNav({ activeTab: 'command-deck' });
+    expect(screen.getByTestId('left-nav-project-home')).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('only More is current on a plain More tab, and More is not current on settings', () => {
+    const view = renderNav({ activeTab: 'metrics', experimental: true });
+    expect(screen.getByTestId('left-nav-project-home')).not.toHaveAttribute('aria-current');
+    expect(screen.getByTestId('left-nav-more')).toHaveAttribute('aria-current', 'page');
+    view.unmount();
+
+    renderNav({ activeTab: 'settings' });
+    expect(screen.getByTestId('left-nav-more')).not.toHaveAttribute('aria-current');
+  });
+
+  it('the More menu has no Command Deck item', () => {
+    renderNav({ experimental: true });
+    fireEvent.click(screen.getByTestId('left-nav-more'));
+    expect(screen.queryByTestId('sidebar-command-deck')).not.toBeInTheDocument();
+    expect(MORE_GROUPS.flatMap((g) => g.items).some((item) => item.id === 'command-deck')).toBe(false);
   });
 });

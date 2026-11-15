@@ -62,8 +62,10 @@ src/components/frame/__tests__/LeftColumn.test.tsx
 src/components/frame/__tests__/LeftColumnFooter.test.tsx
 src/components/frame/__tests__/LeftNav.test.tsx
 src/components/frame/__tests__/NewConversationButton.test.tsx
+src/components/frame/__tests__/ProjectMark.test.tsx
 src/components/frame/__tests__/ProjectSwitcher.test.tsx
 src/components/frame/__tests__/WorkspacesSection.test.tsx
+src/components/frame/__tests__/newConversationSummary.test.ts
 src/components/frame/deck/__tests__/deckNavigation.test.tsx
 src/components/frame/deck/__tests__/useCreateConversation.test.tsx
 src/components/frame/deck/__tests__/useDeckProjects.test.tsx
@@ -491,6 +493,7 @@ src/lib/__tests__/issueActions.no-actions-lost.test.ts
 src/lib/__tests__/issueActions.parity.test.tsx
 src/lib/__tests__/issueActions.test.ts
 src/lib/__tests__/issueLinks.test.ts
+src/lib/__tests__/lastProject.test.ts
 src/lib/__tests__/linkedConversation.test.ts
 src/lib/__tests__/markdownDocLinks.test.ts
 src/lib/__tests__/monaco-setup.test.ts

@@ -19,7 +19,7 @@ export type { EffortLevel };
 
 const EFFORT_LABELS: Record<EffortLevel, string> = { low: 'Low', medium: 'Medium', high: 'High (default)', xhigh: 'Extra High', max: 'Max' };
 const EFFORT_OPTIONS = EFFORT_LEVELS.map((id) => ({ id, label: EFFORT_LABELS[id] }));
-const SHORT_LABELS: Record<EffortLevel, string> = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra High', max: 'Max' };
+export const SHORT_LABELS: Record<EffortLevel, string> = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra High', max: 'Max' };
 
 const EFFORT_STORAGE_KEY = 'conv-composer-effort';
 // Operator default: 'high' — xhigh/max cost far more for almost no extra ROI

@@ -624,9 +624,14 @@ export function ConversationRow({
                     {index > 0 && part.key !== 'deletions' && <span className={styles.conversationMetaSep} aria-hidden>·</span>}
                     <span
                       title={part.title}
-                      className={part.tone === 'additions' ? 'font-mono text-success-foreground'
-                        : part.tone === 'deletions' ? 'font-mono text-destructive-foreground'
-                        : part.tone === 'muted' ? 'text-muted-foreground' : undefined}
+                      data-meta-part={part.key}
+                      className={[
+                        styles.conversationMetaPart,
+                        part.key === 'cost' ? styles.conversationMetaCost : '',
+                        part.tone === 'additions' ? 'font-mono text-success-foreground'
+                          : part.tone === 'deletions' ? 'font-mono text-destructive-foreground'
+                          : part.tone === 'muted' ? 'text-muted-foreground' : '',
+                      ].filter(Boolean).join(' ')}
                     >
                       {part.text}
                     </span>

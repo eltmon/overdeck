@@ -13,6 +13,23 @@ import { NO_PROJECT_KEY } from '../../CommandDeck/projectsData';
 const create = vi.fn();
 vi.mock('../deck/useCreateConversation', () => ({ useCreateConversation: () => ({ create, createForAgent: vi.fn() }) }));
 
+// PAN-5335 WI-8: the button's second line reads the model catalog. Keep it
+// synchronous and off the real catalog fetch with the same FALLBACK_GROUPS
+// every other picker falls back to before the catalog resolves.
+vi.mock('../../shared/ModelPicker', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../shared/ModelPicker')>();
+  return {
+    ...actual,
+    useAvailableModels: () => ({
+      groups: actual.FALLBACK_GROUPS,
+      compactionModel: actual.FALLBACK_COMPACTION_MODEL,
+      authModes: {},
+      harnessPolicy: {},
+      defaultModel: 'claude-opus-5-5',
+    }),
+  };
+});
+
 const openDialog = vi.fn();
 vi.mock('../../newConversation/newConversationDialogStore', () => ({
   openNewConversationDialog: (opts?: { projectKey?: string }) => openDialog(opts),
@@ -99,5 +116,17 @@ describe('NewConversationButton (PAN-5293 F-D12)', () => {
       fireEvent.keyDown(field, { key: 'n' });
     });
     expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  // PAN-5335 WI-8: the second line names the model, harness and effort it will spawn with.
+  it('shows the default model and effort on a second line, and tracks a live default change', () => {
+    useNewConversationDefaults.setState({ model: 'claude-opus-5-5', harness: 'claude-code', effort: 'high' });
+    render(<Harness selectedProject="proj" />);
+
+    expect(screen.getByTestId('new-conversation-summary')).toHaveTextContent('Opus 5.5 · High');
+    expect(screen.getByTestId('new-conversation-button')).toHaveAccessibleName('New conversation');
+
+    act(() => { useNewConversationDefaults.getState().setEffort('low'); });
+    expect(screen.getByTestId('new-conversation-summary')).toHaveTextContent('Opus 5.5 · Low');
   });
 });

@@ -5,7 +5,7 @@
 
 import {
   LayoutGrid, Bot, Server, Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
-  Zap, Compass, GitBranch, GitMerge, History, Mic, FileText, BookOpen, Shield, ListOrdered,
+  Zap, GitBranch, GitMerge, History, Mic, FileText, BookOpen, Shield, ListOrdered,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Tab } from '../Header';
@@ -27,7 +27,6 @@ export const MORE_GROUPS: NavGroup[] = [
     label: 'Operations',
     items: [
       { id: 'backlog' as Tab, label: 'Backlog', icon: ListOrdered },
-      { id: 'command-deck' as Tab, label: 'Command Deck', icon: Compass },
       { id: 'kanban' as Tab, label: 'Board', icon: LayoutGrid },
       { id: 'pipeline' as Tab, label: 'Pipeline', icon: GitBranch },
       { id: 'awaiting-merge' as Tab, label: 'Awaiting Merge', icon: GitMerge },
