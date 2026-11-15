@@ -7,6 +7,10 @@ const toast = vi.hoisted(() => vi.fn())
 vi.mock('sonner', () => ({ toast }))
 vi.mock('../../Stage/panes/AgentPane', () => ({ AgentPane: () => <div data-testid="agent-pane" /> }))
 vi.mock('../../terminal/TerminalDrawer', () => ({ TerminalDrawer: () => <div data-testid="terminal-drawer" /> }))
+// The explorer body is covered by ExplorerPane.test.tsx; here it only shows which root it got.
+vi.mock('../../explorer/ExplorerPane', () => ({
+  ExplorerFiles: ({ rootId }: { rootId: string }) => <div data-testid="explorer-files">{rootId}</div>,
+}))
 
 import { WorkDock, type WorkDockProps } from '../WorkDock'
 import { useWorkDockStore, dockStorageKey } from '../workDockStore'

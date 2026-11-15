@@ -9,6 +9,10 @@ vi.mock('../panes/AgentPane', () => ({
 vi.mock('../../terminal/TerminalDrawer', () => ({
   TerminalDrawer: () => <div data-testid="terminal-drawer" />,
 }))
+// The explorer body is covered by ExplorerPane.test.tsx; here it only shows which root it got.
+vi.mock('../../explorer/ExplorerPane', () => ({
+  ExplorerFiles: ({ rootId }: { rootId: string }) => <div data-testid="explorer-files">{rootId}</div>,
+}))
 
 import { Stage } from '../index'
 import { usePanesStore, selectPanesForWorkspace, selectActivePaneId } from '../../../lib/panesStore'
@@ -66,6 +70,7 @@ describe('Stage deck load: Files panes move into the dock (PAN-5289 FR-4)', () =
     expect(screen.getByRole('tab', { name: /Files/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('button', { name: 'Follow the active tab' })).toBeInTheDocument()
     expect(screen.queryByText('No project is selected, so there are no files to show.')).toBeNull()
+    expect(screen.getByTestId('explorer-files')).toHaveTextContent('issue:PAN-1')
   })
 
   it('closes a files pane with neither an issue nor a root and leaves the dock closed', async () => {

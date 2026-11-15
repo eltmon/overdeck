@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach, onTestFinished } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished } from 'vitest'
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { PanRpcError, type ExplorerEntry, type ExplorerListDirResult, type ExplorerWatchBatch } from '@overdeck/contracts'
 
 vi.mock('@tanstack/react-virtual', () => ({
@@ -34,16 +35,14 @@ vi.mock('../explorer-rpc', async (importOriginal) => {
 })
 
 import { DialogProvider } from '../../DialogProvider'
-import { StageDeckProvider } from '../../Stage/StageDeckContext'
-import { ExplorerPane, PREVIEW_OPEN_DELAY_MS } from '../ExplorerPane'
+import { StageDeckProvider, type StageDeckContextValue } from '../../Stage/StageDeckContext'
+import { ExplorerFiles, PREVIEW_OPEN_DELAY_MS, type ExplorerFilesProps } from '../ExplorerPane'
 import { resetShortcutsForTests, useShortcutList } from '../../../lib/shortcuts/registry'
 import { useExplorerStore } from '../explorerStore'
 import { usePanesStore, selectPanesForWorkspace } from '../../../lib/panesStore'
-import type { WorkspacePane } from '../../../lib/panesStore'
-import type { StageContext } from '../../Stage/types'
+import { installStrictFetchMock } from '../../../test-utils/strictFetchMock'
 
 const DECK = 'overdeck'
-const ctx: StageContext = { workspaceId: DECK, openPane: () => {} }
 
 function entry(path: string, kind: ExplorerEntry['kind'] = 'file'): ExplorerEntry {
   return { name: path.split('/').pop() ?? path, path, kind, mtimeMs: 0, ignored: false }
@@ -58,19 +57,36 @@ function listing(path: string): ExplorerListDirResult {
   return { entries: LISTINGS[path] ?? [], truncated: false, absPath: path ? `/ws/${path}` : '/ws' }
 }
 
-function explorerPaneSpec(over: Partial<WorkspacePane> = {}): WorkspacePane {
-  return { paneId: 'f1', paneType: 'files', label: 'Files', createdAt: 1, explorerRootId: 'issue:PAN-1', ...over }
+// PAN-5289: ExplorerFiles is the Files tab body; it labels its root through the
+// project registry, so each test answers that request.
+let registeredProjects: Array<{ key: string; name?: string; path: string }> = []
+let fetchGuard: ReturnType<typeof installStrictFetchMock>
+
+function filesProps(over: Partial<ExplorerFilesProps> = {}): ExplorerFilesProps {
+  return { rootId: 'issue:PAN-1', deckKey: DECK, changedPaths: new Set(), conversationScope: false, onFindInFolder: vi.fn(), ...over }
 }
 
-function renderPane(pane = explorerPaneSpec()) {
-  return render(
+function renderPane(props: Partial<ExplorerFilesProps> = {}, deck: StageDeckContextValue | null = null) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const files = (
     <DialogProvider>
-      <ExplorerPane pane={pane} ctx={ctx} />
-    </DialogProvider>,
+      <ExplorerFiles {...filesProps(props)} />
+    </DialogProvider>
   )
+  return render(<QueryClientProvider client={qc}>{deck ? <StageDeckProvider value={deck}>{files}</StageDeckProvider> : files}</QueryClientProvider>)
+}
+
+function deckWith(over: Partial<StageDeckContextValue> = {}): StageDeckContextValue {
+  return { deckKey: DECK, openOrFocusEditorPane: vi.fn(), openOrFocusAgentPane: vi.fn(), ...over }
 }
 
 beforeEach(() => {
+  registeredProjects = []
+  fetchGuard = installStrictFetchMock(({ method, url }) => {
+    if (method === 'GET' && url === '/api/registered-projects') return Response.json(registeredProjects)
+    if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] })
+    return undefined
+  })
   localStorage.clear()
   useExplorerStore.setState({ roots: {} })
   usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} })
@@ -90,7 +106,12 @@ beforeEach(() => {
   toastMock.mockReset()
 })
 
-describe('ExplorerPane', () => {
+afterEach(async () => {
+  await fetchGuard.assertNoUnexpectedRequests()
+  vi.unstubAllGlobals()
+})
+
+describe('ExplorerFiles', () => {
   it('lists the root on mount and renders its entries and the branch', async () => {
     renderPane()
     expect(await screen.findByText('README.md')).toBeInTheDocument()
@@ -99,9 +120,15 @@ describe('ExplorerPane', () => {
     expect(await screen.findByText('feature/pan-1')).toBeInTheDocument()
   })
 
-  it('renders a sentence when the pane has no root', () => {
-    renderPane(explorerPaneSpec({ explorerRootId: undefined }))
-    expect(screen.getByText('This Files pane has no root. Close it and open Files again.')).toBeInTheDocument()
+  it('lists the root it is given and labels it with the project name', async () => {
+    // PAN-5289: a Files tab without a root is the WorkDock FR-13 case; ExplorerFiles always has one.
+    registeredProjects = [{ key: 'overdeck', name: 'Overdeck', path: '/ws' }]
+    renderPane({ rootId: 'project:overdeck' })
+    expect(await screen.findByText('README.md')).toBeInTheDocument()
+    expect(rpc.listDir).toHaveBeenCalledWith('project:overdeck', '')
+    expect(await screen.findByText('Overdeck')).toBeInTheDocument()
+    expect(screen.queryByText('overdeck')).toBeNull()
+    expect(screen.getByRole('tree', { name: 'Files in Overdeck' })).toBeInTheDocument()
   })
 
   it('explains a missing issue workspace', async () => {
@@ -153,7 +180,7 @@ describe('ExplorerPane', () => {
     await waitFor(() => expect(rpc.listDir).toHaveBeenCalledWith('issue:PAN-1', ''))
   })
 
-  it('opens a code pane on double click', async () => {
+  it('opens a code pane on double click when there is no deck', async () => {
     renderPane()
     fireEvent.doubleClick(await screen.findByText('README.md'))
     const panes = selectPanesForWorkspace(DECK)(usePanesStore.getState())
@@ -161,23 +188,20 @@ describe('ExplorerPane', () => {
     expect(code).toMatchObject({ explorerRootId: 'issue:PAN-1', explorerPath: 'README.md', label: 'README.md' })
   })
 
-  it('asks the deck to reveal an opened file beside the explorer', async () => {
-    const revealPane = vi.fn()
-    render(
-      <StageDeckProvider value={{ deckKey: DECK, openOrFocusEditorPane: vi.fn(), openOrFocusAgentPane: vi.fn(), revealPane }}>
-        <DialogProvider>
-          <ExplorerPane pane={explorerPaneSpec()} ctx={ctx} />
-        </DialogProvider>
-      </StageDeckProvider>,
-    )
+  it('opens a file with openBeside', async () => {
+    const openBeside = vi.fn(() => 'code-1')
+    renderPane({}, deckWith({ openBeside }))
     fireEvent.doubleClick(await screen.findByText('README.md'))
-    const code = selectPanesForWorkspace(DECK)(usePanesStore.getState()).find((p) => p.paneType === 'code')
-    expect(revealPane).toHaveBeenCalledWith(code?.paneId, 'f1')
+    expect(openBeside).toHaveBeenCalledTimes(1)
+    expect(openBeside).toHaveBeenCalledWith({ rootId: 'issue:PAN-1', path: 'README.md' })
+    expect((openBeside.mock.calls[0] as unknown[])[0]).not.toMatchObject({ preview: true })
+    // The deck opens the pane; ExplorerFiles does not add one itself.
+    expect(selectPanesForWorkspace(DECK)(usePanesStore.getState()).some((p) => p.paneType === 'code')).toBe(false)
   })
 
   it('disables Changed on a non-git root', async () => {
     rpc.gitStatus.mockRejectedValue(new PanRpcError({ message: 'no git', code: 'NOT_A_GIT_REPO' }))
-    renderPane(explorerPaneSpec({ explorerRootId: 'project:plain' }))
+    renderPane({ rootId: 'project:plain' })
     await screen.findByText('README.md')
     await waitFor(() => expect(screen.getByRole('button', { name: 'Changed' })).toBeDisabled())
     expect(screen.getByRole('button', { name: 'Changed' })).toHaveAttribute('title', 'Not a git repository')
@@ -194,12 +218,13 @@ describe('ExplorerPane', () => {
     expect(ids).not.toContain('explorer.content-search')
   })
 
-  it('opens content search scoped to a folder from Find in folder', async () => {
-    renderPane()
+  it('Find in folder calls onFindInFolder with the folder path', async () => {
+    const onFindInFolder = vi.fn()
+    renderPane({ onFindInFolder })
     fireEvent.contextMenu(await screen.findByText('src'))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Find in folder' }))
-    expect(screen.getByRole('textbox', { name: 'Search in files' })).toBeInTheDocument()
-    expect(screen.getByText('src/')).toBeInTheDocument()
+    expect(onFindInFolder).toHaveBeenCalledWith('src')
+    expect(screen.queryByRole('textbox', { name: 'Search in files' })).toBeNull()
   })
 
   it('drops a collapsed folder’s cached listing on remount so it re-lists when opened', async () => {
@@ -307,14 +332,14 @@ describe('ExplorerPane', () => {
     })
 
     it('shows the New buttons on a project root (PAN-5191: writes go to an edit workspace)', async () => {
-      renderPane(explorerPaneSpec({ explorerRootId: 'project:overdeck' }))
+      renderPane({ rootId: 'project:overdeck' })
       await screen.findByText('README.md')
       expect(screen.getByRole('button', { name: 'New file' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'New folder' })).toBeInTheDocument()
     })
 
     it('shows Rename and Delete but no Stage in a project-root context menu', async () => {
-      renderPane(explorerPaneSpec({ explorerRootId: 'project:overdeck' }))
+      renderPane({ rootId: 'project:overdeck' })
       fireEvent.contextMenu(await screen.findByText('README.md'))
       expect(await screen.findByRole('menuitem', { name: 'Rename' })).toBeInTheDocument()
       expect(screen.getByRole('menuitem', { name: /^Delete/ })).toBeInTheDocument()

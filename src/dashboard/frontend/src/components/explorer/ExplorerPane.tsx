@@ -1,33 +1,32 @@
-// The explorer pane: the Stage 'files' pane (PAN-5186, WI-B12; FR-1 to FR-5,
-// FR-19, FR-20).
+// The explorer body of the work dock's Files tab (PAN-5186, WI-B12; FR-1 to
+// FR-5, FR-19, FR-20; PAN-5289 §6.8).
 //
-// One pane shows one explorer root (`pane.explorerRootId`): a project
-// checkout, an issue workspace or a workspace. It lists directories lazily,
-// follows the watch stream, colors rows from git status, and opens files as
-// 'code' panes (rendered by PAN-5187). The Changed filter replaces the old
-// changed-files list: it shows a tree synthesized from git status (D-B8).
+// `ExplorerFiles` shows one explorer root: a project checkout, an issue
+// workspace or a workspace. It lists directories lazily, follows the watch
+// stream, colors rows from git status, and opens files as 'code' panes beside
+// the chat through the deck's openBeside (B-D3). The Changed filter replaces
+// the old changed-files list: it shows a tree synthesized from git status
+// (D-B8). Go to file and content search belong to the dock.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { ChevronsDownUp, ChevronsUpDown, Eye, EyeOff, FilePlus, FolderPlus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { useStageDeck } from '../Stage/StageDeckContext'
-import type { PaneWrapperProps } from '../Stage/types'
 import { useDeleteFlow } from './actions/useDeleteFlow'
 import { useExplorerActions } from './actions/useExplorerActions'
 import { useInlineEdit } from './actions/useInlineEdit'
 import { snapshotDroppedItems, uploadDroppedItems } from './actions/useOsFileDrop'
 import { useTreeActionKeys } from './actions/useTreeActionKeys'
 import { startRowDrag, useTreeDropZone } from './actions/useTreeDragMove'
-import { explorerErrorMessage, listDir, parseRootId, rootLabel } from './explorer-rpc'
+import { explorerErrorMessage, listDir, parseRootId } from './explorer-rpc'
 import { useExplorerStore, type RootState, type SelectMode } from './explorerStore'
 import { useExplorerGitStatus } from './git/useExplorerGitStatus'
 import { ExplorerContextMenu, type ExplorerMenuTarget } from './menu/ExplorerContextMenu'
 import { EditWorkspaceBanner } from './edit/EditWorkspaceBanner'
 import { useEditWorkspaceStore } from './edit/edit-workspace-store'
 import { openCodePane, type CodePaneTarget } from './openCodePane'
-import { ContentSearch, type ContentSearchTarget } from './search/ContentSearch'
-import { QuickOpen } from './search/QuickOpen'
+import { useRootLabel } from './rootForConversation'
 import { createDirectoryLoader, expandAll, type DirectoryLoader } from './tree/directory-loader'
 import { ExplorerTree } from './tree/ExplorerTree'
 import {
@@ -42,7 +41,6 @@ import {
 import { useExplorerWatch } from './watch/useExplorerWatch'
 
 const EXPAND_ALL_CAP = 2000
-const NO_ROOT_MESSAGE = 'This Files pane has no root. Close it and open Files again.'
 
 /** How long a single click waits before opening the preview tab, so a double click can win. */
 export const PREVIEW_OPEN_DELAY_MS = 250
@@ -84,19 +82,19 @@ function HeaderButton({
   )
 }
 
-export function ExplorerPane({ pane, ctx }: PaneWrapperProps) {
-  const rootId = pane.explorerRootId
-  if (!rootId) {
-    return (
-      <div className="flex h-full flex-col">
-        <PaneMessage>{NO_ROOT_MESSAGE}</PaneMessage>
-      </div>
-    )
-  }
-  return <ExplorerPaneBody key={rootId} rootId={rootId} deckKey={ctx.workspaceId} paneId={pane.paneId} />
+export interface ExplorerFilesProps {
+  rootId: string
+  deckKey: string
+  /** Root paths the scoped conversation changed (dot, "Only what this conversation changed"). */
+  changedPaths: ReadonlySet<string>
+  /** True when the scope is a conversation: offers the "Only what this conversation changed" item. */
+  conversationScope: boolean
+  /** Root path to reveal and select (active code pane). */
+  revealPath?: string
+  onFindInFolder(dirPath: string): void
 }
 
-function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey: string; paneId: string }) {
+export function ExplorerFiles({ rootId, deckKey, onFindInFolder }: ExplorerFilesProps) {
   const parsed = parseRootId(rootId)
   const rootKind = parsed?.kind ?? 'workspace'
   const root: RootState | undefined = useExplorerStore((s) => s.roots[rootId])
@@ -105,9 +103,7 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
   const git = useExplorerGitStatus(rootId)
   const deck = useStageDeck()
   const [expanding, setExpanding] = useState(false)
-  const [quickOpen, setQuickOpen] = useState(false)
-  // null = closed; otherwise the folder scope ('' = the whole root).
-  const [contentSearchScope, setContentSearchScope] = useState<string | null>(null)
+  const label = useRootLabel(rootId) ?? rootId
 
   // Create the loader, list the root, and re-list every persisted expanded
   // folder whose ancestors are open (a remount refreshes stale listings).
@@ -209,14 +205,13 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
   const visibleOrder = useMemo(() => treeRows.map((r) => r.path), [treeRows])
   const rowByPath = useMemo(() => new Map(treeRows.map((r) => [r.path, r])), [treeRows])
 
-  // Open a file and, while the deck is split, put it in a region beside this
-  // explorer rather than only activating its tab.
+  // Open a file beside the chat (B-D3); with no deck, open it as a code pane.
   const openFile = useCallback(
     (target: CodePaneTarget) => {
-      const id = openCodePane(deckKey, target)
-      deck?.revealPane?.(id, paneId)
+      if (deck?.openBeside) deck.openBeside({ rootId: target.rootId, path: target.path, line: target.line, preview: target.preview })
+      else openCodePane(deckKey, target)
     },
-    [deck, deckKey, paneId],
+    [deck, deckKey],
   )
   // D-B2 seam: a double click, Enter or quick open opens a permanent pane; a
   // single click opens the root's preview pane (PAN-5187, D-C22). The preview
@@ -301,8 +296,6 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
     undo: actions.undo,
     redo: actions.redo,
   })
-
-  const onPickMatch = useCallback((target: ContentSearchTarget) => openFile({ rootId, ...target }), [openFile, rootId])
 
   const onToggle = useCallback(
     (path: string) => {
@@ -403,7 +396,7 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
         targets={targets}
         decorations={git.decorations}
         onOpen={openFileFromTree}
-        onFindInFolder={(dirPath) => setContentSearchScope(dirPath)}
+        onFindInFolder={onFindInFolder}
         onGitChanged={git.refresh}
         writable={writable}
         onNewFile={() => inline.startCreate('file')}
@@ -424,7 +417,7 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
         ) : (
           <ExplorerTree
             ref={treeRef}
-            aria-label={`Files in ${rootLabel(rootId)}`}
+            aria-label={`Files in ${label}`}
             rows={inline.rows}
             inlineEdit={inline.inlineEdit}
             renderInline={inline.renderInline}
@@ -462,7 +455,7 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="explorer-pane">
       <div className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-xs">
-        <span className="truncate font-mono text-foreground">{rootLabel(rootId)}</span>
+        <span className="truncate font-mono text-foreground">{label}</span>
         {branch && <span className="min-w-0 truncate font-mono text-muted-foreground">{branch}</span>}
         <div className="ml-auto flex shrink-0 items-center gap-0.5">
           <HeaderButton
@@ -512,7 +505,8 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
         <EditWorkspaceBanner
           rootId={rootId}
           deckKey={deckKey}
-          paneId={paneId}
+          // edit-workspace-dock drops paneId: a new edit workspace moves the dock root instead.
+          paneId=""
           changedPaths={changedPaths}
           hasChanges={uncommittedPaths.length > 0}
           uncommittedPaths={uncommittedPaths}
@@ -524,22 +518,7 @@ function ExplorerPaneBody({ rootId, deckKey, paneId }: { rootId: string; deckKey
           Creating edit workspace…
         </div>
       )}
-      {contentSearchScope === null ? (
-        zonedBody
-      ) : (
-        <>
-          {/* The tree keeps the upper half; search takes the lower half. */}
-          <div className="flex min-h-0 flex-1 flex-col">{zonedBody}</div>
-          <ContentSearch
-            rootId={rootId}
-            scopePath={contentSearchScope || undefined}
-            onScopeClear={() => setContentSearchScope('')}
-            onClose={() => setContentSearchScope(null)}
-            onPick={onPickMatch}
-          />
-        </>
-      )}
-      <QuickOpen rootId={rootId} open={quickOpen} onClose={() => setQuickOpen(false)} onPick={openFileFromTree} />
+      {zonedBody}
     </div>
   )
 }
