@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5288",
   "created": "2026-11-14T23:58:11.612Z",
-  "updated": "2026-11-15T00:19:04.431Z",
+  "updated": "2026-11-15T00:19:05.662Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,11 @@
     "spend-conversations.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T00:19:04.431Z"
+    },
+    "changes-assembly": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5288",
+      "claimedAt": "2026-11-15T00:19:05.662Z"
     }
   }
 }
