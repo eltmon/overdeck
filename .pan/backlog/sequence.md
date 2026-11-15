@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T15:22:12.328171Z · model: claude-opus-5-5 · open: 906_
+_Last sequenced: 2026-11-15T15:24:35.233977Z · model: claude-opus-5-5 · open: 905_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1241,10 +1241,10 @@ New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T15:22:12.328171Z",
+  "generatedAt": "2026-11-15T15:24:35.233977Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 906,
+  "openCount": 905,
   "nodes": [
     {
       "issue": "PAN-5290",
