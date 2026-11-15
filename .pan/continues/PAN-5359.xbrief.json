@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5359",
   "created": "2026-11-15T15:42:47.790Z",
-  "updated": "2026-11-15T16:38:28.439Z",
+  "updated": "2026-11-15T16:49:25.926Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,9 +76,26 @@
       "doneAt": "2026-11-15T16:38:18.423Z"
     },
     "codex-prompt-memory-client": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5359",
-      "claimedAt": "2026-11-15T16:38:28.438Z"
+      "claimedAt": "2026-11-15T16:38:28.438Z",
+      "doneAt": "2026-11-15T16:49:25.926Z"
+    },
+    "codex-prompt-memory-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:49:25.926Z"
+    },
+    "codex-prompt-memory-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:49:25.926Z"
+    },
+    "codex-prompt-memory-client.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:49:25.926Z"
+    },
+    "codex-prompt-memory-client.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:49:25.926Z"
     }
   }
 }
