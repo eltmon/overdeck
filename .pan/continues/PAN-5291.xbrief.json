@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5291",
   "created": "2026-11-15T08:32:27.661Z",
-  "updated": "2026-11-15T09:24:44.348Z",
+  "updated": "2026-11-15T09:24:45.592Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -200,6 +200,11 @@
     "header-uat-spec.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T09:24:44.347Z"
+    },
+    "docs-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5291",
+      "claimedAt": "2026-11-15T09:24:45.592Z"
     }
   }
 }
