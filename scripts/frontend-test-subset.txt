@@ -483,6 +483,7 @@ src/lib/__tests__/issueActions.no-actions-lost.test.ts
 src/lib/__tests__/issueActions.parity.test.tsx
 src/lib/__tests__/issueActions.test.ts
 src/lib/__tests__/issueLinks.test.ts
+src/lib/__tests__/lastProject.test.ts
 src/lib/__tests__/linkedConversation.test.ts
 src/lib/__tests__/markdownDocLinks.test.ts
 src/lib/__tests__/monaco-setup.test.ts

@@ -67,7 +67,11 @@ vi.mock('./components/KanbanBoard', () => ({
 vi.mock('./components/Agents/FleetAgentsView', () => ({ FleetAgentsView: () => null }));
 vi.mock('./components/HealthDashboard', () => ({ HealthDashboard: () => null }));
 vi.mock('./components/SkillsList', () => ({ SkillsList: () => null }));
-vi.mock('./components/ActivityPanel', () => ({ ActivityPanel: () => <div data-testid="activity-panel" /> }));
+vi.mock('./components/ActivityPanel', () => ({
+  ActivityPanel: ({ selectedProjectKey }: { selectedProjectKey?: string | null }) => (
+    <div data-testid="activity-panel">{selectedProjectKey ?? ''}</div>
+  ),
+}));
 vi.mock('./components/ConfirmationDialog', () => ({
   ConfirmationDialog: () => null,
 }));
@@ -243,6 +247,7 @@ beforeEach(() => {
   useDashboardStore.setState.mockClear()
   window.localStorage.removeItem('overdeck.ui.sessionFeedSidebarOpen')
   window.localStorage.removeItem('overdeck:last-tab')
+  window.localStorage.removeItem('overdeck.ui.lastProjectKey')
 })
 
 describe('conversation route helpers', () => {
@@ -611,6 +616,58 @@ describe('App feed column removed (PAN-5293)', () => {
     renderApp();
 
     expect(screen.getByTestId('activity-panel')).toBeInTheDocument();
+  });
+});
+
+describe('App remembers the last project (PAN-5335 WI-5)', () => {
+  function stubFetch(registeredProjects: Array<{ key: string; name: string; path: string }>) {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/version') {
+        return new Response(JSON.stringify({ version: '0.5.0' }), { status: 200 });
+      }
+      if (url === '/api/tracker-status') {
+        return new Response(JSON.stringify({ primary: 'github', configured: [] }), { status: 200 });
+      }
+      if (url === '/api/confirmations') {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      if (url === '/api/registered-projects') {
+        return new Response(JSON.stringify(registeredProjects), { status: 200 });
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
+    }));
+  }
+
+  it('restores a stored project on a fresh load of /activity', async () => {
+    window.localStorage.setItem('overdeck.ui.lastProjectKey', 'panopticon-cli');
+    window.history.replaceState(null, '', '/activity');
+    stubFetch([{ key: 'panopticon-cli', name: 'panopticon-cli', path: '/p' }]);
+
+    renderApp();
+
+    await waitFor(() => expect(screen.getByTestId('activity-panel')).toHaveTextContent('panopticon-cli'));
+  });
+
+  it('drops an unknown stored project once the registered-projects query resolves', async () => {
+    window.localStorage.setItem('overdeck.ui.lastProjectKey', 'gone');
+    window.history.replaceState(null, '', '/activity');
+    stubFetch([{ key: 'panopticon-cli', name: 'panopticon-cli', path: '/p' }]);
+
+    renderApp();
+
+    await waitFor(() => expect(screen.getByTestId('activity-panel')).toHaveTextContent(''));
+    expect(window.localStorage.getItem('overdeck.ui.lastProjectKey')).toBeNull();
+  });
+
+  it('stores the project key when one is picked through the deck', () => {
+    window.history.replaceState(null, '', '/command-deck');
+    stubFetch([]);
+
+    renderApp();
+    fireEvent.click(screen.getByText('Select panopticon'));
+
+    expect(window.localStorage.getItem('overdeck.ui.lastProjectKey')).toBe('panopticon-cli');
   });
 });
 

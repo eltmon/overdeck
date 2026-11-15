@@ -11,6 +11,7 @@ import { SharedConversationRoute } from './components/chat/sharing/SharedConvers
 import { SearchModal } from './components/search/SearchModal';
 import { CommandPalette, type ConversationPaletteOpenRequest } from './components/CommandPalette';
 import { NO_PROJECT_KEY } from './components/CommandDeck/projectsData';
+import { clearLastProjectKey, initialProjectKey, isKnownProjectKey, readLastProjectKey, writeLastProjectKey } from './lib/lastProject';
 import { IssueDrawer } from './components/drawer/IssueDrawer';
 import { IssueDrawerAvailableContext } from './components/drawer/issueDrawerAvailableContext';
 import { ResumableSessionDialog } from './components/ResumableSessionDialog';
@@ -177,9 +178,21 @@ export default function App() {
   const [selectedConvId, setSelectedConvIdState] = useState<string | null>(() => initialConversationRoute.convId);
   // PAN-1561: the project whose deck is shown in the Command Deck, driven by the
   // sidebar's Projects rail.
+  // PAN-5335 WI-5: a fresh load of a non-project route (e.g. /activity) restores
+  // the last project selected, until the registered-projects query confirms it
+  // still exists.
+  const initialProjectSelection = initialProjectKey({
+    routeProject: initialCockpitRoute?.project ?? initialProjectRoute,
+    pathname: window.location.pathname,
+    stored: readLastProjectKey(),
+  });
   const [selectedProjectKey, setSelectedProjectKey] = useState<string | null>(
-    () => initialCockpitRoute?.project ?? initialProjectRoute,
+    () => initialProjectSelection.key,
   );
+  const pendingStorageProjectValidationRef = useRef(initialProjectSelection.fromStorage);
+  useEffect(() => {
+    if (selectedProjectKey !== null) writeLastProjectKey(selectedProjectKey);
+  }, [selectedProjectKey]);
   const [conversationViewMode, setConversationViewModeState] = useState<ConversationViewMode>(
     () => initialConversationRoute.viewMode,
   );
@@ -701,7 +714,7 @@ export default function App() {
   // issue's tracker repo (e.g. "eltmon/panopticon-cli") to the dashboard deck key
   // (e.g. "panopticon-cli") so the cockpit opens in the deck whose conversations/tree
   // actually match (PAN-2005).
-  const { data: registeredProjects = [] } = useQuery<Array<{ key: string; name: string; path: string }>>({
+  const { data: registeredProjects = [], isSuccess: registeredProjectsLoaded } = useQuery<Array<{ key: string; name: string; path: string }>>({
     queryKey: ['registered-projects'],
     queryFn: async () => {
       const r = await fetch('/api/registered-projects');
@@ -710,6 +723,16 @@ export default function App() {
     },
     staleTime: 60_000,
   });
+  // PAN-5335 WI-5: validate a storage-restored project selection exactly once,
+  // as soon as the registered-projects list is in.
+  useEffect(() => {
+    if (!pendingStorageProjectValidationRef.current || !registeredProjectsLoaded) return;
+    pendingStorageProjectValidationRef.current = false;
+    if (selectedProjectKey !== null && !isKnownProjectKey(selectedProjectKey, registeredProjects)) {
+      clearLastProjectKey();
+      setSelectedProjectKey(null);
+    }
+  }, [registeredProjectsLoaded, registeredProjects, selectedProjectKey]);
   const resolveDeckKey = useCallback((issueId: string): string | null => {
     const issue = (useDashboardStore.getState().issuesRaw as Issue[]).find((i) => i.identifier === issueId);
     const repo = issue?.sourceRepo || issue?.project?.name || '';
