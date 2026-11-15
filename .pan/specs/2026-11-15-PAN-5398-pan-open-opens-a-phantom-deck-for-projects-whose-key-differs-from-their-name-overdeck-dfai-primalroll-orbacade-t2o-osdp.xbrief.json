@@ -4,17 +4,17 @@
     "created": "2026-11-15T20:43:22Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5398: pan open opens a phantom deck for projects whose key differs from their name (overdeck, DFAI, PrimalRoll, Orbacade, T2O-OSDP)",
-    "updated": "2026-11-15T20:45:14.816Z"
+    "updated": "2026-11-15T20:46:46.249Z"
   },
   "plan": {
     "id": "pan-5398",
     "title": "pan open opens a phantom deck for projects whose key differs from their name (overdeck, DFAI, PrimalRoll, Orbacade, T2O-OSDP)",
-    "status": "proposed",
+    "status": "running",
     "uid": "20dfbf3e-8f09-43f2-81d9-aa4f57424675",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T20:43:22Z",
-    "updated": "2026-11-15T20:45:14.816Z",
+    "updated": "2026-11-15T20:46:46.249Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5398",
@@ -470,5 +470,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
