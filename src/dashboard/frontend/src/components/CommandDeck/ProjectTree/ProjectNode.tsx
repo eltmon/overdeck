@@ -84,7 +84,7 @@ function ProjectNodeMenu({
         onClose();
       }
     };
-    const handleScroll = () => onClose();
+    const handleScroll = (e: Event) => { if (!menuRef.current?.contains(e.target as Node)) onClose(); };
     document.addEventListener('mousedown', handleClick);
     document.addEventListener('scroll', handleScroll, true);
     return () => {
