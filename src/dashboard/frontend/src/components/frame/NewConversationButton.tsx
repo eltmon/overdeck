@@ -75,7 +75,7 @@ export function NewConversationButton({ selectedProject, collapsed }: NewConvers
         onClick={quickCreate}
         title={title}
         aria-label="New conversation"
-        className="list-row flex flex-1 flex-col items-stretch gap-0.5 rounded-l-md px-2 py-1.5 text-left text-sm font-medium text-foreground"
+        className="list-row flex min-w-0 flex-1 flex-col items-stretch gap-0.5 rounded-l-md px-2 py-1.5 text-left text-sm font-medium text-foreground"
       >
         <span className="flex items-center gap-2">
           <Plus aria-hidden className="h-4 w-4 text-muted-foreground" />
