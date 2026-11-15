@@ -4,17 +4,17 @@
     "created": "2026-11-15T15:12:47Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5360: Memory facts: source attribution, supersession and a duplicate/contradiction lint",
-    "updated": "2026-11-15T15:21:53.208Z"
+    "updated": "2026-11-15T15:41:47.896Z"
   },
   "plan": {
     "id": "pan-5360",
     "title": "Memory facts: source attribution, supersession and a duplicate/contradiction lint",
-    "status": "proposed",
+    "status": "running",
     "uid": "b92ddc43-d688-4fbb-a4c3-add80b9e9fdf",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T15:12:47Z",
-    "updated": "2026-11-15T15:21:53.208Z",
+    "updated": "2026-11-15T15:41:47.896Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5360",
@@ -1024,5 +1024,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
