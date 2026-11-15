@@ -7,8 +7,16 @@
 #   1. `pan up --no-resume --no-open --detach` must exit 0, pass /api/health and
 #      print no line that asks for a tool the Herdr backend does not need.
 #   2. The idle dashboard must stay within the per-OS idle budget per 30 s
-#      window. On Linux the measure is new PIDs, net of a baseline window with
-#      no Overdeck running. On macOS it is the traced spawn cost: the
+#      window. On Linux the measure takes 3 back-to-back baseline windows and
+#      3 idle windows and decides on min(idle) - min(baseline): the machine-
+#      wide PID counter (every process AND thread, not just Overdeck's) sees
+#      runner bursts of about +20 to +60 in either side in 5-7% of windows,
+#      and min-of-3 keeps one such burst from moving the net by more than the
+#      normal spread between that side's windows (PAN-5361). A failed Linux
+#      check also reports a heuristic, /proc-based guess (traced spawn calls
+#      plus live process-tree growth, never the verdict) at whether the
+#      dashboard's own process tree accounts for the excess. On macOS it is
+#      the traced spawn cost over one window each side, unchanged: the
 #      child_process calls the dashboard makes, plus 5 for each call that
 #      fails to spawn (macOS tries every one of the 6 PATH entries, one
 #      process each). A hosted macOS runner's own process churn moves the
@@ -112,8 +120,10 @@ Usage: bare-host-smoke.sh (--tarball <path> | --version <npm version>) --work-di
   --work-dir <dir>     Fresh directory for HOME, tools and logs (required; must
                        not exist or must be empty).
   --out <file>         Where to write the JSON result (default <work-dir>/result.json).
-  --budget <n>         Idle budget: new PIDs per 30 s window, net of baseline
-                       (default 30 on macOS and on Linux).
+  --budget <n>         Idle budget (default 30 on macOS and on Linux). On
+                       Linux: new PIDs per 30 s window, min(idle) - min
+                       (baseline) over 3 windows per side. On macOS: the
+                       traced spawn cost over 1 window per side (unchanged).
   --idle-spawner-ms <n> Load a preload into the idle dashboard server only
                        that spawns `true` every <n> ms (whole number >= 50).
                        The positive control for the Linux idle measure: it
