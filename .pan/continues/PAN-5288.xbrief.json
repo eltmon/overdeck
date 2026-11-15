@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5288",
   "created": "2026-11-14T23:58:11.612Z",
-  "updated": "2026-11-15T00:27:52.276Z",
+  "updated": "2026-11-15T00:27:53.638Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,11 @@
     "changes-routes.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T00:27:52.275Z"
+    },
+    "list-change-totals": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5288",
+      "claimedAt": "2026-11-15T00:27:53.638Z"
     }
   }
 }
