@@ -1,32 +1,33 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T14:58:36.076805Z · model: claude-opus-5-5 · open: 902_
+_Last sequenced: 2026-11-15T16:09:24.821658Z · model: claude-opus-5-5 · open: 907_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-5290 | L | high | ok |  |  | In pipeline: workflow redesign C — code opens beside the chat; edit-workspace bar, Create PR and PR status in the editor. |
-| 2 | PAN-5294 | L | high | ok |  |  | In pipeline: workflow redesign G — rebuilt project Home with actions first, needs-you, pipeline rows, recent changes. |
-| 3 | PAN-5348 | S | high | ok |  |  | In pipeline: bare /pan in the composer 404s with an error telling you to type /pan; make it list commands locally |
+| 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5337 | S | high | ok |  |  | In pipeline: every relative link in a Markdown preview opens a 404 /conv/<file> URL instead of the linked file. |
+| 4 | PAN-5356 | M | critical | ok |  |  | Merge train re-assembles on every bookkeeping-only main commit, so batches never live long enough for CI; skip .pan/** moves. |
 | 5 | PAN-5338 | M | medium | ok |  |  | In pipeline: conversation diff view gets a rendered Markdown Preview and an Open file action. |
-| 6 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
-| 7 | PAN-5356 | M | critical | ok |  |  | Merge train re-assembles on every bookkeeping-only main commit, so batches never live long enough for CI; skip .pan/** moves. |
+| 7 | PAN-5363 | S | high | ok |  |  | In pipeline: merge train board Train switch flips back on after off; board cache not dropped on write, optimistic value lost. |
 | 8 | PAN-5357 | S | critical | ok |  |  | Sequencer commits sequence.md every 1-3 min with timestamp-only diffs; skip the commit when the ranking is unchanged and rate-limit runs. |
-| 9 | PAN-5354 | M | critical | ok |  |  | Host-crash-killed work agents stay dead: deacon-lite confirms death but nothing resumes; add paced resumeCrashedWorkAgents. |
+| 9 | PAN-5361 | S | critical | ok |  |  | In pipeline: bare-host-linux idle check fails ~3% of runs; pid-net counts machine-wide runner PID bursts one baseline can't cancel. |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
+| 11 | PAN-5364 | M | high | ok |  |  | In pipeline: merge train board shows a voided rebuild on top, buries the merged batch, and voided batches never age out. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
+| 12 | PAN-5354 | M | critical | ok |  |  | Host-crash-killed work agents stay dead: deacon-lite confirms death but nothing resumes; add paced resumeCrashedWorkAgents. |
 | 12 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 13 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
 | 14 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; seen on MYN and now overdeck (PAN-5232). |
 | 15 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
 | 16 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 17 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
-| 18 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
-| 19 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
-| 20 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
+| 18 | PAN-5369 | M | critical | ok |  |  | Dashboard main thread pinned at 100%: orphan scan re-queries SQLite for 4000 transcripts per tick; cost/usage routes never answer. |
+| 20 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 21 | PAN-5347 | S | medium | ok |  |  | In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group |
+| 21 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 22 | PAN-5339 | S | medium | ok |  |  | In pipeline: conversation names, conv N forms and /conv URLs in messages become clickable links. |
+| 22 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
 | 23 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
 | 24 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
 | 25 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
@@ -222,9 +223,11 @@ _Last sequenced: 2026-11-15T14:58:36.076805Z · model: claude-opus-5-5 · open: 
 | 215 | PAN-4364 | S | medium | ok |  |  | GPT-6 catalog: gpt-6-sol misclassed frontier and OpenAI tierModels still remap to GPT-5.6; prerequisites have closed |
 | 216 | PAN-3196 | S | high | ok |  |  | Root-owned container residue makes close-out die on EACCES after passing every DoD row; same family as PAN-3570. |
 | 217 | PAN-3186 | XS | high | ok |  |  | One configured non-git member (auricle/infra) blanks pipeline membership for the whole project the resolver claims it can answer. |
-| 218 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
-| 219 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
-| 220 | PAN-5335 | M | high | ok |  |  | Workflow redesign F follow-up: collapse handoff groups, unclipped cost, footer label, one current nav item, keep project. |
+| 218 | PAN-5370 | S | medium | ok |  |  | Workflow-redesign live-check fixes: Issues header overlap, breadcrumb clips file name, Spend fact never times out, More wraps. |
+| 219 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
+| 219 | PAN-5371 | S | medium | ok |  |  | Simple Home headline (18) and top bar Needs-you (8) count different things; pick one rule so both agree (epic D-8). |
+| 220 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
+| 221 | PAN-5335 | M | high | ok |  |  | Workflow redesign F follow-up: collapse handoff groups, unclipped cost, footer label, one current nav item, keep project. |
 | 221 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
 | 222 | PAN-3047 | XS | high | ok |  |  | Strike-branch teardown uses --is-ancestor, which cannot see a squash merge, so all 96 strike/* branches survive as residue. |
 | 223 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
@@ -396,563 +399,565 @@ _Last sequenced: 2026-11-15T14:58:36.076805Z · model: claude-opus-5-5 · open: 
 | 389 | PAN-2395 | S | medium | ok |  |  | one invalid tiered_execution enum poisons every config read |
 | 390 | PAN-2381 | S | medium | ok |  |  | three event types missing from DomainEvent schema union poison the RPC stream |
 | 391 | PAN-2287 | S | medium | ok |  |  | every supervisor.log line written twice |
-| 392 | PAN-3661 | XS | medium | ok |  |  | Secure review-mode dispatch dropped the HTTP-200 semantic-rejection surface; two frontend tests fail locally while CI stays green. |
-| 393 | PAN-3288 | XS | medium | ok |  |  | Dev-checkout preflight: after a git pull that adds a dep, the CLI dies with ERR_MODULE_NOT_FOUND instead of saying 'run bun install'. |
-| 394 | PAN-3164 | XS | medium | ok |  |  | probeUatStack reports readiness from container count, so the UI offers 'Open UAT frontend' while the API is still resolving Maven deps. |
+| 392 | PAN-5372 | XS | medium | ok |  |  | First split in a Stage deck remounts the open pane, silently dropping an unsaved editor draft; fix with a stable key per paneId. |
+| 393 | PAN-3661 | XS | medium | ok |  |  | Secure review-mode dispatch dropped the HTTP-200 semantic-rejection surface; two frontend tests fail locally while CI stays green. |
+| 394 | PAN-3288 | XS | medium | ok |  |  | Dev-checkout preflight: after a git pull that adds a dep, the CLI dies with ERR_MODULE_NOT_FOUND instead of saying 'run bun install'. |
 | 395 | PAN-5353 | S | medium | ok |  |  | Send now: flush a queued message into a running Claude Code turn via the Ctrl+X Ctrl+S chord. PRD written, chord live-probed. |
+| 395 | PAN-3164 | XS | medium | ok |  |  | probeUatStack reports readiness from container count, so the UI offers 'Open UAT frontend' while the API is still resolving Maven deps. |
 | 396 | PAN-3121 | S | medium | ok |  |  | The failed-send outbox never reconciles against the transcript, so a delivered message keeps a Retry twin that would double-send. |
 | 397 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
-| 398 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
-| 399 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
-| 400 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
+| 400 | PAN-5366 | M | medium | ok |  | PAN-5359 | Conversation page cannot show whether per-turn memory injection reaches it; add a state route and a status-line part. Needs PAN-5359. |
 | 401 | PAN-5358 | M | medium | ok |  |  | Curated memory facts reach agents only via a budget-cut launch index (89 of 171 dropped in dfai); add facts to per-turn relevance injection. |
+| 401 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
 | 402 | PAN-5359 | M | medium | ok |  |  | Per-turn memory injection skips project-root conversations and every Codex conversation; install the hook there and add a Codex turn path. |
-| 403 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
-| 404 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
-| 405 | PAN-1918 | XS | medium | ok |  |  | full frontend vitest suite runs in no CI path |
-| 406 | PAN-1912 | XS | medium | ok |  |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
-| 407 | PAN-4208 | M | medium | ok |  |  | #4205 follow-ups: Effect-free config read for telemetry to hit <100ms pan --version; CI import test for lazy command targets |
-| 408 | PAN-1846 | S | medium | needs-refinement |  |  | unbounded log growth |
-| 409 | PAN-1830 | S | medium | ok |  |  | Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY |
-| 410 | PAN-1816 | S | medium | ok |  |  | Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry |
-| 411 | PAN-1795 | S | medium | ok |  |  | Codebase map bootstrapped in planning worktree is never promoted to main |
-| 412 | PAN-1774 | S | medium | ok |  |  | workspace server container crashloops when dist/dashboard/server.js is missing |
-| 413 | PAN-1769 | S | medium | ok |  |  | Supervisor echo-confirm false negative on long messages → triple-paste delivery (rewrite ×2 + tmux fallback); resumed-conv message stil… |
-| 414 | PAN-1761 | S | medium | ok |  |  | conversations endpoints fetched via relative /api path |
-| 415 | PAN-1755 | S | medium | ok |  |  | uat stuck-assembly cap (30m) kills slow-but-alive assemblies and leaves orphaned conflict agents racing the next generation |
-| 416 | PAN-3516 | XS | medium | ok |  |  | Repo .claude/skills holds stale duplicates of pan-handoff, pan-flywheel and okf, so overdeck-dev sessions load outdated skill text. |
-| 417 | PAN-3455 | XS | medium | ok |  |  | cliproxy --version exits 2, so the up-to-date check always returns false and every ensure re-downloads the pinned release. |
-| 418 | PAN-3117 | XS | medium | ok |  |  | A deterministic 400 renders as the generic 'Failed to send' bubble with a Retry that can never succeed. |
-| 419 | PAN-3036 | XS | medium | ok |  |  | Pane-idle detection reads a completed strike's idle composer as a pending question, so a finished strike shows '! INPUT'. |
-| 420 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
-| 421 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
-| 422 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
-| 423 | PAN-5028 | M | medium | ok |  |  | list_pending_input loses a conversation's AskUserQuestion after the PAN-1520 deny hook, contrary to the existing test's contract. |
-| 424 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
-| 425 | PAN-5227 | S | medium | ok |  |  | Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle. |
-| 426 | PAN-5349 | L | medium | ok |  |  | pan open <path> opens files/folders in the dashboard; opt-in OS file-manager 'Open in Overdeck'. PRD in .pan/drafts/pan-5349.md |
-| 427 | PAN-5342 | L | medium | ok |  |  | Safe shutdown: drain agents at a tool boundary before reboot; PRD landed; item 16 of workflow-redesign order book. |
-| 428 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
-| 429 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
-| 430 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr… |
-| 431 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
-| 432 | PAN-3901 | S | medium | ok |  |  | test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification |
-| 433 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
-| 434 | PAN-5343 | L | medium | ok |  | PAN-5335, PAN-5290, PAN-5295, PAN-5294 | Workflow redesign H: All projects deck listing conversations across projects, 1-4 side by side. Waits on four siblings. |
-| 435 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
-| 436 | PAN-1572 | M | medium | needs-refinement |  |  | Settings permission-mode can desync from the resolved mode; body cites the removed DSP flag and a renamed symbol — rewrite first |
-| 437 | PAN-4627 | S | medium | ok |  |  | Homebrew Claude Code installs get a copy-only upgrade banner; make the brew plan runnable and auto-upgrade outdated runnable installs. |
-| 438 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
-| 439 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
-| 440 | PAN-5312 | S | medium | ok |  |  | Quality-gate admission: a head that can never fit alone serializes every gate behind it. |
-| 441 | PAN-5241 | L | medium | ok |  |  | Spill work agents to linked machines, then Fly, when this machine is full, up to operator caps. |
-| 442 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
-| 443 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
-| 444 | PAN-1449 | S | medium | ok |  |  | Memory extraction still failing; the live symptom PAN-4370 closed and PAN-4374 adds a working provider; layout half remains |
-| 445 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
-| 446 | PAN-5180 | M | medium | ok |  |  | Tab-open REST burst (~45 requests) delays every client 1.0-1.4 s; uncached prerequisite and status probes. |
-| 447 | PAN-5264 | M | medium | ok |  |  | Attribute the app-rest GitHub caller (1,422 untraced App REST calls/hour), then cut the largest path. |
-| 448 | PAN-5340 | S | medium | ok |  | PAN-5337 | A Preview link to another Markdown file should open it in Preview, not Edit. Follows PAN-5337. |
-| 449 | PAN-5341 | S | medium | ok |  | PAN-5338 | Dock Changes diff view gets the Markdown Preview switch from PAN-5338; matters once D2 moves diffs to the dock. |
-| 450 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
-| 451 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
-| 452 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
-| 453 | PAN-5322 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5319: unguarded identifier.toUpperCase(), modal focus, needs-you rows that open nothing. |
-| 454 | PAN-5317 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5127: route live Codex app-server sends correctly; no replayable mail for keyed sends. |
-| 455 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
-| 456 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
-| 457 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
-| 458 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
-| 459 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
-| 460 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
-| 461 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
-| 462 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
-| 463 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
-| 464 | PAN-4971 | S | medium | ok |  |  | Viewer header shows only host + count; roster of all participants with host/controller marked. Frontend-only, payload exists. |
-| 465 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
-| 466 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
-| 467 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
-| 468 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
-| 469 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
-| 470 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
-| 471 | PAN-5174 | XS | medium | ok |  |  | Flaky CI test: share/rate-limit.test.ts flips 201/429 under CI timing; quarantine or make deterministic. |
-| 472 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
-| 473 | PAN-5346 | S | medium | ok |  |  | Auth docs misstate #overdeck_token delivery, the Origin rule and 401 troubleshooting; PAN-5344 fix has landed. |
-| 474 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
-| 475 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
-| 476 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
-| 477 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
-| 478 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
-| 479 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
-| 480 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
-| 481 | PAN-3938 | M | medium | needs-refinement |  |  | Run Muse Spark under Claude Code via cliproxy — only the paid Zen model is routable; free tier is OpenCode-client gated; needs credit… |
-| 482 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
-| 483 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
-| 484 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
-| 485 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
-| 486 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
-| 487 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
-| 488 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
-| 489 | PAN-3732 | S | medium | ok |  |  | Codex handoff serializes a large rollout twice (~286MB peak RSS on 50MB); serialize once or stream. |
-| 490 | PAN-3700 | M | medium | ok |  |  | pan acp serve would let Zed and other ACP clients drive Overdeck conversations through canonical doors. PRD written. |
-| 491 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
-| 492 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
-| 493 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
-| 494 | PAN-2659 | S | medium | ok |  |  | acquireRecordLock survives for the planning auto-start consent lock; an ownerless lock after a crash is never reclaimed. |
-| 495 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
-| 496 | PAN-4779 | S | medium | ok |  |  | Docs on main: 2 MDX parse errors hide pages from Mintlify + 15 broken vision.mdx links; mint broken-links can't gate |
-| 497 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
-| 498 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
-| 499 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
-| 500 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
-| 501 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
-| 502 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
-| 503 | PAN-4568 | XS | medium | ok |  |  | Codex sub-agent turn start shows thread: not sub: label; adoption lands one frame late. PAN-4563 replay test has landed. |
-| 504 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals read as a broken button. |
-| 505 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers instead of the documented /ws/rpc event contract. |
-| 506 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding so a 1.1MB/227-item plan stops making every finalize failure whole-plan-fatal. |
-| 507 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
-| 508 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
-| 509 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
-| 510 | PAN-4918 | M | medium | ok |  |  | Six Anywhere UI bugs seen while filming: Codex keeps Claude model, Zen models listed first, chip wrap, Pull-here state, no remote archive. |
-| 511 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
-| 512 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
-| 513 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
-| 514 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
-| 515 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
-| 516 | PAN-646 | XS | medium | needs-refinement |  |  | Cancel no longer clears beads or a record; a Recover workflow now means reopening the tracker issue and re-planning |
-| 517 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
-| 518 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
-| 519 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
-| 520 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
-| 521 | PAN-5231 | S | medium | ok |  |  | Explorer: retrying Send through pipeline after a partial failure creates a second issue and branch. |
-| 522 | PAN-5204 | S | medium | ok |  |  | Voice: mixed 16/24 kHz sample rates on /ws/voice, and dictation turns leak into AutoPreso as errors. |
-| 523 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
-| 524 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
-| 525 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
-| 526 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
-| 527 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
-| 528 | PAN-3735 | S | medium | ok |  |  | Sandboxed pan CLI reports 'dashboard down, run pan up' when the real cause is no network; sends agents down the wrong path. |
-| 529 | PAN-3335 | XS | medium | ok |  |  | A pasted screenshot can't be viewed anywhere in the dashboard: thumbnail has no click handler and the sent form is a file-link chip. |
-| 530 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix, redesigned 2026-09-29 as E6 of the model-routing PRD; its medians feed PAN-4364 and PAN-4367 |
-| 531 | PAN-2977 | M | medium | ok |  | PAN-2976 | Settings surface that detects installed ACP CLIs, renders the capability checklist, and guides login without a manual terminal. |
-| 532 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
-| 533 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
-| 534 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
-| 535 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
-| 536 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
-| 537 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
-| 538 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
-| 539 | PAN-4924 | S | medium | ok |  |  | linked-machines.mdx promises switch model for running conversations; dashboard disables it. Fix docs or add the control. |
-| 540 | PAN-4367 | M | medium | ok |  |  | Replace inherited capability scores for Sonnet 5.5, GPT-6 Sol/Luna with measured ones; eval harness has closed |
-| 541 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
-| 542 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
-| 543 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
-| 544 | PAN-5145 | S | medium | ok |  |  | CLIProxy oauth-model-alias hides gpt-6-sol, gpt-5.6-terra and gpt-5.6-luna by their own ids on claude-code. |
-| 545 | PAN-5201 | XL | medium | ok |  |  | Speaker-aware STT: diarizing engines (Speechmatics, AssemblyAI, Muse, Voxtral, NeMo) and one VoiceSettings contract. |
-| 546 | PAN-2392 | M | medium | needs-refinement |  |  | Standing Crew survives; panel becomes a cost view from cost_events + tier-metrics; verdict/escalation columns need a new source. |
-| 547 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
-| 548 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
-| 549 | PAN-3767 | S | medium | ok |  |  | Model switch could hang at 'Saving…'; onError toast landed, remaining work is reproducing the hang on a healthy server. |
-| 550 | PAN-3615 | S | medium | needs-refinement |  |  | TTS silent 9+ days from four stacked failures; three already fixed, only follow-ups remain — rescope to what is left. |
-| 551 | PAN-3558 | S | medium | ok |  |  | Subagent rail shows no model or provider, so mixed-model orchestration needs a transcript open per row to see what it is running. |
-| 552 | PAN-3469 | S | medium | ok |  |  | NewProjectModal violates the PAN-3410 page-not-modal doctrine; migrate the create-project flow to a routed page. |
-| 553 | PAN-3333 | M | medium | ok |  |  | Model pickers show $/1M, which says nothing under a subscription; show relative plan-quota drain among sibling models. |
-| 554 | PAN-3058 | M | medium | ok |  |  | Ship named crew presets that populate the whole tiered_execution block so operators don't hand-build the crew table. |
-| 555 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
-| 556 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
-| 557 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
-| 558 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
-| 559 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
-| 560 | PAN-4366 | M | medium | ok |  |  | Plan the Haiku 4.5 successor and give workhorse:cheap a consumer or drop it; gated on E4 summary-faithfulness |
-| 561 | PAN-5314 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5313 (CLIProxy pool): body-read timeout, cache-miss coalescing, reset timestamps. |
-| 562 | PAN-5267 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5266: escalation limit and caching transient GraphQL errors as missing issues. |
-| 563 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
-| 564 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
-| 565 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
-| 566 | PAN-4393 | XS | medium | ok |  |  | ac-eval-fixtures requires observable:false >= 8 but honest labeling of all specs yields 6; lower the floor |
-| 567 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
-| 568 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
-| 569 | PAN-1967 | M | medium | needs-refinement |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
-| 570 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
-| 571 | PAN-1937 | M | medium | ok |  |  | feat: data export |
-| 572 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
-| 573 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
-| 574 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
-| 575 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
-| 576 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
-| 577 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
-| 578 | PAN-5202 | XL | medium | ok |  | PAN-5201 | Flux: experimental live meeting page capturing open items, ticket proposals and diagrams. Depends on PAN-5201. |
-| 579 | PAN-5141 | M | medium | ok |  |  | Reviewer pairing code: multi-day, reusable, restart-safe code so app store review can pair unattended. |
-| 580 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
-| 581 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
-| 582 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
-| 583 | PAN-3706 | L | medium | ok |  |  | Broadsheet shipped typography only; color, surface, elevation and texture still on Ledger values, so it doesn't read like Subspace. |
-| 584 | PAN-3539 | XS | medium | needs-refinement |  |  | OOMPolicy=continue fix landed with the issue; re-scope to whatever hardening remains or close it out. |
-| 585 | PAN-3502 | XS | medium | needs-refinement |  |  | tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify. |
-| 586 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
-| 587 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
-| 588 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
-| 589 | PAN-4878 | XS | low | ok |  |  | Delete dead ox curl installer in prereqs registry; PAN-4852 builds ox from the pinned fork commit, so ~/.local/bin/ox is never used. |
-| 590 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
-| 591 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
-| 592 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
-| 593 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
-| 594 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
-| 595 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
-| 596 | PAN-1676 | M | medium | ok |  |  | Harden Fly remote workspaces + pan workspace move; work-agent spill policy now specified in PAN-5241. |
-| 597 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
-| 598 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
-| 599 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
-| 600 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
-| 601 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
-| 602 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
-| 603 | PAN-5309 | S | low | ok |  |  | CodeRabbit minor findings on the PAN-5283 Flywheel page redesign; verify each against main before fixing. |
-| 604 | PAN-5308 | S | low | ok |  |  | CodeRabbit findings on the PAN-5282 CLIProxy v8 upgrade: config-write ordering, Windows upgrade staging. |
-| 605 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
-| 606 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
-| 607 | PAN-1550 | M | medium | ok |  |  | BrowserPane half only; the FilesPane half is superseded by the PAN-5183 file explorer, whose children have all closed. |
-| 608 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
-| 609 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
-| 610 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
-| 611 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
-| 612 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
-| 613 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
-| 614 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
-| 615 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
-| 616 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
-| 617 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
-| 618 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
-| 619 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
-| 620 | PAN-4360 | S | medium | ok |  |  | Add pan claude upgrade and offer the Claude Code upgrade in pan install / pan sync; PAN-4359 has closed |
-| 621 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
-| 622 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
-| 623 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
-| 624 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
-| 625 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
-| 626 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
-| 627 | PAN-5067 | M | medium | ok |  |  | Skill overrides: bad-YAML issue file is overwritten on write (data loss), license detection gaps, Pi ignores --pack silently. |
-| 628 | PAN-4908 | S | low | ok |  |  | Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint(). |
-| 629 | PAN-5130 | S | medium | ok |  |  | pan project add gains --issue-prefix for any tracker; --linear-team becomes a deprecated alias. Follow-up to closed PAN-51. |
-| 630 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
-| 631 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
-| 632 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
-| 633 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
-| 634 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
-| 635 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
-| 636 | PAN-4308 | S | medium | ok |  |  | Settle reaped Fly remote transcripts into the Session Vault; PAN-4295 auto-reap landed, still blocked by PAN-2609 (engine). |
-| 637 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
-| 638 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
-| 639 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
-| 640 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
-| 641 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
-| 642 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
-| 643 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
-| 644 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
-| 645 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
-| 646 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
-| 647 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
-| 648 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
-| 649 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
-| 650 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
-| 651 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
-| 652 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
-| 653 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
-| 654 | PAN-5154 | L | low | needs-refinement |  |  | GitHub account, token and host per owner (work accounts, GHES). Not scheduled; needs a PRD first. |
-| 655 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
-| 656 | PAN-3441 | L | low | ok |  |  | God View 'River' WebGL pipeline visualization fed by the live hook-event stream; PRD and mockup exist. |
-| 657 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
-| 658 | PAN-2941 | M | low | stale |  |  | Superseded by OKF v0.2: drafts plus human verify replace the PR gate (eltmon/okf#6); semantic pass is eltmon/okf#7 |
-| 659 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
-| 660 | PAN-4373 | M | medium | ok |  |  | Optional Jev relevance filter for prompt-time memory injection candidates; both prerequisites have closed |
-| 661 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
-| 662 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
-| 663 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
-| 664 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
-| 665 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
-| 666 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
-| 667 | PAN-5066 | M | medium | ok |  |  | Project skills in .pan/skills skip the CLI workspace fallback, never refresh, lose to bundled skills, and never reach Codex/Pi. |
-| 668 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
-| 669 | PAN-4350 | M | medium | needs-refinement |  |  | Re-dispatch budget for foreman items; issue itself flags an unresolved conflict with the no-stored-state rule |
-| 670 | PAN-4003 | L | medium | ok |  |  | Parked: delete the ohmypi/omp harness, keep Pi; obsoletes 10 open ohmypi issues and shrinks PAN-3958's CH-7 scope |
-| 671 | PAN-4368 | S | medium | ok |  |  | Operator-run checklist: verify Sonnet 5.5 across switch-model, fork and compaction (model-locked thinking blocks) |
-| 672 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
-| 673 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
-| 674 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
-| 675 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
-| 676 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
-| 677 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
-| 678 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
-| 679 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
-| 680 | PAN-4769 | XS | low | ok |  |  | Two-sentence wording fix in features/skill-packs.mdx; PAN-4759 created the page and closed, so this is unblocked. |
-| 681 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
-| 682 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
-| 683 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
-| 684 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 685 | PAN-4823 | XL | medium | ok | ✓ |  | Epic: Capacitor phone client for Anywhere without Tailscale; 15 children filed (#4828-4843); OD-1 settled; PAN-4774 done. |
-| 686 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
-| 687 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
-| 688 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
-| 689 | PAN-5082 | XL | medium | ok |  |  | Move every MCP surface to SDK v2 for the 2026-07-28 spec while keeping 2025-11-25 clients; time it on PAN-5083 data. |
-| 690 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
-| 691 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
-| 692 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
-| 693 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
-| 694 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
-| 695 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
-| 696 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
-| 697 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
-| 698 | PAN-2046 | M | low | stale |  |  | Conversation view does not surface terminal command responses |
-| 699 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
-| 700 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
-| 701 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
-| 702 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
-| 703 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
-| 704 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
-| 705 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
-| 706 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
-| 707 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 708 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
-| 709 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
-| 710 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
-| 711 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
-| 712 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
-| 713 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
-| 714 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
-| 715 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
-| 716 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
-| 717 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
-| 718 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
-| 719 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
-| 720 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
-| 721 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
-| 722 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
-| 723 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
-| 724 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
-| 725 | PAN-4352 | XS | low | ok |  |  | Operator verification: skill packs in a managed interactive Claude Code launch now that PAN-4334 has shipped |
-| 726 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
-| 727 | PAN-4298 | XL | low | needs-refinement |  | PAN-4294, PAN-1676 | Anywhere paid tier: run agents on hosted Fly capacity; tenant isolation, credentials, metering open; PAN-4294 and PAN-1676 unbuilt |
-| 728 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
-| 729 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
-| 730 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
-| 731 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
-| 732 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
-| 733 | PAN-4248 | L | medium | ok |  |  | List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; PAN-1641 sidecar has merged. |
-| 734 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
-| 735 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
-| 736 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
-| 737 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
-| 738 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
-| 739 | PAN-3971 | L | low | ok |  |  | Overdeck-native artifact pages (pan artifact publish + state door + dashboard listing); body says backlog only, Claude artifacts work today |
-| 740 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
-| 741 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
-| 742 | PAN-2983 | M | low | stale |  |  | Superseded by the OKF v0.2 redesign: write modes and drafts (eltmon/okf#6) and the advisory semantic pass (eltmon/okf#7) |
-| 743 | PAN-3824 | XS | low | needs-refinement |  |  | Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior |
-| 744 | PAN-3823 | XS | low | needs-refinement |  |  | Image-only report titled "pan sync issue"; needs the command, output text, and expected behavior |
-| 745 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
-| 746 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
-| 747 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
-| 748 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
-| 749 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
+| 402 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
+| 403 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
+| 404 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
+| 405 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
+| 406 | PAN-1918 | XS | medium | ok |  |  | full frontend vitest suite runs in no CI path |
+| 407 | PAN-1912 | XS | medium | ok |  |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
+| 408 | PAN-4208 | M | medium | ok |  |  | #4205 follow-ups: Effect-free config read for telemetry to hit <100ms pan --version; CI import test for lazy command targets |
+| 409 | PAN-1846 | S | medium | needs-refinement |  |  | unbounded log growth |
+| 410 | PAN-1830 | S | medium | ok |  |  | Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY |
+| 411 | PAN-1816 | S | medium | ok |  |  | Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry |
+| 412 | PAN-1795 | S | medium | ok |  |  | Codebase map bootstrapped in planning worktree is never promoted to main |
+| 413 | PAN-1774 | S | medium | ok |  |  | workspace server container crashloops when dist/dashboard/server.js is missing |
+| 414 | PAN-1769 | S | medium | ok |  |  | Supervisor echo-confirm false negative on long messages → triple-paste delivery (rewrite ×2 + tmux fallback); resumed-conv message stil… |
+| 415 | PAN-1761 | S | medium | ok |  |  | conversations endpoints fetched via relative /api path |
+| 416 | PAN-1755 | S | medium | ok |  |  | uat stuck-assembly cap (30m) kills slow-but-alive assemblies and leaves orphaned conflict agents racing the next generation |
+| 417 | PAN-3516 | XS | medium | ok |  |  | Repo .claude/skills holds stale duplicates of pan-handoff, pan-flywheel and okf, so overdeck-dev sessions load outdated skill text. |
+| 418 | PAN-3455 | XS | medium | ok |  |  | cliproxy --version exits 2, so the up-to-date check always returns false and every ensure re-downloads the pinned release. |
+| 419 | PAN-3117 | XS | medium | ok |  |  | A deterministic 400 renders as the generic 'Failed to send' bubble with a Retry that can never succeed. |
+| 420 | PAN-3036 | XS | medium | ok |  |  | Pane-idle detection reads a completed strike's idle composer as a pending question, so a finished strike shows '! INPUT'. |
+| 421 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
+| 422 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
+| 423 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
+| 424 | PAN-5028 | M | medium | ok |  |  | list_pending_input loses a conversation's AskUserQuestion after the PAN-1520 deny hook, contrary to the existing test's contract. |
+| 426 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
+| 427 | PAN-5349 | L | medium | ok |  |  | pan open <path> opens files/folders in the dashboard; opt-in OS file-manager 'Open in Overdeck'. PRD in .pan/drafts/pan-5349.md |
+| 427 | PAN-5227 | S | medium | ok |  |  | Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle. |
+| 428 | PAN-5342 | L | medium | ok |  |  | Safe shutdown: drain agents at a tool boundary before reboot; PRD landed; item 16 of workflow-redesign order book. |
+| 429 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
+| 430 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
+| 431 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr… |
+| 432 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
+| 433 | PAN-3901 | S | medium | ok |  |  | test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification |
+| 434 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
+| 435 | PAN-5343 | L | medium | ok |  | PAN-5335, PAN-5295 | Workflow redesign H: All projects deck listing conversations across projects, 1-4 side by side. Waits on four siblings. |
+| 436 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
+| 437 | PAN-1572 | M | medium | needs-refinement |  |  | Settings permission-mode can desync from the resolved mode; body cites the removed DSP flag and a renamed symbol — rewrite first |
+| 438 | PAN-4627 | S | medium | ok |  |  | Homebrew Claude Code installs get a copy-only upgrade banner; make the brew plan runnable and auto-upgrade outdated runnable installs. |
+| 439 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
+| 440 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
+| 441 | PAN-5312 | S | medium | ok |  |  | Quality-gate admission: a head that can never fit alone serializes every gate behind it. |
+| 442 | PAN-5241 | L | medium | ok |  |  | Spill work agents to linked machines, then Fly, when this machine is full, up to operator caps. |
+| 443 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
+| 444 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
+| 445 | PAN-1449 | S | medium | ok |  |  | Memory extraction still failing; the live symptom PAN-4370 closed and PAN-4374 adds a working provider; layout half remains |
+| 446 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
+| 447 | PAN-5180 | M | medium | ok |  |  | Tab-open REST burst (~45 requests) delays every client 1.0-1.4 s; uncached prerequisite and status probes. |
+| 448 | PAN-5264 | M | medium | ok |  |  | Attribute the app-rest GitHub caller (1,422 untraced App REST calls/hour), then cut the largest path. |
+| 449 | PAN-5340 | S | medium | ok |  | PAN-5337 | A Preview link to another Markdown file should open it in Preview, not Edit. Follows PAN-5337. |
+| 450 | PAN-5341 | S | medium | ok |  | PAN-5338 | Dock Changes diff view gets the Markdown Preview switch from PAN-5338; matters once D2 moves diffs to the dock. |
+| 451 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
+| 452 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
+| 453 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
+| 454 | PAN-5322 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5319: unguarded identifier.toUpperCase(), modal focus, needs-you rows that open nothing. |
+| 455 | PAN-5317 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5127: route live Codex app-server sends correctly; no replayable mail for keyed sends. |
+| 456 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
+| 457 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
+| 458 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
+| 459 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
+| 460 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
+| 461 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
+| 462 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
+| 463 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
+| 464 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
+| 465 | PAN-4971 | S | medium | ok |  |  | Viewer header shows only host + count; roster of all participants with host/controller marked. Frontend-only, payload exists. |
+| 466 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
+| 467 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
+| 468 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
+| 469 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
+| 470 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
+| 471 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
+| 472 | PAN-5174 | XS | medium | ok |  |  | Flaky CI test: share/rate-limit.test.ts flips 201/429 under CI timing; quarantine or make deterministic. |
+| 473 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
+| 474 | PAN-5346 | S | medium | ok |  |  | Auth docs misstate #overdeck_token delivery, the Origin rule and 401 troubleshooting; PAN-5344 fix has landed. |
+| 475 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
+| 476 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
+| 477 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
+| 478 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
+| 479 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
+| 480 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
+| 481 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
+| 482 | PAN-3938 | M | medium | needs-refinement |  |  | Run Muse Spark under Claude Code via cliproxy — only the paid Zen model is routable; free tier is OpenCode-client gated; needs credit… |
+| 483 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
+| 484 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
+| 485 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
+| 486 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
+| 487 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
+| 488 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
+| 489 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
+| 490 | PAN-3732 | S | medium | ok |  |  | Codex handoff serializes a large rollout twice (~286MB peak RSS on 50MB); serialize once or stream. |
+| 491 | PAN-3700 | M | medium | ok |  |  | pan acp serve would let Zed and other ACP clients drive Overdeck conversations through canonical doors. PRD written. |
+| 492 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
+| 493 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
+| 494 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
+| 495 | PAN-2659 | S | medium | ok |  |  | acquireRecordLock survives for the planning auto-start consent lock; an ownerless lock after a crash is never reclaimed. |
+| 496 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
+| 497 | PAN-4779 | S | medium | ok |  |  | Docs on main: 2 MDX parse errors hide pages from Mintlify + 15 broken vision.mdx links; mint broken-links can't gate |
+| 498 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
+| 499 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
+| 500 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
+| 501 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
+| 502 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
+| 503 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
+| 504 | PAN-4568 | XS | medium | ok |  |  | Codex sub-agent turn start shows thread: not sub: label; adoption lands one frame late. PAN-4563 replay test has landed. |
+| 505 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals read as a broken button. |
+| 506 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers instead of the documented /ws/rpc event contract. |
+| 507 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding so a 1.1MB/227-item plan stops making every finalize failure whole-plan-fatal. |
+| 508 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
+| 509 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
+| 510 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
+| 511 | PAN-4918 | M | medium | ok |  |  | Six Anywhere UI bugs seen while filming: Codex keeps Claude model, Zen models listed first, chip wrap, Pull-here state, no remote archive. |
+| 512 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
+| 513 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
+| 514 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
+| 515 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
+| 516 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
+| 517 | PAN-646 | XS | medium | needs-refinement |  |  | Cancel no longer clears beads or a record; a Recover workflow now means reopening the tracker issue and re-planning |
+| 518 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
+| 519 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
+| 520 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
+| 521 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
+| 522 | PAN-5231 | S | medium | ok |  |  | Explorer: retrying Send through pipeline after a partial failure creates a second issue and branch. |
+| 523 | PAN-5204 | S | medium | ok |  |  | Voice: mixed 16/24 kHz sample rates on /ws/voice, and dictation turns leak into AutoPreso as errors. |
+| 524 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
+| 525 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
+| 526 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
+| 527 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
+| 528 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
+| 529 | PAN-3735 | S | medium | ok |  |  | Sandboxed pan CLI reports 'dashboard down, run pan up' when the real cause is no network; sends agents down the wrong path. |
+| 530 | PAN-3335 | XS | medium | ok |  |  | A pasted screenshot can't be viewed anywhere in the dashboard: thumbnail has no click handler and the sent form is a file-link chip. |
+| 531 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix, redesigned 2026-09-29 as E6 of the model-routing PRD; its medians feed PAN-4364 and PAN-4367 |
+| 532 | PAN-2977 | M | medium | ok |  | PAN-2976 | Settings surface that detects installed ACP CLIs, renders the capability checklist, and guides login without a manual terminal. |
+| 533 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
+| 534 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
+| 535 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
+| 536 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
+| 537 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
+| 538 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
+| 539 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
+| 540 | PAN-4924 | S | medium | ok |  |  | linked-machines.mdx promises switch model for running conversations; dashboard disables it. Fix docs or add the control. |
+| 541 | PAN-4367 | M | medium | ok |  |  | Replace inherited capability scores for Sonnet 5.5, GPT-6 Sol/Luna with measured ones; eval harness has closed |
+| 542 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
+| 543 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
+| 544 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
+| 545 | PAN-5145 | S | medium | ok |  |  | CLIProxy oauth-model-alias hides gpt-6-sol, gpt-5.6-terra and gpt-5.6-luna by their own ids on claude-code. |
+| 546 | PAN-5201 | XL | medium | ok |  |  | Speaker-aware STT: diarizing engines (Speechmatics, AssemblyAI, Muse, Voxtral, NeMo) and one VoiceSettings contract. |
+| 547 | PAN-2392 | M | medium | needs-refinement |  |  | Standing Crew survives; panel becomes a cost view from cost_events + tier-metrics; verdict/escalation columns need a new source. |
+| 548 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
+| 549 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
+| 550 | PAN-3767 | S | medium | ok |  |  | Model switch could hang at 'Saving…'; onError toast landed, remaining work is reproducing the hang on a healthy server. |
+| 551 | PAN-3615 | S | medium | needs-refinement |  |  | TTS silent 9+ days from four stacked failures; three already fixed, only follow-ups remain — rescope to what is left. |
+| 552 | PAN-3558 | S | medium | ok |  |  | Subagent rail shows no model or provider, so mixed-model orchestration needs a transcript open per row to see what it is running. |
+| 553 | PAN-3469 | S | medium | ok |  |  | NewProjectModal violates the PAN-3410 page-not-modal doctrine; migrate the create-project flow to a routed page. |
+| 554 | PAN-3333 | M | medium | ok |  |  | Model pickers show $/1M, which says nothing under a subscription; show relative plan-quota drain among sibling models. |
+| 555 | PAN-3058 | M | medium | ok |  |  | Ship named crew presets that populate the whole tiered_execution block so operators don't hand-build the crew table. |
+| 556 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
+| 557 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
+| 558 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
+| 559 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
+| 560 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
+| 561 | PAN-4366 | M | medium | ok |  |  | Plan the Haiku 4.5 successor and give workhorse:cheap a consumer or drop it; gated on E4 summary-faithfulness |
+| 562 | PAN-5314 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5313 (CLIProxy pool): body-read timeout, cache-miss coalescing, reset timestamps. |
+| 563 | PAN-5267 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5266: escalation limit and caching transient GraphQL errors as missing issues. |
+| 564 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
+| 565 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
+| 566 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
+| 567 | PAN-4393 | XS | medium | ok |  |  | ac-eval-fixtures requires observable:false >= 8 but honest labeling of all specs yields 6; lower the floor |
+| 568 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
+| 569 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
+| 570 | PAN-1967 | M | medium | needs-refinement |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
+| 571 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
+| 572 | PAN-1937 | M | medium | ok |  |  | feat: data export |
+| 573 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
+| 574 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
+| 575 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
+| 576 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
+| 577 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
+| 578 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
+| 579 | PAN-5202 | XL | medium | ok |  | PAN-5201 | Flux: experimental live meeting page capturing open items, ticket proposals and diagrams. Depends on PAN-5201. |
+| 580 | PAN-5141 | M | medium | ok |  |  | Reviewer pairing code: multi-day, reusable, restart-safe code so app store review can pair unattended. |
+| 581 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
+| 582 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
+| 583 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
+| 584 | PAN-3706 | L | medium | ok |  |  | Broadsheet shipped typography only; color, surface, elevation and texture still on Ledger values, so it doesn't read like Subspace. |
+| 585 | PAN-3539 | XS | medium | needs-refinement |  |  | OOMPolicy=continue fix landed with the issue; re-scope to whatever hardening remains or close it out. |
+| 586 | PAN-3502 | XS | medium | needs-refinement |  |  | tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify. |
+| 587 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
+| 588 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
+| 589 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
+| 590 | PAN-4878 | XS | low | ok |  |  | Delete dead ox curl installer in prereqs registry; PAN-4852 builds ox from the pinned fork commit, so ~/.local/bin/ox is never used. |
+| 591 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
+| 592 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
+| 593 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
+| 594 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
+| 595 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
+| 596 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
+| 597 | PAN-1676 | M | medium | ok |  |  | Harden Fly remote workspaces + pan workspace move; work-agent spill policy now specified in PAN-5241. |
+| 598 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
+| 599 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
+| 600 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
+| 601 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
+| 602 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
+| 603 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
+| 604 | PAN-5309 | S | low | ok |  |  | CodeRabbit minor findings on the PAN-5283 Flywheel page redesign; verify each against main before fixing. |
+| 605 | PAN-5308 | S | low | ok |  |  | CodeRabbit findings on the PAN-5282 CLIProxy v8 upgrade: config-write ordering, Windows upgrade staging. |
+| 606 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
+| 607 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
+| 608 | PAN-1550 | M | medium | ok |  |  | BrowserPane half only; the FilesPane half is superseded by the PAN-5183 file explorer, whose children have all closed. |
+| 609 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
+| 610 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
+| 611 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
+| 612 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
+| 613 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
+| 614 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
+| 615 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
+| 616 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
+| 617 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
+| 618 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
+| 619 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
+| 620 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
+| 621 | PAN-4360 | S | medium | ok |  |  | Add pan claude upgrade and offer the Claude Code upgrade in pan install / pan sync; PAN-4359 has closed |
+| 622 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
+| 623 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
+| 624 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
+| 625 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
+| 626 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
+| 627 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
+| 628 | PAN-5067 | M | medium | ok |  |  | Skill overrides: bad-YAML issue file is overwritten on write (data loss), license detection gaps, Pi ignores --pack silently. |
+| 629 | PAN-4908 | S | low | ok |  |  | Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint(). |
+| 630 | PAN-5130 | S | medium | ok |  |  | pan project add gains --issue-prefix for any tracker; --linear-team becomes a deprecated alias. Follow-up to closed PAN-51. |
+| 631 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
+| 632 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
+| 633 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
+| 634 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
+| 635 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
+| 636 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
+| 637 | PAN-4308 | S | medium | ok |  |  | Settle reaped Fly remote transcripts into the Session Vault; PAN-4295 auto-reap landed, still blocked by PAN-2609 (engine). |
+| 638 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
+| 639 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
+| 640 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
+| 641 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
+| 642 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
+| 643 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
+| 644 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
+| 645 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
+| 646 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
+| 647 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
+| 648 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
+| 649 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
+| 650 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
+| 651 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
+| 652 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
+| 653 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
+| 654 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
+| 655 | PAN-5154 | L | low | needs-refinement |  |  | GitHub account, token and host per owner (work accounts, GHES). Not scheduled; needs a PRD first. |
+| 656 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
+| 657 | PAN-3441 | L | low | ok |  |  | God View 'River' WebGL pipeline visualization fed by the live hook-event stream; PRD and mockup exist. |
+| 658 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
+| 659 | PAN-2941 | M | low | stale |  |  | Superseded by OKF v0.2: drafts plus human verify replace the PR gate (eltmon/okf#6); semantic pass is eltmon/okf#7 |
+| 660 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
+| 661 | PAN-4373 | M | medium | ok |  |  | Optional Jev relevance filter for prompt-time memory injection candidates; both prerequisites have closed |
+| 662 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
+| 663 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
+| 664 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
+| 665 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
+| 666 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
+| 667 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
+| 668 | PAN-5066 | M | medium | ok |  |  | Project skills in .pan/skills skip the CLI workspace fallback, never refresh, lose to bundled skills, and never reach Codex/Pi. |
+| 669 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
+| 670 | PAN-4350 | M | medium | needs-refinement |  |  | Re-dispatch budget for foreman items; issue itself flags an unresolved conflict with the no-stored-state rule |
+| 671 | PAN-4003 | L | medium | ok |  |  | Parked: delete the ohmypi/omp harness, keep Pi; obsoletes 10 open ohmypi issues and shrinks PAN-3958's CH-7 scope |
+| 672 | PAN-4368 | S | medium | ok |  |  | Operator-run checklist: verify Sonnet 5.5 across switch-model, fork and compaction (model-locked thinking blocks) |
+| 673 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
+| 674 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
+| 675 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
+| 676 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
+| 677 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
+| 678 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
+| 679 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
+| 680 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
+| 681 | PAN-4769 | XS | low | ok |  |  | Two-sentence wording fix in features/skill-packs.mdx; PAN-4759 created the page and closed, so this is unblocked. |
+| 682 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
+| 683 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
+| 684 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
+| 685 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
+| 686 | PAN-4823 | XL | medium | ok | ✓ |  | Epic: Capacitor phone client for Anywhere without Tailscale; 15 children filed (#4828-4843); OD-1 settled; PAN-4774 done. |
+| 687 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
+| 688 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
+| 689 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
+| 690 | PAN-5082 | XL | medium | ok |  |  | Move every MCP surface to SDK v2 for the 2026-07-28 spec while keeping 2025-11-25 clients; time it on PAN-5083 data. |
+| 691 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
+| 692 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
+| 693 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
+| 694 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
+| 695 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
+| 696 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
+| 697 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
+| 698 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
+| 699 | PAN-2046 | M | low | stale |  |  | Conversation view does not surface terminal command responses |
+| 700 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
+| 701 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
+| 702 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
+| 703 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
+| 704 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
+| 705 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
+| 706 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
+| 707 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
+| 708 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
+| 709 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
+| 710 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
+| 711 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
+| 712 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
+| 713 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
+| 714 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
+| 715 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
+| 716 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
+| 717 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
+| 718 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
+| 719 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
+| 720 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
+| 721 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
+| 722 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
+| 723 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
+| 724 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
+| 725 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
+| 726 | PAN-4352 | XS | low | ok |  |  | Operator verification: skill packs in a managed interactive Claude Code launch now that PAN-4334 has shipped |
+| 727 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
+| 728 | PAN-4298 | XL | low | needs-refinement |  | PAN-4294, PAN-1676 | Anywhere paid tier: run agents on hosted Fly capacity; tenant isolation, credentials, metering open; PAN-4294 and PAN-1676 unbuilt |
+| 729 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
+| 730 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
+| 731 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
+| 732 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
+| 733 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
+| 734 | PAN-4248 | L | medium | ok |  |  | List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; PAN-1641 sidecar has merged. |
+| 735 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
+| 736 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
+| 737 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
+| 738 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
+| 739 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
+| 740 | PAN-3971 | L | low | ok |  |  | Overdeck-native artifact pages (pan artifact publish + state door + dashboard listing); body says backlog only, Claude artifacts work today |
+| 741 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
+| 742 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
+| 743 | PAN-2983 | M | low | stale |  |  | Superseded by the OKF v0.2 redesign: write modes and drafts (eltmon/okf#6) and the advisory semantic pass (eltmon/okf#7) |
+| 744 | PAN-3824 | XS | low | needs-refinement |  |  | Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior |
+| 745 | PAN-3823 | XS | low | needs-refinement |  |  | Image-only report titled "pan sync issue"; needs the command, output text, and expected behavior |
+| 746 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
+| 747 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
+| 749 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
 | 750 | PAN-5360 | L | low | ok |  |  | Memory facts lack source, created date and supersession; add frontmatter, --supersedes, and an advisory duplicate/contradiction lint. |
-| 751 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
-| 752 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
-| 753 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
-| 754 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
-| 755 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
-| 756 | PAN-4347 | S | low | ok |  |  | pan done appends continue.json decisions to the PR body so significant decisions outlive the workspace |
-| 757 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
-| 758 | PAN-4275 | S | low | ok |  |  | Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. PAN-1641 has merged. |
-| 759 | PAN-2836 | M | low | needs-refinement |  |  | Placement presets now belong on eltmon/okf#4 after the OKF v0.2 redesign; migrate verb collides; re-scope or move upstream |
-| 760 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
-| 761 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
-| 762 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
-| 763 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
-| 764 | PAN-3456 | XS | low | ok |  |  | Already fixed in 4117c9a777 with a regression test; open only pending close-out. |
-| 765 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
-| 766 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
-| 767 | PAN-772 | M | low | stale |  |  | Auto-resume ladder paths it names are gone; terminal-stack consistency now means the Herdr/tmux contract in TERMINAL-BACKENDS.md |
-| 768 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
-| 769 | PAN-769 | M | low | stale |  | PAN-750 | Phase-transition history no longer accumulates in a record; a churn metric would be rebuilt from PR review cycles or the pipeline journal |
-| 770 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
-| 771 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
-| 772 | PAN-4425 | M | low | ok |  |  | Deft fork work in eltmon/directive (env off switch, external-orchestrator mode); outside the overdeck pipeline |
-| 773 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
-| 774 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
-| 775 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
-| 776 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
-| 777 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
-| 778 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
-| 779 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
-| 780 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
-| 781 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
-| 782 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
-| 783 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
-| 784 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
-| 785 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
-| 786 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
-| 787 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
-| 788 | PAN-604 | M | low | ok |  |  | Hide planning agent from workspace detail pane |
-| 789 | PAN-603 | M | low | ok |  |  | Plan review loop with configurable reviewer model |
-| 790 | PAN-591 | XS | low | ok |  |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
-| 791 | PAN-589 | XS | low | ok |  |  | Review and update commands-skills.md with all available Panopticon skills |
-| 792 | PAN-576 | M | low | ok |  |  | Global / search should include conversations in addition to workspace features |
-| 793 | PAN-571 | XS | low | ok |  |  | Add OpenRouter credits/plan status endpoint and UI |
-| 794 | PAN-568 | M | low | ok |  |  | Kanban: Show workspace and tmux session counts in stats |
-| 795 | PAN-565 | M | low | ok |  |  | Handle CTRL-Z to undo accidental conversation archival |
-| 796 | PAN-564 | M | low | ok |  |  | Slash menu positioned incorrectly |
-| 797 | PAN-554 | M | low | ok |  |  | Add kanban board deeplinks for issue URLs |
-| 798 | PAN-543 | M | low | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
-| 799 | PAN-483 | M | low | ok |  |  | Unify Resume Agent UX |
-| 800 | PAN-480 | M | low | needs-refinement |  |  | Planning-agent --effort; likely covered by merged PAN-4249 resolver and PAN-4258 (plan effort), confirm or close |
-| 801 | PAN-476 | M | low | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
-| 802 | PAN-468 | M | low | ok |  |  | Agent test conversations pollute production database |
-| 803 | PAN-461 | M | low | ok |  |  | Deep-wipe multi-step progress dialog |
-| 804 | PAN-459 | M | low | ok |  |  | Planning setup screen with SSE progress streaming |
-| 805 | PAN-407 | XS | low | ok |  |  | Run Panopticon from a main workspace for development isolation |
-| 806 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
-| 807 | PAN-2346 | XS | low | ok |  |  | docs: refresh AGENT_TYPES_INDEX.md to the post-Cut taxonomy in ROLES.md (xBRIEF items, foreman, conv-flywheel, worker role). |
-| 808 | PAN-2345 | XS | low | ok |  |  | docs: rewrite pan-done.md against done.ts + done-preflight.ts; fix continue path; point MERGE link at MERGE-WORKFLOW.md. |
-| 809 | PAN-2344 | XS | low | ok |  |  | docs: rewrite KANBAN-MODEL.md for derived issue state, pipeline-membership buckets, PR reviews; drop Inspect and beads. |
-| 810 | PAN-2343 | XS | low | ok |  |  | docs: rewrite MISSION-CONTROL.md: state label from deriveStateLabel, membership, liveness.ts; review_status table is gone. |
-| 811 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
-| 812 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
-| 813 | PAN-2068 | XS | low | ok |  |  | docs: add user-facing page for Caveman (agent output compression) |
-| 814 | PAN-2067 | XS | low | ok |  |  | docs: add user-facing page for RTK (Bash output compression) |
-| 815 | PAN-1684 | XS | low | ok |  |  | build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
-| 816 | PAN-1683 | XS | low | ok |  |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) |
-| 817 | PAN-1474 | M | low | ok |  |  | Add ACKNOWLEDGEMENTS doc |
-| 818 | PAN-1469 | M | low | ok |  |  | End-to-end review and consolidation of all project documentation |
-| 819 | PAN-674 | XS | low | ok |  |  | docs: add glossary of Panopticon domain terms |
-| 820 | PAN-634 | M | low | ok |  |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
-| 821 | PAN-2908 | M | low | ok |  |  | Make overdeck not suck |
-| 822 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
-| 823 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
-| 824 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
-| 825 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
-| 826 | PAN-324 | XS | medium | needs-refinement |  |  | Approval is now a PR review or the dashboard MERGE button; verify whether the agent detail pane already surfaces MERGE post-cut |
-| 827 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
-| 828 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
-| 829 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
-| 830 | PAN-4332 | M | low | ok |  |  | Interop: continue t3code sessions in Overdeck and back via native transcripts; PAN-2609 Phase A has closed |
-| 831 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
-| 832 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
-| 833 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
-| 834 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
-| 835 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
-| 836 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
-| 837 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
-| 838 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
-| 839 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
-| 840 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
-| 841 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
-| 842 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
-| 843 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
-| 844 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 845 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 846 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 847 | PAN-5033 | XS | medium | ok |  |  | OpenClaw Connect a bot snippet omits hooks.allowConversationAccess, so the needs-you summary stays off with no message. |
-| 848 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 849 | PAN-5043 | S | medium | ok |  |  | Commit the phone-app iOS Simulator harness (Miniflare connect stand-in, stub account service, rig steps) built twice by hand. |
-| 850 | PAN-5065 | L | medium | ok |  |  | Opt-in mode where a project's agents and gates stop seeing ~/.overdeck.env keys the project did not list. |
-| 851 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 852 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
-| 853 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
-| 854 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
-| 855 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
-| 856 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
-| 857 | PAN-283 | M | low | stale |  |  | Reset should sync workspace feature branch with latest main |
-| 858 | PAN-271 | M | low | stale |  |  | Auto-assign Linear project from project config when creating issues |
-| 859 | PAN-265 | M | low | stale |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
-| 860 | PAN-249 | XS | low | stale |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
-| 861 | PAN-228 | M | low | stale |  |  | Shift-left post-edit diagnostics |
-| 862 | PAN-227 | M | low | stale |  |  | Phase gate validation |
-| 863 | PAN-198 | M | low | stale |  |  | Structured audit trail for agent actions |
-| 864 | PAN-190 | M | low | stale |  |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
-| 865 | PAN-180 | M | low | stale |  |  | PAN-180: Cross-terminal file locking for concurrent agents |
-| 866 | PAN-177 | M | low | stale |  |  | PAN-177: Iteration limits with escalation for autonomous agents |
-| 867 | PAN-175 | M | low | stale |  |  | PAN-175: Pre-compact auto-save hook for agent sessions |
-| 868 | PAN-155 | L | low | stale |  |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
-| 869 | PAN-146 | M | low | stale |  |  | PAN-146: Refine light mode theming across all dashboard pages |
-| 870 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
-| 871 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
-| 872 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
-| 873 | PAN-3536 | S | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): pan tell can not reach ohmypi conversations; fix dies with the harness |
-| 874 | PAN-2027 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): routing kimi-k2 through ohmypi needs a different home once OMP is gone |
-| 875 | PAN-2035 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): Copilot provider routing via omp |
-| 876 | PAN-2034 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): end-to-end test for ohmypi tool-call rendering |
-| 877 | PAN-2033 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi message-delivery latency benchmark |
-| 878 | PAN-2032 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): local Ollama review role via omp |
-| 879 | PAN-2030 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): version-pin the ohmypi extension |
-| 880 | PAN-2029 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi-parser thinking_tokens capture |
-| 881 | PAN-2028 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): per-provider cost grouping keyed on omp |
-| 882 | PAN-2024 | XS | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi conversation Tools-toggle |
-| 883 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
-| 884 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
-| 885 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
-| 886 | PAN-4590 | L | medium | ok |  |  | Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config. |
-| 887 | PAN-4591 | L | medium | ok |  |  | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable. |
-| 888 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
-| 889 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
-| 890 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
-| 891 | PAN-5022 | L | medium | ok |  |  | Phone app: relay notification preferences to offline machines via the directory, and drop muted pushes on the phone. |
-| 892 | PAN-5021 | M | low | needs-refinement |  |  | PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded. |
-| 893 | PAN-5029 | M | medium | needs-refinement |  |  | Grok Build Tailscale reach can't work: pan mcp serve verifies tokens only against its own machine. Needs a design choice. |
-| 894 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
-| 895 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
-| 896 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
-| 897 | PAN-5207 | L | low | needs-refinement |  | PAN-5202 | Parked by the operator: Flux meeting bots for Zoom, Teams, Meet, Slack as a paid integration. Do not start. |
-| 898 | PAN-5183 | XS | low | ok | ✓ |  | Parent of the file explorer; all children PAN-5185..5191 are closed. Verify and close. |
-| 899 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
-| 900 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
-| 901 | PAN-5235 | XS | low | ok |  |  | Fix already applied: terminal-dialog toast now navigates to the agent's terminal tab. Verify and close. |
-| 902 | PAN-5280 | XS | low | ok |  |  | Record of two UI fixes made inline on main (orbiting logo, unclipped Home project menu). Verify and close. |
+| 750 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
+| 751 | PAN-5365 | S | low | needs-refinement |  | PAN-5360 | MCP memory_add gains a source param after PAN-5360; the supersedes-on-agent-surface decision is still open. |
+| 752 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
+| 753 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
+| 754 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
+| 755 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
+| 756 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
+| 757 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
+| 758 | PAN-4347 | S | low | ok |  |  | pan done appends continue.json decisions to the PR body so significant decisions outlive the workspace |
+| 759 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
+| 760 | PAN-4275 | S | low | ok |  |  | Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. PAN-1641 has merged. |
+| 761 | PAN-2836 | M | low | needs-refinement |  |  | Placement presets now belong on eltmon/okf#4 after the OKF v0.2 redesign; migrate verb collides; re-scope or move upstream |
+| 762 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
+| 763 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
+| 764 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
+| 765 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
+| 766 | PAN-3456 | XS | low | ok |  |  | Already fixed in 4117c9a777 with a regression test; open only pending close-out. |
+| 767 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
+| 768 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
+| 769 | PAN-772 | M | low | stale |  |  | Auto-resume ladder paths it names are gone; terminal-stack consistency now means the Herdr/tmux contract in TERMINAL-BACKENDS.md |
+| 770 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
+| 771 | PAN-769 | M | low | stale |  | PAN-750 | Phase-transition history no longer accumulates in a record; a churn metric would be rebuilt from PR review cycles or the pipeline journal |
+| 772 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
+| 773 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
+| 774 | PAN-4425 | M | low | ok |  |  | Deft fork work in eltmon/directive (env off switch, external-orchestrator mode); outside the overdeck pipeline |
+| 775 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
+| 776 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
+| 777 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
+| 778 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
+| 779 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
+| 780 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
+| 781 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
+| 782 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
+| 783 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
+| 784 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
+| 785 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
+| 786 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
+| 787 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
+| 788 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
+| 789 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
+| 790 | PAN-604 | M | low | ok |  |  | Hide planning agent from workspace detail pane |
+| 791 | PAN-603 | M | low | ok |  |  | Plan review loop with configurable reviewer model |
+| 792 | PAN-591 | XS | low | ok |  |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
+| 793 | PAN-589 | XS | low | ok |  |  | Review and update commands-skills.md with all available Panopticon skills |
+| 794 | PAN-576 | M | low | ok |  |  | Global / search should include conversations in addition to workspace features |
+| 795 | PAN-571 | XS | low | ok |  |  | Add OpenRouter credits/plan status endpoint and UI |
+| 796 | PAN-568 | M | low | ok |  |  | Kanban: Show workspace and tmux session counts in stats |
+| 797 | PAN-565 | M | low | ok |  |  | Handle CTRL-Z to undo accidental conversation archival |
+| 798 | PAN-564 | M | low | ok |  |  | Slash menu positioned incorrectly |
+| 799 | PAN-554 | M | low | ok |  |  | Add kanban board deeplinks for issue URLs |
+| 800 | PAN-543 | M | low | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
+| 801 | PAN-483 | M | low | ok |  |  | Unify Resume Agent UX |
+| 802 | PAN-480 | M | low | needs-refinement |  |  | Planning-agent --effort; likely covered by merged PAN-4249 resolver and PAN-4258 (plan effort), confirm or close |
+| 803 | PAN-476 | M | low | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
+| 804 | PAN-468 | M | low | ok |  |  | Agent test conversations pollute production database |
+| 805 | PAN-461 | M | low | ok |  |  | Deep-wipe multi-step progress dialog |
+| 806 | PAN-459 | M | low | ok |  |  | Planning setup screen with SSE progress streaming |
+| 807 | PAN-407 | XS | low | ok |  |  | Run Panopticon from a main workspace for development isolation |
+| 808 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
+| 809 | PAN-2346 | XS | low | ok |  |  | docs: refresh AGENT_TYPES_INDEX.md to the post-Cut taxonomy in ROLES.md (xBRIEF items, foreman, conv-flywheel, worker role). |
+| 810 | PAN-2345 | XS | low | ok |  |  | docs: rewrite pan-done.md against done.ts + done-preflight.ts; fix continue path; point MERGE link at MERGE-WORKFLOW.md. |
+| 811 | PAN-2344 | XS | low | ok |  |  | docs: rewrite KANBAN-MODEL.md for derived issue state, pipeline-membership buckets, PR reviews; drop Inspect and beads. |
+| 812 | PAN-2343 | XS | low | ok |  |  | docs: rewrite MISSION-CONTROL.md: state label from deriveStateLabel, membership, liveness.ts; review_status table is gone. |
+| 813 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
+| 814 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
+| 815 | PAN-2068 | XS | low | ok |  |  | docs: add user-facing page for Caveman (agent output compression) |
+| 816 | PAN-2067 | XS | low | ok |  |  | docs: add user-facing page for RTK (Bash output compression) |
+| 817 | PAN-1684 | XS | low | ok |  |  | build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
+| 818 | PAN-1683 | XS | low | ok |  |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) |
+| 819 | PAN-1474 | M | low | ok |  |  | Add ACKNOWLEDGEMENTS doc |
+| 820 | PAN-1469 | M | low | ok |  |  | End-to-end review and consolidation of all project documentation |
+| 821 | PAN-674 | XS | low | ok |  |  | docs: add glossary of Panopticon domain terms |
+| 822 | PAN-634 | M | low | ok |  |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
+| 823 | PAN-2908 | M | low | ok |  |  | Make overdeck not suck |
+| 824 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
+| 825 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
+| 826 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
+| 827 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
+| 828 | PAN-324 | XS | medium | needs-refinement |  |  | Approval is now a PR review or the dashboard MERGE button; verify whether the agent detail pane already surfaces MERGE post-cut |
+| 829 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
+| 830 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
+| 831 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
+| 832 | PAN-4332 | M | low | ok |  |  | Interop: continue t3code sessions in Overdeck and back via native transcripts; PAN-2609 Phase A has closed |
+| 833 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
+| 834 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
+| 835 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
+| 836 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
+| 837 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
+| 838 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
+| 839 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
+| 840 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
+| 841 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
+| 842 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
+| 843 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
+| 844 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
+| 845 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
+| 846 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 847 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 848 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 849 | PAN-5033 | XS | medium | ok |  |  | OpenClaw Connect a bot snippet omits hooks.allowConversationAccess, so the needs-you summary stays off with no message. |
+| 850 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 851 | PAN-5043 | S | medium | ok |  |  | Commit the phone-app iOS Simulator harness (Miniflare connect stand-in, stub account service, rig steps) built twice by hand. |
+| 852 | PAN-5065 | L | medium | ok |  |  | Opt-in mode where a project's agents and gates stop seeing ~/.overdeck.env keys the project did not list. |
+| 853 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 854 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
+| 855 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
+| 856 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
+| 857 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
+| 858 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
+| 859 | PAN-283 | M | low | stale |  |  | Reset should sync workspace feature branch with latest main |
+| 860 | PAN-271 | M | low | stale |  |  | Auto-assign Linear project from project config when creating issues |
+| 861 | PAN-265 | M | low | stale |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
+| 862 | PAN-249 | XS | low | stale |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
+| 863 | PAN-228 | M | low | stale |  |  | Shift-left post-edit diagnostics |
+| 864 | PAN-227 | M | low | stale |  |  | Phase gate validation |
+| 865 | PAN-198 | M | low | stale |  |  | Structured audit trail for agent actions |
+| 866 | PAN-190 | M | low | stale |  |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
+| 867 | PAN-180 | M | low | stale |  |  | PAN-180: Cross-terminal file locking for concurrent agents |
+| 868 | PAN-177 | M | low | stale |  |  | PAN-177: Iteration limits with escalation for autonomous agents |
+| 869 | PAN-175 | M | low | stale |  |  | PAN-175: Pre-compact auto-save hook for agent sessions |
+| 870 | PAN-155 | L | low | stale |  |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
+| 871 | PAN-146 | M | low | stale |  |  | PAN-146: Refine light mode theming across all dashboard pages |
+| 872 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
+| 873 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
+| 874 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
+| 875 | PAN-3536 | S | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): pan tell can not reach ohmypi conversations; fix dies with the harness |
+| 876 | PAN-2027 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): routing kimi-k2 through ohmypi needs a different home once OMP is gone |
+| 877 | PAN-2035 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): Copilot provider routing via omp |
+| 878 | PAN-2034 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): end-to-end test for ohmypi tool-call rendering |
+| 879 | PAN-2033 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi message-delivery latency benchmark |
+| 880 | PAN-2032 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): local Ollama review role via omp |
+| 881 | PAN-2030 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): version-pin the ohmypi extension |
+| 882 | PAN-2029 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi-parser thinking_tokens capture |
+| 883 | PAN-2028 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): per-provider cost grouping keyed on omp |
+| 884 | PAN-2024 | XS | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi conversation Tools-toggle |
+| 885 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
+| 886 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
+| 887 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
+| 888 | PAN-4590 | L | medium | ok |  |  | Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config. |
+| 889 | PAN-4591 | L | medium | ok |  |  | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable. |
+| 890 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
+| 891 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
+| 892 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
+| 893 | PAN-5022 | L | medium | ok |  |  | Phone app: relay notification preferences to offline machines via the directory, and drop muted pushes on the phone. |
+| 894 | PAN-5021 | M | low | needs-refinement |  |  | PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded. |
+| 895 | PAN-5029 | M | medium | needs-refinement |  |  | Grok Build Tailscale reach can't work: pan mcp serve verifies tokens only against its own machine. Needs a design choice. |
+| 896 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
+| 897 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
+| 898 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
+| 899 | PAN-5207 | L | low | needs-refinement |  | PAN-5202 | Parked by the operator: Flux meeting bots for Zoom, Teams, Meet, Slack as a paid integration. Do not start. |
+| 900 | PAN-5183 | XS | low | ok | ✓ |  | Parent of the file explorer; all children PAN-5185..5191 are closed. Verify and close. |
+| 901 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
+| 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
+| 903 | PAN-5235 | XS | low | ok |  |  | Fix already applied: terminal-dialog toast now navigates to the agent's terminal tab. Verify and close. |
 
 ## Rationale detail
 
-### PAN-5290 (rank 1)
+### PAN-5013 (rank 3)
 
-New in-pipeline child C of the PAN-5284 workflow redesign, pinned at a freed top slot. It is one of four prerequisites for PAN-5343.
-
-### PAN-5294 (rank 2)
-
-New in-pipeline child G of the PAN-5284 workflow redesign, pinned at a freed top slot. It is a prerequisite for PAN-5343.
-
-### PAN-5348 (rank 3)
-
-New in-pipeline bug: the composer parser throws on bare /pan, so every send of the help command fails with a 404 and a self-contradicting error. Pinned in the free rank-3 slot beside the other in-pipeline work; the fix is a small parser change plus a local command result.
+Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
 
 ### PAN-5337 (rank 4)
 
 New in-pipeline bug, pinned at a freed top slot. All 93 links in a measured docs index were dead; PAN-5340 builds on its fix.
 
+### PAN-5356 (rank 4)
+
+New critical substrate bug: it is why the approved PAN-5290/5294/5348 batch cannot land today. Keeping a live generation when main moved only through CI-ignored bookkeeping paths unblocks the merge train; ranked just below the in-pipeline pins and PAN-5013.
+
 ### PAN-5338 (rank 5)
 
 New in-pipeline enhancement, pinned at a freed top slot. Its reusable preview body is what PAN-5341 reuses in the dock diff view.
 
-### PAN-5013 (rank 6)
+### PAN-5363 (rank 7)
 
-Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
-
-### PAN-5356 (rank 7)
-
-New critical substrate bug: it is why the approved PAN-5290/5294/5348 batch cannot land today. Keeping a live generation when main moved only through CI-ignored bookkeeping paths unblocks the merge train; ranked just below the in-pipeline pins and PAN-5013.
+Back in the manifest after dropping out of the last two passes; restored with its prior node. In-pipeline bug with a file:line root cause (switch falls back to a stale 5 s server board cache after the POST settles). Placed in a free top-tier slot near PAN-5364, which edits the same ProjectTrainCard.tsx; high rather than critical because the write itself succeeds.
 
 ### PAN-5357 (rank 8)
 
 New critical substrate bug: 41 no-op sequence commits in 3 hours churn main, feeding the merge-train starvation in PAN-5356 and forcing every worktree to merge noise. Small, self-contained fix in the write-sequence path, ranked right after PAN-5356.
 
-### PAN-5354 (rank 9)
+### PAN-5361 (rank 9)
 
-New substrate bug from the 2026-11-15 host crash: five work agents sat dead 1-2h because no code path turns a confirmed death into a resume or Needs-you item since the PAN-3917 cut. It ranks just below the in-pipeline pins because unattended recovery is a pipeline prerequisite, and the body already carries file:line root cause, a reuse-the-crash-door design, 11 ACs and named tests, so it is ready to plan.
+New in-pipeline substrate bug: a ~3% false-red CI job blocks releases and merges with no code change. It is pinned at rank 9, beside the other critical pipeline substrate fixes; pinned in-pipeline ranks stay where they were.
 
 ### PAN-4636 (rank 10)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
 
+### PAN-5364 (rank 11)
+
+New in-pipeline bug filed 2026-11-15, confirmed against the live board: after a promote there is no hero batch, so the voided sibling sits first and the merged batch is buried among aging voided rows. Pinned beside PAN-5363 because both edit ProjectTrainCard.tsx; the rebuild churn itself is PAN-5356, which this issue explicitly leaves out of scope.
+
 ### PAN-4553 (rank 11)
 
 Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so this issue now waits on that PR instead of being picked up separately.
+
+### PAN-5354 (rank 12)
+
+New substrate bug from the 2026-11-15 host crash: five work agents sat dead 1-2h because no code path turns a confirmed death into a resume or Needs-you item since the PAN-3917 cut. It ranks just below the in-pipeline pins because unattended recovery is a pipeline prerequisite, and the body already carries file:line root cause, a reuse-the-crash-door design, 11 ACs and named tests, so it is ready to plan.
 
 ### PAN-4733 (rank 12)
 
@@ -978,25 +983,29 @@ Operator decision 2026-10-04 after the Flywheel closed 19 deployed issues by han
 
 pan spawn is the foreman's pane-only item worker, so parallel waves cannot run any item through it on either backend. The test suite never asserts argv, so it stayed green. Small fix with a clear expected behavior.
 
-### PAN-4544 (rank 18)
+### PAN-5369 (rank 18)
+
+New issue with a profiled root cause: 42% of main-thread CPU goes to an unindexed per-transcript lookup on every conversation poll tick, which starves /api/costs/summary, /api/fleet/usage and /api/health. It degrades every dashboard surface and blocks PAN-5370 item 3 from being observable, so it ranks beside the other event-loop fix PAN-4544.
+
+### PAN-4544 (rank 20)
 
 Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls this route in the background, so every poll freezes all HTTP and WebSocket traffic for ~1.6 s and can fail DoD health probes. The async reader already exists, so the fix is small.
-
-### PAN-4551 (rank 19)
-
-Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. PAN-4527, PAN-4531 and PAN-4540 closed on 2026-10-24, so it now waits only on PAN-4534 (in pipeline); rank holds at 14.
-
-### PAN-4671 (rank 20)
-
-New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.
 
 ### PAN-5347 (rank 21)
 
 New in-pipeline discoverability fix: skills never reach the composer slash menu, so operators cannot find skill-only workflows. Pinned in the free rank-21 slot beside the other in-pipeline work; it reuses the existing skills route and category grouping.
 
+### PAN-4551 (rank 21)
+
+Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. PAN-4527, PAN-4531 and PAN-4540 closed on 2026-10-24, so it now waits only on PAN-4534 (in pipeline); rank holds at 14.
+
 ### PAN-5339 (rank 22)
 
 New in-pipeline enhancement, pinned at the freed rank-22 slot. It is self-contained in ChatMarkdown and the existing /conv route.
+
+### PAN-4671 (rank 22)
+
+New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.
 
 ### PAN-4675 (rank 23)
 
@@ -1226,10 +1235,6 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
 
 New this pass. A completed-handoff agent owed rework after a blocked verdict cannot be started at all: pan start refuses and recommends --fresh, --fresh gives the identical refusal, and reset-session is refused too because the durable plane reconstructs the session pointer. The refusal message names an action the operator cannot take, which is the self-contradictory-deadlock family PAN-3526 opened.
 
-### PAN-3522 (rank 80)
-
-New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts through a new generation's 138-second boot warm phase and killed it anyway, producing four restarts in ten minutes, racing spawns on port 3012, and a WATCHDOG GIVING UP. Each restart re-triggered docker stack rebuilds, feeding the storm. The probe budget has to know the difference between starved and starting.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1237,47 +1242,21 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T14:58:36.076805Z",
+  "generatedAt": "2026-11-15T16:09:24.821658Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 902,
+  "openCount": 907,
   "nodes": [
     {
-      "issue": "PAN-5290",
-      "rank": 1,
-      "size": "L",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: workflow redesign C — code opens beside the chat; edit-workspace bar, Create PR and PR status in the editor.",
-      "rationale": "New in-pipeline child C of the PAN-5284 workflow redesign, pinned at a freed top slot. It is one of four prerequisites for PAN-5343.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5294",
-      "rank": 2,
-      "size": "L",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: workflow redesign G — rebuilt project Home with actions first, needs-you, pipeline rows, recent changes.",
-      "rationale": "New in-pipeline child G of the PAN-5284 workflow redesign, pinned at a freed top slot. It is a prerequisite for PAN-5343.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5348",
+      "issue": "PAN-5013",
       "rank": 3,
       "size": "S",
-      "importance": "high",
-      "score": 72,
+      "importance": "critical",
+      "score": 86,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In pipeline: bare /pan in the composer 404s with an error telling you to type /pan; make it list commands locally",
-      "rationale": "New in-pipeline bug: the composer parser throws on bare /pan, so every send of the help command fails with a 404 and a self-contradicting error. Pinned in the free rank-3 slot beside the other in-pipeline work; the fix is a small parser change plus a local command result.",
+      "why": "Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned.",
+      "rationale": "Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1295,6 +1274,19 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "planning": "auto"
     },
     {
+      "issue": "PAN-5356",
+      "rank": 4,
+      "size": "M",
+      "importance": "critical",
+      "score": 91,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Merge train re-assembles on every bookkeeping-only main commit, so batches never live long enough for CI; skip .pan/** moves.",
+      "rationale": "New critical substrate bug: it is why the approved PAN-5290/5294/5348 batch cannot land today. Keeping a live generation when main moved only through CI-ignored bookkeeping paths unblocks the merge train; ranked just below the in-pipeline pins and PAN-5013.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5338",
       "rank": 5,
       "size": "M",
@@ -1308,28 +1300,15 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "planning": "auto"
     },
     {
-      "issue": "PAN-5013",
-      "rank": 6,
-      "size": "S",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned.",
-      "rationale": "Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5356",
+      "issue": "PAN-5363",
       "rank": 7,
-      "size": "M",
-      "importance": "critical",
-      "score": 91,
+      "size": "S",
+      "importance": "high",
+      "score": 70,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Merge train re-assembles on every bookkeeping-only main commit, so batches never live long enough for CI; skip .pan/** moves.",
-      "rationale": "New critical substrate bug: it is why the approved PAN-5290/5294/5348 batch cannot land today. Keeping a live generation when main moved only through CI-ignored bookkeeping paths unblocks the merge train; ranked just below the in-pipeline pins and PAN-5013.",
+      "why": "In pipeline: merge train board Train switch flips back on after off; board cache not dropped on write, optimistic value lost.",
+      "rationale": "Back in the manifest after dropping out of the last two passes; restored with its prior node. In-pipeline bug with a file:line root cause (switch falls back to a stale 5 s server board cache after the POST settles). Placed in a free top-tier slot near PAN-5364, which edits the same ProjectTrainCard.tsx; high rather than critical because the write itself succeeds.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1347,15 +1326,15 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "planning": "auto"
     },
     {
-      "issue": "PAN-5354",
+      "issue": "PAN-5361",
       "rank": 9,
-      "size": "M",
+      "size": "S",
       "importance": "critical",
-      "score": 88,
+      "score": 86,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Host-crash-killed work agents stay dead: deacon-lite confirms death but nothing resumes; add paced resumeCrashedWorkAgents.",
-      "rationale": "New substrate bug from the 2026-11-15 host crash: five work agents sat dead 1-2h because no code path turns a confirmed death into a resume or Needs-you item since the PAN-3917 cut. It ranks just below the in-pipeline pins because unattended recovery is a pipeline prerequisite, and the body already carries file:line root cause, a reuse-the-crash-door design, 11 ACs and named tests, so it is ready to plan.",
+      "why": "In pipeline: bare-host-linux idle check fails ~3% of runs; pid-net counts machine-wide runner PID bursts one baseline can't cancel.",
+      "rationale": "New in-pipeline substrate bug: a ~3% false-red CI job blocks releases and merges with no code change. It is pinned at rank 9, beside the other critical pipeline substrate fixes; pinned in-pipeline ranks stay where they were.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1373,6 +1352,19 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "planning": "auto"
     },
     {
+      "issue": "PAN-5364",
+      "rank": 11,
+      "size": "M",
+      "importance": "high",
+      "score": 68,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: merge train board shows a voided rebuild on top, buries the merged batch, and voided batches never age out.",
+      "rationale": "New in-pipeline bug filed 2026-11-15, confirmed against the live board: after a promote there is no hero batch, so the voided sibling sits first and the merged batch is buried among aging voided rows. Pinned beside PAN-5363 because both edit ProjectTrainCard.tsx; the rebuild churn itself is PAN-5356, which this issue explicitly leaves out of scope.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4553",
       "rank": 11,
       "size": "S",
@@ -1382,6 +1374,19 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "dependsOn": [],
       "why": "Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges.",
       "rationale": "Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so this issue now waits on that PR instead of being picked up separately.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5354",
+      "rank": 12,
+      "size": "M",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Host-crash-killed work agents stay dead: deacon-lite confirms death but nothing resumes; add paced resumeCrashedWorkAgents.",
+      "rationale": "New substrate bug from the 2026-11-15 host crash: five work agents sat dead 1-2h because no code path turns a confirmed death into a resume or Needs-you item since the PAN-3917 cut. It ranks just below the in-pipeline pins because unattended recovery is a pipeline prerequisite, and the body already carries file:line root cause, a reuse-the-crash-door design, 11 ACs and named tests, so it is ready to plan.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1464,8 +1469,21 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "planning": "auto"
     },
     {
-      "issue": "PAN-4544",
+      "issue": "PAN-5369",
       "rank": 18,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Dashboard main thread pinned at 100%: orphan scan re-queries SQLite for 4000 transcripts per tick; cost/usage routes never answer.",
+      "rationale": "New issue with a profiled root cause: 42% of main-thread CPU goes to an unindexed per-transcript lookup on every conversation poll tick, which starves /api/costs/summary, /api/fleet/usage and /api/health. It degrades every dashboard surface and blocks PAN-5370 item 3 from being observable, so it ranks beside the other event-loop fix PAN-4544.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4544",
+      "rank": 20,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -1473,32 +1491,6 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "dependsOn": [],
       "why": "/api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl",
       "rationale": "Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls this route in the background, so every poll freezes all HTTP and WebSocket traffic for ~1.6 s and can fail DoD health probes. The async reader already exists, so the fix is small.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4551",
-      "rank": 19,
-      "size": "L",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised",
-      "rationale": "Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. PAN-4527, PAN-4531 and PAN-4540 closed on 2026-10-24, so it now waits only on PAN-4534 (in pipeline); rank holds at 14.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4671",
-      "rank": 20,
-      "size": "M",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff.",
-      "rationale": "New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1516,6 +1508,19 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "planning": "auto"
     },
     {
+      "issue": "PAN-4551",
+      "rank": 21,
+      "size": "L",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised",
+      "rationale": "Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. PAN-4527, PAN-4531 and PAN-4540 closed on 2026-10-24, so it now waits only on PAN-4534 (in pipeline); rank holds at 14.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5339",
       "rank": 22,
       "size": "S",
@@ -1525,6 +1530,19 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "dependsOn": [],
       "why": "In pipeline: conversation names, conv N forms and /conv URLs in messages become clickable links.",
       "rationale": "New in-pipeline enhancement, pinned at the freed rank-22 slot. It is self-contained in ChatMarkdown and the existing /conv route.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4671",
+      "rank": 22,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff.",
+      "rationale": "New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4026,8 +4044,21 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "planning": "auto"
     },
     {
-      "issue": "PAN-3185",
+      "issue": "PAN-5370",
       "rank": 218,
+      "size": "S",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Workflow-redesign live-check fixes: Issues header overlap, breadcrumb clips file name, Spend fact never times out, More wraps.",
+      "rationale": "New child of epic PAN-5284 with four concrete UI defects and testable acceptance; placed just ahead of the epic node with its sibling children.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3185",
+      "rank": 219,
       "size": "XS",
       "importance": "high",
       "score": 70,
@@ -4039,8 +4070,21 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "planning": "auto"
     },
     {
-      "issue": "PAN-3179",
+      "issue": "PAN-5371",
       "rank": 219,
+      "size": "S",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Simple Home headline (18) and top bar Needs-you (8) count different things; pick one rule so both agree (epic D-8).",
+      "rationale": "New child of epic PAN-5284 with a concrete count mismatch, two stated fixes to choose in planning, and a testable acceptance; placed beside sibling PAN-5370.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3179",
+      "rank": 220,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4052,7 +4096,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5335",
-      "rank": 220,
+      "rank": 221,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -6181,7 +6225,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3661",
-      "rank": 392,
+      "rank": 393,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -6193,25 +6237,13 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3288",
-      "rank": 393,
-      "size": "XS",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Dev-checkout preflight: after a git pull that adds a dep, the CLI dies with ERR_MODULE_NOT_FOUND instead of saying 'run bun install'.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3164",
       "rank": 394,
       "size": "XS",
       "importance": "medium",
       "score": 58,
       "condition": "ok",
       "dependsOn": [],
-      "why": "probeUatStack reports readiness from container count, so the UI offers 'Open UAT frontend' while the API is still resolving Maven deps.",
+      "why": "Dev-checkout preflight: after a git pull that adds a dep, the CLI dies with ERR_MODULE_NOT_FOUND instead of saying 'run bun install'.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -6227,6 +6259,18 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "rationale": "New issue since the prior run: a small, self-contained conversation-view feature with a PRD and a live-probed mechanism, placed in the free rank-395 slot among medium conversation UX work.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-3164",
+      "rank": 395,
+      "size": "XS",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "probeUatStack reports readiness from container count, so the UI offers 'Open UAT frontend' while the API is still resolving Maven deps.",
+      "gate": "auto",
+      "planning": "skip"
     },
     {
       "issue": "PAN-3121",
@@ -6253,40 +6297,17 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "planning": "auto"
     },
     {
-      "issue": "PAN-3944",
-      "rank": 398,
-      "size": "S",
-      "importance": "medium",
-      "score": 45,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard",
-      "rationale": "The root-cause fix is on main with a regression test; what is left are two optional hardening follow-ups. Needs a re-scope to those.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3829",
-      "rank": 399,
-      "size": "L",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main)",
-      "rationale": "New this run: medium/58 — Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main).",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2280",
+      "issue": "PAN-5366",
       "rank": 400,
       "size": "M",
       "importance": "medium",
-      "score": 57,
+      "score": 52,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "Resumed conversations wedge without writing transcripts when dashboard is black-holed",
+      "dependsOn": [
+        "PAN-5359"
+      ],
+      "why": "Conversation page cannot show whether per-turn memory injection reaches it; add a state route and a status-line part. Needs PAN-5359.",
+      "rationale": "New issue split from PAN-5359; it reuses that issue's conversation identity resolver, so it ranks directly after it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6304,6 +6325,19 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "planning": "auto"
     },
     {
+      "issue": "PAN-3944",
+      "rank": 401,
+      "size": "S",
+      "importance": "medium",
+      "score": 45,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard",
+      "rationale": "The root-cause fix is on main with a regression test; what is left are two optional hardening follow-ups. Needs a re-scope to those.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5359",
       "rank": 402,
       "size": "M",
@@ -6317,8 +6351,33 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "planning": "auto"
     },
     {
-      "issue": "PAN-2197",
+      "issue": "PAN-3829",
+      "rank": 402,
+      "size": "L",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main)",
+      "rationale": "New this run: medium/58 — Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2280",
       "rank": 403,
+      "size": "M",
+      "importance": "medium",
+      "score": 57,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Resumed conversations wedge without writing transcripts when dashboard is black-holed",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2197",
+      "rank": 404,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6330,7 +6389,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2069",
-      "rank": 404,
+      "rank": 405,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6342,7 +6401,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1918",
-      "rank": 405,
+      "rank": 406,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6354,7 +6413,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1912",
-      "rank": 406,
+      "rank": 407,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6366,7 +6425,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4208",
-      "rank": 407,
+      "rank": 408,
       "size": "M",
       "importance": "medium",
       "score": 58,
@@ -6379,7 +6438,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1846",
-      "rank": 408,
+      "rank": 409,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6392,7 +6451,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1830",
-      "rank": 409,
+      "rank": 410,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6404,7 +6463,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1816",
-      "rank": 410,
+      "rank": 411,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6416,7 +6475,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1795",
-      "rank": 411,
+      "rank": 412,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6428,7 +6487,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1774",
-      "rank": 412,
+      "rank": 413,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6440,7 +6499,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1769",
-      "rank": 413,
+      "rank": 414,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6452,7 +6511,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1761",
-      "rank": 414,
+      "rank": 415,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6464,7 +6523,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1755",
-      "rank": 415,
+      "rank": 416,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6476,7 +6535,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3516",
-      "rank": 416,
+      "rank": 417,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6488,7 +6547,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3455",
-      "rank": 417,
+      "rank": 418,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6500,7 +6559,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3117",
-      "rank": 418,
+      "rank": 419,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6512,7 +6571,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3036",
-      "rank": 419,
+      "rank": 420,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6524,7 +6583,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3016",
-      "rank": 420,
+      "rank": 421,
       "size": "M",
       "importance": "medium",
       "score": 56,
@@ -6536,7 +6595,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3890",
-      "rank": 421,
+      "rank": 422,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6549,7 +6608,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3822",
-      "rank": 422,
+      "rank": 423,
       "size": "L",
       "importance": "medium",
       "score": 56,
@@ -6562,7 +6621,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5028",
-      "rank": 423,
+      "rank": 424,
       "size": "M",
       "importance": "medium",
       "score": 64,
@@ -6575,7 +6634,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1673",
-      "rank": 424,
+      "rank": 426,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6586,20 +6645,8 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "planning": "auto"
     },
     {
-      "issue": "PAN-5227",
-      "rank": 425,
-      "size": "S",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-5349",
-      "rank": 426,
+      "rank": 427,
       "size": "L",
       "importance": "medium",
       "score": 56,
@@ -6611,8 +6658,20 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "planning": "auto"
     },
     {
-      "issue": "PAN-5342",
+      "issue": "PAN-5227",
       "rank": 427,
+      "size": "S",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5342",
+      "rank": 428,
       "size": "L",
       "importance": "medium",
       "score": 60,
@@ -6625,7 +6684,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1669",
-      "rank": 428,
+      "rank": 429,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6637,7 +6696,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1668",
-      "rank": 429,
+      "rank": 430,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6649,7 +6708,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1627",
-      "rank": 430,
+      "rank": 431,
       "size": "M",
       "importance": "medium",
       "score": 55,
@@ -6661,7 +6720,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1624",
-      "rank": 431,
+      "rank": 432,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6673,7 +6732,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3901",
-      "rank": 432,
+      "rank": 433,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6686,7 +6745,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3852",
-      "rank": 433,
+      "rank": 434,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6699,16 +6758,14 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5343",
-      "rank": 434,
+      "rank": 435,
       "size": "L",
       "importance": "medium",
       "score": 58,
       "condition": "ok",
       "dependsOn": [
         "PAN-5335",
-        "PAN-5290",
-        "PAN-5295",
-        "PAN-5294"
+        "PAN-5295"
       ],
       "why": "Workflow redesign H: All projects deck listing conversations across projects, 1-4 side by side. Waits on four siblings.",
       "gate": "auto",
@@ -6716,7 +6773,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3862",
-      "rank": 435,
+      "rank": 436,
       "size": "L",
       "importance": "medium",
       "score": 55,
@@ -6729,7 +6786,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1572",
-      "rank": 436,
+      "rank": 437,
       "size": "M",
       "importance": "medium",
       "score": 54,
@@ -6742,7 +6799,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4627",
-      "rank": 437,
+      "rank": 438,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6755,7 +6812,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1571",
-      "rank": 438,
+      "rank": 439,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6767,7 +6824,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1565",
-      "rank": 439,
+      "rank": 440,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6779,7 +6836,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5312",
-      "rank": 440,
+      "rank": 441,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6791,7 +6848,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5241",
-      "rank": 441,
+      "rank": 442,
       "size": "L",
       "importance": "medium",
       "score": 54,
@@ -6803,7 +6860,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1530",
-      "rank": 442,
+      "rank": 443,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6815,7 +6872,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1461",
-      "rank": 443,
+      "rank": 444,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6827,7 +6884,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1449",
-      "rank": 444,
+      "rank": 445,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6839,7 +6896,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1446",
-      "rank": 445,
+      "rank": 446,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6851,7 +6908,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5180",
-      "rank": 446,
+      "rank": 447,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -6863,7 +6920,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5264",
-      "rank": 447,
+      "rank": 448,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -6875,7 +6932,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5340",
-      "rank": 448,
+      "rank": 449,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6889,7 +6946,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5341",
-      "rank": 449,
+      "rank": 450,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6903,7 +6960,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1445",
-      "rank": 450,
+      "rank": 451,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6915,7 +6972,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3616",
-      "rank": 451,
+      "rank": 452,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6927,7 +6984,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2982",
-      "rank": 452,
+      "rank": 453,
       "size": "XS",
       "importance": "medium",
       "score": 54,
@@ -6939,7 +6996,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5322",
-      "rank": 453,
+      "rank": 454,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -6951,7 +7008,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5317",
-      "rank": 454,
+      "rank": 455,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -6963,7 +7020,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2981",
-      "rank": 455,
+      "rank": 456,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6975,7 +7032,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2976",
-      "rank": 456,
+      "rank": 457,
       "size": "L",
       "importance": "medium",
       "score": 54,
@@ -6987,7 +7044,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1444",
-      "rank": 457,
+      "rank": 458,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6999,7 +7056,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2469",
-      "rank": 458,
+      "rank": 459,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -7012,7 +7069,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1433",
-      "rank": 459,
+      "rank": 460,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -7024,7 +7081,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1416",
-      "rank": 460,
+      "rank": 461,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -7036,7 +7093,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1392",
-      "rank": 461,
+      "rank": 462,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -7049,7 +7106,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4151",
-      "rank": 462,
+      "rank": 463,
       "size": "L",
       "importance": "medium",
       "score": 46,
@@ -7063,7 +7120,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1330",
-      "rank": 463,
+      "rank": 464,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -7075,7 +7132,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4971",
-      "rank": 464,
+      "rank": 465,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7088,7 +7145,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1226",
-      "rank": 465,
+      "rank": 466,
       "size": "L",
       "importance": "medium",
       "score": 52,
@@ -7100,7 +7157,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1173",
-      "rank": 466,
+      "rank": 467,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -7112,7 +7169,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1154",
-      "rank": 467,
+      "rank": 468,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -7124,7 +7181,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3354",
-      "rank": 468,
+      "rank": 469,
       "size": "XS",
       "importance": "medium",
       "score": 52,
@@ -7136,7 +7193,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3178",
-      "rank": 469,
+      "rank": 470,
       "size": "XL",
       "importance": "medium",
       "score": 52,
@@ -7149,7 +7206,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3017",
-      "rank": 470,
+      "rank": 471,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -7161,7 +7218,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5174",
-      "rank": 471,
+      "rank": 472,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -7173,7 +7230,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3873",
-      "rank": 472,
+      "rank": 473,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -7186,7 +7243,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5346",
-      "rank": 473,
+      "rank": 474,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -7199,7 +7256,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1150",
-      "rank": 474,
+      "rank": 475,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7211,7 +7268,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1149",
-      "rank": 475,
+      "rank": 476,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7223,7 +7280,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1130",
-      "rank": 476,
+      "rank": 477,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7235,7 +7292,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1129",
-      "rank": 477,
+      "rank": 478,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7247,7 +7304,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1128",
-      "rank": 478,
+      "rank": 479,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7259,7 +7316,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1113",
-      "rank": 479,
+      "rank": 480,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7271,7 +7328,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1068",
-      "rank": 480,
+      "rank": 481,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7283,7 +7340,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3938",
-      "rank": 481,
+      "rank": 482,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7296,7 +7353,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-933",
-      "rank": 482,
+      "rank": 483,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7308,7 +7365,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-932",
-      "rank": 483,
+      "rank": 484,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7320,7 +7377,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-927",
-      "rank": 484,
+      "rank": 485,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7332,7 +7389,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-900",
-      "rank": 485,
+      "rank": 486,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7344,7 +7401,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-886",
-      "rank": 486,
+      "rank": 487,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7356,7 +7413,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-778",
-      "rank": 487,
+      "rank": 488,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7368,7 +7425,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-681",
-      "rank": 488,
+      "rank": 489,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7380,7 +7437,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3732",
-      "rank": 489,
+      "rank": 490,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7392,7 +7449,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3700",
-      "rank": 490,
+      "rank": 491,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7404,7 +7461,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3290",
-      "rank": 491,
+      "rank": 492,
       "size": "XS",
       "importance": "medium",
       "score": 50,
@@ -7416,7 +7473,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3132",
-      "rank": 492,
+      "rank": 493,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7428,7 +7485,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3909",
-      "rank": 493,
+      "rank": 494,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7441,7 +7498,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2659",
-      "rank": 494,
+      "rank": 495,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7454,7 +7511,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3831",
-      "rank": 495,
+      "rank": 496,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7467,7 +7524,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4779",
-      "rank": 496,
+      "rank": 497,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7480,7 +7537,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-538",
-      "rank": 497,
+      "rank": 498,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -7492,7 +7549,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1164",
-      "rank": 498,
+      "rank": 499,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7504,7 +7561,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3563",
-      "rank": 499,
+      "rank": 500,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7517,7 +7574,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1041",
-      "rank": 500,
+      "rank": 501,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7529,7 +7586,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-924",
-      "rank": 501,
+      "rank": 502,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -7541,7 +7598,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3770",
-      "rank": 502,
+      "rank": 503,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7553,7 +7610,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4568",
-      "rank": 503,
+      "rank": 504,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7566,7 +7623,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3731",
-      "rank": 504,
+      "rank": 505,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7578,7 +7635,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3530",
-      "rank": 505,
+      "rank": 506,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7590,7 +7647,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3131",
-      "rank": 506,
+      "rank": 507,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -7602,7 +7659,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3061",
-      "rank": 507,
+      "rank": 508,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7614,7 +7671,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3057",
-      "rank": 508,
+      "rank": 509,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -7627,7 +7684,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3892",
-      "rank": 509,
+      "rank": 510,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7640,7 +7697,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4918",
-      "rank": 510,
+      "rank": 511,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7653,7 +7710,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-863",
-      "rank": 511,
+      "rank": 512,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7665,7 +7722,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-817",
-      "rank": 512,
+      "rank": 513,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7677,7 +7734,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-802",
-      "rank": 513,
+      "rank": 514,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7689,7 +7746,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-713",
-      "rank": 514,
+      "rank": 515,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7701,7 +7758,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-700",
-      "rank": 515,
+      "rank": 516,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7713,7 +7770,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-646",
-      "rank": 516,
+      "rank": 517,
       "size": "XS",
       "importance": "medium",
       "score": 47,
@@ -7726,7 +7783,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-532",
-      "rank": 517,
+      "rank": 518,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7738,7 +7795,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2896",
-      "rank": 518,
+      "rank": 519,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7750,7 +7807,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2685",
-      "rank": 519,
+      "rank": 520,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7762,7 +7819,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2626",
-      "rank": 520,
+      "rank": 521,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7774,7 +7831,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5231",
-      "rank": 521,
+      "rank": 522,
       "size": "S",
       "importance": "medium",
       "score": 46,
@@ -7786,7 +7843,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5204",
-      "rank": 522,
+      "rank": 523,
       "size": "S",
       "importance": "medium",
       "score": 46,
@@ -7798,7 +7855,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2625",
-      "rank": 523,
+      "rank": 524,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7810,7 +7867,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2608",
-      "rank": 524,
+      "rank": 525,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7822,7 +7879,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2582",
-      "rank": 525,
+      "rank": 526,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7834,7 +7891,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2566",
-      "rank": 526,
+      "rank": 527,
       "size": "L",
       "importance": "medium",
       "score": 46,
@@ -7848,7 +7905,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2565",
-      "rank": 527,
+      "rank": 528,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7861,7 +7918,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3735",
-      "rank": 528,
+      "rank": 529,
       "size": "S",
       "importance": "medium",
       "score": 46,
@@ -7873,7 +7930,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3335",
-      "rank": 529,
+      "rank": 530,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7885,7 +7942,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3054",
-      "rank": 530,
+      "rank": 531,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7897,7 +7954,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2977",
-      "rank": 531,
+      "rank": 532,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7911,7 +7968,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2557",
-      "rank": 532,
+      "rank": 533,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7923,7 +7980,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2553",
-      "rank": 533,
+      "rank": 534,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7935,7 +7992,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2521",
-      "rank": 534,
+      "rank": 535,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7947,7 +8004,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2493",
-      "rank": 535,
+      "rank": 536,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7959,7 +8016,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3772",
-      "rank": 536,
+      "rank": 537,
       "size": "XS",
       "importance": "medium",
       "score": 45,
@@ -7971,7 +8028,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3853",
-      "rank": 537,
+      "rank": 538,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7984,7 +8041,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3830",
-      "rank": 538,
+      "rank": 539,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7997,7 +8054,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4924",
-      "rank": 539,
+      "rank": 540,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -8010,7 +8067,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4367",
-      "rank": 540,
+      "rank": 541,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -8022,7 +8079,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2443",
-      "rank": 541,
+      "rank": 542,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8034,7 +8091,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2442",
-      "rank": 542,
+      "rank": 543,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8046,7 +8103,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2409",
-      "rank": 543,
+      "rank": 544,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8058,7 +8115,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5145",
-      "rank": 544,
+      "rank": 545,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8070,7 +8127,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5201",
-      "rank": 545,
+      "rank": 546,
       "size": "XL",
       "importance": "medium",
       "score": 44,
@@ -8082,7 +8139,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2392",
-      "rank": 546,
+      "rank": 547,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8095,7 +8152,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2335",
-      "rank": 547,
+      "rank": 548,
       "size": "XS",
       "importance": "medium",
       "score": 44,
@@ -8107,7 +8164,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2295",
-      "rank": 548,
+      "rank": 549,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -8119,7 +8176,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3767",
-      "rank": 549,
+      "rank": 550,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8131,7 +8188,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3615",
-      "rank": 550,
+      "rank": 551,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8143,7 +8200,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3558",
-      "rank": 551,
+      "rank": 552,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8155,7 +8212,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3469",
-      "rank": 552,
+      "rank": 553,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8167,7 +8224,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3333",
-      "rank": 553,
+      "rank": 554,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8179,7 +8236,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3058",
-      "rank": 554,
+      "rank": 555,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8191,7 +8248,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2288",
-      "rank": 555,
+      "rank": 556,
       "size": "L",
       "importance": "medium",
       "score": 43,
@@ -8203,7 +8260,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2065",
-      "rank": 556,
+      "rank": 557,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8215,7 +8272,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2031",
-      "rank": 557,
+      "rank": 558,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8227,7 +8284,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2026",
-      "rank": 558,
+      "rank": 559,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8239,7 +8296,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2025",
-      "rank": 559,
+      "rank": 560,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8251,7 +8308,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4366",
-      "rank": 560,
+      "rank": 561,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -8263,7 +8320,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5314",
-      "rank": 561,
+      "rank": 562,
       "size": "S",
       "importance": "medium",
       "score": 42,
@@ -8275,7 +8332,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5267",
-      "rank": 562,
+      "rank": 563,
       "size": "S",
       "importance": "medium",
       "score": 42,
@@ -8287,7 +8344,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2004",
-      "rank": 563,
+      "rank": 564,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8299,7 +8356,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1995",
-      "rank": 564,
+      "rank": 565,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8311,7 +8368,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3739",
-      "rank": 565,
+      "rank": 566,
       "size": "S",
       "importance": "medium",
       "score": 42,
@@ -8323,7 +8380,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4393",
-      "rank": 566,
+      "rank": 567,
       "size": "XS",
       "importance": "medium",
       "score": 44,
@@ -8335,7 +8392,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1985",
-      "rank": 567,
+      "rank": 568,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8347,7 +8404,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1968",
-      "rank": 568,
+      "rank": 569,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8359,7 +8416,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1967",
-      "rank": 569,
+      "rank": 570,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8372,7 +8429,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1965",
-      "rank": 570,
+      "rank": 571,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8384,7 +8441,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1937",
-      "rank": 571,
+      "rank": 572,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8396,7 +8453,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1926",
-      "rank": 572,
+      "rank": 573,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8408,7 +8465,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1916",
-      "rank": 573,
+      "rank": 574,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8420,7 +8477,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1854",
-      "rank": 574,
+      "rank": 575,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8432,7 +8489,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1853",
-      "rank": 575,
+      "rank": 576,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8444,7 +8501,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1852",
-      "rank": 576,
+      "rank": 577,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8456,7 +8513,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1844",
-      "rank": 577,
+      "rank": 578,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8468,7 +8525,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5202",
-      "rank": 578,
+      "rank": 579,
       "size": "XL",
       "importance": "medium",
       "score": 40,
@@ -8482,7 +8539,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5141",
-      "rank": 579,
+      "rank": 580,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8494,7 +8551,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1840",
-      "rank": 580,
+      "rank": 581,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8506,7 +8563,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1839",
-      "rank": 581,
+      "rank": 582,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8518,7 +8575,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1776",
-      "rank": 582,
+      "rank": 583,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8530,7 +8587,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3706",
-      "rank": 583,
+      "rank": 584,
       "size": "L",
       "importance": "medium",
       "score": 40,
@@ -8542,7 +8599,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3539",
-      "rank": 584,
+      "rank": 585,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8554,7 +8611,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3502",
-      "rank": 585,
+      "rank": 586,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8566,7 +8623,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4409",
-      "rank": 586,
+      "rank": 587,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8578,7 +8635,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4410",
-      "rank": 587,
+      "rank": 588,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8592,7 +8649,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2978",
-      "rank": 588,
+      "rank": 589,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -8607,7 +8664,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4878",
-      "rank": 589,
+      "rank": 590,
       "size": "XS",
       "importance": "low",
       "score": 30,
@@ -8620,7 +8677,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1754",
-      "rank": 590,
+      "rank": 591,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8632,7 +8689,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1751",
-      "rank": 591,
+      "rank": 592,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8644,7 +8701,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1750",
-      "rank": 592,
+      "rank": 593,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8656,7 +8713,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1748",
-      "rank": 593,
+      "rank": 594,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8668,7 +8725,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1691",
-      "rank": 594,
+      "rank": 595,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8680,7 +8737,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1685",
-      "rank": 595,
+      "rank": 596,
       "size": "XS",
       "importance": "medium",
       "score": 39,
@@ -8692,7 +8749,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1676",
-      "rank": 596,
+      "rank": 597,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8705,7 +8762,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1667",
-      "rank": 597,
+      "rank": 598,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8717,7 +8774,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1657",
-      "rank": 598,
+      "rank": 599,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8729,7 +8786,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1656",
-      "rank": 599,
+      "rank": 600,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8741,7 +8798,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1655",
-      "rank": 600,
+      "rank": 601,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8753,7 +8810,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1654",
-      "rank": 601,
+      "rank": 602,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -8765,7 +8822,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1653",
-      "rank": 602,
+      "rank": 603,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -8777,7 +8834,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5309",
-      "rank": 603,
+      "rank": 604,
       "size": "S",
       "importance": "low",
       "score": 36,
@@ -8789,7 +8846,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5308",
-      "rank": 604,
+      "rank": 605,
       "size": "S",
       "importance": "low",
       "score": 36,
@@ -8801,7 +8858,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1623",
-      "rank": 605,
+      "rank": 606,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8813,7 +8870,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1561",
-      "rank": 606,
+      "rank": 607,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8825,7 +8882,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1550",
-      "rank": 607,
+      "rank": 608,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8838,7 +8895,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1545",
-      "rank": 608,
+      "rank": 609,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -8850,7 +8907,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1542",
-      "rank": 609,
+      "rank": 610,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -8862,7 +8919,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1524",
-      "rank": 610,
+      "rank": 611,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8874,7 +8931,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1490",
-      "rank": 611,
+      "rank": 612,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8886,7 +8943,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1485",
-      "rank": 612,
+      "rank": 613,
       "size": "S",
       "importance": "medium",
       "score": 32,
@@ -8899,7 +8956,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1473",
-      "rank": 613,
+      "rank": 614,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8911,7 +8968,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1443",
-      "rank": 614,
+      "rank": 615,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -8924,7 +8981,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1442",
-      "rank": 615,
+      "rank": 616,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8936,7 +8993,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1432",
-      "rank": 616,
+      "rank": 617,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8948,7 +9005,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1223",
-      "rank": 617,
+      "rank": 618,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8960,7 +9017,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1165",
-      "rank": 618,
+      "rank": 619,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8972,7 +9029,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1151",
-      "rank": 619,
+      "rank": 620,
       "size": "XS",
       "importance": "medium",
       "score": 35,
@@ -8984,7 +9041,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4360",
-      "rank": 620,
+      "rank": 621,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8996,7 +9053,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1060",
-      "rank": 621,
+      "rank": 622,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -9008,7 +9065,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1051",
-      "rank": 622,
+      "rank": 623,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -9020,7 +9077,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1037",
-      "rank": 623,
+      "rank": 624,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -9032,7 +9089,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-958",
-      "rank": 624,
+      "rank": 625,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -9044,7 +9101,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-949",
-      "rank": 625,
+      "rank": 626,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -9056,7 +9113,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3157",
-      "rank": 626,
+      "rank": 627,
       "size": "XS",
       "importance": "medium",
       "score": 42,
@@ -9069,7 +9126,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5067",
-      "rank": 627,
+      "rank": 628,
       "size": "M",
       "importance": "medium",
       "score": 54,
@@ -9081,7 +9138,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4908",
-      "rank": 628,
+      "rank": 629,
       "size": "S",
       "importance": "low",
       "score": 34,
@@ -9094,7 +9151,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5130",
-      "rank": 629,
+      "rank": 630,
       "size": "S",
       "importance": "medium",
       "score": 36,
@@ -9107,7 +9164,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-947",
-      "rank": 630,
+      "rank": 631,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -9119,7 +9176,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-938",
-      "rank": 631,
+      "rank": 632,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -9131,7 +9188,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-903",
-      "rank": 632,
+      "rank": 633,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -9143,7 +9200,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-902",
-      "rank": 633,
+      "rank": 634,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -9155,7 +9212,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-901",
-      "rank": 634,
+      "rank": 635,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -9167,7 +9224,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-818",
-      "rank": 635,
+      "rank": 636,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -9179,7 +9236,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4308",
-      "rank": 636,
+      "rank": 637,
       "size": "S",
       "importance": "medium",
       "score": 38,
@@ -9192,7 +9249,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3322",
-      "rank": 637,
+      "rank": 638,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -9204,7 +9261,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-678",
-      "rank": 638,
+      "rank": 639,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9216,7 +9273,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-675",
-      "rank": 639,
+      "rank": 640,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9229,7 +9286,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-654",
-      "rank": 640,
+      "rank": 641,
       "size": "L",
       "importance": "medium",
       "score": 33,
@@ -9241,7 +9298,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-649",
-      "rank": 641,
+      "rank": 642,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9253,7 +9310,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-637",
-      "rank": 642,
+      "rank": 643,
       "size": "XS",
       "importance": "medium",
       "score": 33,
@@ -9265,7 +9322,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-629",
-      "rank": 643,
+      "rank": 644,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9277,7 +9334,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-613",
-      "rank": 644,
+      "rank": 645,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9289,7 +9346,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-607",
-      "rank": 645,
+      "rank": 646,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9301,7 +9358,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-606",
-      "rank": 646,
+      "rank": 647,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9313,7 +9370,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-548",
-      "rank": 647,
+      "rank": 648,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9325,7 +9382,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-546",
-      "rank": 648,
+      "rank": 649,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9337,7 +9394,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-537",
-      "rank": 649,
+      "rank": 650,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9349,7 +9406,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-531",
-      "rank": 650,
+      "rank": 651,
       "size": "XS",
       "importance": "medium",
       "score": 32,
@@ -9361,7 +9418,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-452",
-      "rank": 651,
+      "rank": 652,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9373,7 +9430,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-450",
-      "rank": 652,
+      "rank": 653,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9385,7 +9442,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1126",
-      "rank": 653,
+      "rank": 654,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9397,7 +9454,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5154",
-      "rank": 654,
+      "rank": 655,
       "size": "L",
       "importance": "low",
       "score": 30,
@@ -9409,7 +9466,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1066",
-      "rank": 655,
+      "rank": 656,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9421,7 +9478,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3441",
-      "rank": 656,
+      "rank": 657,
       "size": "L",
       "importance": "low",
       "score": 30,
@@ -9433,7 +9490,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2968",
-      "rank": 657,
+      "rank": 658,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9445,7 +9502,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2941",
-      "rank": 658,
+      "rank": 659,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9458,7 +9515,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2936",
-      "rank": 659,
+      "rank": 660,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9470,7 +9527,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4373",
-      "rank": 660,
+      "rank": 661,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -9482,7 +9539,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2868",
-      "rank": 661,
+      "rank": 662,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9494,7 +9551,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2767",
-      "rank": 662,
+      "rank": 663,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9506,7 +9563,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2679",
-      "rank": 663,
+      "rank": 664,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9518,7 +9575,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2662",
-      "rank": 664,
+      "rank": 665,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9530,7 +9587,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2645",
-      "rank": 665,
+      "rank": 666,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9542,7 +9599,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2635",
-      "rank": 666,
+      "rank": 667,
       "size": "XS",
       "importance": "low",
       "score": 28,
@@ -9554,7 +9611,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5066",
-      "rank": 667,
+      "rank": 668,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -9566,7 +9623,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3443",
-      "rank": 668,
+      "rank": 669,
       "size": "L",
       "importance": "low",
       "score": 28,
@@ -9578,7 +9635,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4350",
-      "rank": 669,
+      "rank": 670,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -9590,7 +9647,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4003",
-      "rank": 670,
+      "rank": 671,
       "size": "L",
       "importance": "medium",
       "score": 30,
@@ -9603,7 +9660,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4368",
-      "rank": 671,
+      "rank": 672,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -9615,7 +9672,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2622",
-      "rank": 672,
+      "rank": 673,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9627,7 +9684,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2600",
-      "rank": 673,
+      "rank": 674,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9639,7 +9696,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2533",
-      "rank": 674,
+      "rank": 675,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9651,7 +9708,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2527",
-      "rank": 675,
+      "rank": 676,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9663,7 +9720,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2514",
-      "rank": 676,
+      "rank": 677,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9675,7 +9732,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2505",
-      "rank": 677,
+      "rank": 678,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9687,7 +9744,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2504",
-      "rank": 678,
+      "rank": 679,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9699,7 +9756,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2449",
-      "rank": 679,
+      "rank": 680,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9711,7 +9768,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4769",
-      "rank": 680,
+      "rank": 681,
       "size": "XS",
       "importance": "low",
       "score": 26,
@@ -9724,7 +9781,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3940",
-      "rank": 681,
+      "rank": 682,
       "size": "XL",
       "importance": "low",
       "score": 30,
@@ -9738,7 +9795,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2424",
-      "rank": 682,
+      "rank": 683,
       "size": "L",
       "importance": "low",
       "score": 26,
@@ -9752,7 +9809,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2406",
-      "rank": 683,
+      "rank": 684,
       "size": "S",
       "importance": "low",
       "score": 26,
@@ -9765,7 +9822,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2394",
-      "rank": 684,
+      "rank": 685,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9777,7 +9834,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4823",
-      "rank": 685,
+      "rank": 686,
       "size": "XL",
       "importance": "medium",
       "score": 32,
@@ -9791,7 +9848,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2353",
-      "rank": 686,
+      "rank": 687,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9804,7 +9861,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4294",
-      "rank": 687,
+      "rank": 688,
       "size": "L",
       "importance": "low",
       "score": 22,
@@ -9817,7 +9874,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3133",
-      "rank": 688,
+      "rank": 689,
       "size": "S",
       "importance": "low",
       "score": 26,
@@ -9829,7 +9886,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5082",
-      "rank": 689,
+      "rank": 690,
       "size": "XL",
       "importance": "medium",
       "score": 50,
@@ -9841,7 +9898,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3011",
-      "rank": 690,
+      "rank": 691,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9856,7 +9913,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2282",
-      "rank": 691,
+      "rank": 692,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9868,7 +9925,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2091",
-      "rank": 692,
+      "rank": 693,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9880,7 +9937,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2085",
-      "rank": 693,
+      "rank": 694,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9892,7 +9949,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2084",
-      "rank": 694,
+      "rank": 695,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9904,7 +9961,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2083",
-      "rank": 695,
+      "rank": 696,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9919,7 +9976,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2082",
-      "rank": 696,
+      "rank": 697,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9931,7 +9988,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2074",
-      "rank": 697,
+      "rank": 698,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9943,7 +10000,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2046",
-      "rank": 698,
+      "rank": 699,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9956,7 +10013,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2006",
-      "rank": 699,
+      "rank": 700,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9968,7 +10025,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3919",
-      "rank": 700,
+      "rank": 701,
       "size": "S",
       "importance": "low",
       "score": 25,
@@ -9981,7 +10038,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2005",
-      "rank": 701,
+      "rank": 702,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9993,7 +10050,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2002",
-      "rank": 702,
+      "rank": 703,
       "size": "XS",
       "importance": "low",
       "score": 24,
@@ -10005,7 +10062,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1999",
-      "rank": 703,
+      "rank": 704,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -10017,7 +10074,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1986",
-      "rank": 704,
+      "rank": 705,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -10029,7 +10086,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1983",
-      "rank": 705,
+      "rank": 706,
       "size": "L",
       "importance": "low",
       "score": 24,
@@ -10041,7 +10098,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2672",
-      "rank": 706,
+      "rank": 707,
       "size": "S",
       "importance": "low",
       "score": 25,
@@ -10054,7 +10111,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1958",
-      "rank": 707,
+      "rank": 708,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -10066,7 +10123,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1907",
-      "rank": 708,
+      "rank": 709,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -10078,7 +10135,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1895",
-      "rank": 709,
+      "rank": 710,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -10090,7 +10147,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1878",
-      "rank": 710,
+      "rank": 711,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -10102,7 +10159,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1782",
-      "rank": 711,
+      "rank": 712,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -10114,7 +10171,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1773",
-      "rank": 712,
+      "rank": 713,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -10126,7 +10183,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1646",
-      "rank": 713,
+      "rank": 714,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -10138,7 +10195,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1643",
-      "rank": 714,
+      "rank": 715,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10150,7 +10207,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1592",
-      "rank": 715,
+      "rank": 716,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10162,7 +10219,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1581",
-      "rank": 716,
+      "rank": 717,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10174,7 +10231,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1533",
-      "rank": 717,
+      "rank": 718,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10186,7 +10243,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1483",
-      "rank": 718,
+      "rank": 719,
       "size": "XS",
       "importance": "low",
       "score": 22,
@@ -10198,7 +10255,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1482",
-      "rank": 719,
+      "rank": 720,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10210,7 +10267,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1481",
-      "rank": 720,
+      "rank": 721,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10222,7 +10279,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1356",
-      "rank": 721,
+      "rank": 722,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10234,7 +10291,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1242",
-      "rank": 722,
+      "rank": 723,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10246,7 +10303,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1222",
-      "rank": 723,
+      "rank": 724,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10258,7 +10315,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1208",
-      "rank": 724,
+      "rank": 725,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10270,7 +10327,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4352",
-      "rank": 725,
+      "rank": 726,
       "size": "XS",
       "importance": "low",
       "score": 28,
@@ -10282,7 +10339,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1153",
-      "rank": 726,
+      "rank": 727,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10294,7 +10351,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4298",
-      "rank": 727,
+      "rank": 728,
       "size": "XL",
       "importance": "low",
       "score": 20,
@@ -10310,7 +10367,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1152",
-      "rank": 728,
+      "rank": 729,
       "size": "XS",
       "importance": "low",
       "score": 21,
@@ -10322,7 +10379,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1135",
-      "rank": 729,
+      "rank": 730,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10334,7 +10391,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1133",
-      "rank": 730,
+      "rank": 731,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10347,7 +10404,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1123",
-      "rank": 731,
+      "rank": 732,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10359,7 +10416,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1121",
-      "rank": 732,
+      "rank": 733,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10371,7 +10428,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4248",
-      "rank": 733,
+      "rank": 734,
       "size": "L",
       "importance": "medium",
       "score": 24,
@@ -10384,7 +10441,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1117",
-      "rank": 734,
+      "rank": 735,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10396,7 +10453,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1116",
-      "rank": 735,
+      "rank": 736,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10408,7 +10465,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1065",
-      "rank": 736,
+      "rank": 737,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10420,7 +10477,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1064",
-      "rank": 737,
+      "rank": 738,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10432,7 +10489,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1063",
-      "rank": 738,
+      "rank": 739,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10445,7 +10502,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3971",
-      "rank": 739,
+      "rank": 740,
       "size": "L",
       "importance": "low",
       "score": 20,
@@ -10457,7 +10514,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3768",
-      "rank": 740,
+      "rank": 741,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10469,7 +10526,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3034",
-      "rank": 741,
+      "rank": 742,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10481,7 +10538,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2983",
-      "rank": 742,
+      "rank": 743,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10494,7 +10551,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3824",
-      "rank": 743,
+      "rank": 744,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10507,7 +10564,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3823",
-      "rank": 744,
+      "rank": 745,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10520,7 +10577,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1049",
-      "rank": 745,
+      "rank": 746,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10532,7 +10589,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-984",
-      "rank": 746,
+      "rank": 747,
       "size": "XS",
       "importance": "low",
       "score": 19,
@@ -10544,7 +10601,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-962",
-      "rank": 747,
+      "rank": 749,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10552,30 +10609,6 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "dependsOn": [],
       "why": "Post-PAN-946: vBRIEF lifecycle follow-up plan",
       "rationale": "Triage: xBRIEF already ships file-based specs/continues under .pan/; verify remaining checklist items against the write-xbrief skill. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-961",
-      "rank": 748,
-      "size": "M",
-      "importance": "low",
-      "score": 19,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Update documentation for vBRIEF v0.6 lifecycle model",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-943",
-      "rank": 749,
-      "size": "M",
-      "importance": "low",
-      "score": 19,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Add memory file review and management command",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10593,8 +10626,47 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "planning": "auto"
     },
     {
-      "issue": "PAN-908",
+      "issue": "PAN-961",
+      "rank": 750,
+      "size": "M",
+      "importance": "low",
+      "score": 19,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Update documentation for vBRIEF v0.6 lifecycle model",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5365",
       "rank": 751,
+      "size": "S",
+      "importance": "low",
+      "score": 40,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-5360"
+      ],
+      "why": "MCP memory_add gains a source param after PAN-5360; the supersedes-on-agent-surface decision is still open.",
+      "rationale": "Split out of PAN-5360 planning; it cannot start until PAN-5360 ships the frontmatter fields, so it ranks directly after PAN-5360. Condition is needs-refinement because the body leaves the supersedes policy (allow, project-only, or CLI-only) as an open decision.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-943",
+      "rank": 752,
+      "size": "M",
+      "importance": "low",
+      "score": 19,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Add memory file review and management command",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-908",
+      "rank": 753,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10606,7 +10678,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-898",
-      "rank": 752,
+      "rank": 754,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10618,7 +10690,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-853",
-      "rank": 753,
+      "rank": 755,
       "size": "L",
       "importance": "low",
       "score": 19,
@@ -10630,7 +10702,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-833",
-      "rank": 754,
+      "rank": 756,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10642,7 +10714,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-832",
-      "rank": 755,
+      "rank": 757,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10655,7 +10727,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4347",
-      "rank": 756,
+      "rank": 758,
       "size": "S",
       "importance": "low",
       "score": 30,
@@ -10667,7 +10739,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-797",
-      "rank": 757,
+      "rank": 759,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10679,7 +10751,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4275",
-      "rank": 758,
+      "rank": 760,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -10692,7 +10764,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2836",
-      "rank": 759,
+      "rank": 761,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -10705,7 +10777,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-790",
-      "rank": 760,
+      "rank": 762,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -10717,7 +10789,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-786",
-      "rank": 761,
+      "rank": 763,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10729,7 +10801,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-777",
-      "rank": 762,
+      "rank": 764,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10741,7 +10813,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-775",
-      "rank": 763,
+      "rank": 765,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -10753,7 +10825,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3456",
-      "rank": 764,
+      "rank": 766,
       "size": "XS",
       "importance": "low",
       "score": 18,
@@ -10765,7 +10837,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-774",
-      "rank": 765,
+      "rank": 767,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -10777,7 +10849,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-773",
-      "rank": 766,
+      "rank": 768,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -10789,7 +10861,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-772",
-      "rank": 767,
+      "rank": 769,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10802,7 +10874,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-771",
-      "rank": 768,
+      "rank": 770,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10814,7 +10886,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-769",
-      "rank": 769,
+      "rank": 771,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10829,7 +10901,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-765",
-      "rank": 770,
+      "rank": 772,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10841,7 +10913,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-764",
-      "rank": 771,
+      "rank": 773,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10853,7 +10925,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4425",
-      "rank": 772,
+      "rank": 774,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -10865,7 +10937,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-752",
-      "rank": 773,
+      "rank": 775,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10877,7 +10949,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-751",
-      "rank": 774,
+      "rank": 776,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10889,7 +10961,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-750",
-      "rank": 775,
+      "rank": 777,
       "size": "L",
       "importance": "low",
       "score": 16,
@@ -10901,7 +10973,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-749",
-      "rank": 776,
+      "rank": 778,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10913,7 +10985,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-747",
-      "rank": 777,
+      "rank": 779,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10925,7 +10997,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-743",
-      "rank": 778,
+      "rank": 780,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10937,7 +11009,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-738",
-      "rank": 779,
+      "rank": 781,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10949,7 +11021,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-735",
-      "rank": 780,
+      "rank": 782,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10961,7 +11033,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-730",
-      "rank": 781,
+      "rank": 783,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10973,7 +11045,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-701",
-      "rank": 782,
+      "rank": 784,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10985,7 +11057,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-663",
-      "rank": 783,
+      "rank": 785,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10997,7 +11069,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-660",
-      "rank": 784,
+      "rank": 786,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -11009,7 +11081,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-624",
-      "rank": 785,
+      "rank": 787,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -11021,7 +11093,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-623",
-      "rank": 786,
+      "rank": 788,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -11033,7 +11105,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-622",
-      "rank": 787,
+      "rank": 789,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -11045,7 +11117,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-604",
-      "rank": 788,
+      "rank": 790,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -11057,7 +11129,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-603",
-      "rank": 789,
+      "rank": 791,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -11069,7 +11141,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-591",
-      "rank": 790,
+      "rank": 792,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -11081,7 +11153,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-589",
-      "rank": 791,
+      "rank": 793,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -11093,7 +11165,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-576",
-      "rank": 792,
+      "rank": 794,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11105,7 +11177,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-571",
-      "rank": 793,
+      "rank": 795,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -11117,7 +11189,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-568",
-      "rank": 794,
+      "rank": 796,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11129,7 +11201,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-565",
-      "rank": 795,
+      "rank": 797,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11141,7 +11213,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-564",
-      "rank": 796,
+      "rank": 798,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11153,7 +11225,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-554",
-      "rank": 797,
+      "rank": 799,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11165,7 +11237,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-543",
-      "rank": 798,
+      "rank": 800,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11177,7 +11249,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-483",
-      "rank": 799,
+      "rank": 801,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11189,7 +11261,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-480",
-      "rank": 800,
+      "rank": 802,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11202,7 +11274,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-476",
-      "rank": 801,
+      "rank": 803,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11214,7 +11286,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-468",
-      "rank": 802,
+      "rank": 804,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11226,7 +11298,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-461",
-      "rank": 803,
+      "rank": 805,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11238,7 +11310,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-459",
-      "rank": 804,
+      "rank": 806,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11250,7 +11322,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-407",
-      "rank": 805,
+      "rank": 807,
       "size": "XS",
       "importance": "low",
       "score": 13,
@@ -11262,7 +11334,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2348",
-      "rank": 806,
+      "rank": 808,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11274,7 +11346,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2346",
-      "rank": 807,
+      "rank": 809,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11287,7 +11359,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2345",
-      "rank": 808,
+      "rank": 810,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11300,7 +11372,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2344",
-      "rank": 809,
+      "rank": 811,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11313,7 +11385,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2343",
-      "rank": 810,
+      "rank": 812,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11326,7 +11398,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2073",
-      "rank": 811,
+      "rank": 813,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11338,7 +11410,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2071",
-      "rank": 812,
+      "rank": 814,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11350,7 +11422,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2068",
-      "rank": 813,
+      "rank": 815,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11362,7 +11434,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2067",
-      "rank": 814,
+      "rank": 816,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11374,7 +11446,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1684",
-      "rank": 815,
+      "rank": 817,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11386,7 +11458,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1683",
-      "rank": 816,
+      "rank": 818,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11398,7 +11470,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1474",
-      "rank": 817,
+      "rank": 819,
       "size": "M",
       "importance": "low",
       "score": 9,
@@ -11410,7 +11482,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-1469",
-      "rank": 818,
+      "rank": 820,
       "size": "M",
       "importance": "low",
       "score": 9,
@@ -11422,7 +11494,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-674",
-      "rank": 819,
+      "rank": 821,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11434,7 +11506,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-634",
-      "rank": 820,
+      "rank": 822,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11446,7 +11518,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2908",
-      "rank": 821,
+      "rank": 823,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11458,7 +11530,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-106",
-      "rank": 822,
+      "rank": 824,
       "size": "M",
       "importance": "high",
       "score": 77,
@@ -11471,7 +11543,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-262",
-      "rank": 823,
+      "rank": 825,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -11483,7 +11555,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-176",
-      "rank": 824,
+      "rank": 826,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -11495,7 +11567,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-334",
-      "rank": 825,
+      "rank": 827,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11507,7 +11579,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-324",
-      "rank": 826,
+      "rank": 828,
       "size": "XS",
       "importance": "medium",
       "score": 49,
@@ -11520,7 +11592,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-304",
-      "rank": 827,
+      "rank": 829,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11532,7 +11604,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-245",
-      "rank": 828,
+      "rank": 830,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11544,7 +11616,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-244",
-      "rank": 829,
+      "rank": 831,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11556,7 +11628,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4332",
-      "rank": 830,
+      "rank": 832,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -11568,7 +11640,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-113",
-      "rank": 831,
+      "rank": 833,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -11580,7 +11652,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-49",
-      "rank": 832,
+      "rank": 834,
       "size": "XS",
       "importance": "medium",
       "score": 48,
@@ -11592,7 +11664,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-294",
-      "rank": 833,
+      "rank": 835,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -11604,7 +11676,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-293",
-      "rank": 834,
+      "rank": 836,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11616,7 +11688,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-277",
-      "rank": 835,
+      "rank": 837,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11628,7 +11700,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-258",
-      "rank": 836,
+      "rank": 838,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11640,7 +11712,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-255",
-      "rank": 837,
+      "rank": 839,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11652,7 +11724,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-252",
-      "rank": 838,
+      "rank": 840,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -11664,7 +11736,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-243",
-      "rank": 839,
+      "rank": 841,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11676,7 +11748,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-77",
-      "rank": 840,
+      "rank": 842,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -11688,7 +11760,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-54",
-      "rank": 841,
+      "rank": 843,
       "size": "L",
       "importance": "medium",
       "score": 31,
@@ -11700,7 +11772,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-38",
-      "rank": 842,
+      "rank": 844,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -11712,7 +11784,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-37",
-      "rank": 843,
+      "rank": 845,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -11725,7 +11797,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3248",
-      "rank": 844,
+      "rank": 846,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11738,7 +11810,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3244",
-      "rank": 845,
+      "rank": 847,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11751,7 +11823,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2775",
-      "rank": 846,
+      "rank": 848,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11764,7 +11836,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5033",
-      "rank": 847,
+      "rank": 849,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -11776,7 +11848,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3505",
-      "rank": 848,
+      "rank": 850,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11789,7 +11861,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5043",
-      "rank": 849,
+      "rank": 851,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -11801,7 +11873,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5065",
-      "rank": 850,
+      "rank": 852,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -11813,7 +11885,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3321",
-      "rank": 851,
+      "rank": 853,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11826,7 +11898,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-736",
-      "rank": 852,
+      "rank": 854,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11839,7 +11911,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-762",
-      "rank": 853,
+      "rank": 855,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11852,7 +11924,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-299",
-      "rank": 854,
+      "rank": 856,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11864,7 +11936,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-298",
-      "rank": 855,
+      "rank": 857,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11876,7 +11948,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-297",
-      "rank": 856,
+      "rank": 858,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11888,7 +11960,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-283",
-      "rank": 857,
+      "rank": 859,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11900,7 +11972,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-271",
-      "rank": 858,
+      "rank": 860,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11912,7 +11984,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-265",
-      "rank": 859,
+      "rank": 861,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11924,7 +11996,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-249",
-      "rank": 860,
+      "rank": 862,
       "size": "XS",
       "importance": "low",
       "score": 12,
@@ -11936,7 +12008,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-228",
-      "rank": 861,
+      "rank": 863,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11948,7 +12020,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-227",
-      "rank": 862,
+      "rank": 864,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11960,7 +12032,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-198",
-      "rank": 863,
+      "rank": 865,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11972,7 +12044,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-190",
-      "rank": 864,
+      "rank": 866,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11984,7 +12056,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-180",
-      "rank": 865,
+      "rank": 867,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11996,7 +12068,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-177",
-      "rank": 866,
+      "rank": 868,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -12008,7 +12080,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-175",
-      "rank": 867,
+      "rank": 869,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -12020,7 +12092,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-155",
-      "rank": 868,
+      "rank": 870,
       "size": "L",
       "importance": "low",
       "score": 11,
@@ -12032,7 +12104,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-146",
-      "rank": 869,
+      "rank": 871,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -12044,7 +12116,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-55",
-      "rank": 870,
+      "rank": 872,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -12056,7 +12128,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-44",
-      "rank": 871,
+      "rank": 873,
       "size": "M",
       "importance": "low",
       "score": 10,
@@ -12068,7 +12140,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2070",
-      "rank": 872,
+      "rank": 874,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -12081,7 +12153,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-3536",
-      "rank": 873,
+      "rank": 875,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -12094,7 +12166,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2027",
-      "rank": 874,
+      "rank": 876,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -12107,7 +12179,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2035",
-      "rank": 875,
+      "rank": 877,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -12120,7 +12192,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2034",
-      "rank": 876,
+      "rank": 878,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -12133,7 +12205,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2033",
-      "rank": 877,
+      "rank": 879,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -12146,7 +12218,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2032",
-      "rank": 878,
+      "rank": 880,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -12159,7 +12231,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2030",
-      "rank": 879,
+      "rank": 881,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -12172,7 +12244,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2029",
-      "rank": 880,
+      "rank": 882,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -12185,7 +12257,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2028",
-      "rank": 881,
+      "rank": 883,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -12198,7 +12270,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2024",
-      "rank": 882,
+      "rank": 884,
       "size": "XS",
       "importance": "low",
       "score": 8,
@@ -12211,7 +12283,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2883",
-      "rank": 883,
+      "rank": 885,
       "size": "M",
       "importance": "high",
       "score": 20,
@@ -12224,7 +12296,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-2995",
-      "rank": 884,
+      "rank": 886,
       "size": "XS",
       "importance": "high",
       "score": 20,
@@ -12237,7 +12309,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4555",
-      "rank": 885,
+      "rank": 887,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -12250,7 +12322,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4590",
-      "rank": 886,
+      "rank": 888,
       "size": "L",
       "importance": "medium",
       "score": 50,
@@ -12263,7 +12335,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4591",
-      "rank": 887,
+      "rank": 889,
       "size": "L",
       "importance": "medium",
       "score": 45,
@@ -12276,7 +12348,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4592",
-      "rank": 888,
+      "rank": 890,
       "size": "M",
       "importance": "low",
       "score": 38,
@@ -12291,7 +12363,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4594",
-      "rank": 889,
+      "rank": 891,
       "size": "M",
       "importance": "low",
       "score": 36,
@@ -12306,7 +12378,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4593",
-      "rank": 890,
+      "rank": 892,
       "size": "L",
       "importance": "low",
       "score": 30,
@@ -12321,7 +12393,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5022",
-      "rank": 891,
+      "rank": 893,
       "size": "L",
       "importance": "medium",
       "score": 42,
@@ -12333,7 +12405,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5021",
-      "rank": 892,
+      "rank": 894,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -12346,7 +12418,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5029",
-      "rank": 893,
+      "rank": 895,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -12358,7 +12430,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4842",
-      "rank": 894,
+      "rank": 896,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -12371,7 +12443,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4851",
-      "rank": 895,
+      "rank": 897,
       "size": "S",
       "importance": "low",
       "score": 15,
@@ -12384,7 +12456,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-4887",
-      "rank": 896,
+      "rank": 898,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -12397,7 +12469,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5207",
-      "rank": 897,
+      "rank": 899,
       "size": "L",
       "importance": "low",
       "score": 15,
@@ -12411,7 +12483,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5183",
-      "rank": 898,
+      "rank": 900,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -12424,7 +12496,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5181",
-      "rank": 899,
+      "rank": 901,
       "size": "XS",
       "importance": "low",
       "score": 8,
@@ -12436,7 +12508,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5305",
-      "rank": 900,
+      "rank": 902,
       "size": "XS",
       "importance": "low",
       "score": 8,
@@ -12448,7 +12520,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "issue": "PAN-5235",
-      "rank": 901,
+      "rank": 903,
       "size": "XS",
       "importance": "low",
       "score": 8,
@@ -12459,14 +12531,15 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "planning": "auto"
     },
     {
-      "issue": "PAN-5280",
-      "rank": 902,
+      "issue": "PAN-5372",
+      "rank": 392,
       "size": "XS",
-      "importance": "low",
-      "score": 8,
+      "importance": "medium",
+      "score": 58,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Record of two UI fixes made inline on main (orbiting logo, unclipped Home project menu). Verify and close.",
+      "why": "First split in a Stage deck remounts the open pane, silently dropping an unsaved editor draft; fix with a stable key per paneId.",
+      "rationale": "New issue: small, well-located data-loss bug in PaneLayoutView, ranked with the other medium XS correctness fixes in the free rank-392 slot.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13531,20 +13604,6 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "from": "PAN-5284",
-      "to": "PAN-5290",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5284",
-      "to": "PAN-5294",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5284",
       "to": "PAN-5295",
       "type": "contains",
       "source": "github-ref",
@@ -13572,21 +13631,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "confidence": 1
     },
     {
-      "from": "PAN-5290",
-      "to": "PAN-5343",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-5295",
-      "to": "PAN-5343",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5294",
       "to": "PAN-5343",
       "type": "unblocks",
       "source": "github-ref",
@@ -13677,27 +13722,6 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "confidence": 0.4
     },
     {
-      "from": "PAN-5356",
-      "to": "PAN-5290",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-5356",
-      "to": "PAN-5294",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-5356",
-      "to": "PAN-5348",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
       "from": "PAN-5357",
       "to": "PAN-5356",
       "type": "informs",
@@ -13745,6 +13769,69 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-5360",
+      "to": "PAN-5365",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5356",
+      "to": "PAN-5364",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-5359",
+      "to": "PAN-5366",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5363",
+      "to": "PAN-5364",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-5284",
+      "to": "PAN-5370",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5369",
+      "to": "PAN-5370",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4544",
+      "to": "PAN-5369",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-5284",
+      "to": "PAN-5371",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5337",
+      "to": "PAN-5372",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }

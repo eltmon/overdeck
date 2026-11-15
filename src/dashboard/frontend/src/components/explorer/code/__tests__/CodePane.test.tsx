@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { PanRpcError, type ExplorerReadFileResult } from '@overdeck/contracts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspacePane } from '../../../../lib/panesStore'
+import type { ReactNode } from 'react'
 
 const mocks = vi.hoisted(() => ({
   readFile: vi.fn(),
@@ -9,7 +10,16 @@ const mocks = vi.hoisted(() => ({
     setPosition: vi.fn(),
     revealLineInCenter: vi.fn(),
     focus: vi.fn(),
+    saveViewState: vi.fn(() => null),
+    restoreViewState: vi.fn(),
+    hasTextFocus: vi.fn(() => false),
   },
+}))
+
+// PAN-5290: the header's root label reads the shared registry queries; no QueryClient in this test.
+vi.mock('../../rootForConversation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../rootForConversation')>()),
+  useRootLabel: (rootId: string | null) => rootId,
 }))
 
 vi.mock('../../explorer-rpc', async (importOriginal) => ({
@@ -52,10 +62,22 @@ vi.mock('../../viewers/FileViewer', () => ({
   ),
 }))
 
-const { CodePane, CREATING_EDIT_NOTE, PROJECT_EDIT_NOTE } = await import('../CodePane')
+const { CodePane } = await import('../CodePane')
+const { CREATING_EDIT_NOTE, MAIN_CHECKOUT_SENTENCE } = await import('../../edit/EditorBar')
 const { useEditWorkspaceStore } = await import('../../edit/edit-workspace-store')
 const { draftKey, useCodeDrafts } = await import('../code-drafts')
 const { CodePaneSlot } = await import('../CodePaneSlot')
+const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
+const { installStrictFetchMock } = await import('../../../../test-utils/strictFetchMock')
+
+function withQueryClient(children: ReactNode) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+}
+const { carryViewStates, registerCodeEditor, resetViewStateRegistryForTests } = await import('../view-state-registry')
+const { StageDeckProvider } = await import('../../../Stage/StageDeckContext')
+const { usePanesStore } = await import('../../../../lib/panesStore')
+const { useWorkDockStore } = await import('../../../dock/workDockStore')
 
 function pane(over: Partial<WorkspacePane> = {}): WorkspacePane {
   return {
@@ -82,6 +104,8 @@ beforeEach(() => {
   mocks.editor.setPosition.mockReset()
   mocks.editor.revealLineInCenter.mockReset()
   mocks.editor.focus.mockReset()
+  mocks.editor.restoreViewState.mockReset()
+  resetViewStateRegistryForTests()
 })
 
 describe('CodePane', () => {
@@ -98,15 +122,16 @@ describe('CodePane', () => {
       baseText: 'const a = 1\n',
       baseSignature: 'sig-a',
     })
-    expect(screen.queryByTestId('code-pane-project-note')).toBeNull()
+    // PAN-5290 C-D9: an issue root has no editor bar.
+    expect(screen.queryByTestId('editor-bar')).toBeNull()
   })
 
-  it('renders an editable editor and the project note on a project root', async () => {
+  it('renders an editable editor and the editor bar on a project root', async () => {
     mocks.readFile.mockResolvedValue(textRead({ writable: false }))
     render(<CodePane pane={pane({ explorerRootId: 'project:overdeck' })} ctx={ctx} />)
     const editor = (await screen.findByTestId('monaco')) as HTMLTextAreaElement
     expect(editor.readOnly).toBe(false)
-    expect(screen.getByTestId('code-pane-project-note').textContent).toBe(PROJECT_EDIT_NOTE)
+    expect(screen.getByTestId('editor-bar-sentence').textContent).toBe(MAIN_CHECKOUT_SENTENCE)
   })
 
   it('reads "Creating edit workspace…" while beginEdit runs for the project', async () => {
@@ -114,9 +139,9 @@ describe('CodePane', () => {
     useEditWorkspaceStore.getState().setCreating('overdeck', true)
     render(<CodePane pane={pane({ explorerRootId: 'project:overdeck' })} ctx={ctx} />)
     await screen.findByTestId('monaco')
-    expect(screen.getByTestId('code-pane-project-note').textContent).toBe(CREATING_EDIT_NOTE)
+    expect(screen.getByTestId('editor-bar-sentence').textContent).toBe(CREATING_EDIT_NOTE)
     act(() => useEditWorkspaceStore.getState().setCreating('overdeck', false))
-    expect(screen.getByTestId('code-pane-project-note').textContent).toBe(PROJECT_EDIT_NOTE)
+    expect(screen.getByTestId('editor-bar-sentence').textContent).toBe(MAIN_CHECKOUT_SENTENCE)
   })
 
   it('shows unsaved draft text instead of the disk text', async () => {
@@ -156,10 +181,60 @@ describe('CodePane', () => {
     expect((await screen.findByTestId('code-pane-error')).textContent).toContain('This file no longer exists.')
   })
 
+  it('shows the stale tab, not "Couldn’t open file", when the root is gone (PAN-5290 FR-13)', async () => {
+    mocks.readFile.mockRejectedValue(new PanRpcError({ code: 'ROOT_NOT_FOUND', message: 'Explorer root workspace:w1 not found' }))
+    const guard = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/registered-projects') return Response.json([{ key: 'PAN-1', name: 'Overdeck', path: '/p' }])
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] })
+      return undefined
+    })
+    render(withQueryClient(<CodePane pane={pane({ explorerRootId: 'workspace:w1' })} ctx={ctx} />))
+    expect((await screen.findByTestId('code-pane-stale')).textContent).toContain('This edit workspace was merged or discarded.')
+    expect(screen.queryByTestId('code-pane-error')).toBeNull()
+    await guard.assertNoUnexpectedRequests()
+    vi.unstubAllGlobals()
+  })
+
+  it('shows the stale tab when the editor bar finds the edit workspace gone (PAN-5290 C-D13b)', async () => {
+    mocks.readFile.mockResolvedValue(textRead())
+    const guard = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url.startsWith('/api/explorer/edit-workspaces/w1')) {
+        return Response.json({ error: 'Workspace w1 not found.', code: 'ROOT_NOT_FOUND' }, { status: 404 })
+      }
+      if (method === 'GET' && url === '/api/registered-projects') return Response.json([])
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] })
+      return undefined
+    })
+    render(withQueryClient(<CodePane pane={pane({ explorerRootId: 'workspace:w1' })} ctx={ctx} />))
+    expect(await screen.findByTestId('code-pane-stale')).toBeInTheDocument()
+    expect(screen.queryByTestId('monaco')).toBeNull()
+    await guard.assertNoUnexpectedRequests()
+    vi.unstubAllGlobals()
+  })
+
   it('renders "No file" without a path', () => {
     render(<CodePane pane={pane({ explorerPath: undefined })} ctx={ctx} />)
     expect(screen.getByTestId('code-pane-no-file')).toBeTruthy()
     expect(mocks.readFile).not.toHaveBeenCalled()
+  })
+
+  it('restores a carried view state and focus when it mounts on the new root (PAN-5290 C-D12)', async () => {
+    const viewState = { cursorState: [{ position: { lineNumber: 30, column: 2 } }] }
+    registerCodeEditor(draftKey('project:overdeck', 'src/a.ts'), {
+      saveViewState: () => viewState,
+      restoreViewState: () => {},
+      hasTextFocus: () => true,
+      focus: () => {},
+    } as unknown as Parameters<typeof registerCodeEditor>[1])
+    carryViewStates('project:overdeck', 'issue:PAN-1')
+    mocks.readFile.mockResolvedValue(textRead())
+
+    render(<CodePane pane={pane()} ctx={ctx} />)
+    await screen.findByTestId('monaco')
+
+    await waitFor(() => expect(mocks.editor.restoreViewState).toHaveBeenCalledWith(viewState))
+    expect(mocks.editor.focus).toHaveBeenCalled()
+    expect(mocks.editor.restoreViewState.mock.invocationCallOrder[0]).toBeLessThan(mocks.editor.focus.mock.invocationCallOrder[0]!)
   })
 
   it('reveals the requested line on mount and again on a new nonce', async () => {
@@ -203,6 +278,53 @@ describe('CodePane header', () => {
     fireEvent.click(wrap)
     expect(wrap.getAttribute('aria-pressed')).toBe('false')
     expect(screen.getByTestId('monaco').getAttribute('data-wrap')).toBe('off')
+  })
+
+  it('shows the root label and path as a breadcrumb', async () => {
+    mocks.readFile.mockResolvedValue(textRead())
+    render(<CodePane pane={pane()} ctx={ctx} />)
+    await screen.findByTestId('monaco')
+    expect(screen.getByTestId('code-pane-breadcrumb').textContent).toBe('issue:PAN-1›src›a.ts')
+  })
+
+  it('has no Reveal in files outside a Stage', async () => {
+    mocks.readFile.mockResolvedValue(textRead())
+    render(<CodePane pane={pane()} ctx={ctx} />)
+    await screen.findByTestId('monaco')
+    expect(screen.queryByRole('button', { name: 'Reveal in files' })).toBeNull()
+  })
+
+  it('Reveal in files makes the pane active and opens the dock Files tab on this file', async () => {
+    mocks.readFile.mockResolvedValue(textRead())
+    const setActivePane = vi.spyOn(usePanesStore.getState(), 'setActivePane').mockImplementation(() => {})
+    const openDock = vi.fn()
+    render(
+      <StageDeckProvider value={{ deckKey: 'PAN-1', openOrFocusEditorPane: vi.fn(), openOrFocusAgentPane: vi.fn(), openDock }}>
+        <CodePane pane={pane()} ctx={ctx} />
+      </StageDeckProvider>,
+    )
+    await screen.findByTestId('monaco')
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal in files' }))
+    expect(setActivePane).toHaveBeenCalledWith('PAN-1', 'p1')
+    expect(openDock).toHaveBeenCalledWith({ tab: 'files', reveal: { rootId: 'issue:PAN-1', path: 'src/a.ts' } })
+    setActivePane.mockRestore()
+  })
+
+  it('Reveal in files points a dock pinned to another root at this file first (CodeRabbit 4578715359)', async () => {
+    mocks.readFile.mockResolvedValue(textRead())
+    useWorkDockStore.setState({ byDeck: {} })
+    useWorkDockStore.getState().setRootOverride('PAN-1', 'project:other')
+    const openDock = vi.fn()
+    render(
+      <StageDeckProvider value={{ deckKey: 'PAN-1', openOrFocusEditorPane: vi.fn(), openOrFocusAgentPane: vi.fn(), openDock }}>
+        <CodePane pane={pane()} ctx={ctx} />
+      </StageDeckProvider>,
+    )
+    await screen.findByTestId('monaco')
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal in files' }))
+    expect(useWorkDockStore.getState().byDeck['PAN-1']).toMatchObject({ rootOverride: 'issue:PAN-1', rootOverrideAnchor: 'p1' })
+    expect(openDock).toHaveBeenCalledWith({ tab: 'files', reveal: { rootId: 'issue:PAN-1', path: 'src/a.ts' } })
+    useWorkDockStore.setState({ byDeck: {} })
   })
 })
 

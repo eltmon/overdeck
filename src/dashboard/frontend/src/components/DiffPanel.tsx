@@ -31,7 +31,18 @@ import { buildDiffFetchUrl, parseDiffRouteSearch, type DiffCompareMode } from '.
 import type { TurnDiffFileChange, TurnDiffSummary } from './chat/chat-types'
 import { DiffPanelLoadingState, DiffPanelShell, type DiffPanelMode } from './DiffPanelShell'
 import { DiffCompareBar } from './DiffCompareBar'
-import { PatchFiles } from './diff/PatchFiles'
+import { PatchFiles, getRenderablePatch, resolveFileDiffPath } from './diff/PatchFiles'
+import { DiffFileBar, type DiffFileView } from './diff/DiffFileBar'
+import { DiffMarkdownPreview } from './diff/DiffMarkdownPreview'
+import {
+  diffPathToRootPath,
+  isDeletedDiffFile,
+  markdownPreviewSource,
+  type PreviewScope,
+} from './diff/markdownPreviewSource'
+import { isMarkdownPath } from './explorer/code/CodePaneHeader'
+import { useExplorerStore } from './explorer/explorerStore'
+import { useStageDeck } from './Stage/StageDeckContext'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -186,6 +197,8 @@ interface DiffPanelProps {
   isolateSelection?: boolean
   /** Absolute repo path for the Compare view; the chip is hidden without it. */
   repoPath?: string
+  /** Explorer root of the conversation (PAN-5338): enables Open file and Preview reads. */
+  explorerRootId?: string | null
 }
 
 export function DiffPanel({
@@ -197,6 +210,7 @@ export function DiffPanel({
   defaultView = 'full',
   isolateSelection = false,
   repoPath,
+  explorerRootId,
 }: DiffPanelProps) {
   const { resolvedTheme } = useTheme()
   const { prefs: diffPrefs, update: updateDiffPrefs } = useDiffPreferences()
@@ -251,7 +265,13 @@ export function DiffPanel({
   // ?diff=1 param still gates the popout/sheet (sheet-mode) toggle path.
   const diffOpen = mode === 'inline' || effectiveParams.diff === '1'
   const selectedTurnId = effectiveParams.diffTurnId ?? null
-  const selectedFilePath = selectedTurnId !== null ? (effectiveParams.diffFilePath ?? null) : null
+  const selectedFilePath = effectiveParams.diffFilePath ?? null
+
+  // The Diff/Preview choice belongs to the file (PAN-5338 D-4): it resets
+  // when the selected file changes and survives a scope change for the
+  // same file.
+  const [fileView, setFileView] = useState<{ path: string; view: DiffFileView } | null>(null)
+  const view: DiffFileView = fileView && fileView.path === selectedFilePath ? fileView.view : 'diff'
 
   // Sort summaries by turn count (newest first)
   const orderedTurnDiffSummaries = useMemo(
@@ -324,6 +344,48 @@ export function DiffPanel({
 
   // PatchFiles renders a non-empty patch (parsed files, or the raw text with its reason).
   const hasRenderablePatch = hasResolvedPatch && !hasNoNetChanges
+
+  // ─── Markdown preview (PAN-5338) ───────────────────────────────────────────
+
+  const selectedDiffFile = useMemo(() => {
+    const renderable = getRenderablePatch(selectedPatch, `diff-panel:${resolvedTheme}`)
+    if (renderable?.kind !== 'files') return undefined
+    return (
+      renderable.files.find((f) => resolveFileDiffPath(f) === selectedFilePath) ??
+      (renderable.files.length === 1 ? renderable.files[0] : undefined)
+    )
+  }, [selectedPatch, selectedFilePath, resolvedTheme])
+
+  const listKind = (selectedTurn?.files ?? diffResponse?.files)?.find((f) => f.path === selectedFilePath)?.kind
+
+  const previewable =
+    !!selectedFilePath &&
+    isMarkdownPath(selectedFilePath) &&
+    hasResolvedPatch &&
+    !isDeletedDiffFile(selectedDiffFile, listKind)
+
+  const rootAbs = useExplorerStore((s) =>
+    explorerRootId ? (s.roots[explorerRootId]?.dirs['']?.absPath ?? null) : null,
+  )
+  const repoRoot = isVsMain ? ((diffResponse as { repoRoot?: string | null } | undefined)?.repoRoot ?? null) : null
+  const rootPath = selectedFilePath
+    ? diffPathToRootPath(selectedFilePath, { repoRoot, rootAbs, cwd: repoPath ?? null })
+    : null
+
+  const deck = useStageDeck()
+  const onOpenFile =
+    deck?.openBeside && explorerRootId && rootPath
+      ? () => deck.openBeside!({ rootId: explorerRootId, path: rootPath })
+      : undefined
+
+  const previewScope: PreviewScope = isCompare
+    ? { kind: 'compare' }
+    : isVsMain
+      ? { kind: 'vs-main' }
+      : selectedTurn
+        ? { kind: 'turn', newest: selectedTurn.turnId === orderedTurnDiffSummaries[0]?.turnId }
+        : { kind: 'full' }
+  const agentRoute = baseUrl.startsWith('/api/agents/')
 
   // Scroll to selected file
   useEffect(() => {
@@ -604,6 +666,7 @@ export function DiffPanel({
               if (isCompare && diffBase) params.set('diffBase', diffBase)
               if (isCompare && diffHead) params.set('diffHead', diffHead)
               if (isCompare && diffMode) params.set('diffMode', diffMode)
+              if (explorerRootId) params.set('root', explorerRootId)
               window.open(`/popout/diff?${params.toString()}`, '_blank', 'width=1000,height=800')
             }}
             aria-label="Open diff in new window"
@@ -649,26 +712,46 @@ export function DiffPanel({
       ) : needsFilePicker ? (
         <DiffFilePickerList files={filePickerFiles ?? []} onSelectFile={selectFile} isLoading={isLoadingDiff && !filePickerFiles} />
       ) : (
-        <div
-          ref={patchViewportRef}
-          className="diff-panel-viewport min-h-0 min-w-0 flex-1 overflow-hidden"
-        >
-          {!hasRenderablePatch ? (
-            isLoadingDiff ? (
-              <DiffPanelLoadingState label="Loading checkpoint diff..." />
+        <>
+          <DiffFileBar
+            // needsFilePicker is false here, so selectedFilePath is set.
+            path={selectedFilePath!}
+            previewable={previewable}
+            view={view}
+            onView={(v) => setFileView({ path: selectedFilePath!, view: v })}
+            onOpenFile={onOpenFile}
+          />
+          <div
+            ref={patchViewportRef}
+            className="diff-panel-viewport min-h-0 min-w-0 flex-1 overflow-hidden"
+          >
+            {previewable && view === 'preview' ? (
+              <DiffMarkdownPreview
+                source={markdownPreviewSource({
+                  file: selectedDiffFile,
+                  scope: previewScope,
+                  agentRoute,
+                  rootId: explorerRootId ?? null,
+                  rootPath,
+                })}
+              />
+            ) : !hasRenderablePatch ? (
+              isLoadingDiff ? (
+                <DiffPanelLoadingState label="Loading checkpoint diff..." />
+              ) : (
+                <div className="flex h-full items-center justify-center px-3 py-2 text-xs text-muted-foreground/70">
+                  <p>
+                    {hasNoNetChanges
+                      ? 'No net changes in this selection.'
+                      : 'No patch available for this selection.'}
+                  </p>
+                </div>
+              )
             ) : (
-              <div className="flex h-full items-center justify-center px-3 py-2 text-xs text-muted-foreground/70">
-                <p>
-                  {hasNoNetChanges
-                    ? 'No net changes in this selection.'
-                    : 'No patch available for this selection.'}
-                </p>
-              </div>
-            )
-          ) : (
-            <PatchFiles patch={selectedPatch} cacheScope={`diff-panel:${resolvedTheme}`} />
-          )}
-        </div>
+              <PatchFiles patch={selectedPatch} cacheScope={`diff-panel:${resolvedTheme}`} />
+            )}
+          </div>
+        </>
       )}
     </DiffPanelShell>
   )

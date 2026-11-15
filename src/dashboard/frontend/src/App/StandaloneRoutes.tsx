@@ -97,6 +97,7 @@ export function StandaloneDiffPopoutRoute() {
   const prefix = search.get('prefix') ?? '';
   const agentId = search.get('agentId') ?? prefix;
   const repo = search.get('repo') ?? undefined;
+  const root = search.get('root');
   const { data, isError } = useQuery({
     queryKey: ['popout-diff-summaries', prefix],
     queryFn: async () => {
@@ -132,6 +133,7 @@ export function StandaloneDiffPopoutRoute() {
             turnDiffSummaries={data.summaries}
             diffUrlPrefix={prefix}
             repoPath={repo}
+            explorerRootId={root}
           />
         </DiffWorkerPoolProvider>
       )}

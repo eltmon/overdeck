@@ -1419,3 +1419,6 @@ body::after {
 
 /* PAN-4642: highlights a pending citation's quoted text in its message row. */
 ::highlight(overdeck-citation) { background-color: color-mix(in srgb, var(--primary) 22%, transparent); }
+
+/* PAN-5290 FR-6: a 3 px bar left of each line the conversation beside the file changed. */
+.monaco-editor .code-changed-line { background: var(--primary); width: 3px !important; margin-left: 3px; }
