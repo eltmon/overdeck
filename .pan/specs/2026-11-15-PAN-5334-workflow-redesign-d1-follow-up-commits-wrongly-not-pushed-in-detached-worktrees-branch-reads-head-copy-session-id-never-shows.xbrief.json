@@ -4,17 +4,17 @@
     "created": "2026-11-15T10:29:23Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5334: Workflow redesign D1 follow-up: commits wrongly 'not pushed' in detached worktrees, branch reads HEAD, Copy session id never shows",
-    "updated": "2026-11-15T10:32:22.565Z"
+    "updated": "2026-11-15T10:33:16.514Z"
   },
   "plan": {
     "id": "pan-5334",
     "title": "Workflow redesign D1 follow-up: commits wrongly 'not pushed' in detached worktrees, branch reads HEAD, Copy session id never shows",
-    "status": "proposed",
+    "status": "running",
     "uid": "97cb03fd-84c3-478d-a114-00872abd0b71",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T10:29:23Z",
-    "updated": "2026-11-15T10:32:22.565Z",
+    "updated": "2026-11-15T10:33:16.514Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5334",
@@ -315,5 +315,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
