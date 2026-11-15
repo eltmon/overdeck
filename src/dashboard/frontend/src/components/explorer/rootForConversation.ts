@@ -7,6 +7,7 @@
 
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { resolvePathRoot } from '@overdeck/contracts'
 import { fetchRegisteredProjects } from '../CommandDeck/UnknownProjectState'
 import { useDashboardStore, selectIssues } from '../../lib/store'
 
@@ -26,10 +27,6 @@ export interface RootConversation {
 
 function trimSlash(path: string): string {
   return path.length > 1 ? path.replace(/\/+$/, '') : path
-}
-
-function isAtOrUnder(path: string, base: string): boolean {
-  return path === base || path.startsWith(`${base}/`)
 }
 
 /** Map a conversation to its explorer root id, or null (rules in §6.4, first match wins). */
@@ -54,29 +51,23 @@ export function rootIdForConversation(conv: RootConversation, ctx: RootContext):
   return explorerLocationForPath(conv.cwd, ctx)?.rootId ?? null
 }
 
-/** The explorer root and root-relative path of an absolute file path (rules 4-5 of `rootIdForConversation`), or null. */
+/**
+ * The explorer root and root-relative path of an absolute file path (rules 4-5 of
+ * `rootIdForConversation`), or null. The rules are the shared `resolvePathRoot`
+ * (PAN-5349); no scratch rows, since registry rows carry no path here.
+ */
 export function explorerLocationForPath(absPath: string, ctx: RootContext): { rootId: string; path: string } | null {
   const cwd = trimSlash(absPath)
-  // 4. A feature workspace lives inside its project folder, so check it before rule 5.
-  for (const project of ctx.projects) {
-    const workspacesDir = `${trimSlash(project.path)}/workspaces`
-    if (!cwd.startsWith(`${workspacesDir}/`)) continue
-    const rest = cwd.slice(workspacesDir.length + 1)
-    const first = rest.split('/')[0]
-    const slug = first.startsWith('feature-') ? first.slice('feature-'.length) : ''
-    if (!slug) return null
-    return { rootId: `issue:${slug.toUpperCase()}`, path: rest.slice(first.length + 1) }
-  }
-  // 5. The primary checkout or any folder under it; the longest project path wins.
-  let best: { key: string; length: number; path: string } | null = null
-  for (const project of ctx.projects) {
-    const path = trimSlash(project.path)
-    if (!isAtOrUnder(cwd, path)) continue
-    if (best && path.length <= best.length) continue
-    best = { key: project.key, length: path.length, path: cwd === path ? '' : cwd.slice(path.length + 1) }
-  }
-  // 6. Outside every project.
-  return best ? { rootId: `project:${best.key}`, path: best.path } : null
+  const hit = resolvePathRoot(cwd, ctx.projects, [])
+  if (hit.kind !== 'root') return null
+  const project = ctx.projects.find((p) => p.key === hit.projectKey)
+  if (!project) return null
+  const projectPath = trimSlash(project.path)
+  // An issue root is <project>/workspaces/<first segment>; a project root is the project folder.
+  const base = hit.rootId.startsWith('issue:')
+    ? `${projectPath}/workspaces/${cwd.slice(projectPath.length + '/workspaces/'.length).split('/')[0]}`
+    : projectPath
+  return { rootId: hit.rootId, path: cwd === base ? '' : cwd.slice(base.length + 1) }
 }
 
 const TITLE_MAX = 40

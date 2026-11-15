@@ -34,6 +34,7 @@ import { hostTerminalBackendName, probeHerdrAvailability } from '../../lib/termi
 import type { TerminalBackendName } from '../../lib/terminal-backends/types.js';
 import { renderHerdrReport } from '../herdr-report.js';
 import { setupOllamaForInstall } from './install-ollama.js';
+import { setupFileManagerIntegrationForInstall } from './install-file-manager.js';
 import { evaluatePrereqGate, forgivenPrereqNames, type PrereqResult } from './install-prereqs.js';
 import { findExecutableOnPath, writePanCliShims } from '../../lib/pan-cli-shim.js';
 
@@ -68,6 +69,8 @@ export function registerInstallCommand(program: Command): void {
     .option('--skip-tts-daemon', 'Skip Qwen TTS daemon venv install (CUDA torch download is large)')
     .option('--skip-herdr', 'Skip Herdr terminal backend install/verify (tmux-only hosts)')
     .option('--skip-ollama', 'Skip Ollama local-model detection and optional gemma4:12b pull')
+    .option('--file-manager-integration', 'Add "Open in Overdeck" to the file manager\'s right-click menu without asking')
+    .option('--skip-file-manager-integration', 'Neither ask about nor add the file-manager integration')
     .action(installCommand);
 }
 
@@ -80,6 +83,8 @@ interface InstallOptions {
   skipTtsDaemon?: boolean;
   skipHerdr?: boolean;
   skipOllama?: boolean;
+  fileManagerIntegration?: boolean;
+  skipFileManagerIntegration?: boolean;
 }
 
 // Effect.runSync(detectPlatform()) is now in src/lib/platform.ts
@@ -490,6 +495,14 @@ async function installCommand(options: InstallOptions): Promise<void> {
     platform: await Effect.runPromise(detectPlatform()),
     spinner,
     isTty: Boolean(process.stdin.isTTY),
+  });
+
+  // Step 5g: right-click "Open in Overdeck" (PAN-5349). Opt-in; never fails the install.
+  await setupFileManagerIntegrationForInstall({
+    skip: options.skipFileManagerIntegration,
+    force: options.fileManagerIntegration,
+    isTty: Boolean(process.stdin.isTTY),
+    spinner,
   });
 
   // Step 5d: Build Moonshine voice sidecar (AutoPreso + Voice STT)

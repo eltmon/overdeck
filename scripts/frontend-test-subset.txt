@@ -428,11 +428,13 @@ src/components/newConversation/__tests__/ConversationSkillsField.test.tsx
 src/components/newConversation/__tests__/IssuePickerField.test.tsx
 src/components/newConversation/__tests__/MachineField.test.tsx
 src/components/newConversation/__tests__/NewConversationDialog.test.tsx
+src/components/open/OpenPathHost.test.tsx
 src/components/palette-conversation-hits.test.ts
 src/components/primitives/issuePullRequest.test.ts
 src/components/project/new/ProjectCreateForm.jira.test.tsx
 src/components/project/new/__tests__/AddProjectCloneCreate.test.tsx
 src/components/project/new/__tests__/AddProjectDialog.test.tsx
+src/components/project/new/__tests__/AddProjectFolderStep.initialPath.test.tsx
 src/components/project/new/__tests__/AddProjectFolderStep.test.tsx
 src/components/project/new/__tests__/AddProjectNestedStep.test.tsx
 src/components/project/new/__tests__/AddProjectSuggestions.test.tsx
@@ -523,6 +525,9 @@ src/lib/shortcuts/__tests__/registry.test.ts
 src/lib/shortcuts/__tests__/ShortcutsSheet.test.tsx
 src/lib/simple/uiMode.test.ts
 src/lib/simple/useSimpleActions.test.tsx
+src/lib/uiCommands/leaderTab.test.ts
+src/lib/uiCommands/openPathInDeck.test.ts
+src/lib/uiCommands/useUiCommands.test.tsx
 src/pages/HomePage.test.tsx
 src/pages/__tests__/FlywheelPage.test.tsx
 src/pages/__tests__/NewProjectPage.no-loss.test.tsx

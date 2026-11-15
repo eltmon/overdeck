@@ -73,6 +73,8 @@ const childProcessMocks = vi.hoisted(() => ({
 vi.mock('../../../lib/issue-id.js', () => ({
   resolveBareNumericId: issueIdMocks.resolveBareNumericId,
   listBareNumericIssueMatches: issueIdMocks.listBareNumericIssueMatches,
+  // pan open (PAN-5349) accepts a resolved id only when it parses as an issue id.
+  parseIssueId: (id: string) => (/^[A-Za-z]+-\d+$/.test(id) ? { raw: id } : null),
 }));
 
 vi.mock('../../../lib/overdeck/conversations.js', () => ({
@@ -347,6 +349,8 @@ describe('resolveBareNumericId rollout (PAN-1173)', () => {
 
   it('resolves bare numeric input before pan open resolves the project', async () => {
     const { openCommand } = await import('../open.js');
+    // pan open tries the target as a path first (PAN-5349 O-D2): no file named 9999 here.
+    fsMocks.existsSync.mockImplementation((path: unknown) => !String(path).endsWith('/9999'));
 
     await openCommand('9999', { editor: 'code' });
 

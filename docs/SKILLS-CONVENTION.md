@@ -54,7 +54,8 @@ Verbs that **don't** get wrapped (current exclusion list, with rationale):
 | `pan caveman-compress` | Internal-only utility. |
 | `pan fork`, `pan unarchive-conversation`, `pan resume` | Single-purpose, output is self-explanatory. |
 | `pan map` | No CLI verb exists; `/pan-map` is a topical skill for bootstrapping `.overdeck/context/codebase/` orientation files. |
-| `pan open` | Trivial — opens an editor. |
+| `pan open` | `--help` covers targets and flags; see `features/open-in-overdeck.mdx`. |
+| `pan integrate` | `--help` covers targets and flags; see `features/open-in-overdeck.mdx`. |
 | `pan recover`, `pan restore` | Recovery flows are documented in workflow skills (`pan-diagnose`). |
 | `pan scope`, `pan staffing`, `pan test` | Power-user commands documented in topical/workflow skills as needed. |
 | `pan cost`, `pan update`, `pan serve` | Operations whose `--help` is self-contained. |

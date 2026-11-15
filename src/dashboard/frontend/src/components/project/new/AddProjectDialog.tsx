@@ -26,11 +26,13 @@ interface AddProjectDialogProps {
   initialMode?: AddProjectMode;
   /** Prefills the clone step's Repository URL. */
   initialUrl?: string;
+  /** Opens the folder step on this folder (PAN-5349). */
+  initialPath?: string;
   onCreated: (project: CreatedProject) => void;
   onCancel: () => void;
 }
 
-export function AddProjectDialog({ variant, initialMode, initialUrl, onCreated, onCancel }: AddProjectDialogProps) {
+export function AddProjectDialog({ variant, initialMode, initialUrl, initialPath, onCreated, onCancel }: AddProjectDialogProps) {
   const [step, setStep] = useState<Step>(initialMode ? STEP_FOR_MODE[initialMode] : 'start');
   // A running clone or batch keeps the modal open: closing it would stop
   // watching an operation the server is still carrying out.
@@ -51,6 +53,7 @@ export function AddProjectDialog({ variant, initialMode, initialUrl, onCreated, 
       <AddProjectFolderStep
         titleId={titleId}
         showGuide={variant === 'page'}
+        initialPath={initialPath}
         onCreated={onCreated}
         onChange={backToStart}
         onCancel={onCancel}
@@ -99,6 +102,7 @@ export function AddProjectDialogHost({ onCreated }: { onCreated: (project: Creat
   const open = useAddProjectDialog((state) => state.open);
   const mode = useAddProjectDialog((state) => state.mode);
   const initialUrl = useAddProjectDialog((state) => state.initialUrl);
+  const initialPath = useAddProjectDialog((state) => state.initialPath);
   const onCreatedExtra = useAddProjectDialog((state) => state.onCreatedExtra);
   const hide = useAddProjectDialog((state) => state.hide);
   if (!open) return null;
@@ -107,6 +111,7 @@ export function AddProjectDialogHost({ onCreated }: { onCreated: (project: Creat
       variant="modal"
       initialMode={mode}
       initialUrl={initialUrl}
+      initialPath={initialPath}
       onCancel={hide}
       onCreated={(project) => {
         // Before hide(): the created handler reads the pending returnTo, and

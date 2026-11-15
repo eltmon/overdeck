@@ -46,6 +46,8 @@ interface OverdeckBridge {
   downloadUpdate(): Promise<import('@overdeck/contracts').UpdateSnapshot>;
   quitAndInstall(): void;
   onUpdateStatus(listener: (status: import('@overdeck/contracts').UpdateSnapshot) => void): () => void;
+  /** Show and focus this window (PAN-5349); older desktop builds lack it. */
+  raiseWindow?(): void;
 }
 
 interface Window {

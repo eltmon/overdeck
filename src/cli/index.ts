@@ -263,12 +263,18 @@ program
   .option('--json', 'Output as JSON')
   .action(lazyAction(() => import('./commands/show.js'), 'showCommand'));
 
-// pan open <id> — open workspace in editor
+// pan open <target> — open a file, folder or issue workspace in Overdeck (PAN-5349)
 program
-  .command('open <id>')
-  .description('Open an issue workspace in your preferred editor')
-  .option('-e, --editor <editor>', 'Editor to use (cursor, windsurf, vscode, zed, etc.)')
+  .command('open <target>')
+  .description('Open a file, folder or issue workspace in Overdeck')
+  .option('-e, --editor [editor]', 'Open in an external editor instead (cursor, vscode, zed, file-manager, …)')
+  .option('--line <n>', 'Open a file at this line')
+  .option('--column <n>', 'Open a file at this column')
+  .option('--new-tab', 'Open in a new browser tab instead of the focused dashboard tab')
   .action(lazyAction(() => import('./commands/open.js'), 'openCommand'));
+
+// pan integrate file-manager — right-click "Open in Overdeck" (PAN-5349)
+await groups.register('integrate');
 
 await groups.register('review');
 

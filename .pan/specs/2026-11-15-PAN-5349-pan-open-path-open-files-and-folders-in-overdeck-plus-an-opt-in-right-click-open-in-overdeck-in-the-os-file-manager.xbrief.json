@@ -1,0 +1,1443 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T15:23:30Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5349: pan open <path>: open files and folders in Overdeck, plus an opt-in right-click 'Open in Overdeck' in the OS file manager",
+    "updated": "2026-11-15T15:32:05.122Z"
+  },
+  "plan": {
+    "id": "pan-5349",
+    "title": "pan open <path>: open files and folders in Overdeck, plus an opt-in right-click 'Open in Overdeck' in the OS file manager",
+    "status": "running",
+    "uid": "d1a0774e-82d5-484a-853c-3920838d492d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T15:23:30Z",
+    "updated": "2026-11-15T15:32:05.122Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5349",
+        "label": "PAN-5349",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5349/.pan/drafts/pan-5349.md",
+        "label": "PRD draft (.pan/drafts/pan-5349.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "cli",
+      "dashboard",
+      "explorer",
+      "desktop",
+      "file-manager",
+      "integration"
+    ],
+    "metadata": {
+      "sizeJustification": "About 55 files across contracts, server, frontend, CLI, desktop and docs. One issue because the operator filed and specified both halves together, and the right-click integration's only behavior is running `pan open`, so its live check cannot pass before part 1 lands. A sibling issue would block on this one with no parallelism gain: the integration items (file-manager-planner, pan-integrate-cli, install-step, doctor-check) have no edges to the dashboard items and already run in parallel inside this plan.",
+      "canonicalFilename": "2026-11-15-PAN-5349-pan-open-path-open-files-and-folders-in-overdeck-plus-an-opt-in-right-click-open-in-overdeck-in-the-os-file-manager.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Nothing in Overdeck opens an arbitrary file or folder. There is no deep link for a path, no server-to-browser command channel, and no file-manager integration. `pan open <id>` only opens an issue workspace in an external editor.",
+      "Proposal": "`pan open <target>` resolves a path (or path:line:col, or issue) and POSTs it to a new `POST /api/ui/open`, which maps it to an explorer root with a shared `resolvePathRoot` and publishes a transient UiCommand on a new `pan.subscribeUiCommands` RPC stream. The most recently focused dashboard tab opens a folder in the Files dock or a file in a code pane of the right project's deck. With no tab open the CLI opens `/open?path=…`. `--editor` keeps the old editor behavior. `pan integrate file-manager [--remove] [--dry-run]` writes per-user Linux (Open With, GNOME script, Dolphin menu), macOS (Quick Action) and Windows (HKCU keys) entries that call `pan open`; `pan install` offers it opt-in and `pan doctor` warns when it is stale. The desktop app handles `--open <path>` and raises its window.",
+      "NonGoals": "- Registering Overdeck as the default handler for any file type, or adding fileAssociations to the desktop package.\n- Opening paths on linked (remote) machines.\n- Routing pan open to the desktop app's embedded server (port 7825+) when no pan up dashboard runs.\n- Storing UI commands or replaying them to tabs that subscribe later.\n- Reading file contents or listing directories in POST /api/ui/open.\n- Special viewers for non-text files beyond today's code pane.\n- Line/column positioning in external editors.\n- Opening a path outside every project without registering it first.\n- Starting the dashboard automatically from pan open.\n- Editing components/Stage/index.tsx.\n- Any system-wide (root) install or writing outside the user's home for the integration."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep the whole issue (pan open + file-manager integration + desktop) in one plan with sizeJustification instead of sibling issues.",
+        "rationale": "The operator filed both halves together; the integration only calls pan open so its live check needs part 1; integration items already run in parallel inside the DAG."
+      },
+      {
+        "summary": "Store integration state in ~/.overdeck/integrations/file-manager.json instead of config.yaml (PRD O-D11 originally said config.yaml).",
+        "rationale": "config.yaml is normalized and rewritten by dashboard settings doors; a CLI-only install record read by doctor is safer in its own file, which also records the exact files to remove."
+      },
+      {
+        "summary": "Leader-tab rule: leader acts, followers wait 750 ms for a BroadcastChannel 'handled' ack, missing/stale entry means every visible tab acts; the leader clears its entry on pagehide.",
+        "rationale": "The original 'lowest visible tabId' rule needs a tab registry that does not exist, and a closed leader tab would have silently swallowed every command."
+      },
+      {
+        "summary": "UI command hub is a module-level PubSub singleton, not an Effect layer.",
+        "rationale": "Both the HTTP route and the ws-rpc handler import it without editing server.ts layer wiring, and the name avoids the existing PanOpen service."
+      },
+      {
+        "summary": "Add-project prefill opens the existing modal via useAddProjectDialog.show('existing', undefined, { initialPath }) instead of a /projects/new?path= URL.",
+        "rationale": "The page route has no path parameter today; the modal store already carries per-open options such as initialUrl."
+      },
+      {
+        "summary": "--editor becomes an optional-value flag that works for any target, not only issues.",
+        "rationale": "Keeps today's behavior for issue ids and gives paths the same escape hatch with no extra flag."
+      },
+      {
+        "summary": "panPath prefers the pan shim in <OVERDECK_HOME>/cli-bin, then PATH; Windows looks up pan.cmd/pan.exe; icon copied from the bundled favicon.svg.",
+        "rationale": "The shim is rewritten by pan install/sync so it survives npm reinstalls; process.argv[1] is a JS file, not an executable."
+      },
+      {
+        "summary": "Changelog uses #### New and #### Improved (PRD originally said Changed).",
+        "rationale": "changelog.d/README.md allows only New, Improved and Fixed, and lint:docs rejects others."
+      },
+      {
+        "summary": "no-loss-matrix rows use disposition OUT_OF_SCOPE (PRD originally said NEW).",
+        "rationale": "The Disposition union has no NEW value; OUT_OF_SCOPE with a note is the existing pattern for new non-domain surfaces."
+      }
+    ],
+    "items": [
+      {
+        "id": "path-root",
+        "title": "Add shared resolvePathRoot to contracts and use it in rootForConversation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:23:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-5349",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/path-root.ts",
+            "packages/contracts/src/index.ts",
+            "packages/contracts/src/__tests__/path-root.test.ts",
+            "src/dashboard/frontend/src/components/explorer/rootForConversation.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/__tests__/path-root.test.ts",
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/rootForConversation.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "path-root.test.ts passes",
+            "rootForConversation.test.ts passes with no edits to the test file",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 / O-D3 step 4. Create packages/contracts/src/path-root.ts exporting resolvePathRoot(absPath, projects:{key,path}[], scratch:{id,path}[]) returning {kind:'root',projectKey,rootId} | {kind:'no-root',projectKey} | {kind:'outside'}. Order: scratch path containing the target (longest first) -> workspace:<id>; <projectPath>/workspaces/feature-<x>/... -> issue:<X uppercase>; any other folder under <projectPath>/workspaces/ -> no-root; longest containing project path -> project:<key>; else outside. Trim trailing slashes; match with path === base || path.startsWith(base + '/'). Export from packages/contracts/src/index.ts. Replace the two inline loops of rules 4-5 in rootForConversation.ts with `const hit = resolvePathRoot(trimSlash(conv.cwd), ctx.projects, []); return hit.kind === 'root' ? hit.rootId : null` (empty scratch list keeps behavior identical). Run npm run build:contracts before the server typecheck."
+        },
+        "items": [
+          {
+            "id": "path-root.ac1",
+            "title": "Given a target under both a scratch workspace path and its project, resolvePathRoot returns {kind:'root', rootId:'workspace:<id>'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "path-root.ac2",
+            "title": "Given <project>/workspaces/feature-pan-12/x, resolvePathRoot returns rootId 'issue:PAN-12'; given <project>/workspaces/other/x it returns {kind:'no-root'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "path-root.ac3",
+            "title": "Given two nested registered projects, resolvePathRoot returns the longer project's key, and a path outside both returns {kind:'outside'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "path-root.ac4",
+            "title": "rootForConversation.test.ts passes without any change to that test file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui-command-channel",
+        "title": "Add the UiCommand contract, pan.subscribeUiCommands RPC and in-memory hub",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:23:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5349",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/ui-commands.ts",
+            "packages/contracts/src/rpc.ts",
+            "packages/contracts/src/index.ts",
+            "src/dashboard/server/services/ui-commands.ts",
+            "src/dashboard/server/services/__tests__/ui-commands.test.ts",
+            "src/dashboard/server/ws-rpc.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/ui-commands.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run build:contracts && npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ui-commands.test.ts and no-loss-matrix.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "ui-open-route",
+            "open-path-in-deck",
+            "ui-commands-host"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 / O-D4. In packages/contracts/src/ui-commands.ts define Schemas UiOpenResolution {projectKey, rootId, relPath, kind:'file'|'dir', line?, column?} and UiCommand {id, type:'open-path', resolution}; export from the contracts index. In rpc.ts add subscribeUiCommands: \"pan.subscribeUiCommands\" to WS_METHODS and SubscribeUiCommandsRpc (payload Schema.Struct({}), success UiCommand, stream: true) to PanRpcGroup. New src/dashboard/server/services/ui-commands.ts: module-level hub (no Effect layer, server.ts untouched; do NOT reuse the existing PanOpen service name in services/open.ts) with one PubSub.unbounded<UiCommand>() created once, publishUiCommand(cmd): number (returns subscriber count), uiCommandStream() (count++ when the stream starts, count-- in a finalizer), uiCommandSubscriberCount(). No replay of earlier commands. ws-rpc.ts: [WS_METHODS.subscribeUiCommands]: () => uiCommandStream() next to subscribeDomainEvents (~line 706). route-scopes.ts RPC map: 'pan.subscribeUiCommands': 'read:events'. no-loss-matrix.ts: {surface:'pan.subscribeUiCommands', kind:'rpc', disposition:'OUT_OF_SCOPE', door:'UI command channel (PAN-5349): transient open-path commands, never stored'} (there is no NEW disposition)."
+        },
+        "items": [
+          {
+            "id": "ui-command-channel.ac1",
+            "title": "Given two running uiCommandStream subscribers, publishUiCommand returns 2 and both streams emit the published command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-command-channel.ac2",
+            "title": "Given one of two subscribers is interrupted, uiCommandSubscriberCount returns 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-command-channel.ac3",
+            "title": "Given a command published before a stream starts, that stream never emits it (no replay)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-command-channel.ac4",
+            "title": "no-loss-matrix.test.ts passes with the pan.subscribeUiCommands row and route-scopes maps the method to read:events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui-open-route",
+        "title": "Add POST /api/ui/open that resolves a path to an explorer root and publishes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:23:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5349",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/ui-open.ts",
+            "src/dashboard/server/routes/__tests__/ui-open.test.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/ui-open.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ui-open.test.ts and no-loss-matrix.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 / O-D3. New routes/ui-open.ts: makeUiOpenRoute(deps) with injectable {listProjects, listScratch, realpath, stat, resolveRoot, publish} defaulting to listProjectsAsync, listWorkspaces({kind:'scratch'}), node:fs/promises, resolveExplorerRoot, publishUiCommand (pattern: routes/linked-open.ts). Guard with rejectUnsafeDashboardMutationRequest(request). Body {path, line?, column?, dryRun?}. Steps exactly as O-D3 1-7: 400 path-must-be-absolute / invalid-position; realpath+stat (404 not-found); candidates with realpath'd project and scratch paths (skip failures); resolvePathRoot; for root call resolveExplorerRoot(rootId) and relPath = POSIX relative(root.absPath, realPath); throw or '..' => no-root. Answers: 404 {error:'outside-projects', path, kind, suggestion:'pan project add <dir>'} (dir = folder itself or file's parent); 404 {error:'no-root', path, projectKey}; 200 {projectKey: root.projectKey, rootId, relPath, kind, line?, column?, delivered}. Unless dryRun publish {id: randomUUID(), type:'open-path', resolution}; dryRun => delivered 0. Never list a directory or read file contents. Export uiOpenRouteLayer and mount next to explorerRouteLayer in server.ts (~line 480). route-scopes.ts: {method:'POST', path:'/api/ui/open', scope:'operate'}. no-loss-matrix.ts: {surface:'POST /api/ui/open', kind:'http', disposition:'OUT_OF_SCOPE', door:'pan open (PAN-5349): resolves a path to an explorer root and publishes a UI command'}."
+        },
+        "items": [
+          {
+            "id": "ui-open-route.ac1",
+            "title": "Given an absolute folder inside a registered project, POST /api/ui/open returns 200 with kind 'dir', a POSIX relPath, and calls publish exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-open-route.ac2",
+            "title": "Given dryRun: true, the route returns 200 with delivered 0 and never calls publish",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-open-route.ac3",
+            "title": "Given a file outside every project, the route returns 404 outside-projects whose suggestion names the file's parent folder; a relative path returns 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-open-route.ac4",
+            "title": "Given a symlink that points into a project, the route resolves through its real path; given resolveRoot throwing, it returns 404 no-root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "leader-tab",
+        "title": "Add the leader-tab tracker for UI commands",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:23:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5349",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/uiCommands/leaderTab.ts",
+            "src/dashboard/frontend/src/lib/uiCommands/leaderTab.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/uiCommands/leaderTab.test.ts"
+          ],
+          "expected_outputs": [
+            "leaderTab.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 / O-D5 steps 1-4. New lib/uiCommands/leaderTab.ts: TAB_ID (random per load), markFocused(now) writes localStorage['overdeck.ui.leaderTab'] = JSON.stringify({tabId, at}), releaseLeadership() removes the entry only when the stored tabId is ours, leaderRole(now): 'leader' (own id) | 'follower' (other fresh id) | 'fallback' (missing, unparseable, older than 24 h, or storage throws), installLeaderTracking() adds focus / visibilitychange-to-visible / pagehide listeners and returns a cleanup. Every storage access in try/catch. Tests use vi.useFakeTimers() for the 24 h staleness. Add the test path (relative to src/dashboard/frontend) to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "leader-tab.ac1",
+            "title": "Given this tab called markFocused last, leaderRole returns 'leader'; given another tab's fresh entry, it returns 'follower'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "leader-tab.ac2",
+            "title": "Given an entry older than 24 hours or no entry, leaderRole returns 'fallback'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "leader-tab.ac3",
+            "title": "Given localStorage.getItem throws, leaderRole returns 'fallback' without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "leader-tab.ac4",
+            "title": "Given another tab owns the entry, releaseLeadership leaves the entry in place",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "open-path-in-deck",
+        "title": "Add openPathInDeck: open a resolution in the project's deck",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:23:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5349",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/uiCommands/openPathInDeck.ts",
+            "src/dashboard/frontend/src/lib/uiCommands/openPathInDeck.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/uiCommands/openPathInDeck.test.ts"
+          ],
+          "expected_outputs": [
+            "openPathInDeck.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 / O-D6. New lib/uiCommands/openPathInDeck.ts: openPathInDeck(resolution: UiOpenResolution, navigation: Pick<DeckNavigation,'openInDeck'>). deckKey = resolution.projectKey. 1) usePanesStore.getState().ensureHome(deckKey) then navigation.openInDeck({projectKey: deckKey}). 2) file: openCodePane(deckKey, {rootId, path: relPath, line, column}) then useWorkDockStore.getState().openDock(deckKey, {tab:'files', reveal:{rootId, path: relPath}}), no override. 3) dir: if useActiveDock.getState().current is not {deckKey, rootId}, setRootOverride(deckKey, rootId, anchor) where anchor = current.activePaneId when current.deckKey === deckKey else selectActivePaneId(deckKey)(usePanesStore.getState()) (null -> undefined); then openDock(deckKey, {tab:'files', reveal: relPath === '' ? undefined : {rootId, path: relPath}}). 4) sonner toast `Opened <relPath || 'root folder'> from pan open`. Do not edit components/Stage/index.tsx. Add the test to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "open-path-in-deck.ac1",
+            "title": "Given a dir resolution whose root differs from the active dock, openPathInDeck calls setRootOverride and then openDock with the reveal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-path-in-deck.ac2",
+            "title": "Given a dir resolution whose rootId already matches useActiveDock for that deck, it sets no override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-path-in-deck.ac3",
+            "title": "Given relPath '', openDock is called with no reveal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-path-in-deck.ac4",
+            "title": "Given a file resolution with line 10 and column 3, openCodePane receives line 10 and column 3, openDock receives the reveal, and setRootOverride is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-path-in-deck.ac5",
+            "title": "navigation.openInDeck receives {projectKey} equal to the resolution's projectKey",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui-commands-host",
+        "title": "Subscribe to UI commands in the app and act in the leader tab",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:23:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5349",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/uiCommands/useUiCommands.ts",
+            "src/dashboard/frontend/src/lib/uiCommands/useUiCommands.test.tsx",
+            "src/dashboard/frontend/src/components/open/UiCommandsHost.tsx",
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/types/ambient.d.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/uiCommands/useUiCommands.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useUiCommands.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 / O-D5 step 5-6. New lib/uiCommands/useUiCommands.ts: subscribe with getTransport().subscribe((client) => (client as PanRpcProtocolClient)[WS_METHODS.subscribeUiCommands]({}) ..., onCommand) (pattern components/drawer/useDrawerData.ts ~line 331); call installLeaderTracking(). On a command: leader acts at once; fallback acts at once only if document.visibilityState === 'visible'; follower waits 750 ms (setTimeout) and acts only if visible and no {handled: id} arrived on BroadcastChannel('overdeck.ui-commands'). Acting = openPathInDeck(resolution, navigation), post {handled: id} (when BroadcastChannel exists), window.focus(), window.overdeckBridge?.raiseWindow?.(). New components/open/UiCommandsHost.tsx renders null and calls the hook with useDeckNavigation(); mount it once in App.tsx inside <DeckNavigationProvider> (App.tsx cap 1019 lines). Add optional raiseWindow?(): void to OverdeckBridge in types/ambient.d.ts. Tests use fake timers and a mocked transport; add to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "ui-commands-host.ac1",
+            "title": "Given the tab is leader, a received command calls openPathInDeck at once and posts {handled: id}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-commands-host.ac2",
+            "title": "Given a follower receives {handled: id} within 750 ms, it never calls openPathInDeck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-commands-host.ac3",
+            "title": "Given a visible follower receives no handled message, it calls openPathInDeck after 750 ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-commands-host.ac4",
+            "title": "Given a fallback tab whose document is hidden, it does not call openPathInDeck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "add-project-prefill",
+        "title": "Let the Add-project dialog open on a given folder",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:23:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5349",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/project/new/addProjectDialogStore.ts",
+            "src/dashboard/frontend/src/components/project/new/AddProjectDialog.tsx",
+            "src/dashboard/frontend/src/components/project/new/AddProjectFolderStep.tsx",
+            "src/dashboard/frontend/src/components/project/new/__tests__/AddProjectFolderStep.initialPath.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/project/new/__tests__/AddProjectFolderStep.initialPath.test.tsx src/components/project/new/__tests__/AddProjectFolderStep.test.tsx"
+          ],
+          "expected_outputs": [
+            "both AddProjectFolderStep test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 / O-D10. AddProjectShowOptions gains initialPath?: string; the store keeps it on show() and hide() clears it; AddProjectDialogHost passes it to AddProjectDialog as initialPath; AddProjectDialog passes it to AddProjectFolderStep; when initialPath is set the folder step calls its own choose(initialPath) once on mount (useEffect with a ref guard), moving straight to resolving that folder. Add the new test to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "add-project-prefill.ac1",
+            "title": "Given AddProjectFolderStep renders with initialPath '/x/y', it calls the project resolve with '/x/y' on mount without a click",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-project-prefill.ac2",
+            "title": "Given no initialPath, the step stays on the folder picker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-project-prefill.ac3",
+            "title": "Given show('existing', undefined, {initialPath}) then hide(), the store's initialPath becomes undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "open-path-link",
+        "title": "Handle the /open link and the outside-project dialog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:23:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5349",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/open/OpenPathHost.tsx",
+            "src/dashboard/frontend/src/components/open/OpenPathHost.test.tsx",
+            "src/dashboard/frontend/src/App.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/open/OpenPathHost.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "OpenPathHost.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 / O-D7 / O-D9. New components/open/OpenPathHost.tsx mounted in App.tsx inside <DeckNavigationProvider>. On mount, only when window.location.pathname === '/open': read path/line/column params; no path => sonner toast 'Nothing to open: the link has no path' and history.replaceState to '/'. Otherwise POST /api/ui/open {path, line, column, dryRun: true} with headers from dashboardMutationJsonHeaders(); 200 => openPathInDeck(resolution, useDeckNavigation()) then, if pathname is still '/open', history.replaceState(null, '', '/command-deck/' + encodeURIComponent(projectKey)). 404 outside-projects => components/shared/Modal.tsx dialog '<dir> isn't in a project. Add it as a project?' (dir = folder, or parent for a file) with 'Add project' calling useAddProjectDialog.getState().show('existing', undefined, {initialPath: dir}) and 'Cancel'. 404 no-root / not-found => error toast with the matching sentence. Implementation checkpoint (O-D16): if App's URL effects rewrite the URL, wrap replaceState in setTimeout(..., 0)."
+        },
+        "items": [
+          {
+            "id": "open-path-link.ac1",
+            "title": "Given /open?path=/p/docs and a 200 response, OpenPathHost calls openPathInDeck and replaces the URL with /command-deck/<project>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-path-link.ac2",
+            "title": "Given a 404 outside-projects response, it renders the dialog and clicking Add project calls show('existing', undefined, {initialPath})",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-path-link.ac3",
+            "title": "Given /open with no path param, it shows the 'Nothing to open' toast and replaces the URL with /",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-path-link.ac4",
+            "title": "Given any pathname other than /open, it sends no request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "open-target-parse",
+        "title": "Parse pan open targets (path, path:line:col, issue)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:23:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5349",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/open-target.ts",
+            "tests/unit/cli/open-target.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/open-target.test.ts"
+          ],
+          "expected_outputs": [
+            "open-target.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 / O-D2. New src/cli/commands/open-target.ts: parseOpenTarget(raw, cwd, home, deps?: {exists, resolveIssue}) -> {kind:'path', abs, line?, column?} | {kind:'issue', id} | {kind:'invalid'}. Order: ~ expansion + path.resolve(cwd) exists => path; else regex ^(.*):(\\d+)(?::(\\d+))?$ with existing prefix => path+line(+column); else resolveBareNumericId(raw) => issue; else invalid. Defaults: exists = fs.existsSync is acceptable here (CLI only, not server-reachable), resolveIssue = resolveBareNumericId. Tests use a temp dir."
+        },
+        "items": [
+          {
+            "id": "open-target-parse.ac1",
+            "title": "Given an existing file 'f.ts', parseOpenTarget returns {kind:'path'} with the absolute path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-target-parse.ac2",
+            "title": "Given 'f.ts:12:3' for an existing f.ts, it returns line 12 and column 3; 'missing.ts:12' returns {kind:'invalid'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-target-parse.ac3",
+            "title": "Given 'PAN-123' with no such file, it returns {kind:'issue', id:'PAN-123'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-target-parse.ac4",
+            "title": "Given '~/x' it expands to <home>/x, and an existing file literally named 'a:1' is returned as a path with no line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-open-cli",
+        "title": "Make pan open open targets in the dashboard, with --editor keeping the old behavior",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:23:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5349",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/open.ts",
+            "src/cli/index.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "tests/unit/cli/open-command.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/open-command.test.ts tests/unit/cli/open-target.test.ts",
+            "npm run build && npm run generate:slash-commands && bash scripts/lint-slash-commands.sh",
+            "node dist/cli/index.js open --help"
+          ],
+          "expected_outputs": [
+            "open-command.test.ts passes",
+            "lint-slash-commands.sh passes with the regenerated manifest committed",
+            "help lists --editor [editor], --line <n>, --column <n>, --new-tab"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10 / O-D1, O-D7, O-D8, O-D9. In open.ts keep the editor code as openInEditor(targetPath, editor: string | true) (true = first editor on PATH; 'file-manager' = platform opener). Add openInDashboard(abs, {line, column, newTab}): callDashboard('/api/ui/open', {method:'POST', body:{path: abs, line, column, dryRun: newTab}}); on 200 with delivered 0 or newTab, open `${getDashboardApiUrl()}/open?path=<enc>[&line=n&column=n]` with `await Effect.runPromise(openBrowser(url).pipe(Effect.provide(nodeServicesLayer)))` (pattern: src/cli/commands/serve.ts line 20) and print 'Opening <url> in your browser'; otherwise print 'Opened <relPath> in <projectKey>'. DashboardUnreachableError => stderr \"Overdeck isn't running. Start it with: pan up\", exit 1. 404 outside-projects => \"<path> isn't in a registered project. Add it with: <suggestion>\", exit 1; no-root => '<path> is inside <projectKey> but not in a feature or scratch workspace', exit 1; invalid target => 'Not a file, folder or issue: <target>', exit 1. openCommand(target, options) uses parseOpenTarget; an issue resolves to its workspace path as today. --editor skips the dashboard entirely. index.ts: .command('open <target>'), description 'Open a file, folder or issue workspace in Overdeck', options '-e, --editor [editor]' ('Open in an external editor instead (cursor, vscode, zed, file-manager, ...)'), '--line <n>', '--column <n>', '--new-tab'. Regenerate composer-commands.generated.ts (npm run build, then npm run generate:slash-commands)."
+        },
+        "items": [
+          {
+            "id": "pan-open-cli.ac1",
+            "title": "Given callDashboard answers delivered 1, pan open opens no browser and prints the project and relPath",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-open-cli.ac2",
+            "title": "Given delivered 0, it opens <dashboardUrl>/open?path=<encoded>&line=<n>; given --new-tab, it sends dryRun true and opens the browser",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-open-cli.ac3",
+            "title": "Given callDashboard throws DashboardUnreachableError, it exits 1 with \"Overdeck isn't running. Start it with: pan up\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-open-cli.ac4",
+            "title": "Given --editor, it calls openInEditor and never calls callDashboard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-open-cli.ac5",
+            "title": "pan open --help lists --editor [editor], --line, --column and --new-tab, and scripts/lint-slash-commands.sh passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "desktop-open",
+        "title": "Handle --open in the desktop app and add raiseWindow to the bridge",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:23:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5349",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/src/main.ts",
+            "apps/desktop/src/preload.ts",
+            "apps/desktop/tests/main-open.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd apps/desktop && npx vitest run tests/main-open.test.ts tests/main-switch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "main-open.test.ts and main-switch.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11 / O-D11. main.ts: export pure parseOpenArg(argv): string | null (value after --open; null when absent or no value). Change app.on('second-instance', (_event, argv) => ...): with a path and getActiveDashboard().kind !== 'remote', show the main window (showOrCreateWindow) and loadURL(`${resolveWindowUrl()}/open?path=${encodeURIComponent(path)}`); remote mode or no path => only showOrCreateWindow(). Add IPC 'pan:raise-window' handled with BrowserWindow.fromWebContents(event.sender) -> show() + focus(). preload.ts: RAISE_WINDOW: 'pan:raise-window' in IPC, raiseWindow() on the bridge object and its OverdeckBridge type. No fileAssociations. Test file mocks Electron like tests/main-switch.test.ts and invokes the captured second-instance handler."
+        },
+        "items": [
+          {
+            "id": "desktop-open.ac1",
+            "title": "Given second-instance with ['app','--open','/a/b'] in local mode, the main window loads a URL ending /open?path=%2Fa%2Fb",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "desktop-open.ac2",
+            "title": "Given second-instance without --open, the window is shown and no /open URL is loaded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "desktop-open.ac3",
+            "title": "parseOpenArg(['app','--open']) returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "file-manager-planner",
+        "title": "Plan, apply and record the per-platform file-manager integration",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:23:30Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5349",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/integrations/file-manager.ts",
+            "src/lib/integrations/templates/linux.ts",
+            "src/lib/integrations/templates/macos.ts",
+            "tests/unit/lib/integrations/file-manager.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/integrations/file-manager.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "file-manager.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "pan-integrate-cli",
+            "install-step",
+            "doctor-check"
+          ],
+          "parallelSafeReason": "Touches only new files under src/lib/integrations/ and its new test; no other item edits them."
+        },
+        "narrative": {
+          "Action": "PRD WI-12 / O-D12 / O-D13. New src/lib/integrations/file-manager.ts: pure planFileManagerInstall({platform, home, panPath, iconPath}) and planFileManagerRemove(state) -> {files:{path,content,mode}[], deletes:string[], commands:{cmd,args,optional}[], registryKeys:string[]}. Linux: ~/.local/share/applications/overdeck-open.desktop (0644, Exec=\"<panPath>\" open %f, NoDisplay=true, MimeType=inode/directory;text/plain;application/octet-stream;, Icon=<iconPath> when given) + optional update-desktop-database command; ~/.local/share/nautilus/scripts/Open in Overdeck (0755, #!/bin/sh, for f in \"$@\"; do \"<panPath>\" open \"$f\"; done); ~/.local/share/kio/servicemenus/overdeck-open.desktop (0755, Type=Service, MimeType=all/all;, Actions=openInOverdeck;, X-KDE-Priority=TopLevel, [Desktop Action openInOverdeck] Name=Open in Overdeck, Exec=\"<panPath>\" open %f). macOS: ~/Library/Services/Open in Overdeck.workflow/Contents/Info.plist (NSServices, NSMenuItem.default 'Open in Overdeck', NSMessage runWorkflowAsService, NSSendFileTypes [public.item], NSRequiredContext Finder) and Contents/document.wflow (Run Shell Script, /bin/zsh, args, same loop body) from templates/macos.ts + optional /System/Library/CoreServices/pbs -update. Windows: reg add arrays for HKCU\\Software\\Classes\\*\\shell\\OpenInOverdeck, Directory\\shell\\OpenInOverdeck (command \"<panPath>\" open \"%1\"), Directory\\Background\\shell\\OpenInOverdeck (\"%V\"), default value 'Open in Overdeck'; remove = reg delete <key> /f. applyFileManagerPlan(plan, deps) writes with fs/promises (mkdir -p, chmod mode) and runs commands with promisified execFile (never a shell string); a missing optional command is skipped with a note. State file ~/.overdeck/integrations/file-manager.json via getOverdeckHome(): readFileManagerState()/writeFileManagerState() {installed, platform, panPath, at, files, registryKeys}. resolvePanPath(platform, deps): POSIX prefers join(panCliShimDir(),'pan') when executable, else findExecutableOnPath('pan', PATH); win32 splits PATH on ';' trying pan.cmd then pan.exe. Icon: copy join(dirname(panCliBundlePath()),'..','dashboard','public','favicon.svg') to ~/.overdeck/integrations/overdeck.svg when it exists. Tests pass an explicit temp home; never write the real home."
+        },
+        "items": [
+          {
+            "id": "file-manager-planner.ac1",
+            "title": "Given platform linux, the install plan contains exactly the three files with modes 0644, 0755 and 0755, and every Exec line quotes panPath",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-manager-planner.ac2",
+            "title": "Given a panPath containing a space, every generated Exec and script line keeps it as one double-quoted argument",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-manager-planner.ac3",
+            "title": "Given platform darwin, the plan contains Info.plist with an NSServices entry, document.wflow, and an optional pbs -update command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-manager-planner.ac4",
+            "title": "Given platform win32, the plan emits three reg add argument arrays and the background key's command uses %V",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-manager-planner.ac5",
+            "title": "Given a recorded state, planFileManagerRemove deletes exactly the recorded files and registry keys, and resolvePanPath returns the shim path when it is executable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-integrate-cli",
+        "title": "Add the pan integrate file-manager verb",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:23:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5349",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/integrate.ts",
+            "src/cli/command-groups.ts",
+            "src/cli/index.ts",
+            "scripts/slash-commands-curation.json",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "tests/unit/cli/integrate-command.test.ts",
+            "tests/unit/cli/command-groups.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/integrate-command.test.ts tests/unit/cli/command-groups.test.ts",
+            "npm run build && npm run generate:slash-commands && bash scripts/lint-slash-commands.sh",
+            "node dist/cli/index.js integrate file-manager --dry-run"
+          ],
+          "expected_outputs": [
+            "integrate-command.test.ts and command-groups.test.ts pass",
+            "lint-slash-commands.sh passes",
+            "--dry-run prints the planned paths and writes nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13 / O-D12. New src/cli/commands/integrate.ts: registerIntegrateCommands(program) adding `integrate` with subcommand `file-manager` and options --remove, --dry-run. Install: resolvePanPath (missing => 'pan is not installed on PATH. Run: pan sync', exit 1), copy icon, plan, apply (or print with --dry-run), write state; remove: read state ('Nothing to remove' exit 0 when absent), plan remove, apply, delete state. Print each written/deleted path. command-groups.ts: integrate: group({names:['integrate'], load: () => import('./commands/integrate.js'), register: (mod, program) => mod.registerIntegrateCommands(program)}); index.ts: await groups.register('integrate') with the other groups. scripts/slash-commands-curation.json categories: \"integrate\": \"Core\". Regenerate composer-commands.generated.ts."
+        },
+        "items": [
+          {
+            "id": "pan-integrate-cli.ac1",
+            "title": "Given --dry-run, pan integrate file-manager prints every planned path and the apply step is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-integrate-cli.ac2",
+            "title": "Given a successful install, the state file records installed true, panPath and the written files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-integrate-cli.ac3",
+            "title": "Given --remove with no state file, it prints 'Nothing to remove' and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-integrate-cli.ac4",
+            "title": "command-groups.test.ts passes with the integrate group registered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "install-step",
+        "title": "Offer the file-manager integration during pan install",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:23:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5349",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/install-file-manager.ts",
+            "src/cli/commands/install.ts",
+            "tests/unit/cli/install-file-manager.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/install-file-manager.test.ts",
+            "npm run build && node dist/cli/index.js install --help"
+          ],
+          "expected_outputs": [
+            "install-file-manager.test.ts passes",
+            "help lists --file-manager-integration and --skip-file-manager-integration"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14 / O-D14. New src/cli/commands/install-file-manager.ts: setupFileManagerIntegrationForInstall({skip, force, isTty, spinner, confirm, install}) mirroring install-ollama.ts. skip wins (no prompt, no install); force installs without prompting; TTY without flags asks inquirer confirm 'Add \"Open in Overdeck\" to your file manager\\'s right-click menu?' default false; non-TTY without force => spinner.info skip line; an install error => spinner.warn, never throws. install.ts: add .option('--file-manager-integration', ...) and .option('--skip-file-manager-integration', ...), the InstallOptions fields, and call the step right after setupOllamaForInstall (~line 488) with install = the WI-12/13 install function."
+        },
+        "items": [
+          {
+            "id": "install-step.ac1",
+            "title": "Given force, the step calls install and never calls confirm",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-step.ac2",
+            "title": "Given skip together with force, the step calls neither confirm nor install",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-step.ac3",
+            "title": "Given a non-TTY and no force, install is not called; given a TTY and confirm resolving true, install is called once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-step.ac4",
+            "title": "Given install rejects, the step resolves and calls spinner.warn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-check",
+        "title": "Warn in pan doctor when the file-manager integration is stale",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:23:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5349",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-file-manager.ts",
+            "src/cli/commands/doctor.ts",
+            "tests/unit/cli/doctor-file-manager.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/doctor-file-manager.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "doctor-file-manager.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15 / O-D15. New src/cli/commands/doctor-file-manager.ts: checkFileManagerIntegration(deps) -> CheckResult | null (re-declare CheckResult like doctor-pan-path.ts to avoid an import cycle). No state file => null. installed true: panPath must exist and be executable, every recorded file must exist (registry keys not checked); any failure => {name:'File-manager integration', status:'warn', message:'File-manager integration is stale: <first missing path>', fix:'pan integrate file-manager'}; else ok. Push it in collectDoctorChecks in doctor.ts (skip null). doctor.ts stays under its allowlist cap."
+        },
+        "items": [
+          {
+            "id": "doctor-check.ac1",
+            "title": "Given no state file, checkFileManagerIntegration returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-check.ac2",
+            "title": "Given an installed state whose panPath and files exist, it returns status ok",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-check.ac3",
+            "title": "Given a missing panPath, it returns warn with fix 'pan integrate file-manager'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-check.ac4",
+            "title": "Given a missing recorded file, it returns warn whose message names that file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-open-in-overdeck",
+        "title": "Document pan open, the /open link and the file-manager integration",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:23:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5349",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/open-in-overdeck.mdx",
+            "docs.json",
+            "features/file-explorer.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/SKILLS-CONVENTION.md",
+            "sync-sources/skills/pan/SKILL.md",
+            "changelog.d/pan-5349.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "skill CLI lint passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16. New features/open-in-overdeck.mdx added to docs.json after \"features/file-explorer\" (~line 114): pan open targets and flags (--editor [editor], --line, --column, --new-tab), the leader-tab rule, the /open?path= link, outside-project and no-root answers, pan integrate file-manager per platform (Linux three entries, macOS Quick Action, Windows HKCU keys with the Windows 11 'Show more options' note and 'untested on real hardware'), the macOS manual Automator fallback if the O-D16 checkpoint failed, --remove, the pan doctor warning, the pan install prompt and flags, and that the desktop app's embedded server is not reached. features/file-explorer.mdx: one paragraph linking to it. docs/DASHBOARD-ARCHITECTURE.md: section 'UI commands (PAN-5349)' (module hub, pan.subscribeUiCommands, never stored, leader tab, POST /api/ui/open). docs/SKILLS-CONVENTION.md: pan open row reason becomes '--help covers targets and flags; see features/open-in-overdeck.mdx', add a pan integrate row with the same reason. sync-sources/skills/pan/SKILL.md taxonomy: 'pan open <target>  Open a file, folder or issue in Overdeck' under OBSERVATION and 'pan integrate file-manager  Right-click \"Open in Overdeck\"' under SYSTEM / DAEMON. changelog.d/pan-5349.md: '#### New' (right-click integration, /open link) and '#### Improved' (pan open now opens in Overdeck; --editor keeps the editor behavior) — only New/Improved/Fixed headings are valid."
+        },
+        "items": [
+          {
+            "id": "docs-open-in-overdeck.ac1",
+            "title": "features/open-in-overdeck.mdx exists, docs.json lists features/open-in-overdeck right after features/file-explorer, and the page shows the Windows 11 'Show more options' note",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-open-in-overdeck.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a 'UI commands (PAN-5349)' section naming pan.subscribeUiCommands and POST /api/ui/open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-open-in-overdeck.ac3",
+            "title": "changelog.d/pan-5349.md contains '#### New' and '#### Improved' headings, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-open-in-overdeck.ac4",
+            "title": "docs/SKILLS-CONVENTION.md lists rows for pan open and pan integrate, and scripts/lint-skills.sh prints 'skill CLI lint passed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-check",
+        "title": "Run the live pan open and right-click walkthrough",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:23:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5349",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/open-in-overdeck.mdx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "node dist/cli/index.js open --help"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "screenshots of each AC-17 step are attached to the PR or the fallback is stated"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-17 / AC-17 / O-D16. Build; run the branch's dashboard on a spare port (isolated OVERDECK_HOME copy, see the live-check memory) and open it in an isolated Playwright browser/profile (never another agent's session); with OVERDECK_DASHBOARD_URL pointed at it run `pan open <checkout>/docs` and `pan open <checkout>/README.md:10` and screenshot the Files dock reveal and the code pane at line 10; run /open?path= with no tab open; run `pan integrate file-manager --dry-run` and, on this Linux host, install then right-click -> Scripts -> Open in Overdeck in GNOME Files, then --remove (verify the three files are gone). Run the macOS Quick Action checkpoint on the Mac rig; if the bundle does not register, apply the documented manual fallback in features/open-in-overdeck.mdx and say so in the PR. Fallback when a peer dashboard cannot start: attach the unit-test evidence and state that the live walkthrough is left to the test role's UAT."
+        },
+        "items": [
+          {
+            "id": "live-check.ac1",
+            "title": "Given the branch dashboard is open in an isolated browser, `pan open <checkout>/docs` reveals docs in the Files dock of that project's deck (screenshot in the PR)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-check.ac2",
+            "title": "Given `pan open <checkout>/README.md:10`, the code pane opens README.md at line 10 (screenshot in the PR)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-check.ac3",
+            "title": "Given `pan integrate file-manager` then `--remove` on Linux, the three integration files exist after install and are absent after remove",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-check.ac4",
+            "title": "Given the Mac rig, Finder shows Quick Actions -> Open in Overdeck and running it opens the folder in the dashboard; when the bundle does not register, features/open-in-overdeck.mdx renders the manual Automator steps instead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "path-root",
+        "to": "ui-command-channel",
+        "type": "blocks"
+      },
+      {
+        "from": "path-root",
+        "to": "ui-open-route",
+        "type": "blocks"
+      },
+      {
+        "from": "ui-command-channel",
+        "to": "ui-open-route",
+        "type": "blocks"
+      },
+      {
+        "from": "ui-command-channel",
+        "to": "open-path-in-deck",
+        "type": "blocks"
+      },
+      {
+        "from": "ui-command-channel",
+        "to": "ui-commands-host",
+        "type": "blocks"
+      },
+      {
+        "from": "leader-tab",
+        "to": "ui-commands-host",
+        "type": "blocks"
+      },
+      {
+        "from": "open-path-in-deck",
+        "to": "ui-commands-host",
+        "type": "blocks"
+      },
+      {
+        "from": "open-path-in-deck",
+        "to": "open-path-link",
+        "type": "blocks"
+      },
+      {
+        "from": "add-project-prefill",
+        "to": "open-path-link",
+        "type": "blocks"
+      },
+      {
+        "from": "ui-open-route",
+        "to": "open-path-link",
+        "type": "blocks"
+      },
+      {
+        "from": "ui-commands-host",
+        "to": "open-path-link",
+        "type": "blocks"
+      },
+      {
+        "from": "open-target-parse",
+        "to": "pan-open-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "ui-open-route",
+        "to": "pan-open-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-open-cli",
+        "to": "pan-integrate-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "file-manager-planner",
+        "to": "pan-integrate-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "file-manager-planner",
+        "to": "install-step",
+        "type": "blocks"
+      },
+      {
+        "from": "file-manager-planner",
+        "to": "doctor-check",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-integrate-cli",
+        "to": "install-step",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-open-cli",
+        "to": "docs-open-in-overdeck",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-integrate-cli",
+        "to": "docs-open-in-overdeck",
+        "type": "blocks"
+      },
+      {
+        "from": "install-step",
+        "to": "docs-open-in-overdeck",
+        "type": "blocks"
+      },
+      {
+        "from": "doctor-check",
+        "to": "docs-open-in-overdeck",
+        "type": "blocks"
+      },
+      {
+        "from": "open-path-link",
+        "to": "live-check",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-open-cli",
+        "to": "live-check",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-open-in-overdeck",
+        "to": "live-check",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

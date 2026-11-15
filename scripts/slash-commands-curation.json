@@ -14,6 +14,7 @@
     "sync": "Core",
     "doctor": "Core",
     "install": "Core",
+    "integrate": "Core",
     "skills": "Core",
     "test": "Core",
     "dev": "Core",

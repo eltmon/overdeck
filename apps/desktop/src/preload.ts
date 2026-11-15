@@ -32,6 +32,7 @@ const IPC = {
   CHECK_FOR_UPDATES: "pan:check-for-updates",
   DOWNLOAD_UPDATE: "pan:download-update",
   QUIT_AND_INSTALL: "pan:quit-and-install",
+  RAISE_WINDOW: "pan:raise-window",
 } as const;
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -110,6 +111,9 @@ export interface OverdeckBridge {
   downloadUpdate(): Promise<UpdateSnapshot>;
   quitAndInstall(): void;
   onUpdateStatus(listener: (status: UpdateSnapshot) => void): () => void;
+
+  /** Shows and focuses this window, after it acted on a UI command (PAN-5349). */
+  raiseWindow(): void;
 }
 
 // ─── Bridge implementation ────────────────────────────────────────────────────
@@ -170,6 +174,7 @@ const bridge: OverdeckBridge = {
     ipcRenderer.on('update-status', wrapped);
     return () => ipcRenderer.removeListener('update-status', wrapped);
   },
+  raiseWindow: () => { ipcRenderer.send(IPC.RAISE_WINDOW); },
 };
 
 contextBridge.exposeInMainWorld("overdeckBridge", bridge);
