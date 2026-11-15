@@ -1,12 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T18:24:35.591048Z · model: claude-opus-5-5 · open: 899_
+_Last sequenced: 2026-11-15T18:55:22.053385Z · model: claude-opus-5-5 · open: 901_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 7 | PAN-5363 | S | high | ok |  |  | In pipeline: merge train board Train switch flips back on after off; board cache not dropped on write, optimistic value lost. |
+| 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
 | 9 | PAN-5361 | S | critical | ok |  |  | In pipeline: bare-host-linux idle check fails ~3% of runs; pid-net counts machine-wide runner PID bursts one baseline can't cancel. |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
@@ -426,6 +427,7 @@ _Last sequenced: 2026-11-15T18:24:35.591048Z · model: claude-opus-5-5 · open: 
 | 422 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
 | 423 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
 | 424 | PAN-5028 | M | medium | ok |  |  | list_pending_input loses a conversation's AskUserQuestion after the PAN-1520 deny hook, contrary to the existing test's contract. |
+| 425 | PAN-5386 | XS | medium | ok |  |  | CodeRabbit follow-up for PAN-5361 (PR #5373): 1 Major finding, baseline burst can hide an idle regression in bare-host smoke |
 | 426 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 427 | PAN-5227 | S | medium | ok |  |  | Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle. |
 | 427 | PAN-5349 | L | medium | ok |  |  | pan open <path> opens files/folders in the dashboard; opt-in OS file-manager 'Open in Overdeck'. PRD in .pan/drafts/pan-5349.md |
@@ -915,6 +917,10 @@ Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat 
 
 Back in the manifest after dropping out of the last two passes; restored with its prior node. In-pipeline bug with a file:line root cause (switch falls back to a stale 5 s server board cache after the POST settles). Placed in a free top-tier slot near PAN-5364, which edits the same ProjectTrainCard.tsx; high rather than critical because the write itself succeeds.
 
+### PAN-5385 (rank 8)
+
+New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.
+
 ### PAN-5361 (rank 9)
 
 New in-pipeline substrate bug: a ~3% false-red CI job blocks releases and merges with no code change. It is pinned at rank 9, beside the other critical pipeline substrate fixes; pinned in-pipeline ranks stay where they were.
@@ -1223,10 +1229,6 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
 
 New substrate bug placed in a freed high-tier slot. With several workspace stacks up, browser checks hit the wrong backend and flake, which corrupts verification.
 
-### PAN-3234 (rank 84)
-
-Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1234,10 +1236,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T18:24:35.591048Z",
+  "generatedAt": "2026-11-15T18:55:22.053385Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 899,
+  "openCount": 901,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -1262,6 +1264,19 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "dependsOn": [],
       "why": "In pipeline: merge train board Train switch flips back on after off; board cache not dropped on write, optimistic value lost.",
       "rationale": "Back in the manifest after dropping out of the last two passes; restored with its prior node. In-pipeline bug with a file:line root cause (switch falls back to a stale 5 s server board cache after the POST settles). Placed in a free top-tier slot near PAN-5364, which edits the same ProjectTrainCard.tsx; high rather than critical because the write itself succeeds.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5385",
+      "rank": 8,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix",
+      "rationale": "New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6541,6 +6556,18 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "dependsOn": [],
       "why": "list_pending_input loses a conversation's AskUserQuestion after the PAN-1520 deny hook, contrary to the existing test's contract.",
       "rationale": "Hosted bots and the phone rely on this list; probably the same root cause as PAN-5048, so whichever lands first should check the other.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5386",
+      "rank": 425,
+      "size": "XS",
+      "importance": "medium",
+      "score": 46,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CodeRabbit follow-up for PAN-5361 (PR #5373): 1 Major finding, baseline burst can hide an idle regression in bare-host smoke",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13623,6 +13650,13 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-5361",
+      "to": "PAN-5386",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-5369",

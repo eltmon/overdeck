@@ -1,0 +1,151 @@
+{
+  "version": "1",
+  "issueId": "PAN-5369",
+  "created": "2026-11-15T17:54:40.939Z",
+  "updated": "2026-11-15T18:32:53.144Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "locator-index": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5369",
+      "claimedAt": "2026-11-15T17:54:40.939Z",
+      "doneAt": "2026-11-15T17:56:37.231Z"
+    },
+    "locator-index.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:56:37.231Z"
+    },
+    "locator-index.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:56:37.231Z"
+    },
+    "locator-index.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:56:37.231Z"
+    },
+    "lookup-query-rewrite": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5369",
+      "claimedAt": "2026-11-15T17:56:53.829Z",
+      "doneAt": "2026-11-15T18:05:56.337Z"
+    },
+    "lookup-query-rewrite.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:05:56.337Z"
+    },
+    "lookup-query-rewrite.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:05:56.337Z"
+    },
+    "lookup-query-rewrite.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:05:56.337Z"
+    },
+    "lookup-query-rewrite.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:05:56.337Z"
+    },
+    "ownership-helpers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5369",
+      "claimedAt": "2026-11-15T18:06:09.907Z",
+      "doneAt": "2026-11-15T18:10:59.570Z"
+    },
+    "ownership-helpers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:10:59.570Z"
+    },
+    "ownership-helpers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:10:59.570Z"
+    },
+    "ownership-helpers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:10:59.570Z"
+    },
+    "orphan-scan-locator-set": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5369",
+      "claimedAt": "2026-11-15T18:11:08.484Z",
+      "doneAt": "2026-11-15T18:21:15.970Z"
+    },
+    "orphan-scan-locator-set.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:21:15.970Z"
+    },
+    "orphan-scan-locator-set.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:21:15.970Z"
+    },
+    "orphan-scan-locator-set.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:21:15.970Z"
+    },
+    "orphan-scan-locator-set.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:21:15.970Z"
+    },
+    "orphan-scan-locator-set.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:21:15.970Z"
+    },
+    "orphan-scan-short-transcript-memo": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5369",
+      "claimedAt": "2026-11-15T18:21:28.317Z",
+      "doneAt": "2026-11-15T18:27:07.490Z"
+    },
+    "orphan-scan-short-transcript-memo.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:27:07.490Z"
+    },
+    "orphan-scan-short-transcript-memo.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:27:07.490Z"
+    },
+    "orphan-scan-short-transcript-memo.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:27:07.490Z"
+    },
+    "orphan-scan-short-transcript-memo.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:27:07.490Z"
+    },
+    "fork-adoption-ownership": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5369",
+      "claimedAt": "2026-11-15T18:27:15.291Z",
+      "doneAt": "2026-11-15T18:31:03.128Z"
+    },
+    "fork-adoption-ownership.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:31:03.128Z"
+    },
+    "fork-adoption-ownership.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:31:03.128Z"
+    },
+    "docs-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5369",
+      "claimedAt": "2026-11-15T18:31:12.437Z",
+      "doneAt": "2026-11-15T18:32:53.144Z"
+    },
+    "docs-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:32:53.144Z"
+    },
+    "docs-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:32:53.144Z"
+    },
+    "docs-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:32:53.144Z"
+    }
+  }
+}

@@ -10,7 +10,8 @@ process.env.OVERDECK_HOME = TEST_HOME;
 
 const { getOverdeckDatabase, closeOverdeckDatabase } = await import('../infra.js');
 const { createConversation } = await import('../conversations.js');
-const { resolveConversationsByClaudeSessionIds } = await import('../conversation-batch-lookup.js');
+const { resolveConversationsByClaudeSessionIds, listConversationLocators, isConversationLocatorOwned } = await import('../conversation-batch-lookup.js');
+const { defaultForkAdoptionDeps } = await import('../conversation-fork-adoption.js');
 
 beforeAll(() => {
   createConversation({
@@ -53,5 +54,28 @@ describe('resolveConversationsByClaudeSessionIds', () => {
   it('dedupes repeated session ids', () => {
     const results = resolveConversationsByClaudeSessionIds(['session-a', 'session-a']);
     expect(results.size).toBe(1);
+  });
+});
+
+describe('listConversationLocators', () => {
+  it('returns a set containing every owned locator and not an unowned one', () => {
+    const locators = listConversationLocators();
+    expect(locators.has('session-a')).toBe(true);
+    expect(locators.has('session-b')).toBe(true);
+    expect(locators.has('session-missing')).toBe(false);
+  });
+});
+
+describe('isConversationLocatorOwned', () => {
+  it('returns true for an owned locator and false for an unknown one', () => {
+    expect(isConversationLocatorOwned('session-a')).toBe(true);
+    expect(isConversationLocatorOwned('session-missing')).toBe(false);
+  });
+});
+
+describe('defaultForkAdoptionDeps.isLocatorOwned', () => {
+  it('returns true for an owned locator and false for an unknown one against a real test DB', () => {
+    expect(defaultForkAdoptionDeps.isLocatorOwned('session-a')).toBe(true);
+    expect(defaultForkAdoptionDeps.isLocatorOwned('session-missing')).toBe(false);
   });
 });

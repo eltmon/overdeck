@@ -842,6 +842,13 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   ledger sums every matching row, so a raw INSERT double-counts cost, and the write door is what the open
   Conversation tab follows. The live process keeps its launched id after fork adoption, so process matching must
   include the launcher pin (`conversationRuntimeRootPids` extra ids).
+- Check transcript ownership with `isConversationLocatorOwned`/`listConversationLocators`
+  (`conversation-batch-lookup.ts`, PAN-5369), never `getConversationByClaudeSessionId` per
+  transcript: that query has no index-backed point lookup for the orphan scan's and fork
+  adoption's per-tick, per-file ownership checks, each a full `conversation_files` scan
+  before `conv_files_locator_idx` existed. The orphan scan loads one `Set` of every owned
+  locator per tick and re-checks a single session with the point query only right before
+  adopting it.
 - **Repo `.mcp.json` servers do not load in spawned Claude sessions** (PAN-5061 planning probe, Claude Code 2.1.293) —
   `claude mcp list` reports them `⏸ Pending approval`; `preTrustDirectory` writes `enabledMcpjsonServers: []` and nothing
   approves them. `--strict-mcp-config` keeps every `--mcp-config=` file (two equals-form files both load) and drops
