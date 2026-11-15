@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5334",
   "created": "2026-11-15T10:33:35.496Z",
-  "updated": "2026-11-15T10:34:56.280Z",
+  "updated": "2026-11-15T10:35:22.054Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "push-fallback.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T10:34:56.280Z"
+    },
+    "detached-label": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5334",
+      "claimedAt": "2026-11-15T10:35:22.054Z"
     }
   }
 }
