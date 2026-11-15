@@ -1346,7 +1346,7 @@ describe('ComposerFooter attachments', () => {
     const text = new File(['# notes'], 'drop-notes.md', { type: 'text/markdown' });
 
     fireEvent.drop(screen.getByTestId('composer-editor'), {
-      dataTransfer: { files: [image, text], items: [{ kind: 'file' }] },
+      dataTransfer: { files: [image, text], items: [{ kind: 'file', type: image.type }, { kind: 'file', type: text.type }] },
     });
 
     await waitFor(() => {
@@ -1386,7 +1386,7 @@ describe('ComposerFooter attachments', () => {
     const image = new File(['png-bytes'], 'drop-image.png', { type: '' });
 
     fireEvent.drop(screen.getByTestId('composer-editor'), {
-      dataTransfer: { files: [image], items: [{ kind: 'file' }] },
+      dataTransfer: { files: [image], items: [{ kind: 'file', type: image.type }] },
     });
 
     await waitFor(() => {
@@ -1424,7 +1424,7 @@ describe('ComposerFooter attachments', () => {
     const image = new File(['png-bytes'], 'drop-image.png', { type: 'image/png' });
 
     fireEvent.drop(screen.getByTestId('composer-editor'), {
-      dataTransfer: { files: [image], items: [{ kind: 'file' }] },
+      dataTransfer: { files: [image], items: [{ kind: 'file', type: image.type }] },
     });
 
     expect(await screen.findByText('drop-image.png')).toBeInTheDocument();
