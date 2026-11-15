@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5289",
   "created": "2026-11-15T02:58:13.006Z",
-  "updated": "2026-11-15T04:14:28.341Z",
+  "updated": "2026-11-15T04:14:53.062Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -318,6 +318,11 @@
     "files-header-view-options.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T04:14:28.340Z"
+    },
+    "files-root-menu": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5289",
+      "claimedAt": "2026-11-15T04:14:53.062Z"
     }
   }
 }
