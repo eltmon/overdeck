@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5293",
   "created": "2026-11-15T06:57:45.448Z",
-  "updated": "2026-11-15T08:35:42.265Z",
+  "updated": "2026-11-15T08:58:12.450Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -422,9 +422,10 @@
       "doneAt": "2026-11-15T08:32:09.158Z"
     },
     "playwright-checklist": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5293",
-      "claimedAt": "2026-11-15T08:32:10.974Z"
+      "claimedAt": "2026-11-15T08:32:10.974Z",
+      "doneAt": "2026-11-15T08:58:12.450Z"
     },
     "test-subset": {
       "status": "completed",
@@ -439,6 +440,22 @@
     "test-subset.ac2": {
       "status": "completed",
       "doneAt": "2026-11-15T08:35:42.265Z"
+    },
+    "playwright-checklist.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T08:58:12.450Z"
+    },
+    "playwright-checklist.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T08:58:12.450Z"
+    },
+    "playwright-checklist.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T08:58:12.450Z"
+    },
+    "playwright-checklist.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T08:58:12.450Z"
     }
   }
 }
