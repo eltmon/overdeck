@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5293",
   "created": "2026-11-15T06:57:45.448Z",
-  "updated": "2026-11-15T07:31:26.283Z",
+  "updated": "2026-11-15T07:31:40.356Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,11 @@
     "create-conversation.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T07:31:26.282Z"
+    },
+    "workspace-helpers": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5293",
+      "claimedAt": "2026-11-15T07:31:40.356Z"
     }
   }
 }
