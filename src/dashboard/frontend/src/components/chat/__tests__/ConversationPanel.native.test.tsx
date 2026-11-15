@@ -53,7 +53,7 @@ const conversation: React.ComponentProps<typeof ConversationPanel>['conversation
 
 function defaultResponse(method: string, url: string): Response | undefined {
   if (method === 'POST' && url === 'http://localhost:3000/api/dashboard/session') return Response.json({ csrfToken: 'csrf' });
-  if (method === 'GET' && /^\/api\/conversations\/test-conv\/diffs$/.test(url)) return Response.json({ summaries: [] });
+  if (method === 'GET' && url === '/api/conversations/test-conv/changes?scope=conversation') return Response.json({ conversation: 'test-conv', repoRoot: '/home/user', rootId: null, branch: 'main', scope: 'conversation', uncommitted: [], commits: [], totals: { files: 0, additions: 0, deletions: 0, commitsPushed: 0, commitsLocal: 0, uncommittedFiles: 0 } });
   if (method === 'GET' && url.endsWith('/api/conversations/pending-input')) return Response.json([]);
   if (method === 'GET' && /^\/api\/conversations\/[^/]+\/kickoff$/.test(url)) return Response.json({ held: false });
   if (method === 'GET' && /^\/api\/conversations\/[^/]+\/bookmarks$/.test(url)) return Response.json({ bookmarks: [] });

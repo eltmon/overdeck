@@ -13,7 +13,6 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
 interface SubagentTranscriptProps {
   conversation: Conversation;
   subagent: SubagentSummary;
-  resolvedTheme?: 'light' | 'dark';
   /** Return to the parent conversation (the rail's "Main agent" row does the same). */
   onBack: () => void;
   /** Palette-search message target inside this subagent's transcript (PAN-3982). */
@@ -30,7 +29,6 @@ interface SubagentTranscriptProps {
 export function SubagentTranscript({
   conversation,
   subagent,
-  resolvedTheme,
   onBack,
   targetMessageId,
   targetMessageIndex,
@@ -91,7 +89,6 @@ export function SubagentTranscript({
             conversationName={`${conversation.name}:${subagent.agentId}`}
             cwd={conversation.cwd}
             issueId={conversation.issueId}
-            resolvedTheme={resolvedTheme}
             targetMessageId={targetMessageId}
             targetMessageIndex={targetMessageIndex}
             targetMessageNonce={targetMessageNonce}

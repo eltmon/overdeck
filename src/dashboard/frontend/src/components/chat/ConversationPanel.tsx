@@ -3,7 +3,6 @@ import { inputTargetNotice } from '../../lib/subagentRouting';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { toastResumeOutcome } from '../../lib/resumeOutcome';
 import { useDashboardStore } from '../../lib/store';
-import { useTheme } from '../../hooks/useTheme';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
 import { markTerminalClick, useNeedsTerminalAutoSwitch, type ViewMode } from './useNeedsTerminalAutoSwitch';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -20,22 +19,19 @@ import { useConversationPaneChoice } from '../../lib/useConversationPaneChoice';
 import { ModelPicker, saveStoredHarness, saveStoredModel, type Harness } from './ModelPicker';
 import { resumeConversation } from './conversationResumeApi';
 import { getDefaultConversationModel } from './defaultConversationModel';
-import type { TurnDiffSummary } from './chat-types';
 import {
   useComposerStore,
 } from '../../lib/composerStore';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, isConversationWorking, type WorkingPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
 import { getHarnessBehavior, type ReviewerRoundMetadata } from '@overdeck/contracts';
-import { DiffPanel } from '../DiffPanel';
-import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
-import { rootIdForConversation, useRootContext } from '../explorer/rootForConversation';
 import { acceptsInput, ConversationMachineBanner, conversationHeaderStatus, conversationMachineState } from './ConversationMachineBanner';
 import { ConversationHeader } from './header/ConversationHeader';
 import { ConversationPullRequestProvider } from './TranscriptPullRequestLink';
 import { ConversationBookmarksProvider } from './bookmarks/ConversationBookmarks';
+import { ConversationChangesScope, useConversationChangesContext } from './conversationChanges/ConversationChangesScope';
+import { turnChangesByAnchor } from './messagesTimeline/turnChanges';
 import { BookmarksDrawer } from './bookmarks/BookmarksDrawer';
-import { parseDiffRouteSearch } from '../../lib/diffRouteSearch';
 import { isNativeShell } from '../../lib/nativeShell';
 import { useConversationMutations } from '../CommandDeck/useConversationMutations';
 import { ForkModal } from '../CommandDeck/ForkModal';
@@ -127,39 +123,6 @@ interface ConversationPanelProps {
   onSendFailed?: () => void;
   /** Passed through to SubagentRail — starts the rail at this collapsed state instead of localStorage (PAN-4222). */
   subagentRailCollapsed?: boolean;
-}
-
-// Resolves the conversation's explorer root only while the diff panel is
-// mounted (PAN-5338): rootIdForConversation's own hook, useRootContext,
-// queries /api/registered-projects and /api/workspace-registry, and
-// ConversationPanel must make neither request when the diff is closed
-// (PAN-5291 D1-7/D1-8's no-stage-no-network invariant extends to the diff).
-function ConversationDiffPanel({
-  conversation,
-  agentId,
-  turnDiffSummaries,
-  onClose,
-}: {
-  conversation: Conversation;
-  agentId: string;
-  turnDiffSummaries: TurnDiffSummary[];
-  onClose: () => void;
-}) {
-  const rootContext = useRootContext();
-  const explorerRootId = useMemo(() => rootIdForConversation(conversation, rootContext), [conversation, rootContext]);
-  return (
-    <DiffWorkerPoolProvider>
-      <DiffPanel
-        mode="inline"
-        agentId={agentId}
-        turnDiffSummaries={turnDiffSummaries}
-        onClose={onClose}
-        diffUrlPrefix={`/api/conversations/${encodeURIComponent(conversation.name)}/diffs`}
-        repoPath={conversation.cwd}
-        explorerRootId={explorerRootId}
-      />
-    </DiffWorkerPoolProvider>
-  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -306,110 +269,6 @@ export function ConversationPanel({
   const WorkingIcon = PHASE_ICONS[workingPhase];
   const workingIconClass = isSpinnerPhase(workingPhase) ? styles.spinnerIcon : styles.pulseIcon;
 
-  // Theme for diff tree icons
-  const { resolvedTheme } = useTheme();
-
-  // Fetch turn diff summaries — always use JSONL-based conversation diffs
-  // (the checkpoint-based agent diffs path doesn't populate assistantMessageId).
-  // The /diffs endpoint is keyed by a real conversations-table row; session-
-  // backed panels (SessionPanel, DrawerAgentSession) synthesize a conversation
-  // with id < 0 and have no such row, so skip the fetch — otherwise it
-  // 404-polls every 5s with the session id as the conversation name.
-  const isSyntheticConversation = conversation.id < 0;
-  const { data: diffData } = useQuery({
-    queryKey: ['conversation-diffs', conversation.name],
-    queryFn: async () => {
-      const res = await fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/diffs`)
-      if (!res.ok) return null
-      return res.json() as Promise<{ summaries: TurnDiffSummary[] }>
-    },
-    enabled: !isSyntheticConversation,
-    // Ended conversations cannot gain new edits, so stop polling once the session dies.
-    refetchInterval: conversation.sessionAlive ? 5000 : false,
-  })
-
-  const turnDiffSummaryByAssistantMessageId = useMemo(() => {
-    const map = new Map<string, TurnDiffSummary>()
-    if (!diffData?.summaries) return map
-
-    // Get assistant messages for timestamp-based matching
-    const assistantMessages = (messagesData?.messages ?? [])
-      .filter((m: any) => m.role === 'assistant')
-      .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-
-    for (const summary of diffData.summaries) {
-      if (summary.assistantMessageId) {
-        map.set(summary.assistantMessageId, summary)
-        continue
-      }
-
-      // Match by timestamp: find the closest assistant message before the diff completed
-      if (assistantMessages.length > 0 && summary.completedAt) {
-        const diffTime = new Date(summary.completedAt).getTime()
-        let bestMatch: string | null = null
-        let bestDelta = Infinity
-        for (const msg of assistantMessages) {
-          const msgTime = new Date(msg.createdAt).getTime()
-          const delta = diffTime - msgTime
-          if (delta >= 0 && delta < bestDelta) {
-            bestDelta = delta
-            bestMatch = msg.id
-          }
-        }
-        // Only match if within 7 days — reconciled checkpoints may have been
-        // created long after the agent turn completed.
-        if (bestMatch && bestDelta < 7 * 24 * 60 * 60 * 1000) {
-          map.set(bestMatch, summary)
-        }
-      }
-    }
-    return map
-  }, [diffData?.summaries, messagesData?.messages])
-
-  // Diff panel state — read from URL
-  const [diffOpen, setDiffOpen] = useState(() => {
-    const params = parseDiffRouteSearch(
-      Object.fromEntries(new URLSearchParams(window.location.search)),
-    )
-    return params.diff === '1'
-  })
-
-  // Listen for URL changes (popstate)
-  useEffect(() => {
-    const onPopState = () => {
-      const params = parseDiffRouteSearch(
-        Object.fromEntries(new URLSearchParams(window.location.search)),
-      )
-      setDiffOpen(params.diff === '1')
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [])
-
-  const handleOpenTurnDiff = useCallback((turnId: string, filePath?: string) => {
-    const searchParams = new URLSearchParams(window.location.search)
-    searchParams.set('diff', '1')
-    searchParams.set('diffTurnId', turnId)
-    if (filePath) searchParams.set('diffFilePath', filePath)
-    else searchParams.delete('diffFilePath')
-    const url = `${window.location.pathname}?${searchParams.toString()}`
-    window.history.pushState({}, '', url)
-    window.dispatchEvent(new PopStateEvent('popstate'))
-    setDiffOpen(true)
-  }, [])
-
-  const handleCloseDiff = useCallback(() => {
-    const searchParams = new URLSearchParams(window.location.search)
-    searchParams.delete('diff')
-    searchParams.delete('diffTurnId')
-    searchParams.delete('diffFilePath')
-    const query = searchParams.toString()
-    const url = query ? `${window.location.pathname}?${query}` : window.location.pathname
-    window.history.pushState({}, '', url)
-    window.dispatchEvent(new PopStateEvent('popstate'))
-    setDiffOpen(false)
-  }, [])
-
   const resumeMutation = useMutation({
     mutationFn: () => resumeConversation(
       conversation.name,
@@ -515,10 +374,6 @@ export function ConversationPanel({
   const toggleHideToolCalls = onToggleHideToolCalls ?? uiToolState.toggleHideToolCalls;
 
   const showTerminal = conversation.sessionAlive || resumedAwaitingConfirm;
-  // Diff deep-links are transcript-oriented. If this pane was previously left in
-  // terminal mode, do not mount xterm beside the diff; that opens/reopens the PTY
-  // and looks like a reconnect loop when the user only asked to inspect a diff.
-  const effectiveViewMode = diffOpen ? 'conversation' : viewMode;
   useNeedsTerminalAutoSwitch(!!conversation.needsTerminal && showTerminal, viewMode, onViewModeChange);
 
   const isForkingHeader = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
@@ -528,11 +383,11 @@ export function ConversationPanel({
   const { color: statusColor, label: statusLabel, hollow: statusHollow } = conversationHeaderStatus(conversation, { forking: isForkingHeader, spawning: isSpawningHeader, failed: isForkFailedHeader || isSpawnFailed });
   const machineState = conversationMachineState(conversation); // PAN-4650: which machine runs it (D-6 title bar states)
   return (
-    <ConversationPullRequestProvider conversation={conversation}><ConversationBookmarksProvider conversationName={conversation.name}><div className={styles.conversationTerminal}>
+    <ConversationPullRequestProvider conversation={conversation}><ConversationBookmarksProvider conversationName={conversation.name}><ConversationChangesScope conversation={conversation}><div className={styles.conversationTerminal}>
       {!embedded && (
         <ConversationHeader
           conversation={conversation} agentId={agentId}
-          viewMode={viewMode} effectiveViewMode={effectiveViewMode} onViewMode={handleViewMode}
+          viewMode={viewMode} effectiveViewMode={viewMode} onViewMode={handleViewMode}
           showTerminal={showTerminal} isWorking={isWorking}
           working={{ label: workingLabel, Icon: WorkingIcon, iconClass: workingIconClass }}
           status={{ color: statusColor, label: statusLabel, hollow: statusHollow }}
@@ -563,14 +418,13 @@ export function ConversationPanel({
 
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         <div className={styles.conversationTerminalBody}>
-          {showTerminal && effectiveViewMode === 'terminal' && (
+          {showTerminal && viewMode === 'terminal' && (
             <ConversationTerminalView conversation={conversation} />
           )}
-          {(effectiveViewMode === 'conversation' || !showTerminal) && (selectedSubagent ? (
+          {(viewMode === 'conversation' || !showTerminal) && (selectedSubagent ? (
             <SubagentTranscript
               conversation={conversation}
               subagent={selectedSubagent}
-              resolvedTheme={resolvedTheme}
               onBack={clearSubagent}
               targetMessageId={subagentTarget ? targetMessageId : undefined}
               targetMessageIndex={subagentTarget ? targetMessageIndex : undefined}
@@ -591,9 +445,6 @@ export function ConversationPanel({
               onSendFailed={onSendFailed}
               roundMarkers={roundMarkers}
               roundMetadata={roundMetadata}
-              turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
-              onOpenTurnDiff={handleOpenTurnDiff}
-              resolvedTheme={resolvedTheme}
               agentId={agentId}
               hideToolCalls={hideToolCalls}
               workingPhase={isWorking ? workingPhase : undefined}
@@ -629,14 +480,6 @@ export function ConversationPanel({
             />
           ))}
         </div>
-        {diffOpen && diffData?.summaries && (
-          <ConversationDiffPanel
-            conversation={conversation}
-            agentId={agentId ?? conversation.name}
-            turnDiffSummaries={diffData.summaries}
-            onClose={handleCloseDiff}
-          />
-        )}
         <SubagentRail
           conversation={conversation}
           subagents={subagents}
@@ -658,7 +501,7 @@ export function ConversationPanel({
           }}
         />
       )}
-    </div></ConversationBookmarksProvider></ConversationPullRequestProvider>
+    </div></ConversationChangesScope></ConversationBookmarksProvider></ConversationPullRequestProvider>
   );
 }
 
@@ -685,9 +528,6 @@ interface ConversationViewProps {
   roundMarkers?: ReadonlyArray<RoundMarker>;
   /** Reviewer round metadata to derive timeline dividers (PAN-830 high-8). */
   roundMetadata?: ReviewerRoundMetadata;
-  turnDiffSummaryByAssistantMessageId?: Map<string, TurnDiffSummary>;
-  onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
-  resolvedTheme?: 'light' | 'dark';
   /** Agent ID for agent sessions (uses /api/agents/* endpoints instead of /api/conversations/*) */
   agentId?: string;
   /** When true, pure tool-call work groups are collapsed to a single muted line. */
@@ -714,8 +554,14 @@ interface ConversationViewProps {
 
 export type { FailedMessage } from './chat-types';
 
-function ConversationView({ conversation, onResume, onArchive, archivePending = false, resumePending, resumeLabel, sendResumeContract, onSendResumeContractChange, hideComposer = false, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled = false, receivedFirstPayload = false, refreshMessagesOverHttp, messagesData, messagesLoading, onOpenTerminal, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, archivePending = false, resumePending, resumeLabel, sendResumeContract, onSendResumeContractChange, hideComposer = false, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled = false, receivedFirstPayload = false, refreshMessagesOverHttp, messagesData, messagesLoading, onOpenTerminal, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
+  // PAN-5295 D2-5: one turn card per user turn, from the server messages (never
+  // optimistic echoes) and the panel's shared changes query.
+  const changesContext = useConversationChangesContext();
+  const changes = changesContext?.changes ?? null;
+  const turnMessages = messagesData?.messages;
+  const turnCards = useMemo(() => turnChangesByAnchor(turnMessages ?? [], changes), [turnMessages, changes]);
   // Keep optimistic messages and failed-send retries in the conversation-keyed
   // composer store so switching panes cannot discard them (PAN-1591).
   const addOptimistic = useComposerStore((s) => s.addOptimistic);
@@ -1002,9 +848,7 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
           agentId={agentId}
           subagentByToolUseId={subagentByToolUseId}
           onOpenSubagent={handleOpenSubagent}
-          turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
-          onOpenTurnDiff={onOpenTurnDiff}
-          resolvedTheme={resolvedTheme}
+          turnChangesByAssistantMessageId={turnCards}
           hideToolCalls={hideToolCalls}
           workingPhase={workingPhase}
           targetMessageId={targetMessageId}

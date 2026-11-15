@@ -5,7 +5,6 @@ import { ConversationPanel } from '../chat/ConversationPanel';
 import { MessagesTimeline } from '../chat/MessagesTimeline';
 import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from '../chat/chat-types';
 import type { Conversation } from '../CommandDeck/ConversationList';
-import { useTheme } from '../../hooks/useTheme';
 import type { Session } from './SessionDetail';
 
 interface MessagesResponse {
@@ -38,7 +37,6 @@ function conversationIdentifier(session: Session): string | null {
 }
 
 export function SessionTranscript({ session }: { session: Session }) {
-  const { resolvedTheme } = useTheme();
   const identifier = conversationIdentifier(session);
 
   const conversationQuery = useQuery({
@@ -87,7 +85,6 @@ export function SessionTranscript({ session }: { session: Session }) {
       streaming={messagesQuery.data.streaming ?? false}
       proposedPlan={messagesQuery.data.proposedPlan}
       compactBoundaries={messagesQuery.data.compactBoundaries}
-      resolvedTheme={resolvedTheme}
       conversationName={session.conversationName ?? undefined}
       cwd={session.workspacePath ?? undefined}
       issueId={session.panIssueId}

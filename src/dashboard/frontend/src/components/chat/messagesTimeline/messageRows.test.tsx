@@ -19,6 +19,12 @@ vi.mock('../ChatMarkdown', () => ({
 
 const sendNowQueued = vi.hoisted(() => vi.fn(async (_name: string, _agentId?: string) => {}));
 vi.mock('../../../lib/composerSendNow', () => ({ sendNowQueued }));
+// PAN-5295: the turn card has its own tests; here only the row's wiring.
+vi.mock('./TurnChangesCard', () => ({
+  TurnChangesCard: ({ turn }: { turn: { anchorId: string; files: number } }) => (
+    <div data-testid="turn-changes-card" data-anchor={turn.anchorId}>{turn.files} files changed</div>
+  ),
+}));
 
 function paragraphs(n: number, prefix = 'Paragraph'): string {
   return Array.from({ length: n }, (_, i) => `${prefix} ${i + 1} — the agent explains at length.`).join('\n\n');
@@ -368,5 +374,24 @@ describe('Send now link on the queued bubble (PAN-5353)', () => {
 
     await act(async () => { resolveSend(); await Promise.resolve(); });
     expect(screen.getByRole('button', { name: 'Send queued messages now' })).toHaveTextContent('Send now');
+  });
+});
+
+describe('PAN-5295 turn card on the assistant row', () => {
+  const message: ChatMessage = { id: 'a-2', role: 'assistant', text: 'Done.', createdAt: '2026-11-01T00:00:00Z', completedAt: '2026-11-01T00:00:05Z' };
+  const turn = {
+    anchorId: 'a-2', assistantIds: ['a-1', 'a-2'], rows: [],
+    files: 2, additions: 86, deletions: 1, commitsPushed: 2, commitsLocal: 0, uncommittedFiles: 1,
+  };
+
+  it('renders the turn card under the turn\'s last assistant message and no Changed files card', () => {
+    render(<AssistantMessageRow message={message} durationStart="2026-11-01T00:00:00Z" isStreaming={false} turnChanges={turn} />);
+    expect(screen.getByTestId('turn-changes-card')).toHaveAttribute('data-anchor', 'a-2');
+    expect(screen.queryByText(/Changed files/)).not.toBeInTheDocument();
+  });
+
+  it('renders no turn card without turn changes', () => {
+    render(<AssistantMessageRow message={message} durationStart="2026-11-01T00:00:00Z" isStreaming={false} />);
+    expect(screen.queryByTestId('turn-changes-card')).not.toBeInTheDocument();
   });
 });

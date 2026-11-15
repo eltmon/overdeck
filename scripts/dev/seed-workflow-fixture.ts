@@ -247,6 +247,11 @@ export async function seedWorkflowFixture(opts: SeedOptions): Promise<SeedResult
         }),
       },
       { role: 'user', at: at(now.getTime() - 30 * 60_000 + 5_000), content: toolResult('toolu_multiedit_shared', `Applied 1 edit to ${sharedPath}`) },
+      {
+        role: 'assistant',
+        at: at(now.getTime() - 30 * 60_000 + 10_000),
+        content: [{ type: 'text', text: 'Added the app entry, wired it, and extended the shared notes.' }],
+      },
     ]),
   )
   await writeFile(
