@@ -19,7 +19,77 @@ interface RestartResult {
 const SPECIALIST_PANE_ROLES = new Set<BackendPane['role']>(['plan', 'review', 'test', 'uat']);
 const SETTLED_ISSUE_STATES = new Set<DerivedIssueStateName>(['merged', 'closed']);
 
-export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner' | 'pill' } = {}) {
+/**
+ * The stopped-agents list, results summary and Restart-all button. The pill's
+ * popover and the health-popover section both render this, so they cannot drift.
+ */
+function StoppedAgentsList({
+  stoppedAgents,
+  issueTitleById,
+  onNavigate,
+  results,
+  restarting,
+  onRestartAll,
+  restartTestId,
+}: {
+  stoppedAgents: Agent[];
+  issueTitleById: ReadonlyMap<string, string>;
+  onNavigate: () => void;
+  results: RestartResult[] | null;
+  restarting: boolean;
+  onRestartAll: () => void;
+  restartTestId: string;
+}) {
+  const succeededCount = results?.filter((r) => r.success).length ?? 0;
+  const failedCount = results?.filter((r) => !r.success).length ?? 0;
+  return (
+    <>
+      <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-warning-foreground">
+        <AlertTriangle className="h-3.5 w-3.5" />
+        {stoppedAgents.length} stopped · panes the backend reports exited
+      </div>
+      <div className="mb-3 max-h-64 overflow-y-auto">
+        {stoppedAgents.map((agent) => {
+          const lastActivity = agent.lastActivity ? Date.parse(agent.lastActivity) : 0;
+          const startedAt = agent.startedAt ? Date.parse(agent.startedAt) : 0;
+          const activityAt = new Date(Math.max(lastActivity, startedAt)).toISOString();
+          return (
+            <AgentPillPopoverRow
+              key={agent.id}
+              agent={agent}
+              title={agent.issueId ? issueTitleById.get(agent.issueId.toUpperCase()) : undefined}
+              contextLine={`${describeAgentStop(agent)} · ${relativeTime(activityAt, Date.now())}`}
+              onNavigate={onNavigate}
+            />
+          );
+        })}
+      </div>
+      {results && (
+        <div className="mb-2 text-xs">
+          {succeededCount > 0 && <span className="text-success">✓ {succeededCount} restarted</span>}
+          {failedCount > 0 && <span className="ml-2 text-destructive">✕ {failedCount} failed</span>}
+        </div>
+      )}
+      <button
+        onClick={onRestartAll}
+        disabled={restarting}
+        className="flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+        data-testid={restartTestId}
+      >
+        {restarting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+        {restarting ? 'Restarting…' : 'Restart all'}
+      </button>
+    </>
+  );
+}
+
+/**
+ * Stopped agents in three shapes: the full-width banner, the top bar's
+ * "N stopped" exception chip ('pill'), and the inline block inside the health
+ * dot's popover ('section', PAN-5292 E-D11). The pill is always mounted, so it
+ * owns the api-error toast; the section never fires it.
+ */
+export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner' | 'pill' | 'section' } = {}) {
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
   const issues = useDashboardStore(selectIssues) as Array<Record<string, unknown>>;
   const panesById = useDashboardStore((s) => s.backendPanesById);
@@ -35,6 +105,7 @@ export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner'
   // Show toast when an agent hits an API error (resolution transitions to 'api_error')
   const prevApiErrorAgentsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
+    if (variant === 'section') return;
     const currentApiErrorAgents = new Set(
       agents.filter(a => a.resolution === 'api_error').map(a => a.id),
     );
@@ -46,7 +117,7 @@ export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner'
       }
     }
     prevApiErrorAgentsRef.current = currentApiErrorAgents;
-  }, [agents]);
+  }, [agents, variant]);
 
   const stoppedAgents = useMemo(() => {
     const agentForPane = (pane: BackendPane): Agent | undefined =>
@@ -161,8 +232,24 @@ export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner'
     setDismissed(false);
   }, []);
 
-  const succeededCount = results?.filter((r) => r.success).length ?? 0;
-  const failedCount = results?.filter((r) => !r.success).length ?? 0;
+  // ── Section variant (PAN-5292 health-dot popover) ────────────────────────
+  if (variant === 'section') {
+    if (stoppedAgents.length === 0) return null;
+    return (
+      <section aria-label="Stopped agents" data-testid="stopped-agents-section" className="mt-3 border-t border-border pt-3">
+        <div className="eyebrow mb-2">Stopped agents</div>
+        <StoppedAgentsList
+          stoppedAgents={stoppedAgents}
+          issueTitleById={issueTitleById}
+          onNavigate={() => {}}
+          results={results}
+          restarting={restarting}
+          onRestartAll={handleRestartAll}
+          restartTestId="section-restart-all"
+        />
+      </section>
+    );
+  }
 
   // ── Pill variant (PAN-1591 app bar) ──────────────────────────────────────
   if (variant === 'pill') {
@@ -184,41 +271,15 @@ export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner'
             data-testid="stopped-agents-popover"
             className="absolute right-0 top-full z-50 mt-1.5 w-80 rounded-lg border border-border bg-card p-3 shadow-xl"
           >
-            <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-warning-foreground">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              {stoppedAgents.length} stopped · panes the backend reports exited
-            </div>
-            <div className="mb-3 max-h-64 overflow-y-auto">
-              {stoppedAgents.map((agent) => {
-                const lastActivity = agent.lastActivity ? Date.parse(agent.lastActivity) : 0;
-                const startedAt = agent.startedAt ? Date.parse(agent.startedAt) : 0;
-                const activityAt = new Date(Math.max(lastActivity, startedAt)).toISOString();
-                return (
-                  <AgentPillPopoverRow
-                    key={agent.id}
-                    agent={agent}
-                    title={agent.issueId ? issueTitleById.get(agent.issueId.toUpperCase()) : undefined}
-                    contextLine={`${describeAgentStop(agent)} · ${relativeTime(activityAt, Date.now())}`}
-                    onNavigate={() => setPopoverOpen(false)}
-                  />
-                );
-              })}
-            </div>
-            {results && (
-              <div className="mb-2 text-xs">
-                {succeededCount > 0 && <span className="text-success">✓ {succeededCount} restarted</span>}
-                {failedCount > 0 && <span className="ml-2 text-destructive">✕ {failedCount} failed</span>}
-              </div>
-            )}
-            <button
-              onClick={handleRestartAll}
-              disabled={restarting}
-              className="flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-              data-testid="pill-restart-all"
-            >
-              {restarting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
-              {restarting ? 'Restarting…' : 'Restart all'}
-            </button>
+            <StoppedAgentsList
+              stoppedAgents={stoppedAgents}
+              issueTitleById={issueTitleById}
+              onNavigate={() => setPopoverOpen(false)}
+              results={results}
+              restarting={restarting}
+              onRestartAll={handleRestartAll}
+              restartTestId="pill-restart-all"
+            />
           </div>
         )}
       </div>
