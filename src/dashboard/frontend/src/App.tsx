@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useCallback, useEffect, useRef } from 'react';
+import { lazy, Suspense, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
 import { capture } from './lib/telemetry';
@@ -68,6 +68,7 @@ import { AppRoutes, type PendingConversationTarget } from './App/AppRoutes';
 import { useAppShortcuts } from './App/hooks/useAppShortcuts';
 import { ShortcutsSheet } from './lib/shortcuts/ShortcutsSheet';
 import { AppChrome } from './App/AppChrome';
+import { DeckNavigationProvider, deckNavigationActions, type DeckNavigation, type DeckTarget } from './components/frame/deck/deckNavigation';
 import { useUiMode } from './lib/simple/uiMode';
 import { AppLiveStoreHost, countRunningAgents } from './App/AppLiveStoreHost';
 
@@ -600,6 +601,24 @@ export default function App() {
     }
   }, [setConversationRoute]);
 
+  // PAN-5293 F-D2: the one door into the deck. Callers open the pane through
+  // panesStore first; this switches the project, shows the deck and writes the URL.
+  const openInDeck = useCallback((target: DeckTarget) => {
+    for (const action of deckNavigationActions({ activeTab, selectedProjectKey }, target)) {
+      if (action.kind === 'select-project') setSelectedProjectKey(action.projectKey);
+      else if (action.kind === 'show-deck') setActiveTab('command-deck');
+      else if (action.kind === 'conversation-route') setSelectedConvId(action.routeKey);
+      else if (action.kind === 'cockpit-route') {
+        setCockpitRouteState({ project: action.projectKey, issue: action.issueId });
+        onCockpitChange(action.projectKey, action.issueId);
+      } else onCockpitChange(action.projectKey, null);
+    }
+  }, [activeTab, selectedProjectKey, setActiveTab, setSelectedConvId, onCockpitChange]);
+  const deckNavigation = useMemo<DeckNavigation>(
+    () => ({ openInDeck, selectProject: handleSelectProject }),
+    [openInDeck, handleSelectProject],
+  );
+
   // Handle browser back/forward
   useEffect(() => {
     const onPopState = () => {
@@ -799,6 +818,7 @@ export default function App() {
         />
 
         <div className="min-h-0 flex flex-1 overflow-hidden">
+        <DeckNavigationProvider value={deckNavigation}>
         <main
           data-drawer-open={drawerOpen ? 'true' : undefined}
           className="relative flex-1 flex overflow-hidden data-[drawer-open=true]:before:pointer-events-none data-[drawer-open=true]:before:absolute data-[drawer-open=true]:before:inset-0 data-[drawer-open=true]:before:z-[80] data-[drawer-open=true]:before:bg-primary/[0.04] data-[drawer-open=true]:before:backdrop-blur-[2px]"
@@ -833,6 +853,7 @@ export default function App() {
             onOpenConversationMessage={handleOpenConversationMessage}
           />
         </main>
+        </DeckNavigationProvider>
         {/* PAN-1591: in the Command Deck the merged Awareness rail already covers
             this global feed, so don't double it up there. */}
         {isSessionFeedSidebarOpen && !['command-deck', 'backlog', 'god-view'].includes(activeTab) && (
