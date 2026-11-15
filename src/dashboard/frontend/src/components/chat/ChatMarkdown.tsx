@@ -365,7 +365,20 @@ function remarkBareFileTextLinks(options: { cwd?: string } = {}) {
   };
 }
 
-function makeComponents(isStreaming: boolean, cwd: string | undefined, issueId: string | null | undefined): Components & StreamdownComponents {
+/** An href the browser would resolve against the dashboard page (PAN-5338 D-11). */
+export function isRelativeMarkdownHref(href: string | undefined): boolean {
+  if (typeof href !== 'string') return false;
+  const h = href.trim();
+  if (h.length === 0 || h.startsWith('#') || h.startsWith('/')) return false;
+  return !/^(https?|mailto):/i.test(h);
+}
+
+function makeComponents(
+  isStreaming: boolean,
+  cwd: string | undefined,
+  issueId: string | null | undefined,
+  plainRelativeLinks: boolean,
+): Components & StreamdownComponents {
   return {
     pre({ children }: React.JSX.IntrinsicElements['pre'] & ExtraProps) {
       // Extract code block contents
@@ -406,6 +419,10 @@ function makeComponents(isStreaming: boolean, cwd: string | undefined, issueId: 
         );
       }
 
+      if (plainRelativeLinks && isRelativeMarkdownHref(href)) {
+        return <span className={styles.mdLink} data-relative-link="">{children}</span>;
+      }
+
       // Block javascript: and data: URIs to prevent XSS from assistant markdown
       const safeHref =
         typeof href === 'string' &&
@@ -427,6 +444,8 @@ interface ChatMarkdownProps {
   cwd?: string;
   issueId?: string | null;
   useStreamdown?: boolean;
+  /** Render a relative-href anchor as plain text (PAN-5338 D-11); default false. */
+  plainRelativeLinks?: boolean;
 }
 
 // Messages above this size are rendered as plain text behind a collapse instead
@@ -469,8 +488,12 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   cwd,
   issueId,
   useStreamdown,
+  plainRelativeLinks = false,
 }: ChatMarkdownProps) {
-  const components = useMemo(() => makeComponents(isStreaming, cwd, issueId), [isStreaming, cwd, issueId]);
+  const components = useMemo(
+    () => makeComponents(isStreaming, cwd, issueId, plainRelativeLinks),
+    [isStreaming, cwd, issueId, plainRelativeLinks],
+  );
   const remarkPlugins = useMemo(
     () => [remarkGfm, [remarkBareFileTextLinks, { cwd }]] as ReactMarkdownRemarkPlugins,
     [cwd],

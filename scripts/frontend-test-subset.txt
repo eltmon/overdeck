@@ -8,6 +8,7 @@ src/App.test.tsx
 src/App/AppChrome.test.tsx
 src/App/AppLiveStoreHost.render-count.test.tsx
 src/App/BackendConnectionBoundary.test.tsx
+src/App/__tests__/StandaloneDiffPopoutRoute.test.tsx
 src/App/__tests__/countAgreement.test.tsx
 src/App/api.test.ts
 src/App/appChromeLabels.test.ts
@@ -50,7 +51,10 @@ src/components/CommandDeck/__tests__/useDefaultDeckSelection.test.ts
 src/components/CommandPalette.test.tsx
 src/components/DeaconPauseToggle.test.tsx
 src/components/__tests__/ActivityFeedTab.test.tsx
+src/components/diff/__tests__/DiffFileBar.test.tsx
+src/components/diff/__tests__/DiffMarkdownPreview.test.tsx
 src/components/diff/__tests__/PatchFiles.test.tsx
+src/components/diff/__tests__/markdownPreviewSource.test.ts
 src/components/frame/__tests__/ConversationsSection.test.tsx
 src/components/frame/__tests__/IssuesSection.test.tsx
 src/components/frame/__tests__/LeftColumn.test.tsx
@@ -184,6 +188,7 @@ src/components/__tests__/AskUserQuestionDialog.test.tsx
 src/components/__tests__/BackendRestartCard.test.tsx
 src/components/__tests__/DecisionsPanel.test.tsx
 src/components/__tests__/DegradedModeBanner.test.tsx
+src/components/__tests__/DiffPanel.preview.test.tsx
 src/components/__tests__/DiskAlertCard.test.tsx
 src/components/__tests__/GitHubQuotaPill.test.tsx
 src/components/__tests__/GitHubRateLimitBanner.test.tsx
@@ -197,6 +202,7 @@ src/components/backlog/__tests__/PickupGateControls.test.tsx
 src/components/chat/SubagentRail.test.tsx
 src/components/chat/__tests__/ChatMarkdown.issue-links.test.tsx
 src/components/chat/__tests__/ChatMarkdown.pull-request-links.test.tsx
+src/components/chat/__tests__/ChatMarkdown.relative-links.test.tsx
 src/components/chat/__tests__/ComposerFooter.citations.test.tsx
 src/components/chat/__tests__/ComposerFooter.native.test.tsx
 src/components/chat/__tests__/ComposerFooter.path-drop.test.tsx
