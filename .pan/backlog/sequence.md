@@ -1,14 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T18:55:22.053385Z · model: claude-opus-5-5 · open: 901_
+_Last sequenced: 2026-11-15T19:36:40.268150Z · model: claude-opus-5-5 · open: 898_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 1 | PAN-5392 | XS | low | ok |  |  | In pipeline: docs PR from the file explorer noting Mission Control recent changes refresh every minute. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
-| 7 | PAN-5363 | S | high | ok |  |  | In pipeline: merge train board Train switch flips back on after off; board cache not dropped on write, optimistic value lost. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
-| 9 | PAN-5361 | S | critical | ok |  |  | In pipeline: bare-host-linux idle check fails ~3% of runs; pid-net counts machine-wide runner PID bursts one baseline can't cancel. |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
 | 12 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
@@ -17,13 +16,12 @@ _Last sequenced: 2026-11-15T18:55:22.053385Z · model: claude-opus-5-5 · open: 
 | 15 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
 | 16 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 17 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
-| 18 | PAN-5369 | M | critical | ok |  |  | Dashboard main thread pinned at 100%: orphan scan re-queries SQLite for 4000 transcripts per tick; cost/usage routes never answer. |
+| 18 | PAN-5391 | S | high | ok |  |  | Editor bar treats UNSTABLE as clean: primary Merge squash-merges a PR into main while checks still run; add amber state + confirm. |
 | 19 | PAN-5381 | S | high | ok |  |  | Dashboard main thread: findProjectByPath runs realpathSync on every project root per call (10.8% of profile); cache roots once. |
 | 20 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 21 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 21 | PAN-5347 | S | medium | ok |  |  | In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group |
 | 22 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
-| 22 | PAN-5339 | S | medium | ok |  |  | In pipeline: conversation names, conv N forms and /conv URLs in messages become clickable links. |
 | 23 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
 | 24 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
 | 25 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
@@ -902,28 +900,23 @@ _Last sequenced: 2026-11-15T18:55:22.053385Z · model: claude-opus-5-5 · open: 
 | 897 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 | 898 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
 | 899 | PAN-5207 | L | low | needs-refinement |  | PAN-5202 | Parked by the operator: Flux meeting bots for Zoom, Teams, Meet, Slack as a paid integration. Do not start. |
-| 900 | PAN-5183 | XS | low | ok | ✓ |  | Parent of the file explorer; all children PAN-5185..5191 are closed. Verify and close. |
 | 901 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 903 | PAN-5235 | XS | low | ok |  |  | Fix already applied: terminal-dialog toast now navigates to the agent's terminal tab. Verify and close. |
 
 ## Rationale detail
 
+### PAN-5392 (rank 1)
+
+New since the prior run and already in review with a live workspace, so it is pinned at the top per the in-pipeline rule; it is a docs-only change with no dependencies.
+
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
 
-### PAN-5363 (rank 7)
-
-Back in the manifest after dropping out of the last two passes; restored with its prior node. In-pipeline bug with a file:line root cause (switch falls back to a stale 5 s server board cache after the POST settles). Placed in a free top-tier slot near PAN-5364, which edits the same ProjectTrainCard.tsx; high rather than critical because the write itself succeeds.
-
 ### PAN-5385 (rank 8)
 
 New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.
-
-### PAN-5361 (rank 9)
-
-New in-pipeline substrate bug: a ~3% false-red CI job blocks releases and merges with no code change. It is pinned at rank 9, beside the other critical pipeline substrate fixes; pinned in-pipeline ranks stay where they were.
 
 ### PAN-4636 (rank 10)
 
@@ -957,9 +950,9 @@ Operator decision 2026-10-04 after the Flywheel closed 19 deployed issues by han
 
 pan spawn is the foreman's pane-only item worker, so parallel waves cannot run any item through it on either backend. The test suite never asserts argv, so it stayed green. Small fix with a clear expected behavior.
 
-### PAN-5369 (rank 18)
+### PAN-5391 (rank 18)
 
-New issue with a profiled root cause: 42% of main-thread CPU goes to an unindexed per-transcript lookup on every conversation poll tick, which starves /api/costs/summary, /api/fleet/usage and /api/health. It degrades every dashboard surface and blocks PAN-5370 item 3 from being observable, so it ranks beside the other event-loop fix PAN-4544.
+New bug found while testing workflow redesign child C: the file-explorer editor bar offers a one-click primary Merge while CI is pending because mergeVerdict counts UNSTABLE as CLEAN, so untested code can land on main. The fix is small and fully specified (checksPassing field, amber secondary Merge with confirmation, keep polling), so it takes the rank-18 slot freed by the closure of PAN-5369.
 
 ### PAN-5381 (rank 19)
 
@@ -980,10 +973,6 @@ New in-pipeline discoverability fix: skills never reach the composer slash menu,
 ### PAN-4671 (rank 22)
 
 New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.
-
-### PAN-5339 (rank 22)
-
-New in-pipeline enhancement, pinned at the freed rank-22 slot. It is self-contained in ChatMarkdown and the existing /conv route.
 
 ### PAN-4675 (rank 23)
 
@@ -1229,6 +1218,14 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
 
 New substrate bug placed in a freed high-tier slot. With several workspace stacks up, browser checks hit the wrong backend and flake, which corrupts verification.
 
+### PAN-3234 (rank 84)
+
+Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
+
+### PAN-3205 (rank 85)
+
+New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1236,11 +1233,24 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T18:55:22.053385Z",
+  "generatedAt": "2026-11-15T19:36:40.268150Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 901,
+  "openCount": 898,
   "nodes": [
+    {
+      "issue": "PAN-5392",
+      "rank": 1,
+      "size": "XS",
+      "importance": "low",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: docs PR from the file explorer noting Mission Control recent changes refresh every minute.",
+      "rationale": "New since the prior run and already in review with a live workspace, so it is pinned at the top per the in-pipeline rule; it is a docs-only change with no dependencies.",
+      "gate": "auto",
+      "planning": "auto"
+    },
     {
       "issue": "PAN-5013",
       "rank": 3,
@@ -1255,19 +1265,6 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "planning": "auto"
     },
     {
-      "issue": "PAN-5363",
-      "rank": 7,
-      "size": "S",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: merge train board Train switch flips back on after off; board cache not dropped on write, optimistic value lost.",
-      "rationale": "Back in the manifest after dropping out of the last two passes; restored with its prior node. In-pipeline bug with a file:line root cause (switch falls back to a stale 5 s server board cache after the POST settles). Placed in a free top-tier slot near PAN-5364, which edits the same ProjectTrainCard.tsx; high rather than critical because the write itself succeeds.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-5385",
       "rank": 8,
       "size": "S",
@@ -1277,19 +1274,6 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "dependsOn": [],
       "why": "Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix",
       "rationale": "New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5361",
-      "rank": 9,
-      "size": "S",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: bare-host-linux idle check fails ~3% of runs; pid-net counts machine-wide runner PID bursts one baseline can't cancel.",
-      "rationale": "New in-pipeline substrate bug: a ~3% false-red CI job blocks releases and merges with no code change. It is pinned at rank 9, beside the other critical pipeline substrate fixes; pinned in-pipeline ranks stay where they were.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1398,15 +1382,15 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "planning": "auto"
     },
     {
-      "issue": "PAN-5369",
+      "issue": "PAN-5391",
       "rank": 18,
-      "size": "M",
-      "importance": "critical",
-      "score": 86,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Dashboard main thread pinned at 100%: orphan scan re-queries SQLite for 4000 transcripts per tick; cost/usage routes never answer.",
-      "rationale": "New issue with a profiled root cause: 42% of main-thread CPU goes to an unindexed per-transcript lookup on every conversation poll tick, which starves /api/costs/summary, /api/fleet/usage and /api/health. It degrades every dashboard surface and blocks PAN-5370 item 3 from being observable, so it ranks beside the other event-loop fix PAN-4544.",
+      "why": "Editor bar treats UNSTABLE as clean: primary Merge squash-merges a PR into main while checks still run; add amber state + confirm.",
+      "rationale": "New bug found while testing workflow redesign child C: the file-explorer editor bar offers a one-click primary Merge while CI is pending because mergeVerdict counts UNSTABLE as CLEAN, so untested code can land on main. The fix is small and fully specified (checksPassing field, amber secondary Merge with confirmation, keep polling), so it takes the rank-18 slot freed by the closure of PAN-5369.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1472,19 +1456,6 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "dependsOn": [],
       "why": "CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff.",
       "rationale": "New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5339",
-      "rank": 22,
-      "size": "S",
-      "importance": "medium",
-      "score": 64,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: conversation names, conv N forms and /conv URLs in messages become clickable links.",
-      "rationale": "New in-pipeline enhancement, pinned at the freed rank-22 slot. It is self-contained in ChatMarkdown and the existing /conv route.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12404,19 +12375,6 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "planning": "auto"
     },
     {
-      "issue": "PAN-5183",
-      "rank": 900,
-      "size": "XS",
-      "importance": "low",
-      "score": 10,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Parent of the file explorer; all children PAN-5185..5191 are closed. Verify and close.",
-      "gate": "auto",
-      "planning": "auto",
-      "isEpic": true
-    },
-    {
       "issue": "PAN-5181",
       "rank": 901,
       "size": "XS",
@@ -13331,13 +13289,6 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "from": "PAN-4544",
-      "to": "PAN-5369",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4544",
       "to": "PAN-5381",
       "type": "informs",
       "source": "ai-inferred",
@@ -13519,13 +13470,6 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "confidence": 0.6
     },
     {
-      "from": "PAN-5183",
-      "to": "PAN-1550",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-5201",
       "to": "PAN-5202",
       "type": "unblocks",
@@ -13650,27 +13594,6 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.8
-    },
-    {
-      "from": "PAN-5361",
-      "to": "PAN-5386",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5369",
-      "to": "PAN-5370",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-5369",
-      "to": "PAN-5381",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
     },
     {
       "from": "PAN-750",
