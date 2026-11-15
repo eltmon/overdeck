@@ -53,6 +53,11 @@ function isDotName(name: string): boolean {
   return name.startsWith('.')
 }
 
+/** A `.git` entry — directory in a normal checkout, file in a worktree. Always hidden from the tree. */
+export function isGitDirName(name: string): boolean {
+  return name === '.git'
+}
+
 export function projectRows(input: {
   dirs: Readonly<Record<string, DirState>>
   expanded: ReadonlySet<string>
@@ -68,6 +73,7 @@ export function projectRows(input: {
     if (!dir || dir.status !== 'ready') return
     const entries = [...dir.entries].sort(compareEntries)
     for (const entry of entries) {
+      if (isGitDirName(entry.name)) continue
       if (!showDotfiles && isDotName(entry.name)) continue
       if (!showIgnored && entry.ignored) continue
       const isDir = entry.kind === 'dir'
@@ -115,6 +121,7 @@ export function projectChangedRows(
   for (const { path } of paths) {
     if (!path) continue
     const segments = path.split('/')
+    if (segments.some(isGitDirName)) continue
     if (!showDotfiles && segments.some(isDotName)) continue
     let dir = ''
     for (let i = 0; i < segments.length - 1; i += 1) {

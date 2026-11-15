@@ -201,3 +201,10 @@ passes `defaultCollapsed`, so it always starts with the rail collapsed at its de
 width without disturbing whatever collapsed/expanded state the user left on the conversation's
 own full page.
 
+In a narrow pane the rail collapses on its own (PAN-5329). `SubagentRail` measures its parent row
+(the conversation pane row in `ConversationPanel`) with a `ResizeObserver`; below 760 px
+(`NARROW_PANE_PX`) it shows the 30 px strip. That automatic collapse never writes
+`overdeck.ui.agentsRailCollapsed`. Opening or closing the rail while the pane is narrow is a
+pane-local choice, also never written, and it is cleared once the pane is 760 px or wider, where
+the stored preference (or `defaultCollapsed`) applies again. A width of 0 (hidden pane) is ignored.
+

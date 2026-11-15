@@ -1230,6 +1230,15 @@ body::after {
     background-color: color-mix(in srgb, var(--muted) 30%, transparent);
   }
 
+  /* Go to file / quick-open match highlight: a legible tint instead of the
+     browser-default yellow <mark> with near-white text. */
+  .match-mark {
+    background-color: color-mix(in srgb, var(--state-needs-you) 30%, transparent);
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+
   /* Switch tracks for role="switch" buttons: on, and on-but-locked. */
   .switch-track-on {
     background-color: color-mix(in srgb, var(--foreground) 62%, transparent);

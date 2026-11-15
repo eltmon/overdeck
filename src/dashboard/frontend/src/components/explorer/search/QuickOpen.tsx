@@ -25,7 +25,7 @@ export const QUICK_OPEN_REQUEST_LIMIT = 200
 /** Rows shown. */
 export const QUICK_OPEN_SHOW = 50
 const NO_PATHS: ReadonlySet<string> = new Set()
-const MARK_CLASS = 'rounded-sm bg-warning/30 text-inherit'
+const MARK_CLASS = 'match-mark'
 
 /** `text` (which starts at `offset` in the path) with the ranges that fall inside it marked. */
 function highlight(text: string, offset: number, ranges: readonly MatchRange[]): ReactNode {

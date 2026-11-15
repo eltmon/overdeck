@@ -10,6 +10,7 @@
 import type { ExplorerEntry, ExplorerListDirResult } from '@overdeck/contracts'
 
 import { explorerErrorCode, explorerErrorMessage } from '../explorer-rpc'
+import { isGitDirName } from './explorer-tree-model'
 
 export interface DirectoryLoaderDeps {
   rootId: string
@@ -174,6 +175,7 @@ export async function expandAll(opts: ExpandAllOptions): Promise<{ expanded: str
     for (const entries of listings) {
       for (const entry of entries) {
         if (entry.kind !== 'dir' || entry.ignored) continue
+        if (isGitDirName(entry.name)) continue
         if (!opts.showDotfiles && entry.name.startsWith('.')) continue
         if (expanded.length >= cap) return { expanded, capped: true }
         expanded.push(entry.path)

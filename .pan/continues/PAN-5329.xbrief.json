@@ -1,0 +1,133 @@
+{
+  "version": "1",
+  "issueId": "PAN-5329",
+  "created": "2026-11-15T06:45:07.358Z",
+  "updated": "2026-11-15T07:51:48.993Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "chat-find-plain-ctrl-f": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5329",
+      "claimedAt": "2026-11-15T06:45:07.358Z",
+      "doneAt": "2026-11-15T06:48:16.072Z"
+    },
+    "chat-find-plain-ctrl-f.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:48:16.072Z"
+    },
+    "chat-find-plain-ctrl-f.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:48:16.072Z"
+    },
+    "quick-open-match-mark": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5329",
+      "claimedAt": "2026-11-15T06:48:24.030Z",
+      "doneAt": "2026-11-15T06:49:35.855Z"
+    },
+    "quick-open-match-mark.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:49:35.855Z"
+    },
+    "quick-open-match-mark.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:49:35.855Z"
+    },
+    "rail-narrow-auto-collapse": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5329",
+      "claimedAt": "2026-11-15T06:49:43.662Z",
+      "doneAt": "2026-11-15T06:52:22.900Z"
+    },
+    "rail-narrow-auto-collapse.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:52:22.900Z"
+    },
+    "rail-narrow-auto-collapse.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:52:22.900Z"
+    },
+    "rail-narrow-auto-collapse.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:52:22.900Z"
+    },
+    "rail-narrow-auto-collapse.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:52:22.900Z"
+    },
+    "explorer-hide-dot-git": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5329",
+      "claimedAt": "2026-11-15T06:52:32.612Z",
+      "doneAt": "2026-11-15T06:54:25.104Z"
+    },
+    "explorer-hide-dot-git.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:54:25.104Z"
+    },
+    "explorer-hide-dot-git.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:54:25.104Z"
+    },
+    "explorer-hide-dot-git.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:54:25.104Z"
+    },
+    "change-tag-truncate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5329",
+      "claimedAt": "2026-11-15T06:54:33.151Z",
+      "doneAt": "2026-11-15T06:55:50.264Z"
+    },
+    "change-tag-truncate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:55:50.264Z"
+    },
+    "change-tag-truncate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:55:50.264Z"
+    },
+    "docs-and-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5329",
+      "claimedAt": "2026-11-15T06:55:58.448Z",
+      "doneAt": "2026-11-15T06:57:55.081Z"
+    },
+    "docs-and-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:57:55.081Z"
+    },
+    "docs-and-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:57:55.081Z"
+    },
+    "docs-and-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:57:55.081Z"
+    },
+    "docs-and-changelog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:57:55.081Z"
+    },
+    "quick-open-match-mark.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T07:41:36.360Z"
+    },
+    "change-tag-truncate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T07:41:36.360Z"
+    },
+    "chat-find-plain-ctrl-f.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T07:51:48.993Z"
+    },
+    "rail-narrow-auto-collapse.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T07:51:48.993Z"
+    }
+  }
+}
