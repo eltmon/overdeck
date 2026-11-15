@@ -37,6 +37,9 @@ vi.mock('../../agents/warm-idle-reap.js', async (importOriginal) => ({
 }));
 
 import { existsSync, statSync } from 'node:fs';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   clearFinishedSequencerRun,
   getSequencerRunStatus,
@@ -433,5 +436,91 @@ describe('spawnSequencerAgent', () => {
     await spawnSequencerAgent('incremental', { projectRoot: '/tmp/proj', issues: [], stopFinishedRun: stop });
 
     expect(stop).not.toHaveBeenCalled();
+  });
+});
+
+describe('spawnSequencerAgent skipWhenUnchanged (PAN-5357)', () => {
+  const MANIFEST = [{
+    id: 'PAN-1', title: 'Test', labels: [], priority: 1, ageMs: 0,
+    inPipeline: false, hasPrd: false, ready: false, updatedAt: '2026-06-19T00:00:00Z', isEpic: false,
+  }];
+  const PRIOR_SEQUENCE = {
+    version: 1, project: 'overdeck', generatedAt: '2026-06-18T00:00:00Z', model: 'claude-opus-4-8',
+    pass: 'creation' as const, openCount: 1,
+    nodes: [{ issue: 'PAN-1', rank: 1, size: 'M' as const, importance: 'high' as const, score: 80, condition: 'ok' as const, dependsOn: [], why: 'Core.', gate: 'auto' as const, planning: 'auto' as const }],
+    edges: [],
+  };
+
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'seq-skip-'));
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    const { collectOpenBacklog } = await import('../backlog-input.js');
+    (collectOpenBacklog as ReturnType<typeof vi.fn>).mockResolvedValue({
+      manifest: MANIFEST,
+      bodies: { count: 1, getBatch: () => [] },
+      priorSequence: PRIOR_SEQUENCE,
+    });
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it('returns null and spawns nothing when examined-manifest.json matches', async () => {
+    await mkdir(join(dir, '.pan', 'backlog'), { recursive: true });
+    await writeFile(join(dir, '.pan', 'backlog', 'examined-manifest.json'), JSON.stringify(MANIFEST), 'utf-8');
+
+    const result = await spawnSequencerAgent('incremental', { projectRoot: dir, skipWhenUnchanged: true, issues: [] });
+
+    expect(result).toBeNull();
+    expect(spawnRun).not.toHaveBeenCalled();
+    await expect(readFile(join(dir, '.pan', 'backlog', 'manifest.json'), 'utf-8')).rejects.toThrow();
+  });
+
+  it('spawns when only manifest.json matches (a pass that spawned but never submitted)', async () => {
+    await mkdir(join(dir, '.pan', 'backlog'), { recursive: true });
+    await writeFile(join(dir, '.pan', 'backlog', 'manifest.json'), JSON.stringify(MANIFEST), 'utf-8');
+
+    const result = await spawnSequencerAgent('incremental', { projectRoot: dir, skipWhenUnchanged: true, issues: [] });
+
+    expect(result).not.toBeNull();
+    expect(spawnRun).toHaveBeenCalledOnce();
+  });
+
+  it('spawns when the examined manifest differs', async () => {
+    await mkdir(join(dir, '.pan', 'backlog'), { recursive: true });
+    const differentManifest = [{ ...MANIFEST[0], updatedAt: '2026-06-20T00:00:00Z' }];
+    await writeFile(join(dir, '.pan', 'backlog', 'examined-manifest.json'), JSON.stringify(differentManifest), 'utf-8');
+
+    const result = await spawnSequencerAgent('incremental', { projectRoot: dir, skipWhenUnchanged: true, issues: [] });
+
+    expect(result).not.toBeNull();
+    expect(spawnRun).toHaveBeenCalledOnce();
+  });
+
+  it('without skipWhenUnchanged an identical manifest still spawns', async () => {
+    await mkdir(join(dir, '.pan', 'backlog'), { recursive: true });
+    await writeFile(join(dir, '.pan', 'backlog', 'examined-manifest.json'), JSON.stringify(MANIFEST), 'utf-8');
+
+    const result = await spawnSequencerAgent('incremental', { projectRoot: dir, issues: [] });
+
+    expect(result).not.toBeNull();
+    expect(spawnRun).toHaveBeenCalledOnce();
+  });
+
+  it('restores the prior manifest.json when spawnRun rejects', async () => {
+    await mkdir(join(dir, '.pan', 'backlog'), { recursive: true });
+    const priorManifestText = JSON.stringify([{ id: 'PAN-0' }]);
+    await writeFile(join(dir, '.pan', 'backlog', 'manifest.json'), priorManifestText, 'utf-8');
+    (spawnRun as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('already running'));
+
+    await expect(
+      spawnSequencerAgent('incremental', { projectRoot: dir, issues: [] }),
+    ).rejects.toThrow('already running');
+
+    const manifestAfter = await readFile(join(dir, '.pan', 'backlog', 'manifest.json'), 'utf-8');
+    expect(manifestAfter).toBe(priorManifestText);
   });
 });

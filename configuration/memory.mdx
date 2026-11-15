@@ -22,13 +22,22 @@ title: Be decisive        # optional; defaults to the id with dashes as spaces, 
 description: Make routine reversible calls yourself; ask only for irreversible or operator-owned ones.
                           # required, one line, at most 200 characters; this is the index line
 tags: [workflow]          # optional string array
+created: 2026-09-20       # optional YYYY-MM-DD; add sets it, edit never changes it
 updated: 2026-09-23       # optional YYYY-MM-DD; add/edit set it; sort key
-source: claude:6c30e00a-54f1-4a0e-9d4b-1c2f3e4d5a6b   # optional provenance
+source: twitch:alice 2026-11-10 14:20   # optional attribution: who or what made the rule, and when (one line, at most 200 characters)
+status: superseded        # optional: active (the default, never written) | superseded | retired
+supersedes: [older-rule]  # optional list of fact ids this fact replaces
+superseded_by: newer-rule # optional id of the fact that replaces this one
 review: [unindexed]       # optional; non-empty means excluded from the index
 always: true              # optional, default false; see Prompt-time retrieval below
 ---
 <body: the fact, then **Why:** and **How to apply:** lines, free markdown>
 ```
+
+Frontmatter keys Overdeck does not know are kept: `pan memory edit` and a supersession rewrite write
+them back unchanged, after the known keys. An invalid `created`, `status`, `supersedes`,
+`superseded_by` or `source` value makes the file a problem that `pan memory list` reports, the same as
+an invalid `updated`.
 
 `type: user` is valid only in the operator and machine stores (below). The `id` must match
 `/^[a-z0-9][a-z0-9-]{0,79}$/`. A project-store or operator-store fact whose title, description, tags,
@@ -77,6 +86,10 @@ project section is bounded at 12,000 characters, the operator
 section at 4,000, and the machine section at 2,000; once the budget is reached, the index stops and
 prints how many more facts to find with `pan memory list` (`--user`, `--machine`). A fact
 carrying a non-empty `review` marker is never injected — only `pan memory list --review` shows it.
+The index and `pan memory search` also leave out a fact with `status: superseded` or `status: retired`,
+and any fact that names a `superseded_by`, whatever its status says. `pan memory list` hides them too;
+`pan memory list --all` shows every fact, ending each inactive line with `[superseded by <id>]`,
+`[superseded]`, `[retired]` or `[review: <markers>]`.
 Only the index line is injected; open the fact file (`pan memory show <id>`) for its body. A fact
 added inside a workspace reaches every session's index once its branch merges and the primary
 checkout pulls — not the agent's own next session inside that same workspace.
@@ -138,6 +151,68 @@ exits 1 when embedding fails — it is the way you confirm the cache is healthy.
 project with no `--project`, it skips the project store with a note rather than failing. `pan memory
 sync` also refreshes the operator store's vectors, best-effort, after a `synced` outcome.
 
+Pass `--source <text>` to `add` or `edit` to record who or what made the rule, and when, for example
+`--source "twitch:alice 2026-11-10 14:20"`. `pan memory show` prints it as `Attribution:`, followed by
+`Created:`, `Status:` and `Supersedes:` lines when the fact has those values.
+
+## Replacing a fact
+
+When a new rule replaces an old one, link them instead of deleting the old fact:
+
+```bash
+pan memory add arrival-rule --type project --description "Keep timestream on for caravans; pause it only for sieges." --supersedes disable-timestream-for-sieges-and-caravans
+# or, when the new fact already exists:
+pan memory edit arrival-rule --supersedes disable-timestream-for-sieges-and-caravans
+```
+
+The new fact gets `supersedes: [<old>]`. The old file stays on disk: it is rewritten with
+`status: superseded`, `superseded_by: <new>` and today's `updated`, every other field kept, and it
+leaves the index and search at once. `--supersedes` takes a comma-separated list, and `edit` adds to
+the fact's existing list.
+
+Every file is checked before any is written, and nothing is written when:
+
+- a named fact is not in the same store (`no fact "<id>" in <dir>`), or its file cannot be parsed;
+- the fact names itself (`a fact cannot supersede itself`);
+- a named fact is already superseded by a different fact (`"<old>" is already superseded by "<other>"`);
+- with `edit`, the edited fact is itself superseded (`"<id>" is superseded by "<other>"; edit that fact instead`).
+
+Naming a fact that this fact already supersedes changes nothing for it. For a project fact, commit
+both files: the printed `git add` hint names every file written. There is no undo flag; to undo a
+supersession, edit both files by hand (remove `status` and `superseded_by` from the old fact and the
+id from the new fact's `supersedes`). `pan memory lint` flags a link that is only half undone.
+`pan memory retire <id>` is still the hard delete, with git history as the archive. A fact you mark
+`status: retired` by hand stays on disk and out of the index.
+
+## Linting facts
+
+`pan memory lint` reads one store (chosen like `list`: `--project <key>`, `--user`, `--machine` or
+`--here`) and prints an advisory report. It never edits a fact, and it exits 0 after any report; it
+exits 1 only for an invalid flag or a store it cannot resolve.
+
+```bash
+pan memory lint
+pan memory lint --user --no-llm
+pan memory lint --threshold 0.7 --json
+```
+
+The report has three sections:
+
+- **Links:** supersession problems — an id that names no fact, a link recorded on only one side, a
+  `status: superseded` without `superseded_by` (or the reverse), a supersession cycle, and an active
+  fact whose description says it is superseded, with the `pan memory edit <new> --supersedes <id>` to
+  run.
+- **Duplicates:** pairs of active facts at or above the duplicate similarity threshold.
+- **Contradictions:** pairs of active facts the memory extraction provider judges to conflict.
+
+Similarity uses the conversation-search embedding provider when it is enabled and has a key (duplicate
+threshold 0.90). Without an embedding provider, or when it fails, lint falls back to lexical similarity,
+a local word-overlap score (duplicate threshold 0.60), and names the reason. `--threshold <n>` (0 to 1)
+overrides the duplicate threshold. The contradiction pass asks the memory extraction provider about at
+most 20 of the most similar pairs; `--no-llm` skips it, and an unavailable provider is reported, not
+fatal. Superseded and retired facts are left out of the duplicate and contradiction checks, because a
+fact and its replacement are similar by design. `--json` prints the whole report.
+
 ## Search
 
 `pan memory search <query>` prints matching curated facts first, under `Project memory:`,
@@ -164,6 +239,28 @@ exits 1.
 
 Facts use the same frontmatter keys (`type`, `title`, `description`, `tags`) OKF's indexer reads, so
 `/okf author` can promote a fact into the knowledge bundle by moving the file and re-casing its type.
+
+## Per-turn retrieval
+
+Every prompt — not just session start — can pull relevant memory, briefing updates and docs context in
+front of it. Which harnesses get this, and how:
+
+- **Claude Code** calls it from the global `user-prompt-submit-hook`, registered once in your
+  user-global `~/.claude/settings.json`. It fires for every Claude Code session on the machine, in any
+  cwd — a workspace or a project root.
+- **Codex** calls it from the app-server host, before each turn the host mediates: dashboard messages,
+  `pan tell`, and pane-typed lines. The result is wrapped in `<overdeck-turn-context>` and prepended to
+  the prompt; the chat timeline, titles, search and enrichment all strip that block back out, so you see
+  only your own text. The native Codex terminal companion and `codex.transport: tui` do not call it.
+- **Pi** calls it for issue-linked conversations and work agents.
+
+A conversation's identity comes from the workspace row that owns it — its own `workspace_id`, else the
+project's main workspace for a project-root conversation. Dashboard boot creates any missing main
+workspace row for a registered project, so older projects (imported before workspaces existed) get
+identity too.
+
+Every call — hit, miss or error — is logged to
+`~/.overdeck/memory/<project>/<workspace>/rag-runs/<date>.jsonl`.
 
 ## Previewing
 

@@ -60,6 +60,9 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/conversations/:name/message', scope: 'tell' },
   // PAN-5237: whoever can send a composer message can cancel it.
   { method: 'POST', path: '/api/conversations/:name/message/cancel', scope: 'tell' },
+  // PAN-5353: Send now
+  { method: 'POST', path: '/api/conversations/:name/send-now', scope: 'tell' },
+  { method: 'POST', path: '/api/agents/:id/send-now', scope: 'tell' },
   { method: 'GET', path: '/api/conversations/:name/kickoff', scope: 'read:conversations' },
   { method: 'POST', path: '/api/conversations/:name/kickoff', scope: 'tell' },
   { method: 'GET', path: '/api/conversations/:name/bookmarks', scope: 'read:conversations' },

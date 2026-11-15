@@ -41,6 +41,9 @@ function conflictCopyText(dir: string, path: string, id: string, copyId: string,
     id: copyId,
     review: [...new Set([...parsed.review, SYNC_CONFLICT_REVIEW])],
     source: `${SYNC_CONFLICT_REVIEW}:${id}`,
+    // PAN-5360 D14: a copy never claims a supersession link.
+    supersedes: [],
+    supersededBy: null,
   });
 }
 

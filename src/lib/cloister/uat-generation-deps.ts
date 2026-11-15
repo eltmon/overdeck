@@ -19,6 +19,7 @@ import {
   listUatGenerations,
   updateUatGeneration,
 } from '../overdeck/merge-sync.js';
+import { isBookkeepingOnlyMove, parseGitPathList } from './bookkeeping-paths.js';
 import type { GenerationGitDeps, GenerationStorePort } from './uat-generation-engine.js';
 import type { PolyrepoRepoGit } from './uat-polyrepo-engine.js';
 import type { ResolvedProjectRepo } from '../project-repos.js';
@@ -27,6 +28,9 @@ const execFileAsync = promisify(execFile);
 
 const runGit = (args: string[], cwd: string) =>
   execFileAsync('git', args, { cwd, maxBuffer: 16 * 1024 * 1024 });
+
+/** A full or abbreviated commit SHA — the only base a git range may be built from. */
+const GIT_SHA = /^[0-9a-f]{7,40}$/i;
 
 /**
  * Validate a branch name against its expected namespace.
@@ -134,6 +138,31 @@ export function buildUatGenerationGitDeps(
       return runGit(['merge-base', '--is-ancestor', ref, originTarget], projectRoot)
         .then(() => true)
         .catch(() => false);
+    },
+
+    isBookkeepingOnlyBaseMove: async ({ fromSha, toSha, batchBranch }) => {
+      if (!GIT_SHA.test(fromSha) || !GIT_SHA.test(toSha)) return false;
+      // A rewound main gives an empty range that would pass vacuously.
+      const ancestor = await runGit(['merge-base', '--is-ancestor', fromSha, toSha], projectRoot)
+        .then(() => true)
+        .catch(() => false);
+      if (!ancestor) return false;
+      // Per commit, not the net diff: a code change and its revert still count.
+      // --no-renames lists both sides of a move out of src/ into .pan/.
+      const { stdout: touched } = await runGit(
+        ['log', '--no-renames', '--diff-merges=first-parent', '--name-only', '--format=', `${fromSha}..${toSha}`],
+        projectRoot,
+      );
+      let batchFiles: string[] = [];
+      if (batchBranch) {
+        const safeBranch = safeBranchName(batchBranch, 'uat');
+        const ref = await runGit(['rev-parse', '--verify', `origin/${safeBranch}`], projectRoot)
+          .then(() => `origin/${safeBranch}`)
+          .catch(() => safeBranch);
+        const { stdout } = await runGit(['diff', '--no-renames', '--name-only', `${fromSha}..${ref}`], projectRoot);
+        batchFiles = parseGitPathList(stdout);
+      }
+      return isBookkeepingOnlyMove(parseGitPathList(touched), batchFiles);
     },
 
     mergeBranch: async (featureBranch) => {

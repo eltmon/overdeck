@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addOverdeckHookIfMissing, isAutoApproveHookRegistered, type ClaudeSettings } from '../claude-hooks-registration.js';
+import { addOverdeckHookIfMissing, isAutoApproveHookRegistered, OVERDECK_HOOK_REGISTRATIONS, type ClaudeSettings } from '../claude-hooks-registration.js';
 
 const BIN_DIR = '/home/op/.overdeck/bin';
 
@@ -86,5 +86,11 @@ describe('addOverdeckHookIfMissing widens a narrow auto-approve-hook matcher (PA
     const changed = addOverdeckHookIfMissing(settings, 'PreToolUse', BIN_DIR, 'auto-approve-hook');
 
     expect(changed).toBe(false);
+  });
+});
+
+describe('per-turn memory reaches every Claude session (PAN-5359)', () => {
+  it('registers the global UserPromptSubmit hook with no matcher, so it fires in a project root as well as a workspace', () => {
+    expect(OVERDECK_HOOK_REGISTRATIONS).toContainEqual({ hookType: 'UserPromptSubmit', scriptName: 'user-prompt-submit-hook' });
   });
 });

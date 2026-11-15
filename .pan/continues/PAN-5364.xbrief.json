@@ -1,0 +1,149 @@
+{
+  "version": "1",
+  "issueId": "PAN-5364",
+  "created": "2026-11-15T15:42:11.052Z",
+  "updated": "2026-11-15T16:26:26.216Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "voided-by-field": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5364",
+      "claimedAt": "2026-11-15T15:42:11.052Z",
+      "doneAt": "2026-11-15T16:02:16.540Z"
+    },
+    "voided-by-field.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:02:16.540Z"
+    },
+    "voided-by-field.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:02:16.540Z"
+    },
+    "voided-by-field.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:02:16.540Z"
+    },
+    "voided-by-field.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:02:16.540Z"
+    },
+    "board-chain-selection": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5364",
+      "claimedAt": "2026-11-15T16:02:29.624Z",
+      "doneAt": "2026-11-15T16:07:23.632Z"
+    },
+    "board-chain-selection.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:07:23.632Z"
+    },
+    "board-chain-selection.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:07:23.632Z"
+    },
+    "board-chain-selection.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:07:23.632Z"
+    },
+    "board-chain-selection.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:07:23.632Z"
+    },
+    "board-chain-selection.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:07:23.632Z"
+    },
+    "batch-sections": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5364",
+      "claimedAt": "2026-11-15T16:07:25.782Z",
+      "doneAt": "2026-11-15T16:14:15.759Z"
+    },
+    "batch-sections.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:14:15.759Z"
+    },
+    "batch-sections.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:14:15.759Z"
+    },
+    "batch-sections.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:14:15.759Z"
+    },
+    "batch-sections.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:14:15.759Z"
+    },
+    "batch-sections.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:14:15.759Z"
+    },
+    "outcome-hero": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5364",
+      "claimedAt": "2026-11-15T16:14:22.598Z",
+      "doneAt": "2026-11-15T16:20:22.536Z"
+    },
+    "outcome-hero.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:20:22.536Z"
+    },
+    "outcome-hero.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:20:22.536Z"
+    },
+    "outcome-hero.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:20:22.536Z"
+    },
+    "outcome-hero.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:20:22.536Z"
+    },
+    "older-list-grouping": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5364",
+      "claimedAt": "2026-11-15T16:20:24.287Z",
+      "doneAt": "2026-11-15T16:25:20.035Z"
+    },
+    "older-list-grouping.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:25:20.035Z"
+    },
+    "older-list-grouping.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:25:20.035Z"
+    },
+    "older-list-grouping.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:25:20.035Z"
+    },
+    "older-list-grouping.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:25:20.035Z"
+    },
+    "docs-and-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5364",
+      "claimedAt": "2026-11-15T16:25:22.040Z",
+      "doneAt": "2026-11-15T16:26:26.216Z"
+    },
+    "docs-and-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:26:26.216Z"
+    },
+    "docs-and-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:26:26.216Z"
+    },
+    "docs-and-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:26:26.216Z"
+    }
+  }
+}

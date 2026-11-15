@@ -195,6 +195,45 @@ any reply-notes block (`lib/citationFormat.ts`'s `fileCitationHeader` and
 `formatCitationBlock`) — see `features/conversations.mdx`'s "Citing a
 markdown file" for the exact block shape.
 
+## Links in the Preview (PAN-5337)
+
+A document-relative link in a Preview (`fort3d.md`, `../a.md`, `levels/`) is
+classified by `classifyDocHref` (`lib/markdownDocLinks.ts`) and resolved
+against the file's own folder — `resolveDocPath(docDirOf(docLocation.path),
+href)` — never by letting the browser resolve it against the dashboard's own
+URL, which is the bug this issue fixed. `MarkdownTab` carries the file's
+`docLocation: { rootId, path }` into `ChatMarkdown`; the editor pane computes
+its `docLocation` from its absolute `filePath` via `explorerLocationForPath`
+(`components/explorer/rootForConversation.ts`), the same rules 4–5 that map a
+conversation's cwd to an explorer root. **A file outside every registered
+project gets no `docLocation`, so its relative links render inert** — the
+Docs pane and the cockpit dig tabs pass none for the same reason.
+
+A resolved file link renders as `MarkdownDocLink`
+(`components/chat/MarkdownDocLink.tsx`) with no `href`; clicking or pressing
+Enter calls `deck.openBeside({ rootId, path, line, preview: true })` —
+`preview: true` reuses the root's one preview pane, so reading through many
+links never opens a tab per link — falling back to `openCodePane` when
+`openBeside` is absent, and rendering inert when there is no deck at all. A
+resolved folder link instead calls `deck.openDock({ tab: 'files', reveal:
+{ rootId, path } })`, retargeting the dock first when it is scoped to a
+different root. Existence is checked via `useDocLinkTarget`
+(`components/chat/docLinkTargets.ts`), which caches one `listDir` per
+(root, folder) for 10 seconds, so a preview with many links to the same
+folder sends one request, not one per link.
+
+A `#heading` link scrolls the Preview to the heading with that slug —
+`remarkHeadingSlugs` (`lib/remarkHeadingSlugs.ts`) stamps a GitHub-style
+`data-heading-slug` on every heading when `docLocation` is set, and the click
+handler finds it inside the closest `[data-testid="markdown-tab"]` and calls
+`scrollIntoView`, never touching `location.hash`. `other.md#heading` opens
+`other.md` and ignores the heading.
+
+A link whose target is missing, or whose normalized path leaves the root,
+renders the **not-found state**: a `<span data-doc-link-state="missing"|
+"outside">` with muted, dashed-underline text, `aria-disabled="true"` and a
+title naming the unresolved path — no `href`, no click handler.
+
 ## The open-target preference and the fallback matrix
 
 `src/dashboard/frontend/src/editorPreferences.ts` adds:

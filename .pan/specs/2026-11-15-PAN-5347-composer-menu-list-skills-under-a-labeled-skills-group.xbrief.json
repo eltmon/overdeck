@@ -1,0 +1,653 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T13:23:31Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5347: Composer / menu: list skills under a labeled Skills group",
+    "updated": "2026-11-15T13:35:31.174Z"
+  },
+  "plan": {
+    "id": "pan-5347",
+    "title": "Composer / menu: list skills under a labeled Skills group",
+    "status": "running",
+    "uid": "cd7c33df-6758-4945-abce-8145499c6bf3",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T13:23:31Z",
+    "updated": "2026-11-15T13:35:31.174Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5347",
+        "label": "PAN-5347",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5347.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "composer",
+      "slash-menu",
+      "skills",
+      "harness-capabilities"
+    ],
+    "narratives": {
+      "Problem": "The dashboard composer's / menu (getSlashCommands in src/dashboard/frontend/src/components/chat/slashCommands.ts) has four sources (harness native commands, /handoff, the pan CLI manifest, curated variants) and none of them lists skills. Typing /pan-cons finds nothing although pan-consolidate-conversations is installed and enabled, so operators cannot discover skill-only workflows such as pan-flywheel or pan-recap from the composer.",
+      "Proposal": "Add a harness capability skillSlashCommands (true for Claude Code only). Extend GET /api/skills/overrides with conversation=<name> and cwd=<path> (plus the existing issue=<id>): a known row resolves skill states the way a launch of that conversation does (resolveLaunchScope from the row's cwd and issue, plus the row's skill map as the conversation layer); without a row (agent-session views) the given cwd and issue are used. A new frontend module chat/skillSlashCommands.ts builds that context from the conversation, fetches the list with plain fetch when the slash menu opens, and maps enabled native skills (core included; pan, pan-handoff, handoff excluded) to SlashCommand rows in category 'Skills'. getSlashCommands(harness, skillCommands) appends them last, gated on the capability. ComposerPromptEditor takes a skillContext prop and ComposerFooter passes skillContextForConversation(conversation). Docs: configuration/harnesses.mdx, configuration/skills.mdx, docs/CONTEXT-LAYERS.md, changelog.d/pan-5347.md, codebase map architecture.md.",
+      "NonGoals": "- Pack skills (/<pack>:<skill>) in the menu.\n- Skills for any harness other than Claude Code; Codex, Pi and the rest declare skillSlashCommands false.\n- Skills for linked (other-machine) or vault conversations, or for synthetic sessions with no cwd (for example a specialist pane with cwd '').\n- Reflecting toggles made after launch inside the running harness; the menu shows the current resolved state only.\n- Honoring user-invocable: false frontmatter.\n- Changing how composer text is delivered to the harness.\n- Changing the Settings skills page, the new-conversation skills field, or PUT /api/skills/overrides.\n- Using react-query useQuery anywhere in the ComposerFooter subtree.\n- Moving the existing Overdeck, native or Conversation groups or changing their category labels.\n- Adding a new HTTP route (the change is a query parameter on an existing route)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Gate skills with a new HarnessCapabilities field skillSlashCommands, true only for Claude Code.",
+        "rationale": "PAN-4562 requires per-harness decisions to read a declared capability. Claude Code runs a skill from /<skill>; for Codex, Pi and the other harnesses /<skill> as a skill invocation is not verified, so they declare false rather than insert text that may do nothing."
+      },
+      {
+        "summary": "Resolve the skill scope on the server via conversation=<name>, cwd=<path> and issue=<id> on GET /api/skills/overrides instead of passing project and issue from the frontend; a known row wins, otherwise cwd and issue are used.",
+        "rationale": "The frontend Conversation has no skill map and projectKey is usually null (project comes from cwd); the launcher's resolveLaunchScope plus the row's skillOverrides is what decides which skills Claude Code hides. Agent-session views pass synthetic conversations (id 0 or -1) with no row, so cwd and issue are the fallback, matching a work-agent launch. It is a parameter on an existing route, so no no-loss-matrix row is needed."
+      },
+      {
+        "summary": "List native skills only; exclude pack skills.",
+        "rationale": "Pack skill ids are pack/skill in the API but pack:skill in the harness and the Deft adapter renames them; including them needs separate verification and is better as a follow-up."
+      },
+      {
+        "summary": "Append the Skills block after all existing sources.",
+        "rationale": "Putting skills first would let a skill whose description contains 'pan sync' take the top row and steal Enter from /pan sync; last keeps every existing selection and keyboard order unchanged."
+      },
+      {
+        "summary": "Fetch with plain fetch inside ComposerPromptEditor only when the slash menu opens, refetching on each open.",
+        "rationale": "heldKickoff.tsx documents that useQuery in the ComposerFooter subtree breaks test files without a QueryClientProvider, and ComposerFooter.test.tsx asserts no extra fetch on mount; the ComposerFooter tests mock ComposerPromptEditor, so a menu-open fetch there touches none of them. Refetching on open reflects Settings toggles without a cache."
+      },
+      {
+        "summary": "Exclude skills named pan, pan-handoff and handoff from the Skills group.",
+        "rationale": "ComposerFooter intercepts /pan … as a portable Overdeck command and /pan-handoff or /handoff as the handoff dialog, so those skills never reach the harness from the composer."
+      },
+      {
+        "summary": "Include core skills (pan-flywheel, pan-done, …).",
+        "rationale": "Core skills are always enabled and the issue names pan-flywheel as a skill operators cannot find; the existing ConversationSkillsField drops core skills because they cannot be toggled, which does not apply to a launcher menu."
+      },
+      {
+        "summary": "Linked and vault conversations get no Skills group.",
+        "rationale": "Their skills live on another machine; the local catalog would list skills the owning harness may not have."
+      },
+      {
+        "summary": "When the conversation's issue has no owning project and its cwd gives none, retry the listing with the project only (global).",
+        "rationale": "This is the existing D8 fallback from ConversationSkillsField, moved server-side because the client now sends only the conversation name."
+      },
+      {
+        "summary": "Live browser UAT is an acceptance criterion on the last frontend item for the review/test roles, not a separate xBRIEF item.",
+        "rationale": "pan task done requires an Item: commit on the pushed branch, and verification produces no commit."
+      },
+      {
+        "summary": "If live UAT shows Claude Code does not run a delivered /<skill>, stop and tell the flywheel instead of shipping the menu.",
+        "rationale": "The issue says not to offer a skill where typing it would do nothing; changing message delivery is outside this issue."
+      }
+    ],
+    "items": [
+      {
+        "id": "capability-skill-slash-commands",
+        "title": "Declare the skillSlashCommands harness capability",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T13:23:31Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5347",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/harness-capabilities.ts",
+            "tests/unit/lib/harness-capability-contract.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/harness-capability-contract.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "harness-capability-contract.test.ts passes including the new PAN-5347 describe block",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In packages/contracts/src/harness-capabilities.ts add `readonly skillSlashCommands: boolean` (doc comment: the composer / menu lists skills as /<name> because the harness runs a typed /<skill>, PAN-5347) after overdeckMcp in HarnessCapabilities, append \"skillSlashCommands\" to HARNESS_CAPABILITY_KEYS, set true in CLAUDE_CODE_CAPABILITIES and false in OHMYPI, CODEX, ACP, KIMI_CODE, OPENCODE, MUSE and PRIME_AGENT capability consts. PI_CAPABILITIES and GROK_CAPABILITIES inherit false through their spreads; do not add the key there. Add a describe('composer skill commands (PAN-5347)') test in tests/unit/lib/harness-capability-contract.test.ts asserting claude-code is true and codex, pi, ohmypi, acp, kimi-code, opencode, muse, prime-agent, grok are false via contracts.getRuntimeBehavior(name).capabilities.skillSlashCommands."
+        },
+        "items": [
+          {
+            "id": "capability-skill-slash-commands.ac1",
+            "title": "Given the contracts package, when getRuntimeBehavior('claude-code').capabilities.skillSlashCommands is read, then it returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "capability-skill-slash-commands.ac2",
+            "title": "Given each of codex, pi, ohmypi, acp, kimi-code, opencode, muse, prime-agent and grok, when its capabilities.skillSlashCommands is read, then it returns false and the new contract test asserting this passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "capability-skill-slash-commands.ac3",
+            "title": "HARNESS_CAPABILITY_KEYS contains 'skillSlashCommands' and the existing 'has every HARNESS_CAPABILITY_KEYS value defined' test passes for every registered runtime",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-conversation-skill-scope",
+        "title": "GET /api/skills/overrides resolves launch scope from conversation, cwd and issue",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T13:23:31Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5347",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "frontend-skill-commands-module"
+          ],
+          "files_scope": [
+            "src/lib/skill-overrides/store.ts",
+            "src/lib/skill-overrides/conversation-scope.ts",
+            "src/dashboard/server/routes/misc/skill-overrides.ts",
+            "src/dashboard/server/routes/__tests__/skill-overrides-route.test.ts",
+            "src/lib/skill-overrides/__tests__/store.test.ts",
+            "src/lib/skill-overrides/__tests__/conversation-scope.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/skill-overrides-route.test.ts src/lib/skill-overrides/__tests__/conversation-scope.test.ts src/lib/skill-overrides/__tests__/store.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "the three test files pass including the new conversation cases",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-7",
+            "FR-10",
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. store.ts: add 'unknown-conversation' to SkillOverrideErrorCode; widen listSkillStates ctx with optional conversationOverrides and, after loadSkillOverrideLayers, pass `ctx.conversationOverrides ? { ...layers, conversation: ctx.conversationOverrides } : layers` to both resolvePackStates and resolveSkillStates. New src/lib/skill-overrides/conversation-scope.ts exports listConversationSkillStates({ conversationName?, cwd?, issueId? }): when conversationName is set, dynamic-import getConversationByName from ../overdeck/conversations.js; no row and no cwd throws SkillOverrideError('unknown-conversation'); cwd = row?.cwd ?? query.cwd, issueId = row?.issueId ?? query.issueId; scope = cwd ? await resolveLaunchScope({ cwd, issueId }) (from ./launch.js) : { issueId }; call listSkillStates({ ...scope, conversationOverrides: row?.skillOverrides ?? undefined }); on SkillOverrideError code 'unknown-issue' retry once with { projectKey: scope.projectKey, conversationOverrides }. Route skill-overrides.ts: STATUS_BY_CODE gains 'unknown-conversation': 404; GET reads 'conversation' and 'cwd' (empty -> undefined) and, when either is set, returns jsonResponse(await listConversationSkillStates({ conversationName, cwd, issueId })) inside the existing try/catch/slow-log block without overriddenBelow (project and checkUpdates ignored); update the header comment. Tests per PRD WI-2 step 4."
+        },
+        "items": [
+          {
+            "id": "server-conversation-skill-scope.ac1",
+            "title": "Given a mocked listConversationSkillStates, when GET /api/skills/overrides?conversation=c1&cwd=%2Fw&issue=TST-1 is requested, then the mock receives { conversationName: 'c1', cwd: '/w', issueId: 'TST-1' }, the route returns 200 with its list, the body has no overriddenBelow key, and listLowerLevelOverrides is not called; a request with only cwd takes the same path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-conversation-skill-scope.ac2",
+            "title": "Given an unknown conversation name and no cwd, when the GET runs, then it returns 404 with code 'unknown-conversation'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-conversation-skill-scope.ac3",
+            "title": "Given a known row with cwd, issueId and skillOverrides, when listConversationSkillStates runs, then resolveLaunchScope receives the row's cwd and issue (query cwd/issue ignored) and listSkillStates receives that scope plus conversationOverrides equal to the row map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-conversation-skill-scope.ac4",
+            "title": "Given an unknown name with cwd '/w' and issue 'TST-1', when listConversationSkillStates runs, then it calls resolveLaunchScope({ cwd: '/w', issueId: 'TST-1' }) and passes no conversationOverrides; given listSkillStates rejects with 'unknown-issue', then it retries once with only projectKey and conversationOverrides",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-conversation-skill-scope.ac5",
+            "title": "Given a catalog skill grilling, when listSkillStates({ conversationOverrides: { grilling: false } }) runs in store.test.ts, then the grilling row returns enabled false and source 'conversation'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-skill-commands-module",
+        "title": "Add chat/skillSlashCommands.ts: context, map, fetch and menu-open hook",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T13:23:31Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5347",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/skillSlashCommands.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/skillSlashCommands.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/skillSlashCommands.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "skillSlashCommands.test.ts passes all five cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create src/dashboard/frontend/src/components/chat/skillSlashCommands.ts exporting: SKILLS_CATEGORY = 'Skills'; COMPOSER_INTERCEPTED_SKILL_NAMES = Set(['pan','pan-handoff','handoff']) (comment pointing at ComposerFooter's handoff regex and isPortableCommand); EMPTY_SKILL_COMMANDS = Object.freeze([]) as readonly SlashCommand[]; interface SkillSlashContext { conversationName?, cwd?, issueId? }; skillContextForConversation(conv: { id; name; cwd; issueId; origin? }) (structural param, no Conversation type import) returning undefined for origin 'linked'/'vault', else { conversationName: id > 0 ? name : undefined, cwd: cwd || undefined, issueId: issueId ?? undefined }, and undefined when both conversationName and cwd are absent; skillContextQuery(context) building URLSearchParams with conversation, cwd, issue for set fields only; toSkillSlashCommands(body) (body.skills only; keeps enabled entries including core; drops intercepted names; maps to { id: 'skill-'+name, label: '/'+name, description: description ?? '', insert: '/'+name+' ', category: 'Skills' }; sorted by name); fetchSkillSlashCommands(context, signal) (GET /api/skills/overrides?<skillContextQuery>; non-OK throws); useSkillSlashCommands({ harness, context, active }) (plain fetch, no react-query; key = skillContextQuery(context) string; enabled when key non-empty and getHarnessBehavior(harness).capabilities.skillSlashCommands; initial and disabled value EMPTY_SKILL_COMMANDS; fetches on each false->true transition of active with an AbortController; keeps the previous list on failure and console.warns once; resets on key change). Write the five tests in PRD WI-3 with vi.stubGlobal('fetch') and renderHook. Do not edit scripts/frontend-test-subset.txt here; frontend-editor-skills-menu owns it."
+        },
+        "items": [
+          {
+            "id": "frontend-skill-commands-module.ac1",
+            "title": "Given a body with enabled pan-flywheel (core), disabled grilling, enabled pan and pan-handoff, and a packs entry, when toSkillSlashCommands runs, then it returns only pan-flywheel with label '/pan-flywheel', insert '/pan-flywheel ', id 'skill-pan-flywheel' and category 'Skills'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-skill-commands-module.ac2",
+            "title": "When skillContextForConversation runs, then it returns undefined for origin 'linked' and 'vault', { conversationName: 'c', cwd: '/w', issueId: 'PAN-1' } for id 5, { cwd: '/w' } for id -1, and undefined for id 0 with cwd ''",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-skill-commands-module.ac3",
+            "title": "Given useSkillSlashCommands on claude-code with context { conversationName: 'conv-a' }, when active stays false then fetch is not called, and when active turns true then fetch is called once with /api/skills/overrides?conversation=conv-a and the hook returns the mapped list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-skill-commands-module.ac4",
+            "title": "Given harness codex or an undefined context, when active turns true, then fetch is not called and the hook returns the same EMPTY_SKILL_COMMANDS reference on every render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-skill-commands-module.ac5",
+            "title": "Given fetch rejects, when active turns true, then the hook returns EMPTY_SKILL_COMMANDS without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-get-slash-commands-skills",
+        "title": "getSlashCommands appends skill commands last for capable harnesses",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T13:23:31Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5347",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/slashCommands.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/slashCommands.skills.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/slashCommands.skills.test.ts src/components/chat/__tests__/slashCommands.no-loss.test.ts"
+          ],
+          "expected_outputs": [
+            "slashCommands.skills.test.ts and slashCommands.no-loss.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Change getSlashCommands(harness) to getSlashCommands(harness, skillCommands: readonly SlashCommand[] = []) and append `...(behavior.capabilities.skillSlashCommands ? skillCommands : [])` after CURATED_OVERDECK_VARIANTS. Leave SLASH_COMMANDS = getSlashCommands('claude-code') unchanged. New test file slashCommands.skills.test.ts with the three PRD WI-4 cases. Do not edit scripts/frontend-test-subset.txt here; frontend-editor-skills-menu owns it."
+        },
+        "items": [
+          {
+            "id": "frontend-get-slash-commands-skills.ac1",
+            "title": "Given one skill command, when getSlashCommands('claude-code', [skill]) runs, then the result ends with that entry and every earlier entry equals getSlashCommands('claude-code')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-get-slash-commands-skills.ac2",
+            "title": "Given one skill command, when getSlashCommands('codex', [skill]) runs, then no returned entry has category 'Skills'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-get-slash-commands-skills.ac3",
+            "title": "Overdeck CLI entries keep category 'Overdeck', /model keeps category 'Claude Code native', and slashCommands.no-loss.test.ts passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-editor-skills-menu",
+        "title": "ComposerPromptEditor renders the Skills group from skillContext",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T13:23:31Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5347",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.skills.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ComposerPromptEditor.skills.test.tsx src/components/chat/__tests__/ComposerPromptEditor.test.tsx",
+            "node scripts/run-frontend-test-subset.mjs --dry-run"
+          ],
+          "expected_outputs": [
+            "ComposerPromptEditor.skills.test.tsx passes all four cases and ComposerPromptEditor.test.tsx still passes",
+            "the dry-run output contains skillSlashCommands.test.ts, slashCommands.skills.test.ts and ComposerPromptEditor.skills.test.tsx"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add optional prop skillContext?: SkillSlashContext to ComposerPromptEditorProps. After isSlashMenuOpen is declared, call useSkillSlashCommands({ harness, context: slashCommandsEnabled ? skillContext : undefined, active: isSlashMenuOpen }) and change the slashCommands memo to getSlashCommands(harness, skillCommands) with skillCommands in its deps. Do not change SlashMenu. New test ComposerPromptEditor.skills.test.tsx reusing the Lexical mocks from ComposerPromptEditor.test.tsx, with fetch stubbed per PRD WI-5 and skillContext={{ conversationName: 'conv-skills' }}, covering the four cases. This item owns scripts/frontend-test-subset.txt: append src/components/chat/__tests__/ComposerPromptEditor.skills.test.tsx, src/components/chat/__tests__/skillSlashCommands.test.ts and src/components/chat/__tests__/slashCommands.skills.test.ts, each in sorted position."
+        },
+        "items": [
+          {
+            "id": "frontend-editor-skills-menu.ac1",
+            "title": "Given skillConversationName conv-skills on claude-code and a stubbed skills response, when the menu opens and the filter is pan-cons, then a header with text 'Skills' renders with an option labelled /pan-consolidate-conversations showing its description, and the disabled grilling skill is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-editor-skills-menu.ac2",
+            "title": "When the /pan-consolidate-conversations option is selected, then the editor text becomes '/pan-consolidate-conversations ' and the menu closes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-editor-skills-menu.ac3",
+            "title": "Given harness codex, when the menu opens, then no 'Skills' header renders and fetch is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-editor-skills-menu.ac4",
+            "title": "Given fetch rejects, when the menu opens, then /model still renders under the 'Claude Code native' header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-editor-skills-menu.ac5",
+            "title": "scripts/frontend-test-subset.txt contains the three new test paths and node scripts/run-frontend-test-subset.mjs --dry-run prints all three",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-footer-conversation-prop",
+        "title": "ComposerFooter passes skillContextForConversation(conversation) to the editor",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T13:23:31Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5347",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ComposerFooter.test.tsx src/components/chat/__tests__/ComposerFooter.native.test.tsx",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "both ComposerFooter test files pass unchanged",
+            "lint-file-size.sh exits 0 and ComposerFooter.tsx is at most 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-10",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In ComposerFooter.tsx import skillContextForConversation from './skillSlashCommands' and add `skillContext={skillContextForConversation(conversation)}` to the <ComposerPromptEditor … /> element (around line 789). No other change; the file must stay at or under 1000 lines. Live UAT (AC-8 in the PRD) is verified by the review/test roles against this item: isolated Playwright browser profile, built dashboard, a throwaway conversation for the per-conversation-off check, archived afterwards. If Claude Code does not run a delivered /pan-consolidate-conversations, stop and pan tell flywheel-orchestrator instead of shipping (PRD implementation checkpoint)."
+        },
+        "items": [
+          {
+            "id": "frontend-footer-conversation-prop.ac1",
+            "title": "ComposerFooter renders ComposerPromptEditor with skillContext equal to skillContextForConversation(conversation), and bash scripts/lint-file-size.sh exits 0 with ComposerFooter.tsx at most 1000 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-footer-conversation-prop.ac2",
+            "title": "The existing ComposerFooter.test.tsx fetch assertion passes unchanged because no skills request fires on mount",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-footer-conversation-prop.ac3",
+            "title": "Given the built dashboard in an isolated Playwright browser profile and a Claude Code conversation, when the operator types /pan-cons, then the menu renders a 'Skills' header with /pan-consolidate-conversations and its description, the Overdeck and Claude Code native headers still render for '/', and sending the inserted text runs the skill",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-footer-conversation-prop.ac4",
+            "title": "Given a throwaway Claude Code conversation created with a non-core skill set Off in the New conversation dialog, when its composer menu opens, then that skill is absent from the Skills group while another conversation's menu still shows it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-skills-in-composer",
+        "title": "Document the Skills group, the capability and the conversation parameter",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T13:23:31Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5347",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "configuration/skills.mdx",
+            "docs/CONTEXT-LAYERS.md",
+            "changelog.d/pan-5347.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c skillSlashCommands configuration/harnesses.mdx",
+            "grep -n 'conversation=<name>' docs/CONTEXT-LAYERS.md"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "grep counts 2 lines of skillSlashCommands in harnesses.mdx",
+            "CONTEXT-LAYERS.md prints one line naming conversation=<name>"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. configuration/harnesses.mdx: in '## Composer commands across harnesses' add the Skills-group paragraph from the PRD after the paragraph ending 'never changes the `/pan` control-plane surface.'; in '## Harness capabilities' add the skillSlashCommands table row after overdeckMcp. configuration/skills.mdx: add '## In the composer' before '## Related'. docs/CONTEXT-LAYERS.md near line 212: add the sentence about GET /api/skills/overrides?conversation=<name>. Create changelog.d/pan-5347.md with the '#### New' entry from the PRD. .overdeck/context/codebase/architecture.md line ~269 Skills paragraph: append the one-sentence pointer; leave the last-verified line unchanged."
+        },
+        "items": [
+          {
+            "id": "docs-skills-in-composer.ac1",
+            "title": "configuration/harnesses.mdx Composer commands section contains a paragraph stating that installed skills appear in a Skills group as /<skill-name> on harnesses declaring skillSlashCommands, and the Harness capabilities table contains a skillSlashCommands row stating only Claude Code declares it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-skills-in-composer.ac2",
+            "title": "configuration/skills.mdx contains an 'In the composer' section stating that skills turned off at any level disappear from the composer / menu the next time it opens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-skills-in-composer.ac3",
+            "title": "docs/CONTEXT-LAYERS.md contains GET /api/skills/overrides?conversation=<name> with a sentence stating it resolves the states a launch of that conversation applies, falling back to cwd and issue for agent sessions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-skills-in-composer.ac4",
+            "title": "changelog.d/pan-5347.md exists with a '#### New' heading and one bullet linking #5347, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "capability-skill-slash-commands",
+        "to": "frontend-skill-commands-module",
+        "type": "blocks"
+      },
+      {
+        "from": "capability-skill-slash-commands",
+        "to": "frontend-get-slash-commands-skills",
+        "type": "blocks"
+      },
+      {
+        "from": "server-conversation-skill-scope",
+        "to": "frontend-skill-commands-module",
+        "type": "informs"
+      },
+      {
+        "from": "frontend-skill-commands-module",
+        "to": "frontend-editor-skills-menu",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-get-slash-commands-skills",
+        "to": "frontend-editor-skills-menu",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-editor-skills-menu",
+        "to": "frontend-footer-conversation-prop",
+        "type": "blocks"
+      },
+      {
+        "from": "server-conversation-skill-scope",
+        "to": "frontend-footer-conversation-prop",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "21 files, under the 25-file limit. The 10-subsystem count is inflated by documentation and test locations (configuration/, docs/, changelog.d/, .overdeck/context/, scripts/frontend-test-subset.txt, tests/unit/). The code touches four areas: one contracts field, one skill-overrides lib module, one existing route, and one frontend chat directory. Splitting into sibling issues would ship either a server query parameter that no caller uses or a menu that cannot resolve the conversation's skill scope, and neither half is independently useful to an operator.",
+      "canonicalFilename": "2026-11-15-PAN-5347-composer-menu-list-skills-under-a-labeled-skills-group.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

@@ -4,7 +4,7 @@ import { ChevronRight } from 'lucide-react';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { shortName } from '../merge-train/mergeTrainCopy';
 import type { BoardProject, UatGenerationPayload } from '../merge-train/train/boardTypes';
-import { useMergeTrainBoard } from '../merge-train/train/useMergeTrainBoard';
+import { useApplyProjectTrainWrite, useMergeTrainBoard, type ProjectTrainWrite } from '../merge-train/train/useMergeTrainBoard';
 import { ProjectSkillsSection } from '../skills/SkillOverridesSections';
 
 interface VersionSyncConfig {
@@ -334,8 +334,9 @@ export function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
     },
     enabled: !!projectKey,
   });
+  const applyTrainWrite = useApplyProjectTrainWrite();
   const mergeTrainMutation = useMutation({
-    mutationFn: async (next: 'enabled' | 'disabled' | null) => {
+    mutationFn: async (next: 'enabled' | 'disabled' | null): Promise<ProjectTrainWrite> => {
       const headers = await dashboardMutationJsonHeaders();
       const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/merge-train`, {
         method: 'POST',
@@ -343,9 +344,10 @@ export function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
         body: JSON.stringify({ value: next }),
       });
       if (!res.ok) throw new Error('Failed to save merge-train setting');
-      return res.json();
+      return res.json() as Promise<ProjectTrainWrite>;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['project-merge-train', projectKey] }),
+    // PAN-5363: refreshes the merge train board too, not only this panel.
+    onSuccess: (write) => applyTrainWrite(projectKey, write),
   });
   const mutation = useMutation({
     mutationFn: async (next: 'auto' | 'hold' | null) => {

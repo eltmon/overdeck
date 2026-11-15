@@ -206,6 +206,7 @@ async function recordCodex(input: RecordInput, tempDirs: string[]): Promise<void
     effort,
     stdout: process.stdout,
     recordActivity: () => true,
+    promptMemory: async ({ prompt }) => ({ text: prompt, contextChars: 0 }),
   });
 
   const isOwner = (message: AppServerMessage) => {

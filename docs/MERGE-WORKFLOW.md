@@ -205,8 +205,11 @@ is the merge control. It renders on the Flywheel rail and on Awaiting Merge
 1. **A batch exists.** The card shows it at the top. Click **Start & open**
    (or **Open UAT** when its stack runs) to test the batch, work through its
    "What to UAT" checklist, then click **Merge batch (N) to main** and confirm
-   inline. That lands exactly the tree you tested. Older batches stay listed
-   as one line each, superseded or voided, with the stored reason.
+   inline. That lands exactly the tree you tested. After the merge, the card
+   shows the merged batch at the top with its merge SHA, and the rebuilds that
+   merge voided fold into one line under it. Older voided batches are grouped
+   into one row per identical run, or sit behind **show** when all their
+   features merged later.
 
    When the batch needs UAT (a hold project, or any member set to Hold) and
    its UAT stack is not running, the merge is refused with `stack-unhealthy`

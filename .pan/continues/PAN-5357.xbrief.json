@@ -1,0 +1,137 @@
+{
+  "version": "1",
+  "issueId": "PAN-5357",
+  "created": "2026-11-15T15:33:34.867Z",
+  "updated": "2026-11-15T16:44:26.358Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "seq-write-noop": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5357",
+      "claimedAt": "2026-11-15T15:33:34.867Z",
+      "doneAt": "2026-11-15T15:41:15.205Z"
+    },
+    "seq-write-noop.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T15:41:15.205Z"
+    },
+    "seq-write-noop.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T15:41:15.205Z"
+    },
+    "seq-write-noop.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T15:41:15.205Z"
+    },
+    "seq-write-noop.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T15:41:15.205Z"
+    },
+    "seq-write-noop.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T15:41:15.205Z"
+    },
+    "cli-write-sequence-noop": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5357",
+      "claimedAt": "2026-11-15T15:41:37.775Z",
+      "doneAt": "2026-11-15T16:17:11.984Z"
+    },
+    "cli-write-sequence-noop.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:17:11.984Z"
+    },
+    "cli-write-sequence-noop.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:17:11.984Z"
+    },
+    "cli-write-sequence-noop.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:17:11.984Z"
+    },
+    "cli-write-sequence-noop.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:17:11.984Z"
+    },
+    "spawn-skip-unchanged": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5357",
+      "claimedAt": "2026-11-15T16:17:19.257Z",
+      "doneAt": "2026-11-15T16:34:41.183Z"
+    },
+    "spawn-skip-unchanged.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:34:41.183Z"
+    },
+    "spawn-skip-unchanged.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:34:41.183Z"
+    },
+    "spawn-skip-unchanged.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:34:41.183Z"
+    },
+    "spawn-skip-unchanged.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:34:41.183Z"
+    },
+    "auto-trigger-interval": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5357",
+      "claimedAt": "2026-11-15T16:34:52.583Z",
+      "doneAt": "2026-11-15T16:39:28.372Z"
+    },
+    "auto-trigger-interval.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:39:28.372Z"
+    },
+    "auto-trigger-interval.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:39:28.372Z"
+    },
+    "auto-trigger-interval.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:39:28.372Z"
+    },
+    "sequencer-prompt-unchanged": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5357",
+      "claimedAt": "2026-11-15T16:39:37.586Z",
+      "doneAt": "2026-11-15T16:42:40.494Z"
+    },
+    "sequencer-prompt-unchanged.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:42:40.494Z"
+    },
+    "sequencer-prompt-unchanged.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:42:40.494Z"
+    },
+    "sequencer-prompt-unchanged.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:42:40.494Z"
+    },
+    "docs-sequencer-churn": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5357",
+      "claimedAt": "2026-11-15T16:42:49.955Z",
+      "doneAt": "2026-11-15T16:44:26.358Z"
+    },
+    "docs-sequencer-churn.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:44:26.358Z"
+    },
+    "docs-sequencer-churn.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:44:26.358Z"
+    },
+    "docs-sequencer-churn.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:44:26.358Z"
+    }
+  }
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rootIdForConversation, rootLabelFor, type RootContext } from '../rootForConversation'
+import { explorerLocationForPath, rootIdForConversation, rootLabelFor, type RootContext } from '../rootForConversation'
 
 const ctx: RootContext = {
   projects: [
@@ -64,6 +64,56 @@ describe('rootIdForConversation (PAN-5287 §6.4)', () => {
   it('picks the longest project path for nested projects', () => {
     expect(rootIdForConversation({ cwd: '/home/u/Projects/krux/web/src' }, ctx)).toBe('project:krux-web')
     expect(rootIdForConversation({ cwd: '/home/u/Projects/krux/api' }, ctx)).toBe('project:krux')
+  })
+})
+
+const dfaiCtx: RootContext = {
+  projects: [{ key: 'dfai', path: '/home/u/Projects/dfai' }],
+  workspaces: [],
+}
+
+describe('explorerLocationForPath (PAN-5337, WI-7)', () => {
+  it('maps a primary-checkout file to project root and relative path', () => {
+    expect(explorerLocationForPath('/home/u/Projects/dfai/docs/index.md', dfaiCtx)).toEqual({
+      rootId: 'project:dfai',
+      path: 'docs/index.md',
+    })
+    expect(explorerLocationForPath('/home/u/Projects/overdeck/docs/index.md', ctx)).toEqual({
+      rootId: 'project:panopticon-cli',
+      path: 'docs/index.md',
+    })
+  })
+
+  it('maps a feature-workspace file to the issue root', () => {
+    expect(explorerLocationForPath('/home/u/Projects/dfai/workspaces/feature-dfai-12/docs/a.md', dfaiCtx)).toEqual({
+      rootId: 'issue:DFAI-12',
+      path: 'docs/a.md',
+    })
+    expect(explorerLocationForPath('/home/u/other/a.md', dfaiCtx)).toBeNull()
+    expect(explorerLocationForPath('/home/u/Projects/overdeck/workspaces/feature-pan-77/src/a.md', ctx)).toEqual({
+      rootId: 'issue:PAN-77',
+      path: 'src/a.md',
+    })
+  })
+
+  it('prefers the longest project path', () => {
+    expect(explorerLocationForPath('/home/u/Projects/krux/web/src/x.ts', ctx)).toEqual({
+      rootId: 'project:krux-web',
+      path: 'src/x.ts',
+    })
+  })
+
+  it('returns null outside every project', () => {
+    expect(explorerLocationForPath('/tmp/x.md', ctx)).toBeNull()
+  })
+
+  it('returns an empty path at the project or feature-workspace root, and null for a non-feature workspaces child', () => {
+    expect(explorerLocationForPath('/home/u/Projects/overdeck', ctx)).toEqual({ rootId: 'project:panopticon-cli', path: '' })
+    expect(explorerLocationForPath('/home/u/Projects/overdeck/workspaces/feature-pan-77', ctx)).toEqual({
+      rootId: 'issue:PAN-77',
+      path: '',
+    })
+    expect(explorerLocationForPath('/home/u/Projects/overdeck/workspaces/scratch-x/a.md', ctx)).toBeNull()
   })
 })
 

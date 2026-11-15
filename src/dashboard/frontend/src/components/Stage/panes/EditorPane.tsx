@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { getTransport, type PanRpcProtocolClient } from '../../../lib/wsTransport'
 import { getPreferredEditor, setPreferredEditor } from '../../../editorPreferences'
 import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
+import { explorerLocationForPath, useRootContext } from '../../explorer/rootForConversation'
 import { useStageDeck } from '../StageDeckContext'
 import { CiteSelectionLayer } from '../../chat/citations/CiteSelectionToolbar'
 import { fileSelectionResolver } from '../../chat/citations/resolveSelectionCitation'
@@ -147,6 +148,13 @@ export function EditorPane({ pane }: PaneWrapperProps) {
       })
   }, [filePath])
 
+  // PAN-5337: the Preview tab's document-relative links resolve against this.
+  const rootContext = useRootContext()
+  const docLocation = useMemo(
+    () => (filePath ? explorerLocationForPath(filePath, rootContext) ?? undefined : undefined),
+    [filePath, rootContext],
+  )
+
   if (!filePath) {
     return (
       <div className={styles.placeholder} data-testid="editor-pane-missing-path">
@@ -233,7 +241,7 @@ export function EditorPane({ pane }: PaneWrapperProps) {
           />
         ) : (
           <CitationTargetContext.Provider value={pane.citeConversationName ?? null}>
-            <MarkdownTab body={draft} />
+            <MarkdownTab body={draft} docLocation={docLocation} />
           </CitationTargetContext.Provider>
         )}
       </div>
