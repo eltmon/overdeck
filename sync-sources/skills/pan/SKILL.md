@@ -47,6 +47,7 @@ OBSERVATION
   pan show <id> --cv       Agent work history
   pan show <id> --context  Context engineering state
   pan show <id> --health   Health + heartbeat only
+  pan open <target>        Open a file, folder or issue in Overdeck
 
 REVIEW
   pan review request <id>   Request re-review after fixing feedback
@@ -66,6 +67,7 @@ SYSTEM / DAEMON
   pan status                  Running agents overview
   pan sync                    Sync skills/agents/rules to devroot
   pan doctor                  System health check
+  pan integrate file-manager  Right-click "Open in Overdeck"
 
 ADMIN (PLUMBING)
   pan admin cloister <cmd>    Lifecycle watchdog

@@ -1,0 +1,101 @@
+---
+title: Open in Overdeck
+description: Open any file or folder in the dashboard from a terminal, a link, or your file manager's right-click menu
+---
+
+# Open in Overdeck
+
+`pan open` opens a file or folder in the Overdeck dashboard. A folder opens in the **Files** tab of the work dock, a file opens in a code tab, and both open in the deck of the project they belong to. You can also add **Open in Overdeck** to your file manager's right-click menu, so a click does the same thing.
+
+## `pan open`
+
+```bash
+pan open ~/Projects/my-app/docs          # reveal a folder in the Files dock
+pan open src/server.ts:120               # open a file at line 120
+pan open src/server.ts:120:8             # ... at line 120, column 8
+pan open README.md --line 10             # same as README.md:10
+pan open PAN-123                         # open an issue's feature workspace
+pan open . --editor                      # open in the first editor found on PATH
+pan open . --editor zed                  # open in a named editor
+pan open . --editor file-manager         # open in the system file manager
+```
+
+The target can be:
+
+- **a path:** absolute, relative to the current folder, or starting with `~`;
+- **a path with a position:** `<path>:<line>` or `<path>:<line>:<column>`. `--line <n>` and `--column <n>` set the position too, and win over a suffix. A file whose name really ends in `:12` still opens as that file;
+- **an issue id** such as `PAN-123`, which opens the issue's feature workspace folder.
+
+| Flag | What it does |
+| --- | --- |
+| `-e, --editor [editor]` | Open in an external editor instead of the dashboard: the named editor (`cursor`, `vscode`, `zed`, `file-manager`, …), or the first editor on PATH when you give no name. Line and column are ignored. |
+| `--line <n>`, `--column <n>` | Open a file at this position. |
+| `--new-tab` | Open a new browser tab instead of using a dashboard tab that is already open. |
+
+Before PAN-5349, `pan open <issue>` opened the issue's workspace in an editor. That is now `pan open <issue> --editor`.
+
+### Which tab opens it
+
+When several dashboard tabs are open, the tab you focused last opens the path, and its window comes to the front. If that tab is gone (it crashed or its record is older than a day), any visible tab opens it after a short wait. When no dashboard tab is open, `pan open` opens the link below in your browser instead.
+
+### The `/open` link
+
+`<dashboard>/open?path=<absolute path>[&line=<n>&column=<n>]` opens the same thing in the tab that loads it, then moves that tab to the project's deck. `pan open` builds this link for you (`pan open --new-tab` always uses it). The dashboard address comes from `OVERDECK_DASHBOARD_URL`, or `http://localhost:3011` by default.
+
+### Paths Overdeck cannot open
+
+- **A path outside every project.** `pan open` prints `<path> isn't in a registered project. Add it with: pan project add <folder>`. The `/open` link asks **Add it as a project?** and **Add project** opens the add-project dialog with that folder already chosen. For a file, the folder offered is the file's parent.
+- **A folder under a project's `workspaces/` that is not a feature or scratch workspace.** It answers `<path> is inside <project> but not in a feature or scratch workspace`.
+- **Overdeck is not running.** `pan open` prints `Overdeck isn't running. Start it with: pan up`. It does not start the dashboard for you.
+
+## Right-click "Open in Overdeck"
+
+```bash
+pan integrate file-manager             # add the menu entries
+pan integrate file-manager --dry-run   # print what would be written, change nothing
+pan integrate file-manager --remove    # remove exactly what was added
+```
+
+Every entry runs the absolute path of `pan` (the shim `pan sync` writes in `~/.overdeck/cli-bin`, or the first `pan` on PATH), so it works without a login shell. If no `pan` is found, the command stops with `pan is not installed on PATH. Run: pan sync`. All entries are per user; nothing needs root or an administrator.
+
+`pan install` offers the same entries after the Ollama step: on a terminal it asks `Add "Open in Overdeck" to your file manager's right-click menu?` (default No). `pan install --file-manager-integration` adds them without asking, and `--skip-file-manager-integration` neither asks nor adds them. A failed install of the entries is a warning; it never fails `pan install`.
+
+### Linux
+
+Three entries cover the common file managers:
+
+| File | Where it shows |
+| --- | --- |
+| `~/.local/share/applications/overdeck-open.desktop` | **Open With → Overdeck** in GNOME Files, Dolphin and most others. |
+| `~/.local/share/nautilus/scripts/Open in Overdeck` | GNOME Files: right-click → **Scripts → Open in Overdeck**. |
+| `~/.local/share/kio/servicemenus/overdeck-open.desktop` | KDE Dolphin: right-click → **Open in Overdeck**. |
+
+After writing them, `pan integrate` runs `update-desktop-database` when it is installed. The entries use the dashboard icon, copied to `~/.overdeck/integrations/overdeck.svg`.
+
+### macOS
+
+`pan integrate` writes a Finder Quick Action, `~/Library/Services/Open in Overdeck.workflow`, and refreshes the Services menu. In Finder, right-click a file or folder and choose **Quick Actions → Open in Overdeck**. If it is missing, turn it on in **System Settings → Keyboard → Keyboard Shortcuts → Services**.
+
+If the Quick Action still does not appear, build it by hand in Automator: **File → New → Quick Action**, set **Workflow receives current** to **files or folders** in **Finder**, add **Run Shell Script** with shell `/bin/zsh` and **Pass input: as arguments**, and paste:
+
+```sh
+for f in "$@"; do "$HOME/.overdeck/cli-bin/pan" open "$f"; done
+```
+
+Save it as **Open in Overdeck**.
+
+### Windows
+
+`pan integrate` adds three keys under `HKCU\Software\Classes` with `reg add`: one for files (`*\shell\OpenInOverdeck`), one for folders (`Directory\shell\OpenInOverdeck`) and one for the empty space inside a folder (`Directory\Background\shell\OpenInOverdeck`). On Windows 11 the entry is under **Show more options** in the right-click menu.
+
+The Windows entries are covered by unit tests only; they are untested on real hardware.
+
+### Checking and removing
+
+`pan integrate file-manager --remove` deletes the files and registry keys the install recorded in `~/.overdeck/integrations/file-manager.json`, then that record. With no record it prints `Nothing to remove`.
+
+When the record exists, `pan doctor` checks that the recorded `pan` still runs and every recorded file still exists. If one is gone it warns `File-manager integration is stale: <path>`; run `pan integrate file-manager` again to fix it.
+
+## The desktop app
+
+A second launch of the desktop app with `--open <path>` opens that path in the running window, when the window shows this computer's dashboard. `pan open` itself talks to the `pan up` dashboard (port 3011 by default). It does not reach the desktop app's own embedded server, so with only the desktop app running, start the dashboard with `pan up` or use the desktop app's `--open`.

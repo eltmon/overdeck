@@ -2389,6 +2389,43 @@ The permanent `Home` tab of a project deck (`paneType: 'home'`), mounted by `Com
 
 **Lane rules** (`groupPipelineEntries`). Stalled claims first: an issue with `isStalledFeature` goes to Stalled and no other lane. Then Ready to merge takes `derived.state === 'ready'`, Building takes phase `plan` or `work`, and In review takes phase `review`. Todo, queued-for-pickup, merged and closed issues are not listed. Building, In review and Ready to merge always render with their count; Stalled renders only when non-empty. Rows sort by last activity, and the age cell is time since last activity because derived state has no state-entered time.
 
+## UI commands (PAN-5349)
+
+A UI command is a short-lived instruction from the server to the open
+dashboard tabs, such as "open this path". It is never stored: unlike a domain
+event it does not go to the event store, and a tab that subscribes or
+resubscribes never receives a command published before it subscribed.
+
+- **Hub:** `src/dashboard/server/services/ui-commands.ts` is a module-level
+  `PubSub.unbounded<UiCommand>()` with no Effect layer, so `server.ts` needs no
+  wiring. `publishUiCommand(cmd)` returns the number of live subscribers;
+  `uiCommandStream()` counts a subscriber once its subscription exists and
+  uncounts it in a finalizer.
+- **Stream:** `pan.subscribeUiCommands` (`WS_METHODS.subscribeUiCommands`,
+  payload `{}`, success `UiCommand` from `packages/contracts/src/ui-commands.ts`),
+  scope `read:events`. The only command type today is `open-path`, carrying a
+  `UiOpenResolution` (`projectKey`, `rootId`, `relPath`, `kind`, `line?`, `column?`).
+- **Route:** `POST /api/ui/open { path, line?, column?, dryRun? }`
+  (`src/dashboard/server/routes/ui-open.ts`, scope `operate`) realpaths and stats
+  the absolute path, maps it to an explorer root with the shared
+  `resolvePathRoot` (`packages/contracts/src/path-root.ts`; scratch workspace,
+  then feature workspace, then the longest project), and publishes unless
+  `dryRun`. It answers `delivered`, the subscriber count; 404 `outside-projects`
+  carries a `pan project add <dir>` suggestion, and 404 `no-root` a project key.
+  It never lists a directory or reads file contents.
+- **Leader tab:** `src/dashboard/frontend/src/lib/uiCommands/leaderTab.ts` records the most recently
+  focused tab in `localStorage['overdeck.ui.leaderTab']`. `useUiCommands`
+  (mounted once by `UiCommandsHost` inside `DeckNavigationProvider`) acts at
+  once in the leader tab and in a visible fallback tab (no, stale or unreadable
+  record); a follower waits 750 ms and acts only when visible and no tab posted
+  `{ handled: id }` on `BroadcastChannel('overdeck.ui-commands')`. Acting runs
+  `openPathInDeck`, focuses the window and calls the desktop bridge's
+  `raiseWindow`.
+- **Link:** `/open?path=…` is handled by `OpenPathHost`, which resolves with
+  `dryRun: true` so other tabs do not act too, then replaces the URL with
+  `/command-deck/<project>`. `pan open` opens this link when `delivered` is 0 or
+  with `--new-tab`.
+
 ## File explorer server (PAN-5183)
 
 The file explorer's server half lives in `src/dashboard/server/services/explorer/`
