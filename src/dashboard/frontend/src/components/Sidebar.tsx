@@ -28,6 +28,7 @@ import { OtherMachineProjects, ProjectMachineCount } from './sidebar/OtherMachin
 import { MachinesNavItem } from './sidebar/MachinesNavItem';
 import { OwnerGroupHeader } from './sidebar/OwnerGroupHeader';
 import { groupProjectsByOwner, OTHER_OWNER_KEY, useCollapsedOwners } from './sidebar/projectOwners';
+import { isRailWorkspace, sortWorkspaces, type WorkspaceRegistryRow } from './frame/workspaceRows';
 
 type PipelineIssuePhase = 'ship' | 'review' | 'work' | 'plan' | 'todo';
 const PIPELINE_PHASES: PipelineIssuePhase[] = ['todo', 'plan', 'work', 'review', 'ship'];
@@ -151,28 +152,6 @@ interface SidebarProps {
   onSelectWorkspace?: (workspaceId: string) => void;
 }
 
-/** PAN-1990: a GET /api/workspace-registry row (src/dashboard/server/routes/workspace-registry.ts). */
-export interface WorkspaceRegistryRow {
-  id: string;
-  projectId: string;
-  kind: 'main' | 'issue' | 'scratch';
-  origin: 'operator' | 'pipeline' | 'vault' | 'agent';
-  name: string;
-  issueId: string | null;
-  isFavorite: boolean;
-  isArchived: boolean;
-  title: string | null;
-  lastAccessedAt: number;
-  /**
-   * Memory-synthesized phase for main/scratch rows, null when there is no
-   * status yet and always null for issue rows, which badge the pipeline phase
-   * instead (PAN-3286 FR-12).
-   */
-  memoryPhase?: string | null;
-  /** The owning project's display name; main rows are labelled with it. */
-  projectName?: string;
-}
-
 const WORKSPACE_KIND_ICONS: Record<WorkspaceRegistryRow['kind'], LucideIcon> = {
   main: Home,
   issue: GitBranch,
@@ -180,32 +159,6 @@ const WORKSPACE_KIND_ICONS: Record<WorkspaceRegistryRow['kind'], LucideIcon> = {
 };
 
 const WORKSPACES_GROUPED_KEY = 'overdeck.ui.sidebarWorkspacesGrouped';
-
-/**
- * A workspace the operator created, or one they favorited (PAN-5233). Rows
- * the pipeline, Session Vault or an agent created stay out of the rail and
- * Cmd-K; the API still returns them.
- */
-export function isUserFacingWorkspace(workspace: WorkspaceRegistryRow): boolean {
-  return workspace.origin === 'operator' || workspace.isFavorite;
-}
-
-/**
- * A row the sidebar Workspaces rail lists. A project's main checkout is
- * reached from its Projects entry (Main checkout), so the rail lists it only
- * when favorited; otherwise every project would appear twice. Cmd-K keeps
- * listing main rows, under their project's name.
- */
-export function isRailWorkspace(workspace: WorkspaceRegistryRow): boolean {
-  return isUserFacingWorkspace(workspace) && (workspace.kind !== 'main' || workspace.isFavorite);
-}
-
-export function sortWorkspaces(rows: WorkspaceRegistryRow[]): WorkspaceRegistryRow[] {
-  return [...rows].sort((a, b) => {
-    if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
-    return b.lastAccessedAt - a.lastAccessedAt;
-  });
-}
 
 export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject = null, onSelectProject, onNewProject, onNewWorkspace, onOpenUpdater, onSelectWorkspace }: SidebarProps) {
   const { theme, toggleTheme } = useTheme();

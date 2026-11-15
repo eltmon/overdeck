@@ -9,7 +9,8 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { isRailWorkspace, isUserFacingWorkspace, Sidebar, type WorkspaceRegistryRow } from './Sidebar';
+import { Sidebar } from './Sidebar';
+import { isRailWorkspace, isUserFacingWorkspace, type WorkspaceRegistryRow } from './frame/workspaceRows';
 import { CommandPalette } from './CommandPalette';
 
 vi.mock('./FreshnessIndicator', () => ({ FreshnessIndicator: () => <div data-testid="freshness-indicator" /> }));

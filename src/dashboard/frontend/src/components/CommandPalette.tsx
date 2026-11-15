@@ -48,7 +48,7 @@ import {
   isUserFacingWorkspace,
   sortWorkspaces,
   type WorkspaceRegistryRow,
-} from './Sidebar';
+} from './frame/workspaceRows';
 import type { Issue, Agent } from '../types';
 import {
   describeConversationHit,
