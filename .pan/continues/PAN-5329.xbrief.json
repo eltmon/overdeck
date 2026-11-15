@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5329",
   "created": "2026-11-15T06:45:07.358Z",
-  "updated": "2026-11-15T06:49:35.856Z",
+  "updated": "2026-11-15T06:49:43.662Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,6 +36,11 @@
     "quick-open-match-mark.ac2": {
       "status": "completed",
       "doneAt": "2026-11-15T06:49:35.855Z"
+    },
+    "rail-narrow-auto-collapse": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5329",
+      "claimedAt": "2026-11-15T06:49:43.662Z"
     }
   }
 }
