@@ -546,11 +546,19 @@ describe('memory admission (PAN-5248)', () => {
   it('waits on memory until MemAvailable recovers', async () => {
     const rootDir = home()
     let available = 13 * GiB
+    let reads = 0
     const onWaiting = vi.fn()
-    const promise = acquireQualityGateAdmission(keyed, memDeps(rootDir, 1, () => available, { onWaiting }))
+    const promise = acquireQualityGateAdmission(keyed, memDeps(rootDir, 1, () => {
+      reads++
+      return available
+    }, { onWaiting }))
     const settled = settledFlag(promise)
 
-    await drive(10)
+    await drive(200, () => onWaiting.mock.calls.length > 0)
+    // Two more polls read memory after the first report, so toHaveBeenCalledTimes(1) proves no repeat report.
+    const readsAtReport = reads
+    await drive(200, () => reads >= readsAtReport + 2)
+    expect(reads).toBeGreaterThanOrEqual(readsAtReport + 2)
     expect(settled()).toBe(false)
     expect(onWaiting).toHaveBeenCalledTimes(1)
     expect(onWaiting).toHaveBeenCalledWith({
@@ -579,7 +587,8 @@ describe('memory admission (PAN-5248)', () => {
     const secondSettled = settledFlag(secondPromise)
     const thirdSettled = settledFlag(thirdPromise)
 
-    await drive(20)
+    await drive(200, () => onWaiting.mock.calls.length > 0
+      && readdirSync(rootDir).filter((entry) => entry.startsWith('waiter-')).length === 2)
     expect(secondSettled()).toBe(false)
     expect(thirdSettled()).toBe(false)
     expect(ownerFiles(rootDir)).toEqual(['owner.json'])
@@ -606,7 +615,7 @@ describe('memory admission (PAN-5248)', () => {
     const onWaiting = vi.fn()
     const promise = acquireQualityGateAdmission(keyed, memDeps(emptyRoot, 1, () => available, { onWaiting }))
     const settled = settledFlag(promise)
-    await drive(10)
+    await drive(200, () => onWaiting.mock.calls.length > 0)
     expect(settled()).toBe(false)
     expect(onWaiting).toHaveBeenCalledWith(expect.objectContaining({ kind: 'memory', footprintBytes: 2.5 * GiB }))
     available = 20 * GiB
@@ -650,7 +659,7 @@ describe('memory admission (PAN-5248)', () => {
         onWaiting,
       }))
       const settled = settledFlag(promise)
-      await drive(10)
+      await drive(200, () => onWaiting.mock.calls.length > 0)
       expect(settled()).toBe(false)
       const reason = onWaiting.mock.calls[0]![0]
       expect(reason.kind).toBe('memory')
