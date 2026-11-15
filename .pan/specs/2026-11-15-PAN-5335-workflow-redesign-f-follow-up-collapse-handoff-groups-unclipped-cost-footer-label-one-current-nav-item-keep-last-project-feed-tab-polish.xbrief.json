@@ -1,0 +1,725 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T15:26:05Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5335: Workflow redesign F follow-up: collapse handoff groups, unclipped cost, footer label, one current nav item, keep last project, Feed tab polish",
+    "updated": "2026-11-15T15:33:47.972Z"
+  },
+  "plan": {
+    "id": "pan-5335",
+    "title": "Workflow redesign F follow-up: collapse handoff groups, unclipped cost, footer label, one current nav item, keep last project, Feed tab polish",
+    "status": "proposed",
+    "uid": "d5bd0f21-5d74-407e-94bb-4040fdb351e1",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-15T15:26:05Z",
+    "updated": "2026-11-15T15:33:47.972Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5335",
+        "label": "PAN-5335",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5335/.pan/drafts/pan-5335.md",
+        "label": "PRD draft (.pan/drafts/pan-5335.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5293",
+        "label": "PAN-5293 (child F)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5343",
+        "label": "PAN-5343 (child H, reuses lastProject.ts and ProjectMark.tsx)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "left-column",
+      "workflow-redesign"
+    ],
+    "metadata": {
+      "sizeJustification": "Nine small leaf fixes to one UI surface (the left column and the Feed tab). About half of the ~30 files_scope entries are the existing test files each fix must update, plus four doc files. The operator folded D-7 and D-8 into this issue by comment, and PAN-5343 lists this issue as one prerequisite unit that must merge whole before it is planned, so splitting into siblings would delay PAN-5343 without making any slice easier to review. No item shares a source file with another; the only shared file is scripts/frontend-test-subset.txt, which is merge=union.",
+      "canonicalFilename": "2026-11-15-PAN-5335-workflow-redesign-f-follow-up-collapse-handoff-groups-unclipped-cost-footer-label-one-current-nav-item-keep-last-project-feed-tab-polish.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The epic owner's live check of PAN-5293 (one left column) found six defects and the operator added two requests: handoff groups open by default and push Issues off screen; row cost is clipped mid-number; the footer reads 'Mac…'; Project home and More are both current on a conversation tab; a fresh load of /activity loses the project; the Feed tab repeats its title and offers Project scope without a project; the New conversation button does not say which model it uses; projects have no colored mark.",
+      "Proposal": "Nine independent vertical slices, each a one-to-three-file change plus its tests, as specified in PRD .pan/drafts/pan-5335.md WI-1..WI-9: (1) groups default collapsed unless a descendant needs you, and a collapsed group still shows its selected row; (2) meta-line parts shrink with ellipsis and cost never shrinks; (3) footer Machines becomes icon-only; (4) Project home current only on the Home pane, Command Deck removed from More, More never current on Settings; (5) last project persisted in overdeck.ui.lastProjectKey via new lib/lastProject.ts and restored on fresh loads of non-deck routes; (6) Feed tab hides its inner header, widens, and hides/derives the Project scope without a project; (7) New conversation button's second line shows provider icon, short model, harness (non-Claude Code) and effort; (8) ProjectMark component with a stable 8-color palette on the switcher button and rows; (9) docs and changelog.",
+      "NonGoals": "- Project Home page content (child G, PAN-5294).\n- The New conversation button's color; it stays non-primary.\n- Redesigning successor chains to show the newest successor as the row or the '13 earlier sessions' wording; only the default collapse changes.\n- Project marks on OtherMachineProjects rows, the breadcrumb, Stage tabs or split headers (PAN-5343 adds those).\n- Removing any More item other than Command Deck, or removing Settings from More.\n- Rewriting the stored overdeck.ui.awarenessScope preference when no project is selected.\n- Validating a project that came from the URL route against the registry (the deck's UnknownProjectState already handles it).\n- Changing the popstate handler's project rules in App.tsx.\n- Any server, API route or contracts change.\n- Raising any scripts/file-size-allowlist.txt row."
+    },
+    "autoDecisions": [
+      {
+        "summary": "D-1a: a collapsed group still renders its selected descendant, and only that one, under the toggle; selection does not open the group.",
+        "rationale": "A handoff chain's live successor is a descendant, so collapsing would hide the open conversation's own row. Opening the whole group on selection would show all 20 Flywheel successors again (defect 1), so only the selected row is shown."
+      },
+      {
+        "summary": "D-4: More is never current when activeTab is 'settings'; the footer Settings button carries the current state there.",
+        "rationale": "FR-4 says at most one nav item is current. Settings is listed in More and also has the always-visible footer button, which already sets aria-current. Excluding it from moreActive is the smallest change and keeps Settings reachable from More."
+      },
+      {
+        "summary": "D-4: Project home reads the deck's active pane with usePanesStore(selectActivePane(selectedProject ?? '')); a null pane counts as Home.",
+        "rationale": "CommandDeck/index.tsx line 346 passes deckKey={selectedProject} to Stage and Breadcrumb.tsx line 20 already uses the same lookup with a Home fallback, so the two agree."
+      },
+      {
+        "summary": "D-5: the stored last project is restored on every initial route except a route that names a project, the bare /command-deck path, and /conv/... paths.",
+        "rationale": "The PRD keeps bare /command-deck as 'no project'; conversation deep links set their own project through the deck's deep-link effect, so leaving them at today's null start avoids a regression in that flow."
+      },
+      {
+        "summary": "D-5: only a storage-derived value is validated, once, after the registered-projects query reports isSuccess; NO_PROJECT_KEY and key-or-name matches are valid.",
+        "rationale": "The query's [] default and the project-created flow would otherwise clear a valid selection; selectedProjectKey can hold either a key or a name (resolveDeckKey returns rp.name ?? rp.key)."
+      },
+      {
+        "summary": "D-6: with no project the Project scope chip is hidden and the effective scope is derived as Global without writing storage.",
+        "rationale": "Writing 'global' would overwrite the operator's preference; deriving restores Project as soon as a project is selected. projectScopeAvailable={scoped} covers both null and NO_PROJECT_KEY."
+      },
+      {
+        "summary": "D-7: the effort word is omitted when the model takes no effort, using the same levels rule useCreateConversation.ts lines 42-43 uses; the provider icon is omitted when the provider is unknown and uses the group label (not the model label) as its letter-badge label.",
+        "rationale": "The line must name exactly what quick create sends. ProviderLogo renders a letter badge from its label for unbranded providers, so it needs the provider name."
+      },
+      {
+        "summary": "D-8: keep the PRD hash ((sum of char codes) * 31 % 8) and pin test values from the real project keys.",
+        "rationale": "On the 21 keys in .overdeck/projects.yaml it spreads 4,1,2,3,2,3,3,3, no worse than FNV-1a (3,3,1,3,3,3,3,2); collisions are unavoidable with 8 colors, so changing the PRD decision buys nothing."
+      },
+      {
+        "summary": "WI-5 is tested with pure helpers in lib/lastProject.ts plus App.test.tsx cases that read selectedProjectKey through a changed ActivityPanel mock.",
+        "rationale": "App.test.tsx mocks LeftColumn and ActivityPanel, so the PRD's original 'Conversations section renders' assertion cannot be written there; the ActivityPanel mock is the observable seam."
+      },
+      {
+        "summary": "D-5: when validation rejects a stored project key, the key is also removed from storage (clearLastProjectKey).",
+        "rationale": "Otherwise every reload would briefly show the dead project, and PAN-5343's readLastProjectKey() would keep returning it."
+      },
+      {
+        "summary": "D-7: the button calls useAvailableModels() on every route; the catalog loads once per page through the shared module promise.",
+        "rationale": "The requests run after mount, are shared with every other picker, and are not on the pre-mount boot list (lib/bootRequests.ts); FALLBACK_GROUPS covers the common models until they resolve."
+      }
+    ],
+    "items": [
+      {
+        "id": "collapse-groups-default",
+        "title": "Conversation groups start collapsed unless a descendant needs you; a collapsed group keeps its selected row",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:26:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5335",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationList.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/CommandDeck/__tests__/ConversationList.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationList.test.tsx passes, including the five 'ConversationList nesting (PAN-4223 WI-10)' cases named in PRD WI-1",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 / D-1 / D-1a. In ConversationList.tsx isGroupCollapsed (line 536), replace the final return with `return !node.descendants.some((child) => (child.conv.pendingInputCount ?? 0) > 0);` (deps unchanged). In ConversationListItemImpl (line 404) replace `{!collapsed && node.descendants.map((child) => (` with `{(collapsed ? node.descendants.filter((child) => child.conv.name === selectedConversation) : node.descendants).map((child) => (` so a collapsed group shows only its selected descendant. Keep the collapsedGroups and expandedGroups checks first. Drop the isConversationActive import only if unused. Update (do not delete) the three existing nesting tests to the new labels listed in WI-1 and add the needs-you and selected-descendant cases; renderRows gains an optional selectedConversation argument."
+        },
+        "items": [
+          {
+            "id": "collapse-groups-default.ac1",
+            "title": "Given a group whose only descendants are live (sessionAlive) or working, when the list renders, then the toggle reads with '▸' (e.g. '▸ 1 successor · 1 working') and the descendant rows are not in the DOM",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collapse-groups-default.ac2",
+            "title": "Given a descendant with pendingInputCount: 1, when the list renders, then the toggle reads '▾ 1 successor · 1 needs you' and that row renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collapse-groups-default.ac3",
+            "title": "Given a group with two idle successors and selectedConversation naming one of them, when the list renders, then the toggle reads '▸ 2 successors', the selected successor's row renders and the other successor's row is not in the DOM",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collapse-groups-default.ac4",
+            "title": "Given a collapsed group, when the toggle is clicked twice, then it expands and then collapses, and localStorage commandDeck.groups.collapsed persists ['orchestrator'] after the second click",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "unclipped-row-cost",
+        "title": "Conversation row meta line shrinks text parts and never clips the cost",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:26:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5335",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+            "grep -n -A2 '^\\.conversationMetaCost' src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationRow.test.tsx passes including the new cost-part test",
+            "grep prints a .conversationMetaCost rule containing flex-shrink: 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add .conversationMetaPart { min-width: 0; overflow: hidden; text-overflow: ellipsis; } and .conversationMetaCost { flex-shrink: 0; } after .conversationMetaLine (command-deck.module.css line 2413). In ConversationRow.tsx the part span (line 625) gets className joining styles.conversationMetaPart, styles.conversationMetaCost when part.key === 'cost', and today's tone class; add data-meta-part={part.key}. Badges after the parts are unchanged. Add the ConversationRow test from WI-2. The 240px-width browser check belongs to the epic owner's live AC-8 in the PRD, not to this item."
+        },
+        "items": [
+          {
+            "id": "unclipped-row-cost.ac1",
+            "title": "Given a flat row with totalCost 26.73, when it renders, then the element with data-meta-part='cost' has text '$26.73' and both styles.conversationMetaPart and styles.conversationMetaCost classes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unclipped-row-cost.ac2",
+            "title": "Given the same row, when it renders, then the data-meta-part='state' element has styles.conversationMetaPart and not styles.conversationMetaCost",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "footer-machines-icon",
+        "title": "Footer Machines button becomes icon-only",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:26:05Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5335",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/sidebar/MachinesNavItem.tsx",
+            "src/dashboard/frontend/src/components/sidebar/__tests__/MachinesNavItem.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/sidebar/__tests__/MachinesNavItem.test.tsx src/components/frame/__tests__/LeftColumnFooter.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MachinesNavItem.test.tsx and LeftColumnFooter.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In MachinesNavItem.tsx footer branch, remove the comment and the `{!collapsed && <span className=\"truncate\">Machines</span>}` label; set button className to 'list-row flex shrink-0 items-center justify-center rounded-md p-1 text-muted-foreground' and the Network icon to 'h-4 w-4'. Keep data-testid, aria-label and title. Leave the nav variant unchanged. In MachinesNavItem.test.tsx line 92 replace toHaveTextContent('Machines') with toHaveAccessibleName('Machines') plus an empty textContent check."
+        },
+        "items": [
+          {
+            "id": "footer-machines-icon.ac1",
+            "title": "Given the footer variant, when it renders, then the sidebar-machines button has accessible name 'Machines' and empty textContent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "footer-machines-icon.ac2",
+            "title": "Given one online machine, when the footer variant renders, then its title reads 'Machines · 1 online' and clicking it calls onOpenSettings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "one-current-nav-item",
+        "title": "Project home is current only on the Home pane; Command Deck leaves More",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:26:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5335",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/LeftNav.tsx",
+            "src/dashboard/frontend/src/components/frame/navGroups.ts",
+            "src/dashboard/frontend/src/components/frame/__tests__/LeftNav.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/frame/__tests__/LeftNav.test.tsx",
+            "! grep -q \"'command-deck'\" src/dashboard/frontend/src/components/frame/navGroups.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "LeftNav.test.tsx passes including the current-state cases from PRD WI-4",
+            "the negated grep exits 0 (navGroups.ts contains no 'command-deck')",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 / D-4. Delete the command-deck entry and the unused Compass import from navGroups.ts. In LeftNav.tsx read `const activePane = usePanesStore(selectActivePane(selectedProject ?? ''))` (import from ../../lib/panesStore); `homeActive = activeTab === 'command-deck' && (activePane === null || activePane.paneType === 'home')`; `moreActive = activeTab !== 'settings' && visibleMoreGroups.some(...)`. Pass active={homeActive} to Project home. Add the LeftNav tests from WI-4, seeding usePanesStore.setState and resetting it in afterEach."
+        },
+        "items": [
+          {
+            "id": "one-current-nav-item.ac1",
+            "title": "Given activeTab 'command-deck' and the overdeck deck's active pane is an agent pane, when LeftNav renders, then neither left-nav-project-home nor left-nav-more has aria-current",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "one-current-nav-item.ac2",
+            "title": "Given activeTab 'command-deck' with the Home pane active or no pane recorded, when LeftNav renders, then only left-nav-project-home has aria-current='page'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "one-current-nav-item.ac3",
+            "title": "Given activeTab 'metrics', when LeftNav renders, then only left-nav-more has aria-current='page'; given activeTab 'settings', then left-nav-more has no aria-current",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "one-current-nav-item.ac4",
+            "title": "Given the More menu is opened, when it renders, then no sidebar-command-deck item exists and navGroups.ts contains no 'command-deck' id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remember-last-project",
+        "title": "Remember the last selected project across fresh loads",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:26:05Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5335",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/lastProject.ts",
+            "src/dashboard/frontend/src/lib/__tests__/lastProject.test.ts",
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/App.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/__tests__/lastProject.test.ts src/App.test.tsx",
+            "grep -n 'src/lib/__tests__/lastProject.test.ts' scripts/frontend-test-subset.txt",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "lastProject.test.ts and App.test.tsx pass including the three new App cases",
+            "grep prints the subset entry",
+            "typecheck completes without errors",
+            "file-size guard passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 / D-5. Create lib/lastProject.ts exporting LAST_PROJECT_STORAGE_KEY='overdeck.ui.lastProjectKey', readLastProjectKey(), writeLastProjectKey(key), clearLastProjectKey(), initialProjectKey({ routeProject, pathname, stored }) → { key, fromStorage }, and isKnownProjectKey(key, registered) (true for NO_PROJECT_KEY, or a key/name match). Read rule: routeProject wins; else pathname === '/command-deck' or startsWith('/conv/') → null; else stored. In App.tsx use initialProjectKey in the selectedProjectKey initializer (line 180) and keep fromStorage in a useRef; add an effect writing non-null selections; take isSuccess from the registered-projects query (line 704) and add a one-shot effect that, for an unknown storage-derived selection, calls clearLastProjectKey() and setSelectedProjectKey(null). Leave the popstate handler alone. Tests: new lastProject.test.ts (add to scripts/frontend-test-subset.txt sorted) and three App.test.tsx cases via the changed ActivityPanel mock and a beforeEach removeItem, exactly as WI-5 lists. These names are a contract PAN-5343 calls."
+        },
+        "items": [
+          {
+            "id": "remember-last-project.ac1",
+            "title": "Given 'overdeck.ui.lastProjectKey' = 'panopticon-cli' and registered projects include it, when App mounts at /activity, then the ActivityPanel receives selectedProjectKey 'panopticon-cli'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remember-last-project.ac2",
+            "title": "Given a stored key 'gone' that no registered project matches by key or name, when the registered-projects query succeeds, then the selection falls back to null and localStorage no longer holds 'overdeck.ui.lastProjectKey'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remember-last-project.ac3",
+            "title": "Given initialProjectKey, when called with pathname '/command-deck' or '/conv/42' and a stored key, then it returns { key: null }; with '/command-deck/krux' it returns { key: 'krux', fromStorage: false }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remember-last-project.ac4",
+            "title": "Given localStorage getItem/setItem throw, when readLastProjectKey and writeLastProjectKey run, then read returns null and write does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remember-last-project.ac5",
+            "title": "Given a project is picked through the deck, when the selection changes, then localStorage 'overdeck.ui.lastProjectKey' persists that project key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "feed-tab-polish",
+        "title": "Feed tab drops its duplicate header and hides Project scope without a project",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:26:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5335",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/ActivityFeedTab.tsx",
+            "src/dashboard/frontend/src/components/sessionFeed/SessionFeedSidebar.tsx",
+            "src/dashboard/frontend/src/components/__tests__/ActivityFeedTab.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/__tests__/ActivityFeedTab.test.tsx src/components/sessionFeed/__tests__/SessionFeedSidebar.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ActivityFeedTab.test.tsx and SessionFeedSidebar.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 / D-6. SessionFeedSidebar gains hideHeader?: boolean (skips the <header> block, lines 100-115) and projectScopeAvailable?: boolean = true; compute effScope = !projectScopeAvailable && scope === 'project' ? 'global' : scope and use it for filtering, aria-selected and the needs branch; filter the Project chip out and use grid-cols-2 when unavailable; never write the derived scope. ActivityFeedTab passes embedded hideHeader scopeSwitcher projectScopeAvailable={scoped} (no heading) and uses max-w-5xl. Update the existing 'opens on Feed' test (selectedProjectKey 'proj', hideHeader instead of heading) and add the two new cases from WI-6."
+        },
+        "items": [
+          {
+            "id": "feed-tab-polish.ac1",
+            "title": "Given the Feed tab renders, when queried inside activity-feed-tab, then no element has the text 'Feed' and SessionFeedSidebar receives hideHeader: true with no heading prop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-tab-polish.ac2",
+            "title": "Given selectedProjectKey null and stored overdeck.ui.awarenessScope 'project', when the Feed tab renders, then the scope tablist shows Needs you and Global, no Project tab, Global is aria-selected='true', and storage still reads 'project'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-tab-polish.ac3",
+            "title": "Given selectedProjectKey 'proj', when the Feed tab renders, then the Needs you, Project and Global tabs render and projectScopeAvailable is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "new-conversation-model-line",
+        "title": "New conversation button shows the default model, harness and effort on a second line",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:26:05Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5335",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/newConversationSummary.ts",
+            "src/dashboard/frontend/src/components/frame/NewConversationButton.tsx",
+            "src/dashboard/frontend/src/components/chat/EffortPicker.tsx",
+            "src/dashboard/frontend/src/components/frame/__tests__/newConversationSummary.test.ts",
+            "src/dashboard/frontend/src/components/frame/__tests__/NewConversationButton.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/frame/__tests__/newConversationSummary.test.ts src/components/frame/__tests__/NewConversationButton.test.tsx",
+            "grep -n 'src/components/frame/__tests__/newConversationSummary.test.ts' scripts/frontend-test-subset.txt",
+            "npm run typecheck",
+            "npm run lint:effort"
+          ],
+          "expected_outputs": [
+            "newConversationSummary.test.ts and NewConversationButton.test.tsx pass",
+            "grep prints the subset entry",
+            "typecheck completes without errors",
+            "lint:effort passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 / D-7. Export SHORT_LABELS from chat/EffortPicker.tsx. Create frame/newConversationSummary.ts with shortModelLabel, newConversationSummary({ model, harness, effort, groups }) → { provider, providerLabel, fullLabel, shortName, harnessLabel, effortLabel } and newConversationTitle. Rules: model label from groups else compactModelName; provider via getProviderForPickerModel; providerLabel = group label; harnessLabel = shortHarness(harness) only when harness !== 'claude-code'; effortLabel = SHORT_LABELS[effort] unless (pickerEffortLevels(model) ?? MODEL_EFFORT_SUPPORT[model])?.length === 0. In NewConversationButton.tsx call useAvailableModels(), render the second line with data-testid='new-conversation-summary' (ProviderIcon only when provider is defined), and set both buttons' title to newConversationTitle; aria-label stays 'New conversation'. Tests per WI-8, mocking useAvailableModels in the button test; add the new test file to scripts/frontend-test-subset.txt sorted. useAvailableModels() loads the catalog through the shared module promise after mount; FALLBACK_GROUPS covers the common models until it resolves (PRD D-7 Requests)."
+        },
+        "items": [
+          {
+            "id": "new-conversation-model-line.ac1",
+            "title": "Given defaults { model: 'claude-opus-5-5', harness: 'claude-code', effort: 'high' }, when the button renders, then new-conversation-summary has text 'Opus 5.5 · High' and the main button keeps accessible name 'New conversation'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-conversation-model-line.ac2",
+            "title": "Given the button is rendered, when setEffort('low') runs on useNewConversationDefaults, then the summary re-renders as 'Opus 5.5 · Low'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-conversation-model-line.ac3",
+            "title": "Given newConversationSummary, when harness is 'codex' it returns harnessLabel 'Codex'; when harness is 'claude-code' it returns null; when the model is 'kimi-code/kimi-for-coding-highspeed' it returns effortLabel null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-conversation-model-line.ac4",
+            "title": "Given shortModelLabel, when called with 'Claude Opus 5.5 (1M context)' it returns 'Opus 5.5', and an unknown model id 'm1' produces shortName 'm1' with provider undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-conversation-model-line.ac5",
+            "title": "Given the opus defaults, when newConversationTitle runs, then it returns 'New conversation with Claude Opus 5.5 (1M context) · High (N)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "project-marks",
+        "title": "Colored project initials mark on the switcher button and menu rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:26:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5335",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/ProjectMark.tsx",
+            "src/dashboard/frontend/src/components/frame/ProjectSwitcher.tsx",
+            "src/dashboard/frontend/src/components/frame/__tests__/ProjectMark.test.tsx",
+            "src/dashboard/frontend/src/components/frame/__tests__/ProjectSwitcher.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/frame/__tests__/ProjectMark.test.tsx src/components/frame/__tests__/ProjectSwitcher.test.tsx",
+            "grep -n 'src/components/frame/__tests__/ProjectMark.test.tsx' scripts/frontend-test-subset.txt",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ProjectMark.test.tsx and ProjectSwitcher.test.tsx pass",
+            "grep prints the subset entry",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 / D-8. Create frame/ProjectMark.tsx exporting PROJECT_MARK_COLORS ['#4f46e5','#0f766e','#7c3aed','#be185d','#92400e','#4d7c0f','#0369a1','#86198f'], projectMarkColor(key) = PROJECT_MARK_COLORS[(sum of charCodes * 31) % 8], projectInitials (moved verbatim), and ProjectMark({ name, projectKey, size = 'md', muted = false }) with the md/sm classes in WI-9, white font-mono font-semibold text on the inline background, muted '–', aria-hidden. In ProjectSwitcher.tsx delete the local ProjectMark and projectInitials, re-export projectInitials from './ProjectMark', use md on the closed button (colored by selected.key when selected, muted otherwise), sm before each row's name (project.key), and sm muted on the No project row. OtherMachineProjects rows get no mark. Tests per WI-9; add ProjectMark.test.tsx to scripts/frontend-test-subset.txt sorted. PAN-5343 imports ProjectMark size='sm'. The hex palette is operator-sanctioned (issue comment 2026-11-15, PRD D-8): it is one data constant, no lint enforces the no-hex rule, and shared/branding already holds brand hex values, so review must not block it on the style guide."
+        },
+        "items": [
+          {
+            "id": "project-marks.ac1",
+            "title": "Given projectMarkColor, when called with 'panopticon-cli', 'mind-your-now', 'dfai' and 'krux', then it returns '#4f46e5', '#be185d', '#92400e' and '#0369a1', the same value on repeated calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-marks.ac2",
+            "title": "Given <ProjectMark name='mind-your-now' projectKey='mind-your-now' />, when it renders, then it shows 'MY' with inline background-color rgb(190, 24, 93); the muted variant renders '–' with no inline background",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-marks.ac3",
+            "title": "Given the switcher menu is open, when it renders, then each project-switcher-row-<name> contains that project's initials mark and the closed button for a selected project shows its colored initials",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-marks.ac4",
+            "title": "Given existing imports of projectInitials from ProjectSwitcher, when the ProjectSwitcher helper test runs, then projectInitials('mind-your-now') still returns 'MY' through the re-export",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-changelog",
+        "title": "Docs and changelog describe the left-column follow-up behavior",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:26:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5335",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/mission-control.mdx",
+            "features/conversations.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5335.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'overdeck.ui.lastProjectKey' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n -i 'collapsed' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "grep finds overdeck.ui.lastProjectKey in the Left column section",
+            "grep shows the group-default sentence near the old lines 1364-1367 now naming pending input and the selected conversation's row"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Edit features/mission-control.mdx '## Left column' (lines 19-29), features/conversations.mdx '### New conversation with options' (line 127), and docs/DASHBOARD-ARCHITECTURE.md lines 1364-1367 (group default), '## Activity feed' (line 1500) and '## Left column (PAN-5293)' (line 2044) with exactly the statements WI-7 lists. Create changelog.d/pan-5335.md per changelog.d/README.md: '#### Improved' (model line, project marks) then '#### Fixed' (groups, cost, footer, nav current state, last project, Feed tab), each bullet ending with the ([#5335](https://github.com/eltmon/overdeck/issues/5335)) link; write &#36; for any dollar sign."
+        },
+        "items": [
+          {
+            "id": "docs-and-changelog.ac1",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when read, then the group-default sentence says groups start collapsed unless a descendant has pending input and a collapsed group still shows the selected conversation's row, and the Left column section names overdeck.ui.lastProjectKey, lib/lastProject.ts, ProjectMark.tsx and the Project home current-state rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac2",
+            "title": "Given features/mission-control.mdx and features/conversations.mdx, when read, then they state that More omits Command Deck, the footer Machines is an icon, the last project is remembered, groups start collapsed, each project shows a colored mark, and the New conversation button's second line names the model and effort",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac3",
+            "title": "Given changelog.d/pan-5335.md exists with Improved and Fixed headings, when npm run lint:docs runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "proposed"
+}
