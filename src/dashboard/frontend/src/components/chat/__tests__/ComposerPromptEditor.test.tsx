@@ -191,6 +191,37 @@ describe('ComposerPromptEditor', () => {
     },
   );
 
+  it('offers a /pan entry that inserts bare /pan', () => {
+    const commands = getSlashCommands('claude-code');
+    const helpIndex = commands.findIndex(command => command.id === 'pan-help');
+    const initIndex = commands.findIndex(command => command.id === 'pan-init');
+
+    expect(helpIndex).toBeGreaterThanOrEqual(0);
+    expect(commands[helpIndex]).toMatchObject({
+      id: 'pan-help',
+      label: '/pan',
+      insert: '/pan',
+      category: 'Overdeck',
+    });
+    expect(helpIndex).toBeLessThan(initIndex);
+  });
+
+  it('filters /pan with a trailing space to Overdeck entries only', () => {
+    render(
+      <SlashMenu
+        commands={getSlashCommands('claude-code')}
+        filter="pan "
+        selectedIndex={0}
+        onSelect={noop}
+        onClose={noop}
+        anchorRect={null}
+      />,
+    );
+
+    expect(screen.queryByText('Claude Code native')).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /pan\s*start/i })).toBeInTheDocument();
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
