@@ -34,6 +34,7 @@ import { emitActivityEntry } from '../../../../lib/activity-logger.js';
 import { extractPrefix, parseIssueId } from '../../../../lib/issue-id.js';
 import { workspaceNeedsSetup } from '../../../../lib/workspace-manager/setup-marker.js';
 import { healPolyrepoWorkspaceGitignoreAsync } from '../../../../lib/workspace-manager/polyrepo-gitignore.js';
+import { ensureWorkspaceSyncExclude } from '../../../../lib/workspace-manager/sync-exclude.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
@@ -105,7 +106,9 @@ export function emitDirtyWorkspaceRefusalActivity(issueId: string, porcelain: st
  * workspace read as dirty and 409 the planning auto-handoff (PAN-3266). In a
  * polyrepo wrapper, also tolerates untracked Overdeck sync output written
  * before its .gitignore carried it (PAN-5199); monorepos and tracked edits
- * to sync paths stay refused.
+ * to sync paths stay refused. Single-repo workspaces hide their `.claude/`
+ * sync output through the worktree exclude file instead (PAN-5395,
+ * `ensureWorkspaceSyncExclude`), so this predicate never sees it.
  */
 export function isOnlyOverdeckRuntimeWorkspaceChanges(
   porcelain: string,
@@ -688,6 +691,12 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
       const heal = yield* Effect.promise(() => healPolyrepoWorkspaceGitignoreAsync(workspacePath, polyrepoWorkspace));
       if (heal.added.length > 0 || heal.warning) {
         yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.polyrepo_gitignore_heal', { issueId, workspacePath, ...heal }));
+      }
+    } else if (!polyrepoWorkspace && existsSync(workspacePath)) {
+      // PAN-5395: hide single-repo .claude/ sync output (worktree exclude) so workspaces made before the fix start.
+      const syncExclude = yield* Effect.promise(() => ensureWorkspaceSyncExclude(workspacePath));
+      if (syncExclude.status === 'written' || syncExclude.warning) {
+        yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.workspace_sync_exclude', { issueId, workspacePath, ...syncExclude }));
       }
     }
 
