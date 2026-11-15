@@ -4,17 +4,17 @@
     "created": "2026-11-15T08:23:10Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5291: Workflow redesign D1: conversation header (Changes and Files buttons, ⋯ menu) and status line in words",
-    "updated": "2026-11-15T08:30:57.959Z"
+    "updated": "2026-11-15T08:32:00.102Z"
   },
   "plan": {
     "id": "pan-5291",
     "title": "Workflow redesign D1: conversation header (Changes and Files buttons, ⋯ menu) and status line in words",
-    "status": "proposed",
+    "status": "running",
     "uid": "d7f5c1d7-5e18-497c-8ade-8d66325c8ed9",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T08:23:10Z",
-    "updated": "2026-11-15T08:30:57.959Z",
+    "updated": "2026-11-15T08:32:00.102Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5291",
@@ -889,5 +889,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
