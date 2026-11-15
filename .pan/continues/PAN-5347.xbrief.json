@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5347",
   "created": "2026-11-15T13:35:45.395Z",
-  "updated": "2026-11-15T14:20:49.294Z",
+  "updated": "2026-11-15T14:20:58.216Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,6 +136,11 @@
     "frontend-footer-conversation-prop.ac2": {
       "status": "completed",
       "doneAt": "2026-11-15T14:20:49.294Z"
+    },
+    "docs-skills-in-composer": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5347",
+      "claimedAt": "2026-11-15T14:20:58.216Z"
     }
   }
 }
