@@ -1,18 +1,17 @@
-import { useState, useCallback, useRef, useEffect, useMemo, useReducer } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useShortcut, type ShortcutDef } from '../../lib/shortcuts/registry';
 import { toast } from 'sonner';
 import { useShallow } from 'zustand/react/shallow';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
-import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
+import { ProjectNode } from './ProjectTree/ProjectNode';
 import { type TreeSessionFilter } from './ProjectTree/FeatureItem';
-import { type IssueCostBreakdown } from './ProjectOverview';
 import { Stage } from '../Stage';
 import { ProjectHome } from '../Stage/ProjectHome';
 import { IssueOverview } from '../Stage/IssueOverview';
 import { SessionFeedSidebar } from '../sessionFeed/SessionFeedSidebar';
 import { usePanesStore } from '../../lib/panesStore';
-import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, resolveEffectiveProjectKey, NO_PROJECT_KEY, NO_PROJECT_LABEL } from './projectsData';
+import { NO_PROJECT_KEY, NO_PROJECT_LABEL } from './projectsData';
 import { ProjectMembershipBoundary } from './ProjectMembershipBoundary';
 import { TasksDialog } from '../TasksDialog';
 import { PlanDialog } from '../PlanDialog';
@@ -32,125 +31,29 @@ import { useDashboardStore } from '../../lib/store';
 import { useAgentSetInvalidation } from '../../lib/useAgentSetInvalidation';
 import { agentIdsByIssueKey, issueCreatedAtById, issueTitlesByKey } from './agentIdsByIssueKey';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
-import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';
 import { openRecoveryForStartBlock } from '../../lib/resumeRecovery';
 import { getDirectRestartRequest } from '../../lib/restartRouting';
 import { useConfirm } from '../DialogProvider';
-import { WS_METHODS } from '@overdeck/contracts';
-import type { ProjectSessionTree, SessionTreeDelta } from '@overdeck/contracts';
 import styles from './styles/command-deck.module.css';
-import { fetchWithTimeout } from '../../lib/apiFetch';
-import { fetchRegisteredProjects, findRegisteredProject, isKnownProject, ProjectRegistryErrorState, UnknownProjectState } from './UnknownProjectState';
+import { fetchRegisteredProjects, ProjectRegistryErrorState, UnknownProjectState } from './UnknownProjectState';
 import { DeckEmptyState } from './DeckEmptyState';
 import { useDefaultDeckSelection } from './useDefaultDeckSelection';
 import { IssuesPaneFilterRow } from './IssuesPaneFilterRow';
-import { usePlannedBacklogVisibility } from '../../hooks/usePlannedBacklogVisibility';
 import { usePriorityConversation } from './usePriorityConversation';
 import { LoadingBoundary } from '../primitives/LoadingBoundary';
+import { useDeckProjects } from '../frame/deck/useDeckProjects';
+import { useSessionTreeSubscription } from '../frame/deck/useSessionTreeSubscription';
+import { useContainerStats } from '../frame/deck/useContainerStats';
+import { useIssueCosts } from '../frame/deck/useIssueCosts';
+import { fetchConversations, useProjectScope } from '../frame/deck/useProjectScope';
 import { conversationRouteKey } from '../../lib/linkedConversation';
-
-async function fetchConversations(): Promise<Conversation[]> {
-  const res = await fetchWithTimeout('/api/conversations');
-  if (!res.ok) throw new Error('Failed to fetch conversations');
-  return res.json();
-}
-
-interface IssueCostEntry {
-  issueId: string;
-  totalCost: number;
-  byModel: IssueCostBreakdown['byModel'];
-  byStage: IssueCostBreakdown['byStage'];
-}
-
-async function fetchCostsByIssue(): Promise<{ issues: IssueCostEntry[] }> {
-  const res = await fetch('/api/costs/by-issue');
-  if (!res.ok) throw new Error('Failed to fetch costs');
-  return res.json();
-}
 
 async function fetchVersion(): Promise<{ version: string }> {
   const res = await fetch('/api/version');
   if (!res.ok) throw new Error('Failed to fetch version');
   return res.json();
-}
-
-async function fetchAllSessionTrees(projectKeys: string[]): Promise<ProjectSessionTree[]> {
-  if (projectKeys.length === 0) return [];
-  const res = await fetch(`/api/session-trees?projects=${encodeURIComponent(projectKeys.join(','))}`);
-  if (!res.ok) throw new Error('Failed to fetch session trees');
-  const data = await res.json() as { trees: ProjectSessionTree[] };
-  return data.trees;
-}
-
-/** Apply a live delta to a cached ProjectSessionTree. Returns a new object or undefined if not applicable.
- *  Optimized to O(F + S) per delta by finding the target feature/session by index instead of nested scans.
- */
-function applySessionTreeDelta(tree: ProjectSessionTree, delta: SessionTreeDelta): ProjectSessionTree {
-  const deltaIssueIdLower = delta.issueId.toLowerCase();
-  const featureIdx = tree.features.findIndex(f => f.issueId.toLowerCase() === deltaIssueIdLower);
-  if (featureIdx === -1) return tree;
-
-  const feature = tree.features[featureIdx];
-  if (!feature) return tree;
-
-  switch (delta.kind) {
-    case 'session_added': {
-      // Lightweight delta — invalidate to trigger refetch
-      return tree;
-    }
-    case 'session_removed': {
-      const filtered = feature.sessions.filter(s => s.sessionId !== delta.sessionId);
-      if (filtered.length === feature.sessions.length) return tree;
-      const newFeatures = [...tree.features];
-      newFeatures[featureIdx] = { ...feature, sessions: filtered };
-      return { ...tree, features: newFeatures };
-    }
-    case 'presence_changed':
-    case 'status_changed': {
-      const sessionIdx = feature.sessions.findIndex(s => s.sessionId === delta.sessionId);
-      if (sessionIdx === -1) return tree;
-      const newSessions = [...feature.sessions];
-      newSessions[sessionIdx] = {
-        ...feature.sessions[sessionIdx]!,
-        ...(delta.presence !== undefined && { presence: delta.presence }),
-        ...(delta.status !== undefined && { status: delta.status }),
-      };
-      const newFeatures = [...tree.features];
-      newFeatures[featureIdx] = { ...feature, sessions: newSessions };
-      return { ...tree, features: newFeatures };
-    }
-    case 'pending_input_changed': {
-      const sessionIdx = feature.sessions.findIndex(s => s.sessionId === delta.sessionId);
-      if (sessionIdx === -1) return tree;
-      const newSessions = [...feature.sessions];
-      newSessions[sessionIdx] = {
-        ...feature.sessions[sessionIdx]!,
-        awaitingInput: delta.awaitingInput ?? false,
-        awaitingInputPrompt: delta.awaitingInputPrompt,
-        awaitingInputReason: delta.awaitingInputReason,
-        pendingInputKinds: delta.pendingInputKinds,
-      };
-      const newFeatures = [...tree.features];
-      newFeatures[featureIdx] = { ...feature, sessions: newSessions };
-      return { ...tree, features: newFeatures };
-    }
-    default:
-      return tree;
-  }
-}
-
-interface ContainerStats {
-  id: string;
-  name: string;
-  cpuPercent: number;
-  memoryUsage: number;
-  memoryLimit: number;
-  memoryPercent: number;
-  networkIn: number;
-  networkOut: number;
-  status: 'running' | 'stopped' | 'unhealthy' | 'restarting';
 }
 
 interface CommandDeckProps {
@@ -212,7 +115,6 @@ export function CommandDeck({
   onCockpitChange,
   conversationViewMode,
 }: CommandDeckProps) {
-  const [projectQueryEpoch, bumpProjectQueryEpoch] = useReducer((value: number) => value + 1, 0);
   const selectedFeature = useCommandDeckSelection((s) => s.selectedFeature);
   const selectedConversation = useCommandDeckSelection((s) => s.selectedConversation);
   // PAN-1591: the Awareness rail can be collapsed to reclaim pane width.
@@ -256,7 +158,6 @@ export function CommandDeck({
   const sectionDragStartSplit = useRef(50);
   const sectionContainerRef = useRef<HTMLDivElement>(null);
   const [treeFilter, setTreeFilter] = useState<TreeSessionFilter>('all');
-  const showPlannedBacklog = usePlannedBacklogVisibility((state) => state.showPlannedBacklog);
   const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
   const [sidebarHarness, setSidebarHarness] = useState<Harness>(loadStoredHarness);
   const [sidebarEffort, setSidebarEffort] = useState<EffortLevel>(loadStoredEffort);
@@ -293,17 +194,11 @@ export function CommandDeck({
   // PAN-2893: agent spawn/stop events refetch the projects pane immediately.
   useAgentSetInvalidation(queryClient);
 
-  const { data: projects = [], isLoading, isFetched: projectsFetched } = useQuery({
-    queryKey: ['command-deck-projects', projectQueryEpoch],
-    queryFn: fetchProjects,
-    refetchInterval: 30000,
-  });
-
-  const { data: costData } = useQuery({
-    queryKey: ['costs-by-issue'],
-    queryFn: fetchCostsByIssue,
-    refetchInterval: 15000,
-  });
+  const { projects, projectsWithSessions, sessionTreeMap, isLoading } = useDeckProjects();
+  // Until the frame swap (PAN-5293 WI-17) the deck still mounts the live
+  // session-tree subscription itself.
+  useSessionTreeSubscription(projects);
+  const { issueCosts, issueCostDetails } = useIssueCosts();
 
   const { data: registeredProjects = [], isFetched: registeredProjectsFetched, isError: registeredProjectsError, refetch: refetchRegisteredProjects } = useQuery({
     queryKey: ['registered-projects'],
@@ -318,95 +213,6 @@ export function CommandDeck({
     staleTime: Infinity,
   });
 
-  // ── Session Tree (PAN-821) ───────────────────────────────────────────────────
-  // Fetch all session trees in a single request to avoid N+1 HTTP waterfall
-  const projectNamesKey = useMemo(() => projects.map(p => p.name).join(','), [projects]);
-  const { data: sessionTrees = [] } = useQuery({
-    queryKey: ['session-trees', projectNamesKey],
-    queryFn: () => fetchAllSessionTrees(projects.map(p => p.name)),
-    enabled: projects.length > 0,
-  });
-
-  const sessionTreeDataRef = useRef<Record<string, ProjectSessionTree>>({});
-  const sessionTreeMap = useMemo(() => {
-    const map: Record<string, ProjectSessionTree> = {};
-    let changed = false;
-    for (const tree of sessionTrees) {
-      map[tree.projectKey] = tree;
-      if (sessionTreeDataRef.current[tree.projectKey] !== tree) changed = true;
-    }
-    if (!changed && Object.keys(map).length === Object.keys(sessionTreeDataRef.current).length) {
-      return sessionTreeDataRef.current;
-    }
-    sessionTreeDataRef.current = map;
-    return map;
-  }, [sessionTrees]);
-
-  // Track current project names key for delta handlers (avoids stale closure)
-  // Subscribe to live session tree deltas for each project
-  useEffect(() => {
-    const transport = getTransport();
-    const unsubscribes: Array<() => void> = [];
-
-    for (const project of projects) {
-      const unsubscribe = transport.subscribe(
-        (client) =>
-          (client as PanRpcProtocolClient)[WS_METHODS.subscribeProjectSessionTree]({
-            projectKey: project.name,
-          }) as unknown as import('effect').Stream.Stream<SessionTreeDelta, Error>,
-        (delta) => {
-          const bulkKey = ['session-trees', projectNamesKey] as const;
-          const bulkData = queryClient.getQueryData<ProjectSessionTree[]>(bulkKey);
-          if (!bulkData) return;
-          const tree = bulkData.find(t => t.projectKey === project.name);
-          if (!tree) return;
-          if (delta.kind === 'session_added') {
-            void queryClient.invalidateQueries({ queryKey: bulkKey, exact: true });
-            return;
-          }
-
-          const updated = applySessionTreeDelta(tree, delta);
-          if (updated === tree) return;
-          const newBulkData = bulkData.map(t => t.projectKey === project.name ? updated : t);
-          queryClient.setQueryData(bulkKey, newBulkData);
-        },
-      );
-      unsubscribes.push(unsubscribe);
-    }
-
-    return () => {
-      for (const unsubscribe of unsubscribes) {
-        unsubscribe();
-      }
-    };
-  }, [projectNamesKey, projects, queryClient]);
-
-  // Merge session trees into project features, preserving object identity
-  // for features whose sessions haven't changed (avoids O(total features)
-  // re-renders per delta — only features in the affected project re-render).
-  const projectsWithSessions = useMemo(() => {
-    return projects.map(project => {
-      const tree = sessionTreeMap[project.name];
-      if (!tree) return project;
-
-      const featureSessions = new Map<string, readonly import('@overdeck/contracts').SessionNode[]>();
-      for (const feature of tree.features) {
-        featureSessions.set(feature.issueId.toLowerCase(), feature.sessions);
-      }
-
-      let featuresChanged = false;
-      const nextFeatures = project.features.map((feature: ProjectFeature) => {
-        const treeSessions = featureSessions.get(feature.issueId.toLowerCase());
-        if (!treeSessions && !feature.sessions) return feature;
-        if (treeSessions === feature.sessions) return feature;
-        featuresChanged = true;
-        return { ...feature, sessions: treeSessions ?? feature.sessions };
-      });
-      if (!featuresChanged) return project;
-      return { ...project, features: nextFeatures };
-    });
-  }, [projects, sessionTreeMap]);
-
   useEffect(() => {
     // A pending conversation deep-link (convId) must win over auto-select:
     // onSelectProject's default path clears the conversation route, which would
@@ -418,34 +224,7 @@ export function CommandDeck({
     }
   }, [convId, onSelectProject, projectsWithSessions, selectedProject]);
 
-  const [containerStats, setContainerStats] = useState<Record<string, ContainerStats>>({});
-
-  // Poll container stats every 5s when issues have containers
-  useEffect(() => {
-    const hasContainers = projectsWithSessions.some((p) =>
-      p.features.some((f) => (f.resourceDetails?.dockerContainerCount ?? 0) > 0),
-    );
-    if (!hasContainers) return;
-
-    const fetchStats = async () => {
-      try {
-        const res = await fetch('/api/resources');
-        if (!res.ok) return;
-        const data = (await res.json()) as { containers: ContainerStats[] };
-        const byName: Record<string, ContainerStats> = {};
-        for (const c of data.containers) {
-          byName[c.name] = c;
-        }
-        setContainerStats(byName);
-      } catch {
-        // ignore
-      }
-    };
-
-    fetchStats();
-    const interval = setInterval(fetchStats, 5000);
-    return () => clearInterval(interval);
-  }, [projectsWithSessions]);
+  const containerStats = useContainerStats(projectsWithSessions);
 
   // PAN-4560: flat lookup maps instead of the whole agent and issue slices, so
   // the deck re-renders only when an entry it reads changes. Handlers read the
@@ -459,26 +238,6 @@ export function CommandDeck({
   // the dialog.
   const confirm = useConfirm();
 
-  // Map aggregated costs per issue for the project tree sidebar and project overview.
-  const { issueCosts, issueCostDetails } = useMemo(() => {
-    const costs: Record<string, number> = {};
-    const detailsByIssue: Record<string, IssueCostBreakdown> = {};
-
-    for (const entry of costData?.issues || []) {
-      costs[entry.issueId] = entry.totalCost;
-      costs[entry.issueId.toLowerCase()] = entry.totalCost;
-
-      const details: IssueCostBreakdown = {
-        byModel: entry.byModel ?? {},
-        byStage: entry.byStage ?? {},
-      };
-      detailsByIssue[entry.issueId] = details;
-      detailsByIssue[entry.issueId.toLowerCase()] = details;
-    }
-
-    return { issueCosts: costs, issueCostDetails: detailsByIssue };
-  }, [costData]);
-
   const { data: conversationList = [] } = useQuery({
     queryKey: ['conversations'],
     queryFn: fetchConversations,
@@ -487,56 +246,18 @@ export function CommandDeck({
 
   const { conversations, error: conversationRouteError } = usePriorityConversation(convId, conversationList);
 
-  // Partition conversations into project-scoped vs unscoped
-  const { projectConversations } = useMemo(() => {
-    const map: Record<string, import('./ConversationList').Conversation[]> = {};
-    const excludeSet = new Set<number>();
-    if (!Array.isArray(registeredProjects) || registeredProjects.length === 0) return { projectConversations: map, excludeConvIds: excludeSet };
-
-    const keyToKeys = new Map<string, string[]>();
-    for (const rp of registeredProjects) {
-      const keys = Array.from(new Set([rp.key, rp.name].filter((key): key is string => Boolean(key))));
-      keyToKeys.set(rp.key, keys);
-    }
-
-    // One resolver decides "which project" for every conversation (PAN-1577):
-    // explicit projectKey override first, cwd→project-path inference otherwise.
-    for (const conv of conversations) {
-      const effectiveKey = resolveEffectiveProjectKey(conv, registeredProjects);
-      if (!effectiveKey) continue;
-      const projectKeys = keyToKeys.get(effectiveKey);
-      if (!projectKeys) continue;
-      for (const projectKey of projectKeys) {
-        if (!map[projectKey]) map[projectKey] = [];
-        map[projectKey].push(conv);
-      }
-      excludeSet.add(conv.id);
-    }
-
-    return { projectConversations: map, excludeConvIds: excludeSet };
-  }, [conversations, registeredProjects]);
+  const {
+    projectConvs, projectConvIdSet, projectIssueIds, selectedProjectData, visibleFeatures,
+    selectedRegisteredProject, resolveConversationProjectName, membership,
+  } = useProjectScope(selectedProject, conversations);
+  const isProjectValidationPending = membership.pending;
+  const showUnknownProject = membership.unknown;
 
   // Track the last deep-link ID we applied so we only navigate for *new* deep-links
   // (e.g. popstate), not on every conversations refetch.
   const appliedConvId = useRef<string | null>(null);
   // PAN-2005: same idea for the issue cockpit deep-link (/command-deck/<proj>/<issue>).
   const appliedCockpit = useRef<string | null>(null);
-
-  // Resolve the registered project (by name) that owns a conversation, or null
-  // when the conversation is unscoped. Prefers the explicit `projectKey`
-  // override (PAN-1577) when set; falls back to cwd→project-path inference
-  // only when it's null (e.g. created without a projectKey, so cwd defaults to
-  // ~/Projects).
-  const resolveConversationProjectName = useCallback(
-    (conv: Conversation | null | undefined): string | null => {
-      if (!conv) return null;
-      const effectiveKey = resolveEffectiveProjectKey(conv, registeredProjects);
-      if (!effectiveKey) return null;
-      const matched = registeredProjects.find((rp) => rp.key === effectiveKey);
-      return matched ? (matched.name ?? matched.key) : null;
-    },
-    [registeredProjects],
-  );
 
   // ── Project-deck tab helpers (PAN-1561) ──────────────────────────────────────
   // Open/focus tabs in a project's deck directly via the shared panesStore (the
@@ -758,7 +479,7 @@ export function CommandDeck({
     try {
       const res = await fetch(`/api/issues/${encodeURIComponent(issueId)}/cleanup-workspace`, { method: 'POST' });
       if (!res.ok) throw new Error('Failed to clean up orphaned resources');
-      bumpProjectQueryEpoch();
+      await queryClient.invalidateQueries({ queryKey: ['command-deck-projects'] });
       await refreshDashboardState(queryClient);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to clean up resources');
@@ -1296,44 +1017,8 @@ export function CommandDeck({
     return () => window.removeEventListener('overdeck:reconnected', handler);
   }, [queryClient]);
 
-  const selectedProjectData = useMemo(() => {
-    if (!selectedProject) return null;
-    return projectsWithSessions.find(p => p.name === selectedProject) ?? null;
-  }, [projectsWithSessions, selectedProject]);
-  const visibleFeatures = useMemo(
-    () => filterSpecOnlyPlanned(selectedProjectData?.features ?? [], showPlannedBacklog),
-    [selectedProjectData, showPlannedBacklog],
-  );
-
-  const selectedRegisteredProject = useMemo(
-    () => findRegisteredProject(registeredProjects, selectedProject),
-    [registeredProjects, selectedProject],
-  );
-  const isProjectValidationPending = Boolean(selectedProject && (!projectsFetched || !registeredProjectsFetched));
-  const showUnknownProject = Boolean(selectedProject && !isProjectValidationPending && !registeredProjectsError && !isKnownProject(selectedProject, registeredProjects));
-
-  // ── Project-scoped deck data (PAN-1561) ──────────────────────────────────────
-  // For a real project: its scoped conversations + issue ids. For the special
-  // "No project" bucket: conversations not under any registered project.
+  // ── Project-scoped deck data (PAN-1561) ── from useProjectScope above.
   const isNoProject = selectedProject === NO_PROJECT_KEY;
-  const unscopedConversations = useMemo(
-    () => conversations.filter((c) => isUnscopedConversation(c, registeredProjects)),
-    [conversations, registeredProjects],
-  );
-  const projectConvs = useMemo(
-    () =>
-      isNoProject
-        ? unscopedConversations
-        : selectedProject
-          ? (projectConversations[selectedProject] ?? [])
-          : [],
-    [isNoProject, unscopedConversations, selectedProject, projectConversations],
-  );
-  const projectConvIdSet = useMemo(() => new Set(projectConvs.map(c => c.id)), [projectConvs]);
-  const projectIssueIds = useMemo(
-    () => (selectedProjectData?.features ?? []).map(f => f.issueId),
-    [selectedProjectData],
-  );
 
   // PAN-1593: the selected project's single issue prefix (e.g. "PAN"), derived
   // from its issue ids — the same signal ProjectOverview uses. Reported up so the
