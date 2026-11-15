@@ -135,7 +135,7 @@ What to know:
   runs Claude Code and Codex lanes only. It is destroyed after `remote.fly.machine_idle_minutes`
   (default 30) of idle conversations, so raise that for runs with long waits.
 - The Command Deck nests a remote lane under the orchestrator that launched it, and
-  the Awareness rail counts it in the run card. The row also shows the lane's report
+  the Activity feed on `/activity` counts it in the run card. The row also shows the lane's report
   badge (`DONE`, `BLOCKED`, `FAILED`) and, for a critic or verifier, its verdict; a
   builder's verdict link opens its newest critic on whichever machine it ran. The
   group summary counts remote lanes in `reported` too.
@@ -191,11 +191,11 @@ Git facts (branch, head, commits ahead of upstream, dirty) are read for
 git-backed lanes that are not archived.
 
 This table is implemented once, as `laneActivityOf` in `@overdeck/contracts`;
-`pan lane list`, `GET /api/lanes` and the Awareness rail all use it.
+`pan lane list`, `GET /api/lanes` and the Activity feed all use it.
 
-### In the Awareness rail
+### In the Activity feed
 
-The Command Deck's Awareness rail shows a gauntlet run as **one card**, grouped
+The **Feed** tab on `/activity` shows a gauntlet run as **one card**, grouped
 by project and run key. Lane conversations do not get cards of their own.
 
 - **Counts line:** role counts, then activity counts, only when non-zero, for

@@ -93,7 +93,7 @@ Overdeck finds the installation that covers each repository by itself (`GET /rep
 
 **If the organization enforces SAML single sign-on**, authorize your `gh` token for it: run `gh auth refresh -h github.com` and authorize the organization in the browser.
 
-**Where to see the identity:** the sidebar groups projects by owner when they span more than one; the Command Deck project header shows `<owner> · <identity>`; **Settings → GitHub Identities** lists every project; and `pan doctor` prints one `GitHub identity: <owner>` row per owner, with a fix when the identity cannot push.
+**Where to see the identity:** the project switcher in the left column groups projects by owner when they span more than one; the left column's **Issues** header shows `<owner> · <identity>`; **Settings → GitHub Identities** lists every project; and `pan doctor` prints one `GitHub identity: <owner>` row per owner, with a fix when the identity cannot push.
 
 A separate work GitHub account and GitHub Enterprise Server hosts are not supported yet ([#5154](https://github.com/eltmon/overdeck/issues/5154)).
 

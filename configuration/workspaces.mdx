@@ -17,13 +17,15 @@ checkout, exactly one per project), `issue` (one per tracked issue), or
 
 Workspaces are reachable from three places in the dashboard:
 
-- **Sidebar → Workspaces** — favorites first, then most-recently-accessed.
-  Lists the workspaces you created plus anything you favorited; worktrees
-  Overdeck created for issues, Session Vault scratch workspaces, and
-  agent-made workspaces stay off the list unless favorited — there is no
-  count row to reveal them. Archived workspaces still collapse into their own
-  count row. A project's `main` workspace is listed here only when you
-  favorite it. A flat/grouped-by-project toggle persists across sessions.
+- **Left column → Workspaces** — the selected project's workspaces,
+  favorites first, then most-recently-accessed. Lists the workspaces you
+  created plus anything you favorited; worktrees Overdeck created for issues,
+  Session Vault scratch workspaces, and agent-made workspaces stay off the
+  list unless favorited — there is no count row to reveal them. Archived
+  workspaces collapse into an **Archived (N)** row. A project's `main`
+  workspace is listed here only when you favorite it. To reach another
+  project's workspaces, switch project in the project switcher or use the
+  Cmd-K / Ctrl-K **Workspaces** group.
 - **A project's Home → Main checkout** (next to Terminal and Web) — opens that
   project's `main` workspace, creating it the first time.
 - **Cmd-K / Ctrl-K** — the command palette's "Workspaces" section lists the
@@ -38,10 +40,13 @@ Workspaces are reachable from three places in the dashboard:
 
 ## Creating a workspace from the dashboard
 
-Click the **+** in the sidebar's **Workspaces** header, run **New workspace…**
+Click the **+** in the left column's **Workspaces** header, pick **New
+workspace in <project>…** in the project switcher menu, run **New workspace…**
 from Cmd-K / Ctrl-K, or use **New workspace** on a project's overview. Every
-entry point navigates to `/workspaces/new`; a project overview adds
-`?project=<key>` so that project's chip starts selected.
+entry point navigates to `/workspaces/new`; the project-scoped ones add
+`?project=<key>` so that project's chip starts selected. The **Workspaces**
+section is hidden while a project has no workspaces to list, so use the
+project switcher there.
 
 <ThemedImage
   light="/images/dashboard/new-workspace-page-light.png"
@@ -165,9 +170,9 @@ pan workspace new vendor-lens --target-path ~/code/some-vendored-repo
 # --dry-run prints the resolved intent as JSON and creates nothing
 pan workspace new my-scratch-notes --dry-run
 
-# --origin operator keeps the workspace in the sidebar even when created
-# from inside an Overdeck agent or conversation; the default there is
-# `agent`, which keeps it out of the sidebar.
+# --origin operator keeps the workspace in the left column's Workspaces list
+# even when created from inside an Overdeck agent or conversation; the
+# default there is `agent`, which keeps it off that list.
 pan workspace new my-notes --origin operator
 
 # Re-point an existing workspace at a new directory
@@ -208,17 +213,17 @@ target the same repo and a workspace can be re-pointed later. Two rules to know:
 Relocating never moves memory on disk — memory homes are keyed by workspace id,
 not by path or name.
 
-### What the sidebar shows
+### What the Workspaces list shows
 
-The dashboard's **Workspaces** rail lists the workspaces you created (origin
-`operator`) plus anything you favorited. Pipeline issue worktrees, Session
-Vault scratch workspaces, and agent-made workspaces stay off the rail unless
-you favorite them — there is no count row to reveal them. Issues remain
-reachable from **Projects**, the **Issues** scope, and the Pipeline and Board
-views. A project's `main` workspace is its primary checkout, which the
-**Projects** list already represents, so it opens from the project's Home
-(**Main checkout**) rather than repeating every project in the rail; a
-favorited one is labelled with its project's name. Main and scratch rows also
+The left column's **Workspaces** section lists the selected project's
+workspaces you created (origin `operator`) plus anything you favorited.
+Pipeline issue worktrees, Session Vault scratch workspaces, and agent-made
+workspaces stay off the list unless you favorite them — there is no count row
+to reveal them. Issues remain reachable from the left column's **Issues**
+section and the Pipeline and Board views. A project's `main` workspace is its
+primary checkout, which the project switcher already represents, so it opens
+from the project's Home (**Main checkout**) rather than repeating in the list;
+a favorited one is labelled with its project's name. Main and scratch rows also
 show the phase Overdeck's memory synthesized for them (`exploring`,
 `building`, `shipping`, …). An issue workspace row shows its pull request
 badge (number, colored by state and review, `×` for failing checks).
