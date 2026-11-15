@@ -31,7 +31,7 @@ import { readWorkspaceIdentity, resolveWorkspaceIdentityPath, writeWorkspaceIden
 import { runMemoryFtsStatement } from '../memory/fts-db.js';
 import { ensureParentDir, resolveMemoryBase, resolveMemoryRoot } from '../memory/paths.js';
 import { listProjectsSync } from '../projects.js';
-import { getWorkspaceById, getWorkspaceForIssue, listProjects, listWorkspaces } from './resolver.js';
+import { getMainWorkspace, getWorkspaceById, getWorkspaceForIssue, listProjects, listWorkspaces } from './resolver.js';
 import { archiveWorkspace, createWorkspace, upsertProjectFromConfig } from './writer.js';
 import type { WorkspaceOrigin } from './types.js';
 
@@ -73,6 +73,29 @@ export async function backfillIssueWorkspaces(): Promise<void> {
       });
     }
   }
+}
+
+/**
+ * Create the kind='main' row for every registered project that lacks one
+ * (PAN-5359). Projects imported before PAN-1990 never got one, so their
+ * project-root conversations had no memory identity. Skips system projects
+ * and primary paths that are not directories. Never modifies existing rows.
+ */
+export async function backfillMainWorkspaces(): Promise<string[]> {
+  const created: string[] = [];
+  for (const project of listProjects()) {
+    if (project.isSystem || getMainWorkspace(project.id)) continue;
+    const info = await stat(project.primaryPath).catch(() => null);
+    if (!info?.isDirectory()) continue;
+    const isGitRepository = await stat(join(project.primaryPath, '.git')).then(() => true, () => false);
+    try {
+      created.push(await createWorkspace({ projectId: project.id, kind: 'main', name: 'main', path: project.primaryPath, isGitRepository }));
+    } catch (err) {
+      // One bad project must not stop the rest, nor make main.ts skip the memory migration that follows.
+      console.warn(`[workspaces] main workspace backfill skipped ${project.id}:`, (err as Error)?.message ?? err);
+    }
+  }
+  return created;
 }
 
 export interface RebuildMainAndScratchWorkspacesOptions {

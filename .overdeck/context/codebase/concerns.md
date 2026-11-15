@@ -294,6 +294,20 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   raw prompt or even 3-5 expanded terms return ~0 FTS hits; prompt-time injection
   must search in OR mode. Expansion calls share `recordHealth` with extraction, so
   `extractions_attempted` also counts expansion calls.
+- **Per-turn memory for Claude comes from the global hook** (found planning
+  PAN-5359) — `sync-sources/hooks/user-prompt-submit-hook`, registered in the
+  user-global `~/.claude/settings.json`, posts every Claude prompt to
+  `/api/memory/inject` in any cwd. The workspace `overdeck-memory-hook.js
+  prompt-inject` entry (`caveman/workspace.ts`) is a second caller inside issue
+  workspaces only. A conversation gets nothing when no memory identity resolves:
+  `resolveMemoryIdentityFromConversation` (`routes/hooks.ts`) needs a workspace
+  row, and projects imported before PAN-1990 (mind-your-now, lexerra,
+  papers-please, …) have no `kind='main'` row (only `finishProjectSetup` creates
+  one). Two identity keyings coexist: agents use folder names (`overdeck/feature-x`),
+  conversations use workspace rows (`panopticon-cli/<uuid>`), and
+  `resolveWorkspaceForCwd` does not skip archived rows. Every inject call appends a
+  `rag-decision` line to `rag-runs/<date>.jsonl`, so the logs show whether a
+  conversation is reached.
 - **`pan memory` reads and writes different fact stores from a workspace** (found
   planning PAN-4940) — `add`/`edit`/`retire` write the cwd checkout, but `show`,
   `list` and the facts `search` prints read the primary checkout unless `--here`
