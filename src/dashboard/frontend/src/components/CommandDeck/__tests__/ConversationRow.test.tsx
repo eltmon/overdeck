@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -68,7 +68,7 @@ const mutations: ConversationMutations = {
   isForkPending: false,
 };
 
-function renderRow(overrides: Partial<Conversation>) {
+function renderRow(overrides: Partial<Conversation>, rowProps: Partial<React.ComponentProps<typeof ConversationRow>> = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={queryClient}>
@@ -77,24 +77,52 @@ function renderRow(overrides: Partial<Conversation>) {
         isSelected={false}
         onSelect={vi.fn()}
         mutations={mutations}
+        {...rowProps}
       />
     </QueryClientProvider>,
   );
 }
 
 describe('ConversationRow model metadata', () => {
-  it('renders the harness when the model is absent', () => {
+  // PAN-5293 F-D15: Claude Code is the default, so it gets no harness word;
+  // harness and model move into the meta line's tooltip.
+  it('shows no harness word for claude-code and names it in the tooltip', () => {
     renderRow({ harness: 'claude-code', model: null });
 
-    expect(screen.getByTitle('Harness: Claude Code')).toHaveTextContent('Claude Code');
-    expect(screen.queryByTitle(/^Model:/)).not.toBeInTheDocument();
+    expect(screen.queryByTitle(/^Harness:/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('conversation-meta-line')).toHaveAttribute('title', 'Harness Claude Code');
   });
 
-  it('renders both harness and model when the model is present', () => {
-    renderRow({ harness: 'claude-code', model: 'k3' });
+  it('carries the branch and the model in the meta line tooltip', () => {
+    renderRow({ harness: 'claude-code', model: 'k3', branch: 'feature/pan-1', totalTokens: 1200 });
 
-    expect(screen.getByTitle('Harness: Claude Code')).toHaveTextContent('Claude Code');
-    expect(screen.getByTitle('Model: k3')).toHaveTextContent('k3');
+    const title = screen.getByTestId('conversation-meta-line').getAttribute('title') ?? '';
+    expect(title).toContain('Branch feature/pan-1');
+    expect(title).toContain('Model k3');
+    expect(title).toContain('1.2k tokens');
+    expect(screen.queryByTitle('Model: k3')).not.toBeInTheDocument();
+  });
+});
+
+describe('ConversationRow drag and Move (PAN-5293 F-D20)', () => {
+  it('is not a drag source', () => {
+    renderRow({});
+    const row = screen.getByText('Test conversation').closest('button');
+    expect(row).not.toHaveAttribute('draggable');
+  });
+
+  it('lists registered projects under Move and moves to the chosen one', () => {
+    const registeredProjects = [
+      { key: 'alpha', name: 'Alpha', path: '/p/alpha' },
+      { key: 'beta', name: 'Beta', path: '/p/beta' },
+    ];
+    renderRow({ cwd: '/p/alpha/src' }, { registeredProjects });
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move' }));
+    const submenu = screen.getByRole('menu', { name: 'Move conversation' });
+    expect(within(submenu).getByRole('menuitem', { name: 'Alpha' })).toBeDisabled();
+    fireEvent.click(within(submenu).getByRole('menuitem', { name: 'Beta' }));
+    expect(mutations.move).toHaveBeenCalledWith({ name: 'test-conversation', projectKey: 'beta', projectName: 'Beta' });
   });
 });
 

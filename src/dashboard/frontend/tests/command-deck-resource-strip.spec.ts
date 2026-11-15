@@ -145,14 +145,18 @@ const RESOURCE_DETAIL_IDENTIFIERS: Record<string, ResourceDetailIdentifiers> = {
 };
 
 async function selectSidebarProject(page: Page, projectName: string) {
-  const sidebarProject = page.getByTestId(`sidebar-project-${projectName}`);
-  await expect(sidebarProject).toBeVisible({ timeout: 20_000 });
+  // PAN-5293: projects are picked from the left column's project switcher.
+  const switcher = page.getByTestId('project-switcher');
+  await expect(switcher).toBeVisible({ timeout: 20_000 });
 
   // The dashboard recovery overlay is fixed and full-screen. In CI it can
   // briefly outlive app boot and keep Playwright waiting for an actionable
-  // pointer click even though the sidebar project button has rendered.
+  // pointer click even though the switcher has rendered.
   await page.locator('#pan-recovery-overlay').evaluate((el) => el.remove()).catch(() => {});
-  await sidebarProject.dispatchEvent('click');
+  await switcher.dispatchEvent('click');
+  const row = page.getByTestId(`project-switcher-row-${projectName}`);
+  await expect(row).toBeVisible({ timeout: 20_000 });
+  await row.dispatchEvent('click');
 }
 
 test.describe('Command Deck resource strip', () => {
@@ -247,8 +251,15 @@ test.describe('Command Deck resource strip', () => {
     });
 
     await page.goto(`${DASHBOARD_URL}/command-deck`);
+    // PAN-5293 F-D16: a row's badges and resource strip sit in its expanded
+    // body, so open both rows before the deck renders them.
+    await page.evaluate(() => {
+      localStorage.setItem('mc-feature-expanded:PAN-862', 'true');
+      localStorage.setItem('mc-feature-expanded:PAN-777', 'true');
+    });
+    await page.reload();
 
-    // Select the project from the sidebar rail. This sets selectedProject, which
+    // Select the project from the left column's project switcher. This sets selectedProject, which
     // mounts the ProjectNode (already expanded) in the Issues section.
     // PAN-1609: wait for the sidebar entry to mount before clicking — under CI
     // load the initial app boot (WS connect + first snapshot) can take several
@@ -265,7 +276,7 @@ test.describe('Command Deck resource strip', () => {
     // the row is present and keep the default timeout).
     await expect(pan862Row).toBeVisible({ timeout: 20_000 });
     await expect(pan777Row).toBeVisible();
-    await expect(pan777Row.locator('[class*="featureStateBadge"]').getByText('Closed', { exact: true })).toBeVisible();
+    await expect(pan777Item.locator('[class*="featureStateBadge"]').getByText('Closed', { exact: true })).toBeVisible();
 
     // PAN-4201: resource chips are icon-only — the fact lives in title/aria-label,
     // not visible text. No workspace/branch/tmux/xBRIEF/tasks/docker chip shows

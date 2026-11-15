@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DomainEvent } from '@overdeck/contracts';
 import { CommandDeck } from '../index';
+import { TestDeckNavigationProvider } from '../../frame/deck/deckNavigation';
 import { agentIdsByIssueKey } from '../agentIdsByIssueKey';
 import { useCommandDeckSelection } from '../../../lib/commandDeckSelection';
 import { usePanesStore } from '../../../lib/panesStore';
@@ -71,7 +72,7 @@ async function renderDeck() {
   render(
     <QueryClientProvider client={client}>
       <counter.Probe id="deck">
-        <CommandDeck />
+        <TestDeckNavigationProvider><CommandDeck /></TestDeckNavigationProvider>
       </counter.Probe>
     </QueryClientProvider>,
   );
@@ -85,6 +86,7 @@ async function renderDeck() {
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async () => Response.json([])));
   useCommandDeckSelection.getState().clearAll();
+  useCommandDeckSelection.setState({ selectedConversation: null, selectedFeature: null });
   usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} });
   localStorage.clear();
   seedDashboardStore({

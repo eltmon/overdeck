@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo, type ReactNode } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, MessageSquarePlus } from 'lucide-react';
 import { FeatureItem, sessionMatchesFilter, type TreeSessionFilter } from './FeatureItem';
@@ -44,6 +44,17 @@ interface ProjectNodeProps {
   onOpenPlanDialog?: (issueId: string) => void;
   onNewConversation?: (projectKey: string) => void;
   containerStats?: Record<string, { id: string; name: string; cpuPercent: number; memoryUsage: number; status: 'running' | 'stopped' | 'unhealthy' | 'restarting' }>;
+  /** PAN-5293 F-D17: 'frame' is the left column's Issues section header. */
+  variant?: 'tree' | 'frame';
+  /** Controls at the right of the frame header (the filter menu). */
+  headerActions?: ReactNode;
+}
+
+/** PAN-5293 F-D17: the left column remembers whether its Issues section is collapsed. */
+export const ISSUES_COLLAPSED_STORAGE_KEY = 'overdeck.ui.leftColumnIssuesCollapsed';
+
+function readIssuesCollapsed(): boolean {
+  try { return localStorage.getItem(ISSUES_COLLAPSED_STORAGE_KEY) === 'true'; } catch { return false; }
 }
 
 interface ContextMenuState {
@@ -153,7 +164,7 @@ function ProjectNodeMenu({
   );
 }
 
-export function ProjectNode({ projectKey, name, features, selectedFeature, onSelectFeature, onSelectProject, selectedProject, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onUnpauseSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, onNewConversation, containerStats }: ProjectNodeProps) {
+export function ProjectNode({ projectKey, name, features, selectedFeature, onSelectFeature, onSelectProject, selectedProject, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onUnpauseSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, onNewConversation, containerStats, variant = 'tree', headerActions }: ProjectNodeProps) {
   const visibleFeatures = useMemo(() => {
     if (filter === 'all') return features;
     return features.filter((feature) =>
@@ -161,7 +172,8 @@ export function ProjectNode({ projectKey, name, features, selectedFeature, onSel
     );
   }, [features, filter]);
   const queryClient = useQueryClient();
-  const [expanded, setExpanded] = useState(visibleFeatures.length > 0);
+  const isFrame = variant === 'frame';
+  const [expanded, setExpanded] = useState(() => (isFrame ? !readIssuesCollapsed() : visibleFeatures.length > 0));
   const [menu, setMenu] = useState<ContextMenuState>({ x: 0, y: 0, open: false });
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState('');
@@ -239,8 +251,69 @@ export function ProjectNode({ projectKey, name, features, selectedFeature, onSel
     setExpanded(current => !current);
   }, []);
 
+  const toggleFrameSection = useCallback(() => {
+    setExpanded((current) => {
+      try { localStorage.setItem(ISSUES_COLLAPSED_STORAGE_KEY, String(current)); } catch { /* storage unavailable */ }
+      return !current;
+    });
+  }, []);
+
+  const renameField = editingName && (
+    <span
+      className={styles.projectName}
+      onClick={(event) => event.stopPropagation()}
+      onMouseDown={(event) => event.stopPropagation()}
+    >
+      <input
+        ref={editInputRef}
+        aria-label={`Rename ${name}`}
+        value={draftName}
+        onChange={(event) => {
+          draftNameRef.current = event.target.value;
+          setDraftName(event.target.value);
+          setRenameError(null);
+        }}
+        onClick={(event) => event.stopPropagation()}
+        onMouseDown={(event) => event.stopPropagation()}
+        onKeyDown={(event) => {
+          event.stopPropagation();
+          if (event.key === 'Enter') commitRename();
+          if (event.key === 'Escape') cancelRename();
+        }}
+        onBlur={commitRename}
+      />
+      {renameError && <span role="alert">{renameError}</span>}
+    </span>
+  );
+
   return (
     <div className={styles.projectNode}>
+      {isFrame ? (
+        <div
+          className="flex items-center gap-1.5 px-2 pt-2 pb-1"
+          data-component="project-node"
+          data-variant="frame"
+          data-project-name={name}
+          onContextMenu={handleContextMenu}
+          title={renameError ?? undefined}
+        >
+          <button
+            type="button"
+            onClick={toggleFrameSection}
+            aria-expanded={expanded}
+            data-testid="issues-section-toggle"
+            className="flex min-w-0 items-center gap-1 text-left"
+          >
+            <ChevronRight className={`${styles.chevron} ${expanded ? styles.chevronOpen : ''}`} size={14} />
+            {editingName ? renameField : <span className="eyebrow">Issues</span>}
+            <span className={styles.featureCount} data-testid="issues-section-count">{visibleFeatures.length}</span>
+          </button>
+          <ProjectCiChip projectKey={projectKey} />
+          <ProjectDeployChip projectKey={projectKey} />
+          <ProjectIdentityChip projectKey={projectKey} />
+          {headerActions && <span className="ml-auto flex items-center">{headerActions}</span>}
+        </div>
+      ) : (
       <button
         className={styles.projectHeader}
         data-component="project-node"
@@ -260,31 +333,7 @@ export function ProjectNode({ projectKey, name, features, selectedFeature, onSel
           />
         </span>
         {editingName ? (
-          <span
-            className={styles.projectName}
-            onClick={(event) => event.stopPropagation()}
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <input
-              ref={editInputRef}
-              aria-label={`Rename ${name}`}
-              value={draftName}
-              onChange={(event) => {
-                draftNameRef.current = event.target.value;
-                setDraftName(event.target.value);
-                setRenameError(null);
-              }}
-              onClick={(event) => event.stopPropagation()}
-              onMouseDown={(event) => event.stopPropagation()}
-              onKeyDown={(event) => {
-                event.stopPropagation();
-                if (event.key === 'Enter') commitRename();
-                if (event.key === 'Escape') cancelRename();
-              }}
-              onBlur={commitRename}
-            />
-            {renameError && <span role="alert">{renameError}</span>}
-          </span>
+          renameField
         ) : (
           <span data-testid="command-deck-tree-title" className={`${styles.projectName} font-display`}>{name}</span>
         )}
@@ -306,6 +355,7 @@ export function ProjectNode({ projectKey, name, features, selectedFeature, onSel
           </span>
         )}
       </button>
+      )}
 
       {menu.open && (
         <ProjectNodeMenu

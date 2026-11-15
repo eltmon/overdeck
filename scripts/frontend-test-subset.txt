@@ -4,6 +4,7 @@
 # .gitattributes marks this file merge=union, so concurrent additions merge cleanly.
 # A union merge can leave lines unsorted or duplicated; the runner dedupes.
 # Long-term fix: PAN-3532 runs the whole frontend suite.
+src/App.test.tsx
 src/App/AppChrome.test.tsx
 src/App/AppLiveStoreHost.render-count.test.tsx
 src/App/BackendConnectionBoundary.test.tsx
@@ -15,6 +16,7 @@ src/App/topbar/AgentsMenu.test.tsx
 src/App/topbar/Breadcrumb.test.tsx
 src/__tests__/fr7-conversation-pending-input.test.tsx
 src/__tests__/overlay-tokens.test.ts
+src/components/ActivityPanel.test.tsx
 src/components/Agents/directory/directory-tree.test.ts
 src/components/Agents/live/live-model.test.ts
 src/components/CloisterStatusBar.test.tsx
@@ -22,6 +24,7 @@ src/components/CommandDeck/CommandDeck.test.tsx
 src/components/CommandDeck/ProjectTree/FeatureItem.linkedConversation.test.tsx
 src/components/CommandDeck/ProjectTree/FeatureItem.pullRequest.test.tsx
 src/components/CommandDeck/ProjectTree/ProjectIdentityChip.test.tsx
+src/components/CommandDeck/ProjectTree/ProjectNode.test.tsx
 src/components/CommandDeck/ProjectTree/featureStateBadge.test.ts
 src/components/CommandDeck/SessionView/SessionPanel.test.tsx
 src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx
@@ -36,6 +39,7 @@ src/components/CommandDeck/__tests__/TriageMenuItems.test.tsx
 src/components/CommandDeck/__tests__/UnscopedConversationChip.test.tsx
 src/components/CommandDeck/__tests__/conversation-tree.test.ts
 src/components/CommandDeck/__tests__/conversation-triage.test.ts
+src/components/CommandDeck/__tests__/conversationMeta.test.ts
 src/components/CommandDeck/__tests__/handoffComposerArgs.test.ts
 src/components/CommandDeck/__tests__/pipeline-helpers.test.ts
 src/components/CommandDeck/__tests__/projectsData.origin.test.ts
@@ -45,7 +49,21 @@ src/components/CommandDeck/__tests__/useConversationMutations.triage.test.tsx
 src/components/CommandDeck/__tests__/useDefaultDeckSelection.test.ts
 src/components/CommandPalette.test.tsx
 src/components/DeaconPauseToggle.test.tsx
+src/components/__tests__/ActivityFeedTab.test.tsx
 src/components/diff/__tests__/PatchFiles.test.tsx
+src/components/frame/__tests__/ConversationsSection.test.tsx
+src/components/frame/__tests__/IssuesSection.test.tsx
+src/components/frame/__tests__/LeftColumn.test.tsx
+src/components/frame/__tests__/LeftColumnFooter.test.tsx
+src/components/frame/__tests__/LeftNav.test.tsx
+src/components/frame/__tests__/NewConversationButton.test.tsx
+src/components/frame/__tests__/ProjectSwitcher.test.tsx
+src/components/frame/__tests__/WorkspacesSection.test.tsx
+src/components/frame/deck/__tests__/deckNavigation.test.tsx
+src/components/frame/deck/__tests__/useCreateConversation.test.tsx
+src/components/frame/deck/__tests__/useDeckProjects.test.tsx
+src/components/frame/deck/__tests__/useIssueSessionActions.test.tsx
+src/components/frame/deck/__tests__/useProjectScope.test.ts
 src/components/palette/__tests__/fileProvider.test.tsx
 src/components/StaleBuildChip.test.tsx
 src/components/SystemHealthPill.test.tsx
@@ -163,8 +181,6 @@ src/components/__tests__/HarnessUpdateCard.test.tsx
 src/components/__tests__/McpSignInCard.test.tsx
 src/components/__tests__/NewBuildBanner.test.tsx
 src/components/__tests__/PanOpenInPicker.remote.test.tsx
-src/components/__tests__/Sidebar.ownerGroups.test.tsx
-src/components/__tests__/Sidebar.workspacePullRequest.test.tsx
 src/components/__tests__/palette-anywhere-actions.test.ts
 src/components/__tests__/palette-fleet-hits.test.tsx
 src/components/backlog/__tests__/PickupGateControls.test.tsx
@@ -377,7 +393,6 @@ src/components/newConversation/__tests__/ConversationSkillsField.test.tsx
 src/components/newConversation/__tests__/IssuePickerField.test.tsx
 src/components/newConversation/__tests__/MachineField.test.tsx
 src/components/newConversation/__tests__/NewConversationDialog.test.tsx
-src/components/newConversation/__tests__/NewConversationSplitButton.test.tsx
 src/components/palette-conversation-hits.test.ts
 src/components/primitives/issuePullRequest.test.ts
 src/components/project/new/ProjectCreateForm.jira.test.tsx
@@ -412,6 +427,7 @@ src/components/skills/SkillPacksSection.test.tsx
 src/components/system-health-ui-no-loss.test.tsx
 src/components/terminal/TerminalDrawer.pending.test.tsx
 src/components/terminal/terminalControlFrames.test.ts
+src/components/workspace-rail-filter.test.tsx
 src/components/workspace/new/__tests__/smartField.test.ts
 src/components/workspace/new/__tests__/useWorkspaceCreateIntent.test.ts
 src/hooks/__tests__/useColorTheme.test.ts
@@ -421,6 +437,7 @@ src/lib/__tests__/bootRequests.test.ts
 src/lib/__tests__/buildDrift.test.ts
 src/lib/__tests__/citationFormat.test.ts
 src/lib/__tests__/colorThemeEditor.test.ts
+src/lib/__tests__/commandDeckSelection.test.ts
 src/lib/__tests__/composerCancel.test.ts
 src/lib/__tests__/composerCitations.test.ts
 src/lib/__tests__/composerDraft.test.ts

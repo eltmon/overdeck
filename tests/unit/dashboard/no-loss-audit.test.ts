@@ -59,10 +59,17 @@ describe('no-loss audit (PAN-1990 ac1, ac2)', () => {
     expect(TAB_PATHS['project-new']).toBe('/projects/new'); // PAN-3836
   });
 
-  it('Sidebar nav item affordance resolves (component + workspace-registry rail)', async () => {
-    const mod = await import('../../../src/dashboard/frontend/src/components/Sidebar.js');
-    expect(typeof mod.Sidebar).toBe('function');
-    expect(typeof mod.sortWorkspaces).toBe('function');
+  it('Sidebar nav item affordance relocated: Sidebar -> LeftColumn + WorkspacesSection (PAN-5293)', async () => {
+    // PAN-5293 deleted components/Sidebar.tsx; its nav, project rail and
+    // workspace-registry rail live in the left column. The successors resolve:
+    const column = await import('../../../src/dashboard/frontend/src/components/frame/LeftColumn.js');
+    expect(typeof column.LeftColumn).toBe('function');
+    const nav = await import('../../../src/dashboard/frontend/src/components/frame/LeftNav.js');
+    expect(typeof nav.LeftNav).toBe('function');
+    const workspaces = await import('../../../src/dashboard/frontend/src/components/frame/WorkspacesSection.js');
+    expect(typeof workspaces.WorkspacesSection).toBe('function');
+    const rows = await import('../../../src/dashboard/frontend/src/components/frame/workspaceRows.js');
+    expect(typeof rows.sortWorkspaces).toBe('function');
   });
 
   it('command palette (Cmd-K) affordance resolves', async () => {

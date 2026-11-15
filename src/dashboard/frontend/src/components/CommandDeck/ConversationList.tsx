@@ -14,7 +14,7 @@ import styles from './styles/command-deck.module.css';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import { fetchRegisteredProjects } from './UnknownProjectState';
 import { MenuItemButton, MenuOverlay, MenuSurface } from '../shared/ContextMenu';
-import type { LinkedConversationFields, PullRequestLink } from '@overdeck/contracts';
+import type { ConversationChangeTotals, LinkedConversationFields, PullRequestLink } from '@overdeck/contracts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -88,6 +88,8 @@ export interface Conversation extends LinkedRowFields {
   forkFallbackReason?: string | null;
   /** PAN-1458: if this conv was cleared via Claude Code's /clear, the sibling conv that continues it. */
   clearedToConvId?: number | null;
+  /** PAN-5293 F-D15: the last 24 h's file-change totals (absent when nothing changed). */
+  changeTotals?: ConversationChangeTotals;
   /** PAN-1523: current git branch at cwd, null when cwd is not a git repo. */
   branch?: string | null;
   /** PAN-1523: true when cwd is a secondary git worktree (not the primary checkout). */
@@ -249,7 +251,12 @@ interface ConversationListProps {
   /** When provided, show only conversations whose id is in this set (PAN-1561
    * project scope). Applied after `excludeIds`. */
   includeIds?: Set<number>;
+  /** PAN-5293 F-D13: 'active' shows only Needs you and Inbox; default 'all' shows all four sections. */
+  scope?: 'active' | 'all';
 }
+
+/** The sections the 'active' scope shows. */
+const ACTIVE_SECTION_ORDER: readonly ConversationSectionId[] = ['needsYou', 'inbox'];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -440,7 +447,8 @@ function itemPropsEqual(a: ConversationListItemProps, b: ConversationListItemPro
 
 const ConversationListItem = memo(ConversationListItemImpl, itemPropsEqual);
 
-export function ConversationList({ selectedConversation, onSelectConversation, excludeIds, includeIds }: ConversationListProps) {
+export function ConversationList({ selectedConversation, onSelectConversation, excludeIds, includeIds, scope = 'all' }: ConversationListProps) {
+  const shownSections = scope === 'active' ? ACTIVE_SECTION_ORDER : SECTION_ORDER;
   const [sort, setSort] = useState<SortOption>(loadSort);
   const [tab, setTab] = useState<ListTab>(loadTab);
 
@@ -666,7 +674,7 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
 
   // D14: the visible top-level rows in render order, collapsed sections
   // excluded — Shift-click ranges over exactly this list.
-  visibleTopLevelNamesRef.current = SECTION_ORDER.flatMap((id) => {
+  visibleTopLevelNamesRef.current = shownSections.flatMap((id) => {
     if (COLLAPSIBLE_SECTIONS.has(id) && !expandedSections.has(id)) return [];
     return (sectionsById.get(id)?.nodes ?? []).map((node) => node.conv.name);
   });
@@ -749,7 +757,7 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
       ) : (
         <div className={styles.conversationList}>
           <AnimatePresence initial={false}>
-            {SECTION_ORDER.flatMap((id) => {
+            {shownSections.flatMap((id) => {
               const nodes = sectionsById.get(id)?.nodes ?? [];
               const rendered: React.ReactNode[] = [];
 

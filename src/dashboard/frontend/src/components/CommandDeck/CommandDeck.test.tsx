@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { StrictMode } from 'react';
 import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { CommandDeck } from './index';
+import { TestDeckNavigationProvider, type DeckTarget } from '../frame/deck/deckNavigation';
+import { useNewConversationDefaults } from '../frame/deck/newConversationDefaults';
+import { ConversationsSection } from '../frame/ConversationsSection';
+import { IssuesSection } from '../frame/IssuesSection';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { usePanesStore } from '../../lib/panesStore';
 import { usePlannedBacklogVisibility } from '../../hooks/usePlannedBacklogVisibility';
@@ -254,10 +259,22 @@ vi.mock('lucide-react', async () => {
   };
 });
 
-function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDeck>>) {
-  const queryClient = new QueryClient({
+// Mirrors App's openInDeck for the deck tests: a conversation target writes
+// the conversation route through onConvIdChange.
+function deckNavigationLike(props?: Partial<React.ComponentProps<typeof CommandDeck>>) {
+  return {
+    openInDeck: (target: DeckTarget) => {
+      if ('conversationRouteKey' in target) props?.onConvIdChange?.(target.conversationRouteKey);
+    },
+  };
+}
+
+function renderCommandDeck(
+  props?: Partial<React.ComponentProps<typeof CommandDeck>>,
+  queryClient: QueryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
-  });
+  }),
+) {
 
   // Provide minimal fetch mocks for the hooks
   vi.stubGlobal(
@@ -432,7 +449,17 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <CommandDeck {...props} />
+      <TestDeckNavigationProvider navigation={deckNavigationLike(props)}>
+        {/* PAN-5293: the deck's lists live in the left column now; render its
+            sections beside the deck so row clicks still reach the deck. */}
+        {props?.selectedProject && (
+          <>
+            <ConversationsSection selectedProject={props.selectedProject} />
+            <IssuesSection selectedProject={props.selectedProject} />
+          </>
+        )}
+        <CommandDeck {...props} />
+      </TestDeckNavigationProvider>
     </QueryClientProvider>,
   );
 }
@@ -455,6 +482,7 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
       body: { id: 3, name: 'created-conv', title: 'Agent' },
     };
     useCommandDeckSelection.getState().clearAll();
+    useCommandDeckSelection.setState({ selectedConversation: null, selectedFeature: null });
     usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} });
     usePlannedBacklogVisibility.setState({ showPlannedBacklog: true });
     localStorage.clear();
@@ -471,15 +499,15 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     expect(screen.queryByTestId('project-node')).not.toBeInTheDocument();
   });
 
-  it('mounts the project deck and activity feed for the selected project', async () => {
+  it('mounts the project deck, and no Awareness rail (PAN-5293 F-D22)', async () => {
     renderCommandDeck({ selectedProject: 'test-project' });
     await screen.findAllByTestId('project-node');
 
     const stage = screen.getByTestId('stage');
     expect(stage).toHaveAttribute('data-deck', 'test-project');
-    expect(screen.getByTestId('activity-feed')).toHaveAttribute('data-issues', 'PAN-821');
-    // PAN-4301 FR-15: the rail scopes by the project's resolved conversation set.
-    await waitFor(() => expect(screen.getByTestId('activity-feed')).toHaveAttribute('data-conversations', '1'));
+    // The feed moved to the Feed tab on /activity (ActivityFeedTab.test).
+    expect(screen.queryByTestId('activity-feed')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show Awareness rail' })).not.toBeInTheDocument();
   });
 
   it('keeps the issue rail rendered while selected-project membership is unavailable', async () => {
@@ -540,29 +568,26 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     expect(await screen.findByTestId('feature-PAN-821')).toBeInTheDocument();
     expect(screen.getByTestId('feature-PAN-2822')).toBeInTheDocument();
 
-    const toggle = screen.getByTestId('planned-backlog-toggle');
-    const issuesHeader = screen.getByText('Issues').parentElement!;
-    expect(toggle).toHaveClass('treeFilterButtonActive');
-    expect(within(issuesHeader).getByText('2')).toBeInTheDocument();
+    // PAN-5293: the Planned toggle and the count live in the left column's
+    // Issues header (IssuesSection.test); here the shared store drives both
+    // the tree and the project home.
+    const toggle = () => act(() => usePlannedBacklogVisibility.getState().toggleShowPlannedBacklog());
     const initialHomeFeatures = latestStageProps.renderHome({}).props.features.map((feature: any) => feature.issueId);
     expect(initialHomeFeatures).toHaveLength(2);
     expect(initialHomeFeatures).toEqual(expect.arrayContaining(['PAN-821', 'PAN-2822']));
 
-    fireEvent.click(toggle);
+    toggle();
 
     await waitFor(() => expect(screen.queryByTestId('feature-PAN-2822')).not.toBeInTheDocument());
     expect(screen.getByTestId('feature-PAN-821')).toBeInTheDocument();
-    expect(toggle).not.toHaveClass('treeFilterButtonActive');
-    expect(within(issuesHeader).getByText('1')).toBeInTheDocument();
     expect(latestStageProps.renderHome({}).props.features.map((feature: any) => feature.issueId)).toEqual([
       'PAN-821',
     ]);
 
-    fireEvent.click(toggle);
+    toggle();
 
     expect(await screen.findByTestId('feature-PAN-2822')).toBeInTheDocument();
-    expect(toggle).toHaveClass('treeFilterButtonActive');
-    expect(within(issuesHeader).getByText('2')).toBeInTheDocument();
+    expect(latestStageProps.renderHome({}).props.features).toHaveLength(2);
   });
 
   it('passes the immutable registration key to the project tree node', async () => {
@@ -724,29 +749,29 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     ]));
   });
 
-  it('quick create from the header + sends no context opt-outs and opens no dialog (PAN-4486)', async () => {
-    localStorage.setItem('overdeck.commandDeck.newConversationContext', '{"bareContext":true,"skipClaudeMd":true}');
+  it('creates with the model set on newConversationDefaults (PAN-5293 F-D12)', async () => {
+    useNewConversationDefaults.getState().setModel('m2');
     renderCommandDeck({ selectedProject: 'test-project' });
     await screen.findByTestId('stage');
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'New conversation' }));
+      await latestStageProps.onCreateConversation('claude-code');
     });
 
     const post = vi.mocked(fetch).mock.calls.find(([url, init]) => url === '/api/conversations' && init?.method === 'POST');
-    const body = JSON.parse(String(post?.[1]?.body));
-    expect(body).toMatchObject({ projectKey: 'test-project' });
-    expect(body).not.toHaveProperty('bareContext');
-    expect(body).not.toHaveProperty('skipClaudeMd');
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({ model: 'm2', harness: 'claude-code', projectKey: 'test-project' });
   });
 
-  it('no longer renders the sticky context checkboxes in the sidebar (PAN-4486)', async () => {
+  it('renders no sticky context checkboxes and no column of its own (PAN-4486, PAN-5293)', async () => {
     renderCommandDeck({ selectedProject: 'test-project' });
     await screen.findByTestId('stage');
     expect(screen.queryByRole('checkbox', { name: 'No context' })).toBeNull();
     expect(screen.queryByRole('checkbox', { name: 'Skip CLAUDE.md' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'New conversation options' })).toBeTruthy();
+    // The New conversation split button, its pickers and the heading moved to the left column.
+    expect(screen.queryByRole('button', { name: 'New conversation options' })).toBeNull();
+    expect(screen.queryByText('Command Deck')).toBeNull();
+    expect(document.querySelector('.resizeHandle')).toBeNull();
+    expect(screen.getByTestId('stage').closest('.content')).not.toBeNull();
   });
 
   it('returns the server error while preserving the existing error signals', async () => {
@@ -819,5 +844,86 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     onConvIdChange.mockClear();
     fireEvent.click(screen.getByTestId('conv-test'));
     await waitFor(() => expect(onConvIdChange).toHaveBeenCalledWith('1'));
+  });
+
+  it('records the tree issue as the store selection and clears the conversation (PAN-5293 F-D1)', async () => {
+    renderCommandDeck({ selectedProject: 'test-project' });
+    await screen.findAllByTestId('project-node');
+
+    fireEvent.click(screen.getByTestId('conv-test'));
+    expect(useCommandDeckSelection.getState().selectedConversation).toBe('test-conv');
+
+    fireEvent.click(screen.getByTestId('feature-PAN-821'));
+    expect(useCommandDeckSelection.getState().selectedFeature).toBe('PAN-821');
+    expect(useCommandDeckSelection.getState().selectedConversation).toBeNull();
+  });
+
+  it('keeps a /conv deep-link selection under StrictMode with a warm cache (PAN-5293 F-D1)', async () => {
+    // StrictMode runs the unmount cleanup once between two effect passes. The
+    // deep-link effect must still leave the conversation selected.
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const warm = renderCommandDeck({ selectedProject: 'test-project', convId: null }, queryClient);
+    await screen.findAllByTestId('project-node');
+    await waitFor(() => expect(queryClient.getQueryData(['conversations'])).toBeTruthy());
+    warm.unmount();
+
+    render(
+      <StrictMode>
+        <QueryClientProvider client={queryClient}>
+          <TestDeckNavigationProvider><CommandDeck selectedProject="test-project" convId="1" /></TestDeckNavigationProvider>
+        </QueryClientProvider>
+      </StrictMode>,
+    );
+    await screen.findByTestId('stage');
+    await waitFor(() => expect(useCommandDeckSelection.getState().selectedConversation).toBe('test-conv'));
+    expect(panes('test-project').filter((p) => p.paneType === 'agent' && p.conversationId === 'test-conv')).toHaveLength(1);
+  });
+
+  it('keeps a cockpit deep-link selection under StrictMode with a warm cache (PAN-5293 F-D1)', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const warm = renderCommandDeck({ selectedProject: 'test-project' }, queryClient);
+    await screen.findAllByTestId('project-node');
+    await waitFor(() => expect(queryClient.getQueryData(['conversations'])).toBeTruthy());
+    warm.unmount();
+
+    render(
+      <StrictMode>
+        <QueryClientProvider client={queryClient}>
+          <TestDeckNavigationProvider><CommandDeck selectedProject="test-project" cockpitIssue={{ project: 'test-project', issue: 'PAN-821' }} /></TestDeckNavigationProvider>
+        </QueryClientProvider>
+      </StrictMode>,
+    );
+    await screen.findByTestId('stage');
+    await waitFor(() => expect(useCommandDeckSelection.getState().selectedFeature).toBe('PAN-821'));
+    expect(panes('test-project').filter((p) => p.paneType === 'issue' && p.issueId === 'PAN-821')).toHaveLength(1);
+  });
+
+  it('does not rewrite the URL on remount after a conversation was selected (PAN-5293 F-D1)', async () => {
+    // The selection lives in a store that outlives the deck. Without the
+    // unmount cleanup, the remounted deck's URL-sync effect (prevSelectedRef
+    // starts null) would see the leftover conversation in the cached list and
+    // write /conv/1. Both mounts share one QueryClient, as the app does.
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const onConvIdChange = vi.fn();
+    const first = renderCommandDeck({ selectedProject: 'test-project', convId: null, onConvIdChange }, queryClient);
+    await screen.findAllByTestId('project-node');
+    await waitFor(() => {
+      fireEvent.click(screen.getByTestId('conv-test'));
+      expect(onConvIdChange).toHaveBeenCalledWith('1');
+    });
+
+    first.unmount();
+    expect(useCommandDeckSelection.getState().selectedConversation).toBeNull();
+    expect(useCommandDeckSelection.getState().selectedFeature).toBeNull();
+
+    onConvIdChange.mockClear();
+    renderCommandDeck({ selectedProject: 'test-project', convId: null, onConvIdChange }, queryClient);
+    await screen.findAllByTestId('project-node');
+    for (let i = 0; i < 5; i += 1) {
+      await act(async () => {
+        await Promise.resolve();
+      });
+    }
+    expect(onConvIdChange).not.toHaveBeenCalled();
   });
 });

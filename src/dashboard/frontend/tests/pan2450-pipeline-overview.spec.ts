@@ -122,11 +122,15 @@ test.describe('PAN-2450 pipeline overview', () => {
     }, theme);
     await page.reload();
 
-    const sidebarProject = page.locator('[data-testid^="sidebar-project-"]').filter({ hasText: 'mind-your-now' }).first();
-    await expect(sidebarProject).toBeVisible({ timeout: 20_000 });
+    // PAN-5293: projects are picked from the left column's project switcher.
+    const switcher = page.getByTestId('project-switcher');
+    await expect(switcher).toBeVisible({ timeout: 20_000 });
     // Dismiss any recovery/overlay that intercepts pointer events in the test environment.
     await page.locator('#pan-recovery-overlay').evaluate((el) => el.remove()).catch(() => {});
-    await sidebarProject.click();
+    await switcher.click();
+    const projectRow = page.locator('[data-testid^="project-switcher-row-"]').filter({ hasText: 'mind-your-now' }).first();
+    await expect(projectRow).toBeVisible({ timeout: 20_000 });
+    await projectRow.click();
 
     const pipelineSection = page.getByTestId('pipeline-section');
     await expect(pipelineSection).toBeVisible({ timeout: 20_000 });

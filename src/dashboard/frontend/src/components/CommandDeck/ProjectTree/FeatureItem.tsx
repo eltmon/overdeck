@@ -40,6 +40,9 @@ import { SessionNode } from './SessionNode';
 import { useDashboardStore } from '../../../lib/store';
 import { computeDominantStatus, sessionsNeedAttention } from './sessionAggregates';
 import { DeftDriftBadges } from '../../deft/DeftBadges';
+import { getPipelineIssuePhase } from '../../../lib/pipeline-state';
+import { issueByIdentifier } from '../../../lib/selectors/issueIndex';
+import { featureRowMetaParts } from './featureRowMeta';
 import styles from '../styles/command-deck.module.css';
 export type TreeSessionFilter = 'all' | 'alive' | 'failed';
 interface FeatureItemProps {
@@ -622,6 +625,9 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   const prBadgeLink = issuePullRequestBadgeLink(storeDerived?.pr, feature.resourceDetails?.prs);
   const resolvedState = storeDerived?.state ?? feature.state ?? null;
   const isReady = resolvedState === 'ready';
+  const phase = useDashboardStore((state) => getPipelineIssuePhase(storeDerived, issueByIdentifier(state.issuesRaw, feature.issueId)));
+  const needsYou = storeDerived?.attention === 'needs-you';
+  const metaParts = featureRowMetaParts({ phase, needsYou, sessions: feature.sessions, taskTotals: feature.taskTotals });
 
   const aggregateSessions = feature.sessions?.filter(isWorkOrSpecialistSession) ?? [];
   const activityState = getAggregateActivityState(aggregateSessions);
@@ -746,7 +752,22 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               <span className={styles.featureCost}>{formatCost(cost)}</span>
             )}
           </span>
-          <span className={styles.featureMetaLine}>
+          <span className={styles.featureMetaLine} data-testid="feature-meta-words">
+            {metaParts.map((part, index) => (
+              <span key={part} className={index === 0 && needsYou ? 'text-state-needs-you' : 'text-muted-foreground'}>
+                {index > 0 && <span aria-hidden> · </span>}
+                {part}
+              </span>
+            ))}
+          </span>
+        </button>
+      </ContextMenuTrigger>
+      </div>
+        </IssuePeek>
+      </div>
+      {/* PAN-5293 F-D16: the badges the collapsed row used to carry, unchanged. */}
+      {expanded && (
+        <div className={styles.featureMetaLine} data-section="FeatureBadges" data-testid="feature-badges">
           {/* PAN-2975: the resume affordance lives INSIDE the row's meta line
               as a badge-like chip — never a detached block above the card. */}
           <StartAgentCta issueId={feature.issueId} density="rail" surface="chip" />
@@ -830,12 +851,8 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               <i key={PIPE_ORDER[i]} className={PIPE_CLASS[seg] ? styles[PIPE_CLASS[seg] as keyof typeof styles] as string : undefined} title={`${PIPE_STEP_LABELS[i]}: ${describePipeSegment(seg)}`} />
             ))}
           </span>
-          </span>
-        </button>
-      </ContextMenuTrigger>
-      </div>
-        </IssuePeek>
-      </div>
+        </div>
+      )}
       {expanded && (
         <div data-section="ShipDoorTreeRow"><RailShipProgress issueId={feature.issueId} onClick={() => onSelect?.()} /></div>
       )}

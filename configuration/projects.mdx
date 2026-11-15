@@ -130,7 +130,7 @@ the wrong project.
 
 ### Dashboard
 
-The sidebar `+`, the command palette, the workspace-page chips, and the
+The project switcher's **Add a project**, the command palette, the workspace-page chips, and the
 HomePage button open the **Add a project** dialog over the page you are on.
 `/projects/new` still works and shows the same dialog as a full page;
 `?mode=clone`, `?mode=existing` or `?mode=new` skips the first step.
@@ -245,7 +245,7 @@ projects:
 | `path` | Yes | Absolute path to project root |
 | `issue_prefix` | Yes* | Issue prefix for standard format IDs (e.g., "MIN", "PAN"). Automatically proposed during registration based on the repository name. 1 to 10 uppercase letters; digits are rejected because issue IDs must match `LETTERS-NUMBER`. For tracker IDs that do not fit, use `issue_pattern`. |
 | `tracker` | No | Issue tracker type: `linear`, `github`, `gitlab`, `rally`, `jira`. Set it explicitly when the code host and issue tracker differ. |
-| `owner` | No | The label of the dashboard sidebar group this project shows under. Display only: it never changes which account acts on the repository. See [Sidebar owner groups](#sidebar-owner-groups). |
+| `owner` | No | The label of the owner group this project shows under in the dashboard's project switcher. Display only: it never changes which account acts on the repository. See [Owner groups](#owner-groups). |
 | `jira` | No | Jira settings for a `tracker: jira` project: `site` (Jira site URL), `deployment` (`cloud` or `datacenter`), and `status_map` (Jira status name per Overdeck state). See [Issue Tracker Integration](/configuration/issue-trackers#jira-integration). |
 | `issue_prefixes` | No | Array of prefixes for multi-prefix trackers (e.g., `[F, US, DE, TA]`) |
 | `issue_pattern` | No | Custom regex for issue ID parsing: `^(PREFIX)-(\\d+)$` |
@@ -264,9 +264,9 @@ projects:
 
 *Not required if `issue_prefixes` or `issue_pattern` is specified.
 
-### Sidebar owner groups
+### Owner groups
 
-When your projects have two or more owners, the dashboard sidebar groups them by owner. Each project's owner is the first of these that is set:
+The project switcher at the top of the dashboard's left column lists every project with its machine count and a status word. When your projects have two or more owners, it groups them by owner, and you can collapse each group. Each project's owner is the first of these that is set:
 
 1. `owner`
 2. The GitHub owner, the first part of `github_repo`

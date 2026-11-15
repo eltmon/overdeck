@@ -1,0 +1,2190 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T06:56:07Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5293: Workflow redesign F: one left column replaces the sidebar and Command Deck column; Awareness becomes the Activity feed",
+    "updated": "2026-11-15T06:57:27.104Z"
+  },
+  "plan": {
+    "id": "pan-5293",
+    "title": "Workflow redesign F: one left column replaces the sidebar and Command Deck column; Awareness becomes the Activity feed",
+    "status": "running",
+    "uid": "29ad49df-0199-459f-b620-d900ffa3f6a1",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T06:56:07Z",
+    "updated": "2026-11-15T06:57:27.104Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5293",
+        "label": "PAN-5293",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5293/.pan/drafts/pan-5293.md",
+        "label": "PRD draft (.pan/drafts/pan-5293.md)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-5284.md",
+        "label": "Parent PRD (PAN-5284, child F)",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/design/workflow-redesign-mockup.html",
+        "label": "Approved mockup",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "workflow-redesign",
+      "left-column",
+      "activity-feed"
+    ],
+    "narratives": {
+      "Problem": "Three always-open side columns (nav Sidebar 256 px, the Command Deck column 320 px, the Awareness rail 300 px) leave the chat about 750 px wide at 1920 px, and the deck lists exist only on the command-deck route.",
+      "Proposal": "Extract the Command Deck list state and handlers into route-independent modules under components/frame/deck/ with an App-level openInDeck door (no behavior change), build one left column (switcher, nav, New conversation, Conversations, Issues, Workspaces, footer) against them, swap the frame in one item (full-width top bar with brand, Sidebar and deck column removed), and move the Awareness feed to a Feed tab on /activity while removing the rail and the History toggle.",
+      "NonGoals": "- Project Home changes (child G), including moving the project CI/identity/deploy chips to Project Home\n- Inverting successor chains to newest-first in the conversation tree\n- Adding a Projects group to the command palette\n- Changing PipelineView, God View, Board, Flywheel or Order Book pages\n- Mobile layout beyond the left-column drawer below 900 px; the /m phone shell\n- Ledger theme parity beyond not breaking\n- Any new polling loop or refetchInterval\n- Raising any scripts/file-size-allowlist.txt row"
+    },
+    "metadata": {
+      "sizeJustification": "Parent PRD D-13 requires the child that removes the Command Deck column to move its lists in the same PR so the dashboard stays usable after the Flywheel reloads it; the extraction, section, swap and Awareness items are therefore one deliverable. The surface is mostly new files under components/frame/ plus docs; each item is independently reviewable and gated by its own tests.",
+      "canonicalFilename": "2026-11-15-PAN-5293-workflow-redesign-f-one-left-column-replaces-the-sidebar-and-command-deck-column-awareness-becomes-the-activity-feed.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Left column lists the selected project on every route; row clicks open the pane then switch to the deck via openInDeck",
+        "rationale": "Mockup shows one persistent frame column; App selectedProjectKey already survives route changes (F-D3)."
+      },
+      {
+        "summary": "Deck selection moves to useCommandDeckSelection; deep-link and URL-sync effects stay in CommandDeck",
+        "rationale": "Only one of the two consumers is mounted per route; keeping the effects in place preserves mount semantics (F-D1)."
+      },
+      {
+        "summary": "Session-tree subscription, container poll and N shortcut have one owner in the frame (DeckDataHost / New conversation button)",
+        "rationale": "Avoids duplicate WS subscriptions and double shortcut registration (F-D4)."
+      },
+      {
+        "summary": "Project switcher menu lists every project (owner groups kept) instead of \"All N projects… (Ctrl K)\"",
+        "rationale": "The command palette has no Projects group; adding one is outside F (F-D7)."
+      },
+      {
+        "summary": "Project marks use neutral initials, no per-project color",
+        "rationale": "Style guide forbids hex and decorative color (F-D7)."
+      },
+      {
+        "summary": "Workspaces section is project-scoped; the Flat/Group toggle is dropped",
+        "rationale": "Parent §6.6 scopes the section to the project; other workspaces stay reachable via Ctrl K and the switcher (F-D9)."
+      },
+      {
+        "summary": "Conversations Active/All via a new ConversationList scope prop; Favorites tab and sort stay inside the list",
+        "rationale": "Keeps WorkspaceView unchanged and loses no control (F-D13)."
+      },
+      {
+        "summary": "Compact issue rows; collapsed-row badges move unchanged into the expanded body",
+        "rationale": "Matches the mockup while keeping every badge reachable (F-D16)."
+      },
+      {
+        "summary": "Feed tab reuses SessionFeedSidebar with its scope switcher, keeping DecisionsPanel mounted",
+        "rationale": "Parent §7 says the same feed and scopes; the Needs-you menu cannot host DecisionsPanel inline cards (F-D21)."
+      },
+      {
+        "summary": "Theme toggle and Search are not repeated in the footer; version moves to the footer and the brand to the top bar",
+        "rationale": "E already put theme and search in the top bar; parent §6.6 puts version in the footer; E-D4 hands the brand to F (F-D14, F-D19)."
+      },
+      {
+        "summary": "Drag-to-project on conversation rows is removed",
+        "rationale": "Its only drop target was Sidebar.tsx; parent D-14 names Move ▸ as the replacement (F-D20)."
+      },
+      {
+        "summary": "Pipeline filters are not rebuilt",
+        "rationale": "PipelineView already renders phase and project filters and reads the URL params (F-D11)."
+      },
+      {
+        "summary": "Jump-to-terminal is pinned by a test plus a waiting-time sub-line, no new control",
+        "rationale": "needsYou.ts openSubject already routes non-answerable conversation permissions to the terminal (F-D23)."
+      },
+      {
+        "summary": "Dead showTasks TasksDialog branch in CommandDeck is deleted",
+        "rationale": "showTasks is never set true; App TasksViewerHost already serves Tasks (F-D6)."
+      },
+      {
+        "summary": "Project query key unified to [\"command-deck-projects\"], epoch replaced by invalidateQueries",
+        "rationale": "Removes the duplicate cache entry the Sidebar and deck kept (F-D5)."
+      },
+      {
+        "summary": "Update existing features/mission-control.mdx instead of adding a new docs page",
+        "rationale": "Avoids docs.json nav changes; that page already documents the deck."
+      }
+    ],
+    "items": [
+      {
+        "id": "selection-store",
+        "title": "Move deck selection (selectedConversation, selectedFeature) into useCommandDeckSelection",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/commandDeckSelection.ts",
+            "src/dashboard/frontend/src/lib/__tests__/commandDeckSelection.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/commandDeckSelection.test.ts src/components/CommandDeck/CommandDeck.test.tsx src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in commandDeckSelection.test.ts passed",
+            "vitest reports every test in CommandDeck.test.tsx passed",
+            "vitest reports every test in CommandDeck.render-count.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1, F-D1. Add selectedConversation/selectedFeature (initial null) and setSelectedConversation/setSelectedFeature to lib/commandDeckSelection.ts (clearAll leaves them unchanged). In components/CommandDeck/index.tsx replace the two useState calls (search `const [selectedFeature`, `const [selectedConversation`) with store reads and getState() writes, and add an unmount cleanup that sets both fields back to null (F-D1). No behavior change: CommandDeck.test.tsx passes, resetting the store in beforeEach."
+        },
+        "items": [
+          {
+            "id": "selection-store.ac1",
+            "title": "Given a conversation was selected in a mounted CommandDeck, when CommandDeck unmounts and remounts with convId null and a project selected, then onConvIdChange is not called and both store fields are null after the unmount",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "selection-store.ac2",
+            "title": "Given the store, when setSelectedConversation(\"a\") then setSelectedFeature(\"PAN-1\") run, then getState() returns selectedConversation \"a\" and selectedFeature \"PAN-1\", and clearAll() preserves both",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "selection-store.ac3",
+            "title": "Given CommandDeck renders, when a tree issue is selected, then useCommandDeckSelection.getState().selectedFeature equals that issue id and selectedConversation is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "selection-store.ac4",
+            "title": "Every existing case in CommandDeck.test.tsx and CommandDeck.render-count.test.tsx passes after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deck-navigation",
+        "title": "Deck navigation door: openInDeck in App.tsx + DeckNavigationContext",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/deck/deckNavigation.tsx",
+            "src/dashboard/frontend/src/components/frame/deck/__tests__/deckNavigation.test.tsx",
+            "src/dashboard/frontend/src/App.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/frame/deck/__tests__/deckNavigation.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in deckNavigation.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "issue-session-actions",
+            "create-conversation",
+            "left-column-shell",
+            "frame-swap"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2, F-D2, §6.2. Create components/frame/deck/deckNavigation.tsx with DeckTarget, DeckNavAction, the pure deckNavigationActions(state, target), DeckNavigationContext/Provider, useDeckNavigation() (throws outside a provider) and TestDeckNavigationProvider. In App.tsx add openInDeck mapping each action to setSelectedProjectKey / setActiveTab(\"command-deck\") / setSelectedConvId / setCockpitRouteState+onCockpitChange / onCockpitChange(project, null), and wrap <main> in the provider with { openInDeck, selectProject: handleSelectProject }. App gains no store subscription and stays <= 1019 lines."
+        },
+        "items": [
+          {
+            "id": "deck-navigation.ac1",
+            "title": "Given activeTab \"flywheel\", when deckNavigationActions gets a conversation target, then it returns show-deck followed by conversation-route with that route key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-navigation.ac2",
+            "title": "Given activeTab \"command-deck\" and the same project, when it gets an issue target, then it returns an empty list; for a conversation target it returns only conversation-route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-navigation.ac3",
+            "title": "Given a target project different from selectedProjectKey, then the first returned action is select-project with the target project key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-navigation.ac4",
+            "title": "useDeckNavigation() called outside a provider throws an error whose message names DeckNavigationProvider",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deck-data-hooks",
+        "title": "Extract deck data hooks (projects+session trees, subscription, container stats, costs, project scope)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/deck/useDeckProjects.ts",
+            "src/dashboard/frontend/src/components/frame/deck/useSessionTreeSubscription.ts",
+            "src/dashboard/frontend/src/components/frame/deck/useContainerStats.ts",
+            "src/dashboard/frontend/src/components/frame/deck/useIssueCosts.ts",
+            "src/dashboard/frontend/src/components/frame/deck/useProjectScope.ts",
+            "src/dashboard/frontend/src/components/frame/deck/__tests__/useProjectScope.test.ts",
+            "src/dashboard/frontend/src/components/frame/deck/__tests__/useDeckProjects.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/frame/deck/__tests__/useProjectScope.test.ts src/components/frame/deck/__tests__/useDeckProjects.test.tsx src/components/CommandDeck/CommandDeck.test.tsx src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in useProjectScope.test.ts passed",
+            "vitest reports every test in useDeckProjects.test.tsx passed",
+            "vitest reports every test in CommandDeck.test.tsx passed",
+            "vitest reports every test in CommandDeck.render-count.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "issue-session-actions",
+            "project-switcher",
+            "issues-section",
+            "left-column-shell",
+            "activity-feed-tab"
+          ],
+          "parallelSafeReason": "Runs in its own slot once its blocks-edge predecessors finish; every file it shares with another item is ordered by a direct blocks edge, so no two concurrent slots edit the same file."
+        },
+        "narrative": {
+          "Action": "PRD WI-3, F-D5, §6.1. Create components/frame/deck/useDeckProjects.ts, useSessionTreeSubscription.ts, useContainerStats.ts, useIssueCosts.ts, useProjectScope.ts by moving the code named in the §6.1 table out of CommandDeck/index.tsx. Unify the project query key to [\"command-deck-projects\"] and replace bumpProjectQueryEpoch() with invalidateQueries({ queryKey: [\"command-deck-projects\"] }); delete the epoch reducer. useProjectScope also returns membership { pending, registryError, unknown } and accepts an optional conversations list (CommandDeck passes its usePriorityConversation list). CommandDeck calls the hooks and, until frame-swap, still mounts useSessionTreeSubscription and useContainerStats itself."
+        },
+        "items": [
+          {
+            "id": "deck-data-hooks.ac1",
+            "title": "Given conversations with projectKey overrides and cwd-only rows, when useProjectScope(deckKey) runs, then projectConvs holds exactly the rows resolveEffectiveProjectKey maps to that project, and for NO_PROJECT_KEY it returns the unscoped rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-data-hooks.ac2",
+            "title": "Given a session tree delta for one project, when useDeckProjects merges it, then features of other projects keep object identity (toBe) and the changed feature gets the new sessions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-data-hooks.ac3",
+            "title": "grep -n \"projectQueryEpoch\" src/dashboard/frontend/src/components/CommandDeck/index.tsx returns nothing and the projects query key is [\"command-deck-projects\"]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-data-hooks.ac4",
+            "title": "CommandDeck.test.tsx and CommandDeck.render-count.test.tsx pass, including \"a new agent ID invalidates command-deck-projects\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issue-session-actions",
+        "title": "Extract issue/session handlers into useIssueSessionActions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/deck/useIssueSessionActions.ts",
+            "src/dashboard/frontend/src/components/frame/deck/__tests__/useIssueSessionActions.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/frame/deck/__tests__/useIssueSessionActions.test.tsx src/components/CommandDeck/CommandDeck.test.tsx src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in useIssueSessionActions.test.tsx passed",
+            "vitest reports every test in CommandDeck.test.tsx passed",
+            "vitest reports every test in CommandDeck.render-count.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ],
+          "parallelSafeReason": "Runs in its own slot once its blocks-edge predecessors finish; every file it shares with another item is ordered by a direct blocks edge, so no two concurrent slots edit the same file."
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Move handleSelectFeature … handleViewJsonl (CommandDeck/index.tsx search `const handleSelectFeature` through `const handleViewJsonl`, incl. useConfirm and handleOpenPlanDialog) into components/frame/deck/useIssueSessionActions.ts taking deckKey. Selection writes go to the store; every pane-opening handler opens the pane via panesStore then calls useDeckNavigation().openInDeck. planDialogIssue lives in a small deckDialogsStore in the same file. CommandDeck uses the hook (ProjectHome onSelectFeature, Stage callbacks). Because CommandDeck now calls useDeckNavigation(), wrap every <CommandDeck> render in CommandDeck.test.tsx and __tests__/CommandDeck.render-count.test.tsx in TestDeckNavigationProvider."
+        },
+        "items": [
+          {
+            "id": "issue-session-actions.ac1",
+            "title": "Given deckKey \"proj\", when handleSelectFeature(\"PAN-1\") runs, then panesStore has an active issue pane for PAN-1 in \"proj\" and openInDeck was called once with { projectKey: \"proj\", issueId: \"PAN-1\" }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-session-actions.ac2",
+            "title": "When handleStopSession(\"agent-x\") runs, then fetch is called with DELETE /api/agents/agent-x",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-session-actions.ac3",
+            "title": "When handleCleanupOrphanedResources runs after a confirmed prompt, then invalidateQueries is called with queryKey [\"command-deck-projects\"]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-session-actions.ac4",
+            "title": "CommandDeck.test.tsx cases \"opens an issue tab when a tree issue is selected\" and \"opens an issue tab when a session is selected\" pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "create-conversation",
+        "title": "Extract conversation creation/opening (newConversationDefaults, useCreateConversation, useOpenConversation)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/deck/newConversationDefaults.ts",
+            "src/dashboard/frontend/src/components/frame/deck/useCreateConversation.ts",
+            "src/dashboard/frontend/src/components/frame/deck/useOpenConversation.ts",
+            "src/dashboard/frontend/src/components/frame/deck/__tests__/useCreateConversation.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/frame/deck/__tests__/useCreateConversation.test.tsx src/components/CommandDeck/CommandDeck.test.tsx src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in useCreateConversation.test.tsx passed",
+            "vitest reports every test in CommandDeck.test.tsx passed",
+            "vitest reports every test in CommandDeck.render-count.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ],
+          "parallelSafeReason": "Runs in its own slot once its blocks-edge predecessors finish; every file it shares with another item is ordered by a direct blocks edge, so no two concurrent slots edit the same file."
+        },
+        "narrative": {
+          "Action": "PRD WI-5, F-D12. Create components/frame/deck/newConversationDefaults.ts (zustand: model/harness/effort from loadStored*, re-derived on onKnownModelsSync), useCreateConversation.ts (create/createForAgent with onCreated; POST /api/conversations as today; open pane; openInDeck with the new id; invalidate [\"conversations\"]) and useOpenConversation.ts (handleSelectConversation via openInDeck). CommandDeck uses them; its createDeckConversation passes onCreated that sets appliedConvId/prevSelectedRef. The `deck.new-conversation` shortcut stays in CommandDeck until frame-swap. Move the PAN-4486 \"no context opt-outs\" test here."
+        },
+        "items": [
+          {
+            "id": "create-conversation.ac1",
+            "title": "Given a project key, when create(\"proj\") succeeds, then the POST body has model, harness and projectKey and no context opt-out fields, and openInDeck is called with { projectKey: \"proj\", conversationRouteKey: <new id> }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-conversation.ac2",
+            "title": "Given the server returns 500 with { error: \"boom\" }, when create runs, then it resolves to { error: \"boom\" } and toast.error is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-conversation.ac3",
+            "title": "Given setModel(\"m2\") on newConversationDefaults, when CommandDeck createDeckConversation runs, then the POST body model is \"m2\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-conversation.ac4",
+            "title": "CommandDeck.test.tsx \"opens an agent tab in the deck when a conversation is selected\" and \"re-syncs the /conv URL when an already-selected conversation is clicked again\" pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspace-helpers",
+        "title": "Move workspace row helpers out of Sidebar.tsx into components/frame/workspaceRows.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/workspaceRows.ts",
+            "src/dashboard/frontend/src/components/Sidebar.tsx",
+            "src/dashboard/frontend/src/components/CommandPalette.tsx",
+            "src/dashboard/frontend/src/components/workspace-rail-filter.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/workspace-rail-filter.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in workspace-rail-filter.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6, F-D10. Move WorkspaceRegistryRow, isUserFacingWorkspace, isRailWorkspace, sortWorkspaces verbatim to components/frame/workspaceRows.ts; Sidebar.tsx and CommandPalette.tsx (lines 47-51) import from it. workspace-rail-filter.test.tsx imports the helpers from the new module."
+        },
+        "items": [
+          {
+            "id": "workspace-helpers.ac1",
+            "title": "grep -n \"from './Sidebar'\" src/dashboard/frontend/src/components/CommandPalette.tsx returns nothing and CommandPalette imports the helpers from ./frame/workspaceRows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-helpers.ac2",
+            "title": "workspace-rail-filter.test.tsx passes with isRailWorkspace and isUserFacingWorkspace imported from components/frame/workspaceRows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "project-switcher",
+        "title": "Project switcher button and menu (owner groups, status word, No project, other machines, Add project, New workspace)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/ProjectSwitcher.tsx",
+            "src/dashboard/frontend/src/components/frame/__tests__/ProjectSwitcher.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/frame/__tests__/ProjectSwitcher.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in ProjectSwitcher.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-8",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7, F-D7, F-D8. Create components/frame/ProjectSwitcher.tsx (data-testid \"project-switcher\"; menu rows \"project-switcher-row-<name>\") with props { selectedProject, onSelectProject, onNewProject, onNewWorkspace, collapsed }. Reuse groupProjectsByOwner/useCollapsedOwners/OwnerGroupHeader, ProjectMachineCount, OtherMachineProjects; mark = initials on bg-foreground text-background; path with home shortened to ~; filter input above 8 projects. Per-row status word component uses useAgentsWorking({ projectKey }) and getPipelineIssuePhase."
+        },
+        "items": [
+          {
+            "id": "project-switcher.ac1",
+            "title": "Given two owners, when an owner header is collapsed, then its projects are hidden and the choice persists across remount; with one owner no headers render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-switcher.ac2",
+            "title": "When a project row is clicked, then onSelectProject is called with project.name; the No project row calls it with NO_PROJECT_KEY",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-switcher.ac3",
+            "title": "Given a project with 2 working agents, one with an in-review issue only, and one with neither, then their rows read \"2 working\", \"1 in review\" and \"idle\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-switcher.ac4",
+            "title": "Given 9 projects, the menu renders a filter input and typing \"kr\" leaves only names containing \"kr\"; Add a project and New workspace call onNewProject and onNewWorkspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "left-nav",
+        "title": "Left column nav: Project home, Flywheel (running), Order books, More ▾ menu",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/navGroups.ts",
+            "src/dashboard/frontend/src/components/frame/LeftNav.tsx",
+            "src/dashboard/frontend/src/components/frame/__tests__/LeftNav.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/frame/__tests__/LeftNav.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in LeftNav.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8, F-D11. Move MORE_GROUPS (and NavItem/NavGroup types) verbatim from Sidebar.tsx to components/frame/navGroups.ts; create components/frame/LeftNav.tsx with props { activeTab, selectedProject, onTabChange, onOpenProjectHome, collapsed }. Experimental filtering via fetchExperimentalFeaturesEnabled/isExperimentalTab as today; Flywheel word via useFlywheelRunning. Keep data-testids sidebar-flywheel, sidebar-orders, sidebar-flywheel-live."
+        },
+        "items": [
+          {
+            "id": "left-nav.ac1",
+            "title": "When Project home is clicked, then onOpenProjectHome is called; with selectedProject null the Project home entry is not rendered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "left-nav.ac2",
+            "title": "Given useFlywheelRunning returns true, then the Flywheel entry shows \"running\"; given false, no \"running\" text renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "left-nav.ac3",
+            "title": "When More is opened, then every MORE_GROUPS group label renders with its items, Context and Skills under System, and clicking Pipeline calls onTabChange(\"pipeline\")",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "left-nav.ac4",
+            "title": "Given experimental features off, then experimental tabs are absent from the More menu; given on, they render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "new-conversation-button",
+        "title": "New conversation split button with caret menu (pickers, Retrospective, with options…) and the N shortcut",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/NewConversationButton.tsx",
+            "src/dashboard/frontend/src/components/frame/__tests__/NewConversationButton.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/NewConversationPickers.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/frame/__tests__/NewConversationButton.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in NewConversationButton.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9, F-D12. Create components/frame/NewConversationButton.tsx: main part calls useCreateConversation().create(projectKey or undefined for No project/none) and shows keycap N; caret opens a PopoverSurface menu with NewConversationPickers content bound to newConversationDefaults and \"New conversation with options…\" (openNewConversationDialog({ projectKey })). Registers deck.new-conversation (N, not-editing, when no aria-modal). Nothing mounts it before frame-swap."
+        },
+        "items": [
+          {
+            "id": "new-conversation-button.ac1",
+            "title": "When the main part is clicked with selectedProject \"proj\", then create is called once with \"proj\"; with NO_PROJECT_KEY it is called with undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-conversation-button.ac2",
+            "title": "When the caret is clicked, then the menu shows a model picker, a harness picker, an effort picker, the Retrospective button and \"New conversation with options…\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-conversation-button.ac3",
+            "title": "Given focus on document.body, when N is pressed, then create is called once; given focus in a textarea, pressing N calls nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-meta-line",
+        "title": "Conversation row meta line in words (state · changes · cost), changeTotals type, no drag source",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/conversationMeta.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/conversationMeta.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/__tests__/conversationMeta.test.ts src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in conversationMeta.test.ts passed",
+            "vitest reports every test in ConversationRow.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-8",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10, F-D15, F-D20. Create components/CommandDeck/conversationMeta.ts with conversationMetaParts(conv, now) and shortModel (moved from ConversationRow.tsx). Add changeTotals?: ConversationChangeTotals (from @overdeck/contracts) to the Conversation interface in ConversationList.tsx. Rewrite the flat-row meta line in ConversationRow.tsx (search `Flat list rows: title on line 1`) per F-D15; move branch/model/tokens/harness into the line title; remove draggable/onDragStart."
+        },
+        "items": [
+          {
+            "id": "conversation-meta-line.ac1",
+            "title": "Given rows with pendingInputCount 1, isWorking true, sessionAlive only, and ended, then conversationMetaParts returns state words \"Needs you\", \"Working\", \"Idle <relative>\" and \"<relative>\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-meta-line.ac2",
+            "title": "Given changeTotals { files: 0 } the parts include \"no file changes\"; given { files: 2, additions: 86, deletions: 1, uncommittedFiles: 1 } they include \"+86\", \"−1\" and \"1 not committed\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-meta-line.ac3",
+            "title": "Given harness codex the parts include \"Codex\"; given claude-code no harness word; the rendered meta line title contains the branch and the model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-meta-line.ac4",
+            "title": "Given a rendered ConversationRow, then it has no draggable attribute, and its Move submenu lists registered projects and calls mutations.move with the chosen project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversations-section",
+        "title": "Conversations section: Active / All N header and ConversationList scope prop",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/ConversationsSection.tsx",
+            "src/dashboard/frontend/src/components/frame/__tests__/ConversationsSection.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationList.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/frame/__tests__/ConversationsSection.test.tsx src/components/CommandDeck/__tests__/ConversationList.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in ConversationsSection.test.tsx passed",
+            "vitest reports every test in ConversationList.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11, F-D13. Add optional scope?: \"active\" | \"all\" (default \"all\") to ConversationList (active renders only Needs you and Inbox sections). Create components/frame/ConversationsSection.tsx: eyebrow, segmented Active/All N persisted in overdeck.ui.leftColumnConversationScope (default active), renders ConversationList with selectedConversation from the store, onSelectConversation = useOpenConversation(), includeIds = useProjectScope(...).projectConvIdSet."
+        },
+        "items": [
+          {
+            "id": "conversations-section.ac1",
+            "title": "Given snoozed and settled rows, when scope is Active then the Snoozed and Settled groups do not render; when All they render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-section.ac2",
+            "title": "When the operator picks All and the section remounts, then All is still selected (localStorage overdeck.ui.leftColumnConversationScope = \"all\")",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-section.ac3",
+            "title": "Given N project conversations, then the header renders \"All N\" with N equal to the project conversation count, and clicking a row calls the open-conversation function with that row name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-section.ac4",
+            "title": "ConversationList rendered without scope (WorkspaceView usage) shows all four sections as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issue-row-compact",
+        "title": "Compact collapsed issue rows (id, title, stage · model · progress); badges move into the expanded body",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.pullRequest.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.linkedConversation.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx src/components/CommandDeck/ProjectTree/FeatureItem.pullRequest.test.tsx src/components/CommandDeck/ProjectTree/FeatureItem.linkedConversation.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in FeatureItem.test.tsx passed",
+            "vitest reports every test in FeatureItem.pullRequest.test.tsx passed",
+            "vitest reports every test in FeatureItem.linkedConversation.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-8",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "Runs in its own slot once its blocks-edge predecessors finish; every file it shares with another item is ordered by a direct blocks edge, so no two concurrent slots edit the same file."
+        },
+        "narrative": {
+          "Action": "PRD WI-12, F-D16. In FeatureItem.tsx render the collapsed row as two lines (leading controls, mono id, title, cost; then stage word · agent model via shortModel from conversationMeta.ts · \"k of n items\" from taskTotals; \"Needs you\" first when derived attention is needs-you). Move the collapsed meta-line badges unchanged to the top of the expanded body. Update FeatureItem tests that assert badges to expand the row first."
+        },
+        "items": [
+          {
+            "id": "issue-row-compact.ac1",
+            "title": "Given a work-phase issue with an active session on model claude-opus-5-5 and taskTotals { total: 8, closed: 3 }, then the collapsed row text includes \"Building\", \"opus-5-5\" and \"3 of 8 items\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-row-compact.ac2",
+            "title": "Given derived attention needs-you, then the collapsed meta line starts with \"Needs you\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-row-compact.ac3",
+            "title": "Given a feature with a PR and a ready merge state, then PullRequestBadge and MergeButton are absent while collapsed and render after the expand caret is clicked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-row-compact.ac4",
+            "title": "FeatureItem.tsx stays at or under 1000 lines (npm run lint:file-size passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issues-section",
+        "title": "Issues section: ProjectNode frame variant header (chips, filter menu, rename) wired to the extracted handlers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/IssuesSection.tsx",
+            "src/dashboard/frontend/src/components/frame/IssuesFilterMenu.tsx",
+            "src/dashboard/frontend/src/components/frame/__tests__/IssuesSection.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/frame/__tests__/IssuesSection.test.tsx src/components/CommandDeck/ProjectTree/ProjectNode.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in IssuesSection.test.tsx passed",
+            "vitest reports every test in ProjectNode.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-8"
+          ],
+          "parallelSafeReason": "Runs in its own slot once its blocks-edge predecessors finish; every file it shares with another item is ordered by a direct blocks edge, so no two concurrent slots edit the same file."
+        },
+        "narrative": {
+          "Action": "PRD WI-13, F-D17. Add variant?: \"tree\" | \"frame\" to ProjectNode (frame header: chevron persisted in overdeck.ui.leftColumnIssuesCollapsed, eyebrow \"Issues\", count, ProjectCiChip, ProjectDeployChip, ProjectIdentityChip, headerActions slot, right-click Rename/Copy kept, no MessageSquarePlus). Create components/frame/IssuesFilterMenu.tsx (All/Alive/Failed radio + Planned checkbox) and components/frame/IssuesSection.tsx rendering ProjectMembershipBoundary + ProjectNode variant=\"frame\" with every handler from useIssueSessionActions, costs from useIssueCosts, containerStats from useContainerStats(projectsWithSessions) (its sole owner, F-D4) and ProjectMembershipBoundary loading/disabled from useProjectScope().membership."
+        },
+        "items": [
+          {
+            "id": "issues-section.ac1",
+            "title": "Given variant frame, then the header renders \"Issues\", the feature count and the CI, deploy and identity chips, and no new-conversation icon button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issues-section.ac2",
+            "title": "When the filter menu selects Failed, then only issues with a failed session remain; toggling Planned off removes spec-only planned issues and lowers the count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issues-section.ac3",
+            "title": "When the header is right-clicked, then a menu with \"Rename project\" and \"Copy project name\" opens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issues-section.ac4",
+            "title": "When an issue row is clicked, then useIssueSessionActions().handleSelectFeature is called with its id; ProjectNode without variant renders its tree header as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspaces-section",
+        "title": "Project-scoped Workspaces section (badges, archived expander, + new workspace)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/WorkspacesSection.tsx",
+            "src/dashboard/frontend/src/components/frame/__tests__/WorkspacesSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/frame/__tests__/WorkspacesSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in WorkspacesSection.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14, F-D9. Create components/frame/WorkspacesSection.tsx from Sidebar.tsx renderWorkspaceRow and the Workspaces block, filtered to rail rows whose projectId equals findRegisteredProject(registeredProjects, selectedProject)?.key; keep data-testids sidebar-workspace-<id>, sidebar-workspace-pr-<id>, sidebar-workspace-memory-phase-<id>, sidebar-workspaces-archived-toggle, sidebar-new-workspace. Render nothing when there are no rows. Port the surviving cases of Sidebar.workspaces.test.tsx, Sidebar.workspacePullRequest.test.tsx and the <Sidebar> cases of workspace-rail-filter.test.tsx."
+        },
+        "items": [
+          {
+            "id": "workspaces-section.ac1",
+            "title": "Given rail rows for two projects, then only rows of the selected project render, favorites first then by lastAccessedAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspaces-section.ac2",
+            "title": "An issue row with a PR renders sidebar-workspace-pr-<id>; clicking the badge opens the PR and does not call onSelectWorkspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspaces-section.ac3",
+            "title": "Given 2 archived rows, the Archived toggle shows 2 and expanding it renders them; given no rows for the project, the section renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspaces-section.ac4",
+            "title": "When + is clicked, then onNewWorkspace is called with the selected project key; when a row is clicked, then onSelectWorkspace is called with its id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "left-column-footer",
+        "title": "Left column footer (Settings, Machines, version→updater, Rebuild in dev, freshness, ?)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/LeftColumnFooter.tsx",
+            "src/dashboard/frontend/src/components/frame/__tests__/LeftColumnFooter.test.tsx",
+            "src/dashboard/frontend/src/components/sidebar/MachinesNavItem.tsx",
+            "src/dashboard/frontend/src/components/sidebar/__tests__/MachinesNavItem.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/frame/__tests__/LeftColumnFooter.test.tsx src/components/sidebar/__tests__/MachinesNavItem.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in LeftColumnFooter.test.tsx passed",
+            "vitest reports every test in MachinesNavItem.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15, F-D19. Create components/frame/LeftColumnFooter.tsx with props { activeTab, onTabChange, onOpenUpdater, onOpenShortcuts, collapsed }; add variant \"footer\" to components/sidebar/MachinesNavItem.tsx (keeps data-testid sidebar-machines). Version title per F-D19; Rebuild uses POST /api/dev/rebuild only when /api/version isDev."
+        },
+        "items": [
+          {
+            "id": "left-column-footer.ac1",
+            "title": "When Settings is clicked, then onTabChange(\"settings\") is called; when ? is clicked, then onOpenShortcuts is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "left-column-footer.ac2",
+            "title": "Given /api/version { version: \"0.90.0\", isDev: true }, then the version button reads \"v0.90.0\", its title contains \"Running from a source checkout\", and the Rebuild button renders; given isDev false, no Rebuild button renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "left-column-footer.ac3",
+            "title": "When the version button is clicked, then onOpenUpdater is called; the footer MachinesNavItem renders with data-testid sidebar-machines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "left-column-shell",
+        "title": "LeftColumn shell: compose sections, resize 240–400, [ collapse to 48 px, drawer below 900 px, DeckDataHost, DeckDialogsHost",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/LeftColumn.tsx",
+            "src/dashboard/frontend/src/components/frame/deck/DeckDataHost.tsx",
+            "src/dashboard/frontend/src/components/frame/deck/DeckDialogsHost.tsx",
+            "src/dashboard/frontend/src/components/frame/__tests__/LeftColumn.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/frame/__tests__/LeftColumn.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in LeftColumn.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "acJustification": "Five ACs cover the five independent shell behaviors (width, collapse, empty state, drawer, dialogs host).",
+          "parallelSafeReason": "Runs in its own slot once its blocks-edge predecessors finish; every file it shares with another item is ordered by a direct blocks edge, so no two concurrent slots edit the same file."
+        },
+        "narrative": {
+          "Action": "PRD WI-16, F-D3, F-D4, F-D18. Create components/frame/LeftColumn.tsx, components/frame/deck/DeckDataHost.tsx (null render; sole owner of useSessionTreeSubscription) and components/frame/deck/DeckDialogsHost.tsx (deck fork modal via its own useConversationMutations, overdeck:open-fork-modal listener, PlanDialog from deckDialogsStore). Registry shortcut frame.collapse ([). Widths persisted overdeck.ui.leftColumnWidth / overdeck.ui.leftColumnCollapsed. No-project state per F-D3. Not mounted by App until frame-swap."
+        },
+        "items": [
+          {
+            "id": "left-column-shell.ac1",
+            "title": "Given no stored width, the column renders 264 px wide; dragging its edge to 500 px clamps to 400 and persists overdeck.ui.leftColumnWidth = 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "left-column-shell.ac2",
+            "title": "When [ is pressed outside an editable element, the column becomes 48 px wide, hides the Conversations and Issues lists, and persists overdeck.ui.leftColumnCollapsed = true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "left-column-shell.ac3",
+            "title": "Given selectedProject null, the column renders the switcher reading \"Choose a project\" and the text \"Pick a project to see its conversations and issues\" and no list sections",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "left-column-shell.ac4",
+            "title": "Given matchMedia reports width below 900 px, the column is hidden until the \"Open navigation\" button is clicked, and clicking the overlay hides it again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "left-column-shell.ac5",
+            "title": "When an overdeck:open-fork-modal event fires with a conversation, then DeckDialogsHost renders the ForkModal for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frame-swap",
+        "title": "The swap: App frame grid with full-width top bar + brand, mount LeftColumn, remove Sidebar and the Command Deck column",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/App.test.tsx",
+            "src/dashboard/frontend/src/App/AppChrome.tsx",
+            "src/dashboard/frontend/src/App/AppChrome.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+            "src/dashboard/frontend/src/components/Sidebar.tsx",
+            "src/dashboard/frontend/src/components/Sidebar.test.tsx",
+            "src/dashboard/frontend/src/components/__tests__/Sidebar.ownerGroups.test.tsx",
+            "src/dashboard/frontend/src/components/__tests__/Sidebar.workspaces.test.tsx",
+            "src/dashboard/frontend/src/components/__tests__/Sidebar.workspacePullRequest.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/IssuesPaneFilterRow.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/App.test.tsx src/App/AppChrome.test.tsx src/components/CommandDeck/CommandDeck.test.tsx src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in App.test.tsx passed",
+            "vitest reports every test in AppChrome.test.tsx passed",
+            "vitest reports every test in CommandDeck.test.tsx passed",
+            "vitest reports every test in CommandDeck.render-count.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "awareness-removal",
+            "playwright-checklist",
+            "dev-docs",
+            "user-docs-changelog"
+          ],
+          "parallelSafeReason": "Runs in its own slot once its blocks-edge predecessors finish; every file it shares with another item is ordered by a direct blocks edge, so no two concurrent slots edit the same file."
+        },
+        "narrative": {
+          "Action": "PRD WI-17, F-D14, §6.3. App.tsx: flex-col frame, AppChrome full width, then a row of DeckNavigationProvider > LeftColumn + main; delete the Sidebar mount. AppChrome: brand cell (OverdeckMark orbiting + \"Overdeck\", button to Home) and hamburger below 900 px. CommandDeck: delete its sidebar JSX (search `<div className={styles.sidebar}`), resize handle, section split, width state, version query, NewConversationPickers, deck.new-conversation registration, subscription/poll/dialog mounts, dead TasksDialog (F-D6); remove unused CSS. Delete Sidebar.tsx, Sidebar.test.tsx, __tests__/Sidebar.ownerGroups.test.tsx, __tests__/Sidebar.workspaces.test.tsx, __tests__/Sidebar.workspacePullRequest.test.tsx and IssuesPaneFilterRow.tsx if no importer remains."
+        },
+        "items": [
+          {
+            "id": "frame-swap.ac1",
+            "title": "grep -rn \"<Sidebar\\b\\|components/Sidebar'\" src/dashboard/frontend/src --include=*.tsx returns nothing and src/dashboard/frontend/src/components/Sidebar.tsx does not exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frame-swap.ac2",
+            "title": "Given CommandDeck renders with a project, then no \"Command Deck\" heading, no element with the resize-handle class and no NewConversationPickers render, and the Stage fills the content area",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frame-swap.ac3",
+            "title": "Given App on /flywheel with a mocked deck, when a left-column conversation row is clicked, then activeTab becomes command-deck and window.location.pathname is /conv/<id>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frame-swap.ac4",
+            "title": "AppChrome renders a brand button with the text \"Overdeck\" that navigates to \"/\", and App.tsx stays at or under 1019 lines and CommandDeck/index.tsx under 1612 (lint:file-size passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "activity-feed-tab",
+        "title": "Feed tab on /activity rendering the Awareness feed with its scopes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/ActivityPanel.tsx",
+            "src/dashboard/frontend/src/components/ActivityFeedTab.tsx",
+            "src/dashboard/frontend/src/components/__tests__/ActivityFeedTab.test.tsx",
+            "src/dashboard/frontend/src/App/AppRoutes.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/__tests__/ActivityFeedTab.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in ActivityFeedTab.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-18, F-D21. Add stream \"feed\" to ActivityPanel (first, default, last choice persisted in overdeck.ui.activityStream). Create components/ActivityFeedTab.tsx rendering <SessionFeedSidebar embedded heading=\"Feed\" scopeSwitcher projectIssueIds projectConversationIds /> in a max-w-3xl column, ids from useProjectScope(selectedProjectKey) (undefined for none/No project). AppRoutes passes selectedProjectKey to ActivityPanel."
+        },
+        "items": [
+          {
+            "id": "activity-feed-tab.ac1",
+            "title": "Given no stored stream, when ActivityPanel renders, then the Feed tab is selected and the \"Awareness scope\" tablist shows Needs you, Project and Global",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-feed-tab.ac2",
+            "title": "When the operator selects Activity Log and ActivityPanel remounts, then Activity Log is selected (overdeck.ui.activityStream = \"normal\")",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-feed-tab.ac3",
+            "title": "Given selectedProjectKey \"proj\" with issue PAN-1 and conversation id 7, then SessionFeedSidebar receives projectIssueIds [\"PAN-1\"] and projectConversationIds containing 7; given null it receives undefined for both",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "awareness-removal",
+        "title": "Remove the Awareness rail, the off-deck feed column and the top-bar History toggle",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/App.test.tsx",
+            "src/dashboard/frontend/src/App/AppChrome.tsx",
+            "src/dashboard/frontend/src/App/AppChrome.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/App.test.tsx src/App/AppChrome.test.tsx src/components/CommandDeck/CommandDeck.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in App.test.tsx passed",
+            "vitest reports every test in AppChrome.test.tsx passed",
+            "vitest reports every test in CommandDeck.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-19, F-D22. CommandDeck: delete the Awareness column, collapse button and awarenessCollapsed state. App.tsx: delete SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY, readSessionFeedSidebarOpen, its state/setter and the off-deck SessionFeedSidebar mount. AppChrome: delete the History toggle and the isSessionFeedSidebarOpen/onToggleSessionFeedSidebar props. Update App.test.tsx (replace the session feed sidebar describe block with an assertion that no feed column renders), AppChrome.test.tsx and CommandDeck.test.tsx."
+        },
+        "items": [
+          {
+            "id": "awareness-removal.ac1",
+            "title": "Given CommandDeck renders a known project, then no SessionFeedSidebar and no \"Show Awareness rail\" button render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "awareness-removal.ac2",
+            "title": "Given AppChrome on activeTab \"flywheel\" and \"command-deck\", then no button with aria-label \"Toggle activity feed\" renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "awareness-removal.ac3",
+            "title": "grep -rn \"SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY\\|awarenessCollapsed\" src/dashboard/frontend/src returns nothing outside Playwright specs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "needs-you-row-detail",
+        "title": "Needs-you menu rows show waiting time; pin the non-answerable → terminal jump",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/NeedsYouIndicator.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/NeedsYouIndicator.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/flywheel/__tests__/NeedsYouIndicator.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in NeedsYouIndicator.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-20, F-D23. In components/flywheel/NeedsYouIndicator.tsx append \" · waiting <formatRelativeTime(since)>\" to the row sub-line when item.since is set. Add tests."
+        },
+        "items": [
+          {
+            "id": "needs-you-row-detail.ac1",
+            "title": "Given an item with since 5 minutes ago, then its row sub-line contains \"waiting\" and the relative time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-row-detail.ac2",
+            "title": "Given a pending-input conversation item with permissionAnswerable false, when its row is clicked, then window.location.pathname is /conv/<name> and the search contains view=terminal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "playwright-checklist",
+        "title": "Update Playwright specs for the switcher and /activity; add the AC-F left-column checklist spec",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/command-deck-resource-strip.spec.ts",
+            "src/dashboard/frontend/tests/pan-4201-issue-tree.spec.ts",
+            "src/dashboard/frontend/tests/pan2450-pipeline-overview.spec.ts",
+            "src/dashboard/frontend/tests/pan2464-machine-room.spec.ts",
+            "src/dashboard/frontend/tests/pan-5293-left-column.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx playwright test tests/pan-5293-left-column.spec.ts tests/command-deck-resource-strip.spec.ts tests/pan-4201-issue-tree.spec.ts tests/pan2450-pipeline-overview.spec.ts tests/pan2464-machine-room.spec.ts"
+          ],
+          "expected_outputs": [
+            "playwright reports all tests in the five specs passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-5",
+            "NFR-6"
+          ],
+          "parallelSafeReason": "Runs in its own slot once its blocks-edge predecessors finish; every file it shares with another item is ordered by a direct blocks edge, so no two concurrent slots edit the same file."
+        },
+        "narrative": {
+          "Action": "PRD WI-21. In command-deck-resource-strip.spec.ts, pan-4201-issue-tree.spec.ts and pan2450-pipeline-overview.spec.ts replace sidebar-project-<name> clicks with opening project-switcher and clicking project-switcher-row-<name>; in pan2464-machine-room.spec.ts delete the \"Toggle activity feed\" click (it only closed the removed off-deck feed column). Create tests/pan-5293-left-column.spec.ts that clicks each §7 home (switcher pick, More ▾ → Pipeline, workspace row, New conversation, issue row → cockpit, /activity Feed, [ collapse, ? sheet, version → updater). Isolated browser profile. Then take the NFR-6 screenshots: npm run build, seed scripts/dev/seed-workflow-fixture.ts into an isolated OVERDECK_HOME, run the branch dashboard on a free port, capture 1920x1000 light and dark PNGs of the five NFR-6 states into .tmp/pan-5293-screens/, open each and compare with the mockup left column, fix gaps in the owning files before pan done; attach them to the PR after pan done opens it."
+        },
+        "items": [
+          {
+            "id": "playwright-checklist.ac1",
+            "title": "grep -rn \"sidebar-project-\\|Toggle activity feed\" src/dashboard/frontend/tests returns nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-checklist.ac2",
+            "title": "Given the NFR-6 run on this branch build with the seeded workflow fixture in an isolated Playwright profile, then .tmp/pan-5293-screens/ contains ten PNGs at 1920x1000 (five states in light and dark) and the agent has opened each one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-checklist.ac3",
+            "title": "cd src/dashboard/frontend && npx playwright test tests/pan-5293-left-column.spec.ts passes, with one step per F-owned §7 row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-checklist.ac4",
+            "title": "Given the four updated specs, when npx playwright test runs them, then each passes with the same assertions as before apart from the navigation step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-subset",
+        "title": "Add new frontend tests to the CI subset and remove deleted Sidebar tests",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/frontend-test-subset-list.test.ts"
+          ],
+          "expected_outputs": [
+            "vitest reports frontend-test-subset-list.test.ts passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-22. Edit scripts/frontend-test-subset.txt only: add every new unit test file from the other items (frame/__tests__/*, frame/deck/__tests__/*, conversationMeta.test.ts, ActivityFeedTab.test.tsx, commandDeckSelection.test.ts, and src/App.test.tsx only if npx vitest run src/App.test.tsx passes on this branch, else leave it unlisted and say so in the PR) at their sorted positions; remove src/components/__tests__/Sidebar.ownerGroups.test.tsx and src/components/__tests__/Sidebar.workspacePullRequest.test.tsx."
+        },
+        "items": [
+          {
+            "id": "test-subset.ac1",
+            "title": "Given the finished plan, then scripts/frontend-test-subset.txt contains every unit test file this plan creates and stays sorted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-subset.ac2",
+            "title": "npx vitest run tests/unit/scripts/frontend-test-subset-list.test.ts passes (no listed file is missing)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dev-docs",
+        "title": "Developer docs: Left column section, Activity feed, top bar, render discipline, workspaces doc, CLAUDE.md, codebase map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "CLAUDE.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-23. docs/DASHBOARD-ARCHITECTURE.md: new \"## Left column (PAN-5293)\" section (layout, sections, frame/deck modules table, openInDeck rules, single-owner rule F-D4); rename/rewrite \"## Awareness feed (PAN-4301)\" as \"## Activity feed\" on /activity Feed tab; Top bar item 7 without the Activity-feed toggle; Render discipline names LeftColumn instead of the nav Sidebar; registry row sidebar.collapse -> frame.collapse. docs/WORKSPACES-AND-PROJECTS.md: Workspaces rail -> left column Workspaces section, helpers in components/frame/workspaceRows.ts. CLAUDE.md Workspace creation UI bullet: project switcher New workspace item and Workspaces section +. .overdeck/context/codebase/architecture.md Awareness rail heading -> Activity feed."
+        },
+        "items": [
+          {
+            "id": "dev-docs.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a heading \"## Left column (PAN-5293)\" listing every module under components/frame/deck/ and the openInDeck rules",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dev-docs.ac2",
+            "title": "grep -n \"Toggle activity feed\\|Awareness rail\" docs/DASHBOARD-ARCHITECTURE.md returns nothing, and the keyboard registry table lists frame.collapse",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dev-docs.ac3",
+            "title": "CLAUDE.md and docs/WORKSPACES-AND-PROJECTS.md no longer say \"the sidebar +\" or \"Sidebar.tsx\" for workspace creation and helpers; npm run lint:docs passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "user-docs-changelog",
+        "title": "User docs (features, introduction, quickstart) and changelog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/mission-control.mdx",
+            "features/conversations.mdx",
+            "features/keyboard-shortcuts.mdx",
+            "features/skills.mdx",
+            "introduction.mdx",
+            "quickstart.mdx",
+            "changelog.d/pan-5293.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-24. Rewrite the sidebar/Awareness passages in features/mission-control.mdx (new Left column and Activity feed sections), features/conversations.mdx (New conversation split button + caret menu, Workspaces section, switcher No project), features/keyboard-shortcuts.mdx ([ collapses the left column, N new conversation), features/skills.mdx (More → System → Skills), introduction.mdx and quickstart.mdx (no full-height project sidebar or Awareness rail; Add a project in the switcher); add changelog.d/pan-5293.md with one #### Improved bullet linking #5293."
+        },
+        "items": [
+          {
+            "id": "user-docs-changelog.ac1",
+            "title": "features/mission-control.mdx contains \"Left column\" and \"Activity feed\" headings, and grep -rn \"Awareness rail\\|full-height project sidebar\" features introduction.mdx quickstart.mdx returns nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "user-docs-changelog.ac2",
+            "title": "features/keyboard-shortcuts.mdx states that [ collapses the left column and N starts a new conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "user-docs-changelog.ac3",
+            "title": "changelog.d/pan-5293.md exists with one \"#### Improved\" heading and npm run lint:docs exits with code 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "user-docs-config",
+        "title": "User docs (configuration, reference, anywhere): sidebar wording → left column homes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:56:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/workspaces.mdx",
+            "configuration/projects.mdx",
+            "configuration/knowledge.mdx",
+            "configuration/linked-machines.mdx",
+            "configuration/issue-trackers.mdx",
+            "configuration/effort.mdx",
+            "configuration/remote-access.mdx",
+            "reference/lanes.mdx",
+            "reference/workers.mdx",
+            "anywhere.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-25. Replace sidebar wording in configuration/workspaces.mdx, configuration/projects.mdx, configuration/knowledge.mdx, configuration/linked-machines.mdx, configuration/issue-trackers.mdx, configuration/effort.mdx, configuration/remote-access.mdx, reference/lanes.mdx, reference/workers.mdx and anywhere.mdx line 42 with the left column homes (Workspaces section, switcher, More → System, New conversation caret menu, footer Machines, Activity feed on /activity)."
+        },
+        "items": [
+          {
+            "id": "user-docs-config.ac1",
+            "title": "grep -n -i \"sidebar\" configuration/workspaces.mdx configuration/projects.mdx configuration/knowledge.mdx configuration/linked-machines.mdx configuration/issue-trackers.mdx configuration/effort.mdx configuration/remote-access.mdx returns nothing outside frontmatter keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "user-docs-config.ac2",
+            "title": "Given the edits, then anywhere.mdx says Machines is in the left column footer, and reference/lanes.mdx and reference/workers.mdx name the Activity feed on /activity instead of the Awareness rail",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "user-docs-config.ac3",
+            "title": "npm run lint:docs exits with code 0 after the edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "selection-store",
+        "to": "deck-data-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-data-hooks",
+        "to": "issue-session-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-navigation",
+        "to": "issue-session-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-session-actions",
+        "to": "create-conversation",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-navigation",
+        "to": "create-conversation",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-data-hooks",
+        "to": "project-switcher",
+        "type": "blocks"
+      },
+      {
+        "from": "create-conversation",
+        "to": "new-conversation-button",
+        "type": "blocks"
+      },
+      {
+        "from": "create-conversation",
+        "to": "conversations-section",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-meta-line",
+        "to": "conversations-section",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-meta-line",
+        "to": "issue-row-compact",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-session-actions",
+        "to": "issues-section",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-helpers",
+        "to": "workspaces-section",
+        "type": "blocks"
+      },
+      {
+        "from": "project-switcher",
+        "to": "left-column-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "left-nav",
+        "to": "left-column-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "new-conversation-button",
+        "to": "left-column-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "conversations-section",
+        "to": "left-column-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "issues-section",
+        "to": "left-column-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "workspaces-section",
+        "to": "left-column-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "left-column-footer",
+        "to": "left-column-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "create-conversation",
+        "to": "left-column-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "left-column-shell",
+        "to": "frame-swap",
+        "type": "blocks"
+      },
+      {
+        "from": "create-conversation",
+        "to": "frame-swap",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-navigation",
+        "to": "frame-swap",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-helpers",
+        "to": "frame-swap",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-data-hooks",
+        "to": "activity-feed-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "frame-swap",
+        "to": "awareness-removal",
+        "type": "blocks"
+      },
+      {
+        "from": "activity-feed-tab",
+        "to": "awareness-removal",
+        "type": "blocks"
+      },
+      {
+        "from": "awareness-removal",
+        "to": "playwright-checklist",
+        "type": "blocks"
+      },
+      {
+        "from": "needs-you-row-detail",
+        "to": "playwright-checklist",
+        "type": "blocks"
+      },
+      {
+        "from": "awareness-removal",
+        "to": "dev-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "awareness-removal",
+        "to": "user-docs-changelog",
+        "type": "blocks"
+      },
+      {
+        "from": "awareness-removal",
+        "to": "user-docs-config",
+        "type": "blocks"
+      },
+      {
+        "from": "selection-store",
+        "to": "issue-session-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "selection-store",
+        "to": "create-conversation",
+        "type": "blocks"
+      },
+      {
+        "from": "selection-store",
+        "to": "frame-swap",
+        "type": "blocks"
+      },
+      {
+        "from": "selection-store",
+        "to": "awareness-removal",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-data-hooks",
+        "to": "create-conversation",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-data-hooks",
+        "to": "frame-swap",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-data-hooks",
+        "to": "awareness-removal",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-session-actions",
+        "to": "frame-swap",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-session-actions",
+        "to": "awareness-removal",
+        "type": "blocks"
+      },
+      {
+        "from": "create-conversation",
+        "to": "awareness-removal",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-navigation",
+        "to": "awareness-removal",
+        "type": "blocks"
+      },
+      {
+        "from": "selection-store",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-navigation",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-data-hooks",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-session-actions",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "create-conversation",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-helpers",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "project-switcher",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "left-nav",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "new-conversation-button",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-meta-line",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "conversations-section",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-row-compact",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "issues-section",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "workspaces-section",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "left-column-footer",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "left-column-shell",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "frame-swap",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "activity-feed-tab",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "awareness-removal",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "needs-you-row-detail",
+        "to": "test-subset",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

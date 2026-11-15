@@ -1,4 +1,4 @@
-import { AlertTriangle, History, Moon, Search, Sun } from 'lucide-react';
+import { AlertTriangle, Menu, Moon, Search, Sun } from 'lucide-react';
 import { DeaconFrozenChip, DeaconPauseToggle } from '../components/DeaconPauseToggle';
 import { DegradedModeBanner } from '../components/DegradedModeBanner';
 import { NewBuildBanner } from '../components/NewBuildBanner';
@@ -20,6 +20,9 @@ import { HealthSection, SystemHealthPill } from '../components/SystemHealthPill'
 import { StaleBuildChip } from '../components/StaleBuildChip';
 import type { Tab } from '../components/Header';
 import { useTheme } from '../hooks/useTheme';
+import { useOverdeckBusy } from '../hooks/useOverdeckBusy';
+import { OverdeckMark } from '../components/OverdeckMark';
+import { OPEN_LEFT_COLUMN_EVENT } from '../components/frame/LeftColumn';
 import { PALETTE_SEARCH_PLACEHOLDER, paletteKeycap } from './appChromeLabels';
 import { AgentsMenu } from './topbar/AgentsMenu';
 import { Breadcrumb } from './topbar/Breadcrumb';
@@ -42,16 +45,16 @@ interface AppChromeProps {
   showCliproxyBanner: boolean | undefined;
   isRestartBackendPending: boolean;
   isRestartCliproxyPending: boolean;
-  isSessionFeedSidebarOpen: boolean;
   /** Open the command palette (the top bar's search box, PAN-5292 E-D15). */
   onPaletteOpen: () => void;
   onOpenSettings: () => void;
   onDismissTrackerBanner: () => void;
   onRestartBackend: () => void;
   onRestartCliproxy: () => void;
-  onToggleSessionFeedSidebar: () => void;
   /** A project was added through the Add-project modal this chrome hosts. */
   onProjectCreated: (project: CreatedProject) => void;
+  /** The brand cell opens Home (PAN-5293 F-D14). */
+  onGoHome: () => void;
 }
 
 export function AppChrome({
@@ -63,14 +66,13 @@ export function AppChrome({
   showCliproxyBanner,
   isRestartBackendPending,
   isRestartCliproxyPending,
-  isSessionFeedSidebarOpen,
   onPaletteOpen,
   onOpenSettings,
   onDismissTrackerBanner,
   onRestartBackend,
   onRestartCliproxy,
-  onToggleSessionFeedSidebar,
   onProjectCreated,
+  onGoHome,
 }: AppChromeProps) {
   return (
     <>
@@ -171,6 +173,17 @@ export function AppChrome({
           menu, Needs you, exception chips, health dot, theme. AppChrome calls no
           store selector: every count lives in its own leaf component (E-D1). */}
       <div className="relative flex h-12 shrink-0 items-center gap-3 border-b border-border bg-background px-3">
+        {/* PAN-5293 F-D18: below 900 px the left column is a drawer opened here. */}
+        <button
+          type="button"
+          aria-label="Open navigation"
+          data-testid="topbar-open-navigation"
+          onClick={() => window.dispatchEvent(new Event(OPEN_LEFT_COLUMN_EVENT))}
+          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground min-[900px]:hidden"
+        >
+          <Menu className="h-4 w-4" aria-hidden="true" />
+        </button>
+        <BrandHome onGoHome={onGoHome} />
         <Breadcrumb activeTab={activeTab} selectedProjectKey={selectedProjectKey} />
 
         <button
@@ -200,23 +213,26 @@ export function AppChrome({
             <HealthSection title="System controls"><CloisterStatusBar onOpenSettings={onOpenSettings} /></HealthSection>
           </SystemHealthPill>
           <ThemeToggleButton />
-          {/* The Command Deck has the always-on Awareness rail, so the global
-              feed toggle only appears on other pages (PAN-1591). */}
-          {activeTab !== 'command-deck' && (
-            <button
-              type="button"
-              aria-label="Toggle activity feed"
-              aria-pressed={isSessionFeedSidebarOpen}
-              title="Activity Feed"
-              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              onClick={onToggleSessionFeedSidebar}
-            >
-              <History className="h-4 w-4" aria-hidden="true" />
-            </button>
-          )}
         </div>
       </div>
     </>
+  );
+}
+
+/** PAN-5293 F-D14: the brand at the left of the app bar; the mark orbits while Overdeck is busy. */
+function BrandHome({ onGoHome }: { onGoHome: () => void }) {
+  const busy = useOverdeckBusy();
+  return (
+    <button
+      type="button"
+      onClick={onGoHome}
+      title="Go to Home"
+      data-testid="topbar-brand"
+      className="flex shrink-0 items-center gap-2 rounded-md px-1 py-1 transition-opacity hover:opacity-80"
+    >
+      <OverdeckMark className="h-5 w-5 shrink-0 text-primary" orbiting={busy} />
+      <span className="font-display text-base font-semibold text-foreground">Overdeck</span>
+    </button>
   );
 }
 

@@ -6,7 +6,8 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { NeedsYouItem } from '../../../lib/selectors/needsYou';
+import { buildNeedsYouItems, type NeedsYouItem } from '../../../lib/selectors/needsYou';
+import type { PendingInputSubject } from '../../../lib/store';
 import { renderWithQuery, stubFetch } from './fixtures';
 
 const mocks = vi.hoisted(() => ({ items: null as NeedsYouItem[] | null }));
@@ -115,5 +116,42 @@ describe('NeedsYouIndicator (PAN-5292 WI-E2)', () => {
     renderWithQuery(<NeedsYouIndicator />);
     await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url) === '/api/flywheel/status')).toBe(true));
     expect(screen.getByTestId('flywheel-needs-you-indicator')).toHaveTextContent('Needs you · 0');
+  });
+
+  it('shows how long a row has been waiting (PAN-5293 F-D23)', () => {
+    const since = new Date(Date.now() - 5 * 60_000).toISOString();
+    renderIndicator([item('issue:PAN-1', { ask: 'Approve the plan', since }), item('issue:PAN-2', { ask: 'Answer' })]);
+    fireEvent.click(screen.getByTestId('flywheel-needs-you-indicator'));
+    const [dated, undated] = screen.getAllByTestId('needs-you-row-subline');
+    expect(dated).toHaveTextContent('Approve the plan · waiting 5m ago');
+    expect(undated).toHaveTextContent('Answer');
+    expect(undated.textContent).not.toContain('waiting');
+  });
+
+  it('opens a non-answerable conversation permission in its terminal (PAN-5293 F-D23)', () => {
+    window.history.replaceState(null, '', '/');
+    const subject = {
+      agentId: 'conv-alpha',
+      source: 'conversation',
+      kinds: ['permission'],
+      permissionRequestIds: ['perm-1'],
+      permissionAnswerable: false,
+      conversationTitle: 'Alpha',
+      since: new Date(Date.now() - 60_000).toISOString(),
+    } as unknown as PendingInputSubject;
+    const items = buildNeedsYouItems({
+      subjects: [subject],
+      resolution: { answeredToolUseIds: new Set(), dismissedSubjectIds: new Set(), resolvedPlanToolUseIds: new Set(), dismissedPlanSubjectIds: new Set() },
+      derived: {},
+      flywheelRows: [],
+      decisions: [],
+      issueTitles: new Map(),
+      projectOf: { issue: () => undefined, conversation: () => undefined },
+    } as unknown as Parameters<typeof buildNeedsYouItems>[0]);
+    renderIndicator(items);
+    fireEvent.click(screen.getByTestId('flywheel-needs-you-indicator'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Alpha/ }));
+    expect(window.location.pathname).toBe('/conv/conv-alpha');
+    expect(window.location.search).toContain('view=terminal');
   });
 });

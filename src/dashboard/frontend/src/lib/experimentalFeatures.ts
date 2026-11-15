@@ -5,7 +5,8 @@ export const EXPERIMENTAL_TAB_IDS = new Set<Tab>([
   'agents',
   'autopreso',
   'resources',
-  'activity',
+  // PAN-5293 F-D21: not 'activity' — its Feed tab is the Awareness feed;
+  // ActivityPanel gates only its log streams on the setting.
   'sessions',
   'metrics',
   'costs',

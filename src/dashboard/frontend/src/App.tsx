@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useCallback, useEffect, useRef } from 'react';
+import { lazy, Suspense, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
 import { capture } from './lib/telemetry';
@@ -14,12 +14,11 @@ import { NO_PROJECT_KEY } from './components/CommandDeck/projectsData';
 import { IssueDrawer } from './components/drawer/IssueDrawer';
 import { IssueDrawerAvailableContext } from './components/drawer/issueDrawerAvailableContext';
 import { ResumableSessionDialog } from './components/ResumableSessionDialog';
-import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
 import type { CreatedProject } from './components/project/new/useProjectCreateIntent';
 import { takeAddProjectReturnTo, useAddProjectDialog } from './components/project/new/addProjectDialogStore';
 import { requestLauncherFocusAfterCreate } from './components/Stage/launcherFocusStore';
 import { Tab } from './components/Header';
-import { Sidebar } from './components/Sidebar';
+import { LeftColumn } from './components/frame/LeftColumn';
 import { UpdateDialog } from './components/UpdateDialog';
 import { TasksDialog } from './components/TasksDialog';
 import { PrdViewer } from './components/PrdViewer';
@@ -68,6 +67,7 @@ import { AppRoutes, type PendingConversationTarget } from './App/AppRoutes';
 import { useAppShortcuts } from './App/hooks/useAppShortcuts';
 import { ShortcutsSheet } from './lib/shortcuts/ShortcutsSheet';
 import { AppChrome } from './App/AppChrome';
+import { DeckNavigationProvider, deckNavigationActions, type DeckNavigation, type DeckTarget } from './components/frame/deck/deckNavigation';
 import { useUiMode } from './lib/simple/uiMode';
 import { AppLiveStoreHost, countRunningAgents } from './App/AppLiveStoreHost';
 
@@ -89,14 +89,6 @@ export type { ConversationViewModeMap } from './App/routes';
 // PAN-2355 (D-4) — the phone shell loads in its own chunk; the desktop bundle
 // carries only this lazy import.
 const MobileApp = lazy(() => import('./components/mobile/MobileApp'));
-
-export const SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY = 'overdeck.ui.sessionFeedSidebarOpen';
-
-function readSessionFeedSidebarOpen(): boolean {
-  if (typeof window === 'undefined') return true;
-  const value = window.localStorage.getItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY);
-  return value === null ? true : value === 'true';
-}
 
 function TasksViewerHost() {
   const issueId = useDashboardStore((state) => state.tasksViewerIssueId);
@@ -266,7 +258,6 @@ export default function App() {
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [paletteInitialScope, setPaletteInitialScope] = useState<'all' | 'conversations'>('all');
   const [pendingConversationTarget, setPendingConversationTarget] = useState<PendingConversationTarget | null>(null);
-  const [isSessionFeedSidebarOpen, setIsSessionFeedSidebarOpen] = useState(readSessionFeedSidebarOpen);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
 
   const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
@@ -558,11 +549,6 @@ export default function App() {
     setConversationRoute(conversationName, 'conversation');
   }, [setActiveTab, setConversationRoute]);
 
-  const setSessionFeedSidebarOpen = useCallback((open: boolean) => {
-    setIsSessionFeedSidebarOpen(open);
-    window.localStorage.setItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY, String(open));
-  }, []);
-
   // PAN-1561: open a project's deck from the sidebar rail. Land on the project's
   // HOME pane (the S4 cockpit) rather than whatever tab the deck last had active
   // — the panes store remembers per-workspace, so it would otherwise restore a
@@ -599,6 +585,24 @@ export default function App() {
       if (home) fresh.setActivePane(projectName, home.paneId);
     }
   }, [setConversationRoute]);
+
+  // PAN-5293 F-D2: the one door into the deck. Callers open the pane through
+  // panesStore first; this switches the project, shows the deck and writes the URL.
+  const openInDeck = useCallback((target: DeckTarget) => {
+    for (const action of deckNavigationActions({ activeTab, selectedProjectKey }, target)) {
+      if (action.kind === 'select-project') setSelectedProjectKey(action.projectKey);
+      else if (action.kind === 'show-deck') setActiveTab('command-deck');
+      else if (action.kind === 'conversation-route') setSelectedConvId(action.routeKey);
+      else if (action.kind === 'cockpit-route') {
+        setCockpitRouteState({ project: action.projectKey, issue: action.issueId });
+        onCockpitChange(action.projectKey, action.issueId);
+      } else onCockpitChange(action.projectKey, null);
+    }
+  }, [activeTab, selectedProjectKey, setActiveTab, setSelectedConvId, onCockpitChange]);
+  const deckNavigation = useMemo<DeckNavigation>(
+    () => ({ openInDeck, selectProject: handleSelectProject }),
+    [openInDeck, handleSelectProject],
+  );
 
   // Handle browser back/forward
   useEffect(() => {
@@ -757,48 +761,45 @@ export default function App() {
 
   return (
     <IssueDrawerAvailableContext.Provider value>
-    <div className="h-screen flex flex-row overflow-hidden bg-background">
+    <div className="h-screen flex flex-col overflow-hidden bg-background">
       {/* Event-sourced state: connects WsTransport → DashboardStore (PAN-428 B4) */}
       <EventRouter />
 
       {/* Mounts @keyframes for the pulsing extreme-tier cost warning badge */}
       <CostWarningStyles />
 
-      {/* Collapsible sidebar navigation */}
-      <Sidebar
+      {/* PAN-5293 §6.3: the top bar spans the full width; below it, the left
+          column then the routed page. */}
+      <AppChrome
         activeTab={activeTab}
-        onTabChange={setActiveTab}
-        onSearchOpen={() => setIsSearchOpen(true)}
-        selectedProject={selectedProjectKey}
-        onSelectProject={handleSelectProject}
-        onNewProject={handleNewProject}
-        onNewWorkspace={() => onNewWorkspace(selectedProjectKey ?? undefined)}
-        onOpenUpdater={() => setIsUpdateDialogOpen(true)}
-        onSelectWorkspace={onSelectWorkspace}
+        selectedProjectKey={selectedProjectKey}
+        dashboardLifecycle={dashboardLifecycle}
+        missingKeyTrackers={missingKeyTrackers}
+        trackerBannerDismissed={trackerBannerDismissed}
+        showCliproxyBanner={showCliproxyBanner}
+        isRestartBackendPending={restartBackendMutation.isPending}
+        isRestartCliproxyPending={restartCliproxyMutation.isPending}
+        onPaletteOpen={() => { setPaletteInitialScope('all'); setIsPaletteOpen(true); }}
+        onOpenSettings={() => setActiveTab('settings')}
+        onDismissTrackerBanner={() => setTrackerBannerDismissed(true)}
+        onRestartBackend={() => restartBackendMutation.mutate()}
+        onRestartCliproxy={() => restartCliproxyMutation.mutate()}
+        onProjectCreated={handleProjectCreated}
+        onGoHome={() => setActiveTab('home')}
       />
 
-      {/* Main content area */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <AppChrome
+      <div className="min-h-0 flex flex-1 overflow-hidden">
+        <DeckNavigationProvider value={deckNavigation}>
+        <LeftColumn
           activeTab={activeTab}
-          selectedProjectKey={selectedProjectKey}
-          dashboardLifecycle={dashboardLifecycle}
-          missingKeyTrackers={missingKeyTrackers}
-          trackerBannerDismissed={trackerBannerDismissed}
-          showCliproxyBanner={showCliproxyBanner}
-          isRestartBackendPending={restartBackendMutation.isPending}
-          isRestartCliproxyPending={restartCliproxyMutation.isPending}
-          isSessionFeedSidebarOpen={isSessionFeedSidebarOpen}
-          onPaletteOpen={() => { setPaletteInitialScope('all'); setIsPaletteOpen(true); }}
-          onOpenSettings={() => setActiveTab('settings')}
-          onDismissTrackerBanner={() => setTrackerBannerDismissed(true)}
-          onRestartBackend={() => restartBackendMutation.mutate()}
-          onRestartCliproxy={() => restartCliproxyMutation.mutate()}
-          onToggleSessionFeedSidebar={() => setSessionFeedSidebarOpen(!isSessionFeedSidebarOpen)}
-          onProjectCreated={handleProjectCreated}
+          selectedProject={selectedProjectKey}
+          onTabChange={setActiveTab}
+          onNewProject={handleNewProject}
+          onNewWorkspace={onNewWorkspace}
+          onOpenUpdater={() => setIsUpdateDialogOpen(true)}
+          onSelectWorkspace={onSelectWorkspace}
+          onOpenShortcuts={openShortcutsSheet}
         />
-
-        <div className="min-h-0 flex flex-1 overflow-hidden">
         <main
           data-drawer-open={drawerOpen ? 'true' : undefined}
           className="relative flex-1 flex overflow-hidden data-[drawer-open=true]:before:pointer-events-none data-[drawer-open=true]:before:absolute data-[drawer-open=true]:before:inset-0 data-[drawer-open=true]:before:z-[80] data-[drawer-open=true]:before:bg-primary/[0.04] data-[drawer-open=true]:before:backdrop-blur-[2px]"
@@ -833,12 +834,7 @@ export default function App() {
             onOpenConversationMessage={handleOpenConversationMessage}
           />
         </main>
-        {/* PAN-1591: in the Command Deck the merged Awareness rail already covers
-            this global feed, so don't double it up there. */}
-        {isSessionFeedSidebarOpen && !['command-deck', 'backlog', 'god-view'].includes(activeTab) && (
-          <SessionFeedSidebar onClose={() => setSessionFeedSidebarOpen(false)} />
-        )}
-        </div>
+        </DeckNavigationProvider>
       </div>
 
       <IssueDrawer />

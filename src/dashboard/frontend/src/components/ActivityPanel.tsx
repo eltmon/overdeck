@@ -15,6 +15,8 @@ import { Terminal, XCircle, Loader2, X, Info, AlertTriangle, CheckCircle2, Volum
 import { toast } from 'sonner';
 import { useDashboardStore } from '../lib/store';
 import { NotificationClassBadge } from './NotificationClassBadge';
+import { ActivityFeedTab } from './ActivityFeedTab';
+import { fetchExperimentalFeaturesEnabled } from '../lib/experimentalFeatures';
 
 export interface ActivityEntry {
   id: string;
@@ -39,10 +41,26 @@ export interface TtsEntry {
   issueId?: string | null;
 }
 
-type ActivityStream = 'normal' | 'detailed' | 'tts';
+type ActivityStream = 'feed' | 'normal' | 'detailed' | 'tts';
+
+/** PAN-5293 F-D21: the last stream the viewer picked. */
+export const ACTIVITY_STREAM_STORAGE_KEY = 'overdeck.ui.activityStream';
+const ACTIVITY_STREAMS: readonly ActivityStream[] = ['feed', 'normal', 'detailed', 'tts'];
+const STREAM_LABELS: Record<ActivityStream, string> = { feed: 'Feed', normal: 'Activity Log', detailed: 'Detailed', tts: 'TTS' };
+
+function readStoredStream(): ActivityStream {
+  try {
+    const stored = localStorage.getItem(ACTIVITY_STREAM_STORAGE_KEY);
+    return (ACTIVITY_STREAMS as readonly string[]).includes(stored ?? '') ? stored as ActivityStream : 'feed';
+  } catch {
+    return 'feed';
+  }
+}
 
 interface ActivityPanelProps {
   onClose: () => void;
+  /** PAN-5293 F-D21: scopes the Feed tab's Project view. */
+  selectedProjectKey?: string | null;
 }
 
 async function fetchActivityREST(): Promise<ActivityEntry[]> {
@@ -292,8 +310,21 @@ function TtsItem({ entry }: { entry: TtsEntry }) {
   );
 }
 
-export function ActivityPanel({ onClose }: ActivityPanelProps) {
-  const [activeStream, setActiveStream] = useState<ActivityStream>('normal');
+export function ActivityPanel({ onClose, selectedProjectKey = null }: ActivityPanelProps) {
+  const [storedStream, setStoredStream] = useState<ActivityStream>(readStoredStream);
+  // The Feed is the Awareness feed every operator needs; the log streams stay
+  // behind the experimental setting, as the whole page used to.
+  const { data: experimentalFeaturesEnabled = false } = useQuery({
+    queryKey: ['settings', 'experimental-features'],
+    queryFn: fetchExperimentalFeaturesEnabled,
+    staleTime: 30_000,
+  });
+  const streams = experimentalFeaturesEnabled ? ACTIVITY_STREAMS : (['feed'] as const);
+  const activeStream: ActivityStream = streams.includes(storedStream) ? storedStream : 'feed';
+  const setActiveStream = (stream: ActivityStream) => {
+    setStoredStream(stream);
+    try { localStorage.setItem(ACTIVITY_STREAM_STORAGE_KEY, stream); } catch { /* storage unavailable */ }
+  };
   const [filters, setFilters] = useState<FilterState>({
     level: 'all',
     source: 'all',
@@ -406,15 +437,15 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
       <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           <Terminal className="w-5 h-5 text-primary" />
-          <h2 className="font-medium text-foreground">Activity Log</h2>
-          {totalCount > 0 && (
+          <h2 className="font-medium text-foreground">{activeStream === 'feed' ? 'Activity' : 'Activity Log'}</h2>
+          {activeStream !== 'feed' && totalCount > 0 && (
             <span className="text-xs text-muted-foreground bg-card px-1.5 py-0.5 rounded-full">
               {displayCount !== totalCount ? `${displayCount}/${totalCount}` : totalCount}
             </span>
           )}
         </div>
         <div className="flex items-center gap-1">
-          {activeStream !== 'tts' && (
+          {activeStream !== 'tts' && activeStream !== 'feed' && (
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`text-xs px-2 py-1 rounded ${showFilters ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'} transition-colors`}
@@ -429,11 +460,15 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
         </div>
       </div>
 
-      {/* Stream tabs */}
-      <div className="flex border-b border-border shrink-0">
-        {(['normal', 'detailed', 'tts'] as ActivityStream[]).map((stream) => (
+      {/* Stream tabs — only when there is a choice (the log streams are experimental). */}
+      {streams.length > 1 && (
+      <div role="tablist" aria-label="Activity streams" className="flex border-b border-border shrink-0">
+        {streams.map((stream) => (
           <button
             key={stream}
+            role="tab"
+            aria-selected={activeStream === stream}
+            data-testid={`activity-stream-${stream}`}
             onClick={() => { setActiveStream(stream); setShowFilters(false); }}
             className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
               activeStream === stream
@@ -441,15 +476,14 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
                 : 'text-muted-foreground hover:text-foreground hover:bg-card/50'
             }`}
           >
-            {stream === 'normal' ? 'Normal'
-              : stream === 'detailed' ? 'Detailed'
-              : 'TTS'}
+            {STREAM_LABELS[stream]}
           </button>
         ))}
       </div>
+      )}
 
       {/* Filter bar */}
-      {showFilters && activeStream !== 'tts' && (
+      {showFilters && activeStream !== 'tts' && activeStream !== 'feed' && (
         <div className="px-4 py-2 border-b border-border flex flex-wrap gap-2 shrink-0 bg-card/80">
           <select
             value={filters.level}
@@ -516,7 +550,9 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {isLoading ? (
+        {activeStream === 'feed' ? (
+          <ActivityFeedTab selectedProjectKey={selectedProjectKey} />
+        ) : isLoading ? (
           <div className="flex items-center justify-center h-32 text-muted-foreground">
             <Loader2 className="w-6 h-6 animate-spin" />
           </div>

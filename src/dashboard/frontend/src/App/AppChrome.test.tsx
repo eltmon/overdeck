@@ -12,6 +12,7 @@ import type { Tab } from '../components/Header';
 const marker = (testId: string) => () => <span data-testid={testId} />;
 
 vi.mock('./topbar/AgentsMenu', () => ({ AgentsMenu: marker('mock-agents-menu') }));
+vi.mock('../hooks/useOverdeckBusy', () => ({ useOverdeckBusy: () => false }));
 vi.mock('./topbar/Breadcrumb', () => ({ Breadcrumb: marker('mock-crumb') }));
 vi.mock('../components/flywheel/NeedsYouIndicator', () => ({ NeedsYouIndicator: marker('mock-needs-you') }));
 vi.mock('../components/DeaconPauseToggle', () => ({
@@ -52,7 +53,7 @@ for (const [path, name] of [
 const { AppChrome } = await import('./AppChrome');
 const { PALETTE_SEARCH_PLACEHOLDER, paletteKeycap } = await import('./appChromeLabels');
 
-function renderChrome(overrides: { activeTab?: Tab; onPaletteOpen?: () => void } = {}) {
+function renderChrome(overrides: { activeTab?: Tab; onPaletteOpen?: () => void; onGoHome?: () => void } = {}) {
   return render(
     <AppChrome
       activeTab={overrides.activeTab ?? 'home'}
@@ -63,14 +64,13 @@ function renderChrome(overrides: { activeTab?: Tab; onPaletteOpen?: () => void }
       showCliproxyBanner={false}
       isRestartBackendPending={false}
       isRestartCliproxyPending={false}
-      isSessionFeedSidebarOpen={false}
       onPaletteOpen={overrides.onPaletteOpen ?? vi.fn()}
       onOpenSettings={vi.fn()}
       onDismissTrackerBanner={vi.fn()}
       onRestartBackend={vi.fn()}
       onRestartCliproxy={vi.fn()}
-      onToggleSessionFeedSidebar={vi.fn()}
       onProjectCreated={vi.fn()}
+      onGoHome={overrides.onGoHome ?? vi.fn()}
     />,
   );
 }
@@ -81,6 +81,25 @@ function domOrder(...testIds: string[]): number[] {
 }
 
 describe('AppChrome top bar (PAN-5292)', () => {
+  it('leads with the Overdeck brand, which opens Home (PAN-5293 F-D14)', () => {
+    const onGoHome = vi.fn();
+    renderChrome({ onGoHome });
+    const brand = screen.getByTestId('topbar-brand');
+    expect(brand).toHaveTextContent('Overdeck');
+    expect(domOrder('topbar-brand', 'mock-crumb', 'topbar-search').every((v, i, a) => i === 0 || v > a[i - 1]!)).toBe(true);
+    fireEvent.click(brand);
+    expect(onGoHome).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the left-column drawer from the app bar (PAN-5293 F-D18)', () => {
+    const opened = vi.fn();
+    window.addEventListener('overdeck:open-left-column', opened);
+    renderChrome();
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
+    expect(opened).toHaveBeenCalledTimes(1);
+    window.removeEventListener('overdeck:open-left-column', opened);
+  });
+
   it('places the agents menu, Needs you, the health dot and the theme toggle in that order', () => {
     renderChrome();
     const order = domOrder('mock-agents-menu', 'mock-needs-you', 'mock-health-dot', 'topbar-theme');
@@ -109,9 +128,9 @@ describe('AppChrome top bar (PAN-5292)', () => {
     }
   });
 
-  it('shows the Activity-feed toggle off the Command Deck only', () => {
-    const { unmount } = renderChrome({ activeTab: 'home' });
-    expect(screen.getByRole('button', { name: 'Toggle activity feed' })).toBeInTheDocument();
+  it('has no Activity-feed toggle on any page (PAN-5293 F-D22)', () => {
+    const { unmount } = renderChrome({ activeTab: 'flywheel' });
+    expect(screen.queryByRole('button', { name: 'Toggle activity feed' })).toBeNull();
     unmount();
 
     renderChrome({ activeTab: 'command-deck' });

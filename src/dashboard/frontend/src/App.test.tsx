@@ -4,7 +4,6 @@ import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DialogProvider } from './components/DialogProvider';
 import App, {
-  SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY,
   buildConversationUrl,
   getCommandDeckProjectRouteFromPath,
   getConversationRouteState,
@@ -68,7 +67,7 @@ vi.mock('./components/KanbanBoard', () => ({
 vi.mock('./components/Agents/FleetAgentsView', () => ({ FleetAgentsView: () => null }));
 vi.mock('./components/HealthDashboard', () => ({ HealthDashboard: () => null }));
 vi.mock('./components/SkillsList', () => ({ SkillsList: () => null }));
-vi.mock('./components/ActivityPanel', () => ({ ActivityPanel: () => null }));
+vi.mock('./components/ActivityPanel', () => ({ ActivityPanel: () => <div data-testid="activity-panel" /> }));
 vi.mock('./components/ConfirmationDialog', () => ({
   ConfirmationDialog: () => null,
 }));
@@ -105,7 +104,20 @@ vi.mock('./components/CommandPalette', () => ({
 vi.mock('./components/ResourcesPanel', () => ({ ResourcesPanel: () => null }));
 vi.mock('./components/GodView', () => ({ GodViewPage: () => null }));
 vi.mock('./components/context/ContextPage', () => ({ ContextPage: () => <div data-testid="context-page" /> }));
-vi.mock('./components/Sidebar', () => ({ Sidebar: () => null }));
+// PAN-5293: the left column opens things through the deck navigation door.
+vi.mock('./components/frame/LeftColumn', async () => {
+  const { useDeckNavigation } = await vi.importActual<typeof import('./components/frame/deck/deckNavigation')>('./components/frame/deck/deckNavigation');
+  return {
+    LeftColumn: () => {
+      const navigation = useDeckNavigation();
+      return (
+        <button onClick={() => navigation.openInDeck({ projectKey: 'panopticon-cli', conversationRouteKey: '42' })}>
+          Left column conversation
+        </button>
+      );
+    },
+  };
+});
 vi.mock('./components/BootstrapGate', () => ({ BootstrapGate: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock('./components/skeletons/KanbanSkeleton', () => ({ KanbanSkeleton: () => null }));
 vi.mock('./components/skeletons/AgentsSkeleton', () => ({ AgentsSkeleton: () => null }));
@@ -229,7 +241,7 @@ beforeEach(() => {
   mockToastInfo.mockClear()
   mockToastSuccess.mockClear()
   useDashboardStore.setState.mockClear()
-  window.localStorage.removeItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY)
+  window.localStorage.removeItem('overdeck.ui.sessionFeedSidebarOpen')
   window.localStorage.removeItem('overdeck:last-tab')
 })
 
@@ -452,6 +464,26 @@ describe('App primary routing', () => {
     expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
   });
 
+  it('the top-bar brand navigates Home (PAN-5293 F-D14)', () => {
+    window.history.replaceState(null, '', '/pipeline');
+    renderApp();
+    fireEvent.click(screen.getByTestId('topbar-brand'));
+    expect(window.location.pathname).toBe('/');
+    expect(screen.getByTestId('home-page')).toBeInTheDocument();
+  });
+
+  it('opens a left-column conversation in the deck from another route (PAN-5293 FR-3)', () => {
+    window.history.replaceState(null, '', '/flywheel');
+    renderApp();
+    expect(screen.queryByTestId('conv-id')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Left column conversation'));
+
+    expect(window.location.pathname).toBe('/conv/42');
+    expect(screen.getByTestId('conv-id').textContent).toBe('42');
+    expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
+  });
+
   it('clears a stale conversation route when a command deck project is selected', () => {
     // Regression: with a conversation route lingering in App state, remounting
     // CommandDeck re-applied it (its applied-marker ref dies with the component)
@@ -532,7 +564,7 @@ describe('App primary routing', () => {
   });
 });
 
-describe('App session feed sidebar', () => {
+describe('App feed column removed (PAN-5293)', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', '/');
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
@@ -550,37 +582,35 @@ describe('App session feed sidebar', () => {
     }));
   });
 
-  it('keeps the sidebar open by default', () => {
+  // PAN-5293 F-D22: the off-deck feed column and its History toggle are gone;
+  // the feed is the Feed tab on /activity.
+  it('renders no feed column', () => {
     renderApp();
-
-    expect(screen.getByTestId('session-feed-sidebar')).toBeInTheDocument();
-  });
-
-  it('closes the sidebar from the toggle and persists the closed state', () => {
-    renderApp();
-
-    fireEvent.click(screen.getByLabelText('Toggle activity feed'));
 
     expect(screen.queryByTestId('session-feed-sidebar')).toBeNull();
-    expect(window.localStorage.getItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY)).toBe('false');
   });
 
-  it('restores the open sidebar from localStorage on mount', () => {
-    window.localStorage.setItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY, 'true');
-
+  it('has no Activity-feed toggle in the top bar', () => {
     renderApp();
 
-    expect(screen.getByTestId('session-feed-sidebar')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Toggle activity feed')).toBeNull();
   });
 
-  it('closes from the in-sidebar close button and persists the closed state', () => {
-    window.localStorage.setItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY, 'true');
-    renderApp();
+  it('ignores an old stored open state', () => {
+    window.localStorage.setItem('overdeck.ui.sessionFeedSidebarOpen', 'true');
+    window.history.replaceState(null, '', '/flywheel');
 
-    fireEvent.click(screen.getByText('Close activity feed'));
+    renderApp();
 
     expect(screen.queryByTestId('session-feed-sidebar')).toBeNull();
-    expect(window.localStorage.getItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY)).toBe('false');
+  });
+
+  it('reaches the feed through /activity', () => {
+    window.history.replaceState(null, '', '/activity');
+
+    renderApp();
+
+    expect(screen.getByTestId('activity-panel')).toBeInTheDocument();
   });
 });
 

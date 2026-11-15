@@ -15,6 +15,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { useNeedsYouItems, type NeedsYouItem } from '../../lib/selectors/needsYou';
+import { formatRelativeTime } from '../../lib/formatRelativeTime';
+import { useNow } from '../../hooks/useNow';
 import { fetchRegisteredProjects } from '../CommandDeck/UnknownProjectState';
 import { MenuItemButton, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
 
@@ -39,6 +41,18 @@ function groupByProject(items: readonly NeedsYouItem[], projectName: ReadonlyMap
     name,
     items: groupItems,
   }));
+}
+
+/** PAN-5293 F-D23: "<ask> · waiting <relative>" when the item knows since when it waits. */
+function NeedsYouRowSubline({ item }: { item: NeedsYouItem }) {
+  const now = useNow(60_000);
+  const waiting = item.since ? formatRelativeTime(item.since, now) : '';
+  return (
+    <span className="block truncate text-[11.5px] text-muted-foreground" data-testid="needs-you-row-subline">
+      {item.ask}
+      {waiting && ` · waiting ${waiting}`}
+    </span>
+  );
 }
 
 function navigateToActivity(): void {
@@ -125,7 +139,7 @@ export function NeedsYouIndicator() {
                     <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-state-needs-you" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-medium">{item.title}</span>
-                      <span className="block truncate text-[11.5px] text-muted-foreground">{item.ask}</span>
+                      <NeedsYouRowSubline item={item} />
                     </span>
                   </MenuItemButton>
                 ))}

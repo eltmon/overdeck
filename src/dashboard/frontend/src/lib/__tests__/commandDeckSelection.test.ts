@@ -11,6 +11,7 @@ import {
 
 beforeEach(() => {
   useCommandDeckSelection.getState().clearAll()
+  useCommandDeckSelection.setState({ selectedConversation: null, selectedFeature: null })
 })
 
 describe('useCommandDeckSelection', () => {
@@ -110,5 +111,33 @@ describe('selectIsIssueSelected', () => {
     useCommandDeckSelection.getState().selectSession('PAN-1', 'session-a')
     const state = useCommandDeckSelection.getState()
     expect(selectIsIssueSelected('PAN-1')(state)).toBe(false)
+  })
+})
+
+describe('deck selection fields (PAN-5293 F-D1)', () => {
+  it('start as null', () => {
+    const state = useCommandDeckSelection.getState()
+    expect(state.selectedConversation).toBeNull()
+    expect(state.selectedFeature).toBeNull()
+  })
+
+  it('setters record the conversation and the issue, and clearAll preserves both', () => {
+    useCommandDeckSelection.getState().setSelectedConversation('a')
+    useCommandDeckSelection.getState().setSelectedFeature('PAN-1')
+    expect(useCommandDeckSelection.getState().selectedConversation).toBe('a')
+    expect(useCommandDeckSelection.getState().selectedFeature).toBe('PAN-1')
+
+    useCommandDeckSelection.getState().clearAll()
+    expect(useCommandDeckSelection.getState().selectedConversation).toBe('a')
+    expect(useCommandDeckSelection.getState().selectedFeature).toBe('PAN-1')
+  })
+
+  it('setters accept null', () => {
+    useCommandDeckSelection.getState().setSelectedConversation('a')
+    useCommandDeckSelection.getState().setSelectedFeature('PAN-1')
+    useCommandDeckSelection.getState().setSelectedConversation(null)
+    useCommandDeckSelection.getState().setSelectedFeature(null)
+    expect(useCommandDeckSelection.getState().selectedConversation).toBeNull()
+    expect(useCommandDeckSelection.getState().selectedFeature).toBeNull()
   })
 })

@@ -1,5 +1,5 @@
 /**
- * PAN-5233 (FR-8, FR-9): the WORKSPACES rail and the Cmd-K workspaces scope
+ * PAN-5233 (FR-8, FR-9): the Workspaces section and the Cmd-K workspaces scope
  * list only workspaces the operator created or favorited — rows the
  * pipeline, Session Vault or an agent created stay out of both surfaces
  * entirely. The "Pipeline worktrees" count row is gone; issues are reached
@@ -9,16 +9,9 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { isRailWorkspace, isUserFacingWorkspace, Sidebar, type WorkspaceRegistryRow } from './Sidebar';
+import { WorkspacesSection } from './frame/WorkspacesSection';
+import { isRailWorkspace, isUserFacingWorkspace, type WorkspaceRegistryRow } from './frame/workspaceRows';
 import { CommandPalette } from './CommandPalette';
-
-vi.mock('./FreshnessIndicator', () => ({ FreshnessIndicator: () => <div data-testid="freshness-indicator" /> }));
-vi.mock('./DeaconPauseToggle', () => ({
-  DeaconPauseToggle: () => <button type="button">Pause Deacon</button>,
-}));
-vi.mock('../hooks/useTheme', () => ({
-  useTheme: () => ({ theme: 'dark', toggleTheme: vi.fn() }),
-}));
 
 function workspaceRow(overrides: Partial<WorkspaceRegistryRow> = {}): WorkspaceRegistryRow {
   const kind = overrides.kind ?? 'issue';
@@ -68,10 +61,15 @@ function newQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
 }
 
+// PAN-5293: the rail moved from the Sidebar to the left column's
+// project-scoped WorkspacesSection; the filter is the same.
 function renderSidebar() {
+  const client = newQueryClient();
+  client.setQueryDefaults(['registered-projects'], { staleTime: Infinity });
+  client.setQueryData(['registered-projects'], [{ key: 'overdeck', name: 'Overdeck', path: '/repo' }]);
   return render(
-    <QueryClientProvider client={newQueryClient()}>
-      <Sidebar activeTab="pipeline" onTabChange={vi.fn()} onSearchOpen={vi.fn()} />
+    <QueryClientProvider client={client}>
+      <WorkspacesSection selectedProject="Overdeck" onSelectWorkspace={vi.fn()} onNewWorkspace={vi.fn()} />
     </QueryClientProvider>,
   );
 }
@@ -103,7 +101,7 @@ describe('isUserFacingWorkspace (PAN-5233)', () => {
   });
 });
 
-describe('Sidebar workspaces rail filter (PAN-5233)', () => {
+describe('Workspaces section rail filter (PAN-5233)', () => {
   it('lists exactly the operator scratch and favorited rows, with no pipeline count row', async () => {
     stubFetch();
     renderSidebar();
@@ -166,7 +164,7 @@ describe('Cmd-K workspaces scope filter (PAN-5233)', () => {
   });
 });
 
-describe('Sidebar memory-phase badge (PAN-3286 FR-12)', () => {
+describe('Workspaces section memory-phase badge (PAN-3286 FR-12)', () => {
   it('renders the memory phase for a main/scratch row that has one', async () => {
     stubFetch([
       workspaceRow({ id: 'ws-main', kind: 'main', origin: 'operator', name: 'main', issueId: null, isFavorite: true, memoryPhase: 'shipping', lastAccessedAt: 50 }),

@@ -17,69 +17,6 @@
   background: var(--background);
 }
 
-.sidebar {
-  background: var(--card);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.resizeHandle {
-  width: 4px;
-  cursor: col-resize;
-  background: transparent;
-  flex-shrink: 0;
-  transition: background 0.15s;
-  position: relative;
-}
-
-.resizeHandle:hover,
-.resizeHandle:active {
-  background: var(--primary);
-}
-
-.sidebarHeader {
-  padding: 8px 12px 8px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-
-/* Account for the fixed hamburger menu button on small screens */
-@media (max-width: 767px) {
-  .sidebarHeader {
-    padding-left: 48px;
-  }
-}
-
-.sidebarHeaderRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  gap: 8px;
-  flex-wrap: nowrap;
-}
-
-.sidebarHeaderGroup {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-shrink: 1;
-  min-width: 24px;
-}
-
-.sidebarTitle {
-  font-size: 13px;
-  font-weight: 600;
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
 .sidebarSubtitle {
   font-size: 12px;
   color: var(--muted-foreground);
@@ -124,32 +61,10 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-.segmentCount {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--muted-foreground);
-  background: var(--accent);
-  padding: 0 5px;
-  border-radius: 8px;
-  line-height: 16px;
-}
-
 .projectTree {
   flex: 1;
   overflow-y: auto;
   padding: 4px 0;
-}
-
-.sidebarSection {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.sidebarSectionCollapsed {
-  flex: 0 0 auto;
 }
 
 .sectionHeader {
@@ -175,12 +90,6 @@
 
 .sectionTitle {
   flex: 1;
-}
-
-.sectionBody {
-  flex: 1;
-  overflow-y: auto;
-  padding: 2px 0;
 }
 
 .membershipStatus {
@@ -741,30 +650,6 @@
   color: var(--body-foreground, var(--muted-foreground));
 }
 
-.treeFilterRow {
-  display: flex;
-  gap: 4px;
-  margin-top: 8px;
-}
-
-.treeFilterButton {
-  flex: 1;
-  padding: 2px 6px;
-  font-size: 10px;
-  font-weight: 400;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--muted-foreground);
-  cursor: pointer;
-}
-
-.treeFilterButtonActive {
-  font-weight: 600;
-  background: color-mix(in srgb, var(--primary) 8%, transparent);
-  color: var(--foreground);
-}
-
 /* Issue Header (compact contextual header) */
 .issueHeader {
   display: flex;
@@ -1319,20 +1204,6 @@
 }
 
 /* Draggable section divider */
-.sectionDivider {
-  height: 4px;
-  cursor: row-resize;
-  background: transparent;
-  flex-shrink: 0;
-  transition: background 0.15s;
-  position: relative;
-}
-
-.sectionDivider:hover,
-.sectionDivider:active {
-  background: var(--primary);
-}
-
 /* Project-scoped conversation items — reuses conversationRow affordances */
 .projectConvItem {
   display: flex;
@@ -1476,47 +1347,6 @@
   border-color: transparent;
   background: transparent;
   color: var(--muted-foreground);
-}
-
-/* Activity feed column (PAN-1561, column 4) */
-.activityColumn {
-  width: 300px;
-  min-width: 300px;
-  flex-shrink: 0;
-  border-left: 1px solid var(--border);
-  background: var(--card);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* Collapsed Awareness rail — a thin click-to-expand strip (PAN-1591). */
-.activityColumnCollapsed {
-  width: 30px;
-  min-width: 30px;
-  flex-shrink: 0;
-  border-left: 1px solid var(--border);
-  background: var(--card);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding-top: 10px;
-  cursor: pointer;
-  color: var(--muted-foreground);
-  transition: color 0.12s, background 0.12s;
-}
-.activityColumnCollapsed:hover {
-  color: var(--foreground);
-  background: var(--accent);
-}
-.activityCollapsedLabel {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-size: 10px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 
 /* Feature Header */
@@ -2250,23 +2080,7 @@
 }
 
 /* Sidebar Footer */
-.sidebarFooter {
-  border-top: 1px solid var(--border);
-  padding: 4px 12px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
 /* Version label — technical identifier string, mono per PAN-698 policy */
-.versionLabel {
-  font-size: 10px;
-  color: var(--muted-foreground);
-  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  letter-spacing: 0.03em;
-}
-
 /* ───────────────────────────────────────────────────────────────────────────
    Conversations Section (PAN-416)
    ─────────────────────────────────────────────────────────────────────────── */
@@ -2325,41 +2139,6 @@
 .conversationAddBtn:hover {
   background: var(--accent);
   color: var(--primary);
-}
-
-/* New conversation split button: quick create + options menu (PAN-4486) */
-.conversationAddSplit {
-  display: flex;
-  align-items: center;
-  margin-right: 8px;
-}
-
-.conversationAddSplit .conversationAddBtn {
-  margin-right: 0;
-}
-
-.conversationAddCaret {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 24px;
-  border: none;
-  background: none;
-  cursor: pointer;
-  color: var(--muted-foreground);
-  border-radius: 4px;
-  flex-shrink: 0;
-  transition: background 0.1s, color 0.1s;
-}
-
-.conversationAddCaret:hover {
-  background: var(--accent);
-  color: var(--primary);
-}
-
-.conversationAddMenu {
-  white-space: nowrap;
 }
 
 /* Pipeline retrospective window menu (PAN-3841) */

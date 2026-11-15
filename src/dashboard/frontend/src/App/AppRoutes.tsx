@@ -233,7 +233,7 @@ export function AppRoutes({
       )}
       {activeTab === 'activity' && (
         <div className="w-full h-full">
-          <ActivityPanel onClose={() => onTabChange('kanban')} />
+          <ActivityPanel onClose={() => onTabChange('kanban')} selectedProjectKey={selectedProjectKey} />
         </div>
       )}
       {activeTab === 'metrics' && (

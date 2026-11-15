@@ -655,6 +655,8 @@ describe('FeatureItem', () => {
   });
 
   it('renders the derived state badge and never the raw Allocated stateLabel', () => {
+    // PAN-5293 F-D16: the state badge lives in the expanded body.
+    localStorage.setItem('mc-feature-expanded:PAN-821', 'true');
     renderFeature(
       <FeatureItem
         feature={makeFeature({ stateLabel: 'Allocated', state: 'working' })}
@@ -1016,6 +1018,9 @@ describe('FeatureItem', () => {
   });
 
   it('never nests a resource cluster button inside the row button', () => {
+    // PAN-5293 F-D16: the resource strip moved out of the row button into
+    // the expanded body, so the row button holds no buttons at all.
+    localStorage.setItem('mc-feature-expanded:PAN-821', 'true');
     const { container } = renderFeature(
       <FeatureItem
         feature={makeFeature({
@@ -1037,8 +1042,10 @@ describe('FeatureItem', () => {
       />,
     );
 
-    const rowButton = container.querySelector('[data-section="ResourceStrip"]')?.closest('button');
-    expect(rowButton).not.toBeNull();
+    const strip = container.querySelector('[data-section="ResourceStrip"]');
+    expect(strip).not.toBeNull();
+    expect(strip?.closest('button')).toBeNull();
+    const rowButton = container.querySelector('[data-section="Feature (issue) row"] button[class*="featureItem"]:not([aria-label])');
     expect(rowButton?.querySelector('button')).toBeNull();
   });
 
@@ -1492,6 +1499,7 @@ describe('FeatureItem', () => {
   });
 
   it('shows cleanup affordances for orphaned resources', () => {
+    localStorage.setItem('mc-feature-expanded:PAN-777', 'true');
     const onCleanupOrphanedResources = vi.fn();
     const { container } = renderFeature(
       <FeatureItem
@@ -1651,5 +1659,86 @@ describe('FeatureItem needs-attention shading', () => {
     );
 
     expect(container.querySelector('[data-needs-attention="true"]')).toBeNull();
+  });
+});
+
+describe('FeatureItem compact collapsed row (PAN-5293 F-D16)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useDashboardStore.setState({ derivedIssueStateByIssueId: {}, issuesRaw: [] } as Parameters<typeof useDashboardStore.setState>[0]);
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({}) })));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('reads stage · model · progress in words', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: { 'PAN-821': { issueId: 'PAN-821', state: 'working' } },
+    } as unknown as Parameters<typeof useDashboardStore.setState>[0]);
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          stateLabel: 'Todo',
+          sessions: [
+            makeSession({ sessionId: 'old', model: 'claude-sonnet-4-6', startedAt: '2026-11-14T00:00:00.000Z' }),
+            makeSession({ sessionId: 'new', model: 'claude-opus-5-5', startedAt: '2026-11-15T00:00:00.000Z' }),
+          ],
+          taskTotals: { total: 8, closed: 3, inProgress: 1, lastUpdated: null },
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('feature-meta-words')).toHaveTextContent('Building · opus-5-5 · 3 of 8 items');
+  });
+
+  it('starts with "Needs you" when the issue needs the operator', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: { 'PAN-821': { issueId: 'PAN-821', state: 'working', attention: 'needs-you' } },
+    } as unknown as Parameters<typeof useDashboardStore.setState>[0]);
+    renderFeature(<FeatureItem feature={makeFeature({ stateLabel: 'Todo' })} isSelected={false} onSelect={() => {}} />);
+    expect(screen.getByTestId('feature-meta-words').textContent).toMatch(/^Needs you/);
+  });
+
+  it('shows the PR badge and Merge button only after the row is expanded', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: {
+        'PAN-821': {
+          issueId: 'PAN-821',
+          state: 'ready',
+          pr: { url: 'https://github.com/eltmon/overdeck/pull/42', number: 42, reviewState: 'approved', checks: 'green', mergeable: true },
+        },
+      },
+    } as unknown as Parameters<typeof useDashboardStore.setState>[0]);
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          stateLabel: 'Ready',
+          state: 'ready',
+          sessions: [makeSession()],
+          resourceDetails: {
+            hasWorkspace: false,
+            localBranchCount: 0,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [{ number: 42, title: 'Fix the thing', state: 'OPEN', isDraft: false }],
+            hasXbrief: false,
+            hasTasks: false,
+            dockerContainerCount: 0,
+          },
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.queryByTestId('feature-badges')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('feature-pr')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Merge')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sessions' }));
+    expect(screen.getByTestId('feature-pr')).toBeInTheDocument();
+    expect(screen.getByTitle('Merge')).toBeInTheDocument();
   });
 });

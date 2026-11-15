@@ -8,6 +8,7 @@
 2 src/dashboard/frontend/src/components/CommandDeck/ConversationActionMenu.tsx
 3 src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx
 2 src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx
+1 src/dashboard/frontend/src/components/CommandDeck/conversationMeta.ts
 4 src/dashboard/frontend/src/components/Stage/HomePane/Timeline.tsx
 2 src/dashboard/frontend/src/components/chat/ComposerFooter.tsx
 2 src/dashboard/frontend/src/components/chat/SubagentComposer.tsx

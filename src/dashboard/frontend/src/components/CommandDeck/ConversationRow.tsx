@@ -1,6 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { Fragment, useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { getRuntimeBehavior, normalizeHarnessName } from '@overdeck/contracts';
 import { useDashboardStore } from '../../lib/store';
 import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Info, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical, FolderInput, MonitorSmartphone, CheckSquare, Square, CalendarClock } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
@@ -8,7 +7,6 @@ import { useConfirm } from '../DialogProvider';
 import { continueTargetOf, openContinueOnDevice } from '../chat/continueOnDevice/continueOnDeviceStore';
 import { VaultRowSyncMenuItem } from './VaultRowSyncMenuItem';
 import { useNow } from '../../hooks/useNow';
-import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { AwaitingInputIndicator } from '../AwaitingInputIndicator';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import type { Conversation } from './ConversationList';
@@ -23,28 +21,8 @@ import { ScheduleMenuItem } from '../chat/ConversationScheduleDialog';
 import { TriageMenuItems } from './TriageMenuItems';
 import { formatLocalWhen, formatSnoozeWake, isSnoozed } from './conversation-triage';
 import { PullRequestBadge } from '../primitives/PullRequestBadge';
+import { conversationMetaParts } from './conversationMeta';
 import styles from './styles/command-deck.module.css';
-
-/** Compact token count, e.g. 1234 → "1.2k", 2_500_000 → "2.5M". */
-function formatTokens(tokens: number): string {
-  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
-  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
-  return `${tokens}`;
-}
-
-/** Trim model IDs to a readable label, e.g. "claude-opus-4-8" → "opus-4-8". */
-function shortModel(model: string): string {
-  return model
-    .replace(/^claude-/, '')
-    .replace(/-\d{8}$/, '')
-    .replace(/-latest$/, '');
-}
-
-function shortHarness(harness: NonNullable<Conversation['harness']>): string {
-  const runtime = normalizeHarnessName(harness);
-  // Unknown future harness — show the raw id rather than a wrong label.
-  return runtime ? getRuntimeBehavior(runtime).displayName : harness;
-}
 
 function formatStalledTime(timestamp: string): string {
   return new Date(timestamp).toLocaleTimeString([], {
@@ -199,6 +177,7 @@ export function ConversationRow({
   const [moveSubmenuOpen, setMoveSubmenuOpen] = useState(false);
   const confirm = useConfirm();
   const now = useNow(60_000);
+  const meta = conversationMetaParts(conv, now);
 
   const openMenu = useCallback((e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation();
@@ -464,12 +443,6 @@ export function ConversationRow({
     <button
       ref={rowRef}
       className={itemClass}
-      draggable
-      style={{ cursor: 'grab' }}
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('application/json', JSON.stringify({ name: conv.name, projectKey: conv.projectKey ?? null, cwd: conv.cwd }));
-      }}
       onClick={(e) => {
         if (leavingKind) return;
         if (onRowClick) onRowClick(e, conv.name);
@@ -638,58 +611,31 @@ export function ConversationRow({
           {forkBadges}
         </>
       ) : (
-        // Flat list rows: title on line 1, muted metadata on line 2.
+        // Flat list rows: title on line 1, then the meta line in words
+        // (PAN-5293 F-D15): state · changes · harness · cost, then the chips.
         <span className={styles.conversationMain}>
           <span className={`${styles.conversationName} ${mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
-          <span className={styles.conversationMetaLine}>
+          <span className={styles.conversationMetaLine} title={leavingLabel ? undefined : meta.title} data-testid="conversation-meta-line">
             {leavingLabel ?? (
               <>
+                {meta.parts.map((part, index) => (
+                  <Fragment key={part.key}>
+                    {index > 0 && part.key !== 'deletions' && <span className={styles.conversationMetaSep} aria-hidden>·</span>}
+                    <span
+                      title={part.title}
+                      className={part.tone === 'additions' ? 'font-mono text-success-foreground'
+                        : part.tone === 'deletions' ? 'font-mono text-destructive-foreground'
+                        : part.tone === 'muted' ? 'text-muted-foreground' : undefined}
+                    >
+                      {part.text}
+                    </span>
+                  </Fragment>
+                ))}
                 {verdictBadge}
-                {conv.branch && (
-                  <span
-                    className={styles.conversationBranchChip}
-                    title={`${conv.isWorktree ? 'Worktree' : 'Local'} · ${conv.branch} · ${conv.cwd}`}
-                    aria-label={`Branch ${conv.branch} (${conv.isWorktree ? 'worktree' : 'local'})`}
-                  >
-                    {conv.isWorktree ? <GitFork size={10} /> : <GitBranch size={10} />}
-                    <span className={styles.conversationBranchChipText}>{conv.branch}</span>
-                  </span>
-                )}
                 {ownerBadge}
                 {pullRequestBadge}
                 {scheduleBadge}
-                {conv.lastAttachedAt && (
-                  <>
-                    {conv.branch && <span className={styles.conversationMetaSep} aria-hidden>·</span>}
-                    <time
-                      dateTime={conv.lastAttachedAt}
-                      title={new Date(conv.lastAttachedAt).toLocaleString()}
-                    >
-                      {formatRelativeTime(conv.lastAttachedAt, now)}
-                    </time>
-                  </>
-                )}
-                {conv.totalCost !== undefined && conv.totalCost > 0 && (
-                  <>
-                    <span className={styles.conversationMetaSep} aria-hidden>·</span>
-                    <span title="Total cost (cache-discount aware)">{conv.totalCost < 0.01 ? '<$0.01' : `$${conv.totalCost.toFixed(2)}`}</span>
-                  </>
-                )}
-                {conv.totalTokens !== undefined && conv.totalTokens > 0 && (
-                  <>
-                    <span className={styles.conversationMetaSep} aria-hidden>·</span>
-                    <span title={`${conv.totalTokens.toLocaleString()} tokens (input + output + cache read/write)`}>{formatTokens(conv.totalTokens)} tok</span>
-                  </>
-                )}
-                <span className={styles.conversationMetaSep} aria-hidden>·</span>
-                <span title={`Harness: ${shortHarness(conv.harness ?? 'claude-code')}`}>{shortHarness(conv.harness ?? 'claude-code')}</span>
                 {offlineLinked && <LinkedOfflineMeta conv={conv} />}
-                {conv.model && !offlineLinked && (
-                  <>
-                    <span className={styles.conversationMetaSep} aria-hidden>·</span>
-                    <span title={`Model: ${conv.model}`}>{shortModel(conv.model)}</span>
-                  </>
-                )}
                 {forkBadges}
                 {isSnoozed(conv, now.getTime()) && conv.snoozedUntil && (
                   <>
