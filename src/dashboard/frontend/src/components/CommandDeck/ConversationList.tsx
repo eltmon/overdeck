@@ -14,7 +14,7 @@ import styles from './styles/command-deck.module.css';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import { fetchRegisteredProjects } from './UnknownProjectState';
 import { MenuItemButton, MenuOverlay, MenuSurface } from '../shared/ContextMenu';
-import type { LinkedConversationFields, PullRequestLink } from '@overdeck/contracts';
+import type { ConversationChangeTotals, LinkedConversationFields, PullRequestLink } from '@overdeck/contracts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -88,6 +88,8 @@ export interface Conversation extends LinkedRowFields {
   forkFallbackReason?: string | null;
   /** PAN-1458: if this conv was cleared via Claude Code's /clear, the sibling conv that continues it. */
   clearedToConvId?: number | null;
+  /** PAN-5293 F-D15: the last 24 h's file-change totals (absent when nothing changed). */
+  changeTotals?: ConversationChangeTotals;
   /** PAN-1523: current git branch at cwd, null when cwd is not a git repo. */
   branch?: string | null;
   /** PAN-1523: true when cwd is a secondary git worktree (not the primary checkout). */

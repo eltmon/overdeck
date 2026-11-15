@@ -162,7 +162,7 @@ describe('ConversationList rename flow', () => {
     expect(screen.getByText('My Test Conversation')).toBeInTheDocument();
   });
 
-  it('renders the harness next to the model', () => {
+  it('renders the harness word and keeps the model in the meta line tooltip (PAN-5293 F-D15)', () => {
     const client = makeClient();
     client.setQueryData(['conversations'], [{
       ...mockConversation,
@@ -178,7 +178,7 @@ describe('ConversationList rename flow', () => {
     );
 
     expect(screen.getByTitle('Harness: Codex')).toHaveTextContent('Codex');
-    expect(screen.getByTitle('Model: gpt-5.5-codex')).toHaveTextContent('gpt-5.5-codex');
+    expect(screen.getByTestId('conversation-meta-line').getAttribute('title')).toContain('Model gpt-5.5-codex');
   });
 
   it('renders a spinner for actively working conversations', () => {
@@ -535,18 +535,7 @@ describe('ConversationList move flow (PAN-1577)', () => {
 
 // ─── Drag-drop move (PAN-1577) ─────────────────────────────────────────────
 
-function fakeDataTransfer() {
-  const store = new Map<string, string>();
-  return {
-    effectAllowed: 'uninitialized',
-    dropEffect: 'none',
-    get types() { return Array.from(store.keys()); },
-    setData: (type: string, value: string) => { store.set(type, value); },
-    getData: (type: string) => store.get(type) ?? '',
-  };
-}
-
-describe('ConversationRow drag source (PAN-1577)', () => {
+describe('ConversationRow drag source (PAN-1577, retired by PAN-5293 F-D20)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
@@ -556,7 +545,9 @@ describe('ConversationRow drag source (PAN-1577)', () => {
     vi.restoreAllMocks();
   });
 
-  it('is draggable and carries {name, projectKey, cwd} as the drag payload (ac2)', () => {
+  // Its only drop target was the Sidebar's project rail; the row menu's
+  // Move submenu replaces drag-to-project (ConversationRow.test.tsx).
+  it('is no longer draggable', () => {
     const client = makeClient();
     client.setQueryData(['conversations'], [{ ...mockConversation, projectKey: 'krux' }]);
     render(
@@ -567,18 +558,7 @@ describe('ConversationRow drag source (PAN-1577)', () => {
       </DialogProvider>,
     );
 
-    const row = screen.getByTitle('test-conv');
-    expect(row).toHaveAttribute('draggable', 'true');
-
-    const dataTransfer = fakeDataTransfer();
-    fireEvent.dragStart(row, { dataTransfer });
-
-    // cwd travels too (review fix): the drop target needs it to resolve the
-    // conversation's *effective* current project (override-first, cwd
-    // fallback) for the already-in-target no-op check.
-    expect(dataTransfer.getData('application/json')).toBe(
-      JSON.stringify({ name: 'test-conv', projectKey: 'krux', cwd: mockConversation.cwd }),
-    );
+    expect(screen.getByTitle('test-conv')).not.toHaveAttribute('draggable');
   });
 });
 
