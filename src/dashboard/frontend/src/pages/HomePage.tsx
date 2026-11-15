@@ -14,6 +14,8 @@ import { GetSetUpCard } from '../components/home/GetSetUpCard';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { bucketByTime, type TimeBucketKey } from '../lib/timeBuckets';
 import type { DerivedIssueState, Issue } from '../types';
+import { useNeedsYouItems } from '../lib/selectors/needsYou';
+import { useAgentsWorking, type AgentsWorking, type WorkingRole } from '../lib/selectors/agentsWorking';
 
 interface FeatureRegistryResponse {
   entries: FeatureRegistryEntry[];
@@ -26,7 +28,7 @@ interface MetricsSummaryResponse {
 }
 
 interface HomeSummaryCards {
-  runningAgents: number;
+  agentsWorking: AgentsWorking;
   pausedAgents: number;
   readyToMerge: number;
   needsYou: number;
@@ -133,11 +135,16 @@ export function HomePage({ onOpenWorkspaceHome, onNewProject, onSelectProject, o
     derivedIssueStateByIssueId,
   }), [agentsById, issuesRaw, observationsByIssueId, derivedIssueStateByIssueId, statusByIssueId]);
   const actionObservations = useMemo(() => selectActionObservations(observationsByIssueId), [observationsByIssueId]);
+  // The same selectors as the top bar's agents menu and Needs-you button, so the counts agree (PAN-5292 FR-E8).
+  const needsYouCount = useNeedsYouItems().length;
+  const agentsWorking = useAgentsWorking();
   const summaryCards = useMemo(() => buildSummaryCardViews(buildHomeSummaryCards({
     agentsById,
     derivedIssueStateByIssueId,
+    agentsWorking,
+    needsYouCount,
     dailyCost: metricsQuery.data?.today?.totalCost,
-  })), [agentsById, metricsQuery.data?.today?.totalCost, derivedIssueStateByIssueId]);
+  })), [agentsById, agentsWorking, needsYouCount, metricsQuery.data?.today?.totalCost, derivedIssueStateByIssueId]);
 
   return (
     <div className="h-full w-full overflow-y-auto bg-background">
@@ -429,19 +436,23 @@ function HomeActivityFeedItem({ observation, now }: { observation: MemoryObserva
 function buildHomeSummaryCards({
   agentsById = {},
   derivedIssueStateByIssueId = {},
+  agentsWorking,
+  needsYouCount,
   dailyCost,
 }: {
   agentsById?: Record<string, AgentSnapshot>;
   derivedIssueStateByIssueId?: Record<string, DerivedIssueState>;
+  agentsWorking: AgentsWorking;
+  needsYouCount: number;
   dailyCost?: number;
 }): HomeSummaryCards {
   const agents = Object.values(agentsById);
   const derivedStates = Object.values(derivedIssueStateByIssueId);
   return {
-    runningAgents: agents.filter(isRunningAgent).length,
+    agentsWorking,
     pausedAgents: agents.filter((agent) => agent.paused === true).length,
     readyToMerge: derivedStates.filter((derived) => derived.state === 'ready').length,
-    needsYou: derivedStates.filter((derived) => derived.attention === 'needs-you').length,
+    needsYou: needsYouCount,
     dailyCost: typeof dailyCost === 'number' && Number.isFinite(dailyCost) ? dailyCost : null,
   };
 }
@@ -449,10 +460,10 @@ function buildHomeSummaryCards({
 function buildSummaryCardViews(summary: HomeSummaryCards): SummaryCardView[] {
   return [
     {
-      label: 'Running agents',
-      value: String(summary.runningAgents),
-      detail: 'Live or starting sessions',
-      tone: summary.runningAgents > 0 ? 'text-primary' : undefined,
+      label: 'Agents working',
+      value: String(summary.agentsWorking.count),
+      detail: agentsWorkingDetail(summary.agentsWorking),
+      tone: summary.agentsWorking.count > 0 ? 'text-primary' : undefined,
     },
     {
       label: 'Paused',
@@ -481,8 +492,22 @@ function buildSummaryCardViews(summary: HomeSummaryCards): SummaryCardView[] {
   ];
 }
 
-function isRunningAgent(agent: AgentSnapshot): boolean {
-  return agent.hasLivePane === true || agent.status === 'running' || agent.status === 'starting';
+const WORKING_ROLE_WORDS: ReadonlyArray<readonly [WorkingRole, string]> = [
+  ['planning', 'planning'],
+  ['building', 'building'],
+  ['review', 'review'],
+  ['test', 'test'],
+  ['conversation', 'conversation'],
+  ['other', 'agent'],
+];
+
+/** "1 planning · 2 building", or "Live sessions" when nothing is working. */
+function agentsWorkingDetail(working: AgentsWorking): string {
+  if (working.count === 0) return 'Live sessions';
+  return WORKING_ROLE_WORDS
+    .filter(([role]) => (working.byRole[role] ?? 0) > 0)
+    .map(([role, word]) => `${working.byRole[role]} ${word}`)
+    .join(' · ');
 }
 
 function selectActionObservations(observationsByIssueId: Record<string, MemoryObservation[]>): Array<MemoryObservation & { actionStatus: string }> {
