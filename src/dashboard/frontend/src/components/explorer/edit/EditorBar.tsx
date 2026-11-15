@@ -142,6 +142,8 @@ export interface EditorBarProps {
   paneId?: string
   /** The edit workspace no longer exists (PAN-5290 C-D13b). */
   onStale?: () => void
+  /** A commit landed (direct Create PR or Push changes): the Files tab re-reads git status. */
+  onGitChanged?: () => void
 }
 
 function ProjectBar({ projectKey, rootId, deckKey, paneId }: { projectKey: string; rootId: string; deckKey: string; paneId?: string }) {
@@ -244,7 +246,17 @@ function EditingSentence({ status, changes, saving }: { status: EditWorkspaceSta
   )
 }
 
-function WorkspaceBar({ rootId, workspaceId, onStale }: { rootId: string; workspaceId: string; onStale?: () => void }) {
+function WorkspaceBar({
+  rootId,
+  workspaceId,
+  onStale,
+  onGitChanged,
+}: {
+  rootId: string
+  workspaceId: string
+  onStale?: () => void
+  onGitChanged?: () => void
+}) {
   const queryClient = useQueryClient()
   const status = useEditWorkspaceStatus(workspaceId, { poll: true })
   const changes = useEditWorkspaceChanges(workspaceId)
@@ -318,6 +330,7 @@ function WorkspaceBar({ rootId, workspaceId, onStale }: { rootId: string; worksp
     setDialog(null)
     if (result.mode === 'direct') {
       toast.success(result.created ? `Opened PR #${result.number}.` : `Pushed your changes to PR #${result.number}.`)
+      onGitChanged?.()
       refresh()
       return
     }
@@ -445,9 +458,9 @@ function WorkspaceBar({ rootId, workspaceId, onStale }: { rootId: string; worksp
   )
 }
 
-export function EditorBar({ rootId, deckKey, paneId, onStale }: EditorBarProps) {
+export function EditorBar({ rootId, deckKey, paneId, onStale, onGitChanged }: EditorBarProps) {
   const parsed = parseRootId(rootId)
   if (parsed?.kind === 'project') return <ProjectBar projectKey={parsed.key} rootId={rootId} deckKey={deckKey} paneId={paneId} />
-  if (parsed?.kind === 'workspace') return <WorkspaceBar rootId={rootId} workspaceId={parsed.key} onStale={onStale} />
+  if (parsed?.kind === 'workspace') return <WorkspaceBar rootId={rootId} workspaceId={parsed.key} onStale={onStale} onGitChanged={onGitChanged} />
   return null
 }
