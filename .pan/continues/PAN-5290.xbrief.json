@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5290",
   "created": "2026-11-15T11:24:24.576Z",
-  "updated": "2026-11-15T11:44:21.479Z",
+  "updated": "2026-11-15T11:44:27.390Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,11 @@
     "edit-changes-route.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T11:44:21.478Z"
+    },
+    "view-state-carry": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5290",
+      "claimedAt": "2026-11-15T11:44:27.390Z"
     }
   }
 }
