@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5364",
   "created": "2026-11-15T15:42:11.052Z",
-  "updated": "2026-11-15T16:25:20.035Z",
+  "updated": "2026-11-15T16:25:22.041Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,11 @@
     "older-list-grouping.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T16:25:20.035Z"
+    },
+    "docs-and-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5364",
+      "claimedAt": "2026-11-15T16:25:22.040Z"
     }
   }
 }
