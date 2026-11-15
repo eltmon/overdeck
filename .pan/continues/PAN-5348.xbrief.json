@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5348",
   "created": "2026-11-15T13:34:43.139Z",
-  "updated": "2026-11-15T14:03:22.178Z",
+  "updated": "2026-11-15T14:16:37.708Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,6 +152,10 @@
     "docs-bare-pan-help.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T14:03:22.177Z"
+    },
+    "router-help-dispatch.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:16:37.708Z"
     }
   }
 }
