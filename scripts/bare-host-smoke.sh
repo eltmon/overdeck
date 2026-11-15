@@ -62,21 +62,24 @@ IDLE_BUDGET_LINUX=30
 BARE_PATH_ENTRIES=6
 WINDOW_SECS=30
 SETTLE_SECS=20
-# PAN-5361 review (cycle fa257f60/8f9a2499): the directly started dashboard
-# runs a one-time startup probe sweep (docker/tailscale/nvidia-smi/gh/claude/
-# herdr/etc. availability checks) that, across 20 calibration runs, never
-# started later than server start and never ran past about +62 s after it
-# (tight across runs: 60.7-62.4 s). At SETTLE_SECS=20 s that sweep landed
-# inside the idle windows -- mostly window 2 -- so min-of-3 was effectively
-# min-of-2 over two windows whose own spread (13-45 PIDs) already crosses
-# the budget on a burst. Linux waits past the sweep before any idle window
-# starts; macOS is untouched (non-goal: do not change idle behaviour).
-SETTLE_SECS_LINUX=80
+# PAN-5361 review (cycles fa257f60, 8f9a2499): min-of-3 was not immune to a
+# single burst. A SETTLE_SECS_LINUX=80 s experiment (cycle 8f9a2499 fix,
+# since reverted) proved the cause is not one startup sweep: the directly
+# started dashboard runs at least three distinct one-time/periodic probe
+# bursts after boot (one around 45-62 s, a tightly-timed one around 120-122 s
+# in every run, and a third, untraced one of about +27 PIDs that floats
+# between runs), and the "floor" itself steps up after about 60 s. Waiting
+# past one burst walks the idle windows into the next. This constant is
+# WIP while PAN-5361 maps the full timeline (see the issue/PRD); do not
+# treat it as final. macOS is untouched regardless (non-goal: do not change
+# idle behaviour).
 HEALTH_TIMEOUT_SECS=120
 CHURN_SECS=20
-# PAN-5361: Linux takes 3 windows per side (min-of-N absorbs one runner PID
-# burst); macOS keeps the single window its traced-cost rule has always used.
-WINDOWS_PER_SIDE_LINUX=3
+# PAN-5361: Linux takes WINDOWS_PER_SIDE_LINUX windows per side (min-of-N
+# absorbs one runner PID burst); macOS keeps the single window its
+# traced-cost rule has always used. The Linux count is temporarily raised
+# for PAN-5361's exploratory mapping run; it is not the final value.
+WINDOWS_PER_SIDE_LINUX=10
 WINDOWS_PER_SIDE_MACOS=1
 
 DENIED_TOOLS="docker tmux systemctl journalctl brew"
@@ -634,8 +637,7 @@ sample_churn() {
 }
 
 measure_idle() {
-  local server waited=0 node_options settle_secs="$SETTLE_SECS"
-  if [ "$OS_NAME" = linux ]; then settle_secs="$SETTLE_SECS_LINUX"; fi
+  local server waited=0 node_options
   sample_churn
   echo "== baseline window(s) (${WINDOWS_PER_SIDE} x ${WINDOW_SECS} s, no Overdeck process)"
   take_windows baseline
@@ -659,7 +661,7 @@ measure_idle() {
   done
 
   if [ "$R_IDLE_BOOTED" = true ]; then
-    sleep "$settle_secs"
+    sleep "$SETTLE_SECS"
     take_windows idle "$server"
     echo "idle new PIDs per window: $R_IDLE_WINDOWS (the verdict is in the summary below)"
     # A dashboard that died during the window spawns nothing, so an empty
