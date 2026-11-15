@@ -2020,8 +2020,11 @@ feed column.
   conversation icon and the footer icons, with no lists. The state persists in
   `overdeck.ui.leftColumnCollapsed`.
 - **Drawer.** Below 900 px (`matchMedia('(max-width: 899px)')`) the column is a
-  drawer and is hidden by default. `LeftColumn` renders the **Open navigation**
-  button, fixed at the top left of the window. The overlay closes the drawer,
+  drawer and is hidden by default. The **Open navigation** button sits at the
+  left of `AppChrome`'s app bar (shown only below 900 px) and dispatches
+  `OPEN_LEFT_COLUMN_EVENT` (`overdeck:open-left-column`), which `LeftColumn`
+  listens for. The column hides with a `hidden` class, not the `hidden`
+  attribute, because Tailwind's `flex` would override it. The overlay closes the drawer,
   and so does any navigation: a change of route, project, selected conversation
   or selected issue. The drawer always shows the full column, ignores the
   collapsed preference and has no resize handle.

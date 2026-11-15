@@ -91,6 +91,15 @@ describe('AppChrome top bar (PAN-5292)', () => {
     expect(onGoHome).toHaveBeenCalledTimes(1);
   });
 
+  it('opens the left-column drawer from the app bar (PAN-5293 F-D18)', () => {
+    const opened = vi.fn();
+    window.addEventListener('overdeck:open-left-column', opened);
+    renderChrome();
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
+    expect(opened).toHaveBeenCalledTimes(1);
+    window.removeEventListener('overdeck:open-left-column', opened);
+  });
+
   it('places the agents menu, Needs you, the health dot and the theme toggle in that order', () => {
     renderChrome();
     const order = domOrder('mock-agents-menu', 'mock-needs-you', 'mock-health-dot', 'topbar-theme');

@@ -6,7 +6,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  LEFT_COLUMN_COLLAPSED_KEY, LEFT_COLUMN_WIDTH_KEY, LeftColumn,
+  LEFT_COLUMN_COLLAPSED_KEY, LEFT_COLUMN_WIDTH_KEY, LeftColumn, OPEN_LEFT_COLUMN_EVENT,
 } from '../LeftColumn';
 import { DeckDialogsHost } from '../deck/DeckDialogsHost';
 import { TestDeckNavigationProvider } from '../deck/deckNavigation';
@@ -117,17 +117,23 @@ describe('LeftColumn (PAN-5293 F-D18)', () => {
     expect(screen.queryByTestId('stub-workspaces')).not.toBeInTheDocument();
   });
 
-  it('below 900 px is a drawer hidden until Open navigation, closed by its overlay', () => {
+  it('below 900 px is a drawer hidden until the open-navigation event, closed by its overlay', () => {
     narrow = true;
     stubMatchMedia();
     renderShell();
-    expect(screen.getByTestId('left-column')).not.toBeVisible();
+    // jsdom loads no Tailwind CSS, so assert the display class; the
+    // Playwright checklist covers the real browser at 800 px.
+    expect(screen.getByTestId('left-column')).toHaveClass('hidden');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
-    expect(screen.getByTestId('left-column')).toBeVisible();
+    // The app bar's Open navigation button (AppChrome) sends this event.
+    act(() => {
+      window.dispatchEvent(new Event(OPEN_LEFT_COLUMN_EVENT));
+    });
+    expect(screen.getByTestId('left-column')).not.toHaveClass('hidden');
+    expect(screen.getByTestId('left-column')).toHaveClass('fixed');
 
     fireEvent.click(screen.getByTestId('left-column-overlay'));
-    expect(screen.getByTestId('left-column')).not.toBeVisible();
+    expect(screen.getByTestId('left-column')).toHaveClass('hidden');
   });
 });
 

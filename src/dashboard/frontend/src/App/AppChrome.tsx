@@ -1,4 +1,4 @@
-import { AlertTriangle, Moon, Search, Sun } from 'lucide-react';
+import { AlertTriangle, Menu, Moon, Search, Sun } from 'lucide-react';
 import { DeaconFrozenChip, DeaconPauseToggle } from '../components/DeaconPauseToggle';
 import { DegradedModeBanner } from '../components/DegradedModeBanner';
 import { NewBuildBanner } from '../components/NewBuildBanner';
@@ -22,6 +22,7 @@ import type { Tab } from '../components/Header';
 import { useTheme } from '../hooks/useTheme';
 import { useOverdeckBusy } from '../hooks/useOverdeckBusy';
 import { OverdeckMark } from '../components/OverdeckMark';
+import { OPEN_LEFT_COLUMN_EVENT } from '../components/frame/LeftColumn';
 import { PALETTE_SEARCH_PLACEHOLDER, paletteKeycap } from './appChromeLabels';
 import { AgentsMenu } from './topbar/AgentsMenu';
 import { Breadcrumb } from './topbar/Breadcrumb';
@@ -172,6 +173,16 @@ export function AppChrome({
           menu, Needs you, exception chips, health dot, theme. AppChrome calls no
           store selector: every count lives in its own leaf component (E-D1). */}
       <div className="relative flex h-12 shrink-0 items-center gap-3 border-b border-border bg-background px-3">
+        {/* PAN-5293 F-D18: below 900 px the left column is a drawer opened here. */}
+        <button
+          type="button"
+          aria-label="Open navigation"
+          data-testid="topbar-open-navigation"
+          onClick={() => window.dispatchEvent(new Event(OPEN_LEFT_COLUMN_EVENT))}
+          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground min-[900px]:hidden"
+        >
+          <Menu className="h-4 w-4" aria-hidden="true" />
+        </button>
         <BrandHome onGoHome={onGoHome} />
         <Breadcrumb activeTab={activeTab} selectedProjectKey={selectedProjectKey} />
 

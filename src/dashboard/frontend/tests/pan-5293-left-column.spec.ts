@@ -185,4 +185,28 @@ test.describe('PAN-5293 left column checklist', () => {
       await expect(page.getByTestId('left-column')).not.toHaveAttribute('data-collapsed', 'true');
     });
   });
+
+  test.describe('below 900 px', () => {
+    test.use({ viewport: { width: 800, height: 900 } });
+
+    test('the column is a drawer opened by Open navigation and closed by its overlay', async ({ page }) => {
+      await routeFixedAnswers(page);
+      await page.goto(`${DASHBOARD_URL}/flywheel`);
+      await page.locator('#pan-recovery-overlay').evaluate((el) => el.remove()).catch(() => {});
+      const column = page.getByTestId('left-column');
+      const open = page.getByRole('button', { name: 'Open navigation' });
+      await expect(open).toBeVisible({ timeout: 30_000 });
+      await expect(column).toBeHidden();
+
+      await open.click();
+      await expect(column).toBeVisible();
+      // The drawer overlays the page instead of pushing it.
+      expect(await column.evaluate((el) => getComputedStyle(el).position)).toBe('fixed');
+      await page.screenshot({ path: '../../../.tmp/pan-5293-screens/drawer-800-open.png' });
+
+      await page.getByTestId('left-column-overlay').click({ position: { x: 780, y: 450 } });
+      await expect(column).toBeHidden();
+      await page.screenshot({ path: '../../../.tmp/pan-5293-screens/drawer-800-closed.png' });
+    });
+  });
 });

@@ -13,7 +13,6 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
-import { Menu } from 'lucide-react';
 import type { Tab } from '../Header';
 import { useShortcut, type ShortcutDef } from '../../lib/shortcuts/registry';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
@@ -36,6 +35,8 @@ export const LEFT_COLUMN_MAX_WIDTH = 400;
 export const LEFT_COLUMN_COLLAPSED_WIDTH = 48;
 /** Below this window width the column is a drawer. */
 export const LEFT_COLUMN_DRAWER_QUERY = '(max-width: 899px)';
+/** The app bar's "Open navigation" button (AppChrome) dispatches this window event. */
+export const OPEN_LEFT_COLUMN_EVENT = 'overdeck:open-left-column';
 
 const clampWidth = (width: number) => Math.max(LEFT_COLUMN_MIN_WIDTH, Math.min(LEFT_COLUMN_MAX_WIDTH, width));
 
@@ -99,6 +100,12 @@ export function LeftColumn({
     group: 'General', run: () => toggleCollapsed(),
   }), [toggleCollapsed]));
 
+  useEffect(() => {
+    const open = () => setDrawerOpen(true);
+    window.addEventListener(OPEN_LEFT_COLUMN_EVENT, open);
+    return () => window.removeEventListener(OPEN_LEFT_COLUMN_EVENT, open);
+  }, []);
+
   // Any navigation closes the drawer: a route, project or selection change.
   const selectedConversation = useCommandDeckSelection((s) => s.selectedConversation);
   const selectedFeature = useCommandDeckSelection((s) => s.selectedFeature);
@@ -135,17 +142,6 @@ export function LeftColumn({
     <>
       <DeckDataHost />
       <DeckDialogsHost selectedProject={selectedProject} />
-      {isDrawer && !drawerOpen && (
-        <button
-          type="button"
-          aria-label="Open navigation"
-          data-testid="left-column-open"
-          onClick={() => setDrawerOpen(true)}
-          className="fixed left-3 top-3 z-50 rounded-lg border border-border bg-card p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
-        >
-          <Menu aria-hidden className="h-4 w-4" />
-        </button>
-      )}
       {isDrawer && drawerOpen && (
         <div data-testid="left-column-overlay" className="fixed inset-0 z-40 bg-black/40" onClick={() => setDrawerOpen(false)} />
       )}
@@ -153,9 +149,10 @@ export function LeftColumn({
         data-testid="left-column"
         data-collapsed={collapsed ? 'true' : undefined}
         aria-label="Navigation"
-        hidden={hidden}
+        aria-hidden={hidden || undefined}
         style={{ width: shownWidth, minWidth: shownWidth }}
-        className={`relative flex h-full shrink-0 flex-col border-r border-border bg-card ${isDrawer ? 'fixed inset-y-0 left-0 z-50 shadow-overlay' : ''}`}
+        // A display class, not the hidden attribute: Tailwind's `flex` would override [hidden].
+        className={`${hidden ? 'hidden' : 'flex'} h-full shrink-0 flex-col border-r border-border bg-card ${isDrawer ? 'fixed inset-y-0 left-0 z-50 shadow-overlay' : 'relative'}`}
       >
         <div className={`flex shrink-0 flex-col gap-1 ${collapsed ? 'items-center px-1 py-2' : 'p-2'}`}>
           <ProjectSwitcher
