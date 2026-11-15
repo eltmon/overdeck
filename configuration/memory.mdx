@@ -126,6 +126,28 @@ exits 1.
 Facts use the same frontmatter keys (`type`, `title`, `description`, `tags`) OKF's indexer reads, so
 `/okf author` can promote a fact into the knowledge bundle by moving the file and re-casing its type.
 
+## Per-turn retrieval
+
+Every prompt — not just session start — can pull relevant memory, briefing updates and docs context in
+front of it. Which harnesses get this, and how:
+
+- **Claude Code** calls it from the global `user-prompt-submit-hook`, registered once in your
+  user-global `~/.claude/settings.json`. It fires for every Claude Code session on the machine, in any
+  cwd — a workspace or a project root.
+- **Codex** calls it from the app-server host, before each turn the host mediates: dashboard messages,
+  `pan tell`, and pane-typed lines. The result is wrapped in `<overdeck-turn-context>` and prepended to
+  the prompt; the chat timeline, titles, search and enrichment all strip that block back out, so you see
+  only your own text. The native Codex terminal companion and `codex.transport: tui` do not call it.
+- **Pi** calls it for issue-linked conversations and work agents.
+
+A conversation's identity comes from the workspace row that owns it — its own `workspace_id`, else the
+project's main workspace for a project-root conversation. Dashboard boot creates any missing main
+workspace row for a registered project, so older projects (imported before workspaces existed) get
+identity too.
+
+Every call — hit, miss or error — is logged to
+`~/.overdeck/memory/<project>/<workspace>/rag-runs/<date>.jsonl`.
+
 ## Previewing
 
 The dashboard's **Context** page preview shows the same Project / Operator / Machine memory sections the
