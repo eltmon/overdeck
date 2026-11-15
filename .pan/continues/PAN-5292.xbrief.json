@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5292",
   "created": "2026-11-15T01:03:44.357Z",
-  "updated": "2026-11-15T01:07:19.904Z",
+  "updated": "2026-11-15T01:07:27.199Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "agents-menu.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T01:07:19.904Z"
+    },
+    "needs-you-menu": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5292",
+      "claimedAt": "2026-11-15T01:07:27.199Z"
     }
   }
 }
