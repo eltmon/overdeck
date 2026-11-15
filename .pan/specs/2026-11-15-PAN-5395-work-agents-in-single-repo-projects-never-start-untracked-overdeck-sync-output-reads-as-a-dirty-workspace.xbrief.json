@@ -4,17 +4,17 @@
     "created": "2026-11-15T20:07:34Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5395: Work agents in single-repo projects never start: untracked Overdeck sync output reads as a dirty workspace",
-    "updated": "2026-11-15T20:19:26.988Z"
+    "updated": "2026-11-15T20:20:26.550Z"
   },
   "plan": {
     "id": "pan-5395",
     "title": "Work agents in single-repo projects never start: untracked Overdeck sync output reads as a dirty workspace",
-    "status": "proposed",
+    "status": "running",
     "uid": "9adb0bc6-97e7-41b2-bff9-70fe4f5b93d7",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T20:07:34Z",
-    "updated": "2026-11-15T20:19:26.988Z",
+    "updated": "2026-11-15T20:20:26.550Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5395",
@@ -363,5 +363,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
