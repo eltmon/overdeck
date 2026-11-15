@@ -1,0 +1,871 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T15:14:15Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5358: Memory facts: select by relevance into prompts, not only a budget-cut launch list",
+    "updated": "2026-11-15T15:25:18.193Z"
+  },
+  "plan": {
+    "id": "pan-5358",
+    "title": "Memory facts: select by relevance into prompts, not only a budget-cut launch list",
+    "status": "proposed",
+    "uid": "4aee6745-0f31-47ea-8bd6-3404f421f823",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-15T15:14:15Z",
+    "updated": "2026-11-15T15:25:18.193Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5358",
+        "label": "PAN-5358",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5358.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "memory",
+      "facts",
+      "rag",
+      "prompt-injection",
+      "embeddings"
+    ],
+    "metadata": {
+      "sizeJustification": "25 files, but the quality lint counts 9 subsystems only because tests/unit, tests/lib and each top-level doc file (configuration/memory.mdx, docs/CONTEXT-LAYERS.md, changelog.d/pan-5358.md, sync-sources/skills) count separately. All code is one feature in src/lib/memory plus its CLI verbs and one additive contract field; every item is a small vertical slice with its own tests, and the issue asks for retrieval, the always-on launch set and write-time vectors together.",
+      "canonicalFilename": "2026-11-15-PAN-5358-memory-facts-select-by-relevance-into-prompts-not-only-a-budget-cut-launch-list.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Curated memory facts reach an agent only through the launch index, which sorts by type and date and stops at a 12,000-character budget, so in dfai 89 of 171 active facts never reach the agent. Prompt-time injection (injectPromptTimeMemory) never considers facts, and the only query-based fact lookup (matchMemoryFacts) ANDs every word, so a raw prompt matches almost nothing.",
+      "Proposal": "Add curated facts as a ranked candidate group ('facts', 1,500-token budget, at most 6 facts) of prompt-time injection, ranked by field-weighted BM25 with a relevance floor, and log them in rag-runs. Add an 'always' frontmatter flag whose facts lead the launch index and are excluded from retrieval. Add optional semantic re-ranking: the CLI embeds facts at write time (pan memory add/edit, pan memory sync, new pan memory reindex) through the docs index's existing embedding path into a global content-hash vector cache, and prompt-time ranking fuses lexical and vector ranks with a pseudo-relevance centroid, never embedding the prompt and never loading a model in the dashboard server. Full design: .pan/drafts/PAN-5358.md.",
+      "NonGoals": "- Shrinking any launch-index budget or changing its overflow line text.\n- Embedding the prompt (query-time embedding) or importing @huggingface/transformers / calling an embedding API from the dashboard server or prompt-time injection.\n- Changing matchMemoryFacts, pan memory search, or pan memory list --query semantics.\n- Per-session dedupe of injected facts.\n- Changing the <overdeck-memory-context> notice or adding separate trust framing for facts.\n- Adding per-turn injection to harnesses that lack it (codex, opencode, kimi-code, grok, acp).\n- Automatic pruning of the vector cache, or refreshing vectors from pan sync or the dashboard.\n- Implementing #4373 (Jev relevance filter).\n- An async twin of readMemoryFactsSync in store.ts."
+    },
+    "autoDecisions": [
+      {
+        "summary": "The launch index keeps its budgets and overflow line; always facts only sort first.",
+        "rationale": "Codex, opencode, kimi-code, grok and acp agents get no per-turn injection, prompt-time injection can be disabled or time out, and no existing fact carries the new flag, so shrinking the index would hide facts. rag-runs fact logs will show coverage before any later shrink."
+      },
+      {
+        "summary": "Vectors are computed only by CLI paths at write time; prompt-time ranking uses a pseudo-relevance centroid of stored vectors and never embeds the prompt.",
+        "rationale": "Measured cold gte-small load is about 630 ms and adds about 250 MB RSS, which does not fit the 750 ms hook window or the dashboard process; the docs index already uses the centroid technique."
+      },
+      {
+        "summary": "Fact embeddings reuse the docs embedding config (docs.embedding, default local gte-small) via a new embedText export in src/lib/docs/index-builder.ts.",
+        "rationale": "The issue asks to reuse an existing embedding path rather than add a third; this is the one with a local default."
+      },
+      {
+        "summary": "One global vector cache at ~/.overdeck/cache/memory-fact-vectors.json keyed by content hash, never pruned automatically.",
+        "rationale": "Project facts arrive by git merge, not only by pan memory add; a content-hash key lets a vector computed in a workspace serve the same fact in the primary checkout. Entries are about 2 KB and facts change rarely."
+      },
+      {
+        "summary": "Facts budget is 1,500 tokens and at most 6 facts per injection; each fact injects its description, its body cut at 1,200 characters, and a pan memory show hint.",
+        "rationale": "Matches the existing sibling and knowledge-index budgets; the body is the detail the launch index tells agents to open."
+      },
+      {
+        "summary": "Facts already listed in the launch index remain retrieval candidates; always facts do not; no per-session dedupe.",
+        "rationale": "The index carries one line per fact while retrieval carries the body; always facts are guaranteed first in the index; observations are not deduped either."
+      },
+      {
+        "summary": "The project store read at prompt time is the identity's primary checkout (getProjectByKey(projectId).primaryPath), plus the operator and machine stores.",
+        "rationale": "Same store the launch index renders and the same resolution readPinnedDocCandidates uses; MemoryIdentity carries no path."
+      },
+      {
+        "summary": "RagDecision.allocations.facts is Schema.optional and docType gains 'fact'.",
+        "rationale": "Additive and backward-compatible for any stored payload; no emitter of MemoryHealthChangedEvent.ragDecision exists in src."
+      },
+      {
+        "summary": "The fact ranker scores the full prompt/expansion text (stopwords removed, at most 400 terms) with a floor that counts only matches in the fact head: two discriminating terms, or one rare term.",
+        "rationale": "The 12-term searchQuery keeps only the first 12 words, which on the spawn surface are orchestration boilerplate; a query-length floor would inject noise for two-word prompts and reject a long prompt whose only link to a fact is one rare word."
+      }
+    ],
+    "items": [
+      {
+        "id": "fact-ranker",
+        "title": "Add the lexical fact ranker (BM25 with head/rarity floor) in src/lib/memory/facts/rank.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:14:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5358",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "inject-facts",
+            "vector-rerank"
+          ],
+          "files_scope": [
+            "src/lib/memory/facts/rank.ts",
+            "src/lib/memory/search.ts",
+            "tests/unit/lib/memory/facts/rank.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/memory/facts/rank.test.ts src/lib/memory/__tests__/search-match-mode.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "rank.test.ts passes with every named WI-1 test and search-match-mode.test.ts passes unchanged",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-1 and 'Design > Ranker' steps 1-7 (lexical only; the vectors parameter is declared and ignored until vector-rerank): in src/lib/memory/search.ts rename KEYWORD_STOPWORDS to an exported ReadonlySet PROMPT_KEYWORD_STOPWORDS with no behaviour change to buildPromptKeywordQuery. Create src/lib/memory/facts/rank.ts exporting FACT_RETRIEVAL_LIMIT = 6, FACT_QUERY_MAX_TERMS = 400, VECTOR_ONLY_MIN_SIMILARITY = 0.9, RankedFact, tokenizeForFacts (token length >= 3; strip one of ing/ed/non-ss s with the stated remainder minimums, then drop one final e when the remainder is >= 4; never strip 'es' as a unit) and rankFactsForQuery. The query is the full prompt/expansion text, tokenized, stopwords removed, at most 400 terms (NOT the 12-term searchQuery). Floor: eligible when bm25 > 0 and either >= 2 distinct discriminating query terms (df <= ceil(N/2)) occur in the fact head (id words, title, description, tags) or >= 1 rare query term (df <= max(2, ceil(N*0.02))) occurs in the head. Pure module, no I/O. Write the named tests listed in PRD WI-1."
+        },
+        "items": [
+          {
+            "id": "fact-ranker.ac1",
+            "title": "Given facts where only one description names the query topic, rankFactsForQuery returns that fact first, and returns [] when no fact contains any query term",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fact-ranker.ac2",
+            "title": "Given a 200-fact fixture, rankFactsForQuery rejects a fact whose head shares only one common (df 20) term with the query, and accepts a fact whose head holds one rare query term inside a 400-word prompt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fact-ranker.ac3",
+            "title": "For the prompt 'commit and push', rankFactsForQuery returns only facts whose head names both words, and when the topic word appears after the first 12 words of a prompt the matching fact is still returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fact-ranker.ac4",
+            "title": "tokenizeForFacts returns one token for each family: reconnect/reconnecting, merge/merges/merged/merging, cache/caches/cached, issue/issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fact-ranker.ac5",
+            "title": "rankFactsForQuery never returns more than FACT_RETRIEVAL_LIMIT facts and returns [] for an empty fact list or a stopword-only query",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "always-flag-store",
+        "title": "Parse and serialize the always frontmatter flag in src/lib/memory/facts/store.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:14:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/memory/facts/store.ts",
+            "tests/unit/lib/memory/facts/store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/memory/facts/store.test.ts tests/unit/lib/memory/facts/operator-sync-conflicts.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "store.test.ts and operator-sync-conflicts.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-2: add readonly always: boolean to MemoryFact; parseMemoryFact reads frontmatter.always (absent -> false, boolean -> value, other -> problem 'always must be true or false') and includes it in the returned object; serializeMemoryFact writes always: true only when true, right after tags. Change serializeMemoryFact and writeMemoryFact input types to Omit<MemoryFact, 'file' | 'scope' | 'always'> & { always?: boolean } so existing callers compile unchanged. Add the five named store tests."
+        },
+        "items": [
+          {
+            "id": "always-flag-store.ac1",
+            "title": "Given a fact file with always: true, readMemoryFactsSync returns the fact with always === true, and given no always key it returns always === false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "always-flag-store.ac2",
+            "title": "Given a fact file with always: yes, readMemoryFactsSync rejects it and records the problem reason 'always must be true or false'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "always-flag-store.ac3",
+            "title": "serializeMemoryFact emits an always: true line only when the flag is true, and writeMemoryFact then readMemoryFactsSync preserves the flag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "inject-facts",
+        "title": "Inject ranked facts as the 'facts' candidate group of prompt-time memory and log them in rag-runs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:14:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/memory.ts",
+            "src/lib/memory/injection.ts",
+            "tests/lib/memory/injection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/memory/injection.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "injection.test.ts passes, including the unchanged byte-identical snapshot test and the seven new named tests from PRD WI-3",
+            "typecheck completes without errors",
+            "no new circular dependency is reported"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "acJustification": "Six criteria: the five behaviours of the facts candidate group plus the spawn-surface case the advisor review showed the 12-term query would miss."
+        },
+        "narrative": {
+          "Action": "Per PRD WI-3 and 'Design > Injection wiring': in packages/contracts/src/memory.ts add 'fact' to RagDecisionSource.docType and facts: Schema.optional(Schema.Number) to RagDecision.allocations. In src/lib/memory/injection.ts add facts: 1500 to PROMPT_TIME_MEMORY_BUDGETS, 'facts' to BudgetKey, facts to hitCounts/emptyAllocations/emptyHitCounts/countHits, a loadFacts?(identity, query) input option, and a default readFactCandidates loader that reads active, non-always facts from the primary-checkout project store (getProjectByKey(identity.projectId)?.primaryPath), userMemoryDir() and machineMemoryDir() with readMemoryFactsSync (each store in its own try), ranks them with rankFactsForQuery against the full expansion.query text (NOT the 12-term searchQuery) and maps them to candidates with FR-5 text and source. Insert fact candidates after pinnedDocs and before sameProjectHits. Tests always use loadFacts or temp stores, never the developer's stores."
+        },
+        "items": [
+          {
+            "id": "inject-facts.ac1",
+            "title": "Given a temp project store of 300 facts whose launch index omits fact X, when the prompt names X's topic, injectPromptTimeMemory returns context containing X's description and a decision source { docType: 'fact', id: 'fact:project:<X>' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inject-facts.ac2",
+            "title": "When budgets is { facts: 50 }, the returned decision records allocations.facts of at most 50 and the outcome budget-truncated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inject-facts.ac3",
+            "title": "The rag-runs jsonl line written for an injection with facts records hitCounts.facts, budgets.facts === 1500 and allocationBytes.facts > 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inject-facts.ac4",
+            "title": "An empty or missing fact store produces the same context string as a run without fact loading, and the existing snapshot test passes with no snapshot file change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inject-facts.ac5",
+            "title": "Given facts with always: true or a non-empty review marker, injectPromptTimeMemory returns context that contains none of them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inject-facts.ac6",
+            "title": "Given surface 'spawn' and a 300+ word boilerplate prompt followed by an issue body naming fact X's topic, injectPromptTimeMemory returns context containing X and not a fact whose head shares only boilerplate words",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launch-always-first",
+        "title": "List always facts first in the launch index (render.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:14:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/memory/facts/render.ts",
+            "tests/unit/lib/memory/facts/render.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/memory/facts/render.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "render.test.ts passes, existing tests unchanged plus two new tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-4: make the first line of compareFacts in src/lib/memory/facts/render.ts `if (a.always !== b.always) return a.always ? -1 : 1;` and update the module header to say always facts lead. Do not change budgets, header text or the overflow line. Add tests 'lists always facts before other facts regardless of type' and 'keeps an always fact when the budget omits later facts'."
+        },
+        "items": [
+          {
+            "id": "launch-always-first.ac1",
+            "title": "Given one always reference fact plus several feedback facts, renderMemoryIndexSection returns the always fact as the first fact line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-always-first.ac2",
+            "title": "When the budget omits facts, an always fact whose type and date would sort last still renders and the overflow line text is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-always-flag",
+        "title": "Add --always to pan memory add and --always/--no-always to pan memory edit",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:14:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/memory-facts.ts",
+            "tests/unit/cli/memory-facts.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/memory-facts.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "memory-facts.test.ts passes with the three new named tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-5: add always?: boolean to MemoryFactAddOptions (write always: options.always === true) and MemoryFactEditOptions (hasChange includes options.always !== undefined; write options.always ?? existing.always). Register --always on add, and --always then --no-always on edit, with the help text from the PRD."
+        },
+        "items": [
+          {
+            "id": "cli-always-flag.ac1",
+            "title": "When memoryFactAddCommand runs with always: true, the written fact file contains always: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-always-flag.ac2",
+            "title": "When memoryFactEditCommand runs with always: false the rewritten file contains no always key, and when it runs with only always: true it accepts the change instead of exiting with 'nothing to change'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "embed-text-export",
+        "title": "Export embedText from src/lib/docs/index-builder.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:14:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/docs/index-builder.ts",
+            "src/lib/docs/__tests__/index-builder.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/docs/__tests__/index-builder.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "index-builder.test.ts passes with two new embedText tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-6 and 'Design > Embedding export': add `export async function embedText(text, config: NormalizedDocsConfig['embedding']): Promise<Float32Array>` that calls createDocsEmbeddingFunction(config) with a synthetic DocsChunk and returns normalizeFloat32Embedding(resolveDocsEmbeddingOutput(output).embedding, config.dimensions). Do not change buildDocsIndex. Tests mock @huggingface/transformers pipeline; no model loads."
+        },
+        "items": [
+          {
+            "id": "embed-text-export.ac1",
+            "title": "With a mocked pipeline returning a non-unit vector of config.dimensions length, embedText returns a vector of that length with L2 norm 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "embed-text-export.ac2",
+            "title": "embedText rejects with 'embedding dimension mismatch' when the provider returns the wrong length",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fact-vector-cache",
+        "title": "Add the content-hash fact vector cache in src/lib/memory/facts/vectors.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:14:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5358",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "vector-rerank",
+            "cli-refresh-on-write",
+            "cli-reindex-sync"
+          ],
+          "files_scope": [
+            "src/lib/memory/facts/vectors.ts",
+            "tests/unit/lib/memory/facts/vectors.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/memory/facts/vectors.test.ts",
+            "npm run typecheck",
+            "npm run lint:effect-facades"
+          ],
+          "expected_outputs": [
+            "vectors.test.ts passes with the six named tests from PRD WI-7",
+            "typecheck completes without errors",
+            "effect-facades ratchet reports no NEW rows"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-7 and 'Design > Vector cache': implement FACT_VECTOR_REFRESH_TIMEOUT_MS, factVectorCachePath (join(getOverdeckHome(), 'cache', 'memory-fact-vectors.json')), factEmbeddingText, factContentHash, readFactVectors (memoised by mtimeMs:size; empty map on missing/corrupt/version or provider/model/dimensions mismatch), readFactVectorsForFacts (fact.file -> vector), refreshFactVectors (embed only missing hashes, atomic temp+rename write, never prune) and refreshStoreVectorsBestEffort (readMemoryFactsSync per store, active facts, race against timeoutMs, never throws; returns { ok: false, reason, timedOut } on failure). Default embed is embedText from src/lib/docs/index-builder.ts; default config is loadConfigSync().config.docs.embedding. Timeout tests use vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "fact-vector-cache.ac1",
+            "title": "A second refreshFactVectors over unchanged facts returns { embedded: 0 } and does not call the embed function",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fact-vector-cache.ac2",
+            "title": "Given identical fact text in two different store directories, refreshFactVectors returns embedded: 1 across both refreshes because the second reuses the cached vector",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fact-vector-cache.ac3",
+            "title": "readFactVectors returns an empty map for a missing file, a corrupt file, or a cache built with a different model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fact-vector-cache.ac4",
+            "title": "Under fake timers, refreshStoreVectorsBestEffort with a never-resolving refresh returns { ok: false } with a timeout reason after FACT_VECTOR_REFRESH_TIMEOUT_MS instead of throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vector-rerank",
+        "title": "Fuse stored fact vectors into prompt-time ranking with a pseudo-relevance centroid",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:14:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/memory/facts/rank.ts",
+            "src/lib/memory/injection.ts",
+            "tests/unit/lib/memory/facts/rank.test.ts",
+            "tests/lib/memory/injection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/memory/facts/rank.test.ts tests/lib/memory/injection.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "rank.test.ts and injection.test.ts pass with the five new named tests from PRD WI-8",
+            "typecheck completes without errors",
+            "no new circular dependency is reported"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-8: implement Design step 8 in rankFactsForQuery (centroid of the vectors of the top 3 eligible lexical facts, cosine for every fact with a vector, vector-only facts admitted at similarity >= VECTOR_ONLY_MIN_SIMILARITY, RRF with k = 60, tiebreak bm25 then id). In readFactCandidates read vectors with readFactVectorsForFacts(facts, loadConfigSync().config.docs.embedding) and pass them. Run the PRD implementation checkpoint (similarity distribution on this machine's operator store after pan memory reindex; raise the constant to 0.92 or 0.94 only if more than 3 vector-only facts clear 0.90 per prompt; fallback keep 0.90) and record the measurement in the commit message."
+        },
+        "items": [
+          {
+            "id": "vector-rerank.ac1",
+            "title": "Given stored vectors, a fact with no lexical match but cosine >= VECTOR_ONLY_MIN_SIMILARITY to the centroid appears in the result, and one below the bar does not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vector-rerank.ac2",
+            "title": "With no vectors, or with no eligible lexical fact that has a vector, rankFactsForQuery returns exactly the lexical-only result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vector-rerank.ac3",
+            "title": "injectPromptTimeMemory re-ranks facts from a seeded vector cache while the @huggingface/transformers mock records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-refresh-on-write",
+        "title": "Refresh fact vectors best-effort after pan memory add and edit",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:14:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/memory-facts.ts",
+            "tests/unit/cli/memory-facts.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/memory-facts.test.ts tests/unit/cli/memory-self-roundtrip.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "memory-facts.test.ts and memory-self-roundtrip.test.ts pass with the four new named tests from PRD WI-9",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-9: add an injectable refreshVectors?: typeof refreshStoreVectorsBestEffort to MemoryFactAddOptions and MemoryFactEditOptions; after a successful write and before printWriteResult call it with [{ dir: target.dir, scope: target.scope }]; on { ok: false } print 'vector index not refreshed: <reason>; run pan memory reindex' to stderr in yellow. Exit code and JSON output never change. retire does not refresh. Existing tests pass a stub or mock the vectors module so no model loads. The best-effort result is { ok: true; embedded; reused } | { ok: false; reason; timedOut }; when timedOut is true the command calls await exitCli(0) after its normal output, so a still-running model load cannot keep the process (or an MCP memory_add job) alive."
+        },
+        "items": [
+          {
+            "id": "cli-refresh-on-write.ac1",
+            "title": "When memoryFactAddCommand or memoryFactEditCommand succeeds, the injected refreshVectors stub records exactly one call with the written store's dir and scope",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-refresh-on-write.ac2",
+            "title": "When refreshVectors returns { ok: false }, add still writes the fact, leaves the exit code 0, prints the same JSON, and emits the warning on stderr",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-refresh-on-write.ac3",
+            "title": "When refreshVectors returns { ok: false, timedOut: true }, add prints its normal output and then exits with code 0 through exitCli",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-reindex-sync",
+        "title": "Add pan memory reindex and refresh operator vectors after pan memory sync",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:14:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/memory-reindex.ts",
+            "src/cli/commands/memory.ts",
+            "src/cli/commands/memory-sync.ts",
+            "tests/unit/cli/memory-reindex.test.ts",
+            "tests/unit/cli/memory-sync.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/memory-reindex.test.ts tests/unit/cli/memory-sync.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "memory-reindex.test.ts and memory-sync.test.ts pass with the five named tests from PRD WI-10",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-10: create src/cli/commands/memory-reindex.ts with memoryReindexCommand({ project?, json?, refresh? }) and registerMemoryReindexCommand(memory); the project target comes from resolveFactTarget({ project }, 'read') (skip it with a note when the cwd owns no project and no --project is given), then the operator and machine stores; call refreshFactVectors per store; print '<scope>: <embedded> embedded, <reused> reused' per store or JSON { stores: [{ scope, dir, embedded, reused }] }; exit 1 on any failure. Register it in src/cli/commands/memory.ts next to registerMemorySyncCommand. In memorySyncCommand add an injectable deps.refreshVectors (default refreshStoreVectorsBestEffort over the operator store) called after a 'synced' outcome of the plain sync path, printing the FR-13 warning on failure."
+        },
+        "items": [
+          {
+            "id": "cli-reindex-sync.ac1",
+            "title": "pan memory reindex prints one '<scope>: N embedded, M reused' line per refreshed store and --json prints { stores: [...] } with one entry per store",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-reindex-sync.ac2",
+            "title": "pan memory reindex exits 1 when the embed function rejects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-reindex-sync.ac3",
+            "title": "When memorySyncCommand receives a synced outcome, the injected refreshVectors stub records one call for the operator store; when it receives an offline outcome the stub records no call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document prompt-time fact retrieval, the always flag and pan memory reindex",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:14:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/memory.mdx",
+            "docs/CONTEXT-LAYERS.md",
+            "sync-sources/skills/pan-memory/SKILL.md",
+            "changelog.d/pan-5358.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-11: configuration/memory.mdx gains the always frontmatter line in 'What a fact is', a 'Prompt-time retrieval' paragraph in 'How agents see them' (Claude Code and Pi prompts plus every agent's first prompt receive up to 6 ranked facts with bodies under a 1,500-token budget, logged in rag-runs; always facts lead the launch index; launch budgets unchanged), the --always / --no-always / pan memory reindex commands and the vector cache path in 'Adding and curating facts', and the new 'How injected' cell. docs/CONTEXT-LAYERS.md 'Project memory' row (line 343) appends the per-prompt injection note. sync-sources/skills/pan-memory/SKILL.md documents --always, --no-always and pan memory reindex. changelog.d/pan-5358.md adds one '#### New' bullet linking #5358."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "configuration/memory.mdx contains the 6-fact and 1,500-token bounds of prompt-time fact retrieval, the always frontmatter key, and the pan memory reindex command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "sync-sources/skills/pan-memory/SKILL.md shows the --always, --no-always and pan memory reindex usages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "changelog.d/pan-5358.md contains a single '#### New' heading with one bullet linking https://github.com/eltmon/overdeck/issues/5358, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fact-ranker",
+        "to": "inject-facts",
+        "type": "blocks"
+      },
+      {
+        "from": "always-flag-store",
+        "to": "inject-facts",
+        "type": "blocks"
+      },
+      {
+        "from": "always-flag-store",
+        "to": "launch-always-first",
+        "type": "blocks"
+      },
+      {
+        "from": "always-flag-store",
+        "to": "cli-always-flag",
+        "type": "blocks"
+      },
+      {
+        "from": "embed-text-export",
+        "to": "fact-vector-cache",
+        "type": "blocks"
+      },
+      {
+        "from": "fact-ranker",
+        "to": "vector-rerank",
+        "type": "blocks"
+      },
+      {
+        "from": "inject-facts",
+        "to": "vector-rerank",
+        "type": "blocks"
+      },
+      {
+        "from": "fact-vector-cache",
+        "to": "vector-rerank",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-always-flag",
+        "to": "cli-refresh-on-write",
+        "type": "blocks"
+      },
+      {
+        "from": "fact-vector-cache",
+        "to": "cli-refresh-on-write",
+        "type": "blocks"
+      },
+      {
+        "from": "fact-vector-cache",
+        "to": "cli-reindex-sync",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
