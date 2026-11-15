@@ -42,6 +42,24 @@
  * from the phase.
  */
 
+/** PAN-5359: the Codex host's per-turn memory wrapper; this reader strips it. */
+export const CODEX_TURN_CONTEXT_OPEN = '<overdeck-turn-context>';
+export const CODEX_TURN_CONTEXT_CLOSE = '</overdeck-turn-context>';
+
+/** Wrap `context` in front of `prompt`; null when the context cannot be wrapped safely. */
+export function wrapCodexTurnContext(context: string, prompt: string): string | null {
+  if (!context.trim() || context.includes(CODEX_TURN_CONTEXT_CLOSE)) return null;
+  return `${CODEX_TURN_CONTEXT_OPEN}\n${context}\n${CODEX_TURN_CONTEXT_CLOSE}\n\n${prompt}`;
+}
+
+/** Remove one leading turn-context block; any other text is returned unchanged. */
+export function stripCodexTurnContext(text: string): string {
+  if (!text.startsWith(CODEX_TURN_CONTEXT_OPEN)) return text;
+  const end = text.indexOf(CODEX_TURN_CONTEXT_CLOSE);
+  if (end === -1) return text;
+  return text.slice(end + CODEX_TURN_CONTEXT_CLOSE.length).replace(/^\n+/, '');
+}
+
 /** A user or assistant turn recovered from one rollout `event_msg` entry. */
 export interface CodexRolloutMessage {
   role: 'user' | 'assistant';
@@ -98,7 +116,8 @@ export function readCodexRolloutMessage(entry: unknown): CodexRolloutMessage | u
 
   // Legacy shape — clean text sits directly on the payload.
   if (ptype === 'user_message' || ptype === 'agent_message') {
-    const text = typeof message === 'string' ? message.trim() : '';
+    const raw = typeof message === 'string' ? message.trim() : '';
+    const text = (ptype === 'user_message' ? stripCodexTurnContext(raw) : raw).trim();
     if (!text) return undefined;
     return { role: ptype === 'user_message' ? 'user' : 'assistant', text };
   }
@@ -107,7 +126,8 @@ export function readCodexRolloutMessage(entry: unknown): CodexRolloutMessage | u
   if (ptype !== 'item_completed' || !item || typeof item !== 'object') return undefined;
   const itemLike = item as ItemLike;
   if (itemLike.type !== 'UserMessage' && itemLike.type !== 'AgentMessage') return undefined;
-  const text = itemText(itemLike);
+  const raw = itemText(itemLike);
+  const text = itemLike.type === 'UserMessage' ? stripCodexTurnContext(raw).trim() : raw;
   if (!text) return undefined;
   return {
     role: itemLike.type === 'UserMessage' ? 'user' : 'assistant',

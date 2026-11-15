@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readCodexRolloutMessage } from '../codex-rollout-message.js';
+import { readCodexRolloutMessage, stripCodexTurnContext, wrapCodexTurnContext } from '../codex-rollout-message.js';
 
 /**
  * PAN-3781. Codex has written a rollout's user/assistant text two ways, and
@@ -99,5 +99,50 @@ describe('readCodexRolloutMessage', () => {
       .toBeUndefined();
     expect(readCodexRolloutMessage({ type: 'event_msg', payload: { type: 'item_completed', item: { type: 'AgentMessage', content: 'oops' } } }))
       .toBeUndefined();
+  });
+
+  describe('turn-context block (PAN-5359)', () => {
+    it('strips a wrapped block off a legacy user_message, reading back the bare prompt', () => {
+      const wrapped = wrapCodexTurnContext('relevant memory', 'build it')!;
+      const entry = { type: 'event_msg', payload: { type: 'user_message', message: wrapped } };
+      expect(readCodexRolloutMessage(entry)).toEqual({ role: 'user', text: 'build it' });
+    });
+
+    it('strips a wrapped block off a current-shape UserMessage, reading back the bare prompt', () => {
+      const wrapped = wrapCodexTurnContext('relevant memory', 'build it')!;
+      const entry = {
+        type: 'event_msg',
+        payload: { type: 'item_completed', item: { type: 'UserMessage', content: [{ type: 'text', text: wrapped }] } },
+      };
+      expect(readCodexRolloutMessage(entry)).toEqual({ role: 'user', text: 'build it' });
+    });
+
+    it('never strips an AgentMessage, even one that starts with the open marker', () => {
+      const entry = {
+        type: 'event_msg',
+        payload: {
+          type: 'item_completed',
+          item: { type: 'AgentMessage', content: [{ type: 'Text', text: '<overdeck-turn-context>\nnot stripped\n</overdeck-turn-context>\n\nDone.' }] },
+        },
+      };
+      expect(readCodexRolloutMessage(entry)?.text).toBe('<overdeck-turn-context>\nnot stripped\n</overdeck-turn-context>\n\nDone.');
+    });
+
+    it('returns a user message with only an opening marker unchanged', () => {
+      const entry = { type: 'event_msg', payload: { type: 'user_message', message: '<overdeck-turn-context>\nno close marker' } };
+      expect(readCodexRolloutMessage(entry)).toEqual({ role: 'user', text: '<overdeck-turn-context>\nno close marker' });
+    });
+
+    it('wrapCodexTurnContext returns null for empty context and for context containing the close marker', () => {
+      expect(wrapCodexTurnContext('', 'build it')).toBeNull();
+      expect(wrapCodexTurnContext('   ', 'build it')).toBeNull();
+      expect(wrapCodexTurnContext('has </overdeck-turn-context> inside', 'build it')).toBeNull();
+    });
+
+    it('round-trips: stripCodexTurnContext(wrapCodexTurnContext(c, p)) === p', () => {
+      const prompt = 'how does delivery work';
+      const wrapped = wrapCodexTurnContext('some memory context', prompt)!;
+      expect(stripCodexTurnContext(wrapped)).toBe(prompt);
+    });
   });
 });
