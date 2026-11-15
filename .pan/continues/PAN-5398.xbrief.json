@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5398",
   "created": "2026-11-15T20:47:31.521Z",
-  "updated": "2026-11-15T21:08:13.294Z",
+  "updated": "2026-11-15T23:00:40.531Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,9 +82,18 @@
       "doneAt": "2026-11-15T21:08:07.772Z"
     },
     "switcher-uses-project-deck-key": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5398",
-      "claimedAt": "2026-11-15T21:08:13.294Z"
+      "claimedAt": "2026-11-15T21:08:13.294Z",
+      "doneAt": "2026-11-15T23:00:40.530Z"
+    },
+    "switcher-uses-project-deck-key.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:00:40.530Z"
+    },
+    "switcher-uses-project-deck-key.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:00:40.530Z"
     }
   }
 }
