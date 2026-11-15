@@ -28,6 +28,7 @@ import {
 import type { Harness } from '../shared/ModelPicker';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 import { getSlashCommands, SLASH_COMMANDS, type SlashCommand } from './slashCommands';
+import { useSkillSlashCommands, type SkillSlashContext } from './skillSlashCommands';
 import { loadDraft, saveDraft } from '../../lib/composerDraft';
 
 export { getSlashCommands, SLASH_COMMANDS };
@@ -164,6 +165,8 @@ export interface ComposerPromptEditorProps {
   conversationName: string;
   harness?: Harness;
   slashCommandsEnabled?: boolean;
+  /** The open conversation's skill scope (PAN-5347); the / menu's Skills group fetches from it. */
+  skillContext?: SkillSlashContext;
   disabled?: boolean;
   placeholder?: string;
   onCommandKeyDown: (key: 'Enter' | 'SteerEnter') => void;
@@ -316,6 +319,7 @@ export function ComposerPromptEditor({
   slashCommandsEnabled = true,
   conversationName,
   harness = 'claude-code',
+  skillContext,
   disabled = false,
   placeholder = 'Message the agent…',
   onCommandKeyDown,
@@ -327,6 +331,9 @@ export function ComposerPromptEditor({
 
   const [text, setText] = useState(draft);
   const [isSlashMenuOpen, setIsSlashMenuOpen] = useState(false);
+  const skillCommands = useSkillSlashCommands({
+    harness, context: slashCommandsEnabled ? skillContext : undefined, active: isSlashMenuOpen,
+  });
   const pendingSlashTriggerRef = useRef(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [menuAnchorRect, setMenuAnchorRect] = useState<DOMRect | null>(null);
@@ -370,7 +377,10 @@ export function ComposerPromptEditor({
     };
   }, [text]);
 
-  const slashCommands = useMemo(() => slashCommandsEnabled ? getSlashCommands(harness) : [], [harness, slashCommandsEnabled]);
+  const slashCommands = useMemo(
+    () => slashCommandsEnabled ? getSlashCommands(harness, skillCommands) : [],
+    [harness, slashCommandsEnabled, skillCommands],
+  );
   const filteredCommands = useMemo(
     () => filterCommands(slashCommands, slashContext?.filterText ?? ''),
     [slashCommands, slashContext],
