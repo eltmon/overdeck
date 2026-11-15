@@ -436,7 +436,7 @@ export interface GlabMrRow {
   merge_commit_sha?: string | null;
 }
 
-const cachedRepoMergeRequests = createSettledTtlPromiseCache<string, readonly GlabMrRow[]>(PR_CACHE_TTL_MS);
+const cachedRepoMergeRequests = createSettledTtlPromiseCache<string, readonly GlabMrRow[] | null>(PR_CACHE_TTL_MS);
 
 /** GitLab pipeline status → the aggregate check state. */
 export function toChecksStateFromPipeline(status: string | undefined): PrChecksState {
@@ -468,17 +468,48 @@ export function mrFromGlabRow(row: GlabMrRow): LoadedPr | null {
   };
 }
 
-export async function listRepoMergeRequests(projectPath: string): Promise<readonly GlabMrRow[]> {
+const MR_PAGE_SIZE = 100;
+const MAX_OPEN_MR_PAGES = 20;
+
+/**
+ * Every open MR (all pages) plus the newest 100 merged ones. The ready set
+ * needs the open side complete: GitLab lists newest first, so one page of
+ * `state=all` could hide an older open MR behind newer merged ones (PAN-5320).
+ * Throws when a page fails or the open side has more than the page cap.
+ */
+export async function fetchRepoMergeRequests(
+  runApi: (query: string) => Promise<readonly GlabMrRow[]>,
+): Promise<GlabMrRow[]> {
+  const open: GlabMrRow[] = [];
+  for (let page = 1; ; page += 1) {
+    if (page > MAX_OPEN_MR_PAGES) throw new Error(`more than ${MAX_OPEN_MR_PAGES * MR_PAGE_SIZE} open MRs`);
+    const rows = await runApi(`state=opened&per_page=${MR_PAGE_SIZE}&page=${page}`);
+    open.push(...rows);
+    if (rows.length < MR_PAGE_SIZE) break;
+  }
+  const merged = await runApi(`state=merged&order_by=updated_at&per_page=${MR_PAGE_SIZE}`);
+  return [...open, ...merged];
+}
+
+/** The repo's open and recently merged MRs, or null when a read failed (PAN-4753 WI-4). */
+export async function readRepoMergeRequests(projectPath: string): Promise<readonly GlabMrRow[] | null> {
   return cachedRepoMergeRequests(projectPath, async () => {
     try {
-      const { stdout } = await execFileAsync('glab', [
-        'api', 'projects/:id/merge_requests?state=all&per_page=100',
-      ], { cwd: projectPath, encoding: 'utf-8', timeout: 20_000, maxBuffer: 16 * 1024 * 1024 });
-      return JSON.parse(stdout || '[]') as GlabMrRow[];
+      return await fetchRepoMergeRequests(async (query) => {
+        const { stdout } = await execFileAsync('glab', ['api', `projects/:id/merge_requests?${query}`], {
+          cwd: projectPath, encoding: 'utf-8', timeout: 20_000, maxBuffer: 16 * 1024 * 1024,
+        });
+        return JSON.parse(stdout || '[]') as GlabMrRow[];
+      });
     } catch {
-      return [];
+      return null;
     }
   });
+}
+
+/** The repo's MR listing; empty when the read failed. */
+export async function listRepoMergeRequests(projectPath: string): Promise<readonly GlabMrRow[]> {
+  return (await readRepoMergeRequests(projectPath)) ?? [];
 }
 
 async function readMrWithGlab(_issueId: string, projectPath: string, branch: string): Promise<LoadedPr | null> {
@@ -817,14 +848,7 @@ export async function getDerivedIssueState(
   return deriveIssueState(await loadIssueStateFacts(issueId, deps));
 }
 
-// ─── the ready set (FR-9) ────────────────────────────────────────────────────
-
-/** One issue whose PR is ready to merge: approved, green, and mergeable. */
-export interface ReadyIssue {
-  readonly issueId: string;
-  readonly title: string;
-  readonly pr?: number;
-}
+// ─── issue branches ──────────────────────────────────────────────────────────
 
 /** `feature/pan-3917` → `PAN-3917`. Anything else has no issue. */
 export function issueIdFromBranch(branch: string | undefined): string | null {
@@ -832,32 +856,8 @@ export function issueIdFromBranch(branch: string | undefined): string | null {
   return match?.[1] ? match[1].toUpperCase() : null;
 }
 
-/**
- * The project's ready set, from the same cached repo listing the batch door
- * uses. Readiness is approvals plus green checks plus forge mergeability, and
- * nothing else (FR-9, D3).
- */
-export async function listReadyIssuesForProject(
-  projectPath: string,
-  deps: { readonly listPullRequests?: (projectPath: string) => Promise<readonly GhPrRow[]> } = {},
-): Promise<ReadyIssue[]> {
-  const rows = await (deps.listPullRequests ?? (async (p) => (await readOpenRepoPullRequests(p)) ?? []))(projectPath);
-  const ready: ReadyIssue[] = [];
-  for (const row of rows) {
-    if (row.isDraft) continue;
-    const issueId = issueIdFromBranch(row.headRefName);
-    if (!issueId) continue;
-    const pr = prFromGhRow(row);
-    if (!pr || pr.merged) continue;
-    // #4066 review: this is the UAT train's candidate set, which is mostly
-    // issues held for UAT. The auto-merge scheduler never runs the gate for a
-    // held issue, so the gate's cached answer would empty the train; it keeps
-    // the forge's own decision. It merges nothing: every merge asks the gate.
-    if (pr.reviewState !== 'approved' || pr.checks !== 'green' || pr.mergeable !== true) continue;
-    ready.push({ issueId, title: row.title ?? issueId, pr: pr.number });
-  }
-  return ready;
-}
+// The ready set (`listReadyIssuesForProject`) lives in `ready-set.ts`
+// (PAN-4753 WI-4); the server adapter re-exports it.
 
 /**
  * PAN-4597: the project's open, non-draft PRs (GitHub) or MRs (GitLab) by

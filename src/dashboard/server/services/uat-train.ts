@@ -67,17 +67,13 @@ import {
   type UatGeneration,
   type UatGenerationRepo,
 } from '../../../lib/overdeck/merge-sync.js';
-import { forgeForProject, getDerivedIssueState, listReadyIssuesForProject } from './derived-issue-state.js';
-import { mergedIssueIdsForGithubProject } from './merged-issue-ids.js';
+import { forgeForProject, getDerivedIssueState, listReadyIssuesForProject, mergedIssueIdsForProject } from './derived-issue-state.js';
+import { orderPolyrepoQueue, PolyrepoRefsUnavailableError, resolveReposForIssue } from './polyrepo-queue.js';
 import { evaluateIssueMergeGate } from '../../../lib/cloister/merge-gate.js';
 import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.js';
 import { findXBriefByIssue, invalidateXBriefIndex, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
-import { findProjectByPath, listProjectsSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
-import {
-  resolveConfiguredRepos,
-  resolveProjectReposFromResolvedIssue,
-  type ResolvedProjectRepo,
-} from '../../../lib/project-repos.js';
+import { findProjectByPath, listProjectsSync } from '../../../lib/projects.js';
+import { resolveConfiguredRepos, type ResolvedProjectRepo } from '../../../lib/project-repos.js';
 import { getDashboardIdentity } from '../identity.js';
 import { issueHoldsForUat } from '../../../lib/cloister/auto-merge-eligibility.js';
 import { isFlywheelRequireUatBeforeMerge } from '../../../lib/overdeck/control-settings.js';
@@ -235,6 +231,7 @@ async function runUatTrainReconcileForProject(
       cleanup: makeCleanupForProject(projectPath),
       holdsForUat: (feature) => issueHoldsForUat(feature.issueId, projectConfig, isFlywheelRequireUatBeforeMerge()),
       mergesPerPr: async (feature) => (await mergePathOwner(feature.issueId, projectPath, projectConfig)) === 'per-pr',
+      mergedIssueIds: () => mergedIssueIdsForProject(projectPath),
       log: (msg) => console.log(msg),
     }, options);
   }
@@ -262,8 +259,7 @@ async function runUatTrainReconcileForProject(
       cleanup: makeCleanupForProject(projectPath, store),
       holdsForUat: (feature: ReadyFeature) => issueHoldsForUat(feature.issueId, projectConfig, isFlywheelRequireUatBeforeMerge()),
       mergesPerPr: async (feature: ReadyFeature) => (await mergePathOwner(feature.issueId, projectPath, projectConfig)) === 'per-pr',
-      // PAN-4753 WI-3: GitHub only until WI-4 brings the GitLab listing.
-      ...(forgeForProject(projectPath) === 'github' ? { mergedIssueIds: () => mergedIssueIdsForGithubProject(projectPath) } : {}),
+      mergedIssueIds: () => mergedIssueIdsForProject(projectPath),
       ...(lane === 'window' ? { selectBatch: buildSelectBatch(projectPath, projectConfig), laneKey: lane } : {}),
       ...(lane === 'uat' ? { laneKey: lane } : {}),
       log: (msg: string) => console.log(msg),
@@ -306,24 +302,14 @@ async function getReadySetForProject(projectPath: string): Promise<ReadyFeature[
 }
 
 /**
- * Member repos configured for an issue in a polyrepo project. Resolution goes
- * through the canonical repo resolver, which collapses monorepo to one
- * synthetic entry — so this is the same door the rest of the pipeline uses.
- */
-function resolveReposForIssue(issueId: string): ResolvedProjectRepo[] {
-  const resolvedProject = resolveProjectFromIssueSync(issueId);
-  if (!resolvedProject) return [];
-  return resolveProjectReposFromResolvedIssue(issueId, resolvedProject) ?? [];
-}
-
-/**
  * The project's configured member repos, resolved through the issue door using
  * any eligible candidate. Every issue in a project resolves the same repo set;
  * only the per-issue branch names differ, and callers here use the branches
  * from each feature's own contributions rather than these.
  */
 async function resolveProjectRepos(projectPath: string, preferredIssueId?: string): Promise<ResolvedProjectRepo[]> {
-  const issueId = preferredIssueId ?? (await listReadyIssuesForProject(projectPath))[0]?.issueId;
+  // A ready set that cannot be read falls through to the configured repo set.
+  const issueId = preferredIssueId ?? (await listReadyIssuesForProject(projectPath).catch(() => []))[0]?.issueId;
   if (issueId) return resolveReposForIssue(issueId);
 
   // No candidate to resolve through — the exact state cleanup runs in after the
@@ -339,33 +325,20 @@ async function resolveProjectRepos(projectPath: string, preferredIssueId?: strin
 
 /** Polyrepo ready set: per-candidate contributions across member repos. */
 async function getPolyrepoReadySetForProject(projectPath: string): Promise<ReadyFeature[] | null> {
-  const { computePolyrepoMergeQueueFromCandidates, resolveMergeQueuePrUrl } =
-    await import('../../../lib/flywheel-merge-order.js');
-
   const candidates = await listReadyIssuesForProject(projectPath);
   if (candidates.length === 0) return [];
 
-  const reposByIssue = new Map(candidates.map((c) => [c.issueId, resolveReposForIssue(c.issueId)]));
-
-  // An outage is "unavailable", never "empty". The reconciler treats an empty
-  // ready set as authoritative and will invalidate the live generation and tear
-  // down its stack; null means "do nothing this tick".
-  let unavailableRepos: readonly string[] = [];
-
-  const queue = await Effect.runPromise(
-    computePolyrepoMergeQueueFromCandidates(candidates, reposByIssue, projectPath, {
-      getPrUrl: resolveMergeQueuePrUrl,
-      onExcluded: (issueId, reason) =>
-        console.log(`[uat-train] ${issueId} excluded from the polyrepo ready set: ${reason}`),
-      onRefreshUnavailable: (repoPaths) => { unavailableRepos = repoPaths; },
-    }).pipe(Effect.provide(nodeServicesLayer)),
-  );
-
-  if (unavailableRepos.length > 0) {
-    console.log(
-      `[uat-train] polyrepo ready set unavailable for ${projectPath}: could not refresh refs in ` +
-      `${unavailableRepos.join(', ')} — skipping this tick rather than invalidating the live batch`,
-    );
+  let queue: Awaited<ReturnType<typeof orderPolyrepoQueue>>;
+  try {
+    queue = await orderPolyrepoQueue(projectPath, candidates, {
+      onExcluded: (issueId, reason) => console.log(`[uat-train] ${issueId} excluded from the polyrepo ready set: ${reason}`),
+    });
+  } catch (err) {
+    // An outage is "unavailable", never "empty". The reconciler treats an empty
+    // ready set as authoritative and will invalidate the live generation and
+    // tear down its stack; null means "do nothing this tick".
+    if (!(err instanceof PolyrepoRefsUnavailableError)) throw err;
+    console.log(`[uat-train] polyrepo ready set unavailable for ${projectPath}: ${err.message} — skipping this tick rather than invalidating the live batch`);
     return null;
   }
 

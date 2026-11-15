@@ -272,6 +272,50 @@ describe('getMergeTrainBoard projects', () => {
     expect(board.projects[1]).toMatchObject({ mode: 'hold', cars: [], strikes: [], batches: [], recent: [] });
   });
 
+  it('a polyrepo project lists every member repo with its own forge, one PR link per repo (PAN-3657)', async () => {
+    const POLY = { name: 'myn', path: '/repos/myn', auto_merge_default: 'hold', workspace: { type: 'polyrepo', repos: [] } } as unknown as ProjectConfig;
+    const listed: Array<[string, string]> = [];
+    const base = deps({ projects: [{ key: 'myn', config: POLY }], facts: { 'MIN-1': facts('MIN-1') } });
+    const board = await getMergeTrainBoard({}, {
+      ...base,
+      memberRepos: () => [
+        { repoKey: 'fe', repoPath: '/repos/myn/frontend', forge: 'gitlab' },
+        { repoKey: 'skills', repoPath: '/repos/myn/myn-skills', forge: 'github' },
+      ],
+      listing: async (repoPath, forge) => {
+        listed.push([repoPath, forge]);
+        return repoPath.endsWith('frontend')
+          ? {
+            open: [open('MIN-1', { number: 11, url: 'https://gitlab.com/x/fe/-/merge_requests/11' })],
+            merged: [{ issueId: 'MIN-2', branch: 'feature/min-2', url: null, mergedAt: '2026-11-14T11:00:00.000Z', sha: 'abc1234' }],
+          }
+          : { open: [open('MIN-1', { number: 30, url: 'https://github.com/x/skills/pull/30' })], merged: [] };
+      },
+    });
+    expect(listed).toEqual([['/repos/myn/frontend', 'gitlab'], ['/repos/myn/myn-skills', 'github']]);
+    const project = board.projects[0]!;
+    expect(project.error).toBeUndefined();
+    expect(project.cars.map((car) => [car.issueId, car.prs.map((pr) => pr.label)])).toEqual([['MIN-1', ['fe !11', 'skills #30']]]);
+    expect(project.recent.flatMap((merge) => merge.issueIds)).toEqual(['MIN-2']);
+  });
+
+  it('a polyrepo issue whose first member PR is approved stays a candidate when a later one is undecided', async () => {
+    const POLY = { name: 'myn', path: '/repos/myn', workspace: { type: 'polyrepo', repos: [] } } as unknown as ProjectConfig;
+    const base = deps({ projects: [{ key: 'myn', config: POLY }], facts: { 'MIN-1': facts('MIN-1') } });
+    const board = await getMergeTrainBoard({}, {
+      ...base,
+      memberRepos: () => [
+        { repoKey: 'fe', repoPath: '/repos/myn/frontend', forge: 'github' },
+        { repoKey: 'api', repoPath: '/repos/myn/api', forge: 'github' },
+      ],
+      listing: async (repoPath) => ({
+        open: [open('MIN-1', { number: repoPath.endsWith('frontend') ? 11 : 12, reviewDecided: repoPath.endsWith('frontend') })],
+        merged: [],
+      }),
+    });
+    expect(board.projects[0]!.cars.map((car) => [car.issueId, car.prs.map((pr) => pr.label)])).toEqual([['MIN-1', ['fe #11', 'api #12']]]);
+  });
+
   it('filters to one project and reports mode, override and master flag', async () => {
     const board = await getMergeTrainBoard({ projectKey: 'myn' }, deps({
       master: false,

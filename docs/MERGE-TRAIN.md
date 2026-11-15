@@ -19,6 +19,7 @@ merge mechanics after a PR is chosen are in [MERGE-WORKFLOW.md](MERGE-WORKFLOW.m
 | **Merge route** | Where a ready PR goes, from `mergeRouteFor` (`src/lib/cloister/merge-route.ts`): `per-pr` (the auto-merge scheduler merges it alone after the cooldown) or `batch` (it waits for a batch). |
 | **High priority** | A PR that never waits for a batch: a strike branch `strike/<id>`, or an issue labeled `critical`, `blocks-main`, `P0` or `urgent`, or both `substrate-improvement` and `bug`. |
 | **Batch window** | With the train on, an auto project's batch assembles at `merge_train.batch_size` ready features (default 3) or when the oldest has waited `merge_train.batch_wait_minutes` (default 30). |
+| **Ready set** | The issues whose PRs are approved, green and mergeable (`listReadyIssuesForProject`, `src/lib/overdeck/ready-set.ts`). Batches are assembled from it and the queue orders it. See [The ready set](#the-ready-set). |
 | **Car** | One issue on the train: an open PR a review approved, or an issue with a live auto-merge row or merge run. |
 | **Batch** (generation) | A `uat/<label>-<codename>-<MMDD>-<n>` branch merging several ready features for joint testing, stored in `uat_generations`. |
 | **Live batch** | A batch with status `assembling`, `ready` or `superseded`. |
@@ -54,6 +55,36 @@ buttons then; the issue page's Merge button still merges one feature. When
 the newest batch failed and no testable batch exists, the card offers
 **Retry batch assembly** (a forced `POST /api/merge-train/assemble`, PAN-4598).
 
+## The ready set
+
+`listReadyIssuesForProject(projectPath)` (`src/lib/overdeck/ready-set.ts`)
+answers for three project shapes (PAN-4753 WI-4, PAN-3657):
+
+| Project | Rows read | Ready when |
+| --- | --- | --- |
+| GitHub monorepo | the cached open `gh pr list` rows | the row's review decision is approved, its checks are green and it is mergeable |
+| GitLab monorepo | the cached MR listing: every page of open MRs plus the newest 100 merged | the MR is open, not a draft and has no conflicts on the listing, and its own facts (`readGitLabMrFacts`: `glab mr view` plus the approvals endpoint) show a named approver, a green pipeline and mergeability |
+| Polyrepo | every writable member repo, each with its own forge and branch prefix (`memberReposForProject`) | every open PR/MR for the issue, across the member repos, is ready by its forge's rule |
+
+GitLab's list endpoint carries no `approved` and no `head_pipeline`, so a
+GitLab row is never ready from the listing alone. Each MR's facts are cached
+for a minute per MR head; a failed read is not kept. A GitLab or polyrepo read
+that fails throws `ReadySetUnavailableError`, and an unread approval is never
+an approval. The reconciler then skips the tick instead of reading an empty
+ready set, which it would treat as authoritative and use to invalidate the live
+batch. The queue route reports the project's error instead.
+
+A polyrepo root is not a git repo, so its queue is ordered per member repo by
+`orderPolyrepoQueue` (`src/dashboard/server/services/polyrepo-queue.ts`).
+`GET /api/merge-train/queues`, `POST /api/merge-train/merge-next` and the
+reconciler share it. A member repo whose refs could not be refreshed throws
+`PolyrepoRefsUnavailableError`, never a shorter queue.
+
+The batch window and auto-promote still apply only to GitHub monorepo auto
+projects (`batchWindowAppliesToProject`). A GitLab or polyrepo project batches
+on today's terms: the batch assembles at once, and the operator tests and
+promotes it.
+
 ## Batches and their status reason
 
 A batch moves `assembling` → `ready` → (`superseded`) → `promoted`, or ends
@@ -69,11 +100,11 @@ A batch moves `assembling` → `ready` → (`superseded`) → `promoted`, or end
 | Auto-promote drop or dissolve (`batch-auto-promote.ts`) | the drop reason, e.g. `combined CI failed on <name> (<checks>); <ID> merges on its own` |
 
 The "merged on its own" reason needs to know which members merged. The
-reconciler's optional `mergedIssueIds` dep answers it from the cached GitHub PR
-listing (`merged-issue-ids.ts`), read once per tick and only while a live batch
-exists. GitLab and polyrepo projects omit it until their listing lands
-(PAN-3657); the "no longer ready to merge" reason is then correct, only less
-specific. The generations payload and the board carry `statusReason`, and the
+reconciler's optional `mergedIssueIds` dep answers it with
+`mergedIssueIdsForProject` (`ready-set.ts`): the merged rows of the same
+listings the ready set reads, from any member repo in a polyrepo project. It is
+read once per tick and only while a live batch exists. If that read fails, the
+less specific "no longer ready to merge" reason is used. The generations payload and the board carry `statusReason`, and the
 UI never hides a voided or superseded batch.
 
 ## Strikes
@@ -143,9 +174,10 @@ forge-native types.
 **Errors.** One project's failure never blanks the board: that project
 returns its card with `error` and empty lists.
 
-**Polyrepo.** Until PAN-3657 brings a polyrepo PR listing, a polyrepo
-project's cars come from auto-merge rows and merge runs only, and its recent
-merges are empty.
+**Polyrepo.** A polyrepo project's listing is its writable member repos'
+listings, each read with that repo's own forge (`memberReposForProject`). A car
+shows one PR link per member repo (`fe !11`, `skills #30`). Recent merges
+include merges in every member repo.
 
 ## Recent merges
 
@@ -253,9 +285,10 @@ merge.
 | Route rule, priority, drop lookup | `src/lib/cloister/merge-route.ts` |
 | Batch window | `src/lib/cloister/batch-window.ts`, `src/dashboard/server/services/merge-train-batching.ts` |
 | Scheduler and executor | `src/dashboard/server/services/auto-merge-scheduler.ts`, `auto-merge-executor.ts`, `auto-merge-door-policy.ts`, `merge-path-owner.ts` |
+| Ready set and merged issues | `src/lib/overdeck/ready-set.ts`, `src/dashboard/server/services/polyrepo-queue.ts` |
 | Reconciler and engines | `src/lib/cloister/uat-reconciler.ts`, `uat-generation-engine.ts`, `uat-polyrepo-engine.ts`, `src/dashboard/server/services/uat-train.ts` |
 | Promote and auto-promote | `src/lib/cloister/uat-promote.ts`, `src/dashboard/server/services/batch-auto-promote.ts`, `promote-stack-gate.ts` |
 | Issue policy write | `src/dashboard/server/services/merge-policy-write.ts`, `src/dashboard/server/routes/merge-train-lanes.ts` |
-| Board | `src/dashboard/server/services/merge-train-board.ts`, `merge-train-board-types.ts`, `recent-merges.ts`, `merged-issue-ids.ts`; `src/lib/cloister/merge-blocker-types.ts`, `unresolved-threads.ts` |
+| Board | `src/dashboard/server/services/merge-train-board.ts`, `merge-train-board-types.ts`, `recent-merges.ts`; `src/lib/cloister/merge-blocker-types.ts`, `unresolved-threads.ts` |
 | Strike merge | `src/dashboard/server/services/strike-merge.ts`, `src/dashboard/server/routes/merge-train-lanes.ts` |
 | UI | `src/dashboard/frontend/src/components/merge-train/train/` (`MergeTrain`, `ProjectTrainCard`, `BatchCard`, `TrainCarRow`, `StrikeLane`, `RecentMergesStrip`, …) |

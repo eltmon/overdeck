@@ -5,8 +5,9 @@
  *
  * Everything here is derived. The sources are the cached forge listings
  * (GitHub: one stale-while-revalidate listing per repo; GitLab: the cached
- * `state=all` MR listing), the 60 s PR-facts cache, the gate's cached
- * approval answers, `pending_auto_merges` rows, the in-memory merge runs,
+ * MR listing of every open and the newest merged MRs), the 60 s PR-facts
+ * cache, the gate's cached approval answers, `pending_auto_merges` rows, the
+ * in-memory merge runs,
  * the pipeline journal and the stored generations.
  *
  * Forge cost (NFR-6): a car candidate is picked without a forge read (a
@@ -14,8 +15,8 @@
  * auto-merge row or a merge run), and only candidates read PR facts, through
  * the cache the gate and the approval refresher already fill. Unresolved
  * threads are one GraphQL read per GitHub repo, cached two minutes. A
- * polyrepo project shows cars from rows and runs only until WI-4 brings its
- * listing (PAN-3657).
+ * polyrepo project's listing is its writable member repos' listings, each
+ * read with that repo's own forge (PAN-3657, WI-4).
  *
  * One project's failure never blanks the board (NFR-7): it returns that
  * project's card with `error` and empty lists.
@@ -66,6 +67,9 @@ export interface OpenPr {
   readySince: number | null;
   /** GitLab: `detailed_merge_status === 'discussions_not_resolved'`. */
   discussionsOpen?: boolean;
+  /** Polyrepo: the member repo this row came from, and its forge. */
+  repoKey?: string;
+  forge?: 'github' | 'gitlab';
 }
 
 export interface ProjectListing { open: OpenPr[]; merged: MergedPr[] }
@@ -77,6 +81,8 @@ export interface BoardDeps {
   requireUat(): boolean;
   forgeOf(projectPath: string): 'github' | 'gitlab';
   listing(projectPath: string, forge: 'github' | 'gitlab'): Promise<ProjectListing>;
+  /** A polyrepo project's writable member repos (WI-4); none when omitted. */
+  memberRepos?(projectPath: string, config: ProjectConfig): ReadonlyArray<{ repoKey: string; repoPath: string; forge: 'github' | 'gitlab' }>;
   unresolvedThreads(repoSlug: string, projectPath: string): Promise<ReadonlyMap<number, number>>;
   approvalAtHead(issueId: string, headSha: string | null): boolean | undefined;
   /** Feature facts (cached); with `strikeBranch`, the strike PR's facts. Null on failure. */
@@ -221,7 +227,8 @@ async function boardProject(
   const trainOn = identity.enabled && !deps.lacksBatchCi(root);
   const forge = identity.forge;
 
-  const listing: ProjectListing = forge ? await deps.listing(root, forge) : { open: [], merged: [] };
+  const listing: ProjectListing = identity.polyrepo ? await polyrepoListing(root, config, deps)
+    : forge ? await deps.listing(root, forge) : { open: [], merged: [] };
   const threads = forge === 'github' && identity.repo
     ? await deps.unresolvedThreads(identity.repo, root).catch(() => new Map<number, number>())
     : new Map<number, number>();
@@ -235,13 +242,17 @@ async function boardProject(
   const now = deps.now();
   const runs = new Map(deps.mergeRuns().map((run) => [run.issueId.toUpperCase(), run]));
   const openById = new Map(listing.open.filter((pr) => pr.kind === 'feature').map((pr) => [pr.issueId, pr]));
+  const prLabel = (row: OpenPr) => `${row.repoKey ? `${row.repoKey} ` : ''}${(row.forge ?? forge) === 'gitlab' ? '!' : '#'}${row.number}`;
 
   // Candidates without a forge read (see the module doc).
   const candidates = new Set<string>();
   // `reviewDecision` is empty without branch protection and the gate caches
   // answers only for PRs it judged, so a journaled review verdict is the leg
-  // that finds marker-approved PRs.
-  for (const pr of openById.values()) {
+  // that finds marker-approved PRs. Every feature row counts, not just the
+  // one `openById` keeps per issue: a polyrepo issue's approved member PR
+  // must find it even when another member's PR is undecided.
+  for (const pr of listing.open) {
+    if (pr.kind !== 'feature') continue;
     if (pr.reviewDecided || deps.approvalAtHead(pr.issueId, pr.headSha) !== undefined
       || deps.journal(pr.issueId, pr.branch).some((entry) => entry.type === 'review.verdict')) {
       candidates.add(pr.issueId);
@@ -314,9 +325,12 @@ async function boardProject(
       issueId,
       title: pr?.title ?? deps.issueTitle(issueId) ?? issueId,
       branch,
-      prs: pr || facts?.url
-        ? [{ label: `${forge === 'gitlab' ? '!' : '#'}${pr?.number ?? facts?.number ?? ''}`, url: pr?.url ?? facts?.url ?? null }]
-        : [],
+      // FR-20: one link per member repo for a polyrepo issue.
+      prs: identity.polyrepo && pr
+        ? listing.open.filter((open) => open.kind === 'feature' && open.issueId === issueId).map((open) => ({ label: prLabel(open), url: open.url }))
+        : pr || facts?.url
+          ? [{ label: `${forge === 'gitlab' ? '!' : '#'}${pr?.number ?? facts?.number ?? ''}`, url: pr?.url ?? facts?.url ?? null }]
+          : [],
       state,
       route: routing.route,
       policy: routing.policy,
@@ -365,6 +379,17 @@ async function boardProject(
 
   const notices = skips.filter((skip) => skip.scope === 'project').map((skip) => `Not scheduled: ${skip.reason}`);
   return { ...identity, window, notices, cars, strikes, batches, recent };
+}
+
+/** Every writable member repo's listing, rows tagged with the repo they came from. */
+async function polyrepoListing(root: string, config: ProjectConfig, deps: BoardDeps): Promise<ProjectListing> {
+  const out: ProjectListing = { open: [], merged: [] };
+  for (const repo of deps.memberRepos?.(root, config) ?? []) {
+    const listed = await deps.listing(repo.repoPath, repo.forge);
+    out.open.push(...listed.open.map((row) => ({ ...row, repoKey: repo.repoKey, forge: repo.forge })));
+    out.merged.push(...listed.merged);
+  }
+  return out;
 }
 
 async function strikeOf(
@@ -491,7 +516,7 @@ const STRIKE_FACTS_TTL_MS = 60_000;
 async function defaultBoardDeps(): Promise<BoardDeps> {
   const [
     projects, mergeSync, controls, prFacts, prListing, derived, approval, queue, journalMod,
-    trackerType, issueProjects, uatTrain, mergeRoute, threads, doorPolicy, singleton, skipReasons,
+    trackerType, issueProjects, uatTrain, mergeRoute, threads, doorPolicy, singleton, skipReasons, readySet,
   ] = await Promise.all([
     import('../../../lib/projects.js'),
     import('../../../lib/overdeck/merge-sync.js'),
@@ -510,6 +535,7 @@ async function defaultBoardDeps(): Promise<BoardDeps> {
     import('./auto-merge-door-policy.js'),
     import('./issue-service-singleton.js'),
     import('./auto-merge-skip-reasons.js'),
+    import('../../../lib/overdeck/ready-set.js'),
   ]);
   const { readySinceFromRollup } = await import('../../../lib/cloister/batch-window.js');
 
@@ -567,6 +593,7 @@ async function defaultBoardDeps(): Promise<BoardDeps> {
     requireUat: () => controls.isFlywheelRequireUatBeforeMerge(),
     forgeOf: (projectPath) => derived.forgeForProject(projectPath),
     listing: (projectPath, forge) => (forge === 'gitlab' ? gitlabListing(projectPath) : githubListing(projectPath)),
+    memberRepos: (projectPath, config) => readySet.memberReposForProject(projectPath, config),
     unresolvedThreads: (repoSlug, projectPath) => threads.listUnresolvedThreadCounts(repoSlug, projectPath),
     approvalAtHead: (issueId, headSha) => approval.cachedApprovalAtHead(issueId, headSha),
     facts: async (issueId, strikeBranch, headSha) => {
