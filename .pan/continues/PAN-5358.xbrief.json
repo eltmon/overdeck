@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5358",
   "created": "2026-11-15T16:13:08.101Z",
-  "updated": "2026-11-15T17:39:28.423Z",
+  "updated": "2026-11-15T17:39:57.340Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -124,6 +124,11 @@
     "embed-text-export.ac2": {
       "status": "completed",
       "doneAt": "2026-11-15T17:39:28.422Z"
+    },
+    "fact-vector-cache": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5358",
+      "claimedAt": "2026-11-15T17:39:57.340Z"
     }
   }
 }
