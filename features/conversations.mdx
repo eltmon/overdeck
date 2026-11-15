@@ -63,7 +63,9 @@ request, **N commits pushed**, **N commits not pushed**, **N files not
 committed**, and the cost. A count of zero is left out. In a Command Deck tab
 the folder opens the Files tab, the commit counts open the Changes tab on
 **This conversation**, and **N files not committed** opens it on **Not
-committed**.
+committed**. In a detached checkout the branch reads **detached**. When the
+checkout has no upstream branch, as in a detached checkout, a commit counts
+as pushed when any remote branch has it.
 
 The ⋯ menu lists, in groups:
 
@@ -73,7 +75,7 @@ The ⋯ menu lists, in groups:
 2. **Open folder in** an editor, one item for each editor on this machine (a linked
    conversation lists the editors that work over remote SSH), **Copy
    conversation id** (the conversation's name), **Copy session id** (the agent's
-   session file id, shown only when it differs from the name), **Copy link**,
+   session id, shown only when it differs from the name), **Copy link**,
    and **Open in new window**.
 3. **Favorite**, **Regenerate title**, and the pull request items.
 4. **Hand off to new conversation**, **Create summary fork**, **Export

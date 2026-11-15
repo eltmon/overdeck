@@ -1965,6 +1965,13 @@ the header, the Files tab dots and the Changes tab share the cache entry
 disabled for synthetic rows (`id < 0`) and for linked and vault conversations.
 It refetches every 5 s only while the conversation works.
 
+**Pushed without an upstream (PAN-5334).** `listLocalShas` uses
+`git rev-list @{u}..HEAD`. When `@{u}` does not resolve — a detached checkout
+has no upstream branch — and the repo has a remote, it falls back to
+`git rev-list HEAD --not --remotes`; with no remote every commit is not
+pushed. A detached checkout's branch renders as `detached`. Copy session id
+reads `claudeSessionId`, falling back to the `sessionFile` basename.
+
 **Chip resync.** `ConversationChangesList` subscribes to the deck's `openSeq`;
 when it changes and the store has a `changesScope`, the chip moves to that scope.
 So the header's Changes button resets the chip to This conversation and
