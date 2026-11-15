@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T20:41:28.315345Z · model: claude-opus-5-5 · open: 898_
+_Last sequenced: 2026-11-15T21:03:35.057965Z · model: claude-opus-5-5 · open: 898_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,7 +8,7 @@ _Last sequenced: 2026-11-15T20:41:28.315345Z · model: claude-opus-5-5 · open: 
 | 1 | PAN-5396 | S | critical | ok |  |  | In pipeline: post-merge pause/close skipped when verifying_on_main transition throws; merged issues keep live agents. |
 | 2 | PAN-5395 | S | critical | ok |  |  | In pipeline: single-repo workspaces read untracked Overdeck sync output as dirty, so work agents are refused and never start. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
-| 4 | PAN-5394 | XS | high | ok |  |  | In pipeline: admission test asserts after a fixed 10 ms drive; turned main CI red. Wait on the predicate instead. |
+| 4 | PAN-5394 | XS | high | ok |  |  | Fixed by PR #5397 (merged 20:46Z) and closed out at 21:02Z; no work left, drops off on the next run. |
 | 5 | PAN-5398 | S | medium | ok |  |  | In pipeline: pan open uses the project key as deck key, opening a phantom deck where key differs from name. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
@@ -920,7 +920,7 @@ Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat 
 
 ### PAN-5394 (rank 4)
 
-New in-pipeline test-only flake fix that turned main CI red; pinned into a free top rank so it is not displaced.
+Its PR #5397 merged and the close-out ceremony closed the issue after the manifest snapshot, so it is no longer in the pipeline; rank kept so pinned neighbours do not shift.
 
 ### PAN-5398 (rank 5)
 
@@ -1233,7 +1233,7 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T20:41:28.315345Z",
+  "generatedAt": "2026-11-15T21:03:35.057965Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 898,
@@ -1285,8 +1285,8 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "score": 76,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In pipeline: admission test asserts after a fixed 10 ms drive; turned main CI red. Wait on the predicate instead.",
-      "rationale": "New in-pipeline test-only flake fix that turned main CI red; pinned into a free top rank so it is not displaced.",
+      "why": "Fixed by PR #5397 (merged 20:46Z) and closed out at 21:02Z; no work left, drops off on the next run.",
+      "rationale": "Its PR #5397 merged and the close-out ceremony closed the issue after the manifest snapshot, so it is no longer in the pipeline; rank kept so pinned neighbours do not shift.",
       "gate": "auto",
       "planning": "auto"
     },
