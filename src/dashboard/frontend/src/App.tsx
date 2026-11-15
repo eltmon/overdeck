@@ -69,6 +69,7 @@ import { ShortcutsSheet } from './lib/shortcuts/ShortcutsSheet';
 import { AppChrome } from './App/AppChrome';
 import { DeckNavigationProvider, deckNavigationActions, type DeckNavigation, type DeckTarget } from './components/frame/deck/deckNavigation';
 import { UiCommandsHost } from './components/open/UiCommandsHost';
+import { OpenPathHost } from './components/open/OpenPathHost';
 import { useUiMode } from './lib/simple/uiMode';
 import { AppLiveStoreHost, countRunningAgents } from './App/AppLiveStoreHost';
 
@@ -836,6 +837,7 @@ export default function App() {
           />
         </main>
         <UiCommandsHost />
+        <OpenPathHost />
         </DeckNavigationProvider>
       </div>
 
