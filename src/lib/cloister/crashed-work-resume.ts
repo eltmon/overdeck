@@ -16,8 +16,8 @@
  *
  * 1. `detectCrashedAgents` returns it with `role === 'work'`, and the selected
  *    backend's inventory does not list it. A null inventory is not a death.
- * 2. It was confirmed dead on two consecutive ticks at least
- *    `CRASH_CONFIRM_GAP_MS` apart, so a pane that is mid-restart is left alone.
+ * 2. It was confirmed dead on two consecutive ticks (`CRASH_CONFIRM_GAP_MS`
+ *    apart or more), so a pane that is mid-restart is left alone.
  * 3. No deliberate stop is recorded for its launch generation
  *    (`readRecordedAgentStopAt`, read WITHOUT the `reports` option so
  *    deacon-lite's own death report never counts as a stop).
@@ -43,7 +43,10 @@
  * change, never once per tick (the PAN-4300 lesson).
  *
  * All state is in memory, like the rest of deacon-lite. Across a deacon child
- * restart the streak restarts, so a resume waits one more tick.
+ * restart the streak restarts, so a resume waits one more tick. The
+ * one-attempt record is lost too: an agent whose attempt failed early (its
+ * `state.json` still reads `running`) gets one more attempt, and one more
+ * Needs-you item, after each deacon child restart.
  */
 import { getAgentState, type AgentState } from '../agents/agent-state-read.js';
 import { decideResumeGate, getAgentResumeGateBlockReason } from '../agents/agent-state.js';
@@ -52,10 +55,15 @@ import { isNoResumeValueEnabled } from '../boot-no-resume.js';
 import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { readRecordedAgentStopAt } from '../overdeck/event-reads.js';
 
-/** Two dead verdicts this far apart count as two consecutive ticks (the deacon-lite tick is 60 s). */
-export const CRASH_CONFIRM_GAP_MS = 60_000;
-/** At most one automatic resume attempt per minute, even when a manual patrol runs between ticks. */
-export const CRASH_RESUME_MIN_INTERVAL_MS = 60_000;
+/**
+ * Two dead verdicts this far apart count as two consecutive ticks. Ticks start
+ * 60 s apart, but this routine runs after three others of variable length, so
+ * the gap between its own runs can fall a little short of 60 s. 45 s still
+ * needs a second scheduled tick and rejects a manual patrol run right after one.
+ */
+export const CRASH_CONFIRM_GAP_MS = 45_000;
+/** At most one automatic resume attempt per tick, even when a manual patrol runs between ticks (same jitter allowance). */
+export const CRASH_RESUME_MIN_INTERVAL_MS = 45_000;
 
 const ROUTINE = 'resumeCrashedWorkAgents';
 

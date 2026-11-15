@@ -111,6 +111,16 @@ describe('resumeCrashedWorkAgents (PAN-5354)', () => {
     expect(deps.resumeAgent).not.toHaveBeenCalled();
   });
 
+  it('tolerates a second tick that runs a little under 60 s after the first', async () => {
+    const { deps } = deadHost([workAgent('agent-pan-5337')]);
+
+    // A slow first tick: this routine ran 5 s into it, and 1 s into the next.
+    await resumeCrashedWorkAgents(T0 + 5_000, deps);
+    await resumeCrashedWorkAgents(T0 + TICK + 1_000, deps);
+
+    expect(deps.resumeAgent).toHaveBeenCalledTimes(1);
+  });
+
   it('does not resume when the second dead verdict comes sooner than the confirm gap', async () => {
     const { deps } = deadHost([workAgent('agent-pan-5337')]);
 
@@ -218,6 +228,8 @@ describe('resumeCrashedWorkAgents (PAN-5354)', () => {
     expect(deps.resumeAgent).toHaveBeenCalledTimes(1);
     await resumeCrashedWorkAgents(T0 + TICK + CRASH_RESUME_MIN_INTERVAL_MS, deps);
     expect(deps.resumeAgent).toHaveBeenCalledTimes(2);
+    // The next scheduled tick, even a little early, is never held by the interval.
+    expect(CRASH_RESUME_MIN_INTERVAL_MS).toBeLessThan(TICK);
   });
 
   it('waits while the memory governor does not admit', async () => {

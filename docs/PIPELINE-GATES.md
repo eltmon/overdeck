@@ -2232,8 +2232,10 @@ leaves a trace:
    host crash, an OOM of the terminal-backend unit, power loss). Its
    candidates come from `detectCrashedAgents`. It resumes an agent only when
    every guard holds:
-   - The agent is confirmed dead on two consecutive ticks at least 60 s
-     apart, and is absent from the selected backend's inventory. A null
+   - The agent is confirmed dead on two consecutive scheduled ticks, and is
+     absent from the selected backend's inventory. The two verdicts must be
+     at least 45 s apart, which allows for the time the earlier routines take
+     inside a tick and rejects a manual patrol run right after a tick. A null
      inventory or a `runtime-indeterminate` verdict is not a death.
    - No deliberate stop is recorded for its launch generation
      (`readRecordedAgentStopAt`).
@@ -2244,10 +2246,12 @@ leaves a trace:
    - The deacon is not frozen and the boot is not `--no-resume`.
    - The memory governor admits (`assessMemoryPressure()` band `ok`).
 
-   It attempts at most one resume per tick and per minute, oldest
-   `lastActivity` first. Each launch generation gets one automatic attempt;
-   a failed attempt raises one Needs-you item naming the agent and the reason,
-   and the routine does not retry it. The stall sweeper stays report-only.
+   It attempts at most one resume per tick, oldest `lastActivity` first, and
+   never two within 45 s, so a manual patrol run cannot add one. Each launch
+   generation gets one automatic attempt; a failed attempt raises one
+   Needs-you item naming the agent and the reason, and the routine does not
+   retry it. The attempt record is in memory, so a deacon child restart
+   allows one more attempt. The stall sweeper stays report-only.
 
 While the Deacon is frozen (`deacon.globally_paused`), `runDeaconLite()`
 returns before any of the routines run — none of them fires at all
