@@ -10,7 +10,7 @@
  * state, so unsaved edits survive the pane unmounting.
  */
 import type { ExplorerReadFileResult } from '@overdeck/contracts'
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { usePanesStore } from '../../../lib/panesStore'
 import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
 import { pickViewer } from '../viewers/viewer-router'
@@ -18,6 +18,8 @@ import styles from '../../Stage/stage.module.css'
 import type { PaneWrapperProps } from '../../Stage/types'
 import { EditWorkspaceNote } from '../edit/EditWorkspaceBanner'
 import { useEditWorkspaceStore } from '../edit/edit-workspace-store'
+import { useStageDeck } from '../../Stage/StageDeckContext'
+import { useRootLabel } from '../rootForConversation'
 import { explorerErrorCode, explorerErrorMessage, parseRootId, readFile } from '../explorer-rpc'
 import { openCodePane } from '../openCodePane'
 import { draftKey, isDraftDirty, useCodeDrafts } from './code-drafts'
@@ -83,6 +85,8 @@ function CodePaneForFile({
   const text = useCodeDrafts((s) => s.drafts[key]?.text)
   const external = useExternalChange(rootId, path)
   const { setState: setExternal } = external
+  const rootLabel = useRootLabel(rootId) ?? rootId
+  const deck = useStageDeck()
 
   useEffect(() => {
     let cancelled = false
@@ -209,10 +213,23 @@ function CodePaneForFile({
     if (diff === 'disk' && externalState.kind !== 'changed') switchDiff(null)
   }, [diff, externalState.kind, switchDiff])
   const onCompare = useCallback(() => switchDiff(diff === 'disk' ? null : 'disk'), [diff, switchDiff])
+  // PAN-5290 FR-4: inside a Stage the renamed file opens beside the chat like every other open.
   const onOpenRenamed = useCallback(
-    (newPath: string) => openCodePane(workspaceId, { rootId, path: newPath }),
-    [workspaceId, rootId],
+    (newPath: string) => {
+      if (deck?.openBeside) deck.openBeside({ rootId, path: newPath })
+      else openCodePane(workspaceId, { rootId, path: newPath })
+    },
+    [deck, workspaceId, rootId],
   )
+  // PAN-5290 FR-3: make this pane active and show its file in the dock's Files tab.
+  const onReveal = useMemo(() => {
+    const openDock = deck?.openDock
+    if (!openDock) return undefined
+    return () => {
+      usePanesStore.getState().setActivePane(workspaceId, pane.paneId)
+      openDock({ tab: 'files', reveal: { rootId, path } })
+    }
+  }, [deck, workspaceId, pane.paneId, rootId, path])
   const onPaneKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
@@ -249,6 +266,8 @@ function CodePaneForFile({
     <div className="flex h-full min-h-0 flex-col" data-testid="code-pane" onKeyDown={onPaneKeyDown}>
       <CodePaneHeader
         path={path}
+        rootLabel={rootLabel}
+        onReveal={onReveal}
         previewable={previewable}
         view={view}
         onView={setView}

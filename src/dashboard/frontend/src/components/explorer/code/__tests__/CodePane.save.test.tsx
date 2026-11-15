@@ -1,9 +1,15 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { PanRpcError, type ExplorerReadFileResult } from '@overdeck/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { usePanesStore, type WorkspacePane } from '../../../../lib/panesStore'
 
 const mocks = vi.hoisted(() => ({ readFile: vi.fn(), writeFile: vi.fn(), ensureEditRoot: vi.fn() }))
+
+// PAN-5290: the header's root label reads the shared registry queries; no QueryClient in this test.
+vi.mock('../../rootForConversation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../rootForConversation')>()),
+  useRootLabel: (rootId: string | null) => rootId,
+}))
 
 vi.mock('../../explorer-rpc', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../explorer-rpc')>()),
@@ -148,7 +154,7 @@ describe('CodePane saving', () => {
     const bar = render(
       <PaneBar panes={[currentPane(pane.paneId)]} activePaneId={pane.paneId} onSelect={() => {}} onClose={() => {}} onAdd={() => {}} />,
     )
-    expect(bar.getByText(pane.label).className).toContain('italic')
+    expect(within(bar.container).getByText(pane.label).className).toContain('italic')
     expect(bar.queryByLabelText('Unsaved changes')).toBeNull()
 
     type('two\n')
@@ -156,7 +162,7 @@ describe('CodePane saving', () => {
     bar.rerender(
       <PaneBar panes={[currentPane(pane.paneId)]} activePaneId={pane.paneId} onSelect={() => {}} onClose={() => {}} onAdd={() => {}} />,
     )
-    expect(bar.getByText(pane.label).className).not.toContain('italic')
+    expect(within(bar.container).getByText(pane.label).className).not.toContain('italic')
     expect(bar.getByLabelText('Unsaved changes')).toBeTruthy()
 
     await act(async () => {

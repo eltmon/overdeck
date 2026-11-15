@@ -12,6 +12,12 @@ const mocks = vi.hoisted(() => ({
   },
 }))
 
+// PAN-5290: the header's root label reads the shared registry queries; no QueryClient in this test.
+vi.mock('../../rootForConversation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../rootForConversation')>()),
+  useRootLabel: (rootId: string | null) => rootId,
+}))
+
 vi.mock('../../explorer-rpc', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../explorer-rpc')>()),
   // The pane subscribes to the watch hub; no server stream in unit tests.
@@ -56,6 +62,8 @@ const { CodePane, CREATING_EDIT_NOTE, PROJECT_EDIT_NOTE } = await import('../Cod
 const { useEditWorkspaceStore } = await import('../../edit/edit-workspace-store')
 const { draftKey, useCodeDrafts } = await import('../code-drafts')
 const { CodePaneSlot } = await import('../CodePaneSlot')
+const { StageDeckProvider } = await import('../../../Stage/StageDeckContext')
+const { usePanesStore } = await import('../../../../lib/panesStore')
 
 function pane(over: Partial<WorkspacePane> = {}): WorkspacePane {
   return {
@@ -203,6 +211,36 @@ describe('CodePane header', () => {
     fireEvent.click(wrap)
     expect(wrap.getAttribute('aria-pressed')).toBe('false')
     expect(screen.getByTestId('monaco').getAttribute('data-wrap')).toBe('off')
+  })
+
+  it('shows the root label and path as a breadcrumb', async () => {
+    mocks.readFile.mockResolvedValue(textRead())
+    render(<CodePane pane={pane()} ctx={ctx} />)
+    await screen.findByTestId('monaco')
+    expect(screen.getByTestId('code-pane-breadcrumb').textContent).toBe('issue:PAN-1›src›a.ts')
+  })
+
+  it('has no Reveal in files outside a Stage', async () => {
+    mocks.readFile.mockResolvedValue(textRead())
+    render(<CodePane pane={pane()} ctx={ctx} />)
+    await screen.findByTestId('monaco')
+    expect(screen.queryByRole('button', { name: 'Reveal in files' })).toBeNull()
+  })
+
+  it('Reveal in files makes the pane active and opens the dock Files tab on this file', async () => {
+    mocks.readFile.mockResolvedValue(textRead())
+    const setActivePane = vi.spyOn(usePanesStore.getState(), 'setActivePane').mockImplementation(() => {})
+    const openDock = vi.fn()
+    render(
+      <StageDeckProvider value={{ deckKey: 'PAN-1', openOrFocusEditorPane: vi.fn(), openOrFocusAgentPane: vi.fn(), openDock }}>
+        <CodePane pane={pane()} ctx={ctx} />
+      </StageDeckProvider>,
+    )
+    await screen.findByTestId('monaco')
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal in files' }))
+    expect(setActivePane).toHaveBeenCalledWith('PAN-1', 'p1')
+    expect(openDock).toHaveBeenCalledWith({ tab: 'files', reveal: { rootId: 'issue:PAN-1', path: 'src/a.ts' } })
+    setActivePane.mockRestore()
   })
 })
 
