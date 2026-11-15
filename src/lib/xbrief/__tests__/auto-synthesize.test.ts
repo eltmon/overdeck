@@ -1,7 +1,8 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -41,6 +42,21 @@ async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+}
+
+function git(cwd: string, args: string[]): string {
+  return execFileSync('git', args, { cwd, encoding: 'utf-8' }).trim();
+}
+
+async function initializeGitRepo(root: string, branch: string): Promise<void> {
+  await mkdir(root, { recursive: true });
+  git(root, ['init', '--quiet']);
+  git(root, ['config', 'user.email', 'test@example.com']);
+  git(root, ['config', 'user.name', 'Test']);
+  git(root, ['branch', '-m', branch]);
+  await writeFile(join(root, '.gitkeep'), 'initial\n');
+  git(root, ['add', '.gitkeep']);
+  git(root, ['commit', '--quiet', '-m', 'initial']);
 }
 
 describe('extractAcceptanceCriteriaFromIssue', () => {
@@ -187,6 +203,107 @@ describe('writeAutoStartXBrief', () => {
         if (previousOverdeckHome === undefined) delete process.env['OVERDECK_HOME'];
         else process.env['OVERDECK_HOME'] = previousOverdeckHome;
       }
+    });
+  });
+
+  it('keeps the primary checkout clean and writes the spec into the issue worktree (PAN-5316)', async () => {
+    await withTempDir(async (root) => {
+      const previousOverdeckHome = process.env['OVERDECK_HOME'];
+      process.env['OVERDECK_HOME'] = root;
+      try {
+        const projectRoot = join(root, 'project');
+        await initializeGitRepo(projectRoot, 'main');
+        await writeFile(join(projectRoot, '.gitignore'), 'workspaces/\n');
+        git(projectRoot, ['add', '.gitignore']);
+        git(projectRoot, ['commit', '--quiet', '-m', 'ignore workspaces']);
+        projectRegistry.entries = [{
+          key: 'skip-plan-project',
+          config: { name: 'Skip plan project', path: projectRoot },
+        }];
+        git(projectRoot, ['worktree', 'add', '--quiet', '-b', 'feature/pan-5316', 'workspaces/feature-pan-5316']);
+        const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-5316');
+
+        const result = await Effect.runPromise(writeAutoStartXBrief(workspacePath, {
+          issueId: 'PAN-5316',
+          title: 'pan start --plan skip writes into the primary tree',
+          body: '- [ ] Write the spec into the workspace',
+        }));
+
+        expect(git(projectRoot, ['status', '--porcelain'])).toBe('');
+        expect(existsSync(join(projectRoot, '.pan', 'specs'))).toBe(false);
+        expect(result.specPath).toBe(join(workspacePath, '.pan', 'specs', result.canonicalFilename));
+        expect(git(workspacePath, ['status', '--porcelain', '--untracked-files=all']))
+          .toContain(join('.pan', 'specs', result.canonicalFilename));
+        expect(findPlanSync(workspacePath)).toBe(result.specPath);
+      } finally {
+        if (previousOverdeckHome === undefined) delete process.env['OVERDECK_HOME'];
+        else process.env['OVERDECK_HOME'] = previousOverdeckHome;
+      }
+    });
+  });
+
+  it('refuses the primary root and writes nothing', async () => {
+    await withTempDir(async (root) => {
+      const projectRoot = join(root, 'project');
+      await initializeGitRepo(projectRoot, 'main');
+
+      const error = await Effect.runPromise(Effect.flip(writeAutoStartXBrief(projectRoot, {
+        issueId: 'PAN-5316',
+        title: 'pan start --plan skip writes into the primary tree',
+      })));
+
+      expect(error.operation).toBe('writeAutoStartXBrief');
+      expect(git(projectRoot, ['status', '--porcelain'])).toBe('');
+      expect(existsSync(join(projectRoot, '.pan'))).toBe(false);
+    });
+  });
+
+  it("refuses another issue's workspace", async () => {
+    await withTempDir(async (root) => {
+      const projectRoot = join(root, 'project');
+      const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-1074');
+      await mkdir(workspacePath, { recursive: true });
+
+      const error = await Effect.runPromise(Effect.flip(writeAutoStartXBrief(workspacePath, {
+        issueId: 'PAN-9999',
+        title: 'Mismatched issue id',
+      })));
+
+      expect(error.operation).toBe('writeAutoStartXBrief');
+      expect(existsSync(join(workspacePath, '.pan'))).toBe(false);
+    });
+  });
+
+  it('refuses a missing workspace without creating it', async () => {
+    await withTempDir(async (root) => {
+      const projectRoot = join(root, 'project');
+      const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-1075');
+
+      const error = await Effect.runPromise(Effect.flip(writeAutoStartXBrief(workspacePath, {
+        issueId: 'PAN-1075',
+        title: 'Workspace never created',
+      })));
+
+      expect(error.operation).toBe('writeAutoStartXBrief');
+      expect(existsSync(workspacePath)).toBe(false);
+    });
+  });
+
+  it('refuses a workspace symlink that points at the primary checkout', async () => {
+    await withTempDir(async (root) => {
+      const projectRoot = join(root, 'project');
+      await initializeGitRepo(projectRoot, 'main');
+      await mkdir(join(projectRoot, 'workspaces'), { recursive: true });
+      const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-1076');
+      await symlink(projectRoot, workspacePath);
+
+      const error = await Effect.runPromise(Effect.flip(writeAutoStartXBrief(workspacePath, {
+        issueId: 'PAN-1076',
+        title: 'Workspace symlinked to the primary checkout',
+      })));
+
+      expect(error.operation).toBe('writeAutoStartXBrief');
+      expect(existsSync(join(projectRoot, '.pan'))).toBe(false);
     });
   });
 });
