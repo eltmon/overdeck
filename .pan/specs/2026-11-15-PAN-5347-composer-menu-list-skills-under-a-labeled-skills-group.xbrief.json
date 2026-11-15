@@ -4,17 +4,17 @@
     "created": "2026-11-15T13:23:31Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5347: Composer / menu: list skills under a labeled Skills group",
-    "updated": "2026-11-15T13:34:36.088Z"
+    "updated": "2026-11-15T13:35:31.174Z"
   },
   "plan": {
     "id": "pan-5347",
     "title": "Composer / menu: list skills under a labeled Skills group",
-    "status": "proposed",
+    "status": "running",
     "uid": "cd7c33df-6758-4945-abce-8145499c6bf3",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T13:23:31Z",
-    "updated": "2026-11-15T13:34:36.088Z",
+    "updated": "2026-11-15T13:35:31.174Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5347",
@@ -649,5 +649,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
