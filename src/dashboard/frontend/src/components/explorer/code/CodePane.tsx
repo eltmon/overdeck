@@ -16,8 +16,7 @@ import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
 import { pickViewer } from '../viewers/viewer-router'
 import styles from '../../Stage/stage.module.css'
 import type { PaneWrapperProps } from '../../Stage/types'
-import { EditWorkspaceNote } from '../edit/EditWorkspaceBanner'
-import { useEditWorkspaceStore } from '../edit/edit-workspace-store'
+import { EditorBar } from '../edit/EditorBar'
 import { useStageDeck } from '../../Stage/StageDeckContext'
 import { useRootLabel } from '../rootForConversation'
 import { explorerErrorCode, explorerErrorMessage, parseRootId, readFile } from '../explorer-rpc'
@@ -40,10 +39,6 @@ type LoadState =
 // PAN-5188's viewer host: images, PDFs, audio, fonts, tables, archives and
 // large text. Its viewers lazy-load in turn (PAN-5188 D-1, the §6.7 seam).
 const FileViewer = lazy(() => import('../viewers/FileViewer'))
-
-/** PAN-5191: the note on a project root, whose saves go to an edit workspace. */
-export const PROJECT_EDIT_NOTE = 'Edits here are saved to an edit workspace. The main checkout is never changed.'
-export const CREATING_EDIT_NOTE = 'Creating edit workspace…'
 
 function Placeholder({ title, hint, testId }: { title: string; hint?: string; testId: string }) {
   return (
@@ -160,7 +155,6 @@ function CodePaneForFile({
 
   const rootRef = parseRootId(rootId)
   const isProjectRoot = rootRef?.kind === 'project'
-  const creatingEdit = useEditWorkspaceStore((s) => (isProjectRoot && rootRef ? s.creating[rootRef.key] === true : false))
   // PAN-5191: a project root is editable; the first save moves the edit to an edit workspace.
   const writable = load.status === 'ready' && load.result.kind === 'text' && (load.result.writable || isProjectRoot)
   const preview = pane.explorerPreview === true
@@ -317,12 +311,10 @@ function CodePaneForFile({
         onOverwrite={onOverwrite}
         onOpen={onOpenRenamed}
       />
-      {isProjectRoot ? (
-        <div className="border-b border-border px-3 py-1.5 text-xs text-muted-foreground" data-testid="code-pane-project-note">
-          {creatingEdit ? CREATING_EDIT_NOTE : PROJECT_EDIT_NOTE}
-        </div>
+      {/* PAN-5290 C-D9: the editor bar on project and edit-workspace roots only. */}
+      {isProjectRoot || rootRef?.kind === 'workspace' ? (
+        <EditorBar rootId={rootId} deckKey={workspaceId} path={path} paneId={pane.paneId} />
       ) : null}
-      {rootRef?.kind === 'workspace' ? <EditWorkspaceNote rootId={rootId} /> : null}
       {diff === 'head' || diskDiff !== undefined ? (
         <div className="min-h-0 flex-1" data-testid="code-pane-changes">
           <ChangesView

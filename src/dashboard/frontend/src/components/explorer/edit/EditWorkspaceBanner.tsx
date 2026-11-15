@@ -44,16 +44,8 @@ function EditSentence({ status }: { status: EditWorkspaceStatus }) {
   )
 }
 
-/** The one-line note a code pane on an edit root shows (no buttons). */
-export function EditWorkspaceNote({ rootId }: { rootId: string }) {
-  const status = useEditWorkspaceStatus(workspaceIdOf(rootId) ?? '')
-  if (!status.data) return null
-  return (
-    <div className="border-b border-border px-3 py-1.5 text-xs text-muted-foreground" data-testid="code-pane-edit-note">
-      <EditSentence status={status.data} />
-    </div>
-  )
-}
+// Moved to EditorBar.tsx (PAN-5290); re-exported until this banner is deleted.
+export { EditWorkspaceNote } from './EditorBar'
 
 function unsavedPathsIn(drafts: Record<string, CodeDraft>, rootId: string): string[] {
   const prefix = draftKey(rootId, '')

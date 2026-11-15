@@ -23,7 +23,7 @@ vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 
 vi.mock('../../edit/edit-workspace-switch', () => ({ ensureEditRoot: mocks.ensureEditRoot }))
 // The edit-root note reads the status route; these tests cover saving only.
-vi.mock('../../edit/EditWorkspaceBanner', () => ({ EditWorkspaceNote: () => null }))
+vi.mock('../../edit/EditorBar', () => ({ EditorBar: () => null }))
 
 vi.mock('../MonacoCodeEditor', () => ({
   codeModelUri: (rootId: string, path: string) => `overdeck-explorer://${rootId}/${path}`,
