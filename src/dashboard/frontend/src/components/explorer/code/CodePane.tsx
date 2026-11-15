@@ -28,6 +28,7 @@ import { ChangesView } from './ChangesView'
 import { CodePaneHeader, isMarkdownPath, type CodePaneView } from './CodePaneHeader'
 import { ExternalChangeBanner } from './ExternalChangeBanner'
 import { useCodePaneSave } from './useCodePaneSave'
+import { ChangedLineMarks } from './useChangedLineMarks'
 import { readDisk, useExternalChange } from './useExternalChange'
 
 type LoadState =
@@ -87,6 +88,9 @@ function CodePaneForFile({
   const { setState: setExternal } = external
   const rootLabel = useRootLabel(rootId) ?? rootId
   const deck = useStageDeck()
+  // PAN-5290 FR-6: mark the lines the conversation beside this pane changed (plain editor only).
+  const conversation = deck?.conversationBeside?.(pane.paneId) ?? null
+  const dirty = useCodeDrafts((s) => isDraftDirty(s.drafts[key]))
 
   useEffect(() => {
     let cancelled = false
@@ -334,6 +338,7 @@ function CodePaneForFile({
             onToggleWrap={toggleWrap}
             onMount={setEditor}
           />
+          {conversation ? <ChangedLineMarks editor={editor} rootId={rootId} path={path} conversation={conversation} dirty={dirty} /> : null}
         </div>
       )}
     </div>

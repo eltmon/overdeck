@@ -279,12 +279,14 @@ src/components/explorer/code/__tests__/CodePane.test.tsx
 src/components/explorer/code/__tests__/CodePaneHeader.test.tsx
 src/components/explorer/code/__tests__/ExternalChangeBanner.test.tsx
 src/components/explorer/code/__tests__/autosave.test.ts
+src/components/explorer/code/__tests__/changed-lines.test.ts
 src/components/explorer/code/__tests__/changes-view.test.tsx
 src/components/explorer/code/__tests__/code-drafts.test.ts
 src/components/explorer/code/__tests__/external-change.test.ts
 src/components/explorer/code/__tests__/monaco-language.test.ts
 src/components/explorer/code/__tests__/save-queue.test.ts
 src/components/explorer/code/__tests__/self-write-registry.test.ts
+src/components/explorer/code/__tests__/useChangedLineMarks.test.tsx
 src/components/explorer/code/__tests__/useExternalChange.test.tsx
 src/components/explorer/edit/__tests__/CreatePrDialog.test.tsx
 src/components/explorer/edit/__tests__/DiscardDialog.test.tsx
