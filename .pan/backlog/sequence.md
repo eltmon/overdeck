@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T15:31:15.137463Z · model: claude-opus-5-5 · open: 904_
+_Last sequenced: 2026-11-15T15:33:13.852313Z · model: claude-opus-5-5 · open: 903_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -11,7 +11,6 @@ _Last sequenced: 2026-11-15T15:31:15.137463Z · model: claude-opus-5-5 · open: 
 | 5 | PAN-5338 | M | medium | ok |  |  | In pipeline: conversation diff view gets a rendered Markdown Preview and an Open file action. |
 | 8 | PAN-5357 | S | critical | ok |  |  | Sequencer commits sequence.md every 1-3 min with timestamp-only diffs; skip the commit when the ranking is unchanged and rate-limit runs. |
 | 9 | PAN-5361 | S | critical | ok |  |  | In pipeline: bare-host-linux idle check fails ~3% of runs; pid-net counts machine-wide runner PID bursts one baseline can't cancel. |
-| 10 | PAN-5363 | S | high | ok |  |  | In pipeline: merge train board Train switch flips back on after off; board cache not dropped on write, optimistic value lost. |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 11 | PAN-5364 | M | high | ok |  |  | In pipeline: merge train board shows a voided rebuild on top, buries the merged batch, and voided batches never age out. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
@@ -936,10 +935,6 @@ New critical substrate bug: 41 no-op sequence commits in 3 hours churn main, fee
 
 New in-pipeline substrate bug: a ~3% false-red CI job blocks releases and merges with no code change. It is pinned at rank 9, beside the other critical pipeline substrate fixes; pinned in-pipeline ranks stay where they were.
 
-### PAN-5363 (rank 10)
-
-New in-pipeline bug filed 2026-11-15 with a file:line root cause (switch falls back to a stale 5 s server board cache after the POST settles). It is pinned just below the existing in-pipeline top tier because it is already in work; it misleads the operator about merge train state but the write itself succeeds, so it is high rather than critical.
-
 ### PAN-4636 (rank 10)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -1232,6 +1227,10 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 
 New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts through a new generation's 138-second boot warm phase and killed it anyway, producing four restarts in ten minutes, racing spawns on port 3012, and a WATCHDOG GIVING UP. Each restart re-triggered docker stack rebuilds, feeding the storm. The probe budget has to know the difference between starved and starting.
 
+### PAN-3314 (rank 81)
+
+New this pass. Every agent pane is a child of one transient tmux-server unit, so agent memory is the unit's memory and systemd-oomd's kill decision is all-or-nothing: one hungry agent takes the entire fleet with it. That has now happened twice, the second time killing seven work agents, four strikes and a live review convoy. Blast-radius containment is a different fix from choosing a better victim.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1239,10 +1238,10 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T15:31:15.137463Z",
+  "generatedAt": "2026-11-15T15:33:13.852313Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 904,
+  "openCount": 903,
   "nodes": [
     {
       "issue": "PAN-5337",
@@ -1319,19 +1318,6 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "dependsOn": [],
       "why": "In pipeline: bare-host-linux idle check fails ~3% of runs; pid-net counts machine-wide runner PID bursts one baseline can't cancel.",
       "rationale": "New in-pipeline substrate bug: a ~3% false-red CI job blocks releases and merges with no code change. It is pinned at rank 9, beside the other critical pipeline substrate fixes; pinned in-pipeline ranks stay where they were.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5363",
-      "rank": 10,
-      "size": "S",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: merge train board Train switch flips back on after off; board cache not dropped on write, optimistic value lost.",
-      "rationale": "New in-pipeline bug filed 2026-11-15 with a file:line root cause (switch falls back to a stale 5 s server board cache after the POST settles). It is pinned just below the existing in-pipeline top tier because it is already in work; it misleads the operator about merge train state but the write itself succeeds, so it is high rather than critical.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13733,13 +13719,6 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-5363",
-      "to": "PAN-5364",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
     },
     {
       "from": "PAN-5356",
