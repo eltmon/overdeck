@@ -4,17 +4,17 @@
     "created": "2026-11-15T15:27:08Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5363: Merge train board: per-project Train switch flips back on after turning it off, then off again (board cache not dropped on write)",
-    "updated": "2026-11-15T15:31:53.615Z"
+    "updated": "2026-11-15T15:35:32.175Z"
   },
   "plan": {
     "id": "pan-5363",
     "title": "Merge train board: per-project Train switch flips back on after turning it off, then off again (board cache not dropped on write)",
-    "status": "proposed",
+    "status": "running",
     "uid": "285b775c-f0a3-42d8-81cf-3ddaaa227e67",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T15:27:08Z",
-    "updated": "2026-11-15T15:31:53.615Z",
+    "updated": "2026-11-15T15:35:32.175Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5363",
@@ -323,5 +323,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
