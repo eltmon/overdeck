@@ -364,6 +364,11 @@ export async function getCachedMessages(
   return parsed;
 }
 
+/** The cached parse of `sessionFile`, or null; never parses (PAN-5288 D-5: name others only from warm parses). */
+export function peekCachedMessages(sessionFile: string): ConversationMessagesParseResult | null {
+  return messagesCache.get(`${sessionFile}:false`)?.result ?? null;
+}
+
 // ─── Pending input helpers ───────────────────────────────────────────────────
 
 export function askUserQuestionSnapshotFromScan(
