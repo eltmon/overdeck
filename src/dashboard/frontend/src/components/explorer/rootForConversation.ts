@@ -48,23 +48,35 @@ export function rootIdForConversation(conv: RootConversation, ctx: RootContext):
     }
   }
   if (!conv.cwd) return null
-  const cwd = trimSlash(conv.cwd)
+  // 4-5. A feature workspace, else the primary checkout or any folder under
+  // it (longest project path wins) — shared with explorerLocationForPath
+  // (WI-7, PAN-5337), which also returns the root-relative path.
+  return explorerLocationForPath(conv.cwd, ctx)?.rootId ?? null
+}
+
+/** The explorer root and root-relative path of an absolute file path (rules 4-5 of `rootIdForConversation`), or null. */
+export function explorerLocationForPath(absPath: string, ctx: RootContext): { rootId: string; path: string } | null {
+  const cwd = trimSlash(absPath)
   // 4. A feature workspace lives inside its project folder, so check it before rule 5.
   for (const project of ctx.projects) {
     const workspacesDir = `${trimSlash(project.path)}/workspaces`
     if (!cwd.startsWith(`${workspacesDir}/`)) continue
-    const first = cwd.slice(workspacesDir.length + 1).split('/')[0]
+    const rest = cwd.slice(workspacesDir.length + 1)
+    const first = rest.split('/')[0]
     const slug = first.startsWith('feature-') ? first.slice('feature-'.length) : ''
-    return slug ? `issue:${slug.toUpperCase()}` : null
+    if (!slug) return null
+    return { rootId: `issue:${slug.toUpperCase()}`, path: rest.slice(first.length + 1) }
   }
   // 5. The primary checkout or any folder under it; the longest project path wins.
-  let best: { key: string; length: number } | null = null
+  let best: { key: string; length: number; path: string } | null = null
   for (const project of ctx.projects) {
     const path = trimSlash(project.path)
-    if (isAtOrUnder(cwd, path) && (!best || path.length > best.length)) best = { key: project.key, length: path.length }
+    if (!isAtOrUnder(cwd, path)) continue
+    if (best && path.length <= best.length) continue
+    best = { key: project.key, length: path.length, path: cwd === path ? '' : cwd.slice(path.length + 1) }
   }
   // 6. Outside every project.
-  return best ? `project:${best.key}` : null
+  return best ? { rootId: `project:${best.key}`, path: best.path } : null
 }
 
 const TITLE_MAX = 40

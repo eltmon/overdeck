@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T17:22:52.996499Z · model: claude-opus-5-5 · open: 904_
+_Last sequenced: 2026-11-15T17:46:53.351669Z · model: claude-opus-5-5 · open: 904_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -11,10 +11,10 @@ _Last sequenced: 2026-11-15T17:22:52.996499Z · model: claude-opus-5-5 · open: 
 | 8 | PAN-5357 | S | critical | ok |  |  | Sequencer commits sequence.md every 1-3 min with timestamp-only diffs; skip the commit when the ranking is unchanged and rate-limit runs. |
 | 9 | PAN-5361 | S | critical | ok |  |  | In pipeline: bare-host-linux idle check fails ~3% of runs; pid-net counts machine-wide runner PID bursts one baseline can't cancel. |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
-| 11 | PAN-5364 | M | high | ok |  |  | In pipeline: merge train board shows a voided rebuild on top, buries the merged batch, and voided batches never age out. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
-| 12 | PAN-5354 | M | critical | ok |  |  | Host-crash-killed work agents stay dead: deacon-lite confirms death but nothing resumes; add paced resumeCrashedWorkAgents. |
+| 11 | PAN-5364 | M | high | ok |  |  | In pipeline: merge train board shows a voided rebuild on top, buries the merged batch, and voided batches never age out. |
 | 12 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
+| 12 | PAN-5354 | M | critical | ok |  |  | Host-crash-killed work agents stay dead: deacon-lite confirms death but nothing resumes; add paced resumeCrashedWorkAgents. |
 | 13 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
 | 14 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; seen on MYN and now overdeck (PAN-5232). |
 | 15 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
@@ -22,10 +22,10 @@ _Last sequenced: 2026-11-15T17:22:52.996499Z · model: claude-opus-5-5 · open: 
 | 17 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 18 | PAN-5369 | M | critical | ok |  |  | Dashboard main thread pinned at 100%: orphan scan re-queries SQLite for 4000 transcripts per tick; cost/usage routes never answer. |
 | 20 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
-| 21 | PAN-5347 | S | medium | ok |  |  | In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group |
 | 21 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
-| 22 | PAN-5339 | S | medium | ok |  |  | In pipeline: conversation names, conv N forms and /conv URLs in messages become clickable links. |
+| 21 | PAN-5347 | S | medium | ok |  |  | In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group |
 | 22 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
+| 22 | PAN-5339 | S | medium | ok |  |  | In pipeline: conversation names, conv N forms and /conv URLs in messages become clickable links. |
 | 23 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
 | 24 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
 | 25 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
@@ -225,8 +225,8 @@ _Last sequenced: 2026-11-15T17:22:52.996499Z · model: claude-opus-5-5 · open: 
 | 219 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
 | 219 | PAN-5371 | S | medium | ok |  |  | Simple Home headline (18) and top bar Needs-you (8) count different things; pick one rule so both agree (epic D-8). |
 | 220 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
-| 221 | PAN-5335 | M | high | ok |  |  | Workflow redesign F follow-up: collapse handoff groups, unclipped cost, footer label, one current nav item, keep project. |
 | 221 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
+| 221 | PAN-5335 | M | high | ok |  |  | Workflow redesign F follow-up: collapse handoff groups, unclipped cost, footer label, one current nav item, keep project. |
 | 222 | PAN-3047 | XS | high | ok |  |  | Strike-branch teardown uses --is-ancestor, which cannot see a squash merge, so all 96 strike/* branches survive as residue. |
 | 223 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
 | 224 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
@@ -404,10 +404,10 @@ _Last sequenced: 2026-11-15T17:22:52.996499Z · model: claude-opus-5-5 · open: 
 | 396 | PAN-3121 | S | medium | ok |  |  | The failed-send outbox never reconciles against the transcript, so a delivered message keeps a Retry twin that would double-send. |
 | 397 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
 | 400 | PAN-5366 | M | medium | ok |  | PAN-5359 | Conversation page cannot show whether per-turn memory injection reaches it; add a state route and a status-line part. Needs PAN-5359. |
-| 401 | PAN-5358 | M | medium | ok |  |  | Curated memory facts reach agents only via a budget-cut launch index (89 of 171 dropped in dfai); add facts to per-turn relevance injection. |
 | 401 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
-| 402 | PAN-5359 | M | medium | ok |  |  | Per-turn memory injection skips project-root conversations and every Codex conversation; install the hook there and add a Codex turn path. |
+| 401 | PAN-5358 | M | medium | ok |  |  | Curated memory facts reach agents only via a budget-cut launch index (89 of 171 dropped in dfai); add facts to per-turn relevance injection. |
 | 402 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
+| 402 | PAN-5359 | M | medium | ok |  |  | Per-turn memory injection skips project-root conversations and every Codex conversation; install the hook there and add a Codex turn path. |
 | 403 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 404 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
 | 405 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
@@ -431,8 +431,8 @@ _Last sequenced: 2026-11-15T17:22:52.996499Z · model: claude-opus-5-5 · open: 
 | 423 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
 | 424 | PAN-5028 | M | medium | ok |  |  | list_pending_input loses a conversation's AskUserQuestion after the PAN-1520 deny hook, contrary to the existing test's contract. |
 | 426 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
-| 427 | PAN-5349 | L | medium | ok |  |  | pan open <path> opens files/folders in the dashboard; opt-in OS file-manager 'Open in Overdeck'. PRD in .pan/drafts/pan-5349.md |
 | 427 | PAN-5227 | S | medium | ok |  |  | Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle. |
+| 427 | PAN-5349 | L | medium | ok |  |  | pan open <path> opens files/folders in the dashboard; opt-in OS file-manager 'Open in Overdeck'. PRD in .pan/drafts/pan-5349.md |
 | 428 | PAN-5342 | L | medium | ok |  |  | Safe shutdown: drain agents at a tool boundary before reboot; PRD landed; item 16 of workflow-redesign order book. |
 | 429 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
 | 430 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
@@ -936,21 +936,21 @@ New in-pipeline substrate bug: a ~3% false-red CI job blocks releases and merges
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
 
-### PAN-5364 (rank 11)
-
-New in-pipeline bug filed 2026-11-15, confirmed against the live board: after a promote there is no hero batch, so the voided sibling sits first and the merged batch is buried among aging voided rows. Pinned beside PAN-5363 because both edit ProjectTrainCard.tsx; the rebuild churn itself is PAN-5356, which this issue explicitly leaves out of scope.
-
 ### PAN-4553 (rank 11)
 
 Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so this issue now waits on that PR instead of being picked up separately.
 
-### PAN-5354 (rank 12)
+### PAN-5364 (rank 11)
 
-New substrate bug from the 2026-11-15 host crash: five work agents sat dead 1-2h because no code path turns a confirmed death into a resume or Needs-you item since the PAN-3917 cut. It ranks just below the in-pipeline pins because unattended recovery is a pipeline prerequisite, and the body already carries file:line root cause, a reuse-the-crash-door design, 11 ACs and named tests, so it is ready to plan.
+New in-pipeline bug filed 2026-11-15, confirmed against the live board: after a promote there is no hero batch, so the voided sibling sits first and the merged batch is buried among aging voided rows. Pinned beside PAN-5363 because both edit ProjectTrainCard.tsx; the rebuild churn itself is PAN-5356, which this issue explicitly leaves out of scope.
 
 ### PAN-4733 (rank 12)
 
 Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as completed on 2026-11-01, so this follow-up is now unblocked and next in line.
+
+### PAN-5354 (rank 12)
+
+New substrate bug from the 2026-11-15 host crash: five work agents sat dead 1-2h because no code path turns a confirmed death into a resume or Needs-you item since the PAN-3917 cut. It ranks just below the in-pipeline pins because unattended recovery is a pipeline prerequisite, and the body already carries file:line root cause, a reuse-the-crash-door design, 11 ACs and named tests, so it is ready to plan.
 
 ### PAN-4710 (rank 13)
 
@@ -980,21 +980,21 @@ New issue with a profiled root cause: 42% of main-thread CPU goes to an unindexe
 
 Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls this route in the background, so every poll freezes all HTTP and WebSocket traffic for ~1.6 s and can fail DoD health probes. The async reader already exists, so the fix is small.
 
-### PAN-5347 (rank 21)
-
-New in-pipeline discoverability fix: skills never reach the composer slash menu, so operators cannot find skill-only workflows. Pinned in the free rank-21 slot beside the other in-pipeline work; it reuses the existing skills route and category grouping.
-
 ### PAN-4551 (rank 21)
 
 Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. PAN-4527, PAN-4531 and PAN-4540 closed on 2026-10-24, so it now waits only on PAN-4534 (in pipeline); rank holds at 14.
 
-### PAN-5339 (rank 22)
+### PAN-5347 (rank 21)
 
-New in-pipeline enhancement, pinned at the freed rank-22 slot. It is self-contained in ChatMarkdown and the existing /conv route.
+New in-pipeline discoverability fix: skills never reach the composer slash menu, so operators cannot find skill-only workflows. Pinned in the free rank-21 slot beside the other in-pipeline work; it reuses the existing skills route and category grouping.
 
 ### PAN-4671 (rank 22)
 
 New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.
+
+### PAN-5339 (rank 22)
+
+New in-pipeline enhancement, pinned at the freed rank-22 slot. It is self-contained in ChatMarkdown and the existing /conv route.
 
 ### PAN-4675 (rank 23)
 
@@ -1239,7 +1239,7 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T17:22:52.996499Z",
+  "generatedAt": "2026-11-15T17:46:53.351669Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 904,
@@ -1323,19 +1323,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-5364",
-      "rank": 11,
-      "size": "M",
-      "importance": "high",
-      "score": 68,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: merge train board shows a voided rebuild on top, buries the merged batch, and voided batches never age out.",
-      "rationale": "New in-pipeline bug filed 2026-11-15, confirmed against the live board: after a promote there is no hero batch, so the voided sibling sits first and the merged batch is buried among aging voided rows. Pinned beside PAN-5363 because both edit ProjectTrainCard.tsx; the rebuild churn itself is PAN-5356, which this issue explicitly leaves out of scope.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4553",
       "rank": 11,
       "size": "S",
@@ -1349,15 +1336,15 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-5354",
-      "rank": 12,
+      "issue": "PAN-5364",
+      "rank": 11,
       "size": "M",
-      "importance": "critical",
-      "score": 88,
+      "importance": "high",
+      "score": 68,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Host-crash-killed work agents stay dead: deacon-lite confirms death but nothing resumes; add paced resumeCrashedWorkAgents.",
-      "rationale": "New substrate bug from the 2026-11-15 host crash: five work agents sat dead 1-2h because no code path turns a confirmed death into a resume or Needs-you item since the PAN-3917 cut. It ranks just below the in-pipeline pins because unattended recovery is a pipeline prerequisite, and the body already carries file:line root cause, a reuse-the-crash-door design, 11 ACs and named tests, so it is ready to plan.",
+      "why": "In pipeline: merge train board shows a voided rebuild on top, buries the merged batch, and voided batches never age out.",
+      "rationale": "New in-pipeline bug filed 2026-11-15, confirmed against the live board: after a promote there is no hero batch, so the voided sibling sits first and the merged batch is buried among aging voided rows. Pinned beside PAN-5363 because both edit ProjectTrainCard.tsx; the rebuild churn itself is PAN-5356, which this issue explicitly leaves out of scope.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1371,6 +1358,19 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "dependsOn": [],
       "why": "Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it.",
       "rationale": "Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as completed on 2026-11-01, so this follow-up is now unblocked and next in line.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5354",
+      "rank": 12,
+      "size": "M",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Host-crash-killed work agents stay dead: deacon-lite confirms death but nothing resumes; add paced resumeCrashedWorkAgents.",
+      "rationale": "New substrate bug from the 2026-11-15 host crash: five work agents sat dead 1-2h because no code path turns a confirmed death into a resume or Needs-you item since the PAN-3917 cut. It ranks just below the in-pipeline pins because unattended recovery is a pipeline prerequisite, and the body already carries file:line root cause, a reuse-the-crash-door design, 11 ACs and named tests, so it is ready to plan.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1466,19 +1466,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-5347",
-      "rank": 21,
-      "size": "S",
-      "importance": "medium",
-      "score": 64,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group",
-      "rationale": "New in-pipeline discoverability fix: skills never reach the composer slash menu, so operators cannot find skill-only workflows. Pinned in the free rank-21 slot beside the other in-pipeline work; it reuses the existing skills route and category grouping.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4551",
       "rank": 21,
       "size": "L",
@@ -1492,15 +1479,15 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-5339",
-      "rank": 22,
+      "issue": "PAN-5347",
+      "rank": 21,
       "size": "S",
       "importance": "medium",
       "score": 64,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In pipeline: conversation names, conv N forms and /conv URLs in messages become clickable links.",
-      "rationale": "New in-pipeline enhancement, pinned at the freed rank-22 slot. It is self-contained in ChatMarkdown and the existing /conv route.",
+      "why": "In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group",
+      "rationale": "New in-pipeline discoverability fix: skills never reach the composer slash menu, so operators cannot find skill-only workflows. Pinned in the free rank-21 slot beside the other in-pipeline work; it reuses the existing skills route and category grouping.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1514,6 +1501,19 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "dependsOn": [],
       "why": "CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff.",
       "rationale": "New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5339",
+      "rank": 22,
+      "size": "S",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: conversation names, conv N forms and /conv URLs in messages become clickable links.",
+      "rationale": "New in-pipeline enhancement, pinned at the freed rank-22 slot. It is self-contained in ChatMarkdown and the existing /conv route.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4066,6 +4066,18 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "planning": "auto"
     },
     {
+      "issue": "PAN-3130",
+      "rank": 221,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5335",
       "rank": 221,
       "size": "M",
@@ -4075,18 +4087,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "dependsOn": [],
       "why": "Workflow redesign F follow-up: collapse handoff groups, unclipped cost, footer label, one current nav item, keep project.",
       "rationale": "New follow-up to the merged child F of PAN-5284, placed in a freed high-tier slot; it is a prerequisite for PAN-5343.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3130",
-      "rank": 221,
-      "size": "S",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6195,6 +6195,19 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "planning": "skip"
     },
     {
+      "issue": "PAN-5372",
+      "rank": 392,
+      "size": "XS",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "First split in a Stage deck remounts the open pane, silently dropping an unsaved editor draft; fix with a stable key per paneId.",
+      "rationale": "New issue: small, well-located data-loss bug in PaneLayoutView, ranked with the other medium XS correctness fixes in the free rank-392 slot.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3661",
       "rank": 393,
       "size": "XS",
@@ -6270,19 +6283,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-5358",
-      "rank": 401,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Curated memory facts reach agents only via a budget-cut launch index (89 of 171 dropped in dfai); add facts to per-turn relevance injection.",
-      "rationale": "New memory feature with a concrete, measured gap; placed beside the other mid-tier context-delivery work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3944",
       "rank": 401,
       "size": "S",
@@ -6296,15 +6296,15 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-5359",
-      "rank": 402,
+      "issue": "PAN-5358",
+      "rank": 401,
       "size": "M",
       "importance": "medium",
-      "score": 56,
+      "score": 58,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Per-turn memory injection skips project-root conversations and every Codex conversation; install the hook there and add a Codex turn path.",
-      "rationale": "New harness-coverage gap for memory injection; companion to PAN-5358, ranked right after it.",
+      "why": "Curated memory facts reach agents only via a budget-cut launch index (89 of 171 dropped in dfai); add facts to per-turn relevance injection.",
+      "rationale": "New memory feature with a concrete, measured gap; placed beside the other mid-tier context-delivery work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6318,6 +6318,19 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "dependsOn": [],
       "why": "Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main)",
       "rationale": "New this run: medium/58 — Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5359",
+      "rank": 402,
+      "size": "M",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Per-turn memory injection skips project-root conversations and every Codex conversation; install the hook there and add a Codex turn path.",
+      "rationale": "New harness-coverage gap for memory injection; companion to PAN-5358, ranked right after it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6603,6 +6616,18 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "planning": "auto"
     },
     {
+      "issue": "PAN-5227",
+      "rank": 427,
+      "size": "S",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5349",
       "rank": 427,
       "size": "L",
@@ -6612,18 +6637,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "dependsOn": [],
       "why": "pan open <path> opens files/folders in the dashboard; opt-in OS file-manager 'Open in Overdeck'. PRD in .pan/drafts/pan-5349.md",
       "rationale": "New feature with a PRD on main: needs a server-to-browser command channel plus per-OS file-manager integrations, so it is large but self-contained; ranked with other medium features of clear value.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5227",
-      "rank": 427,
-      "size": "S",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12486,19 +12499,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "why": "Fix already applied: terminal-dialog toast now navigates to the agent's terminal tab. Verify and close.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-5372",
-      "rank": 392,
-      "size": "XS",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "First split in a Stage deck remounts the open pane, silently dropping an unsaved editor draft; fix with a stable key per paneId.",
-      "rationale": "New issue: small, well-located data-loss bug in PaneLayoutView, ranked with the other medium XS correctness fixes in the free rank-392 slot.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -12510,39 +12510,11 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 1
     },
     {
-      "from": "PAN-2642",
-      "to": "PAN-1868",
-      "type": "contains",
+      "from": "PAN-1592",
+      "to": "PAN-2083",
+      "type": "unblocks",
       "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2642",
-      "to": "PAN-1042",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2642",
-      "to": "PAN-570",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2642",
-      "to": "PAN-106",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2642",
-      "to": "PAN-2079",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
+      "confidence": 0.9
     },
     {
       "from": "PAN-1666",
@@ -12552,6 +12524,55 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 1
     },
     {
+      "from": "PAN-1676",
+      "to": "PAN-2424",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-1676",
+      "to": "PAN-4298",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-1711",
+      "to": "PAN-2905",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-1711",
+      "to": "PAN-3522",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.75
+    },
+    {
+      "from": "PAN-1824",
+      "to": "PAN-2421",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-1824",
+      "to": "PAN-4705",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-1983",
+      "to": "PAN-1984",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.5
+    },
+    {
       "from": "PAN-2079",
       "to": "PAN-2080",
       "type": "unblocks",
@@ -12559,15 +12580,29 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 0.95
     },
     {
-      "from": "PAN-2642",
-      "to": "PAN-570",
+      "from": "PAN-2211",
+      "to": "PAN-2210",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-2259",
+      "to": "PAN-2880",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 0.95
     },
     {
-      "from": "PAN-2337",
-      "to": "PAN-2932",
+      "from": "PAN-2259",
+      "to": "PAN-4302",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-2331",
+      "to": "PAN-2639",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 0.95
@@ -12581,269 +12616,24 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
     },
     {
       "from": "PAN-2337",
+      "to": "PAN-2932",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-2337",
       "to": "PAN-2957",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 0.95
     },
     {
-      "from": "PAN-2259",
-      "to": "PAN-2880",
-      "type": "unblocks",
+      "from": "PAN-2350",
+      "to": "PAN-1676",
+      "type": "contains",
       "source": "github-ref",
-      "confidence": 0.95
-    },
-    {
-      "from": "PAN-2331",
-      "to": "PAN-2639",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.95
-    },
-    {
-      "from": "PAN-2905",
-      "to": "PAN-2259",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-3566",
-      "to": "PAN-3563",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-3560",
-      "to": "PAN-3563",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.85
-    },
-    {
-      "from": "PAN-3541",
-      "to": "PAN-3543",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-2580",
-      "to": "PAN-3536",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-3532",
-      "to": "PAN-3502",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3460",
-      "to": "PAN-3463",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3454",
-      "to": "PAN-3517",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-3306",
-      "to": "PAN-3317",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.95
-    },
-    {
-      "from": "PAN-3289",
-      "to": "PAN-3627",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.75
-    },
-    {
-      "from": "PAN-3248",
-      "to": "PAN-3244",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-3256",
-      "to": "PAN-3267",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-3566",
-      "to": "PAN-3274",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3270",
-      "to": "PAN-3325",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-3325",
-      "to": "PAN-3697",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-3234",
-      "to": "PAN-3235",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3186",
-      "to": "PAN-3256",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3113",
-      "to": "PAN-3234",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.85
-    },
-    {
-      "from": "PAN-3113",
-      "to": "PAN-3235",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.85
-    },
-    {
-      "from": "PAN-3107",
-      "to": "PAN-3108",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3129",
-      "to": "PAN-3130",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.85
-    },
-    {
-      "from": "PAN-3100",
-      "to": "PAN-3084",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-3062",
-      "to": "PAN-3505",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3062",
-      "to": "PAN-3250",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.75
-    },
-    {
-      "from": "PAN-3054",
-      "to": "PAN-3061",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-3081",
-      "to": "PAN-3096",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-3040",
-      "to": "PAN-3708",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.95
-    },
-    {
-      "from": "PAN-3032",
-      "to": "PAN-3174",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.85
-    },
-    {
-      "from": "PAN-3118",
-      "to": "PAN-3043",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3015",
-      "to": "PAN-3630",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-2982",
-      "to": "PAN-2983",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-3771",
-      "to": "PAN-2981",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-2976",
-      "to": "PAN-2977",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.95
-    },
-    {
-      "from": "PAN-2976",
-      "to": "PAN-2978",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.95
-    },
-    {
-      "from": "PAN-2977",
-      "to": "PAN-2978",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.9
+      "confidence": 1
     },
     {
       "from": "PAN-2350",
@@ -12853,158 +12643,67 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 1
     },
     {
-      "from": "PAN-3566",
-      "to": "PAN-2706",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-3113",
-      "to": "PAN-2492",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-1824",
-      "to": "PAN-2421",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-1711",
-      "to": "PAN-3522",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.75
-    },
-    {
-      "from": "PAN-1711",
-      "to": "PAN-2905",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-3517",
-      "to": "PAN-3518",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.95
-    },
-    {
-      "from": "PAN-465",
-      "to": "PAN-3011",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-1592",
-      "to": "PAN-2083",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-750",
-      "to": "PAN-769",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.95
-    },
-    {
-      "from": "PAN-1983",
-      "to": "PAN-1984",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-3853",
-      "to": "PAN-3854",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3830",
-      "to": "PAN-3831",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-3563",
-      "to": "PAN-3560",
-      "type": "informs",
+      "from": "PAN-2350",
+      "to": "PAN-3862",
+      "type": "contains",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-3524",
-      "to": "PAN-1824",
-      "type": "informs",
+      "from": "PAN-2350",
+      "to": "PAN-4294",
+      "type": "contains",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-3524",
-      "to": "PAN-1711",
-      "type": "informs",
+      "from": "PAN-2350",
+      "to": "PAN-4297",
+      "type": "contains",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-3278",
-      "to": "PAN-3274",
-      "type": "informs",
+      "from": "PAN-2350",
+      "to": "PAN-4298",
+      "type": "contains",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-2775",
-      "to": "PAN-2758",
-      "type": "informs",
+      "from": "PAN-2350",
+      "to": "PAN-4308",
+      "type": "contains",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-2706",
-      "to": "PAN-2695",
-      "type": "informs",
+      "from": "PAN-2350",
+      "to": "PAN-4332",
+      "type": "contains",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-3952",
-      "to": "PAN-3944",
-      "type": "informs",
+      "from": "PAN-2350",
+      "to": "PAN-4418",
+      "type": "contains",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-3946",
-      "to": "PAN-3944",
-      "type": "informs",
+      "from": "PAN-2350",
+      "to": "PAN-4419",
+      "type": "contains",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-3935",
-      "to": "PAN-3048",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-3952",
-      "to": "PAN-3234",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
+      "from": "PAN-2350",
+      "to": "PAN-4420",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-2566",
@@ -13028,64 +12727,456 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 0.9
     },
     {
-      "from": "PAN-4003",
+      "from": "PAN-2580",
       "to": "PAN-3536",
       "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-2580",
+      "to": "PAN-4303",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-2626",
+      "to": "PAN-4924",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-2642",
+      "to": "PAN-1042",
+      "type": "contains",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-4003",
-      "to": "PAN-2027",
+      "from": "PAN-2642",
+      "to": "PAN-106",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2642",
+      "to": "PAN-1868",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2642",
+      "to": "PAN-2079",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2642",
+      "to": "PAN-570",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2642",
+      "to": "PAN-570",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-2706",
+      "to": "PAN-2695",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-4003",
-      "to": "PAN-2035",
+      "from": "PAN-2775",
+      "to": "PAN-2758",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-4003",
-      "to": "PAN-2034",
+      "from": "PAN-2905",
+      "to": "PAN-2259",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-2976",
+      "to": "PAN-2977",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-2976",
+      "to": "PAN-2978",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-2977",
+      "to": "PAN-2978",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-2982",
+      "to": "PAN-2983",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-3015",
+      "to": "PAN-3630",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3032",
+      "to": "PAN-3174",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.85
+    },
+    {
+      "from": "PAN-3040",
+      "to": "PAN-3708",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-3054",
+      "to": "PAN-3061",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-3054",
+      "to": "PAN-4364",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-4003",
-      "to": "PAN-2033",
+      "from": "PAN-3054",
+      "to": "PAN-4367",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-4003",
-      "to": "PAN-2032",
+      "from": "PAN-3062",
+      "to": "PAN-3250",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.75
+    },
+    {
+      "from": "PAN-3062",
+      "to": "PAN-3505",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-3081",
+      "to": "PAN-3096",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-3100",
+      "to": "PAN-3084",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-3107",
+      "to": "PAN-3108",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-3113",
+      "to": "PAN-2492",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-3113",
+      "to": "PAN-3234",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.85
+    },
+    {
+      "from": "PAN-3113",
+      "to": "PAN-3235",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.85
+    },
+    {
+      "from": "PAN-3118",
+      "to": "PAN-3043",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-3129",
+      "to": "PAN-3130",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.85
+    },
+    {
+      "from": "PAN-3186",
+      "to": "PAN-3256",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-3234",
+      "to": "PAN-3235",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-3248",
+      "to": "PAN-3244",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-3256",
+      "to": "PAN-3267",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-3270",
+      "to": "PAN-3325",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-3278",
+      "to": "PAN-3274",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-4003",
-      "to": "PAN-2030",
+      "from": "PAN-3289",
+      "to": "PAN-3627",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.75
+    },
+    {
+      "from": "PAN-3306",
+      "to": "PAN-3317",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-3325",
+      "to": "PAN-3697",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3454",
+      "to": "PAN-3517",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3460",
+      "to": "PAN-3463",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-3502",
+      "to": "PAN-4236",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-3517",
+      "to": "PAN-3518",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-3524",
+      "to": "PAN-1711",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-4003",
-      "to": "PAN-2029",
+      "from": "PAN-3524",
+      "to": "PAN-1824",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-4003",
-      "to": "PAN-2028",
+      "from": "PAN-3532",
+      "to": "PAN-3502",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-3541",
+      "to": "PAN-3543",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3557",
+      "to": "PAN-2186",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-3560",
+      "to": "PAN-3563",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.85
+    },
+    {
+      "from": "PAN-3563",
+      "to": "PAN-3560",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3566",
+      "to": "PAN-2706",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-3566",
+      "to": "PAN-3274",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-3566",
+      "to": "PAN-3563",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-3657",
+      "to": "PAN-4240",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-3771",
+      "to": "PAN-2981",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3822",
+      "to": "PAN-4151",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3822",
+      "to": "PAN-4151",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3830",
+      "to": "PAN-3831",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-3853",
+      "to": "PAN-3854",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-3935",
+      "to": "PAN-3048",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-3946",
+      "to": "PAN-3944",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3952",
+      "to": "PAN-3234",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-3952",
+      "to": "PAN-3944",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
@@ -13099,24 +13190,80 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
     },
     {
       "from": "PAN-4003",
+      "to": "PAN-2027",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4003",
+      "to": "PAN-2028",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4003",
+      "to": "PAN-2029",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4003",
+      "to": "PAN-2030",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4003",
+      "to": "PAN-2032",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4003",
+      "to": "PAN-2033",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4003",
+      "to": "PAN-2034",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4003",
+      "to": "PAN-2035",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4003",
       "to": "PAN-2282",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.85
     },
     {
-      "from": "PAN-1676",
-      "to": "PAN-2424",
+      "from": "PAN-4003",
+      "to": "PAN-3536",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-3822",
-      "to": "PAN-4151",
-      "type": "unblocks",
+      "from": "PAN-4003",
+      "to": "PAN-4555",
+      "type": "informs",
       "source": "github-ref",
-      "confidence": 1
+      "confidence": 0.5
     },
     {
       "from": "PAN-4203",
@@ -13147,46 +13294,11 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 0.9
     },
     {
-      "from": "PAN-3557",
-      "to": "PAN-2186",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-2211",
-      "to": "PAN-2210",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-3502",
-      "to": "PAN-4236",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-3822",
-      "to": "PAN-4151",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4241",
       "to": "PAN-4240",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-3657",
-      "to": "PAN-4240",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
     },
     {
       "from": "PAN-4242",
@@ -13196,23 +13308,9 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 0.6
     },
     {
-      "from": "PAN-2350",
-      "to": "PAN-4294",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
+      "from": "PAN-4294",
       "to": "PAN-4297",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4298",
-      "type": "contains",
+      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -13224,79 +13322,44 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 1
     },
     {
-      "from": "PAN-1676",
-      "to": "PAN-4298",
-      "type": "unblocks",
+      "from": "PAN-4344",
+      "to": "PAN-4345",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4345",
+      "to": "PAN-4346",
+      "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-4294",
-      "to": "PAN-4297",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-3862",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-1676",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2259",
+      "from": "PAN-4349",
       "to": "PAN-4302",
       "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
+      "source": "github-ref",
+      "confidence": 1
     },
     {
-      "from": "PAN-2580",
-      "to": "PAN-4303",
+      "from": "PAN-4360",
+      "to": "PAN-4627",
       "type": "informs",
       "source": "ai-inferred",
-      "confidence": 0.4
+      "confidence": 0.5
     },
     {
-      "from": "PAN-2350",
-      "to": "PAN-4308",
-      "type": "contains",
+      "from": "PAN-4364",
+      "to": "PAN-3667",
+      "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-2350",
-      "to": "PAN-4418",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4419",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4420",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4332",
-      "type": "contains",
+      "from": "PAN-4367",
+      "to": "PAN-1852",
+      "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },
@@ -13315,50 +13378,8 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 0.8
     },
     {
-      "from": "PAN-4367",
-      "to": "PAN-1852",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3054",
-      "to": "PAN-4367",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3054",
-      "to": "PAN-4364",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4364",
-      "to": "PAN-3667",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4349",
-      "to": "PAN-4302",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4345",
-      "to": "PAN-4346",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4344",
-      "to": "PAN-4345",
+      "from": "PAN-4544",
+      "to": "PAN-5369",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
@@ -13389,13 +13410,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "to": "PAN-4554",
       "type": "informs",
       "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4003",
-      "to": "PAN-4555",
-      "type": "informs",
-      "source": "github-ref",
       "confidence": 0.5
     },
     {
@@ -13434,11 +13448,18 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 1
     },
     {
-      "from": "PAN-4360",
-      "to": "PAN-4627",
+      "from": "PAN-465",
+      "to": "PAN-3011",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4666",
+      "to": "PAN-5013",
       "type": "informs",
       "source": "ai-inferred",
-      "confidence": 0.5
+      "confidence": 0.7
     },
     {
       "from": "PAN-4675",
@@ -13455,11 +13476,11 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 0.5
     },
     {
-      "from": "PAN-1824",
-      "to": "PAN-4705",
+      "from": "PAN-4705",
+      "to": "PAN-4746",
       "type": "informs",
       "source": "ai-inferred",
-      "confidence": 0.4
+      "confidence": 0.5
     },
     {
       "from": "PAN-4710",
@@ -13467,13 +13488,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-4705",
-      "to": "PAN-4746",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
     },
     {
       "from": "PAN-4747",
@@ -13518,25 +13532,11 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 0.6
     },
     {
-      "from": "PAN-2626",
-      "to": "PAN-4924",
+      "from": "PAN-5013",
+      "to": "PAN-5354",
       "type": "informs",
       "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-4666",
-      "to": "PAN-5013",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-5048",
-      "to": "PAN-5028",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
+      "confidence": 0.4
     },
     {
       "from": "PAN-5029",
@@ -13546,8 +13546,8 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 0.5
     },
     {
-      "from": "PAN-5097",
-      "to": "PAN-4391",
+      "from": "PAN-5048",
+      "to": "PAN-5028",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
@@ -13555,6 +13555,69 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
     {
       "from": "PAN-5097",
       "to": "PAN-2954",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-5097",
+      "to": "PAN-4391",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-5183",
+      "to": "PAN-1550",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5201",
+      "to": "PAN-5202",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5202",
+      "to": "PAN-5207",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5204",
+      "to": "PAN-5201",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5227",
+      "to": "PAN-5264",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-5241",
+      "to": "PAN-1676",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5250",
+      "to": "PAN-5312",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.3
+    },
+    {
+      "from": "PAN-5263",
+      "to": "PAN-5264",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
@@ -13581,14 +13644,35 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 1
     },
     {
-      "from": "PAN-5335",
+      "from": "PAN-5284",
+      "to": "PAN-5370",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5284",
+      "to": "PAN-5371",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5295",
+      "to": "PAN-5341",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-5295",
       "to": "PAN-5343",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-5295",
+      "from": "PAN-5335",
       "to": "PAN-5343",
       "type": "unblocks",
       "source": "github-ref",
@@ -13602,74 +13686,18 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 1
     },
     {
-      "from": "PAN-5201",
-      "to": "PAN-5202",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5202",
-      "to": "PAN-5207",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5183",
-      "to": "PAN-1550",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5241",
-      "to": "PAN-1676",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5204",
-      "to": "PAN-5201",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5295",
-      "to": "PAN-5341",
+      "from": "PAN-5337",
+      "to": "PAN-5372",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
     },
     {
-      "from": "PAN-5227",
-      "to": "PAN-5264",
+      "from": "PAN-5358",
+      "to": "PAN-1121",
       "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-5263",
-      "to": "PAN-5264",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-5250",
-      "to": "PAN-5312",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.3
-    },
-    {
-      "from": "PAN-5013",
-      "to": "PAN-5354",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
+      "source": "github-ref",
+      "confidence": 0.8
     },
     {
       "from": "PAN-5358",
@@ -13687,24 +13715,17 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
     },
     {
       "from": "PAN-5358",
-      "to": "PAN-1121",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5358",
       "to": "PAN-5359",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.7
     },
     {
-      "from": "PAN-5360",
-      "to": "PAN-943",
-      "type": "informs",
+      "from": "PAN-5359",
+      "to": "PAN-5366",
+      "type": "unblocks",
       "source": "github-ref",
-      "confidence": 0.8
+      "confidence": 1
     },
     {
       "from": "PAN-5360",
@@ -13721,11 +13742,11 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 1
     },
     {
-      "from": "PAN-5359",
-      "to": "PAN-5366",
-      "type": "unblocks",
+      "from": "PAN-5360",
+      "to": "PAN-943",
+      "type": "informs",
       "source": "github-ref",
-      "confidence": 1
+      "confidence": 0.8
     },
     {
       "from": "PAN-5363",
@@ -13735,13 +13756,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 0.5
     },
     {
-      "from": "PAN-5284",
-      "to": "PAN-5370",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-5369",
       "to": "PAN-5370",
       "type": "informs",
@@ -13749,25 +13763,11 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 0.6
     },
     {
-      "from": "PAN-4544",
-      "to": "PAN-5369",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-5284",
-      "to": "PAN-5371",
-      "type": "contains",
+      "from": "PAN-750",
+      "to": "PAN-769",
+      "type": "unblocks",
       "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5337",
-      "to": "PAN-5372",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
+      "confidence": 0.95
     }
   ]
 }

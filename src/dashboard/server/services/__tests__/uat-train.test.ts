@@ -293,6 +293,31 @@ describe('getUatGenerationsPayload', () => {
     ]);
   });
 
+  it('scans 50 rows for the board and 10 rows otherwise (PAN-5364)', async () => {
+    mocks.listUatGenerations.mockReturnValue([]);
+
+    await getUatGenerationsPayload('/repos/myn', { board: { now: Date.parse('2026-11-15T12:00:00.000Z') } });
+    expect(mocks.listUatGenerations).toHaveBeenLastCalledWith({ projectRoot: '/repos/myn', limit: 50 });
+
+    await getUatGenerationsPayload('/repos/myn');
+    expect(mocks.listUatGenerations).toHaveBeenLastCalledWith({ projectRoot: '/repos/myn', limit: 10 });
+  });
+
+  it('carries voidedBy for an invalidated batch only (PAN-5364)', async () => {
+    mocks.listUatGenerations.mockReturnValue([
+      { ...gen([]), name: 'uat/pan-voided-1115', status: 'invalidated', voidedBy: 'uat/a' } as UatGeneration,
+      { ...gen([]), name: 'uat/pan-merged-1115', status: 'promoted', voidedBy: 'uat/b' } as UatGeneration,
+    ]);
+    mocks.findXBriefByIssue.mockReturnValue(Effect.succeed(null));
+
+    const payload = await getUatGenerationsPayload('/repos/myn');
+
+    expect(payload.map((p) => [p.name, p.voidedBy])).toEqual([
+      ['uat/pan-voided-1115', 'uat/a'],
+      ['uat/pan-merged-1115', null],
+    ]);
+  });
+
   it('projects the synthesized single repo for a monorepo generation', async () => {
     // The store always yields at least one entry, so the payload shape is the
     // same whether or not the project is polyrepo.

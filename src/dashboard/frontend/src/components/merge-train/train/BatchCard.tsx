@@ -51,11 +51,11 @@ export function isPromotable(status: UatGenerationPayload['status']): boolean {
   return status === 'ready' || status === 'superseded';
 }
 
-export function batchTone(gen: Pick<UatGenerationPayload, 'status' | 'shipStatus'>): Tone {
+export function batchTone(gen: Pick<UatGenerationPayload, 'status' | 'shipStatus' | 'versionSyncConfigured'>): Tone {
   switch (gen.status) {
     case 'ready': return 'warning';
     case 'assembling': return 'info';
-    case 'promoted': return gen.shipStatus?.status === 'passed' ? 'success' : 'warning';
+    case 'promoted': return gen.shipStatus?.status === 'passed' || gen.versionSyncConfigured !== true ? 'success' : 'warning';
     case 'failed': return 'destructive';
     default: return 'muted';
   }

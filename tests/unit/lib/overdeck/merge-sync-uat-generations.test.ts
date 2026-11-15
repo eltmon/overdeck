@@ -258,6 +258,21 @@ describe('updateUatGeneration patch', () => {
     expect(Date.parse(getUatGeneration(gen.name)!.updatedAt)).toBeGreaterThan(failedAtMs);
   });
 
+  it('writes and reads back voidedBy; a fresh row reads null (PAN-5364)', () => {
+    const db = odb.raw();
+    seedIssue(db, 'PAN-1');
+    seedIssue(db, 'PAN-2');
+
+    const gen = makeGeneration();
+    insertUatGeneration(gen);
+    expect(getUatGeneration(gen.name)!.voidedBy).toBeNull();
+
+    updateUatGeneration(gen.name, { status: 'invalidated', voidedBy: 'uat/x-1' });
+    const loaded = getUatGeneration(gen.name)!;
+    expect(loaded.status).toBe('invalidated');
+    expect(loaded.voidedBy).toBe('uat/x-1');
+  });
+
   it('is a no-op with an empty patch', () => {
     const db = odb.raw();
     seedIssue(db, 'PAN-1');

@@ -278,6 +278,9 @@ function CodePaneForFile({
     [saveNow],
   )
 
+  // PAN-5337: the Preview tab's document-relative links resolve against this.
+  const docLocation = useMemo(() => ({ rootId, path }), [rootId, path])
+
   if (load.status === 'stale' || statusStale) {
     return <StaleCodeTab rootId={rootId} path={path} deckKey={workspaceId} paneId={pane.paneId} />
   }
@@ -357,7 +360,7 @@ function CodePaneForFile({
         </div>
       ) : showPreview ? (
         <div className="min-h-0 flex-1 overflow-auto" data-testid="code-pane-markdown">
-          <MarkdownTab body={text ?? result.text ?? ''} />
+          <MarkdownTab body={text ?? result.text ?? ''} docLocation={docLocation} />
         </div>
       ) : (
         <div className="min-h-0 flex-1">
