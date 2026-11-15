@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5337",
   "created": "2026-11-15T11:36:29.093Z",
-  "updated": "2026-11-15T11:43:13.563Z",
+  "updated": "2026-11-15T11:43:21.639Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "doc-href-classifier.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T11:43:13.563Z"
+    },
+    "heading-slugs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5337",
+      "claimedAt": "2026-11-15T11:43:21.638Z"
     }
   }
 }
