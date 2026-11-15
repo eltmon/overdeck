@@ -246,9 +246,9 @@ memoized 3 s); entry `state` comes from the pane inventory, never stored
 status. PAN-4197 makes the Live view (`?scope=live`) the default and keeps the
 Directory as `?view=history`.
 
-## Awareness rail (Command Deck right column)
+## Activity feed (/activity Feed tab)
 
-`components/sessionFeed/SessionFeedSidebar.tsx`: Needs you = `DecisionsPanel`, fed by `lib/useDecisions.ts` (agent rows with non-empty `pendingInputKinds` from the 10 s enrichment poller `services/agent-enrichment-service.ts` → `computeAgentEnrichment` in `src/lib/agent-enrichment.ts`, which also surfaces an open `pan ask` decision from the workspace pipeline journal via `src/lib/cloister/operator-decision.ts` (PAN-4383), plus a 5 s poll of `/api/conversations/pending-input`, which also returns every unarchived held handoff with `heldKickoff: { since, focus? }`, shown as the non-blocking `heldKickoff` kind (PAN-4596), plus a root-viewer-only 5 s poll of `/api/mcp-oauth/approvals` surfaced as the blocking `mcpSignIn` kind, rendered by `components/McpSignInCard.tsx` (PAN-4946)); agent answers go to `POST /api/agents/:id/answer-question` (`routes/agents/permissions.ts`); Project/Global merge conversations (`GET /api/conversations`), `activity.entry` (`recentActivity`, capped at 50) and memory observations in `useMergedFeed.ts`, with All / Chats / Activity tabs. All dates conversations by `createdAt`/`endedAt` in a 24 h window; Chats by recency. Lanes fold into one run card per `(projectKey, gauntletRun)` (`gauntletRunEntries.ts`); D10 lane activity is `laneActivityOf` in `@overdeck/contracts` (PAN-4301). PAN-4306 moves telemetry to `activity.detailed`. Details: `docs/DASHBOARD-ARCHITECTURE.md` "Awareness feed".
+`components/ActivityFeedTab.tsx` (the first, default tab of `components/ActivityPanel.tsx`, PAN-5293) renders `components/sessionFeed/SessionFeedSidebar.tsx` embedded, with project scope from `frame/deck/useProjectScope.ts`: Needs you = `DecisionsPanel`, fed by `lib/useDecisions.ts` (agent rows with non-empty `pendingInputKinds` from the 10 s enrichment poller `services/agent-enrichment-service.ts` → `computeAgentEnrichment` in `src/lib/agent-enrichment.ts`, which also surfaces an open `pan ask` decision from the workspace pipeline journal via `src/lib/cloister/operator-decision.ts` (PAN-4383), plus a 5 s poll of `/api/conversations/pending-input`, which also returns every unarchived held handoff with `heldKickoff: { since, focus? }`, shown as the non-blocking `heldKickoff` kind (PAN-4596), plus a root-viewer-only 5 s poll of `/api/mcp-oauth/approvals` surfaced as the blocking `mcpSignIn` kind, rendered by `components/McpSignInCard.tsx` (PAN-4946)); agent answers go to `POST /api/agents/:id/answer-question` (`routes/agents/permissions.ts`); Project/Global merge conversations (`GET /api/conversations`), `activity.entry` (`recentActivity`, capped at 50) and memory observations in `useMergedFeed.ts`, with All / Chats / Activity tabs. All dates conversations by `createdAt`/`endedAt` in a 24 h window; Chats by recency. Lanes fold into one run card per `(projectKey, gauntletRun)` (`gauntletRunEntries.ts`); D10 lane activity is `laneActivityOf` in `@overdeck/contracts` (PAN-4301). PAN-4306 moves telemetry to `activity.detailed`. Details: `docs/DASHBOARD-ARCHITECTURE.md` "Activity feed".
 
 ## Flywheel (PAN-3964, derived view)
 
@@ -297,7 +297,7 @@ the settle poller auto-saves work/review/test/plan transcripts, not just managed
 inserts `branch` links via `resolveConversationBranch` (`conversation-branch.ts`)
 and refreshes snapshots; links are never deleted, only dismissed. `pan done` /
 `review-artifacts.ts` write `created` links. Command Deck issue rows
-(`ProjectTree/FeatureItem.tsx`) and sidebar workspace rows read the issue's PR
+(`ProjectTree/FeatureItem.tsx`) and left-column workspace rows (`frame/WorkspacesSection.tsx`) read the issue's PR
 from `DerivedIssueState.pr`, not from links; the conversation list's badge
 (`primitives/PullRequestBadge.tsx`) reads the effective link.
 

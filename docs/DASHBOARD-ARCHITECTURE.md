@@ -180,7 +180,7 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
   REST. `lib/queryRecovery.ts` (PAN-3527) retries any failure of them with
   backoff (1s, 2s, 4s, 8s, 16s) and, when EventRouter re-bootstraps after a
   `/ws/rpc` reconnect, cancels in-flight fetches and refetches them, so a failed
-  or hung fetch during a dashboard restart does not leave the sidebar empty.
+  or hung fetch during a dashboard restart does not leave the left column empty.
 - The Command Deck's pipeline-membership banner (`ProjectMembershipBoundary`,
   PAN-3527) tells a temporary outage from a settled answer. While a restarted
   server's snapshot warms, `GET /api/pipeline/membership` returns 503 with
@@ -225,8 +225,8 @@ most 2000 characters): once the tmux session exists, it is typed in with
 `roles/retrospective.md` on every request — edit it to tune the prompt, no
 rebuild or restart — renders the window bounds and per-project state/repo
 paths into the kickoff message, and creates an **unscoped** conversation
-through `handleConversationCreate`, so it appears under the sidebar's
-`No project` bucket. The conversation is read-only by prompt contract only
+through `handleConversationCreate`, so it appears in the `No project` bucket
+(the project switcher's No project item). The conversation is read-only by prompt contract only
 (no tool sandbox); `tests/unit/prompts/retrospective-template.test.ts` pins
 the read-only clause and the placeholder set.
 
@@ -482,7 +482,7 @@ door that does not exist; a real record read door would be a separate change.
 
 **Conversation loading and delivery:**
 - A `/conv/<id>` deep link loads that conversation directly, independently of the
-  sidebar list. Favorites, pending-input state, and normal list navigation remain intact.
+  conversation list. Favorites, pending-input state, and normal list navigation remain intact.
 - Issue Session tabs load agent transcripts through
   `GET /api/agents/:agentId/conversation`. For Claude agents, the route checks the
   durable `sessions.json` index from newest to oldest until it finds an existing
@@ -537,7 +537,7 @@ door that does not exist; a real record read door would be a separate change.
   (PAN-4457) does every non-archived, non-vault operator conversation whose
   `cwd` is at or under the issue's `workspacePath` (matched with SQLite
   `instr()`, never `LIKE`, so a path containing `_` or `%` isn't a wildcard).
-  Issue and workspace row badges (`FeatureItem.tsx`, `Sidebar.tsx`) read
+  Issue and workspace row badges (`FeatureItem.tsx`, `frame/WorkspacesSection.tsx`) read
   `DerivedIssueState.pr` through `issuePullRequestBadgeLink`, never a
   conversation link. `startRequestReviewPipeline`
   (`routes/workspaces/review-pipeline.ts`) calls
@@ -906,7 +906,7 @@ The dashboard store is a Zustand 4 store, so a `useDashboardStore(selector)` cal
 - **Click handlers read the store at call time.** A component that needs a slice only to look something up when the operator clicks reads `useDashboardStore.getState()` inside the handler instead of subscribing.
 - **Streamed deltas reach only the open conversation.** A delta is a `setQueryData` on `['conversation-messages', name]`; it re-renders `ConversationPanel` and its timeline. `ComposerFooter` and `ConversationListItem` are memoized, so their props must stay identity-stable: `useStableComposerProps` gives the composer a send callback that reads the latest messages from a ref, and `useConversationMutations` returns one memoized object built from the mutations' stable `.mutate` functions. Archive- and stop-pending state are not per instance: the archive and stop mutations carry `mutationKey: ['conversation-archive']` and `mutationKey: ['conversation-stop']`, every hook instance reads the pending names from the MutationCache with `useMutationState`, and the returned object changes identity only when one of those lists changes (PAN-4584). Both mutations' `onSuccess` await the `['conversations']` invalidate promise before their side effects, so pending lasts until the refetch lands, not just until the POST resolves (PAN-4626).
 - **Live-store consumers of the shell live in `AppLiveStoreHost`.** The pending-input dialogs, desktop activity notifications and the "Rebuild stack for" workspace invalidation follow agent, issue and activity changes. They render in `App/AppLiveStoreHost.tsx`, a sibling of the routed tree, so those changes do not re-render `App` and everything below it.
-- **Aggregate chrome is the exception.** `AgentsMenu`, `StoppedAgentsBanner`, `SystemHealthPill`, `NeedsYouIndicator`, the nav `Sidebar` and `ConversationDock` show cross-issue totals, so they may re-render when any agent or issue entry changes.
+- **Aggregate chrome is the exception.** `AgentsMenu`, `StoppedAgentsBanner`, `SystemHealthPill`, `NeedsYouIndicator`, `LeftColumn` and `ConversationDock` show cross-issue totals, so they may re-render when any agent or issue entry changes.
 - **The 5 s health poll still re-renders `App`.** `App` reads `dataUpdatedAt` from the `backend-health` query, and several relative-time labels advance only because of that re-render. It stays until those labels move onto a shared clock (the PAN-4560 follow-up issue).
 
 **Render-count tests.** `src/dashboard/frontend/src/test-utils/renderCounter.tsx` provides `createRenderCounter()` (a `Probe` that counts React `Profiler` commits of a subtree, mounts excluded), `applyStoreEvents(events)` (applies domain events inside `act`), `resetDashboardStore()` and `seedDashboardStore(partial)`. The tests assert render counts, never that a `memo` exists, so they stay valid when the React Compiler ([PAN-4561](https://github.com/eltmon/overdeck/issues/4561)) replaces hand-written memoization. Each fixed path has one, and all run in CI through `npm run test:frontend-subset`,
@@ -1497,14 +1497,26 @@ thread. A registration is written to a temp file, fsynced and `link()`ed to `reg
 so the name only appears with complete content; a file that does not parse counts as absent and
 is replaced. The transcript link is appended with the async `appendSessionIdToHistoryAsync`.
 
-## Awareness feed (PAN-4301)
+## Activity feed
 
-The Command Deck's right-hand rail is `SessionFeedSidebar`
-(`src/dashboard/frontend/src/components/sessionFeed/`) with three scopes, Needs
-you, Project and Global. Needs you is the `DecisionsPanel`. Project and Global
-show one merged feed with three tabs: All, Chats and Activity. The Git, Files and
-Comments tabs are gone because no source ever wrote rows for them; a stored
-hidden tab falls back to All.
+The feed renders on the **Feed** tab of `/activity` (PAN-5293). `ActivityPanel`
+(`components/ActivityPanel.tsx`) shows Feed first and selects it by default; the
+last stream choice persists in `localStorage` key `overdeck.ui.activityStream`.
+Feed is the only stream unless experimental features are on. Then the Activity
+Log, Detailed and TTS streams appear too. With Feed as the only stream there is
+no stream tab bar. The page header reads "Activity" on the Feed and "Activity
+Log" on the other streams. `/activity` is not an experimental tab
+(`lib/experimentalFeatures.ts`).
+
+The Feed tab is `ActivityFeedTab` (`components/ActivityFeedTab.tsx`). It renders
+`SessionFeedSidebar` (`src/dashboard/frontend/src/components/sessionFeed/`)
+embedded, with the heading "Feed" and the scope switcher, inside a `max-w-3xl`
+column. The feed has three scopes, Needs you, Project and Global. Needs you is
+the `DecisionsPanel`, so its inline cards (MCP sign-in, held kickoff, agent
+requests) have a production mount here. Project and Global show one merged feed
+with three tabs: All, Chats and Activity. The Git, Files and Comments tabs are
+gone because no source ever wrote rows for them; a stored hidden tab falls back
+to All. The Command Deck has no feed column, and the top bar has no feed toggle.
 
 Sources, merged in `useMergedFeed.ts`:
 
@@ -1573,9 +1585,12 @@ facts and archived lanes.
   session is alive with pending input, active when it is alive and working,
   idle otherwise.
 - **Project scope** keeps an entry when it is system-wide activity, its issue is
-  one of the project's issues, it is a conversation in the Command Deck's
-  resolved project conversation set (`projectConvIdSet`, built with
-  `resolveEffectiveProjectKey`), or it is a run card with a lane in that set.
+  one of the project's issues, it is a conversation in the selected project's
+  resolved conversation set, or it is a run card with a lane in that set.
+  `ActivityFeedTab` takes the issue ids and the conversation set
+  (`projectIssueIds`, `projectConvIdSet`, built with `resolveEffectiveProjectKey`)
+  from `useProjectScope(selectedProjectKey)`. Both are `undefined` when no
+  project or No project is selected.
 
 Everything above is a selector over existing rows and events; nothing is stored.
 `activity.entry` is meant for news (something shipped, failed, finished or needs
@@ -1904,9 +1919,9 @@ that is not `hidden` and is bound on the current platform.
 | `stage.focus-tab-1`…`-9` | `⌘1`…`⌘9` | `Ctrl+Alt+1`…`9` | not-editing | `Stage/useStageShortcuts.ts` |
 | `stage.close-tab` | `⌘W` | `Ctrl+Alt+W` | not-editing | `Stage/useStageShortcuts.ts` |
 | `stage.toggle-terminal` | `⌘T` | unbound | not-editing | `Stage/useStageShortcuts.ts` |
-| `sidebar.collapse` | `[` | `[` | not-editing | `components/Sidebar.tsx` |
+| `frame.collapse` | `[` | `[` | not-editing | `components/frame/LeftColumn.tsx` |
 | `safety.emergency-stop` | `⌘⇧.` | `Ctrl+Shift+.` | global | `components/EmergencyStopOverlay.tsx` |
-| `deck.new-conversation` | `N` | `N` | not-editing, no open modal | `components/CommandDeck/index.tsx` |
+| `deck.new-conversation` | `N` | `N` | not-editing, no open modal | `components/frame/NewConversationButton.tsx` |
 | `explorer.quick-open` | `⌘P` | `Ctrl+P` | global, focus in that explorer | `explorer/search/useExplorerShortcuts.ts` |
 | `explorer.content-search` | `⌘⇧F` | `Ctrl+Shift+F` | global, focus in that explorer | `explorer/search/useExplorerShortcuts.ts` |
 
@@ -1925,9 +1940,12 @@ isolated test home.
 
 ## Top bar (PAN-5292)
 
-The top bar is the 48 px row that `App/AppChrome.tsx` renders above the routed
-page, right of the sidebar. The system-notices row and the banners above it are
-separate and unchanged. Left to right, the bar holds:
+The top bar is the 48 px row that `App/AppChrome.tsx` renders across the full
+window width, above the left column and the routed page (PAN-5293). The
+system-notices row and the banners above it are separate and unchanged. The bar
+starts with the brand cell (PAN-5293 F-D14): `OverdeckMark`, which orbits while
+`useOverdeckBusy()` is true, and the "Overdeck" wordmark, as one button that
+opens Home (`/`). After the brand, left to right, the bar holds:
 
 1. **Crumb** (`App/topbar/Breadcrumb.tsx`). On the Command Deck it reads
    `<project name> / <active Stage pane label>`. The name is the registered
@@ -1967,8 +1985,7 @@ separate and unchanged. Left to right, the bar holds:
    GitHub quota (`GitHubQuotaSection`), Auto-resume (`DeaconPauseToggle`),
    Stopped agents (`StoppedAgentsBanner variant="section"`, only when some
    exist) and System controls (`CloisterStatusBar`).
-7. **Theme toggle**, then the Activity-feed toggle on every route except the
-   Command Deck.
+7. **Theme toggle.**
 
 The Home page's "Needs you" and "Agents working" cards read the same two
 selectors, so the top bar and Home always show the same numbers
@@ -1981,6 +1998,152 @@ Settings), and a pointer-down outside the dot's wrapper. A pointer-down is
 ignored while any `[role="alertdialog"]` is mounted, and when its target is
 inside a `[role="dialog"]` or `[role="alertdialog"]` outside the wrapper, which
 covers Cloister's portaled restart popover and its restart-config modal.
+
+## Left column (PAN-5293)
+
+One left column, `components/frame/LeftColumn.tsx`, replaced the nav `Sidebar`
+and the Command Deck's own column. It shows the selected project's lists on
+every desktop route, not only on the Command Deck.
+
+### Layout
+
+`App.tsx` renders the top bar (`AppChrome`) across the full window width. Below
+it, one row holds the left column and then the routed page. `CommandDeck`
+renders only its content area, full width: it has no column of its own and no
+feed column.
+
+- **Width.** 264 px by default. Dragging the right edge resizes it between 240
+  and 400 px. The width persists in `localStorage` key
+  `overdeck.ui.leftColumnWidth`.
+- **Collapsed.** `[` (shortcut `frame.collapse`) toggles a 48 px strip: the
+  project mark (opens the switcher menu), nav icons with titles, a `+` New
+  conversation icon and the footer icons, with no lists. The state persists in
+  `overdeck.ui.leftColumnCollapsed`.
+- **Drawer.** Below 900 px (`matchMedia('(max-width: 899px)')`) the column is a
+  drawer and is hidden by default. `LeftColumn` renders the **Open navigation**
+  button, fixed at the top left of the window. The overlay closes the drawer,
+  and so does any navigation: a change of route, project, selected conversation
+  or selected issue. The drawer always shows the full column, ignores the
+  collapsed preference and has no resize handle.
+
+### Sections
+
+Top to bottom:
+
+1. **Project switcher** (`ProjectSwitcher.tsx`). The button shows the project's
+   two-letter mark, its name and its path with the home directory as `~`. The
+   menu lists every registered project in owner groups, each with its machine
+   count and a status word: `<n> working`, else `<n> in review`, else `idle`.
+   Then come **No project**, projects on other machines
+   (`OtherMachineProjects`), **Add a project** (opens the Add-project dialog)
+   and `New workspace in <project>…`. A filter input appears above 8
+   projects. Picking a project calls `selectProject`, which opens its deck on
+   the Home pane.
+2. **Nav** (`LeftNav.tsx`). **Project home** (hidden with no project),
+   **Flywheel** (with the word "running" while a run is going), **Order books**,
+   and **More ▾**, which holds the groups in `navGroups.ts` (`MORE_GROUPS`).
+   Experimental views appear there only when the setting is on
+   (`isExperimentalTab`). Home (`/`) is the top-bar brand.
+3. **New conversation** (`NewConversationButton.tsx`). A split button. The main
+   part quick-creates a conversation in the selected project, or an unscoped
+   one for No project or no project, and opens it in the deck. The caret menu
+   holds the model, harness and effort pickers, the Retrospective button and
+   **New conversation with options…**.
+4. **Conversations** (`ConversationsSection.tsx`). An **Active / All N** switch
+   over `ConversationList`, persisted in `overdeck.ui.leftColumnConversationScope`
+   (default Active). Active shows Needs you and Inbox; All adds Snoozed and
+   Settled.
+5. **Issues** (`IssuesSection.tsx`). `ProjectNode` in its `frame` variant inside
+   `ProjectMembershipBoundary`: the eyebrow "Issues", the issue count, the CI,
+   deploy and identity chips, and the filter menu (`IssuesFilterMenu.tsx`: All,
+   Alive or Failed sessions, plus a **Planned** checkbox). Its collapse state
+   persists in `overdeck.ui.leftColumnIssuesCollapsed`.
+6. **Workspaces** (`WorkspacesSection.tsx`). The selected project's workspaces,
+   an **Archived (N)** expander and a `+` for a new workspace. The row helpers
+   live in `workspaceRows.ts`. The section renders nothing when the project has
+   no workspace rows. See `docs/WORKSPACES-AND-PROJECTS.md`.
+7. **Footer** (`LeftColumnFooter.tsx`). **Settings**, **Machines**, the version
+   button (opens the updater; its title says whether this is a source
+   checkout), **Rebuild** (source checkout only), the freshness indicator, and
+   `?` for the shortcuts sheet.
+
+Conversations, Issues and Workspaces share one scroll area. With no project
+selected, that area shows "Pick a project to see its conversations and issues"
+instead. In the collapsed strip it is not rendered.
+
+### Deck controller modules
+
+`CommandDeck` mounts only on the `command-deck` route, but the left column is
+mounted everywhere. So the lists' state and handlers live in route-independent
+modules under `components/frame/deck/`, not in `CommandDeck`. The deck and the
+left column both read them.
+
+The selection (`selectedConversation`, `selectedFeature` and their setters) is
+in the `useCommandDeckSelection` store, `lib/commandDeckSelection.ts`. A store
+outlives the route, so `CommandDeck` clears both fields on unmount and resets
+its deep-link guard refs (`appliedConvId`, `appliedCockpit`,
+`hasAutoSelected`). The next mount's URL sync then sees no leftover value, and
+StrictMode's second effect pass re-applies a deep link. A left-column click
+made off the deck writes the selection after that cleanup, so the next mount
+still sees it.
+
+| Module | Role |
+|---|---|
+| `deckNavigation.tsx` | `DeckTarget`, `DeckNavigationProvider` and `useDeckNavigation()` (`openInDeck`, `selectProject`), the pure `deckNavigationActions` rules, and `TestDeckNavigationProvider` for tests. |
+| `useDeckProjects.ts` | The `['command-deck-projects']` query (one key for every reader, 30 s) merged with the session-tree bulk query (`sessionTreesQueryKey`). It reuses the previous merge per project, so untouched projects and features keep object identity. |
+| `useSessionTreeSubscription.ts` | Subscribes to `subscribeProjectSessionTree` for each project and patches the bulk session-tree cache entry with `applySessionTreeDelta`; a `session_added` delta refetches it instead. |
+| `useContainerStats.ts` | Polls `/api/resources` every 5 s, only while some issue reports containers, and returns the stats by container name. |
+| `useIssueCosts.ts` | The `['costs-by-issue']` query (15 s) mapped to `issueCosts` and `issueCostDetails`, keyed as given and lowercased. |
+| `useProjectScope.ts` | `useProjectScope(deckKey, conversations?)`: the `conversations` list it scoped (the `['conversations']` query unless the caller passes one), `projectConvs`, `projectConvIdSet`, `projectIssueIds`, the project data and registry entry, `resolveConversationProjectName`, and the `membership` flags (`pending`, `registryError`, `unknown`). |
+| `useIssueSessionActions.ts` | `useIssueSessionActions(deckKey)`: one memoized object of the issue and session handlers (select, terminal, transcript, stop, pause, resume, unpause, restart, deep wipe, state dir, orphan cleanup, Plan dialog). Also the `useDeckDialogs` store that holds the open Plan dialog's issue. |
+| `newConversationDefaults.ts` | The `useNewConversationDefaults` store: `model`, `harness` and `effort` for quick create, loaded from storage and re-derived when the model catalog syncs. |
+| `useCreateConversation.ts` | `useCreateConversation(deckKey, onCreated?)` returns `{ create, createForAgent }`: POST `/api/conversations` with the stored defaults, select it, open its pane and call `openInDeck`. |
+| `useOpenConversation.ts` | `useOpenConversation(deckKey, options?)` returns `(name) => void`: select the conversation, open its pane in its project (the No-project bucket when unscoped) and call `openInDeck`. `null` clears the selection. |
+| `DeckDataHost.tsx` | Renders `null`. Calls `useSessionTreeSubscription(useDeckProjects().projects)` and nothing else. |
+| `DeckDialogsHost.tsx` | The deck's fork modal (its own `useConversationMutations` instance), the `overdeck:open-fork-modal` listener for `/handoff`, and the Plan dialog. |
+
+Two row helpers sit beside the deck: `shortModel`, moved out of
+`ConversationRow`, is in `components/CommandDeck/modelLabels.ts`, and
+`conversationMetaParts`, which builds a conversation row's meta line in words,
+is in `components/CommandDeck/conversationMeta.ts`.
+
+### openInDeck
+
+`openInDeck(target)` is the one door into the deck. `App.tsx` implements it,
+because it holds the route state, and provides it through
+`DeckNavigationProvider`. The caller first opens or focuses the Stage pane
+through `panesStore` (`openConversationTab`, `openIssueTabIn`,
+`openSessionPaneIn`, `openTerminalTabIn`). `openInDeck` then only switches the
+project, shows the deck and writes the URL.
+
+`deckNavigationActions(state, target)` decides the steps:
+
+1. If the target's project is not the selected project: `select-project`
+   first. It does not reset the pane to Home, because the caller chose it.
+2. Off the deck (`activeTab !== 'command-deck'`): `show-deck`, then the
+   target's route: `/conv/<routeKey>` for a conversation,
+   `/command-deck/<project>/<issue>` for an issue, `/command-deck/<project>`
+   for a project.
+3. On the deck: a conversation still writes its route, so re-clicking the open
+   conversation resyncs the `/conv` URL. An issue or a project does nothing
+   more, because `CommandDeck`'s selection URL-sync effect writes the cockpit
+   URL.
+
+### One owner per subscription, poll and shortcut
+
+Each of these has exactly one owner in the frame (F-D4). `CommandDeck` does
+none of them.
+
+- `DeckDataHost`, mounted by `LeftColumn`, owns the session-tree subscription.
+  It is always mounted, so the tree stays live on every desktop route.
+- `IssuesSection` owns the 5 s container-stats poll (`useContainerStats`). The
+  section mounts only when a project is selected and the column is not
+  collapsed, and the poll runs only while an issue reports containers.
+- `NewConversationButton` owns the `N` shortcut (`deck.new-conversation`). It
+  is mounted in both the full and the collapsed column.
+
+`LeftColumn` also mounts `DeckDialogsHost` once, so the fork modal and the Plan
+dialog open from any route.
 
 ## Conversation changes (PAN-5288)
 

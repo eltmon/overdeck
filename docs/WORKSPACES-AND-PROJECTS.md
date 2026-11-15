@@ -173,7 +173,8 @@ intent — it resolves from the raw fields, so a doctored body cannot name an
 arbitrary path on the host. `project-targets` is registered ahead of the
 `/:id` detail route, which would otherwise capture the literal as an id.
 
-**Entry points.** The `+` in the sidebar WORKSPACES header, the
+**Entry points.** The project switcher's `New workspace in <project>…` item,
+the `+` in the left column's Workspaces section header, the
 `New workspace…` command-palette action, and the `New workspace` button on a
 project overview all navigate to `/workspaces/new`; project-scoped entry points
 add `?project=<key>` so the matching chip starts selected. The project
@@ -192,7 +193,7 @@ state. Archive keeps its pre-existing route contract for every kind — this
 feature adds the button, it does not narrow what the route allows. Writer refusals surface as the 409 message rather than a
 click that appears to do nothing. Successful mutations invalidate both
 `['workspace-registry']` and `['workspace-registry', workspaceId]` rather than
-waiting out the rail's 10s poll.
+waiting out the Workspaces section's 10s poll.
 
 **Out of scope.** The page creates `scratch` (and bootstraps `main`); `issue`
 workspaces stay pipeline-owned. Deleting a workspace and purging memory remain
@@ -329,7 +330,7 @@ that failed later during setup.
 
 ### Entry points
 
-The sidebar `+`, the command palette, the workspace-page chips ("clone repo",
+The project switcher's **Add a project** item, the command palette, the workspace-page chips ("clone repo",
 "add existing", "new project"), and the HomePage `New project` button all open
 the **Add-project dialog** as a modal (`AddProjectDialog`, mounted once in the
 app chrome and opened through the `useAddProjectDialog` store). `/projects/new`
@@ -437,9 +438,9 @@ cleaning | shipping`) synthesized by the memory rollup. It is distinct from the
 *pipeline* phase an issue moves through.
 
 `GET /api/workspace-registry` rows carry `memoryPhase: string | null`, read
-server-side per row so the sidebar needs no extra fetch. It is **always `null`
+server-side per row so the Workspaces section needs no extra fetch. It is **always `null`
 for `kind='issue'` rows** — those badge the pipeline phase instead, and the
-route skips the status read for them entirely (D-12). The sidebar renders the
+route skips the status read for them entirely (D-12). The Workspaces section renders the
 memory phase as plain muted text with no status dot, deliberately unlike the
 pipeline badge's colored dot; `WorkspaceView`'s Memory panel header shows the
 phase and its confidence.
@@ -672,13 +673,24 @@ session write rows the operator never asked for either. The rows are correct
 and stay — they own the memory homes — but the user-facing surfaces default to
 what the operator made:
 
-- The sidebar WORKSPACES rail and the Cmd-K `workspaces` scope list
+- The Workspaces rail is the left column's Workspaces section
+  (`components/frame/WorkspacesSection.tsx`, PAN-5293). It is project-scoped:
+  it lists only rows whose `projectId` is the selected project's registered
+  key, active rows first (favorites, then most recent), then an
+  **Archived (N)** expander. The rules below filter the active rows only; the
+  expander lists every archived row of the project. The section renders
+  nothing when the project has no rows.
+  Other projects' workspaces stay reachable from Cmd-K and by switching
+  project.
+- The Workspaces section and the Cmd-K `workspaces` scope list
   `origin === 'operator' || isFavorite`, sharing one exported predicate
-  (`isUserFacingWorkspace` in `Sidebar.tsx`) so the two cannot drift. A
+  (`isUserFacingWorkspace`) so the two cannot drift. The row type and the
+  helpers (`WorkspaceRegistryRow`, `isUserFacingWorkspace`, `isRailWorkspace`,
+  `sortWorkspaces`) live in `components/frame/workspaceRows.ts`. A
   pipeline issue worktree, a Session Vault scratch row, and an agent-made
   scratch row are all `origin !== 'operator'` and stay out unless favorited.
 - The rail additionally drops a non-favorited `main` row (`isRailWorkspace`):
-  the Projects list already represents each primary checkout, and every main
+  the project switcher already represents each primary checkout, and every main
   row is named `main`, so listing them repeated each project as an
   indistinguishable row. They stay in Cmd-K, labelled with the row's
   `projectName` (a list-DTO field the route fills from the `projects` table,
