@@ -2238,7 +2238,11 @@ leaves a trace:
      inside a tick and rejects a manual patrol run right after a tick. A null
      inventory or a `runtime-indeterminate` verdict is not a death.
    - No deliberate stop is recorded for its launch generation
-     (`readRecordedAgentStopAt`).
+     (`readRecordedAgentStopAt`). An operator stop, pause, planning finalize
+     and an operator suspend (the Command Deck Pause button,
+     `POST /api/agents/:id/suspend`) all record one as `agent.status_changed`
+     to `stopped`. A suspend closes the pane and leaves `state.json` at
+     `running`, so without that event the agent would look crashed.
    - The `autonomous` resume gate proceeds. A paused, troubled,
      stopped-by-user or failure-backoff agent is never resumed; a
      stopped-by-user agent raises one Needs-you item.

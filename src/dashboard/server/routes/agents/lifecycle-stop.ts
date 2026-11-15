@@ -26,6 +26,7 @@ import {
 } from '../../../../lib/agents/issue-pause.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { getGuardedReviewRequester } from '../../../../lib/cloister/request-review-pipeline.js';
+import { buildSuspendedAgentEvents } from '../../../../lib/cloister/agent-status-events.js';
 import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projection.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -181,14 +182,15 @@ export const postAgentSuspendRoute = HttpRouter.add(
     });
     // PAN-1908: write-through projection — agents-row upsert + lifecycle event
     // append in one SQLite transaction. Preserve the existing agent-table status
-    // (suspend does not flip it to stopped).
+    // (suspend does not flip it to stopped). PAN-5354: also record the
+    // deliberate stop as `agent.status_changed` to `stopped`, so deacon-lite's
+    // resumeCrashedWorkAgents does not resume a session the operator paused.
     const stateAfterSuspend = getAgentState(id);
     if (stateAfterSuspend) {
-      yield* saveAgentStateAndEmitEventProgram(stateAfterSuspend, {
-        type: 'agent.stopped',
-        timestamp: new Date().toISOString(),
-        payload: { agentId: id, issueId: stateAfterSuspend.issueId || suspendIssueId },
-      });
+      const suspendState = { ...stateAfterSuspend, issueId: stateAfterSuspend.issueId || suspendIssueId };
+      for (const event of buildSuspendedAgentEvents(suspendState)) {
+        yield* saveAgentStateAndEmitEventProgram(stateAfterSuspend, event);
+      }
     }
 
     invalidateAgentsCache();

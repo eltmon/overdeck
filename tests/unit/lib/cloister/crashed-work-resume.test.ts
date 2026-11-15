@@ -8,6 +8,8 @@ import {
   resumeCrashedWorkAgents,
   type CrashedWorkResumeDeps,
 } from '../../../../src/lib/cloister/crashed-work-resume.js';
+import { buildSuspendedAgentEvents } from '../../../../src/lib/cloister/agent-status-events.js';
+import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../helpers/overdeck-test-db.js';
 
 const T0 = Date.parse('2026-11-15T12:02:49.000Z');
 const TICK = 60_000;
@@ -330,5 +332,40 @@ describe('resumeCrashedWorkAgents (PAN-5354)', () => {
     expect(deps.isIssueClosed.mock.calls.filter((call) => call[0] === 'PAN-1')).toHaveLength(1);
     expect(ticks.flat()).toContain('resumeCrashedWorkAgents: agent-pan-1 not resumed: PAN-1 is closed');
     expect(ticks.flat()).toContain('resumeCrashedWorkAgents: agent-pan-2 not resumed: PAN-2 is merged (PR #9 merged)');
+  });
+});
+
+// PAN-5354 review: the Command Deck Pause button suspends a work agent. The
+// suspend route closes the pane and leaves state.json at `running`, so the
+// agent looks crashed; only the recorded stop tells the two apart.
+describe('resumeCrashedWorkAgents and an operator suspend', () => {
+  let odb: OverdeckTestDb;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(T0);
+    __resetCrashedWorkResumeStateForTests();
+    odb = setupOverdeckTestDb();
+  }, 20_000);
+
+  afterEach(() => {
+    teardownOverdeckTestDb(odb);
+    vi.useRealTimers();
+  });
+
+  it('does not resume a work agent the operator suspended', async () => {
+    const agent = workAgent('agent-pan-5337');
+    for (const event of buildSuspendedAgentEvents(agent, () => new Date(T0 - TICK).toISOString())) {
+      odb.raw().prepare('INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)')
+        .run(event.type, event.timestamp, JSON.stringify(event.payload));
+    }
+    // The real stop reader, not a stub: it must see the suspend in the event log.
+    const { deps } = deadHost([agent]);
+    const { readRecordedStopAt: _stub, ...withRealStopReader } = deps;
+
+    const ticks = await runTicks(withRealStopReader, 4);
+
+    expect(deps.resumeAgent).not.toHaveBeenCalled();
+    expect(ticks.flat().filter((line) => line.includes('its stop is recorded'))).toHaveLength(1);
   });
 });

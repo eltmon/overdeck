@@ -20,7 +20,10 @@
  *    apart or more), so a pane that is mid-restart is left alone.
  * 3. No deliberate stop is recorded for its launch generation
  *    (`readRecordedAgentStopAt`, read WITHOUT the `reports` option so
- *    deacon-lite's own death report never counts as a stop).
+ *    deacon-lite's own death report never counts as a stop). An operator
+ *    suspend (Command Deck Pause) closes the pane and leaves state.json at
+ *    `running`; the suspend route records its stop for exactly this reason
+ *    (`buildSuspendedAgentEvents`).
  * 4. The `autonomous` resume gate proceeds: paused, troubled, stopped-by-user
  *    and failure-backoff agents are never resumed. `resumeAgent` itself gates
  *    with the `operator-start` intent, which overrides stopped-by-user, so this
