@@ -49,6 +49,8 @@ export interface OpenDockInput {
   changesScope?: ChangeScope
   /** Search tab: limit content search to this root path (Find in folder). */
   searchPath?: string
+  /** Files tab: switch a conversation-scoped tree to this conversation's files (Show in files). */
+  filesFilter?: 'mine'
 }
 
 export interface DockState {
@@ -63,6 +65,8 @@ export interface DockState {
   diffList?: readonly DockDiffTarget[]
   reveal?: { rootId: string; path: string }
   searchPath?: string
+  /** The last openDock's Files filter request; never persisted. */
+  filesFilter?: 'mine'
   /** Counts openDock calls; starts at 0 on hydrate, never persisted. */
   openSeq: number
   /** Go to file is open; shared by the Stage + menu and the dock, never persisted. */
@@ -73,7 +77,7 @@ export interface WorkDockStore {
   byDeck: Record<string, DockState>
   /** The deck's state, hydrated from localStorage on first read (defaults: closed, 'files', 340). */
   ensureDeck(deckKey: string): DockState
-  /** open=true and the tab; replaces reveal/diff/changesScope/searchPath with the input's (absent fields cleared); increments openSeq. */
+  /** open=true and the tab; replaces reveal/diff/changesScope/searchPath/filesFilter with the input's (absent fields cleared); increments openSeq. */
   openDock(deckKey: string, input: OpenDockInput): void
   /** open=false; keeps tab and width. */
   closeDock(deckKey: string): void
@@ -152,13 +156,14 @@ export const useWorkDockStore = create<WorkDockStore>((set, get) => {
     },
 
     openDock: (deckKey, input) => {
-      const { reveal: _reveal, diff: _diff, diffList: _diffList, changesScope: _scope, searchPath: _searchPath, ...rest } = current(deckKey)
+      const { reveal: _reveal, diff: _diff, diffList: _diffList, changesScope: _scope, searchPath: _searchPath, filesFilter: _filesFilter, ...rest } = current(deckKey)
       const next: DockState = { ...rest, open: true, tab: input.tab, openSeq: rest.openSeq + 1 }
       if (input.reveal) next.reveal = input.reveal
       if (input.diff) next.diff = input.diff
       if (input.diffList) next.diffList = input.diffList
       if (input.changesScope) next.changesScope = input.changesScope
       if (input.searchPath) next.searchPath = input.searchPath
+      if (input.filesFilter) next.filesFilter = input.filesFilter
       commit(deckKey, next)
     },
 
