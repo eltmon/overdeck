@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5288",
   "created": "2026-11-14T23:58:11.612Z",
-  "updated": "2026-11-15T00:15:34.514Z",
+  "updated": "2026-11-15T00:15:39.327Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,11 @@
     "change-uncommitted.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T00:15:34.513Z"
+    },
+    "project-changes": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5288",
+      "claimedAt": "2026-11-15T00:15:39.327Z"
     }
   }
 }
