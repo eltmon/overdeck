@@ -20,6 +20,9 @@ interface RowProps {
   conversationName?: string;
   cwd?: string;
   issueId?: string | null;
+  /** PAN-5353 — a queued optimistic bubble may offer Send now. */
+  sendNowAvailable?: boolean;
+  agentId?: string;
   subagentByToolUseId?: ReadonlyMap<string, SubagentSummary>;
   onOpenSubagent?: (toolUseId: string) => void;
   turnDiffSummary?: TurnDiffSummary;
@@ -38,7 +41,7 @@ interface RowProps {
   citeConversationName?: string;
 }
 
-export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, cwd, issueId, subagentByToolUseId, onOpenSubagent, turnDiffSummary, onOpenTurnDiff, resolvedTheme, hideToolCalls, workingPhase, onConfirmCommand, onOpenTerminal, onPaneChoiceAnswered, bookmarkable, citeConversationName }: RowProps) {
+export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, cwd, issueId, sendNowAvailable, agentId, subagentByToolUseId, onOpenSubagent, turnDiffSummary, onOpenTurnDiff, resolvedTheme, hideToolCalls, workingPhase, onConfirmCommand, onOpenTerminal, onPaneChoiceAnswered, bookmarkable, citeConversationName }: RowProps) {
   if (row.kind === 'working') {
     return <WorkingIndicator startedAt={row.createdAt} phase={workingPhase} />;
   }
@@ -75,7 +78,17 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isSt
     return <SessionPermissionsRow message={row.message} />;
   }
   if (row.message.role === 'user') {
-    return <UserMessageRow message={row.message} cwd={cwd} issueId={issueId} bookmarkable={bookmarkable} citeConversationName={citeConversationName} />;
+    return (
+      <UserMessageRow
+        message={row.message}
+        cwd={cwd}
+        issueId={issueId}
+        bookmarkable={bookmarkable}
+        citeConversationName={citeConversationName}
+        sendNowConversationName={sendNowAvailable ? conversationName : undefined}
+        sendNowAgentId={agentId}
+      />
+    );
   }
   return (
     <AssistantMessageRow

@@ -19,6 +19,7 @@ import { stripVTControlCharacters } from 'node:util';
 import { Effect } from 'effect';
 
 import { getHerdrApiClient, type HerdrApiClient } from './herdr-api.js';
+import { STEER_HERDR_KEYS, STEER_TMUX_KEYS } from './steer-keys.js';
 import type { TerminalBackend } from './types.js';
 
 /**
@@ -109,6 +110,7 @@ export interface AgentPaneIo {
   readonly backend: 'herdr' | 'tmux';
   read(lines: number): Promise<string>;
   sendKey(key: SelectorKey): Promise<void>;
+  pressSendNow(): Promise<void>;
 }
 
 /** PAN-5169: `legacyTmuxFallback: false` is the strict read the polled conversation reads use. */
@@ -141,16 +143,28 @@ export async function resolveAgentPaneIo(
         backend: 'herdr',
         read: (lines) => readHerdrPaneText(pane.paneId, lines, 'visible'),
         sendKey: (key) => sendHerdrPaneKeys(pane.paneId, [key]),
+        pressSendNow: async () => {
+          await getHerdrApiClient().call('pane.send_keys', { pane_id: pane.paneId, keys: [...STEER_HERDR_KEYS] });
+        },
       };
     }
     if (options.legacyTmuxFallback === false) throw new Error(`herdr holds no pane for ${agentId}`);
   }
-  const { capturePane, sendKeysAsync } = await import('../tmux.js');
+  const { capturePane, sendKeysAsync, tmuxExecAsync, exactPaneTarget, validateSessionName } = await import('../tmux.js');
   return {
     backend: 'tmux',
     read: (lines) => capturePane(agentId, lines),
     sendKey: (key) => sendKeysAsync(agentId, key, 'input-target'),
+    pressSendNow: async () => {
+      validateSessionName(agentId);
+      await tmuxExecAsync(['send-keys', '-t', exactPaneTarget(agentId), ...STEER_TMUX_KEYS], { encoding: 'utf-8' });
+    },
   };
+}
+
+/** PAN-5353: press Claude Code's send-now chord in the agent's pane, typing no text. Throws when the press fails. */
+export async function pressSendNowChord(agentId: string, backend?: TerminalBackend): Promise<void> {
+  await (await resolveAgentPaneIo(agentId, backend)).pressSendNow();
 }
 
 /** How long a refusal waits for the screen before it reports without it. */

@@ -827,6 +827,11 @@ and sends the message at once. Every spelling of the chord lives in
 | Herdr | Goes through the same paste-verify-submit routine as a plain Claude Code submit (`pasteAndSubmitHerdrPane`, PAN-4492): `pane.send_text` with the text in bracketed-paste markers, a 600 ms–3 s settle (not a fixed 300 ms), then `pane.send_keys ctrl+x ctrl+s`. `agent.prompt` always ends with Enter, so a steer bypasses it; a `blocked` agent is refused before anything is typed. If the chord doesn't clear the composer within 2 s, it resubmits once with `ctrl+x ctrl+s` — never Enter. |
 | PTY supervisor | writes `\x18\x13` instead of `\r` and answers `{"ok":true,"submit":"steer"}` |
 
+`AgentPaneIo.pressSendNow()` / `pressSendNowChord(agentId)` (`agent-pane-io.ts`, PAN-5353) presses
+the chord with no text — tmux one `send-keys C-x C-s`, Herdr one `pane.send_keys ctrl+x ctrl+s` —
+for the dashboard's Send now action (`POST /api/conversations/:name/send-now`,
+`POST /api/agents/:id/send-now`).
+
 Claude Code also binds Ctrl+Enter to send-now, but no multiplexer carries it. A byte probe showed
 that tmux `send-keys C-Enter` emits no bytes, and Herdr `send-keys ctrl+enter` emits `\r` (a plain
 submit). So Overdeck never sends Ctrl+Enter. Claude Code runs its tty in raw mode, so the `0x13`
