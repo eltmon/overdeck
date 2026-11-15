@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ConversationChanges } from '@overdeck/contracts'
 
@@ -121,6 +121,19 @@ describe('ConversationChangesList', () => {
     renderList()
     await waitFor(() => expect(lastUrl()).toBe('/api/conversations/c1/changes?scope=uncommitted'))
     expect(screen.getByRole('radio', { name: 'Not committed' })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('moves the chip to the scope of a repeat openDock while the list stays mounted (PAN-5291)', async () => {
+    useWorkDockStore.getState().openDock(DECK, { tab: 'changes', changesScope: 'conversation' })
+    renderList()
+    await waitFor(() => expect(lastUrl()).toBe('/api/conversations/c1/changes?scope=conversation'))
+    expect(screen.getByRole('radio', { name: 'This conversation' })).toHaveAttribute('aria-checked', 'true')
+
+    act(() => {
+      useWorkDockStore.getState().openDock(DECK, { tab: 'changes', changesScope: 'uncommitted' })
+    })
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Not committed' })).toHaveAttribute('aria-checked', 'true'))
+    await waitFor(() => expect(lastUrl()).toBe('/api/conversations/c1/changes?scope=uncommitted'))
   })
 
   it('shows the shared-file note with the other conversations, and the edit-records sentence', async () => {
