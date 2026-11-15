@@ -11,7 +11,7 @@
  * Three project shapes (PAN-3657, FR-8):
  *   - **GitHub monorepo**: the cached open `gh pr list` rows, judged on the
  *     row itself (review decision, check rollup, mergeability). Unchanged.
- *   - **GitLab monorepo**: the cached `state=all` MR listing. The listing has
+ *   - **GitLab monorepo**: the cached MR listing (every open MR, recent merged). It has
  *     no approval and no pipeline (GitLab's list endpoint omits `approved` and
  *     `head_pipeline`), so each open, non-draft, conflict-free MR is judged by
  *     its own facts: `glab mr view` for the pipeline and mergeability, and the
@@ -73,7 +73,7 @@ export interface ReadySetDeps {
   readonly readOpenPullRequests?: (repoPath: string) => Promise<readonly GhPrRow[] | null>;
   /** A GitHub repo's rows of every state, null when the read failed. */
   readonly readAllPullRequests?: (repoPath: string) => Promise<readonly GhPrRow[] | null>;
-  /** A GitLab repo's `state=all` MR rows, null when the read failed. */
+  /** A GitLab repo's open (every page) and recently merged MR rows, null when the read failed. */
   readonly readMergeRequests?: (repoPath: string) => Promise<readonly GlabMrRow[] | null>;
   /** One GitLab MR's facts (view + approvals); cached per MR head here. */
   readonly gitlabMrFacts?: (issueId: string, row: GlabMrRow) => Promise<PrFacts>;

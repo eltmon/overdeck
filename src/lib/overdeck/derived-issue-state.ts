@@ -468,14 +468,39 @@ export function mrFromGlabRow(row: GlabMrRow): LoadedPr | null {
   };
 }
 
-/** The repo's MR listing (`state=all`), or null when the read failed (PAN-4753 WI-4). */
+const MR_PAGE_SIZE = 100;
+const MAX_OPEN_MR_PAGES = 20;
+
+/**
+ * Every open MR (all pages) plus the newest 100 merged ones. The ready set
+ * needs the open side complete: GitLab lists newest first, so one page of
+ * `state=all` could hide an older open MR behind newer merged ones (PAN-5320).
+ * Throws when a page fails or the open side has more than the page cap.
+ */
+export async function fetchRepoMergeRequests(
+  runApi: (query: string) => Promise<readonly GlabMrRow[]>,
+): Promise<GlabMrRow[]> {
+  const open: GlabMrRow[] = [];
+  for (let page = 1; ; page += 1) {
+    if (page > MAX_OPEN_MR_PAGES) throw new Error(`more than ${MAX_OPEN_MR_PAGES * MR_PAGE_SIZE} open MRs`);
+    const rows = await runApi(`state=opened&per_page=${MR_PAGE_SIZE}&page=${page}`);
+    open.push(...rows);
+    if (rows.length < MR_PAGE_SIZE) break;
+  }
+  const merged = await runApi(`state=merged&order_by=updated_at&per_page=${MR_PAGE_SIZE}`);
+  return [...open, ...merged];
+}
+
+/** The repo's open and recently merged MRs, or null when a read failed (PAN-4753 WI-4). */
 export async function readRepoMergeRequests(projectPath: string): Promise<readonly GlabMrRow[] | null> {
   return cachedRepoMergeRequests(projectPath, async () => {
     try {
-      const { stdout } = await execFileAsync('glab', [
-        'api', 'projects/:id/merge_requests?state=all&per_page=100',
-      ], { cwd: projectPath, encoding: 'utf-8', timeout: 20_000, maxBuffer: 16 * 1024 * 1024 });
-      return JSON.parse(stdout || '[]') as GlabMrRow[];
+      return await fetchRepoMergeRequests(async (query) => {
+        const { stdout } = await execFileAsync('glab', ['api', `projects/:id/merge_requests?${query}`], {
+          cwd: projectPath, encoding: 'utf-8', timeout: 20_000, maxBuffer: 16 * 1024 * 1024,
+        });
+        return JSON.parse(stdout || '[]') as GlabMrRow[];
+      });
     } catch {
       return null;
     }

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PrFacts } from '../../cloister/pr-facts.js';
 import type { ProjectConfig } from '../../projects.js';
-import type { GlabMrRow } from '../derived-issue-state.js';
+import { fetchRepoMergeRequests, type GlabMrRow } from '../derived-issue-state.js';
 import type { GhPrRow } from '../pr-listing.js';
 import {
   _resetReadySetCacheForTests,
@@ -31,7 +31,7 @@ function ghRow(branch: string, number: number, overrides: Partial<GhPrRow> = {})
 }
 
 /**
- * A GitLab list row as `merge_requests?state=all` returns it: no `approved`
+ * A GitLab list row as `projects/:id/merge_requests` returns it: no `approved`
  * and no `head_pipeline` (the list endpoint omits both).
  */
 function mr(branch: string, iid: number, overrides: Partial<GlabMrRow> = {}): GlabMrRow {
@@ -268,5 +268,32 @@ describe('mergedIssueIdsForProject', () => {
     await expect(mergedIssueIdsForProject('/repos/gl', {
       projectConfig: () => GITLAB_MONO, forgeOf: () => 'gitlab', readMergeRequests: async () => null,
     })).rejects.toBeInstanceOf(ReadySetUnavailableError);
+  });
+});
+
+describe('fetchRepoMergeRequests (the GitLab listing)', () => {
+  const page = (n: number, start: number) => Array.from({ length: n }, (_, i) => mr(`feature/min-${start + i}`, start + i));
+
+  it('reads every open page, then the newest merged page', async () => {
+    const queries: string[] = [];
+    const rows = await fetchRepoMergeRequests(async (query) => {
+      queries.push(query);
+      if (query.startsWith('state=opened') && query.endsWith('page=1')) return page(100, 1);
+      if (query.startsWith('state=opened') && query.endsWith('page=2')) return page(3, 101);
+      return [mr('feature/min-900', 900, { state: 'merged', merged_at: '2026-11-14T10:00:00Z' })];
+    });
+    expect(queries).toEqual([
+      'state=opened&per_page=100&page=1',
+      'state=opened&per_page=100&page=2',
+      'state=merged&order_by=updated_at&per_page=100',
+    ]);
+    expect(rows).toHaveLength(104);
+  });
+
+  it('fails the whole listing when any page fails', async () => {
+    await expect(fetchRepoMergeRequests(async (query) => {
+      if (query.includes('page=2')) throw new Error('502');
+      return page(100, 1);
+    })).rejects.toThrow('502');
   });
 });

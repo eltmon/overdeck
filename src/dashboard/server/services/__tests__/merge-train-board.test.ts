@@ -299,6 +299,23 @@ describe('getMergeTrainBoard projects', () => {
     expect(project.recent.flatMap((merge) => merge.issueIds)).toEqual(['MIN-2']);
   });
 
+  it('a polyrepo issue whose first member PR is approved stays a candidate when a later one is undecided', async () => {
+    const POLY = { name: 'myn', path: '/repos/myn', workspace: { type: 'polyrepo', repos: [] } } as unknown as ProjectConfig;
+    const base = deps({ projects: [{ key: 'myn', config: POLY }], facts: { 'MIN-1': facts('MIN-1') } });
+    const board = await getMergeTrainBoard({}, {
+      ...base,
+      memberRepos: () => [
+        { repoKey: 'fe', repoPath: '/repos/myn/frontend', forge: 'github' },
+        { repoKey: 'api', repoPath: '/repos/myn/api', forge: 'github' },
+      ],
+      listing: async (repoPath) => ({
+        open: [open('MIN-1', { number: repoPath.endsWith('frontend') ? 11 : 12, reviewDecided: repoPath.endsWith('frontend') })],
+        merged: [],
+      }),
+    });
+    expect(board.projects[0]!.cars.map((car) => [car.issueId, car.prs.map((pr) => pr.label)])).toEqual([['MIN-1', ['fe #11', 'api #12']]]);
+  });
+
   it('filters to one project and reports mode, override and master flag', async () => {
     const board = await getMergeTrainBoard({ projectKey: 'myn' }, deps({
       master: false,

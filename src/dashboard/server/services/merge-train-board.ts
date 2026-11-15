@@ -5,8 +5,9 @@
  *
  * Everything here is derived. The sources are the cached forge listings
  * (GitHub: one stale-while-revalidate listing per repo; GitLab: the cached
- * `state=all` MR listing), the 60 s PR-facts cache, the gate's cached
- * approval answers, `pending_auto_merges` rows, the in-memory merge runs,
+ * MR listing of every open and the newest merged MRs), the 60 s PR-facts
+ * cache, the gate's cached approval answers, `pending_auto_merges` rows, the
+ * in-memory merge runs,
  * the pipeline journal and the stored generations.
  *
  * Forge cost (NFR-6): a car candidate is picked without a forge read (a
@@ -249,8 +250,11 @@ async function boardProject(
   const candidates = new Set<string>();
   // `reviewDecision` is empty without branch protection and the gate caches
   // answers only for PRs it judged, so a journaled review verdict is the leg
-  // that finds marker-approved PRs.
-  for (const pr of openById.values()) {
+  // that finds marker-approved PRs. Every feature row counts, not just the
+  // one `openById` keeps per issue: a polyrepo issue's approved member PR
+  // must find it even when another member's PR is undecided.
+  for (const pr of listing.open) {
+    if (pr.kind !== 'feature') continue;
     if (pr.reviewDecided || deps.approvalAtHead(pr.issueId, pr.headSha) !== undefined
       || deps.journal(pr.issueId, pr.branch).some((entry) => entry.type === 'review.verdict')) {
       candidates.add(pr.issueId);

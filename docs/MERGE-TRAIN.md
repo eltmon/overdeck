@@ -63,7 +63,7 @@ answers for three project shapes (PAN-4753 WI-4, PAN-3657):
 | Project | Rows read | Ready when |
 | --- | --- | --- |
 | GitHub monorepo | the cached open `gh pr list` rows | the row's review decision is approved, its checks are green and it is mergeable |
-| GitLab monorepo | the cached `merge_requests?state=all` listing | the MR is open, not a draft and has no conflicts on the listing, and its own facts (`readGitLabMrFacts`: `glab mr view` plus the approvals endpoint) show a named approver, a green pipeline and mergeability |
+| GitLab monorepo | the cached MR listing: every page of open MRs plus the newest 100 merged | the MR is open, not a draft and has no conflicts on the listing, and its own facts (`readGitLabMrFacts`: `glab mr view` plus the approvals endpoint) show a named approver, a green pipeline and mergeability |
 | Polyrepo | every writable member repo, each with its own forge and branch prefix (`memberReposForProject`) | every open PR/MR for the issue, across the member repos, is ready by its forge's rule |
 
 GitLab's list endpoint carries no `approved` and no `head_pipeline`, so a
