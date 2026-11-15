@@ -41,6 +41,8 @@ import { resetShortcutsForTests, useShortcutList } from '../../../lib/shortcuts/
 import { useExplorerStore } from '../explorerStore'
 import { usePanesStore, selectPanesForWorkspace } from '../../../lib/panesStore'
 import { installStrictFetchMock } from '../../../test-utils/strictFetchMock'
+import { useWorkDockStore } from '../../dock/workDockStore'
+import { useActiveDock } from '../../dock/activeDock'
 
 const DECK = 'overdeck'
 
@@ -60,6 +62,7 @@ function listing(path: string): ExplorerListDirResult {
 // PAN-5289: ExplorerFiles is the Files tab body; it labels its root through the
 // project registry, so each test answers that request.
 let registeredProjects: Array<{ key: string; name?: string; path: string }> = []
+let workspaceRows: Array<{ id: string; projectId: string; kind: 'main' | 'issue' | 'scratch'; name: string; issueId: string | null }> = []
 let fetchGuard: ReturnType<typeof installStrictFetchMock>
 
 function filesProps(over: Partial<ExplorerFilesProps> = {}): ExplorerFilesProps {
@@ -88,9 +91,12 @@ function deckWith(over: Partial<StageDeckContextValue> = {}): StageDeckContextVa
 
 beforeEach(() => {
   registeredProjects = []
+  workspaceRows = []
+  useWorkDockStore.setState({ byDeck: {} })
+  useActiveDock.setState({ current: null })
   fetchGuard = installStrictFetchMock(({ method, url }) => {
     if (method === 'GET' && url === '/api/registered-projects') return Response.json(registeredProjects)
-    if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] })
+    if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: workspaceRows })
     return undefined
   })
   localStorage.clear()
@@ -271,6 +277,37 @@ describe('ExplorerFiles', () => {
     await waitFor(() => expect(useExplorerStore.getState().roots['issue:PAN-1'].expanded).toContain('src'))
     fireEvent.click(viewOption('New folder'))
     expect(screen.getByRole('textbox', { name: 'New folder name' })).toBeInTheDocument()
+  })
+
+  it('offers the root menu: follow the tab, the main checkout and the deck project edit workspaces', async () => {
+    registeredProjects = [{ key: 'overdeck', name: 'Overdeck', path: '/ws' }]
+    workspaceRows = [
+      { id: 'w1', projectId: 'overdeck', kind: 'scratch', name: 'edit-one', issueId: null },
+      { id: 'w2', projectId: 'overdeck', kind: 'scratch', name: 'edit-two', issueId: null },
+      { id: 'w3', projectId: 'other', kind: 'scratch', name: 'elsewhere', issueId: null },
+      { id: 'i1', projectId: 'overdeck', kind: 'issue', name: 'feature-pan-1', issueId: 'PAN-1' },
+    ]
+    useActiveDock.setState({
+      current: { deckKey: DECK, activePaneId: 'chat-1', rootId: 'project:overdeck', changedPaths: new Set(), openFile: vi.fn(), revealFile: vi.fn() },
+    })
+    renderPane({ rootId: 'project:overdeck' })
+    await screen.findByText('README.md')
+    const openMenu = async () => {
+      fireEvent.click(await screen.findByRole('button', { name: /Overdeck/ }))
+      return within(screen.getByRole('menu', { name: 'Files root' }))
+    }
+    let menu = await openMenu()
+    await waitFor(() => expect(menu.getByText('edit-two')).toBeInTheDocument())
+    expect(menu.getAllByRole('menuitemradio').map((el) => el.textContent)).toEqual(['Follow the active tab', 'Main checkout', 'edit-one', 'edit-two'])
+    expect(menu.getByRole('menuitemradio', { name: 'Follow the active tab' })).toHaveAttribute('aria-checked', 'true')
+
+    fireEvent.click(menu.getByRole('menuitemradio', { name: 'edit-two' }))
+    expect(useWorkDockStore.getState().byDeck[DECK]).toMatchObject({ rootOverride: 'workspace:w2', rootOverrideAnchor: 'chat-1' })
+
+    menu = await openMenu()
+    expect(menu.getByRole('menuitemradio', { name: 'edit-two' })).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(menu.getByRole('menuitemradio', { name: 'Follow the active tab' }))
+    expect(useWorkDockStore.getState().byDeck[DECK].rootOverride).toBeUndefined()
   })
 
   it('reveals and selects the revealPath file (PAN-5289)', async () => {

@@ -9,12 +9,15 @@
 // (D-B8). Go to file and content search belong to the dock.
 
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
-import { Check, ChevronsDownUp, FilePlus, MoreHorizontal } from 'lucide-react'
+import { Check, ChevronDown, ChevronsDownUp, FilePlus, MoreHorizontal } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 
 import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu'
 import { useStageDeck } from '../Stage/StageDeckContext'
+import { findRegisteredProject } from '../CommandDeck/UnknownProjectState'
+import { useActiveDock } from '../dock/activeDock'
+import { useWorkDockStore } from '../dock/workDockStore'
 import { useDeleteFlow } from './actions/useDeleteFlow'
 import { useExplorerActions } from './actions/useExplorerActions'
 import { useInlineEdit } from './actions/useInlineEdit'
@@ -28,7 +31,7 @@ import { ExplorerContextMenu, type ExplorerMenuTarget } from './menu/ExplorerCon
 import { EditWorkspaceBanner } from './edit/EditWorkspaceBanner'
 import { useEditWorkspaceStore } from './edit/edit-workspace-store'
 import { openCodePane, type CodePaneTarget } from './openCodePane'
-import { useRootLabel } from './rootForConversation'
+import { useRootContext, useRootLabel } from './rootForConversation'
 import { createDirectoryLoader, expandAll, type DirectoryLoader } from './tree/directory-loader'
 import { ExplorerTree } from './tree/ExplorerTree'
 import {
@@ -176,6 +179,76 @@ function ViewOptionsMenu(props: ViewOptionsProps) {
                 <CheckMark on={false} />
                 Refresh
               </MenuItemButton>
+            </MenuSurface>
+          </>,
+          document.body,
+        )}
+    </>
+  )
+}
+
+/** The Files header root name: a menu that pins the dock to a root or follows the active tab (§6.9, FR-2). */
+function RootMenu({ deckKey, label }: { deckKey: string; label: string }) {
+  const buttonRef = useRef<HTMLButtonElement | null>(null)
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
+  const rootContext = useRootContext()
+  const override = useWorkDockStore((s) => s.byDeck[deckKey]?.rootOverride)
+  const deckProject = findRegisteredProject(rootContext.projects, deckKey)
+  const workspaces = deckProject ? rootContext.workspaces.filter((w) => w.kind === 'scratch' && w.projectId === deckProject.key) : []
+  const close = () => setPosition(null)
+  const pick = (rootId: string | undefined) => {
+    close()
+    // B-D17: an override belongs to the tab that was active when it was set.
+    const anchor = useActiveDock.getState().current?.activePaneId ?? undefined
+    useWorkDockStore.getState().setRootOverride(deckKey, rootId, rootId === undefined ? undefined : anchor)
+  }
+  const toggleOpen = () => {
+    if (position) return close()
+    const rect = buttonRef.current?.getBoundingClientRect()
+    setPosition({ top: (rect?.bottom ?? 0) + 4, left: rect?.left ?? 0 })
+  }
+  const item = (rootId: string | undefined, text: string) => (
+    <MenuItemButton role="menuitemradio" aria-checked={override === rootId} onClick={() => pick(rootId)}>
+      <CheckMark on={override === rootId} />
+      {text}
+    </MenuItemButton>
+  )
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={position !== null}
+        title="Choose which files the panel shows"
+        onClick={toggleOpen}
+        className="flex min-w-0 items-center gap-1 rounded px-1 font-mono text-foreground hover:bg-accent"
+      >
+        <span className="truncate">{label}</span>
+        <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+      </button>
+      {position &&
+        createPortal(
+          <>
+            <MenuOverlay onClick={close} />
+            <MenuSurface
+              aria-label="Files root"
+              onClose={close}
+              returnFocusRef={buttonRef}
+              className="fixed z-[1000] min-w-[220px]"
+              style={{ position: 'fixed', top: position.top, left: position.left }}
+            >
+              {item(undefined, 'Follow the active tab')}
+              {deckProject && item(`project:${deckProject.key}`, 'Main checkout')}
+              {workspaces.map((w) => {
+                const rootId = `workspace:${w.id}`
+                return (
+                  <MenuItemButton key={w.id} role="menuitemradio" aria-checked={override === rootId} onClick={() => pick(rootId)}>
+                    <CheckMark on={override === rootId} />
+                    {w.name}
+                  </MenuItemButton>
+                )
+              })}
             </MenuSurface>
           </>,
           document.body,
@@ -574,7 +647,7 @@ export function ExplorerFiles({ rootId, deckKey, changedPaths: scopeChangedPaths
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="explorer-pane">
       <div className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-xs">
-        <span className="truncate font-mono text-foreground">{label}</span>
+        <RootMenu deckKey={deckKey} label={label} />
         {branch && <span className="min-w-0 truncate font-mono text-muted-foreground">{branch}</span>}
         <div className="ml-auto flex shrink-0 items-center gap-0.5">
           {writable && (
