@@ -1,8 +1,13 @@
 /**
  * MarkdownTab — renders a markdown body via ChatMarkdown with empty/loading states.
  *
- * Used for PRD / STATE / INFERENCE tabs. The actual fetch happens once at
- * the ZoneCOverview level (`usePlanningQuery`) — this component only formats.
+ * Used for PRD / STATE / INFERENCE tabs, the code pane Preview and the editor
+ * pane Preview. An optional `docLocation` (PAN-5337) names the explorer root
+ * and root-relative path the body came from, so ChatMarkdown can resolve its
+ * document-relative links; the Docs pane and the cockpit dig tabs pass none,
+ * so their relative links stay inert. A located preview renders through
+ * ReactMarkdown rather than Streamdown (D11), since Streamdown's
+ * rehype-sanitize/rehype-harden pipeline runs before the `a` component.
  */
 
 import { ChatMarkdown } from '../../chat/ChatMarkdown';
@@ -12,9 +17,10 @@ interface MarkdownTabProps {
   body: string | undefined | null;
   isLoading?: boolean;
   emptyLabel?: string;
+  docLocation?: { rootId: string; path: string };
 }
 
-export function MarkdownTab({ body, isLoading, emptyLabel = 'No content available.' }: MarkdownTabProps) {
+export function MarkdownTab({ body, isLoading, emptyLabel = 'No content available.', docLocation }: MarkdownTabProps) {
   if (isLoading) {
     return (
       <div
@@ -40,7 +46,7 @@ export function MarkdownTab({ body, isLoading, emptyLabel = 'No content availabl
       data-testid="markdown-tab"
       style={{ padding: 16, fontSize: 13, lineHeight: 1.55 }}
     >
-      <ChatMarkdown text={body} cwd={undefined} />
+      <ChatMarkdown text={body} cwd={undefined} docLocation={docLocation} {...(docLocation ? { useStreamdown: false } : {})} />
     </div>
   );
 }
