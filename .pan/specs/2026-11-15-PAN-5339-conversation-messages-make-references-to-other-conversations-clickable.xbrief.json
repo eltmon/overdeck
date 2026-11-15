@@ -4,17 +4,17 @@
     "created": "2026-11-15T11:40:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5339: Conversation messages: make references to other conversations clickable",
-    "updated": "2026-11-15T11:42:39.223Z"
+    "updated": "2026-11-15T11:44:10.693Z"
   },
   "plan": {
     "id": "pan-5339",
     "title": "Conversation messages: make references to other conversations clickable",
-    "status": "proposed",
+    "status": "running",
     "uid": "432504ed-c431-408b-9eeb-3de09a6845ee",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T11:40:00Z",
-    "updated": "2026-11-15T11:42:39.223Z",
+    "updated": "2026-11-15T11:44:10.693Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5339",
@@ -713,5 +713,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
