@@ -34,11 +34,11 @@ import type { HarnessName } from '../runtimes/types.js';
 import { parseSessionIndex } from '../session-history.js';
 import { isSupersededConversation } from './conversation-clear-chain.js';
 import {
-  getConversationByClaudeSessionId,
   isAgentConversationName,
   setConversationClaudeSessionId,
   type LegacyConversation,
 } from './conversations.js';
+import { isConversationLocatorOwned } from './conversation-batch-lookup.js';
 
 export interface ForkAdoptionDeps {
   overdeckHome: () => string;
@@ -67,7 +67,7 @@ async function* streamLines(path: string): AsyncGenerator<string> {
 export const defaultForkAdoptionDeps: ForkAdoptionDeps = {
   overdeckHome: getOverdeckHome,
   claudeProjectDir: (cwd) => claudeProjectDir(cwd),
-  isLocatorOwned: (sessionId) => getConversationByClaudeSessionId(sessionId) !== null,
+  isLocatorOwned: (sessionId) => isConversationLocatorOwned(sessionId),
   adopt: (conversationName, sessionId) => setConversationClaudeSessionId(conversationName, sessionId),
   log: (message) => console.log(message),
   openLines: streamLines,

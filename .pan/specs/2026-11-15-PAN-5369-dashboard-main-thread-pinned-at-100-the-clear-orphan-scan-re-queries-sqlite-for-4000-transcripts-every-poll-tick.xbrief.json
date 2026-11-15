@@ -1,0 +1,553 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T17:43:43Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5369: Dashboard main thread pinned at 100%: the /clear-orphan scan re-queries SQLite for 4000 transcripts every poll tick",
+    "updated": "2026-11-15T17:54:23.304Z"
+  },
+  "plan": {
+    "id": "pan-5369",
+    "title": "Dashboard main thread pinned at 100%: the /clear-orphan scan re-queries SQLite for 4000 transcripts every poll tick",
+    "status": "running",
+    "uid": "2f9012b6-668c-4705-95a8-c940f32c00ca",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T17:43:43Z",
+    "updated": "2026-11-15T17:54:23.304Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5369",
+        "label": "PAN-5369",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "performance",
+      "dashboard-server",
+      "conversation-lifecycle",
+      "sqlite"
+    ],
+    "narratives": {
+      "Problem": "The 10 s conversation lifecycle poll's /clear-orphan scan (detectOrphanedClaudeCodeSessions in src/dashboard/server/services/conversation-lifecycle.ts) calls getConversationByClaudeSessionId once per transcript that is not already proven non-orphan. Owned transcripts are never skipped, the query scans every conversation row because conversation_files has no locator index, and the full conversation select sorts every locator of the matched row. On live data (4089 transcripts in one project dir, 3930 conversations) one tick spends 11.6 s of synchronous SQLite on the main thread, so slow routes such as /api/costs/summary never answer. Short transcripts (5 lines or fewer, 721 live) are also re-opened every tick, and fork adoption's backgrounding-marker scan uses the same full-select ownership check per file.",
+      "Proposal": "Load every conversation locator once per tick into a Set (about 10 ms) and check transcripts against it; re-check one session with an existence-only point query just before adopting it, and add adopted ids to the Set. Memoize provisional (short-file) verdicts by size:mtimeMs so unchanged short transcripts are not re-read. Add conv_files_locator_idx on conversation_files(locator) to the init migration and the runtime top-ups, and rewrite getConversationByClaudeSessionId to drive from that index with ORDER BY c.rowid LIMIT 1 (verified to return the same row as today for all 8215 live locators). Switch fork adoption's default isLocatorOwned to the existence query. Document the behavior in docs/DASHBOARD-ARCHITECTURE.md, the codebase concerns map and changelog.d/pan-5369.md.",
+      "NonGoals": "- Do not cache findProjectByPath / canonicalPath / realpathSync, and do not change runPullRequestSyncOnce or loadIssueStatesForProject (tracked in PAN-5381).\n- Do not change LEGACY_CONVERSATION_SELECT or its claude_session_id subquery, and do not change how sequencer-runner accumulates locators.\n- Do not edit hooks.ts, vault-liveness.ts, conversation-pull.ts or conversation-reads.ts call sites.\n- Do not add a per-boot memo of owned transcripts (a deleted locator row must become visible on the next tick).\n- Do not memoize the no-parent-found outcome for /clear orphans without an Overdeck parent.\n- Do not regenerate docs/overdeck-db-erd.excalidraw.\n- Do not move the poll to a worker thread and do not change POLL_INTERVAL_MS.\n- Do not add synchronous filesystem calls to server-reachable code.\n- Do not grow src/lib/overdeck/conversations.ts by any line."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use a per-tick Set of all locators instead of the issue's suggested per-boot memo of linked transcripts.",
+        "rationale": "Loading the Set costs about 10 ms per tick on live data, and a per-boot memo would go stale when vacateConversationName or removeVaultBrowseRow deletes locator rows; the Set gives today's exact answer at bulk cost."
+      },
+      {
+        "summary": "Apply both fix directions: the per-tick Set for the scan, plus conv_files_locator_idx and an index-driven getConversationByClaudeSessionId.",
+        "rationale": "hooks.ts and fork adoption call the same lookup on every hook event and marker scan; the index fixes their misses without editing those call sites."
+      },
+      {
+        "summary": "Pin getConversationByClaudeSessionId to ORDER BY c.rowid LIMIT 1.",
+        "rationale": "Today's SCAN c returns the lowest rowid; planning verified zero differences across all 8215 live locators with the pin, while the unpinned rewrite changed 2 of 7 shared-locator answers that hooks.ts routes on."
+      },
+      {
+        "summary": "Include the short-transcript re-read memo (size:mtimeMs) in scope.",
+        "rationale": "It is the same per-tick repeated work in the same loop (721 live files re-opened every tick) and the stat-keyed memo is exact."
+      },
+      {
+        "summary": "Leave findProjectByPath/realpathSync, runPullRequestSyncOnce and loadIssueStatesForProject to follow-up issues.",
+        "rationale": "The issue marks them optional; findProjectByPath has about 40 callers and caching realpath needs its own invalidation design."
+      },
+      {
+        "summary": "Turn the live :3011 acceptance checks into a post-deploy step in continue.json, with pre-merge proxies as item ACs.",
+        "rationale": "The work agent cannot run its branch as the production dashboard before merge, and pending ACs block pan done."
+      }
+    ],
+    "items": [
+      {
+        "id": "locator-index",
+        "title": "Add conv_files_locator_idx on conversation_files(locator)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T17:43:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5369",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "drizzle/overdeck/0000_overdeck_init.sql",
+            "src/lib/overdeck/infra.ts",
+            "src/lib/overdeck/__tests__/conversation-locator-index.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-locator-index.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-locator-index.test.ts passes both index-existence tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In drizzle/overdeck/0000_overdeck_init.sql add the line CREATE INDEX `conv_files_locator_idx` ON `conversation_files` (`locator`);--> statement-breakpoint directly after the conv_files_conv_idx line (line 67). In src/lib/overdeck/infra.ts ensureRuntimeIndexesSync, directly after the idx_cost_issue_upper top-up, add a PAN-5369 comment and runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `conv_files_locator_idx` ON `conversation_files` (`locator`)'). Create src/lib/overdeck/__tests__/conversation-locator-index.test.ts following conversation-batch-lookup.test.ts (set process.env.OVERDECK_HOME to a fresh tmp dir before dynamically importing ../infra.js) with a fresh-DB index test and a drop-index/close/reopen top-up test. Leave the infra.ts header comment about a schema audit unchanged."
+        },
+        "items": [
+          {
+            "id": "locator-index.ac1",
+            "title": "Given a fresh OVERDECK_HOME, when getOverdeckDatabase() opens the DB, then sqlite_master returns one index row named conv_files_locator_idx on conversation_files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "locator-index.ac2",
+            "title": "Given a DB whose conv_files_locator_idx was dropped, when the DB is closed and reopened with getOverdeckDatabase(), then the top-up recreates conv_files_locator_idx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "locator-index.ac3",
+            "title": "grep -c conv_files_locator_idx returns 1 for drizzle/overdeck/0000_overdeck_init.sql and 1 for src/lib/overdeck/infra.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lookup-query-rewrite",
+        "title": "Drive getConversationByClaudeSessionId from the locator index with lowest-rowid order",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T17:43:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5369",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversations.ts",
+            "src/lib/overdeck/__tests__/conversation-locator-index.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-locator-index.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "conversation-locator-index.test.ts passes the duplicate-locator, query-plan and unknown-locator tests",
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/lib/overdeck/conversations.ts (function at line 617) replace the WHERE EXISTS (SELECT 1 FROM conversation_files cf WHERE cf.conversation_id = c.id AND cf.locator = ?) clause with WHERE c.id IN (SELECT cf.conversation_id FROM conversation_files cf WHERE cf.locator = ?) ORDER BY c.rowid LIMIT 1, keeping the function the same number of lines (the file is above the 1000-line ceiling and must not grow). Add three tests to conversation-locator-index.test.ts: two conversations sharing locator 'shared' (second one's conversation_files row inserted raw) returns the first-created (lowest rowid) name; EXPLAIN QUERY PLAN of the SQL the function prepares has a detail containing conv_files_locator_idx and no detail equal to 'SCAN c'; an unknown locator returns null. The plan test must exercise the SQL the function itself prepares: vi.spyOn(getOverdeckDatabase(), 'prepare') (overdeckDb() returns that cached handle), call getConversationByClaudeSessionId('shared'), take the prepared SQL containing 'cf.locator = ?', restore the spy, and run EXPLAIN QUERY PLAN on that SQL. Assert a detail contains conv_files_locator_idx and no detail equals 'SCAN c'; this assertion fails on today's WHERE EXISTS query."
+        },
+        "items": [
+          {
+            "id": "lookup-query-rewrite.ac1",
+            "title": "Given conversations A then B both owning locator 'shared', when getConversationByClaudeSessionId('shared') runs, then it returns A (the lowest rowid)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lookup-query-rewrite.ac2",
+            "title": "Given a prepare spy on the cached DB handle, when getConversationByClaudeSessionId runs, then EXPLAIN QUERY PLAN of the SQL it prepared returns a detail containing conv_files_locator_idx and no 'SCAN c' detail (the same test fails against today's WHERE EXISTS query)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lookup-query-rewrite.ac3",
+            "title": "getConversationByClaudeSessionId returns null for a locator no conversation owns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lookup-query-rewrite.ac4",
+            "title": "bash scripts/lint-file-size.sh exits 0 with src/lib/overdeck/conversations.ts at or below its origin/main line count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ownership-helpers",
+        "title": "Add listConversationLocators and isConversationLocatorOwned to conversation-batch-lookup.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T17:43:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5369",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-batch-lookup.ts",
+            "src/lib/overdeck/__tests__/conversation-batch-lookup.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-batch-lookup.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-batch-lookup.test.ts passes including the two new helper tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In src/lib/overdeck/conversation-batch-lookup.ts add exported listConversationLocators(): Set<string> running SELECT cf.locator AS locator FROM conversation_files cf JOIN conversations c ON c.id = cf.conversation_id (all harnesses), and exported isConversationLocatorOwned(locator: string): boolean running SELECT 1 FROM conversation_files cf JOIN conversations c ON c.id = cf.conversation_id WHERE cf.locator = ? LIMIT 1 and returning whether a row came back. Both use getOverdeckDatabase() from ./infra.js; import nothing else. Extend the module header to mention the ownership helpers. Add tests to conversation-batch-lookup.test.ts using its beforeAll rows session-a and session-b."
+        },
+        "items": [
+          {
+            "id": "ownership-helpers.ac1",
+            "title": "listConversationLocators() returns a Set containing session-a and session-b and not session-missing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ownership-helpers.ac2",
+            "title": "isConversationLocatorOwned returns true for session-a and false for session-missing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ownership-helpers.ac3",
+            "title": "conversation-batch-lookup.ts imports only ./infra.js, and npm run lint:circular exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "orphan-scan-locator-set",
+        "title": "Resolve /clear-orphan scan ownership from one locator Set per tick",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T17:43:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5369",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "orphan-scan-short-transcript-memo"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/conversation-lifecycle.ts",
+            "src/dashboard/server/services/__tests__/conversation-lifecycle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-lifecycle.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-lifecycle.test.ts passes, including the 4000-transcript, mid-tick re-check and shared-project-dir tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In detectOrphanedClaudeCodeSessions: after the cwd-grouping loop return early when cwdGroups is empty, then load const ownedLocators = listConversationLocators(); replace `if (getConversationByClaudeSessionId(sessionId)) continue;` with `if (ownedLocators.has(sessionId)) continue;`; directly before `const baseTitle = parent.title ?? 'Conversation';` add `if (isConversationLocatorOwned(sessionId)) continue;`; after the createConversation try/catch succeeds add `ownedLocators.add(sessionId);`. Import both helpers from ../../../lib/overdeck/conversation-batch-lookup.js and drop the now-unused getConversationByClaudeSessionId import. In the test file add a vi.mock for conversation-batch-lookup.js (mockListConversationLocators default new Set(), mockIsConversationLocatorOwned default false, reset in the orphan suite beforeEach), wrap the real readFirstClearTimestamp in a counting vi.fn built inside the existing conversation-fork-adoption.js mock factory (readFirstClearTimestamp: vi.fn((path) => original.readFirstClearTimestamp(path)), read back with vi.mocked), migrate the six existing orphan tests per the PRD WI-4 table, and add the three new tests (4000 owned transcripts over two polls; re-check returns true so nothing is created; cwds /work/myproj and /work.myproj sharing -work-myproj adopt once)."
+        },
+        "items": [
+          {
+            "id": "orphan-scan-locator-set.ac1",
+            "title": "Given 4000 owned transcripts in one project dir, when pollConversations runs twice, then listConversationLocators is called exactly 2 times and isConversationLocatorOwned, getConversationByClaudeSessionId and readFirstClearTimestamp are called 0 times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orphan-scan-locator-set.ac2",
+            "title": "Given a /clear orphan whose session isConversationLocatorOwned reports owned at adoption time, when the scan runs, then createConversation is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orphan-scan-locator-set.ac3",
+            "title": "Given two active parents whose cwds encode to the same project dir, when one poll runs, then createConversation is called exactly once for the orphan",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orphan-scan-locator-set.ac4",
+            "title": "Given only ended conversations, when the scan runs, then listConversationLocators is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orphan-scan-locator-set.ac5",
+            "title": "grep -n getConversationByClaudeSessionId src/dashboard/server/services/conversation-lifecycle.ts returns no lines, and the existing adoption test still creates the sibling with the same fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "orphan-scan-short-transcript-memo",
+        "title": "Re-read a short transcript only when its size or mtime changed",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T17:43:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5369",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation-lifecycle.ts",
+            "src/dashboard/server/services/__tests__/conversation-lifecycle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-lifecycle.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-lifecycle.test.ts passes including both short-transcript tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add module-level const provisionalJsonlStat = new Map<string, string>() below notOrphanJsonlPaths. In the scan loop, after the ownedLocators check, await stat(jsonlPath) (fs/promises, already imported) inside try/catch (continue on error), build statKey = `${info.size}:${info.mtimeMs}`, and continue when provisionalJsonlStat.get(jsonlPath) === statKey. Take the stat before readFirstClearTimestamp. On a null verdict: definitive adds to notOrphanJsonlPaths and deletes the memo entry; provisional sets the memo to statKey. When a sentinel is found, delete the memo entry. Add the two PRD WI-5 tests (a 2-line transcript is read once over two polls and again after appendFileSync; a 1-line transcript that later gains the sentinel is adopted). The suite's writeJsonl writes no trailing newline, so appended text must start with a newline: appendFileSync(path, '\\n' + JSON.stringify(line)); reset the orphan's mtime with utimesSync after appending so it stays after the parent's."
+        },
+        "items": [
+          {
+            "id": "orphan-scan-short-transcript-memo.ac1",
+            "title": "Given an unowned 2-line transcript, when pollConversations runs twice, then readFirstClearTimestamp is called once for that path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orphan-scan-short-transcript-memo.ac2",
+            "title": "Given that transcript gains a line, when the next poll runs, then readFirstClearTimestamp reads it again (two calls in total)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orphan-scan-short-transcript-memo.ac3",
+            "title": "Given a 1-line transcript that later gains the /clear sentinel after the parent's mtime, when the next poll runs, then createConversation adopts it once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orphan-scan-short-transcript-memo.ac4",
+            "title": "The new stat call uses fs/promises; grep -nE 'Sync\\(' on the diff of conversation-lifecycle.ts returns no added lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-adoption-ownership",
+        "title": "Use isConversationLocatorOwned as fork adoption's default ownership check",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T17:43:43Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-5369",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-fork-adoption.ts",
+            "src/lib/overdeck/__tests__/conversation-batch-lookup.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-batch-lookup.test.ts tests/unit/lib/overdeck/conversation-fork-adoption.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass, including the defaultForkAdoptionDeps.isLocatorOwned test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In src/lib/overdeck/conversation-fork-adoption.ts change defaultForkAdoptionDeps.isLocatorOwned (line 70) to (sessionId) => isConversationLocatorOwned(sessionId), import it from ./conversation-batch-lookup.js, and remove getConversationByClaudeSessionId from the ./conversations.js import (it has no other use in the file). In conversation-batch-lookup.test.ts import defaultForkAdoptionDeps from ../conversation-fork-adoption.js and assert isLocatorOwned('session-a') is true and isLocatorOwned('session-missing') is false."
+        },
+        "items": [
+          {
+            "id": "fork-adoption-ownership.ac1",
+            "title": "defaultForkAdoptionDeps.isLocatorOwned returns true for an owned locator and false for an unknown one against a real test DB",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-adoption-ownership.ac2",
+            "title": "grep -n getConversationByClaudeSessionId src/lib/overdeck/conversation-fork-adoption.ts returns no lines and tests/unit/lib/overdeck/conversation-fork-adoption.test.ts still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Document the per-tick locator Set, short-transcript memo and locator index",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T17:43:43Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5369",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            ".overdeck/context/codebase/concerns.md",
+            "changelog.d/pan-5369.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npm run lint:last-verified"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "lint:last-verified exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Add the PRD's bullet to docs/DASHBOARD-ARCHITECTURE.md directly after the bullet starting '- A post-`/clear` sibling shares its parent's terminal session (PAN-4485).'; add the PRD's ownership-check bullet to .overdeck/context/codebase/concerns.md after the bullet starting '- A human conversation's Claude session is its current (newest) `conversation_files` locator', keeping the single last-verified line unchanged at the end; create changelog.d/pan-5369.md with the PRD's '#### Fixed' entry."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a bullet that names listConversationLocators, isConversationLocatorOwned and conv_files_locator_idx and states that a short transcript is re-read only when its size or mtime changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": ".overdeck/context/codebase/concerns.md contains a bullet telling readers to check transcript ownership with isConversationLocatorOwned/listConversationLocators instead of getConversationByClaudeSessionId, and still ends with exactly one last-verified line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac3",
+            "title": "changelog.d/pan-5369.md exists with a '#### Fixed' heading and one bullet linking #5369, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "locator-index",
+        "to": "lookup-query-rewrite",
+        "type": "blocks"
+      },
+      {
+        "from": "ownership-helpers",
+        "to": "orphan-scan-locator-set",
+        "type": "blocks"
+      },
+      {
+        "from": "orphan-scan-locator-set",
+        "to": "orphan-scan-short-transcript-memo",
+        "type": "blocks"
+      },
+      {
+        "from": "ownership-helpers",
+        "to": "fork-adoption-ownership",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-15-PAN-5369-dashboard-main-thread-pinned-at-100-the-clear-orphan-scan-re-queries-sqlite-for-4000-transcripts-every-poll-tick.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

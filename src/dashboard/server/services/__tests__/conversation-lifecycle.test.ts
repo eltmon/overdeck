@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync, mkdirSync, utimesSync } from 'fs';
+import { mkdtempSync, writeFileSync, mkdirSync, utimesSync, appendFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { Effect } from 'effect';
@@ -15,9 +15,10 @@ const mockListPaneValues = vi.fn();
 const mockGetRuntimeCensus = vi.fn();
 const mockRefreshRuntimeCensus = vi.fn();
 const mockCreateConversation = vi.fn();
-const mockGetConversationByClaudeSessionId = vi.fn();
 const mockGetConversationByName = vi.fn();
 const mockSetClearedToConvId = vi.fn();
+const mockListConversationLocators = vi.fn(() => new Set<string>());
+const mockIsConversationLocatorOwned = vi.fn(() => false);
 // PAN-4739: the sessions the latest census mock returned, so the
 // conversation-liveness door can agree with the census by default.
 let lastCensusSessions = new Set<string>();
@@ -53,16 +54,26 @@ vi.mock('../../../../lib/overdeck/conversations.js', () => ({
   markConversationEnded: mockMarkConversationEnded,
   markConversationRunning: mockMarkConversationRunning,
   createConversation: mockCreateConversation,
-  getConversationByClaudeSessionId: mockGetConversationByClaudeSessionId,
   getConversationByName: mockGetConversationByName,
   setClearedToConvId: mockSetClearedToConvId,
 }));
 
-// PAN-2652: fork adoption has its own suite; keep the real /clear sentinel reader.
-vi.mock('../../../../lib/overdeck/conversation-fork-adoption.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../lib/overdeck/conversation-fork-adoption.js')>()),
-  adoptForkedClaudeSessions: vi.fn(async () => undefined),
+vi.mock('../../../../lib/overdeck/conversation-batch-lookup.js', () => ({
+  listConversationLocators: mockListConversationLocators,
+  isConversationLocatorOwned: mockIsConversationLocatorOwned,
 }));
+
+// PAN-2652: fork adoption has its own suite; keep the real /clear sentinel reader,
+// wrapped in a counting mock so the PAN-2215 seen-cache test can assert it is
+// not re-read for a transcript already proven not to be a /clear orphan.
+vi.mock('../../../../lib/overdeck/conversation-fork-adoption.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../../lib/overdeck/conversation-fork-adoption.js')>();
+  return {
+    ...original,
+    adoptForkedClaudeSessions: vi.fn(async () => undefined),
+    readFirstClearTimestamp: vi.fn((path: string) => original.readFirstClearTimestamp(path)),
+  };
+});
 
 vi.mock('../conversation-attachments.js', () => ({
   cleanupUnreferencedConversationAttachments: mockCleanupUnreferencedConversationAttachments,
@@ -733,6 +744,9 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
     vi.clearAllMocks();
     // Default: harness alive in sessions that exist (corpse cases set false explicitly).
     mockIsHarnessProcessAlive.mockResolvedValue(true);
+    // Default: nothing owned, so tests opt in to the locators they need.
+    mockListConversationLocators.mockReturnValue(new Set<string>());
+    mockIsConversationLocatorOwned.mockReturnValue(false);
     fakeHome = mkdtempSync(join(tmpdir(), 'pan-clear-orphan-'));
     cwd = '/work/myproj';
     // encodeClaudeProjectDir(/work/myproj) → -work-myproj (slashes/dots collapse to dashes)
@@ -810,9 +824,7 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
 
     mockListConversations.mockReturnValue([parent]);
     mockListSessionNames.mockReturnValue(Effect.succeed(['conv-parent']));
-    mockGetConversationByClaudeSessionId.mockImplementation((id: string) =>
-      id === parentSessionId ? parent : null,
-    );
+    mockListConversationLocators.mockReturnValue(new Set([parentSessionId]));
     mockCreateConversation.mockReturnValue({ id: 200, name: 'parent-conv-post-clear-bbbbbbbb' });
 
     const { pollConversations } = await import('../conversation-lifecycle.js');
@@ -859,7 +871,7 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
       { id: 1, name: 'p', tmuxSession: 'conv-p', status: 'active', cwd, claudeSessionId: 'parent-uuid', harness: 'claude-code', title: null },
     ]);
     mockListSessionNames.mockReturnValue(Effect.succeed(['conv-p']));
-    mockGetConversationByClaudeSessionId.mockReturnValue({ id: 999 }); // every session lookup says "known"
+    mockListConversationLocators.mockReturnValue(new Set([known])); // every session lookup says "known"
 
     const { pollConversations } = await import('../conversation-lifecycle.js');
     await pollConversations();
@@ -885,7 +897,6 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
     // No active conversation has this cwd
     mockListConversations.mockReturnValue([]);
     mockListSessionNames.mockReturnValue(Effect.succeed([]));
-    mockGetConversationByClaudeSessionId.mockReturnValue(null);
 
     const { pollConversations } = await import('../conversation-lifecycle.js');
     await pollConversations();
@@ -913,7 +924,7 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
       { id: 1, name: 'p', tmuxSession: 'conv-p', status: 'active', cwd, claudeSessionId: parent, harness: 'claude-code', title: 'parent' },
     ]);
     mockListSessionNames.mockReturnValue(Effect.succeed(['conv-p']));
-    mockGetConversationByClaudeSessionId.mockImplementation((id: string) => (id === parent ? { id: 1 } : null));
+    mockListConversationLocators.mockReturnValue(new Set([parent]));
 
     const { pollConversations } = await import('../conversation-lifecycle.js');
     await pollConversations();
@@ -941,12 +952,11 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
       { id: 1, name: 'was-here', tmuxSession: 'conv-was-here', status: 'ended', cwd, claudeSessionId: 'gone-uuid', harness: 'claude-code', title: null, createdAt: '2026-05-24T19:00:00.000Z' },
     ]);
     mockListSessionNames.mockReturnValue(Effect.succeed([]));
-    mockGetConversationByClaudeSessionId.mockReturnValue(null);
 
     const { pollConversations } = await import('../conversation-lifecycle.js');
     await pollConversations();
 
-    expect(mockGetConversationByClaudeSessionId).not.toHaveBeenCalled();
+    expect(mockListConversationLocators).not.toHaveBeenCalled();
     expect(mockCreateConversation).not.toHaveBeenCalled();
   });
 
@@ -976,15 +986,211 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
       { id: 1, name: 'p', tmuxSession: 'conv-p', status: 'active', cwd, claudeSessionId: parent, harness: 'claude-code', title: 'parent' },
     ]);
     mockListSessionNames.mockReturnValue(Effect.succeed(['conv-p']));
-    mockGetConversationByClaudeSessionId.mockImplementation((id: string) => (id === parent ? { id: 1 } : null));
+    mockListConversationLocators.mockReturnValue(new Set([parent]));
 
+    const { readFirstClearTimestamp } = await import('../../../../lib/overdeck/conversation-fork-adoption.js');
     const { pollConversations } = await import('../conversation-lifecycle.js');
     await pollConversations();
     await pollConversations();
 
-    const peerLookups = mockGetConversationByClaudeSessionId.mock.calls.filter(([id]) => id === peer);
-    expect(peerLookups).toHaveLength(1);
+    const peerReads = vi.mocked(readFirstClearTimestamp).mock.calls.filter(([path]) => path.includes(peer));
+    expect(peerReads).toHaveLength(1);
     expect(mockCreateConversation).not.toHaveBeenCalled();
+  });
+
+  it('skips every owned transcript via the per-tick locator Set, even at scale (4000 transcripts)', async () => {
+    const parentSessionId = 'owned-parent-aaaa-aaaa-aaaaaaaaaaaa';
+    const owned = new Set<string>([parentSessionId]);
+    for (let i = 0; i < 4000; i++) {
+      const sessionId = `owned-${String(i).padStart(6, '0')}-0000-0000-0000-000000000000`;
+      writeFileSync(
+        join(projectDir, `${sessionId}.jsonl`),
+        JSON.stringify({ type: 'user', message: { role: 'user', content: 'hi' }, timestamp: '2026-05-24T19:30:00.000Z' }),
+        'utf-8',
+      );
+      owned.add(sessionId);
+    }
+
+    mockListConversations.mockReturnValue([
+      { id: 1, name: 'p', tmuxSession: 'conv-p', status: 'active', cwd, claudeSessionId: parentSessionId, harness: 'claude-code', title: 'parent' },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed(['conv-p']));
+    mockListConversationLocators.mockReturnValue(owned);
+
+    const { readFirstClearTimestamp } = await import('../../../../lib/overdeck/conversation-fork-adoption.js');
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+    await pollConversations();
+
+    expect(mockListConversationLocators).toHaveBeenCalledTimes(2);
+    expect(mockIsConversationLocatorOwned).not.toHaveBeenCalled();
+    expect(vi.mocked(readFirstClearTimestamp)).not.toHaveBeenCalled();
+    expect(mockCreateConversation).not.toHaveBeenCalled();
+  }, 20_000);
+
+  it('skips a /clear orphan that the mid-tick re-check reports as already owned', async () => {
+    const parentSessionId = 'aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa';
+    const orphanSessionId = 'bbbbbbbb-2222-2222-2222-bbbbbbbbbbbb';
+
+    writeJsonl(
+      `${parentSessionId}.jsonl`,
+      [{ type: 'user', message: { role: 'user', content: 'hello world' }, timestamp: '2026-05-24T19:30:00.000Z' }],
+      Date.parse('2026-05-24T19:48:00.000Z'),
+    );
+    writeJsonl(
+      `${orphanSessionId}.jsonl`,
+      [
+        { type: 'file-history-snapshot', messageId: 'x', snapshot: {}, isSnapshotUpdate: false },
+        {
+          type: 'user',
+          message: { role: 'user', content: '<command-name>/clear</command-name>\n<command-message>clear</command-message>' },
+          timestamp: '2026-05-24T19:50:00.000Z',
+        },
+      ],
+      Date.parse('2026-05-24T19:50:30.000Z'),
+    );
+
+    mockListConversations.mockReturnValue([
+      { id: 1, name: 'parent-conv', tmuxSession: 'conv-parent', status: 'active', cwd, claudeSessionId: parentSessionId, harness: 'claude-code', title: 'Original work' },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed(['conv-parent']));
+    mockListConversationLocators.mockReturnValue(new Set([parentSessionId]));
+    mockIsConversationLocatorOwned.mockImplementation((id: string) => id === orphanSessionId);
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+
+    expect(mockCreateConversation).not.toHaveBeenCalled();
+  });
+
+  it('adopts a shared-project-dir orphan only once per tick when two cwds encode to the same dir', async () => {
+    const parentASessionId = 'aaaa1111-0000-0000-0000-000000000001';
+    const parentBSessionId = 'bbbb2222-0000-0000-0000-000000000002';
+    const orphanSessionId = 'cccc3333-0000-0000-0000-000000000003';
+
+    writeJsonl(
+      `${parentASessionId}.jsonl`,
+      [{ type: 'user', message: { role: 'user', content: 'hi from A' }, timestamp: '2026-05-24T19:30:00.000Z' }],
+      Date.parse('2026-05-24T19:48:00.000Z'),
+    );
+    writeJsonl(
+      `${parentBSessionId}.jsonl`,
+      [{ type: 'user', message: { role: 'user', content: 'hi from B' }, timestamp: '2026-05-24T19:30:00.000Z' }],
+      Date.parse('2026-05-24T19:47:00.000Z'),
+    );
+    writeJsonl(
+      `${orphanSessionId}.jsonl`,
+      [
+        { type: 'file-history-snapshot', messageId: 'x', snapshot: {}, isSnapshotUpdate: false },
+        {
+          type: 'user',
+          message: { role: 'user', content: '<command-name>/clear</command-name>\n<command-message>clear</command-message>' },
+          timestamp: '2026-05-24T19:50:00.000Z',
+        },
+      ],
+      Date.parse('2026-05-24T19:50:30.000Z'),
+    );
+
+    mockListConversations.mockReturnValue([
+      { id: 1, name: 'parent-a', tmuxSession: 'conv-parent-a', status: 'active', cwd: '/work/myproj', claudeSessionId: parentASessionId, harness: 'claude-code', title: 'A' },
+      { id: 2, name: 'parent-b', tmuxSession: 'conv-parent-b', status: 'active', cwd: '/work.myproj', claudeSessionId: parentBSessionId, harness: 'claude-code', title: 'B' },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed(['conv-parent-a', 'conv-parent-b']));
+    mockListConversationLocators.mockReturnValue(new Set([parentASessionId, parentBSessionId]));
+    mockCreateConversation.mockReturnValue({ id: 999, name: 'sibling' });
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+
+    expect(mockCreateConversation).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-reads an unowned short transcript only when its stat changes (PAN-5369)', async () => {
+    const parentSessionId = 'short-parent-aaaa-aaaa-aaaaaaaaaaaa';
+    const shortOrphanSessionId = 'short-orphan-bbbb-bbbb-bbbbbbbbbbbb';
+
+    writeJsonl(
+      `${parentSessionId}.jsonl`,
+      [{ type: 'user', message: { role: 'user', content: 'hi' }, timestamp: '2026-05-24T19:30:00.000Z' }],
+      Date.parse('2026-05-24T19:48:00.000Z'),
+    );
+    const shortPath = writeJsonl(
+      `${shortOrphanSessionId}.jsonl`,
+      [
+        { type: 'user', message: { role: 'user', content: 'line 1' }, timestamp: '2026-05-24T19:50:00.000Z' },
+        { type: 'user', message: { role: 'user', content: 'line 2' }, timestamp: '2026-05-24T19:50:05.000Z' },
+      ],
+      Date.parse('2026-05-24T19:50:30.000Z'),
+    );
+
+    mockListConversations.mockReturnValue([
+      { id: 1, name: 'p', tmuxSession: 'conv-p', status: 'active', cwd, claudeSessionId: parentSessionId, harness: 'claude-code', title: 'parent' },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed(['conv-p']));
+    mockListConversationLocators.mockReturnValue(new Set([parentSessionId]));
+
+    const { readFirstClearTimestamp } = await import('../../../../lib/overdeck/conversation-fork-adoption.js');
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+    await pollConversations();
+
+    let reads = vi.mocked(readFirstClearTimestamp).mock.calls.filter(([path]) => path === shortPath);
+    expect(reads).toHaveLength(1);
+
+    appendFileSync(
+      shortPath,
+      '\n' + JSON.stringify({ type: 'user', message: { role: 'user', content: 'line 3' }, timestamp: '2026-05-24T19:50:10.000Z' }),
+    );
+    const laterMtimeSec = Date.parse('2026-05-24T19:50:40.000Z') / 1000;
+    utimesSync(shortPath, laterMtimeSec, laterMtimeSec);
+
+    await pollConversations();
+
+    reads = vi.mocked(readFirstClearTimestamp).mock.calls.filter(([path]) => path === shortPath);
+    expect(reads).toHaveLength(2);
+    expect(mockCreateConversation).not.toHaveBeenCalled();
+  });
+
+  it('adopts a short transcript once it gains the /clear sentinel after a stat change (PAN-5369)', async () => {
+    const parentSessionId = 'short-adopt-parent-aaaa-aaaaaaaaaaaa';
+    const orphanSessionId = 'short-adopt-orphan-bbbb-bbbbbbbbbbbb';
+
+    writeJsonl(
+      `${parentSessionId}.jsonl`,
+      [{ type: 'user', message: { role: 'user', content: 'hi' }, timestamp: '2026-05-24T19:30:00.000Z' }],
+      Date.parse('2026-05-24T19:48:00.000Z'),
+    );
+    const orphanPath = writeJsonl(
+      `${orphanSessionId}.jsonl`,
+      [{ type: 'user', message: { role: 'user', content: 'not yet cleared' }, timestamp: '2026-05-24T19:50:00.000Z' }],
+      Date.parse('2026-05-24T19:50:05.000Z'),
+    );
+
+    mockListConversations.mockReturnValue([
+      { id: 1, name: 'parent-conv', tmuxSession: 'conv-parent', status: 'active', cwd, claudeSessionId: parentSessionId, harness: 'claude-code', title: 'Original work' },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed(['conv-parent']));
+    mockListConversationLocators.mockReturnValue(new Set([parentSessionId]));
+    mockCreateConversation.mockReturnValue({ id: 321, name: 'parent-conv-post-clear' });
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+    expect(mockCreateConversation).not.toHaveBeenCalled();
+
+    appendFileSync(
+      orphanPath,
+      '\n' + JSON.stringify({
+        type: 'user',
+        message: { role: 'user', content: '<command-name>/clear</command-name>\n<command-message>clear</command-message>' },
+        timestamp: '2026-05-24T19:50:30.000Z',
+      }),
+    );
+    const clearedMtimeSec = Date.parse('2026-05-24T19:50:45.000Z') / 1000;
+    utimesSync(orphanPath, clearedMtimeSec, clearedMtimeSec);
+
+    await pollConversations();
+
+    expect(mockCreateConversation).toHaveBeenCalledTimes(1);
   });
 });
 

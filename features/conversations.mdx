@@ -815,6 +815,25 @@ that mounts the issue drawer; in a pop-out window (`/popout/conversation/<id>`,
 `/popout/flywheel-conversation`) or the mobile app (`/m`), an issue link always
 opens the tracker in a new tab.
 
+### Conversation links
+
+Inside a conversation transcript, text that names another conversation
+renders as a link once the dashboard resolves it: a name (`20261113-6031`,
+or `conv-20261113-6031`), a numbered form (`conv 3904`, `conversation 3904`,
+`conv #3904`), or a `/conv/<id>` path — written as plain text, as the whole
+value of an inline code span, or as a hand-written Markdown link. The link's
+tooltip is the conversation's title, or its name when it has none. Fenced
+code never links, and a name the dashboard can't resolve (or hasn't resolved
+yet) stays plain text — archived conversations still resolve and link. The
+conversation currently being viewed is never turned into a link.
+
+A plain click opens the conversation in the dashboard, the same way clicking
+its row in the left column does — no page reload. Ctrl/Cmd-click,
+middle-click and the browser's right-click menu open it in a new tab
+instead. As with issue links, this in-dashboard behaviour only applies to
+the main layout: in a pop-out window, the mobile app (`/m`), or the issue
+drawer, a plain click opens a new tab too.
+
 ### On issue and workspace rows
 
 The issue's row in the left column's Issues section (when you expand it), and
