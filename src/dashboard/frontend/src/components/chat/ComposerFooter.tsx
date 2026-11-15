@@ -20,6 +20,7 @@ import { isNativeShell } from '../../lib/nativeShell';
 import type { LexicalEditor } from 'lexical';
 import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical';
 import { ComposerPromptEditor, loadDraft } from './ComposerPromptEditor';
+import { skillContextForConversation } from './skillSlashCommands';
 import { hasDragPaths, readDragPaths } from '../../lib/explorer-drag-paths';
 import { insertPathsIntoComposer } from './composerPathDrop';
 import { clearDraft } from '../../lib/composerDraft';
@@ -789,6 +790,7 @@ function ComposerFooterInput({
         <ComposerPromptEditor
           conversationName={conversation.name}
           harness={harness}
+          skillContext={skillContextForConversation(conversation)}
           disabled={isDisabled}
           onCommandKeyDown={handleCommandKey}
           editorRef={editorRef}

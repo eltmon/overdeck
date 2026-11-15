@@ -12,9 +12,16 @@ interface MarkdownTabProps {
   body: string | undefined | null;
   isLoading?: boolean;
   emptyLabel?: string;
+  /** Render a relative-href anchor as plain text (PAN-5338 D-11); default false. */
+  plainRelativeLinks?: boolean;
 }
 
-export function MarkdownTab({ body, isLoading, emptyLabel = 'No content available.' }: MarkdownTabProps) {
+export function MarkdownTab({
+  body,
+  isLoading,
+  emptyLabel = 'No content available.',
+  plainRelativeLinks,
+}: MarkdownTabProps) {
   if (isLoading) {
     return (
       <div
@@ -40,7 +47,7 @@ export function MarkdownTab({ body, isLoading, emptyLabel = 'No content availabl
       data-testid="markdown-tab"
       style={{ padding: 16, fontSize: 13, lineHeight: 1.55 }}
     >
-      <ChatMarkdown text={body} cwd={undefined} />
+      <ChatMarkdown text={body} cwd={undefined} plainRelativeLinks={plainRelativeLinks} />
     </div>
   );
 }

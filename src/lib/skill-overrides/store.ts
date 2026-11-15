@@ -57,7 +57,7 @@ import {
 } from './resolve.js';
 
 export type SkillOverrideErrorCode =
-  | 'core-skill' | 'unknown-skill' | 'unknown-pack' | 'unknown-project' | 'unknown-issue' | 'bad-request';
+  | 'core-skill' | 'unknown-skill' | 'unknown-pack' | 'unknown-project' | 'unknown-issue' | 'unknown-conversation' | 'bad-request';
 
 export class SkillOverrideError extends Error {
   constructor(readonly code: SkillOverrideErrorCode, message: string) {
@@ -256,7 +256,7 @@ function resolvePackStates(
  * `.pan/skills`, so project skills appear only in project and issue context.
  */
 export async function listSkillStates(
-  ctx: { projectKey?: string; issueId?: string },
+  ctx: { projectKey?: string; issueId?: string; conversationOverrides?: SkillOverrideMap },
   opts: { checkUpdates?: boolean } = {},
 ): Promise<SkillStateList> {
   const issueId = ctx.issueId?.toUpperCase();
@@ -279,13 +279,14 @@ export async function listSkillStates(
   ]);
   const narrowest: SkillOverrideLevel = issueId ? 'issue' : projectKey ? 'project' : 'global';
   const nativeNames = new Set(catalog.map(entry => entry.name));
-  const packs = resolvePackStates(packCatalog, layers, narrowest, nativeNames, installedPlugins);
+  const effectiveLayers = ctx.conversationOverrides ? { ...layers, conversation: ctx.conversationOverrides } : layers;
+  const packs = resolvePackStates(packCatalog, effectiveLayers, narrowest, nativeNames, installedPlugins);
   if (opts.checkUpdates) {
     await Promise.all(packs.map(async (pack) => {
       pack.updateAvailable = await packUpdateAvailable(pack);
     }));
   }
-  return { project: projectKey ?? null, issue: issueId ?? null, skills: resolveSkillStates(catalog, layers), packs };
+  return { project: projectKey ?? null, issue: issueId ?? null, skills: resolveSkillStates(catalog, effectiveLayers), packs };
 }
 
 export interface LowerLevelOverrides {

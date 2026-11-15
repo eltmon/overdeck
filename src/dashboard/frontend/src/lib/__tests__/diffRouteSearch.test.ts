@@ -38,3 +38,13 @@ describe('compare search params (PAN-4503)', () => {
     })).toEqual({ tab: 'x' });
   });
 });
+
+describe('All turns file selection (PAN-5338 WI-10)', () => {
+  it('keeps diffFilePath without a diffTurnId', () => {
+    expect(parseDiffRouteSearch({ diff: '1', diffFilePath: 'a.md' })).toEqual({ diff: '1', diffFilePath: 'a.md' });
+  });
+
+  it('drops diffFilePath without diff open', () => {
+    expect(parseDiffRouteSearch({ diffFilePath: 'a.md' })).toEqual({});
+  });
+});

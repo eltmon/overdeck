@@ -326,6 +326,13 @@ describe('pack states (PAN-4334)', () => {
   });
 });
 
+describe('conversation overrides (PAN-5347)', () => {
+  it('resolves a catalog skill from conversationOverrides as the narrowest layer', async () => {
+    const list = await listSkillStates({ conversationOverrides: { grilling: false } });
+    expect(list.skills.find(skill => skill.name === 'grilling')).toMatchObject({ enabled: false, source: 'conversation' });
+  });
+});
+
 describe('pack writes (PAN-4334)', () => {
   const registry = `skills:\n  packs:\n    mattpocock:\n      url: https://github.com/mattpocock/skills\n      ref: v1.2.3\n      commit: ${'c'.repeat(40)}\n`;
   const issuePath = () => issueSkillOverridesPath(repo, 'TST-1');

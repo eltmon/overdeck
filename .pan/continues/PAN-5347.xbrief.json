@@ -1,0 +1,169 @@
+{
+  "version": "1",
+  "issueId": "PAN-5347",
+  "created": "2026-11-15T13:35:45.395Z",
+  "updated": "2026-11-15T14:39:17.224Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "capability-skill-slash-commands": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5347",
+      "claimedAt": "2026-11-15T13:35:45.395Z",
+      "doneAt": "2026-11-15T13:43:39.348Z"
+    },
+    "capability-skill-slash-commands.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:43:39.348Z"
+    },
+    "capability-skill-slash-commands.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:43:39.348Z"
+    },
+    "capability-skill-slash-commands.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:43:39.348Z"
+    },
+    "server-conversation-skill-scope": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5347",
+      "claimedAt": "2026-11-15T13:44:03.397Z",
+      "doneAt": "2026-11-15T13:50:37.546Z"
+    },
+    "server-conversation-skill-scope.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:50:37.546Z"
+    },
+    "server-conversation-skill-scope.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:50:37.546Z"
+    },
+    "server-conversation-skill-scope.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:50:37.546Z"
+    },
+    "server-conversation-skill-scope.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:50:37.546Z"
+    },
+    "server-conversation-skill-scope.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:50:37.546Z"
+    },
+    "frontend-skill-commands-module": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5347",
+      "claimedAt": "2026-11-15T13:50:46.224Z",
+      "doneAt": "2026-11-15T13:58:38.794Z"
+    },
+    "frontend-skill-commands-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:58:38.794Z"
+    },
+    "frontend-skill-commands-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:58:38.794Z"
+    },
+    "frontend-skill-commands-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:58:38.794Z"
+    },
+    "frontend-skill-commands-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:58:38.794Z"
+    },
+    "frontend-skill-commands-module.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:58:38.794Z"
+    },
+    "frontend-get-slash-commands-skills": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5347",
+      "claimedAt": "2026-11-15T13:59:02.261Z",
+      "doneAt": "2026-11-15T14:05:06.930Z"
+    },
+    "frontend-get-slash-commands-skills.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:05:06.930Z"
+    },
+    "frontend-get-slash-commands-skills.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:05:06.930Z"
+    },
+    "frontend-get-slash-commands-skills.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:05:06.930Z"
+    },
+    "frontend-editor-skills-menu": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5347",
+      "claimedAt": "2026-11-15T14:05:13.226Z",
+      "doneAt": "2026-11-15T14:14:47.570Z"
+    },
+    "frontend-editor-skills-menu.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:14:47.570Z"
+    },
+    "frontend-editor-skills-menu.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:14:47.570Z"
+    },
+    "frontend-editor-skills-menu.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:14:47.570Z"
+    },
+    "frontend-editor-skills-menu.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:14:47.570Z"
+    },
+    "frontend-editor-skills-menu.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:14:47.570Z"
+    },
+    "frontend-footer-conversation-prop": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5347",
+      "claimedAt": "2026-11-15T14:14:56.004Z",
+      "doneAt": "2026-11-15T14:20:49.294Z"
+    },
+    "frontend-footer-conversation-prop.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:20:49.294Z"
+    },
+    "frontend-footer-conversation-prop.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:20:49.294Z"
+    },
+    "docs-skills-in-composer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5347",
+      "claimedAt": "2026-11-15T14:20:58.216Z",
+      "doneAt": "2026-11-15T14:23:00.630Z"
+    },
+    "docs-skills-in-composer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:23:00.630Z"
+    },
+    "docs-skills-in-composer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:23:00.630Z"
+    },
+    "docs-skills-in-composer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:23:00.630Z"
+    },
+    "docs-skills-in-composer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:23:00.630Z"
+    },
+    "frontend-footer-conversation-prop.ac3": {
+      "status": "cancelled"
+    },
+    "frontend-footer-conversation-prop.ac4": {
+      "status": "cancelled"
+    }
+  }
+}
