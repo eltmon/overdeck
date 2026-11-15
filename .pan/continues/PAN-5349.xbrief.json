@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5349",
   "created": "2026-11-15T15:32:54.289Z",
-  "updated": "2026-11-15T17:08:55.675Z",
+  "updated": "2026-11-15T17:12:39.257Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -300,9 +300,26 @@
       "doneAt": "2026-11-15T17:06:55.769Z"
     },
     "install-step": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5349",
-      "claimedAt": "2026-11-15T17:08:55.675Z"
+      "claimedAt": "2026-11-15T17:08:55.675Z",
+      "doneAt": "2026-11-15T17:12:39.256Z"
+    },
+    "install-step.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:12:39.256Z"
+    },
+    "install-step.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:12:39.256Z"
+    },
+    "install-step.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:12:39.256Z"
+    },
+    "install-step.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:12:39.256Z"
     }
   }
 }
