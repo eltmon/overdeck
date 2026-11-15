@@ -54,7 +54,6 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { scopeSatisfies, type AccessTokenScope } from '../../lib/access-tokens.js';
 import { isPublicMcpEnabled, publicMcpSurface } from '../../lib/mcp/public-mcp.js';
-import { readRemoteAccessConfig } from '../../lib/remote-access/config.js';
 import { type ChannelMarker, channelOfRequest } from './channel-peer.js';
 import { jsonResponse } from './http-helpers.js';
 import { AGENT_FENCED_MESSAGE, linkActorFence } from './link-fence.js';
@@ -64,6 +63,7 @@ import {
   hasProxyForwardingHeader,
   isLoopbackPeer,
   isTailscaleFunnelRequest,
+  isTrustedLocalCaller,
   resolveDashboardCredential,
 } from './routes/dashboard-auth.js';
 import { getHeaderFromMap, type HeaderMap } from './routes/origin-validation.js';
@@ -98,14 +98,6 @@ function hasEventsStreamToken(headers: HeaderMap): boolean {
 /** True when this server answers only secure channels and local callers (rule 0b). */
 export function publicLinkOnly(env: NodeJS.ProcessEnv = process.env): boolean {
   return env['OVERDECK_PUBLIC_LINK_ONLY'] === '1';
-}
-
-/** True when the request is a trusted local caller under the current config. */
-export function isTrustedLocalRequest(request: HttpServerRequest.HttpServerRequest): boolean {
-  if (!isLoopbackPeer(request)) return false;
-  const headers = request.headers as HeaderMap;
-  if (isTailscaleFunnelRequest(headers)) return false;
-  return !(readRemoteAccessConfig().requireTokenMint && hasProxyForwardingHeader(headers));
 }
 
 export type RemoteGateRejection =
@@ -162,7 +154,7 @@ export function remoteGateRejection(
   // A channel request is never a trusted local caller (D-4645-10).
   if (channel !== null) return { status: 401 };
   if (pathname === '/events/stream' && hasEventsStreamToken(headers)) return null;
-  if (isTrustedLocalRequest(request)) return null;
+  if (isTrustedLocalCaller(request)) return null;
   return { status: 401 };
 }
 

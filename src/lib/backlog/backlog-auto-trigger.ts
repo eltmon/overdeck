@@ -24,21 +24,51 @@ function autonomousSpawnSuppressed(mode: 'incremental' | 'review'): boolean {
 }
 
 let _incrementalTimer: ReturnType<typeof setTimeout> | null = null;
+let _lastAutoPassAt: number | null = null;
+let _spawnInFlight = false;
 
 const DEBOUNCE_MS = 30_000;
+/** PAN-5357: at most one automatic pass per 30 minutes. Operator passes are immediate. */
+export const MIN_AUTO_PASS_INTERVAL_MS = 30 * 60_000;
+
+function windowEndMs(): number {
+  return _lastAutoPassAt === null ? 0 : _lastAutoPassAt + MIN_AUTO_PASS_INTERVAL_MS;
+}
+
+function schedule(projectRoot: string, delayMs: number): void {
+  if (_incrementalTimer !== null) clearTimeout(_incrementalTimer);
+  _incrementalTimer = setTimeout(() => fire(projectRoot), delayMs);
+}
+
+function fire(projectRoot: string): void {
+  _incrementalTimer = null;
+  const wait = windowEndMs() - Date.now();
+  if (wait > 0) return schedule(projectRoot, wait);
+  if (_spawnInFlight) return schedule(projectRoot, DEBOUNCE_MS);
+  if (autonomousSpawnSuppressed('incremental')) return;
+  _spawnInFlight = true;
+  spawnSequencerAgent('incremental', { projectRoot, skipWhenUnchanged: true })
+    .then((agent) => {
+      // FR-8: only a pass that actually spawned starts the window.
+      if (agent) _lastAutoPassAt = Date.now();
+    })
+    .catch((err: unknown) => console.warn('[backlog-auto-trigger] incremental pass failed:', err))
+    .finally(() => { _spawnInFlight = false; });
+}
 
 /**
- * PAN-1866: Call on every backlog delta (issue opened/closed/edited).
- * Debounces: multiple changes within DEBOUNCE_MS collapse into a single
- * incremental sequencer pass.
+ * PAN-1866: call on every backlog delta; PAN-5357: deltas inside the
+ * 30-minute window after a spawned automatic pass collapse into one pass at
+ * the window's end. Outside the window, deltas within DEBOUNCE_MS collapse
+ * into a single incremental sequencer pass as before.
  */
 export function triggerDebouncedIncrementalPass(projectRoot: string): void {
+  schedule(projectRoot, Math.max(DEBOUNCE_MS, windowEndMs() - Date.now()));
+}
+
+export function resetBacklogAutoTriggerForTests(): void {
   if (_incrementalTimer !== null) clearTimeout(_incrementalTimer);
-  _incrementalTimer = setTimeout(() => {
-    _incrementalTimer = null;
-    if (autonomousSpawnSuppressed('incremental')) return;
-    spawnSequencerAgent('incremental', { projectRoot }).catch((err: unknown) =>
-      console.warn('[backlog-auto-trigger] incremental pass failed:', err),
-    );
-  }, DEBOUNCE_MS);
+  _incrementalTimer = null;
+  _lastAutoPassAt = null;
+  _spawnInFlight = false;
 }

@@ -37,6 +37,7 @@ import {
   compositeAnchor,
   compositeMemberAnchor,
 } from '../../../lib/cloister/uat-polyrepo-engine.js';
+import type { BaseMove } from '../../../lib/cloister/bookkeeping-paths.js';
 import { buildConflictAgentHook } from '../../../lib/cloister/uat-conflict-agent.js';
 import { reconcileUatGenerations, type ReconcileResult } from '../../../lib/cloister/uat-reconciler.js';
 import { mergePathOwner } from './merge-path-owner.js';
@@ -251,6 +252,7 @@ async function runUatTrainReconcileForProject(
       getMainHeadSha: () => gitDeps.fetchMain(),
       getBranchHeadSha: (branch: string) => gitDeps.branchHeadSha(branch),
       isGenerationContainedInMain: (generation: UatGeneration) => gitDeps.isBranchContainedInMain?.(generation.name) ?? Promise.resolve(false),
+      isBookkeepingOnlyBaseMove: (move: BaseMove) => gitDeps.isBookkeepingOnlyBaseMove?.(move) ?? Promise.resolve(false),
       store,
       assemble: (features: readonly ReadyFeature[]) => assembleFromReadySetForProject(projectPath, features, {
         store, ...(lane === 'window' ? { labelSuffix: WINDOW_LANE_LABEL_SUFFIX } : {}),

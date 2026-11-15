@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parseSequenceJson } from './types.js';
 import type { SequenceDoc, SequenceEdge, SequenceNode, SequenceParseError } from './types.js';
@@ -50,6 +50,49 @@ function renderRationaleSection(nodes: SequenceNode[]): string {
   return lines.join('\n');
 }
 
+/** PAN-5357: deterministic node order so array order never changes the rendered bytes. */
+function sortNodes(nodes: SequenceNode[]): SequenceNode[] {
+  return [...nodes].sort(
+    (a, b) => a.rank - b.rank || a.issue.localeCompare(b.issue) || JSON.stringify(a).localeCompare(JSON.stringify(b)),
+  );
+}
+
+/** PAN-5357: deterministic edge order so array order never changes the rendered bytes. */
+function sortEdges(edges: SequenceEdge[]): SequenceEdge[] {
+  const key = (e: SequenceEdge): string => `${e.from}\u0000${e.to}\u0000${e.type}\u0000${e.source}`;
+  return [...edges].sort((a, b) => key(a).localeCompare(key(b)) || a.confidence - b.confidence);
+}
+
+/** PAN-5357: the full sequence.md rendering, as a pure function of the doc. */
+function renderSequenceMd(doc: SequenceDoc): string {
+  const sortedNodes = sortNodes(doc.nodes);
+  const canonical: SequenceDoc = { ...doc, nodes: sortedNodes, edges: sortEdges(doc.edges) };
+  const header = `# Backlog Sequence\n\n_Last sequenced: ${doc.generatedAt} · model: ${doc.model} · open: ${doc.openCount}_\n`;
+  const table = renderTable(sortedNodes);
+  const rationale = renderRationaleSection(sortedNodes);
+  const machineBlock = `${MACHINE_MARKER}\n\n\`\`\`json\n${JSON.stringify(canonical, null, 2)}\n\`\`\`\n`;
+
+  const parts = [header, table];
+  if (rationale) parts.push(rationale);
+  parts.push(machineBlock);
+
+  return parts.join('\n\n');
+}
+
+/**
+ * PAN-5357 FR-11: the submission path records which manifest it ranked, so the
+ * auto-trigger can tell "nothing changed since the last submitted pass" from
+ * "nothing changed since the last spawn attempt". Operator edits never call this.
+ */
+function recordExaminedManifest(outPath: string): void {
+  const manifestPath = join(dirname(outPath), 'manifest.json');
+  if (existsSync(manifestPath)) copyFileSync(manifestPath, join(dirname(outPath), 'examined-manifest.json'));
+}
+
+export interface WriteSequenceMdResult {
+  written: boolean;
+}
+
 export interface WriteSequenceMdOpts {
   /**
    * Set to true when the caller is an operator-facing route that has already
@@ -75,19 +118,20 @@ export interface WriteSequenceMdOpts {
  * For explicit operator edits (operatorEdit: true), the doc already contains
  * the correct operator-intended value; prior-preservation is skipped entirely.
  */
-export function writeSequenceMd(projectRoot: string, doc: SequenceDoc, opts?: WriteSequenceMdOpts): void {
+export function writeSequenceMd(projectRoot: string, doc: SequenceDoc, opts?: WriteSequenceMdOpts): WriteSequenceMdResult {
   const outPath = sequencePath(projectRoot);
+
+  // PAN-5357: read the prior file once, whatever opts?.operatorEdit is, so the
+  // change-detection below can compare against it either way.
+  const priorText = existsSync(outPath) ? readFileSync(outPath, 'utf-8') : null;
+  const priorParsed = priorText !== null ? parseSequenceMd(priorText) : null;
 
   // Load prior sequence for merge-preservation (AI resequence path only)
   let priorNodeMap = new Map<string, SequenceNode>();
   let priorOperatorEdges: SequenceEdge[] = [];
-  if (!opts?.operatorEdit && existsSync(outPath)) {
-    const priorText = readFileSync(outPath, 'utf-8');
-    const prior = parseSequenceMd(priorText);
-    if (prior.ok) {
-      priorNodeMap = new Map(prior.doc.nodes.map((n) => [n.issue, n]));
-      priorOperatorEdges = prior.doc.edges.filter((e) => e.source === 'operator');
-    }
+  if (!opts?.operatorEdit && priorParsed?.ok) {
+    priorNodeMap = new Map(priorParsed.doc.nodes.map((n) => [n.issue, n]));
+    priorOperatorEdges = priorParsed.doc.edges.filter((e) => e.source === 'operator');
   }
 
   // Detect in-pipeline (pinned) issues: an issue with a live workspace is
@@ -128,18 +172,24 @@ export function writeSequenceMd(projectRoot: string, doc: SequenceDoc, opts?: Wr
   const mergedEdges: SequenceEdge[] = [...mergedOperatorEdges, ...currentNonOperatorEdges];
 
   const mergedDoc: SequenceDoc = { ...doc, nodes: mergedNodes, edges: mergedEdges };
-  const sortedNodes = [...mergedDoc.nodes].sort((a, b) => a.rank - b.rank);
-  const ts = mergedDoc.generatedAt;
-  const header = `# Backlog Sequence\n\n_Last sequenced: ${ts} · model: ${mergedDoc.model} · open: ${mergedDoc.openCount}_\n`;
-  const table = renderTable(sortedNodes);
-  const rationale = renderRationaleSection(sortedNodes);
-  const machineBlock = `${MACHINE_MARKER}\n\n\`\`\`json\n${JSON.stringify(mergedDoc, null, 2)}\n\`\`\`\n`;
 
-  const parts = [header, table];
-  if (rationale) parts.push(rationale);
-  parts.push(machineBlock);
+  // PAN-5357 FR-2: if the only difference from the prior file is generatedAt,
+  // skip the write so an unchanged ranking produces nothing for git to commit.
+  if (priorText !== null && priorParsed?.ok) {
+    const sameButTimestamp = renderSequenceMd({ ...mergedDoc, generatedAt: priorParsed.doc.generatedAt });
+    if (sameButTimestamp === priorText) {
+      if (!opts?.operatorEdit) {
+        // FR-3: bump mtime so getSequencerRunStatus still sees a fresh sequence.
+        const now = new Date();
+        utimesSync(outPath, now, now);
+        recordExaminedManifest(outPath);
+      }
+      return { written: false };
+    }
+  }
 
-  const content = parts.join('\n\n');
   mkdirSync(dirname(outPath), { recursive: true });
-  writeFileSync(outPath, content, 'utf-8');
+  writeFileSync(outPath, renderSequenceMd(mergedDoc), 'utf-8');
+  if (!opts?.operatorEdit) recordExaminedManifest(outPath);
+  return { written: true };
 }

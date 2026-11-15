@@ -41,6 +41,28 @@ export function buildAgentStatusChangedPayload(
 }
 
 /**
+ * PAN-5354: the events for an operator suspend (`POST /api/agents/:id/suspend`,
+ * the Command Deck Pause button). `agent.stopped` keeps its cleanup consumers
+ * (permission requests, the session index). `agent.status_changed` to `stopped`
+ * records the deliberate stop that `readRecordedAgentStopAt` reads, so
+ * deacon-lite never takes the suspended agent for a crashed one and resumes it.
+ * The state.json itself is not changed: a suspend leaves its status as it was.
+ */
+export function buildSuspendedAgentEvents(
+  state: AgentState,
+  now: () => string = () => new Date().toISOString(),
+): Array<Omit<DomainEvent, 'sequence'>> {
+  return [
+    { type: 'agent.stopped', timestamp: now(), payload: { agentId: state.id, issueId: state.issueId } } as Omit<DomainEvent, 'sequence'>,
+    {
+      type: 'agent.status_changed',
+      timestamp: now(),
+      payload: buildAgentStatusChangedPayload({ ...state, status: 'stopped' }, state.status, false),
+    } as Omit<DomainEvent, 'sequence'>,
+  ];
+}
+
+/**
  * The events for an agent deacon-lite confirmed dead. With a state.json:
  * `agent.heartbeat_dead` then `agent.status_changed` recording the transition
  * from the recorded status to `stopped` with no live pane. Without one: only

@@ -309,7 +309,7 @@ and it is re-dispatched once. If the re-dispatched reviewer is still silent, or
 has died without a report, one more period later, the issue surfaces as
 needs-you and the reviewer is not re-dispatched again for that run. Config load
 and the Settings API reject `0`, negative, and non-integer values. See
-"Deacon-lite: eight routines" in [PIPELINE-GATES.md](PIPELINE-GATES.md).
+"Deacon-lite: nine routines" in [PIPELINE-GATES.md](PIPELINE-GATES.md).
 
 ```yaml
 roles:

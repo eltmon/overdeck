@@ -9,6 +9,9 @@
  *   2. explorer and code panes are retargeted (or closed when the deck
  *      already has the same pane on the edit root);
  *   3. the expanded-folder set is copied.
+ * Before step 1 the cursor, scroll and focus of every live editor on the old
+ * root are carried to the new root, so the remounted panes keep them
+ * (PAN-5290 C-D12).
  * A work-dock root override on the old root moves with them, keeping its anchor
  * pane (PAN-5289 B-D16, B-D17), and the mounted dock follows a project root it
  * was showing onto the edit root.
@@ -20,6 +23,7 @@ import { toast } from 'sonner'
 
 import { usePanesStore, type WorkspacePane } from '../../../lib/panesStore'
 import { draftKey, isDraftDirty, useCodeDrafts } from '../code/code-drafts'
+import { carryViewStates } from '../code/view-state-registry'
 import { beginEdit, explorerErrorMessage, parseRootId, rootLabel } from '../explorer-rpc'
 import { useExplorerStore } from '../explorerStore'
 import { useActiveDock } from '../../dock/activeDock'
@@ -66,6 +70,7 @@ function moveDockOverrides(fromRootId: string, toRootId: string | undefined): vo
 
 /** Moves drafts, panes, dock overrides and the expanded set from one root to another. */
 export function switchRoot(fromRootId: string, toRootId: string, opts: { name?: string } = {}): void {
+  carryViewStates(fromRootId, toRootId)
   const drafts = useCodeDrafts.getState()
   const name = opts.name ?? rootLabel(toRootId)
   for (const [key, draft] of Object.entries(drafts.drafts)) {
@@ -155,6 +160,7 @@ export function leaveEditWorkspace(editRootId: string, projectKey: string): void
   }
   // Cleared, not moved: the dock follows the active tab again.
   moveDockOverrides(editRootId, undefined)
+  carryViewStates(editRootId, `project:${projectKey}`)
   retargetPanes(editRootId, `project:${projectKey}`)
   if (useEditWorkspaceStore.getState().active[projectKey] === editRootId) {
     useEditWorkspaceStore.getState().setActive(projectKey, null)

@@ -20,6 +20,7 @@ import { isNativeShell } from '../../lib/nativeShell';
 import type { LexicalEditor } from 'lexical';
 import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical';
 import { ComposerPromptEditor, loadDraft } from './ComposerPromptEditor';
+import { skillContextForConversation } from './skillSlashCommands';
 import { hasDragPaths, readDragPaths } from '../../lib/explorer-drag-paths';
 import { insertPathsIntoComposer } from './composerPathDrop';
 import { clearDraft } from '../../lib/composerDraft';
@@ -43,6 +44,7 @@ import { VaultContinuityNotice } from './VaultContinuityNotice';
 import { HandoffNotice } from './HandoffNotice';
 import { HeldKickoffConflictError, HeldKickoffNotice, kickoffUnchanged, startHeldKickoff, useHeldKickoff, useSeedHeldKickoff } from './heldKickoff';
 import { useComposerRestoreTarget } from './useComposerRestoreTarget';
+import { sendNowQueued } from '../../lib/composerSendNow';
 import { openImageLightbox, useImageLightboxStore } from './ImageLightbox';
 import { ComposerAttachmentStrip } from './ComposerAttachmentStrip';
 import { CitationChips } from './citations/CitationChips';
@@ -733,10 +735,18 @@ function ComposerFooterInput({
     (key: 'Enter' | 'SteerEnter') => {
       // PAN-4292 D5: Ctrl/Cmd+Enter steers on a steer-capable harness, busy or
       // idle (an idle steer is a plain submit); elsewhere it is Enter.
-      if (key === 'SteerEnter') void handleSubmit(undefined, showDeliverySelector ? 'steer' : undefined);
+      // PAN-5353 D7: on an empty composer it presses send-now instead (Claude Code).
+      // Read the editor itself, as handleSubmit does: the `text` state can lag a
+      // restored draft or a paste, and a stale "empty" would interrupt the turn
+      // and drop the operator's text.
+      let editorText = '';
+      editorRef.current?.read(() => { editorText = $getRoot().getTextContent(); });
+      if (key === 'SteerEnter' && steerKind === 'send-now-keys' && conversation.sessionAlive && editorRef.current
+        && editorText.trim() === '' && pendingAttachments.length === 0 && citationCount === 0) void sendNowQueued(conversation.name, agentId);
+      else if (key === 'SteerEnter') void handleSubmit(undefined, showDeliverySelector ? 'steer' : undefined);
       else void handleSubmit();
     },
-    [handleSubmit, showDeliverySelector],
+    [agentId, citationCount, conversation.name, conversation.sessionAlive, handleSubmit, pendingAttachments.length, showDeliverySelector, steerKind],
   );
 
   return (
@@ -789,6 +799,7 @@ function ComposerFooterInput({
         <ComposerPromptEditor
           conversationName={conversation.name}
           harness={harness}
+          skillContext={skillContextForConversation(conversation)}
           disabled={isDisabled}
           onCommandKeyDown={handleCommandKey}
           editorRef={editorRef}

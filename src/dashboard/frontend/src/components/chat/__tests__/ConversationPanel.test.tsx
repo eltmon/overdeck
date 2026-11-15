@@ -61,7 +61,9 @@ vi.mock('../../DiffWorkerPoolProvider', () => ({
   DiffWorkerPoolProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 vi.mock('../../DiffPanel', () => ({
-  DiffPanel: () => <div data-testid="diff-panel" />,
+  DiffPanel: (props: { explorerRootId?: string | null }) => (
+    <div data-testid="diff-panel" data-root={props.explorerRootId ?? ''} />
+  ),
 }));
 // PAN-1523 moved the context-usage meter into the composer footer. Capture the
 // usage snapshot ConversationPanel computes and passes down so we can assert it
@@ -481,6 +483,12 @@ describe('ConversationPanel rename flow', () => {
 
   it('does not mount the terminal when a diff deep-link opens a live terminal-mode conversation', () => {
     window.history.replaceState(null, '', '/conv/1?diff=1&diffTurnId=turn-1&diffFilePath=src%2Ffile.ts');
+    // The mounted diff panel resolves the conversation's explorer root (PAN-5338).
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/registered-projects') return Response.json([]);
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      return defaultConversationResponse(method, url);
+    });
     const activeConversation = {
       ...mockConversation,
       sessionAlive: true,
@@ -504,6 +512,33 @@ describe('ConversationPanel rename flow', () => {
 
     expect(screen.getByTestId('diff-panel')).toBeInTheDocument();
     expect(screen.queryByTestId('xterminal')).not.toBeInTheDocument();
+  });
+
+  it('passes the conversation explorer root to the diff panel (PAN-5338)', () => {
+    window.history.replaceState(null, '', '/conv/1?diff=1&diffTurnId=turn-1&diffFilePath=src%2Ffile.ts');
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/registered-projects') return Response.json([]);
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      return defaultConversationResponse(method, url);
+    });
+    const issueConversation = { ...mockConversation, issueId: 'PAN-1' };
+    const client = makeClient();
+    client.setQueryData(['conversation-diffs', 'test-conv'], {
+      summaries: [{ turnId: 'turn-1', completedAt: '2024-01-01T00:00:00Z', status: 'completed', files: [] }],
+    });
+    render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationPanel
+            conversation={issueConversation}
+            viewMode="conversation"
+            onArchived={() => {}}
+          />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+
+    expect(screen.getByTestId('diff-panel')).toHaveAttribute('data-root', 'issue:PAN-1');
   });
 
   it('passes conversation context usage to the composer footer', () => {

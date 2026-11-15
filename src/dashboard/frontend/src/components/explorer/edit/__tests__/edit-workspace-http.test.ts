@@ -32,6 +32,22 @@ describe('edit-workspace HTTP calls', () => {
     expect(init?.method ?? 'GET').toBe('GET')
   })
 
+  it('reads what will land with a GET to /changes (PAN-5290)', async () => {
+    const changes = { base: 'abc', files: [], additions: 0, deletions: 0, uncommittedPaths: [] }
+    const fetchMock = stubFetch(200, changes)
+    await expect(http.fetchEditWorkspaceChanges('w 1')).resolves.toEqual(changes)
+    const [url, init] = fetchMock.mock.calls[0]!
+    expect(url).toBe('/api/explorer/edit-workspaces/w%201/changes')
+    expect(init?.method ?? 'GET').toBe('GET')
+  })
+
+  it('throws ExplorerHttpError with the server code when /changes answers 404', async () => {
+    stubFetch(404, { error: 'Workspace w1 not found.', code: 'ROOT_NOT_FOUND' })
+    const error = await http.fetchEditWorkspaceChanges('w1').catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(ExplorerHttpError)
+    expect(error).toMatchObject({ status: 404, code: 'ROOT_NOT_FOUND', message: 'Workspace w1 not found.' })
+  })
+
   it('posts the create-PR input with the CSRF headers', async () => {
     const fetchMock = stubFetch(201, { mode: 'direct', url: 'u', number: 1, created: true })
     const input = { mode: 'direct' as const, title: 't', body: 'b', draft: false }

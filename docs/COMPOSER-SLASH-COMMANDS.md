@@ -32,7 +32,7 @@ Never edit `composer-commands.generated.ts` by hand. `scripts/lint-slash-command
 
 Use the narrowest source that owns the behavior:
 
-- Add a **static entry** in `src/dashboard/frontend/src/components/chat/slashCommands.ts` only when it is not a `pan` CLI command. The AI CLI entries such as `/model` and the dashboard-intercepted `/handoff` live there.
+- Add a **static entry** in `src/dashboard/frontend/src/components/chat/slashCommands.ts` only when it is not a `pan` CLI command. The AI CLI entries such as `/model` and the dashboard-intercepted `/handoff` live there. The `/pan` entry is also static: it lists commands and is not a CLI command (the registry excludes Commander's `help`).
 - Add an **extra** to `scripts/slash-commands-curation.json` for a useful flag variant that cannot be inferred from positional command metadata, such as `pan show --cv`.
 - Add a **deny prefix** to the same overlay only when a visible CLI command must deliberately stay out of the composer. The deny list ships empty; exclusions must be explicit and reviewable.
 - Add an **insert override** only when preserving an established insertion affordance requires whitespace different from the argument-derived default. Keep the command path as the key so the generated entry remains unique.
@@ -43,7 +43,11 @@ Manifest categories are assigned in `scripts/slash-commands-curation.json`, with
 
 Conversation and agent message endpoints validate the target and message first, then offer the exact text to the `/pan` router. A recognized portable command returns before native compaction, attachment rewriting, prompt-memory injection, FIFO/control-channel delivery, or tmux/PTY delivery can run. When the composer has pending uploads, it submits only the typed `/pan` command and leaves those attachments pending for a later prompt. Ordinary text and unprefixed `pan ...` continue through the existing harness-specific stages unchanged.
 
-The parser rejects shell control syntax and returns typed errors for unknown commands, missing arguments, and unknown flags. The policy overlay then selects captured, detached, UI, or terminal-only execution and applies single-use confirmation requirements before any executor starts.
+The parser rejects shell control syntax and returns typed errors for unknown commands, missing arguments, and unknown flags. An unknown command's error tells the operator to type `/pan` for the list. The policy overlay then selects captured, detached, UI, or terminal-only execution and applies single-use confirmation requirements before any executor starts.
+
+## Listing commands
+
+`/pan`, `/pan help`, `/pan --help` and `/pan -h` return the command list as a captured result. The parser maps them to `COMPOSER_HELP_ENTRY` (`src/lib/composer-commands/parser.ts`), and the router answers it from `src/lib/composer-commands/help.ts` before any policy, confirmation or executor runs. The list shows the composer-runnable commands first, then every other top-level command under its manifest category, written as `pan <command>` because it runs in a terminal. It is built from the manifest and the policy overlay, so it never drifts from them and never spawns `pan --help`. `/pan help <verb>` is rejected; use `pan <verb> --help` in a terminal.
 
 ## No-loss rule
 

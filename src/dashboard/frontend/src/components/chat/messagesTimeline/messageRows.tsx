@@ -7,6 +7,7 @@ import { DiffStatLabel } from '../DiffStatLabel';
 import { summarizeTurnDiffStats } from '../../../lib/turnDiffTree';
 import styles from '../../CommandDeck/styles/command-deck.module.css';
 import { useComposerStore } from '../../../lib/composerStore';
+import { sendNowQueued } from '../../../lib/composerSendNow';
 import { openImageLightbox } from '../ImageLightbox';
 import { type AttachmentImageRef, extractAttachmentImageRefs, formatElapsed, formatTimestamp } from './helpers';
 import { SlashCommandDivider } from './dividers';
@@ -104,7 +105,7 @@ function parseSlashCommandMessage(text: string): { command: string } | null {
   return match ? { command: match[1] } : null;
 }
 
-export function UserMessageRow({ message, cwd, issueId, bookmarkable, citeConversationName }: { message: ChatMessage; cwd?: string; issueId?: string | null; bookmarkable?: boolean; citeConversationName?: string }) {
+export function UserMessageRow({ message, cwd, issueId, bookmarkable, citeConversationName, sendNowConversationName, sendNowAgentId }: { message: ChatMessage; cwd?: string; issueId?: string | null; bookmarkable?: boolean; citeConversationName?: string; sendNowConversationName?: string; sendNowAgentId?: string }) {
   const slashCommand = parseSlashCommandMessage(message.text);
   if (slashCommand) {
     return <SlashCommandDivider command={slashCommand.command} createdAt={message.createdAt} />;
@@ -204,7 +205,14 @@ export function UserMessageRow({ message, cwd, issueId, bookmarkable, citeConver
               {canCancel && <CancelMessageButton messageId={message.id} />}
             </span>
           ) : (
-            message.id.startsWith('optimistic-') ? 'Sent · waiting for transcript' : formatTimestamp(message.createdAt)
+            message.id.startsWith('optimistic-') ? (
+              <>
+                Sent · waiting for transcript
+                {sendNowConversationName && message.deliveryState !== 'unknown' && (
+                  <SendNowButton conversationName={sendNowConversationName} agentId={sendNowAgentId} />
+                )}
+              </>
+            ) : formatTimestamp(message.createdAt)
           )}
         </span>
       </div>
@@ -230,6 +238,26 @@ function CancelMessageButton({ messageId }: { messageId: string }) {
         style={{ border: 'none', background: 'transparent', padding: 0, color: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}
       >
         Cancel
+      </button>
+    </>
+  );
+}
+
+/** PAN-5353: ` · Send now` on a queued bubble — presses Claude Code's send-now chord. */
+function SendNowButton({ conversationName, agentId }: { conversationName: string; agentId?: string }) {
+  const [running, setRunning] = useState(false);
+  return (
+    <>
+      {' · '}
+      <button
+        type="button"
+        aria-label="Send queued messages now"
+        title="Interrupt the current turn and send every queued message now (Claude Code Ctrl+Enter)"
+        disabled={running}
+        onClick={() => { setRunning(true); void sendNowQueued(conversationName, agentId).finally(() => setRunning(false)); }}
+        style={{ border: 'none', background: 'transparent', padding: 0, color: 'inherit', textDecoration: 'underline', cursor: running ? 'default' : 'pointer' }}
+      >
+        {running ? 'Sending now…' : 'Send now'}
       </button>
     </>
   );

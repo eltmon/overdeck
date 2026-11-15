@@ -733,6 +733,11 @@ door that does not exist; a real record read door would be a separate change.
   `input-target-not-main`, the toast shows the reason, and the message moves to the
   outbox, whose Retry sends it again under a fresh `clientMessageId` because the
   response proved nothing was delivered (PAN-5184).
+  **Send now (PAN-5353).** An acknowledged optimistic bubble on a busy Claude Code
+  conversation or agent shows **Send now**, and Ctrl/Cmd+Enter on an empty composer does
+  the same. Both POST the send-now route through `composerSendQueue.ts`, so the chord
+  never lands between a pending paste and its Enter. The server runs the permission and
+  ensure-main guards, then presses Ctrl+X Ctrl+S; a refusal becomes a toast.
   Conversation rows carry `inputTarget` (`'main' | { subagent } | 'unknown'`), which
   drives the composer's "Typed messages are going to subagent" notice. An `accepted` bubble
   that stays unmatched for `TURN_STALL_MS` (4 minutes) **while the conversation is not
@@ -2055,7 +2060,7 @@ renders only its content area, full width: it has no column of its own and no
 feed column.
 
 - **Width.** 264 px by default. Dragging the right edge resizes it between 240
-  and 400 px. The width persists in `localStorage` key
+  and 640 px. The width persists in `localStorage` key
   `overdeck.ui.leftColumnWidth`.
 - **Collapsed.** `[` (shortcut `frame.collapse`) toggles a 48 px strip: the
   project mark (opens the switcher menu), nav icons with titles, a `+` New
@@ -2351,6 +2356,44 @@ the text after the last `/`:
 `searchFiles` sorts by tier, then path length (tiers 0–3) or fuzzy score
 (tier 4). The client stable-sorts by tier, then files changed here first.
 
+## Project home (PAN-5294)
+
+The permanent `Home` tab of a project deck (`paneType: 'home'`), mounted by `CommandDeck/index.tsx` through `renderHome`. One component tree, three states:
+
+| State | What renders |
+| --- | --- |
+| No-project deck (`projectKey` undefined) | Title "No project" and the action row (New conversation, Terminal, More ▾ → Web page). |
+| Registered project, no issues loaded | Header with metadata line, action row, facts, Needs you (when non-empty), the merge train card, Recent changes. |
+| Registered project with issues | All of the above plus the Pipeline panel, with the merge train below it. |
+
+| File (under `src/dashboard/frontend/src/components/`) | Role |
+| --- | --- |
+| `Stage/ProjectHome.tsx` | Assembles Home: registered-project lookup, the shared selectors, the data hooks, refs for fact scrolling, the Start an issue dialog. `ProjectHomeProps` is the mount contract. |
+| `Stage/HomePane/HomeHeader.tsx` | Title (`display-lg`) with rename, repository subtitle, Settings modal (`ProjectSettingsSection`). |
+| `Stage/HomePane/HomeMetaLine.tsx` | Path · branch · release (popover with `ProjectReleasePanel`) · CI word · deploy chip · identity chip. |
+| `Stage/HomePane/HomeActions.tsx` | The action row and its New conversation and More ▾ menus. Registers no shortcut. |
+| `Stage/HomePane/StartIssueDialog.tsx`, `Stage/HomePane/startIssue.ts` | Plan or start an issue; `startIssue.ts` holds the `/api/agents` request sequence and returns a tagged result. |
+| `Stage/HomePane/useHomeData.ts` | `useProjectChanges` and `useProjectSpend`. |
+| `Stage/HomePane/HomeFacts.tsx` | The five facts; exports `landedSummary` and `formatCost`. |
+| `Stage/HomePane/HomeNeedsYou.tsx` | The Needs you panel. |
+| `Stage/HomePane/RecentChanges.tsx` | Recent changes on main with commit attribution. |
+| `Stage/HomePane/home.module.css` | Header, metadata line and page layout styles. |
+| `CommandDeck/ProjectOverview.tsx` | The Pipeline panel: header, `PipelineSection`, then `MergeTrain placement="project"`. |
+| `CommandDeck/PipelineSection.tsx` | One card with a lane bar and rows per lane. |
+| `CommandDeck/PipelineRow.tsx` | One row: id, title, tag, who, age; stuck reason and spend in the tooltip. |
+| `CommandDeck/pipeline-helpers.ts` | `bucketFeaturePhase`, `groupPipelineEntries`, `homeLaneFor`, `homeStageTag`, `homeWhoFor`, `formatAge`. |
+
+**Data sources.** Every number comes from a shared source, so Home never disagrees with the rest of the frame:
+
+- `useAgentsWorking({ projectKey })` (`lib/selectors/agentsWorking.ts`) — the Agents working fact, the same count as the project switcher.
+- `useNeedsYouItems({ projectKey })` (`lib/selectors/needsYou.ts`) — the Needs you fact and panel, and the `needs you` row tag (an issue is tagged when the list has key `issue:<ID>`).
+- `GET /api/projects/:key/changes?since=7d` (query key `['project-changes', key, '7d']`, 60 s poll) — the Landed fact, the metadata line's branch and Recent changes.
+- `GET /api/costs/summary?project=<prefix>` (query key `['project-recent-spend', prefix]`, 60 s poll) — the Spend fact. The prefix is the registered issue prefix, else the single prefix of the loaded issues.
+- `GET /api/projects/:key/release-status` (query key `['projectReleaseStatus', key]`, shared with `ProjectReleasePanel`) — the release word.
+- The project CI record, `selectProjectCi(key)` + `deriveProjectCi` — the CI word.
+
+**Lane rules** (`groupPipelineEntries`). Stalled claims first: an issue with `isStalledFeature` goes to Stalled and no other lane. Then Ready to merge takes `derived.state === 'ready'`, Building takes phase `plan` or `work`, and In review takes phase `review`. Todo, queued-for-pickup, merged and closed issues are not listed. Building, In review and Ready to merge always render with their count; Stalled renders only when non-empty. Rows sort by last activity, and the age cell is time since last activity because derived state has no state-entered time.
+
 ## File explorer server (PAN-5183)
 
 The file explorer's server half lives in `src/dashboard/server/services/explorer/`
@@ -2580,9 +2623,9 @@ other page pays for it; `lib/monaco-setup.ts` gives every Monaco editor its
 local web workers and never loads from a CDN. The slot keys the pane by root
 and path, so a retargeted preview tab mounts a fresh pane. The language comes
 from the path against Monaco's own language list (`monaco-language.ts`), not
-from the server's Shiki id. A `project` root opens editable with the note
-"Edits here are saved to an edit workspace. The main checkout is never
-changed." Its first save calls `ensureEditRoot` (PAN-5191), which moves the
+from the server's Shiki id. A `project` root opens editable under the editor
+bar's main-checkout sentence (PAN-5290, see "Editor bar and gutter marks"
+below). Its first save calls `ensureEditRoot` (PAN-5191), which moves the
 draft to the edit workspace and marks it for a pending save; the pane on the
 edit root saves it once. The pane asks
 PAN-5188's `pickViewer` how to show a file: a binary or large-text read renders
@@ -2716,9 +2759,29 @@ per project. The routes live in `routes/explorer-edit-workspaces.ts`, all
 | Method and path | Body | Success | Errors |
 |---|---|---|---|
 | `GET /api/explorer/edit-workspaces/:workspaceId` | — | 200 `EditWorkspaceStatus` | 404 `ROOT_NOT_FOUND`, 409 `NOT_AN_EDIT_WORKSPACE` |
+| `GET /api/explorer/edit-workspaces/:workspaceId/changes` | — | 200 `EditWorkspaceChanges` (PAN-5290) | 404 `ROOT_NOT_FOUND`, 409 `NOT_AN_EDIT_WORKSPACE` |
 | `POST /api/explorer/edit-workspaces/:workspaceId/pr` | `EditWorkspaceCreatePrInput` | 201 `EditWorkspaceCreatePrResult` | 400 `INVALID_INPUT`, 409 `NOTHING_TO_COMMIT`, 409 `PR_UNSUPPORTED`, 409 `PIPELINE_UNSUPPORTED`, 409 `PR_EXISTS`, 422 `COMMIT_REFUSED`, 502 `PUSH_FAILED`, 502 `PR_CREATE_FAILED`, 502 `ISSUE_CREATE_FAILED` |
 | `POST /api/explorer/edit-workspaces/:workspaceId/merge` | `{}` | 200 `{ merged: true }` | 404 `NO_PR`, 409 `NOT_MERGEABLE`, 409 `UNPUSHED_CHANGES`, 502 `MERGE_FAILED`, 500 `REMOVE_FAILED` |
 | `POST /api/explorer/edit-workspaces/:workspaceId/discard` | `{ closePr: boolean }` | 200 `{ removed: true, prClosed }` | 409 `REMOVE_FAILED`, 502 `PR_CLOSE_FAILED`, 502 `PR_LOOKUP_FAILED` |
+
+**What will land** (`services/explorer/edit-workspace-changes.ts`, PAN-5290):
+`/changes` diffs the worktree, untracked files included, against `git
+merge-base HEAD refs/remotes/origin/<default branch>` (`HEAD` when git reports
+none; a killed or truncated `merge-base` run fails the call instead) with
+`--numstat` and `--name-status`, renames split. An untracked file
+counts its lines, unless it is over 2 MiB, unreadable or has a NUL byte in its
+first 8,192 bytes; then it is `binary: true` with 0/0, like a binary tracked
+file. `uncommittedPaths` comes from `git status --porcelain=v2`. It never
+calls `gh`, so the client (`useEditWorkspaceChanges`) refetches it on every
+explorer watch batch of the edit root.
+
+**PR status refetch.** Each status read calls `gh`. The status query never
+polls, except for the editor bar: it refetches every 15 s
+(`PR_STATUS_REFETCH_MS`) while `shouldPollPr(pr)` is true, which is an open,
+non-draft PR that cannot merge yet whose `mergeable` or `mergeStateStatus` is
+`UNKNOWN` or whose `mergeStateStatus` is `BLOCKED`. A draft, conflicting
+(`DIRTY`) or out-of-date (`BEHIND`) PR cannot change by itself, so it is read
+again only on **Refresh**.
 
 **Commits run the repository's hooks.** The commit is made as the operator's
 global git identity, never with `--no-verify`; a refused commit or push returns
@@ -2817,6 +2880,80 @@ one per file, extension rows first:
 stay out of the entry bundle. Workers build as ES modules (`worker: { format:
 'es' }` in `vite.config.ts`), and the `pdfjs-dist-assets` alias points the
 pdf.js font, cmap and wasm globs at the real package folder.
+
+### Editor bar and gutter marks (PAN-5290)
+
+**Editor bar** (`components/explorer/edit/EditorBar.tsx`). One line under a
+code pane's header on a project or edit-workspace root; issue roots, other
+workspace roots and viewer-only files get none. The Files tab mounts the same
+component on an edit root without `paneId`, so it has no Close tab; the old
+Files-tab banner and PR row are gone, and **New edit workspace** is in the
+Files root menu. On a project root the bar reads the main-checkout sentence
+with **Start editing** (`ensureEditRoot`), or "Creating edit workspace…".
+On an edit root it reads the status and `/changes` queries: the workspace,
+branch, file count with +/−, save state, **Discard…** and **Create PR**; an
+open PR's merge verdict reason with a disabled **Merge**, **Push changes** when
+something is uncommitted or unpushed, **View on GitHub** and **Refresh**; then
+"no conflicts" with an enabled **Merge**. Merge also waits for the `/changes`
+query: while it loads or after it fails, Merge stays disabled with that reason,
+and a failure offers **Retry**. A `ROOT_NOT_FOUND` from either query
+calls `onStale`, and `NOT_AN_EDIT_WORKSPACE` renders nothing.
+
+**Landed notes.** Merge, a pipeline send and a discard set
+`landed[projectKey]` in `edit-workspace-store.ts` before
+`leaveEditWorkspace` moves the panes back to the project root, so the bar
+there says what happened (merged PR, pipeline issue and PR with **Open PR**,
+or discarded workspace) with **Dismiss** and **Close tab**. The note is not
+persisted, and `setCreating(projectKey, true)` clears it.
+
+**Create PR dialog** (`CreatePrDialog.tsx`) takes the `/changes` answer: it
+lists what will land, asks "How should it land?" as a `radiogroup` of the
+direct and pipeline choices (an unsupported one is `aria-disabled` with its
+reason), and labels its one primary button by the choice. With an open PR it
+is "Commit and push" and lists the `uncommittedPaths` themselves, without
+counts, since the merge-base file list can miss a file a pushed commit added
+and the working tree deleted.
+
+**View state across a root switch** (`code/view-state-registry.ts`). Each
+mounted code pane registers its live editor (the diff's modified editor while
+Changes is open) by draft key. `switchRoot` and `leaveEditWorkspace` call
+`carryViewStates(from, to)` before they retarget panes; the remounted pane
+takes the state with `takeViewState(key)`, restores it and refocuses the
+editor if it had focus.
+
+**Gutter marks.** `StageDeckContextValue.conversationBeside(paneId)` returns
+the conversation in the first other layout leaf that is an agent pane bound to
+a known conversation, or null when the deck is not split. A code pane with one
+mounts `useChangedLineMarks` (`code/useChangedLineMarks.ts`), which maps the
+pane's root path into the conversation's repo with `toRepoPath` (null for
+another worktree, such as an edit workspace) and, when the file is in the
+conversation's changes, reads
+`GET /api/conversations/:name/changes/lines?file=<repo path>`
+(`ConversationChangedLines`, scope `read:conversations`). It decorates those
+lines with `linesDecorationsClassName: 'code-changed-line'`, a 3 px
+`var(--primary)` bar, refetches when the conversation's changes do, and never
+applies an answer while the draft is dirty.
+
+The lines route (`src/lib/overdeck/conversation-change-lines.ts`) runs `git
+blame --porcelain` on the working tree. A line is marked when its commit is
+one of the conversation's commits that touched the file, or when it is
+uncommitted and the file's uncommitted record has `attribution: 'file'`, or
+`attribution: 'lines'` and the line's trimmed text is one the conversation
+wrote. When blame fails on an added file, every line of the file counts as
+uncommitted; otherwise there are no lines. Unknown conversation 404; a
+missing, absolute, NUL-containing or `..` path 400; no repository, or a file
+the conversation did not change, 200 with `lines: []`. Answers are cached per
+(conversation, file), at most 128, while `HEAD`, the file's stat and the
+transcript's stat are unchanged, so a repeat spawns no blame. The stamp is
+taken before any evidence is read, and an answer is cached only when the
+stamp is the same afterwards and no evidence (blame of a tracked file, the
+transcript, an added file's text) failed to load; anything else is retried.
+
+**Stale tabs** (`code/StaleCodeTab.tsx`). A code pane whose `readFile` or bar
+query answers `ROOT_NOT_FOUND` (`isRootNotFound` checks both the RPC and the
+HTTP error class) shows a sentence by root kind instead of "Couldn't open
+file", with **Open on main** (retargets the pane to the deck's registered
+project; disabled when there is none) and **Close tab**.
 
 ### Viewers tier 2: Office, notebooks and Mermaid (PAN-5189)
 

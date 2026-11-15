@@ -26,9 +26,10 @@ import {
 } from '../../lib/composerStore';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, isConversationWorking, type WorkingPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
-import type { ReviewerRoundMetadata } from '@overdeck/contracts';
+import { getHarnessBehavior, type ReviewerRoundMetadata } from '@overdeck/contracts';
 import { DiffPanel } from '../DiffPanel';
 import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
+import { rootIdForConversation, useRootContext } from '../explorer/rootForConversation';
 import { acceptsInput, ConversationMachineBanner, conversationHeaderStatus, conversationMachineState } from './ConversationMachineBanner';
 import { ConversationHeader } from './header/ConversationHeader';
 import { ConversationPullRequestProvider } from './TranscriptPullRequestLink';
@@ -126,6 +127,39 @@ interface ConversationPanelProps {
   onSendFailed?: () => void;
   /** Passed through to SubagentRail — starts the rail at this collapsed state instead of localStorage (PAN-4222). */
   subagentRailCollapsed?: boolean;
+}
+
+// Resolves the conversation's explorer root only while the diff panel is
+// mounted (PAN-5338): rootIdForConversation's own hook, useRootContext,
+// queries /api/registered-projects and /api/workspace-registry, and
+// ConversationPanel must make neither request when the diff is closed
+// (PAN-5291 D1-7/D1-8's no-stage-no-network invariant extends to the diff).
+function ConversationDiffPanel({
+  conversation,
+  agentId,
+  turnDiffSummaries,
+  onClose,
+}: {
+  conversation: Conversation;
+  agentId: string;
+  turnDiffSummaries: TurnDiffSummary[];
+  onClose: () => void;
+}) {
+  const rootContext = useRootContext();
+  const explorerRootId = useMemo(() => rootIdForConversation(conversation, rootContext), [conversation, rootContext]);
+  return (
+    <DiffWorkerPoolProvider>
+      <DiffPanel
+        mode="inline"
+        agentId={agentId}
+        turnDiffSummaries={turnDiffSummaries}
+        onClose={onClose}
+        diffUrlPrefix={`/api/conversations/${encodeURIComponent(conversation.name)}/diffs`}
+        repoPath={conversation.cwd}
+        explorerRootId={explorerRootId}
+      />
+    </DiffWorkerPoolProvider>
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -596,16 +630,12 @@ export function ConversationPanel({
           ))}
         </div>
         {diffOpen && diffData?.summaries && (
-          <DiffWorkerPoolProvider>
-            <DiffPanel
-              mode="inline"
-              agentId={agentId ?? conversation.name}
-              turnDiffSummaries={diffData.summaries}
-              onClose={handleCloseDiff}
-              diffUrlPrefix={`/api/conversations/${encodeURIComponent(conversation.name)}/diffs`}
-              repoPath={conversation.cwd}
-            />
-          </DiffWorkerPoolProvider>
+          <ConversationDiffPanel
+            conversation={conversation}
+            agentId={agentId ?? conversation.name}
+            turnDiffSummaries={diffData.summaries}
+            onClose={handleCloseDiff}
+          />
         )}
         <SubagentRail
           conversation={conversation}
@@ -968,6 +998,8 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
           conversationName={conversation.name}
           cwd={conversation.cwd}
           issueId={conversation.issueId}
+          sendNowAvailable={agentBusy && getHarnessBehavior(conversation.harness ?? 'claude-code').steerKind === 'send-now-keys'}
+          agentId={agentId}
           subagentByToolUseId={subagentByToolUseId}
           onOpenSubagent={handleOpenSubagent}
           turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}

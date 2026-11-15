@@ -60,6 +60,9 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/conversations/:name/message', scope: 'tell' },
   // PAN-5237: whoever can send a composer message can cancel it.
   { method: 'POST', path: '/api/conversations/:name/message/cancel', scope: 'tell' },
+  // PAN-5353: Send now
+  { method: 'POST', path: '/api/conversations/:name/send-now', scope: 'tell' },
+  { method: 'POST', path: '/api/agents/:id/send-now', scope: 'tell' },
   { method: 'GET', path: '/api/conversations/:name/kickoff', scope: 'read:conversations' },
   { method: 'POST', path: '/api/conversations/:name/kickoff', scope: 'tell' },
   { method: 'GET', path: '/api/conversations/:name/bookmarks', scope: 'read:conversations' },
@@ -205,6 +208,7 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/conversations/:name/diffs', scope: 'read:conversations' },
   { method: 'GET', path: '/api/conversations/:name/diffs/:turnId', scope: 'read:conversations' },
   { method: 'GET', path: '/api/conversations/:name/changes', scope: 'read:conversations' },
+  { method: 'GET', path: '/api/conversations/:name/changes/lines', scope: 'read:conversations' },
   { method: 'POST', path: '/api/conversations/:name/upload-image', scope: 'tell' },
   // PAN-4835 D-7: the undo of upload-image.
   { method: 'POST', path: '/api/conversations/:name/delete-image', scope: 'tell' },
@@ -237,6 +241,7 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/explorer/upload', scope: 'admin' },
   // PAN-5191: explorer edit workspaces (parent PRD PAN-5183 D-8: explicit admin).
   { method: 'GET', path: '/api/explorer/edit-workspaces/:workspaceId', scope: 'admin' },
+  { method: 'GET', path: '/api/explorer/edit-workspaces/:workspaceId/changes', scope: 'admin' },
   { method: 'POST', path: '/api/explorer/edit-workspaces/:workspaceId/pr', scope: 'admin' },
   { method: 'POST', path: '/api/explorer/edit-workspaces/:workspaceId/merge', scope: 'admin' },
   { method: 'POST', path: '/api/explorer/edit-workspaces/:workspaceId/discard', scope: 'admin' },

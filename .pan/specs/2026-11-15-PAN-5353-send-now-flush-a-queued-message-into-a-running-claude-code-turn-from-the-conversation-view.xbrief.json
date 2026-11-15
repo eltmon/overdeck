@@ -1,0 +1,801 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T14:31:52Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5353: Send now: flush a queued message into a running Claude Code turn from the conversation view",
+    "updated": "2026-11-15T14:41:06.076Z"
+  },
+  "plan": {
+    "id": "pan-5353",
+    "title": "Send now: flush a queued message into a running Claude Code turn from the conversation view",
+    "status": "running",
+    "uid": "78e7680c-ebda-4f5f-b432-b88aa4d48f56",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T14:31:52Z",
+    "updated": "2026-11-15T14:41:06.076Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5353",
+        "label": "PAN-5353",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5353/.pan/drafts/pan-5353.md",
+        "label": "PRD draft (.pan/drafts/pan-5353.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "composer",
+      "claude-code",
+      "steer",
+      "terminal-backends"
+    ],
+    "metadata": {
+      "sizeJustification": "Send now is one user action: a pane-key helper, two server doors, two routes and two UI triggers that are useless apart (a route with no UI, or a UI with no route, ships nothing a user can do). The code surface is three areas (src/lib, src/dashboard, packages/contracts telemetry list); the subsystem metric is inflated because each top-level doc file (configuration/harnesses.mdx, three docs/*.md files, changelog.d/pan-5353.md) and scripts/frontend-test-subset.txt count as their own subsystem.",
+      "canonicalFilename": "2026-11-15-PAN-5353-send-now-flush-a-queued-message-into-a-running-claude-code-turn-from-the-conversation-view.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "A message sent while Claude Code is busy waits in Claude Code's own queue, and the dashboard bubble reads 'Sent · waiting for transcript' until the turn reaches a tool boundary or ends. In the terminal, Ctrl+Enter on an empty input interrupts the turn and sends the queue now; the dashboard has no way to do that for a message it already sent.",
+      "Proposal": "Add Send now: a link on the acknowledged queued bubble, and Ctrl/Cmd+Enter on an empty composer. Both POST a new route (POST /api/conversations/:name/send-now or POST /api/agents/:id/send-now) through the per-conversation send queue. The server door refuses non-Claude-Code, remote, ended/paused/stopped targets, permission prompts and failed ensure-main, then presses Claude Code's send-now chord (tmux one send-keys C-x C-s; Herdr one pane.send_keys ctrl+x ctrl+s) through a new AgentPaneIo.pressSendNow / pressSendNowChord helper, typing no text. The PRD at .pan/drafts/pan-5353.md carries exact files, snippets and decisions D1-D14.",
+      "NonGoals": "- Send now must never type or paste text into the pane; it presses the chord only.\n- No Send now for Pi, oh-my-pi, Codex or any harness whose steerKind is not 'send-now-keys'.\n- No Send now for remote (Fly) agents.\n- No special handling for conversations on another linked machine: they reach the route through the existing generic /api/conversations/@<machine>/... proxy, and an older linked machine's 404 becomes a toast.\n- No new pan CLI verb or MCP tool; pan tell --steer stays the shell path.\n- No change to Steer (PAN-4292) delivery, the message route, or messageAgent/steerRefusalReason in src/lib/agents/messaging.ts.\n- No server-side per-conversation lock; serialization is the frontend send queue for one tab only.\n- No reading, clearing or preserving text the operator typed into the pane's own input box.\n- No per-bubble flush: the chord flushes every queued message, and the UI says so.\n- No new code in src/lib/tmux.ts (at its 1167-line cap) and no allowlist raise anywhere.\n- Never send C-Enter / ctrl+enter to a pane."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split the server logic into an agent door (src/lib/agents/send-now.ts, owns SendNowResult) and a conversation door (src/lib/overdeck/conversation-send-now.ts).",
+        "rationale": "Matches the existing import direction: overdeck/conversation-message.ts imports agents/* statically while agents/messaging.ts only lazy-imports overdeck/conversations.js, so one agents-side module importing the conversation store would risk lint:circular."
+      },
+      {
+        "summary": "The agent door repeats steerRefusalReason's checks with its own codes instead of exporting or refactoring messaging.ts.",
+        "rationale": "steerRefusalReason is private and returns a bare string that loses the HTTP code; leaving messaging.ts untouched keeps Steer's behaviour unchanged."
+      },
+      {
+        "summary": "The agent door checks for a permission prompt with parsePermissionPrompt on one pane read before ensure-main.",
+        "rationale": "D4 requires the chord never lands in a permission menu, and ensure-main's Down/Enter keys could answer one; agents have no conversation permission helper, and an unreadable pane still falls to ensure-main's own refusal."
+      },
+      {
+        "summary": "tmux presses the chord in one send-keys call (C-x C-s), not two sendKeysAsync calls.",
+        "rationale": "Same shape as the live probe and the steer path (src/lib/tmux.ts line ~1128), so another writer can never split the chord; tmux.ts is at its cap so the call is made from agent-pane-io.ts via the exported tmuxExecAsync."
+      },
+      {
+        "summary": "A press that throws answers 502 press-failed; a read-only conversation copy answers 409 with conversationWriteRefusalBody's code; an ended conversation answers 409 not-running.",
+        "rationale": "The message route's only liveness gates are conversationWriteRefusal and status === 'ended'; a thrown press is a server-side failure the toast must explain."
+      },
+      {
+        "summary": "Empty Ctrl+Enter counts as empty only with no pending attachments at all (uploading included) and no citations.",
+        "rationale": "An uploading attachment means the operator intends to send it; the existing handleSubmit path then toasts 'Please wait for uploads to finish'."
+      },
+      {
+        "summary": "Both routes go in one top-level route file, src/dashboard/server/routes/send-now.ts.",
+        "rationale": "The no-loss matrix route scanner reads only top-level files in src/dashboard/server/routes/, not routes/agents/."
+      },
+      {
+        "summary": "The frontend client lives in a new lib/composerSendNow.ts rather than composerSend.ts.",
+        "rationale": "Keeps composerSend.ts free of toast and lets the client item touch no shared file."
+      }
+    ],
+    "items": [
+      {
+        "id": "pane-chord",
+        "title": "Add AgentPaneIo.pressSendNow and pressSendNowChord",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T14:31:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5353",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/terminal-backends/agent-pane-io.ts",
+            "src/lib/terminal-backends/__tests__/agent-pane-io-keys.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/terminal-backends/__tests__/agent-pane-io-keys.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent-pane-io-keys.test.ts reports all tests green including the three new pressSendNow cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. Add pressSendNow(): Promise<void> to the AgentPaneIo interface (do not widen SelectorKey). In resolveAgentPaneIo's Herdr branch add pressSendNow calling getHerdrApiClient().call('pane.send_keys', { pane_id: pane.paneId, keys: [...STEER_HERDR_KEYS] }) directly (not sendHerdrPaneKeys, whose toHerdrKey mangles C-x). In the tmux branch import tmuxExecAsync, exactPaneTarget and validateSessionName from ../tmux.js and press with one call: validateSessionName(agentId); tmuxExecAsync(['send-keys', '-t', exactPaneTarget(agentId), ...STEER_TMUX_KEYS], { encoding: 'utf-8' }). Export pressSendNowChord(agentId, backend?) that resolves the pane IO and calls pressSendNow. Do not touch src/lib/tmux.ts. Extend agent-pane-io-keys.test.ts with a hoisted tmuxExecAsync spy and three cases: Herdr pane, tmux host, Herdr host with no pane (tmux fallback)."
+        },
+        "items": [
+          {
+            "id": "pane-chord.ac1",
+            "title": "Given a Herdr host holding pane p-1, when pressSendNow() runs, then it sends exactly one pane.send_keys call with keys ['ctrl+x','ctrl+s'] and no pane.send_text call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-chord.ac2",
+            "title": "Given a tmux host, when pressSendNow() runs, then tmuxExecAsync receives one args array starting ['send-keys','-t'] and ending ['C-x','C-s'], and sendKeysAsync is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-chord.ac3",
+            "title": "Given a Herdr host that holds no pane for the agent, when pressSendNow() runs, then it falls back to the single tmux send-keys call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-chord.ac4",
+            "title": "git diff origin/main -- src/lib/tmux.ts prints nothing, and SelectorKey still contains only 'Up' | 'Down' | 'Enter' | 'Escape'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-door",
+        "title": "Add the sendNowToAgent door and the SendNowResult type",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T14:31:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5353",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "conversation-door",
+            "routes"
+          ],
+          "files_scope": [
+            "src/lib/agents/send-now.ts",
+            "src/lib/agents/__tests__/send-now.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/send-now.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "send-now.test.ts reports every refusal case and the happy path green",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2a exactly. Create src/lib/agents/send-now.ts exporting SendNowCode, SendNowResult, AgentSendNowDeps and sendNowToAgent(rawId, deps). Steps in order, each refusal returning before press: normalizeAgentId; getAgentState (import from ./agent-state-read.js, never ../agents.js) null -> 404 not-found; steerKind !== 'send-now-keys' -> 422 steer-unsupported; paused / suspended (getAgentRuntimeStateSync) / stopped -> 409 not-running; remote (lazy import ../remote/remote-agents.js, loadRemoteAgentState(id)?.vmName) -> 422 steer-unsupported; read the pane once with resolveAgentPaneIo(id).read(PANE_CAPTURE_LINES) and refuse 409 permission-pending when parsePermissionPrompt returns non-null (an unreadable pane falls through); ensureMainInputTarget !ok -> 409 input-target-not-main; press via pressSendNowChord, a throw -> 502 press-failed; else { ok: true }. Use the exact error strings in the PRD. Never import src/lib/overdeck/*. Do not modify src/lib/agents/messaging.ts. Tests inject every dep; one case per refusal asserting status, code and that press was not called, plus happy path, permission-before-ensure-main ordering, and unreadable-pane fall-through."
+        },
+        "items": [
+          {
+            "id": "agent-door.ac1",
+            "title": "Given each of: unknown id, codex harness, paused, suspended, stopped, remote, permission prompt on pane, ensure-main refusal — sendNowToAgent returns the PRD status and code and never calls press",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-door.ac2",
+            "title": "Given a live local Claude Code agent with a clean pane, sendNowToAgent returns { ok: true } and calls press exactly once with the normalized agent id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-door.ac3",
+            "title": "Given parsePermissionPrompt finds a prompt on the pane, when sendNowToAgent runs, then ensureMain is not called and the result is 409 permission-pending",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-door.ac4",
+            "title": "Given press throws, sendNowToAgent returns 502 press-failed whose error contains the thrown message; given readPane throws, ensureMain still runs and press is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-door.ac5",
+            "title": "grep -n \"overdeck/\\|from '../agents.js'\" src/lib/agents/send-now.ts prints nothing, and npm run lint:circular exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-door",
+        "title": "Add the sendNowToConversation door",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T14:31:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5353",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-send-now.ts",
+            "src/lib/overdeck/__tests__/conversation-send-now.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-send-now.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "conversation-send-now.test.ts reports every refusal case and the happy path green",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2b exactly. Create src/lib/overdeck/conversation-send-now.ts exporting ConversationSendNowDeps and sendNowToConversation(name, deps), importing the SendNowResult type from ../agents/send-now.js. Steps in order, each refusal returning before press: getConversationByName null -> 404 not-found; conversationWriteRefusalBody(conv) non-null -> 409 with its code and error; conv.status === 'ended' -> 409 not-running; getHarnessBehavior(conv.harness ?? 'claude-code').steerKind !== 'send-now-keys' -> 422 steer-unsupported; when behavior.capabilities.paneInputGuard: conversationPendingPermission(conv)?.answerable -> 409 permission-pending, then ensureMainInputTarget(conv.tmuxSession) !ok -> 409 input-target-not-main; press via pressSendNowChord(conv.tmuxSession), a throw -> 502 press-failed; else { ok: true }. Inject every external call through deps. Tests cover each refusal, the non-answerable permission case (no refusal), and the happy path."
+        },
+        "items": [
+          {
+            "id": "conversation-door.ac1",
+            "title": "Given each of: unknown name, released copy, ended conversation, codex harness, answerable permission prompt, ensure-main refusal — sendNowToConversation returns the PRD status and code and never calls press",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-door.ac2",
+            "title": "Given an active Claude Code conversation with no prompt, sendNowToConversation returns { ok: true } and calls press exactly once with conv.tmuxSession",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-door.ac3",
+            "title": "Given a pending permission with answerable: false, sendNowToConversation does not refuse and still presses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-door.ac4",
+            "title": "Given press throws, sendNowToConversation returns 502 with code press-failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "routes",
+        "title": "Register the two send-now HTTP routes with scopes, matrix rows and telemetry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T14:31:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5353",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/send-now.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "src/dashboard/server/__tests__/send-now-routes.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "packages/contracts/src/telemetry.ts",
+            "docs/TELEMETRY.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:contracts",
+            "npx vitest run src/dashboard/server/__tests__/send-now-routes.test.ts src/dashboard/server/__tests__/route-scopes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts tests/unit/telemetry-docs.test.ts tests/unit/contracts/telemetry-client-route.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "build:contracts completes without errors",
+            "all five named test files report green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 exactly. Create top-level src/dashboard/server/routes/send-now.ts with two HttpRouter.add('POST', '/api/...') routes written with method and path as the first two literals: POST /api/conversations/:name/send-now calling sendNowToConversation and POST /api/agents/:id/send-now calling sendNowToAgent, each running validateOrigin first (403). Map results with an exported pure helper sendNowResponse(result). Export sendNowRouteLayer = Layer.mergeAll(...) and register it in server.ts right after conversationMessageCancelRouteLayer. Add both paths as scope 'tell' rows in route-scopes.ts after the message/cancel row; add two WRITE rows to tests/unit/lib/overdeck/no-loss-matrix.ts after the message/cancel row; add both paths to TELEMETRY_PROPERTY_DOMAINS.client_route in packages/contracts/src/telemetry.ts in plain string order and to the client_route row of docs/TELEMETRY.md in the same order. Run npm run build:contracts before typecheck. Each handler awaits its door with yield* Effect.promise(() => door(param)) (see the PRD snippet). Test the real layer the way color-themes-routes.test.ts does, with both door modules and origin-validation.js mocked: refused origin returns 403 with no door call, success returns 200 { ok: true } with the right name/id, and failures return the door's status and { error, code }; also assert requiredScopeFor for both paths."
+        },
+        "items": [
+          {
+            "id": "routes.ac1",
+            "title": "Given validateOrigin refuses, when either route is POSTed, then it returns 403 { error: 'Missing origin' } and neither door is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes.ac2",
+            "title": "Given origin accepted and a door result, POST /api/conversations/c1/send-now passes 'c1' to sendNowToConversation, POST /api/agents/agent-pan-1/send-now passes 'agent-pan-1' to sendNowToAgent, and each returns 200 { ok: true } or the door's status with { error, code }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes.ac3",
+            "title": "requiredScopeFor returns 'tell' for POST /api/conversations/c1/send-now and for POST /api/agents/agent-pan-1/send-now",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes.ac4",
+            "title": "vitest run of route-scopes.test.ts, no-loss-matrix.test.ts, telemetry-docs.test.ts and telemetry-client-route.test.ts exits 0 with both new paths present in route-scopes.ts, no-loss-matrix.ts, telemetry.ts and docs/TELEMETRY.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes.ac5",
+            "title": "grep -n sendNowRouteLayer src/dashboard/server/server.ts prints both the import line and the layer-list entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "client",
+        "title": "Add the frontend Send now client (requestSendNow, sendNowQueued)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T14:31:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5353",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/composerSendNow.ts",
+            "src/dashboard/frontend/src/lib/__tests__/composerSendNow.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/composerSendNow.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "composerSendNow.test.ts reports the URL, toast and queue-ordering cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 exactly. Create src/dashboard/frontend/src/lib/composerSendNow.ts with requestSendNow(conversationName, agentId?) — POST /api/agents/<id>/send-now when agentId is set, else /api/conversations/<name>/send-now, both encodeURIComponent'd, body '{}', a 120 s AbortController timeout cleared in finally (same ceiling as the message POST; never abort while the server may still be pressing keys), and Error(body.error) or 'Send now failed (<status>)' on a non-2xx answer — and sendNowQueued(conversationName, agentId?) that runs requestSendNow through enqueueConversationSend(conversationName, ...) and turns any rejection into toast.error(message) so it never rejects. Add the test file to scripts/frontend-test-subset.txt right after src/lib/__tests__/composerSendQueue.test.ts. Tests mock fetch and sonner and call resetConversationSendQueues() in beforeEach."
+        },
+        "items": [
+          {
+            "id": "client.ac1",
+            "title": "requestSendNow sends POST to /api/agents/agent-pan-1/send-now when agentId is set and to /api/conversations/conv%20a/send-now for name 'conv a' without it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client.ac2",
+            "title": "Given a 409 answer with { error: 'Waiting: the agent needs a permission answer first' }, sendNowQueued resolves and calls toast.error with exactly that text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client.ac3",
+            "title": "Given an earlier unresolved task enqueued on the same conversation name, the send-now fetch is not sent until that task resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bubble-link",
+        "title": "Render a Send now link on the acknowledged queued bubble",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T14:31:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5353",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.test.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/messagesTimeline/messageRows.test.tsx",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "messageRows.test.tsx reports the new Send now visibility and click cases green",
+            "typecheck completes without errors",
+            "lint-file-size prints the passed line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5 exactly. In ConversationView (ConversationPanel.tsx) pass primitive props sendNowAvailable={agentBusy && getHarnessBehavior(conversation.harness ?? 'claude-code').steerKind === 'send-now-keys'} and agentId={agentId} to MessagesTimeline (never a fresh object: MessagesTimeline and TimelineRowRenderer are memo components). Thread both props through MessagesTimelineProps (both TimelineRowRenderer calls) and RowProps, and pass sendNowConversationName={sendNowAvailable ? conversationName : undefined} and sendNowAgentId={agentId} to UserMessageRow. In UserMessageRow's non-pending optimistic branch, after 'Sent · waiting for transcript', render SendNowButton when sendNowConversationName is set and deliveryState !== 'unknown'. SendNowButton is styled like CancelMessageButton, labelled 'Send now' / 'Sending now…' while running (disabled), aria-label 'Send queued messages now', title 'Interrupt the current turn and send every queued message now (Claude Code Ctrl+Enter)', and calls sendNowQueued(conversationName, agentId). Add the six visibility cases and the click case to messageRows.test.tsx with composerSendNow mocked."
+        },
+        "items": [
+          {
+            "id": "bubble-link.ac1",
+            "title": "Given an optimistic bubble with acknowledged: true and sendNowConversationName='c1', UserMessageRow renders a button named 'Send queued messages now' with text 'Send now'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bubble-link.ac2",
+            "title": "UserMessageRow renders no Send now button when sendNowConversationName is absent, the bubble is unacknowledged, deliveryState is 'held' or 'unknown', or the id lacks the optimistic- prefix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bubble-link.ac3",
+            "title": "When the Send now button is clicked with sendNowAgentId='agent-pan-1', it calls sendNowQueued('c1', 'agent-pan-1') and shows 'Sending now…' disabled until the call resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bubble-link.ac4",
+            "title": "bash scripts/lint-file-size.sh exits 0 with ConversationPanel.tsx at or below its 1531-line cap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "empty-ctrl-enter",
+        "title": "Make Ctrl/Cmd+Enter on an empty composer call Send now",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T14:31:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5353",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.send-now.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ComposerFooter.send-now.test.tsx",
+            "npm run typecheck",
+            "wc -l src/dashboard/frontend/src/components/chat/ComposerFooter.tsx"
+          ],
+          "expected_outputs": [
+            "ComposerFooter.send-now.test.tsx reports its five cases green",
+            "typecheck completes without errors",
+            "wc -l prints 1000 or fewer"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6 exactly. Replace handleCommandKey in ComposerFooter.tsx with the PRD's After snippet: read the editor text at key time with editorRef.current?.read(() => $getRoot().getTextContent()) (never the lagging isEmpty state), and on 'SteerEnter', when steerKind === 'send-now-keys', conversation.sessionAlive, the editor is mounted, that text is blank, pendingAttachments.length === 0 and citationCount === 0, call sendNowQueued(conversation.name, agentId); otherwise keep the existing steer/plain handleSubmit calls. Import sendNowQueued from '../../lib/composerSendNow' and update the useCallback dependency list. Keep ComposerFooter.tsx at or below 1000 lines. Create __tests__/ComposerFooter.send-now.test.tsx modelled on ComposerFooter.send-queue.test.tsx with composerSendNow mocked and fetch spied, covering the five PRD cases (a-e, including a restored draft seeded in localStorage key conv-draft:<name>), and list it in scripts/frontend-test-subset.txt between ComposerFooter.schedule.test.tsx and ComposerFooter.send-queue.test.tsx."
+        },
+        "items": [
+          {
+            "id": "empty-ctrl-enter.ac1",
+            "title": "Given a live Claude Code conversation with an empty composer, when Ctrl+Enter is pressed, then sendNowQueued is called once with the conversation name and no /message fetch is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "empty-ctrl-enter.ac2",
+            "title": "Given the composer holds 'hello', when Ctrl+Enter is pressed, then sendNowQueued is not called and one /message POST is sent with deliverAs: 'steer'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "empty-ctrl-enter.ac3",
+            "title": "Given a codex conversation with an empty composer, or a Claude Code composer holding only an uploading attachment, when Ctrl+Enter is pressed, then sendNowQueued is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "empty-ctrl-enter.ac5",
+            "title": "Given a restored draft 'restored text' seeded in localStorage conv-draft:<name> before render, when Ctrl+Enter is pressed, then sendNowQueued is not called and a steer POST containing 'restored text' is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "empty-ctrl-enter.ac4",
+            "title": "wc -l src/dashboard/frontend/src/components/chat/ComposerFooter.tsx prints 1000 or fewer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document Send now and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T14:31:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5353",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "docs/TERMINAL-BACKENDS.md",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5353.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'Send now' configuration/harnesses.mdx docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'pressSendNow' docs/TERMINAL-BACKENDS.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7 exactly. In configuration/harnesses.mdx section 'Steering a running turn', after the paragraph starting 'A steer never falls back silently', add a bold Send now paragraph: queued message bubble reads Sent · waiting for transcript; click Send now or press Ctrl+Enter (Cmd+Enter) on an empty composer to interrupt and send every queued message; Overdeck presses Ctrl+X Ctrl+S and types no text; conversations and workspace agents, Claude Code only; nothing queued means nothing happens; text typed into the pane's input in the Terminal tab is submitted with it. In docs/TERMINAL-BACKENDS.md after the Steer submit table add the pressSendNow / pressSendNowChord paragraph naming both routes. In docs/DASHBOARD-ARCHITECTURE.md after the Cancel (PAN-5237) description add the Send now (PAN-5353) sentences. Create changelog.d/pan-5353.md with the PRD's #### New entry."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "configuration/harnesses.mdx contains a Send now paragraph that names Ctrl+Enter on an empty composer, Ctrl+X Ctrl+S, Claude Code only, and the Terminal-tab input caveat",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/TERMINAL-BACKENDS.md contains pressSendNowChord with both route paths, and docs/DASHBOARD-ARCHITECTURE.md contains 'Send now (PAN-5353)' after the Cancel (PAN-5237) text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "changelog.d/pan-5353.md exists with a '#### New' heading and one bullet linking issue 5353, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-check",
+        "title": "Verify Send now live against a busy Claude Code conversation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T14:31:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5353",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/terminal-backends/agent-pane-io.ts",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.tsx",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "tmux -L sendnowcheck capture-pane -p -t sendnowcheck"
+          ],
+          "expected_outputs": [
+            "build completes without errors",
+            "the captured pane (or Playwright screenshot) shows the queued QUEUED-X answer and no continuation of the interrupted long reply"
+          ],
+          "readiness": "sequential",
+          "acJustification": "Two observable checks (link click and empty Ctrl+Enter) plus the fallback path; files_scope lists only the files a defect found here would be fixed in.",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implementation checkpoint for PRD AC-9, run after every other code item is done. Build the branch and, in an isolated Playwright browser profile against a dashboard built from this branch (never reload the operator's live dashboard), open a Claude Code conversation writing a long reply, send 'Reply with only the word QUEUED-X', wait for 'Sent · waiting for transcript', click Send now, and confirm the reply stops and QUEUED-X is answered within a few seconds; repeat with Ctrl+Enter on an empty composer; also press Send now once while an AskUserQuestion dialog is on screen and record the result in the PR description (a harmful result becomes a follow-up issue). Fallback when the dashboard cannot be driven: tmux -L sendnowcheck new-session -d -s sendnowcheck 'claude --model haiku', queue one message during a long reply, run a scratchpad Node script with OVERDECK_TMUX_SOCKET_NAME=sendnowcheck calling the built pressSendNowChord('sendnowcheck', { name: 'tmux' }), capture with tmux -L sendnowcheck capture-pane -p -t sendnowcheck, paste the capture into the PR description, then tmux -L sendnowcheck kill-server. Fix any defect found in the listed files before finishing."
+        },
+        "items": [
+          {
+            "id": "live-check.ac1",
+            "title": "Given a busy Claude Code conversation with one queued message, when Send now is clicked, then the pane or timeline shows the QUEUED-X answer within 10 seconds and the long reply does not continue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-check.ac2",
+            "title": "Given the same setup, when Ctrl+Enter is pressed on an empty composer, then the queued answer appears the same way; on the fallback path, the PR description contains the sendnowcheck pane capture that shows QUEUED-X answered after pressSendNowChord",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-check.ac3",
+            "title": "The PR description records what pressing Send now does while an AskUserQuestion dialog is on screen",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pane-chord",
+        "to": "agent-door",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-chord",
+        "to": "conversation-door",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-door",
+        "to": "conversation-door",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-door",
+        "to": "routes",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-door",
+        "to": "routes",
+        "type": "blocks"
+      },
+      {
+        "from": "client",
+        "to": "bubble-link",
+        "type": "blocks"
+      },
+      {
+        "from": "client",
+        "to": "empty-ctrl-enter",
+        "type": "blocks"
+      },
+      {
+        "from": "routes",
+        "to": "live-check",
+        "type": "blocks"
+      },
+      {
+        "from": "bubble-link",
+        "to": "live-check",
+        "type": "blocks"
+      },
+      {
+        "from": "empty-ctrl-enter",
+        "to": "live-check",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-chord",
+        "to": "live-check",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

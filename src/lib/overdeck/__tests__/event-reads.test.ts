@@ -9,6 +9,8 @@ import {
   readLatestAgentClaudeSessionIdEvent,
   readRecordedAgentStopAt,
 } from '../event-reads.js';
+import { buildConfirmedDeadAgentEvents, buildSuspendedAgentEvents } from '../../cloister/agent-status-events.js';
+import type { AgentState } from '../../agents/agent-state-read.js';
 
 function insertEvent(
   odb: OverdeckTestDb,
@@ -123,6 +125,27 @@ describe('agent event read door', () => {
       insertEvent(odb, 'agent.stopped', FINALIZED + 1_000, { agentId: 'planning-pan-5069' });
       insertEvent(odb, 'agent.started', FINALIZED + 2_000, { agentId: 'planning-pan-5070' });
       expect(readRecordedAgentStopAt(planning)).toBe(FINALIZED);
+    });
+
+    // PAN-5354: the Command Deck Pause button suspends a work agent; deacon-lite
+    // must read that as a deliberate stop, even after it reports the death.
+    it('counts an operator suspend as a recorded stop, past a later death report', () => {
+      const SUSPENDED = '2026-11-15T12:30:00.000Z';
+      const work = {
+        id: 'agent-pan-5337', issueId: 'PAN-5337', status: 'running', startedAt: '2026-11-15T11:23:00.000Z',
+      } as AgentState;
+      const append = (events: ReadonlyArray<{ type: string; timestamp: string; payload: unknown }>) => {
+        for (const event of events) {
+          odb.raw().prepare('INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)')
+            .run(event.type, event.timestamp, JSON.stringify(event.payload));
+        }
+      };
+
+      append(buildSuspendedAgentEvents(work, () => SUSPENDED));
+      expect(readRecordedAgentStopAt(work)).toBe(Date.parse(SUSPENDED));
+
+      append(buildConfirmedDeadAgentEvents(work.id, work, () => '2026-11-15T12:31:00.000Z'));
+      expect(readRecordedAgentStopAt(work)).toBe(Date.parse(SUSPENDED));
     });
 
     it('reads only events before beforeSequence', () => {

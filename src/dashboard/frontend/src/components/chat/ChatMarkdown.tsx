@@ -369,11 +369,20 @@ function remarkBareFileTextLinks(options: { cwd?: string } = {}) {
   };
 }
 
+/** An href the browser would resolve against the dashboard page (PAN-5338 D-11). */
+export function isRelativeMarkdownHref(href: string | undefined): boolean {
+  if (typeof href !== 'string') return false;
+  const h = href.trim();
+  if (h.length === 0 || h.startsWith('#') || h.startsWith('/')) return false;
+  return !/^(https?|mailto):/i.test(h);
+}
+
 function makeComponents(
   isStreaming: boolean,
   cwd: string | undefined,
   issueId: string | null | undefined,
   conversationRefs: ConversationRefMap,
+  plainRelativeLinks: boolean,
 ): Components & StreamdownComponents {
   const conversationRefsByRouteKey = new Map<string, ConversationRef>();
   for (const ref of conversationRefs.values()) conversationRefsByRouteKey.set(ref.routeKey, ref);
@@ -432,6 +441,10 @@ function makeComponents(
         );
       }
 
+      if (plainRelativeLinks && isRelativeMarkdownHref(href)) {
+        return <span className={styles.mdLink} data-relative-link="">{children}</span>;
+      }
+
       // Block javascript: and data: URIs to prevent XSS from assistant markdown
       const safeHref =
         typeof href === 'string' &&
@@ -453,6 +466,8 @@ interface ChatMarkdownProps {
   cwd?: string;
   issueId?: string | null;
   useStreamdown?: boolean;
+  /** Render a relative-href anchor as plain text (PAN-5338 D-11); default false. */
+  plainRelativeLinks?: boolean;
 }
 
 interface ChatMarkdownBodyProps extends ChatMarkdownProps {
@@ -500,10 +515,11 @@ const ChatMarkdownBody = memo(function ChatMarkdownBody({
   issueId,
   useStreamdown,
   conversationRefs,
+  plainRelativeLinks = false,
 }: ChatMarkdownBodyProps) {
   const components = useMemo(
-    () => makeComponents(isStreaming, cwd, issueId, conversationRefs),
-    [isStreaming, cwd, issueId, conversationRefs],
+    () => makeComponents(isStreaming, cwd, issueId, conversationRefs, plainRelativeLinks),
+    [isStreaming, cwd, issueId, conversationRefs, plainRelativeLinks],
   );
   // Streamdown's internal processor cache keys a plugin's options via
   // JSON.stringify, and JSON.stringify(Map) always serializes to "{}" — so

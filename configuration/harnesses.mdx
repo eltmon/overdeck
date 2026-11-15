@@ -35,7 +35,9 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 
 The dashboard reserves `/pan <verb> [args]` for Overdeck operator commands. The dashboard parses and executes this namespace before a message reaches the coding harness, so `/pan` has the same syntax, validation, canonical arguments, confirmations, and result shape under `claude-code`, `codex`, `pi`, `ohmypi`, `acp`, `kimi-code`, `muse`, and `prime-agent`. Unprefixed `pan ...` text is still delivered as an ordinary prompt.
 
-Harness-native slash commands are a separate lane and are not uniform. The composer menu reads the active harness's verified capability list: for example, Claude Code exposes native commands such as `/model`, while a harness with no verified inventory shows no native entries. Overdeck commands appear in their own **Overdeck** group, so choosing a harness never changes the `/pan` control-plane surface.
+Harness-native slash commands are a separate lane and are not uniform. The composer menu reads the active harness's verified capability list: for example, Claude Code exposes native commands such as `/model`, while a harness with no verified inventory shows no native entries. Overdeck commands appear in their own **Overdeck** group, so choosing a harness never changes the `/pan` control-plane surface. Type `/pan` alone and send it to list the Overdeck commands; the ones that run in the composer come first.
+
+Installed skills appear in their own **Skills** group, as `/<skill-name>`, on a harness that runs `/<skill>` as a skill itself (the `skillSlashCommands` capability; today only Claude Code) — unlike `/pan`, the dashboard never intercepts these; the harness receives and runs them. The group lists the skills enabled for the open conversation (or agent session), after its conversation, issue, project, and global overrides, the same way a launch decides what to hide, fetched from `GET /api/skills/overrides` only while the menu is open. Skill pack skills and the `pan` and `pan-handoff` skills are not listed: the composer itself handles `/pan …` and `/pan-handoff`.
 
 Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resume, Overdeck copies the Agent Skills standard directories synced by `pan sync` from `~/.agents/skills` into that home's `skills/` directory. Managed skills are refreshed additively, per-agent-only skill directories are preserved, and Codex still keeps its sessions and configuration inside the isolated home.
 
@@ -51,6 +53,8 @@ Pressing **Enter** in the dashboard composer queues your message while the agent
 | ACP, OpenCode, Grok Build, Kimi Code, Muse Code, Prime Agent | Auto | None. |
 
 A steer never falls back silently to a queued message. A harness without steer answers `steer-unsupported` and delivers nothing. A Claude Code agent launched before steer support has a PTY supervisor that presses Enter instead, and the delivery reports that it went out as a normal submit.
+
+**Send now.** A message sent while Claude Code is busy waits in Claude Code's own queue, and its bubble reads *Sent · waiting for transcript*. Click **Send now** on that bubble, or press **Ctrl+Enter** (**Cmd+Enter** on macOS) on an empty composer, to interrupt the turn and send every queued message at once, like the TUI's Ctrl+Enter on an empty input box. Overdeck presses Claude Code's send-now chord, Ctrl+X Ctrl+S, and types no text. It works for conversations and workspace agents, Claude Code only. With nothing queued it does nothing. Text typed into the agent's input box in the Terminal tab is submitted with it.
 
 ## Supported harnesses
 
@@ -1285,6 +1289,7 @@ name. Every field is required, so a harness cannot leave a decision undeclared.
 | `askAnswerDelivery` | How the dashboard delivers an answer to a conversation's pending question: `message` sends it as a message; `pi-ask-modal` drives the open ask modal with keystrokes; `codex-approval` means it is really a numbered approval prompt, answered with `answer_codex_approval` (PAN-4944), not a question. |
 | `runsOnFlyMachine` | A conversation may be started on a Fly machine (`pan machines add-fly`). Only Claude Code declares it; other harnesses on Fly are #4296. |
 | `overdeckMcp` | Launches get the `overdeck` MCP server with a per-agent token. Claude Code, Codex, `acp` and `opencode` declare it. |
+| `skillSlashCommands` | The composer `/` menu lists installed skills as `/<skill-name>` under a Skills group, because this harness runs a typed `/<skill>` command. Only Claude Code declares it. |
 
 The rule for harness-specific code:
 

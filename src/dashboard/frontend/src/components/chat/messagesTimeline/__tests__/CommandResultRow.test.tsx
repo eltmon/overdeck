@@ -75,4 +75,25 @@ describe('CommandResultRow', () => {
 
     expect(onConfirm).toHaveBeenCalledWith('command-result-1', 'CONFIRM');
   });
+
+  it('renders the /pan help list as captured output', () => {
+    render(
+      <CommandResultRow
+        message={commandMessage({
+          kind: 'captured',
+          status: 'completed',
+          command: '/pan help',
+          output: 'Overdeck commands\n\nRun in this composer (type /pan <command>):\n  /pan status  Show running agents',
+          truncated: false,
+        })}
+      />,
+    );
+
+    expect(screen.getByText('/pan help completed successfully.')).toBeInTheDocument();
+    expect(screen.getByText(/Run in this composer/)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    const row = screen.getByText('/pan help completed successfully.').closest('[data-command-result]');
+    expect(row).toHaveAttribute('data-command-result', 'completed');
+  });
 });

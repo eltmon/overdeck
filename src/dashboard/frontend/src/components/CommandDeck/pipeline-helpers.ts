@@ -1,6 +1,6 @@
 import type { SessionNode } from '@overdeck/contracts';
-import type { DerivedIssueState } from '../../types';
-import type { PipelineIssuePhase } from '../../lib/pipeline-state';
+import type { CanonicalState, DerivedIssueState } from '../../types';
+import { PHASE_BY_DERIVED_STATE, type PipelineIssuePhase } from '../../lib/pipeline-state';
 import { compactModelName } from '../../lib/model-names';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 
@@ -13,11 +13,12 @@ export interface BucketedFeature {
   phase: PipelineBucketPhase;
 }
 
+/** PAN-5294 G-D5 — the four Home pipeline lanes, in render order. */
+export type PipelineLaneKey = 'building' | 'review' | 'ready' | 'stalled';
+
 export interface PipelineGroup {
-  key: string;
-  phase: PipelineBucketPhase;
+  key: PipelineLaneKey;
   title: string;
-  subtitle: string;
   entries: BucketedFeature[];
 }
 
@@ -328,16 +329,6 @@ export function whoLineFor(entry: BucketedFeature): string | null {
   return `${parts.join(' + ')} · ${suffix}`;
 }
 
-export function sessionCountFor(feature: ProjectFeature): number {
-  return feature.sessions?.length ?? 0;
-}
-
-export function formatPipelineCost(cost: number | undefined): string {
-  if (cost === undefined || Number.isNaN(cost)) return '—';
-  if (cost === 0) return '$0.00';
-  return `$${cost.toFixed(2)}`;
-}
-
 export function lastActivityAt(entry: BucketedFeature): number {
   return featureLastActivity(entry.feature);
 }
@@ -346,63 +337,152 @@ export function sortByLastActivity(entries: readonly BucketedFeature[]): Buckete
   return [...entries].sort((a, b) => lastActivityAt(b) - lastActivityAt(a));
 }
 
-export function stageDisplayName(phase: PipelineBucketPhase): { title: string; subtitle: string } {
-  switch (phase) {
-    case 'ship': return { title: 'Lining up to ship', subtitle: 'ready to merge' };
-    case 'review': return { title: 'Being reviewed', subtitle: 'quality checks' };
-    case 'work': return { title: 'Being built', subtitle: 'implementation' };
-    case 'plan': return { title: 'Planning', subtitle: 'writing the plan' };
-    case 'ready': return { title: 'Ready', subtitle: 'queued for pickup' };
-    case 'todo': return { title: 'Todo', subtitle: 'not started' };
-    case 'stalled': return { title: 'Stalled / fell off the pipeline', subtitle: 'started work with nobody on it' };
-    case 'needs-you': return { title: 'Needs you', subtitle: 'waiting on a human decision' };
-    default: return { title: phase, subtitle: '' };
+const LANE_TITLES: Record<PipelineLaneKey, string> = {
+  building: 'Building',
+  review: 'In review',
+  ready: 'Ready to merge',
+  stalled: 'Stalled',
+};
+
+/**
+ * PAN-5294 G-D5 — the lane an entry belongs to, or null when Home does not
+ * list it (todo, queued for pickup, merged, closed). Stalled claims first, so
+ * a stalled entry appears in no other lane.
+ */
+export function homeLaneFor(entry: BucketedFeature): PipelineLaneKey | null {
+  if (entry.phase === 'stalled' || isStalledFeature(entry.feature)) return 'stalled';
+  if (entry.derived?.state === 'ready') return 'ready';
+  if (entry.phase === 'plan' || entry.phase === 'work') return 'building';
+  if (entry.phase === 'review') return 'review';
+  return null;
+}
+
+/**
+ * PAN-5294 G-D5 — Building, In review and Ready to merge always render (even
+ * at 0); Stalled renders only when it has entries and comes last.
+ */
+export function groupPipelineEntries(entries: readonly BucketedFeature[]): PipelineGroup[] {
+  const byLane: Record<PipelineLaneKey, BucketedFeature[]> = { building: [], review: [], ready: [], stalled: [] };
+  for (const entry of entries) {
+    const lane = homeLaneFor(entry);
+    if (!lane) continue;
+    byLane[lane].push(lane === 'stalled' ? { ...entry, phase: 'stalled' } : entry);
+  }
+
+  const order: PipelineLaneKey[] = ['building', 'review', 'ready'];
+  if (byLane.stalled.length > 0) order.push('stalled');
+  return order.map(key => ({ key, title: LANE_TITLES[key], entries: sortByLastActivity(byLane[key]) }));
+}
+
+export interface HomeStageTag {
+  key: 'needs-you' | 'blocked' | 'stalled' | 'planning' | 'building' | 'changes-requested' | 'in-review' | 'ready' | 'queued';
+  label: string;
+  /** Badge formula classes: one colored signal per row (style guide). */
+  className: string;
+}
+
+const MUTED_TAG = 'badge-bg-muted badge-border-muted text-muted-foreground';
+const LIVE_TAG = 'badge-bg-state-live badge-border-state-live text-state-live';
+
+/**
+ * PAN-5294 G-D6 — the Home row tag. `needsYou` comes from the same
+ * needs-you list as the Needs-you fact, so the tag and the fact agree.
+ */
+export function homeStageTag(entry: BucketedFeature, needsYou: boolean): HomeStageTag {
+  const { feature, derived, phase } = entry;
+  if (needsYou) {
+    return { key: 'needs-you', label: 'needs you', className: 'badge-bg-state-needs-you badge-border-state-needs-you text-state-needs-you' };
+  }
+  if (isBlockedFeature(feature, derived)) {
+    return { key: 'blocked', label: 'blocked', className: 'badge-bg-destructive badge-border-destructive text-destructive' };
+  }
+  const lane = homeLaneFor(entry);
+  if (lane === 'stalled') return { key: 'stalled', label: 'stalled', className: MUTED_TAG };
+  if (lane === 'ready') {
+    return { key: 'ready', label: 'ready', className: 'badge-bg-state-done badge-border-state-done text-state-done' };
+  }
+  if (phase === 'plan') return { key: 'planning', label: 'planning', className: LIVE_TAG };
+  if (phase === 'work') return { key: 'building', label: 'building', className: LIVE_TAG };
+  if (phase === 'review') {
+    return derived?.state === 'changes-requested'
+      ? { key: 'changes-requested', label: 'changes requested', className: MUTED_TAG }
+      : { key: 'in-review', label: 'in review', className: MUTED_TAG };
+  }
+  return { key: 'queued', label: 'queued', className: MUTED_TAG };
+}
+
+const CHECKS_WORD: Partial<Record<string, string>> = { green: 'green', pending: 'running', red: 'failing' };
+
+/**
+ * PAN-5294 G-D7 — the Home row "who" cell: the pull request and its checks for
+ * In review / Ready to merge rows, else the agent's model and item progress.
+ */
+export function homeWhoFor(entry: BucketedFeature): string {
+  const { feature, derived } = entry;
+  const lane = homeLaneFor(entry);
+  if ((lane === 'review' || lane === 'ready') && derived?.pr) {
+    const word = CHECKS_WORD[derived.pr.checks ?? ''];
+    return word ? `PR #${derived.pr.number} · checks ${word}` : `PR #${derived.pr.number}`;
+  }
+
+  const sessions = feature.sessions ?? [];
+  if (sessions.length === 0) return 'no agent';
+  const session = sessions.find(s => s.presence === 'active') ?? sessions[0];
+  const model = compactModelName(session.model);
+  const totals = feature.taskTotals;
+  if (totals && totals.total > 0) return `${model} · ${totals.closed} of ${totals.total} items`;
+  if (feature.childCount && feature.childCount > 0) {
+    return `${model} · ${feature.completedCount ?? 0} of ${feature.childCount} items`;
+  }
+  return model;
+}
+
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+
+/**
+ * PAN-5294 G-D7 — the Home row age: time since last activity. Unknown or
+ * non-positive → '—'; under an hour → minutes; under 48 hours → hours; else days.
+ */
+export function formatAge(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined || !Number.isFinite(ms) || ms <= 0) return '—';
+  if (ms < HOUR_MS) return `${Math.floor(ms / MINUTE_MS)} m`;
+  if (ms < 48 * HOUR_MS) return `${Math.floor(ms / HOUR_MS)} h`;
+  return `${Math.floor(ms / (24 * HOUR_MS))} d`;
+}
+
+/**
+ * PAN-3917: the lane comes from the derived issue state. When the server has
+ * not derived one yet, the tracker's own state (an owner, never a record)
+ * places the row so the tree does not collapse every feature into Todo.
+ */
+function featureState(feature: ProjectFeature): CanonicalState | undefined {
+  const raw = `${feature.status} ${feature.stateLabel}`.toLowerCase();
+  if (raw.includes('close-out')) return 'done';
+  if (raw.includes('review')) return 'in_review';
+  if (raw.includes('progress') || hasActiveAgentSignal(feature)) return 'in_progress';
+  if (raw.includes('done') || raw.includes('complete')) return 'done';
+  if (raw.includes('cancel')) return 'canceled';
+  return feature.status as CanonicalState | undefined;
+}
+
+function trackerPhase(feature: ProjectFeature): PipelineIssuePhase {
+  switch (featureState(feature)) {
+    case 'done':
+    case 'canceled':
+      return 'ship';
+    case 'in_review':
+      return 'review';
+    case 'in_progress':
+      return 'work';
+    default:
+      return feature.hasPlanning && !hasWorkSession(feature) ? 'plan' : 'todo';
   }
 }
 
-export function groupPipelineEntries(entries: readonly BucketedFeature[]): PipelineGroup[] {
-  const needsYou = sortByLastActivity(entries.filter(e => isNeedsYouFeature(e.feature, e.derived)));
-  const groups: PipelineGroup[] = [];
-
-  if (needsYou.length > 0) {
-    groups.push({
-      key: 'needs-you',
-      phase: 'needs-you',
-      title: 'Needs you',
-      subtitle: 'waiting on a human decision',
-      entries: needsYou,
-    });
-  }
-
-  const stalledEntries = sortByLastActivity(
-    entries.filter(e =>
-      isStalledFeature(e.feature) &&
-      !isNeedsYouFeature(e.feature, e.derived),
-    ),
-  );
-  if (stalledEntries.length > 0) {
-    groups.push({
-      key: 'stalled',
-      phase: 'stalled',
-      title: 'Stalled / fell off the pipeline',
-      subtitle: 'started work with nobody on it',
-      entries: stalledEntries.map(e => ({ ...e, phase: 'stalled' })),
-    });
-  }
-
-  const phaseOrder: PipelineBucketPhase[] = ['ship', 'review', 'work', 'plan', 'ready', 'todo'];
-  for (const phase of phaseOrder) {
-    const phaseEntries = sortByLastActivity(
-      entries.filter(e =>
-        e.phase === phase &&
-        !isNeedsYouFeature(e.feature, e.derived) &&
-        !isStalledFeature(e.feature),
-      ),
-    );
-    if (phaseEntries.length === 0) continue;
-    const { title, subtitle } = stageDisplayName(phase);
-    groups.push({ key: phase, phase, title, subtitle, entries: phaseEntries });
-  }
-
-  return groups;
+export function bucketFeaturePhase(
+  feature: ProjectFeature,
+  derived: DerivedIssueState | undefined,
+): PipelineIssuePhase {
+  return derived ? PHASE_BY_DERIVED_STATE[derived.state] : trackerPhase(feature);
 }

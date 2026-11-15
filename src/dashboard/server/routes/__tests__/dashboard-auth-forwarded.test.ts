@@ -107,3 +107,42 @@ describe('remote request gate from a Docker-bridge peer — PAN-4299', () => {
     expect(await gateStatus('/api/issues', { peer: BRIDGE_PEER, headers: { 'x-forwarded-for': '172.18.0.1' } })).toBe(200);
   });
 });
+
+describe('require_token_mint never locks out a local browser — PAN-5344', () => {
+  beforeEach(async () => {
+    await writeFile(join(home, 'config.yaml'), 'dashboard:\n  require_token_mint: true\n', 'utf8');
+    invalidateRemoteAccessConfig();
+  });
+
+  it('mints for a browser on localhost (loopback peer, no forwarding header)', () => {
+    expect(mint('127.0.0.1')).toBeNull();
+    expect(mint('::1')).toBeNull();
+  });
+
+  it('mints for a browser on overdeck.localhost (bridge peer, local forwarded client)', () => {
+    expect(mint(BRIDGE_PEER, { 'x-forwarded-for': '172.18.0.1' })).toBeNull();
+    expect(mint(BRIDGE_PEER, { 'x-forwarded-for': '127.0.0.1' })).toBeNull();
+  });
+
+  it('401s a host-local proxy: loopback peer carrying a forwarding header', () => {
+    expect((mint('127.0.0.1', { 'x-forwarded-for': '203.0.113.9' }) as unknown as { status: number }).status).toBe(401);
+    expect((mint('127.0.0.1', { 'x-forwarded-for': '127.0.0.1' }) as unknown as { status: number }).status).toBe(401);
+    expect((mint('127.0.0.1', { 'x-forwarded-host': 'box.tailnet.ts.net' }) as unknown as { status: number }).status).toBe(401);
+  });
+
+  it('401s a bridge peer whose forwarded client is a LAN address or a spoofed prefix', () => {
+    expect((mint(BRIDGE_PEER, { 'x-forwarded-for': '192.168.1.50' }) as unknown as { status: number }).status).toBe(401);
+    expect((mint(BRIDGE_PEER, { 'x-forwarded-for': '127.0.0.1, 192.168.1.50' }) as unknown as { status: number }).status).toBe(401);
+  });
+
+  it('401s a Tailscale Funnel request from a loopback peer', () => {
+    expect((mint('127.0.0.1', { 'tailscale-funnel-request': '?1' }) as unknown as { status: number }).status).toBe(401);
+  });
+
+  it('the gate agrees with the mint for every shape', async () => {
+    expect(await gateStatus('/api/issues', { peer: '127.0.0.1' })).toBe(200);
+    expect(await gateStatus('/api/issues', { peer: BRIDGE_PEER, headers: { 'x-forwarded-for': '172.18.0.1' } })).toBe(200);
+    expect(await gateStatus('/api/issues', { peer: '127.0.0.1', headers: { 'x-forwarded-for': '203.0.113.9' } })).toBe(401);
+    expect(await gateStatus('/api/issues', { peer: BRIDGE_PEER, headers: { 'x-forwarded-for': '192.168.1.50' } })).toBe(401);
+  });
+});
