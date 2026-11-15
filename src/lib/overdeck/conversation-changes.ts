@@ -299,7 +299,12 @@ export async function getConversationChanges(
 
   const repoRoot = await repoRootForDir(conv.cwd);
   if (!repoRoot) {
-    // A-D9: a cwd outside any repository has nothing to report.
+    // A-D9: a cwd outside any repository has nothing to report. Zero totals are
+    // recorded so list rows stop re-queuing this conversation (A-D16).
+    totalsMap.set(conv.name, {
+      totals: { files: 0, additions: 0, deletions: 0, uncommittedFiles: 0, commitsLocal: 0 },
+      at: deps.now(),
+    });
     return {
       status: 200,
       body: {

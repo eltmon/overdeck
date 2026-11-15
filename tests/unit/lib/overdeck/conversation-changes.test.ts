@@ -221,6 +221,7 @@ describe('getConversationChanges on the workflow fixture', () => {
     const empty = body(await getConversationChanges('no-repo', { scope: 'conversation' }, deps()));
     expect(empty).toMatchObject({ conversation: 'no-repo', repoRoot: outside, branch: null, rootId: null, commits: [], uncommitted: [] });
     expect(empty.totals).toEqual({ files: 0, additions: 0, deletions: 0, commitsPushed: 0, commitsLocal: 0, uncommittedFiles: 0 });
+    expect(getChangeTotals('no-repo')?.totals).toEqual({ files: 0, additions: 0, deletions: 0, uncommittedFiles: 0, commitsLocal: 0 });
   });
 
   // Runs last in this block: it adds a commit to the fixture repository.
