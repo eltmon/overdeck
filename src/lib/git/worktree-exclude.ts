@@ -1,7 +1,7 @@
 /**
  * Hide paths from `git status` with owner blocks in an exclude file
- * (PAN-4852 WI-9). Deft and SageOx share this module, because a worktree has
- * only one `core.excludesFile`.
+ * (PAN-4852 WI-9). Deft, SageOx and the workspace sync-output hide (PAN-5395)
+ * share this module, because a worktree has only one `core.excludesFile`.
  *
  * Two scopes, chosen by where `root` lives:
  * - **worktree** (a linked worktree): `<gitdir>/info/overdeck-exclude`, set as
@@ -31,7 +31,7 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-export type ExcludeOwner = 'deft' | 'sageox';
+export type ExcludeOwner = 'deft' | 'sageox' | 'sync';
 
 export interface ExcludeTarget {
   scope: 'worktree' | 'common';

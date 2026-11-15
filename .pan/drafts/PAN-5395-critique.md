@@ -1,0 +1,13 @@
+plan-digest: f7dac651aa7d1c383da8b184cfdfc30186cf18aab83f8f1fea0338ea4a077042
+
+## blocks-the-design: Reported workspace still refuses to start
+
+The PRD says the observed OKF-11 porcelain included `scripts/__pycache__/` as well as `.claude/` output ([PRD](/home/eltmon/Projects/overdeck/workspaces/feature-pan-5395/.pan/drafts/PAN-5395.md), line 16), then explicitly leaves that path visible and start blocking (line 290). The start gate returns 409 for any visible path outside its runtime allowlist ([spawn-issue.ts](/home/eltmon/Projects/overdeck/workspaces/feature-pan-5395/src/dashboard/server/routes/agents/spawn-issue.ts), lines 703–729). Thus the exact reported work agent still cannot start after all four items pass. The smallest resolution is to include an explicit OKF-11 cleanup or project ignore change and a real-porcelain acceptance check, while keeping project tool output outside the generic Overdeck exclude list.
+
+## blocks-the-design: Existing worktree ignores can disappear
+
+The new helper delegates to `setExcludeBlock` whenever the `sync` block is absent. That writer rebuilds `overdeck-exclude` from the *global/local/system* exclude file and parsed Overdeck owner blocks, then points the worktree's `core.excludesFile` at the rebuilt file ([worktree-exclude.ts](/home/eltmon/Projects/overdeck/workspaces/feature-pan-5395/src/lib/git/worktree-exclude.ts), lines 159–170 and 195–223). It never reads a different file already named by the worktree's own `core.excludesFile`; only the legacy Deft file has a migration path (lines 173–185). Applying this automatically to every single-repo workspace can make previously ignored project files visible and change what `git add -A` stages. Preserve the active worktree exclude rules before repointing, or skip a foreign configured file with a warning, and test that case. I confirmed the writer path in code; an executable scratch reproduction was unavailable because this sandbox rejected child `git` processes with `EPERM`.
+
+## sharpens-framing: Route test bypasses the route
+
+WI-1's route-level test imports the predicate, calls `ensureWorkspaceSyncExclude` directly, and checks the predicate again ([PRD](/home/eltmon/Projects/overdeck/workspaces/feature-pan-5395/.pan/drafts/PAN-5395.md), lines 185–186). It would pass if WI-3 never called the helper from `spawnIssueAgentForRoute`; the existing dirty-workspace test also checks only the predicate ([agents-spawn-dirty-workspace.test.ts](/home/eltmon/Projects/overdeck/workspaces/feature-pan-5395/src/dashboard/server/routes/__tests__/agents-spawn-dirty-workspace.test.ts), lines 1–81). Add one test that exercises the actual start preflight or an extracted function that the route calls, and asserts the exclude runs before `git status`.

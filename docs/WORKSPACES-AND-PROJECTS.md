@@ -820,8 +820,34 @@ race with a concurrent start) restores the original `.gitignore` from `HEAD`
 rather than leaving a half-written file. Independently of the heal, the start
 gate (`isOnlyOverdeckRuntimeWorkspaceChanges`) accepts an *untracked* sync
 path only inside a confirmed polyrepo wrapper; it still refuses a tracked or
-staged edit to one of those paths, every other untracked path, and — in a
-monorepo project — every sync path at all.
+staged edit to one of those paths and every other untracked path. In a
+single-repo project the predicate still refuses every sync path, but such a
+workspace never shows them to it: the worktree exclude file described below
+hides them.
+
+### Sync output in single-repo workspaces (PAN-5395)
+
+Overdeck writes seven paths into every single-repo workspace's `.claude/`:
+`.claude/skills/`, `.claude/agents/pan-*.md`, `.claude/settings.json`,
+`.claude/settings.local.json`, `.claude/mcp.json`,
+`.claude/.overdeck-manifest.json` and `.claude/.caveman-variant`.
+
+`ensureWorkspaceSyncExclude` (`src/lib/workspace-manager/sync-exclude.ts`)
+hides them in a `sync` block of the worktree exclude file
+(`<gitdir>/info/overdeck-exclude`, `src/lib/git/worktree-exclude.ts`), at
+workspace creation and before the dirty-workspace check on every start.
+
+The hide covers the start gate, the `pan done` preflight and the approve
+gate, and `git add -A` skips the files.
+
+It never writes the common `info/exclude`, so the primary checkout is
+untouched. It turns on `extensions.worktreeConfig` in the repository config.
+
+Tracked sync files (a project that commits `.claude/settings.json`) and
+every other untracked path still refuse the start.
+
+A new project file at one of the seven paths (for example a first
+`.claude/settings.json`) is hidden too, and must be added with `git add -f`.
 
 ## Edit workspaces (PAN-5191)
 

@@ -23,6 +23,7 @@ import {
 import { copyOverdeckSettingsToWorkspace, ensurePanGitignore } from './migration.js';
 import { ensurePolyrepoWorkspaceGitignore, commitPolyrepoWorkspaceGitignoreAsync } from './polyrepo-gitignore.js';
 export { ensurePolyrepoWorkspaceGitignore, commitPolyrepoWorkspaceGitignoreAsync } from './polyrepo-gitignore.js';
+import { ensureWorkspaceSyncExclude } from './sync-exclude.js';
 import {
   assignPort,
   copyProjectTemplateDirs,
@@ -308,6 +309,15 @@ async function createWorkspaceHoldingReservation(
       // Non-fatal — log but do not block workspace creation
       result.steps.push(`Warning: could not create workspace .gitignore: ${gitignoreErr.message}`);
     }
+  }
+
+  // PAN-5395: a single-repo workspace's .claude/ sync output must not read as
+  // user changes (dirty start gate, pan done preflight) or be swept up by
+  // `git add -A`. Hide it in this worktree only; never fatal.
+  if (workspaceConfig.type !== 'polyrepo') {
+    const syncExclude = await ensureWorkspaceSyncExclude(workspacePath);
+    if (syncExclude.status === 'written') result.steps.push('Hid Overdeck sync output (.claude/) from git in this worktree');
+    if (syncExclude.warning) result.steps.push(`Warning: could not hide Overdeck sync output from git: ${syncExclude.warning}`);
   }
 
   progress('Creating git worktree', 'Worktree ready', 'complete');

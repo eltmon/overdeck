@@ -1,0 +1,367 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T20:07:34Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5395: Work agents in single-repo projects never start: untracked Overdeck sync output reads as a dirty workspace",
+    "updated": "2026-11-15T20:20:26.550Z"
+  },
+  "plan": {
+    "id": "pan-5395",
+    "title": "Work agents in single-repo projects never start: untracked Overdeck sync output reads as a dirty workspace",
+    "status": "running",
+    "uid": "9adb0bc6-97e7-41b2-bff9-70fe4f5b93d7",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T20:07:34Z",
+    "updated": "2026-11-15T20:20:26.550Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5395",
+        "label": "PAN-5395",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "workspace",
+      "dirty-gate",
+      "git-exclude",
+      "agent-start",
+      "single-repo"
+    ],
+    "narratives": {
+      "Problem": "In a single-repo project, the dirty-workspace start gate in spawn-issue.ts (isOnlyOverdeckRuntimeWorkspaceChanges, line 110) tolerates untracked Overdeck sync output only for polyrepo wrappers (PAN-5199). Workspace creation and agent launches write .claude/agents/, .claude/settings.json, .claude/settings.local.json, .claude/mcp.json, .claude/.overdeck-manifest.json and .claude/.caveman-variant, so every fresh workspace in a project whose .gitignore does not list them returns 409 WORKSPACE_DIRTY and the work agent never starts (OKF-11, 2026-11-15). The pan done preflight and approve gate (isOverdeckOwnedOnlyStatus) would stall on the same files, and git add -A would commit .claude/mcp.json, which holds credentials.",
+      "Proposal": "Issue Fix option 1, worktree-scoped. A new helper ensureWorkspaceSyncExclude (src/lib/workspace-manager/sync-exclude.ts) writes a `sync` owner block of seven root-anchored .claude/ patterns (agents narrowed to /.claude/agents/pan-*.md) into the linked worktree's private exclude file through the existing src/lib/git/worktree-exclude.ts (PAN-4852). createWorkspace calls it for non-polyrepo workspaces, and spawnIssueAgentForRoute calls it before the dirty-workspace git status on every start, so existing workspaces heal. It never writes the common info/exclude, never throws, and leaves the start-gate predicate unchanged. Docs and changelog describe the behavior. Full detail: .pan/drafts/PAN-5395.md.",
+      "NonGoals": "- Notifying the Flywheel or retrying when a start is refused as dirty (the issue's Fix section does not ask for it; follow-up candidate)\n- Hiding project-owned tool output such as scripts/__pycache__/ or .pytest_cache/; it still refuses the start\n- Tolerating tracked edits to sync files (e.g. ` M .claude/settings.json` in a project that commits it); they still refuse the start\n- Excluding .claude/commands/ or any .claude/ path outside the seven-pattern list\n- Excluding .overdeck/ or .pan/ paths (already tolerated by isOverdeckWorkspaceRuntimePath; .overdeck/memory/ and .pan/drafts|specs/ are committed work product)\n- Changing polyrepo wrapper handling, the PAN-5199 .gitignore heal, or the polyrepoWrapper predicate branch\n- Changing the body of isOnlyOverdeckRuntimeWorkspaceChanges or isOverdeckOwnedOnlyStatus\n- Writing any project's tracked .gitignore or the common .git/info/exclude\n- Removing the operator's manual okf .git/info/exclude lines"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose issue Fix option 1 (local exclude) over option 2 (drop the polyrepoWrapper condition).",
+        "rationale": "Option 2 fixes only the start gate: pan done preflight (filterUncommittedPorcelainLines) and the approve gate (shouldBlockApproveForDirtyStatus) use isOverdeckOwnedOnlyStatus, which keeps ?? .claude/settings.json, so the stall moves to pan done. Option 2 also leaves .claude/mcp.json (verified to hold a Linear bearer token in the okf workspace) visible to git add -A. Option 1 fixes every git-status gate and keeps the files out of commits."
+      },
+      {
+        "summary": "Write the worktree-scoped exclude file (<gitdir>/info/overdeck-exclude via worktree-exclude.ts), never the common info/exclude.",
+        "rationale": "The common file is shared with the primary checkout and would hide a user's own .claude/settings.json there. Worktree scope affects only the issue workspace; its cost is extensions.worktreeConfig=true in the repo config, already accepted for Deft and SageOx (PAN-4852). Reusing the module avoids a second core.excludesFile fighting Deft/SageOx."
+      },
+      {
+        "summary": "Use seven exact root-anchored .claude/ patterns (agents narrowed to /.claude/agents/pan-*.md) instead of a blanket .claude/ entry, and no .overdeck/ or .pan/ patterns.",
+        "rationale": "A blanket .claude/ would hide a project's own new .claude/commands/ files from git add. The seven paths match what Overdeck writes (verified in the okf workspace and the overdeck repo's own .gitignore). .overdeck/ and .pan/ are already tolerated by the gates and contain committed work product. Every shipped agent in sync-sources/agents/ is pan-*.md, so a project's own .claude/agents/my-agent.md stays visible."
+      },
+      {
+        "summary": "Apply the exclude both at workspace creation and on every agent start before the dirty gate.",
+        "rationale": "Creation alone would leave every existing single-repo workspace refusing starts. The start-time call mirrors where PAN-5199 heals polyrepo wrappers and is idempotent."
+      },
+      {
+        "summary": "Deferred the Flywheel-notification half of the issue.",
+        "rationale": "The issue body's Fix section lists only the two exclude/predicate options and the test; notification on refusal is a separate behavior and a follow-up candidate."
+      },
+      {
+        "summary": "The exclude owner is named `sync`.",
+        "rationale": "worktree-exclude.ts parses block markers with /^# overdeck:([a-z]+) (begin|end)$/, so an owner name with a hyphen such as workspace-sync would not round-trip."
+      },
+      {
+        "summary": "Accept that a new project file at one of the seven exact paths (e.g. a first .claude/settings.json) is hidden in issue workspaces and needs git add -f.",
+        "rationale": "Overdeck overwrites or merges into these files in every workspace, and .claude/mcp.json and .claude/settings.json can hold credentials, so hiding them is safer than leaving them open to git add -A. Both doc pages state the git add -f escape."
+      }
+    ],
+    "items": [
+      {
+        "id": "sync-exclude-helper",
+        "title": "Add ensureWorkspaceSyncExclude with the `sync` exclude owner and seven-pattern list",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T20:07:34Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5395",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "create-applies-sync-exclude",
+            "start-heals-sync-exclude"
+          ],
+          "files_scope": [
+            "src/lib/git/worktree-exclude.ts",
+            "src/lib/workspace-sync-paths.ts",
+            "src/lib/workspace-manager/sync-exclude.ts",
+            "src/lib/workspace-manager/__tests__/sync-exclude.test.ts",
+            "src/dashboard/server/routes/__tests__/agents-spawn-sync-exclude.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/workspace-manager/__tests__/sync-exclude.test.ts src/dashboard/server/routes/__tests__/agents-spawn-sync-exclude.test.ts src/lib/git/__tests__/worktree-exclude.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "sync-exclude.test.ts passes every named test",
+            "agents-spawn-sync-exclude.test.ts passes its one named test",
+            "worktree-exclude.test.ts still passes",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "FR-7"
+          ],
+          "acJustification": "Six criteria: the helper has six independently observable behaviors (gate outcome, visibility of project files, primary-checkout isolation, idempotence/non-throwing, foreign excludes file preservation, coexistence with other owners)."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. (1) In src/lib/git/worktree-exclude.ts change `export type ExcludeOwner = 'deft' | 'sageox';` to add `| 'sync'` and update the header's 'Deft and SageOx share this module' sentence to name the PAN-5395 sync-output hide; change no logic. (2) In src/lib/workspace-sync-paths.ts add `export const OVERDECK_WORKSPACE_SYNC_EXCLUDE_PATTERNS` = ['/.claude/skills/', '/.claude/agents/pan-*.md', '/.claude/settings.json', '/.claude/settings.local.json', '/.claude/mcp.json', '/.claude/.overdeck-manifest.json', '/.claude/.caveman-variant'] as const, with the PRD's doc comment. (3) Create src/lib/workspace-manager/sync-exclude.ts with `ensureWorkspaceSyncExclude(workspacePath): Promise<WorkspaceSyncExcludeResult>` as in the PRD snippet: excludeTarget → skip when scope !== 'worktree'; read `git config --worktree --get core.excludesFile` and, when it names a file other than target.file or <gitdir>/info/overdeck-deft-exclude, return { status: 'skipped', warning } without writing (FR-7); return 'unchanged' only when readExcludeBlock(…,'sync') equals the list AND `git config --worktree --get core.excludesFile` equals target.file; else setExcludeBlock(…,'sync', list) → 'written'; any error → { status: 'skipped', warning }. Async execFile only; never throws; imports only ../git/worktree-exclude.js and ../workspace-sync-paths.js plus node built-ins. (4) Write src/lib/workspace-manager/__tests__/sync-exclude.test.ts with the named lib tests from PRD WI-1 step 4 (real temp repo + linked worktree, env-isolation scaffold copied from src/lib/git/__tests__/worktree-exclude.test.ts); it asserts filterUncommittedPorcelainLines (src/lib/work/done-preflight.ts) returns [] and imports nothing from src/dashboard. (5) Write src/dashboard/server/routes/__tests__/agents-spawn-sync-exclude.test.ts with the one issue-required test from PRD WI-1 step 5: mock ../../../../lib/activity-logger.js as agents-spawn-dirty-workspace.test.ts does, import isOnlyOverdeckRuntimeWorkspaceChanges from ../agents/spawn.js, same real-git scaffold. No source-reading tests, no skipIf/.only."
+        },
+        "items": [
+          {
+            "id": "sync-exclude-helper.ac1",
+            "title": "Given a linked worktree with untracked .claude/settings.json, .claude/mcp.json, .claude/agents/pan-work-agent.md and .overdeck/continue.json, when ensureWorkspaceSyncExclude runs, then isOnlyOverdeckRuntimeWorkspaceChanges over real `git status --porcelain --untracked-files=all` output returns true in agents-spawn-sync-exclude.test.ts (it returns false before the call)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-exclude-helper.ac2",
+            "title": "Given untracked .claude/notes.md, .claude/commands/x.md, .claude/agents/my-agent.md and src/.claude/settings.json in the worktree, when ensureWorkspaceSyncExclude runs, then git status still shows all four paths, while filterUncommittedPorcelainLines returns [] for a worktree holding only the seven sync files and .overdeck/continue.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-exclude-helper.ac3",
+            "title": "Given the helper runs on the worktree, then the primary checkout's .git/info/exclude preserves its exact bytes and git status in the primary checkout still shows an untracked .claude/settings.json; when called on the primary checkout itself it returns { status: 'skipped' } with no warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-exclude-helper.ac4",
+            "title": "When called a second time on the same worktree it returns status 'unchanged' with the same file path, and when called on a non-git directory it resolves to status 'skipped' with a non-empty warning instead of throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-exclude-helper.ac5",
+            "title": "Given an existing sageox block ['/.sageox/'] in the worktree exclude file, when ensureWorkspaceSyncExclude runs, then readExcludeBlock(wt, 'sageox') still returns ['/.sageox/'], and the existing worktree-exclude.test.ts file passes with no edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-exclude-helper.ac6",
+            "title": "Given a worktree whose core.excludesFile points at a foreign file <gitdir>/info/my-ignore that hides local-only.txt, when ensureWorkspaceSyncExclude runs, then it returns status 'skipped' with a warning naming that file, git config --worktree --get core.excludesFile still returns that path, and git status still hides local-only.txt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "create-applies-sync-exclude",
+        "title": "Call ensureWorkspaceSyncExclude from createWorkspace for single-repo workspaces",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T20:07:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5395",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-manager/create.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ],
+          "acJustification": "Two criteria fully cover a single guarded call site; behavior is tested in sync-exclude-helper."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In src/lib/workspace-manager/create.ts, import { ensureWorkspaceSyncExclude } from './sync-exclude.js'. Immediately after the `if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) { … ensurePolyrepoWorkspaceGitignore … }` block closes and before the line `progress('Creating git worktree', 'Worktree ready', 'complete');`, add: `if (workspaceConfig.type !== 'polyrepo') { const syncExclude = await ensureWorkspaceSyncExclude(workspacePath); if (syncExclude.status === 'written') result.steps.push('Hid Overdeck sync output (.claude/) from git in this worktree'); if (syncExclude.warning) result.steps.push(`Warning: could not hide Overdeck sync output from git: ${syncExclude.warning}`); }` with the PAN-5395 comment from the PRD. Never set result.success = false here."
+        },
+        "items": [
+          {
+            "id": "create-applies-sync-exclude.ac1",
+            "title": "Given a non-polyrepo project, when createWorkspace reaches the point after the worktree exists and before progress('Creating git worktree', 'Worktree ready', 'complete'), then it applies ensureWorkspaceSyncExclude(workspacePath); given a polyrepo project, it never calls the helper",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-applies-sync-exclude.ac2",
+            "title": "When the helper returns 'written', createWorkspace records the step 'Hid Overdeck sync output (.claude/) from git in this worktree'; when it returns a warning, createWorkspace records a 'Warning: could not hide Overdeck sync output from git:' step and result.success preserves its prior value; npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-heals-sync-exclude",
+        "title": "Call ensureWorkspaceSyncExclude in spawnIssueAgentForRoute before the dirty-workspace check",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T20:07:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5395",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/spawn-issue.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/routes/__tests__/agents-spawn-dirty-workspace.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "agents-spawn-dirty-workspace.test.ts passes unchanged",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In src/dashboard/server/routes/agents/spawn-issue.ts import { ensureWorkspaceSyncExclude } from '../../../../lib/workspace-manager/sync-exclude.js'. Extend the PAN-5199 heal block (search '// PAN-5199: heal a polyrepo wrapper created before its .gitignore carried') with `else if (!polyrepoWorkspace && existsSync(workspacePath)) { const syncExclude = yield* Effect.promise(() => ensureWorkspaceSyncExclude(workspacePath)); if (syncExclude.status === 'written' || syncExclude.warning) { yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.workspace_sync_exclude', { issueId, workspacePath, ...syncExclude })); } }` plus the one-line PAN-5395 comment. Add the PRD's one-sentence note to the isOnlyOverdeckRuntimeWorkspaceChanges doc comment; do not change the predicate body. Keep the file at or under 1000 lines."
+        },
+        "items": [
+          {
+            "id": "start-heals-sync-exclude.ac1",
+            "title": "Given a non-polyrepo project with an existing local workspace, when spawnIssueAgentForRoute runs, then it applies ensureWorkspaceSyncExclude(workspacePath) before the dirty gate's `git status --porcelain --untracked-files=all` exec; given a polyrepo project, it runs the PAN-5199 heal instead and never calls the helper",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-heals-sync-exclude.ac2",
+            "title": "When the helper result is 'written' or carries a warning, the route logs lifecycle event 'agent.workspace_sync_exclude' with issueId, workspacePath and the result fields; when the result is 'unchanged' or a warning-free 'skipped', the route logs nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-heals-sync-exclude.ac3",
+            "title": "Given the predicate body is unchanged, then agents-spawn-dirty-workspace.test.ts passes with no edits (including the 'rejects … without the polyrepoWrapper option' cases), and bash scripts/lint-file-size.sh exits 0 with spawn-issue.ts at or under 1000 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-sync-exclude",
+        "title": "Document the single-repo sync-output exclude in developer docs, user docs and the changelog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T20:07:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5395",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "configuration/projects.mdx",
+            "changelog.d/pan-5395.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. (1) docs/WORKSPACES-AND-PROJECTS.md, section 'Wrapper-repo git posture (polyrepo projects)': replace the whole paragraph-ending sentence 'it still refuses a tracked or staged edit to one of those paths, every other untracked path, and — in a monorepo project — every sync path at all.' with the exact replacement sentence given in PRD WI-4 step 1, then add the subsection '### Sync output in single-repo workspaces (PAN-5395)' stating: the seven .claude/ paths; ensureWorkspaceSyncExclude (src/lib/workspace-manager/sync-exclude.ts) hides them in a `sync` block of <gitdir>/info/overdeck-exclude (src/lib/git/worktree-exclude.ts) at creation and before the dirty-workspace check on every start; this covers the start gate, pan done preflight, the approve gate and git add -A; the common info/exclude and primary checkout are untouched; extensions.worktreeConfig is turned on; tracked sync files and every other untracked path still refuse the start; a new project file at one of the seven paths needs git add -f. (2) configuration/projects.mdx: after the paragraph beginning '`workspaces/` is excluded through `<project>/.git/info/exclude`', add the user-facing paragraph from the PRD. (3) Create changelog.d/pan-5395.md with the exact '#### Fixed' bullet from the PRD."
+        },
+        "items": [
+          {
+            "id": "docs-sync-exclude.ac1",
+            "title": "docs/WORKSPACES-AND-PROJECTS.md contains a '### Sync output in single-repo workspaces (PAN-5395)' heading whose text names ensureWorkspaceSyncExclude, <gitdir>/info/overdeck-exclude, all seven .claude/ patterns and git add -f, and the file no longer contains the phrase 'every sync path at all'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-sync-exclude.ac2",
+            "title": "configuration/projects.mdx contains a paragraph after the workspaces/ exclusion paragraph that tells users issue workspaces hide Overdeck's copied .claude/ files through a workspace-private git exclude file, that their tracked .gitignore and main checkout are not changed, and that git add -f commits a new file at one of those paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-sync-exclude.ac3",
+            "title": "changelog.d/pan-5395.md exists with a single '#### Fixed' heading and one bullet linking https://github.com/eltmon/overdeck/issues/5395, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "sync-exclude-helper",
+        "to": "create-applies-sync-exclude",
+        "type": "blocks"
+      },
+      {
+        "from": "sync-exclude-helper",
+        "to": "start-heals-sync-exclude",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-15-PAN-5395-work-agents-in-single-repo-projects-never-start-untracked-overdeck-sync-output-reads-as-a-dirty-workspace.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}
