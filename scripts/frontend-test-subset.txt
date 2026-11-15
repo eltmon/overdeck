@@ -311,6 +311,7 @@ src/components/issue-view/ShipProgress.test.tsx
 src/components/issue-view/StackDrawer.test.tsx
 src/components/issue-view/derivations.test.ts
 src/components/issue-view/useIssueRecord.test.tsx
+src/components/issue-view/useIssueView.test.tsx
 src/components/merge-train/__tests__/MergeTrainView.test.tsx
 src/components/mobile/__tests__/AppearanceChoice.test.tsx
 src/components/mobile/__tests__/LogoSting.test.tsx
