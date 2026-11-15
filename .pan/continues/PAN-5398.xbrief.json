@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5398",
+  "created": "2026-11-15T20:47:31.521Z",
+  "updated": "2026-11-15T20:47:31.521Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "resolution-deck-key": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5398",
+      "claimedAt": "2026-11-15T20:47:31.521Z"
+    }
+  }
+}
