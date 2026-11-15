@@ -39,7 +39,11 @@ import { LRUCache } from '../../lib/lruCache';
 import { fnv1a32 } from '../../lib/diffRendering';
 import { isNativeShell } from '../../lib/nativeShell';
 import { ensureSyntaxTheme, highlight, syntaxThemeName } from '../../lib/syntaxTheme';
-import { TranscriptLink } from './TranscriptPullRequestLink';
+import { TranscriptLink, useTranscriptConversation } from './TranscriptPullRequestLink';
+import { ConversationReferenceLink } from './ConversationReferenceLink';
+import { remarkConversationReferences } from './remarkConversationReferences';
+import { useConversationReferences } from './useConversationReferences';
+import { EMPTY_CONVERSATION_REFS, parseConversationHref, type ConversationRef, type ConversationRefMap } from '../../lib/conversationReferences';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── LRU Cache for syntax highlighting ───────────────────────────────────────
@@ -365,7 +369,14 @@ function remarkBareFileTextLinks(options: { cwd?: string } = {}) {
   };
 }
 
-function makeComponents(isStreaming: boolean, cwd: string | undefined, issueId: string | null | undefined): Components & StreamdownComponents {
+function makeComponents(
+  isStreaming: boolean,
+  cwd: string | undefined,
+  issueId: string | null | undefined,
+  conversationRefs: ConversationRefMap,
+): Components & StreamdownComponents {
+  const conversationRefsByRouteKey = new Map<string, ConversationRef>();
+  for (const ref of conversationRefs.values()) conversationRefsByRouteKey.set(ref.routeKey, ref);
   return {
     pre({ children }: React.JSX.IntrinsicElements['pre'] & ExtraProps) {
       // Extract code block contents
@@ -394,6 +405,21 @@ function makeComponents(isStreaming: boolean, cwd: string | undefined, issueId: 
       );
     },
     a({ href, children }: React.JSX.IntrinsicElements['a'] & ExtraProps) {
+      // PAN-5339 FR-7: a hand-written /conv/<key> link gets the same in-dashboard
+      // click and tooltip as a generated one, when its key resolves. A link
+      // remarkConversationReferences generated always points at
+      // /conv/<routeKey> (the numeric id) even when the original reference
+      // was name-form, so the routeKey index catches those too.
+      const conversationKey = parseConversationHref(href);
+      const conversationRef = conversationKey
+        ? conversationRefs.get(conversationKey) ?? conversationRefsByRouteKey.get(conversationKey)
+        : undefined;
+      // D9: unlike a generated reference, a hand-written link to the current
+      // conversation still renders in-app — the agent chose to link it.
+      if (conversationRef) {
+        return <ConversationReferenceLink conversationRef={conversationRef} className={styles.mdLink}>{children}</ConversationReferenceLink>;
+      }
+
       const fileLinkMeta = resolveMarkdownFileLinkMeta(href, cwd);
       if (fileLinkMeta) {
         return (
@@ -427,6 +453,10 @@ interface ChatMarkdownProps {
   cwd?: string;
   issueId?: string | null;
   useStreamdown?: boolean;
+}
+
+interface ChatMarkdownBodyProps extends ChatMarkdownProps {
+  conversationRefs: ConversationRefMap;
 }
 
 // Messages above this size are rendered as plain text behind a collapse instead
@@ -463,17 +493,35 @@ function LargeMessageBlock({ text }: { text: string }) {
   );
 }
 
-export const ChatMarkdown = memo(function ChatMarkdown({
+const ChatMarkdownBody = memo(function ChatMarkdownBody({
   text,
   isStreaming = false,
   cwd,
   issueId,
   useStreamdown,
-}: ChatMarkdownProps) {
-  const components = useMemo(() => makeComponents(isStreaming, cwd, issueId), [isStreaming, cwd, issueId]);
+  conversationRefs,
+}: ChatMarkdownBodyProps) {
+  const components = useMemo(
+    () => makeComponents(isStreaming, cwd, issueId, conversationRefs),
+    [isStreaming, cwd, issueId, conversationRefs],
+  );
+  // Streamdown's internal processor cache keys a plugin's options via
+  // JSON.stringify, and JSON.stringify(Map) always serializes to "{}" — so
+  // without a plain string field here, every render's conversationRefs
+  // (empty or resolved, this message's or another's) collides on the same
+  // cache key, and Streamdown keeps reusing whichever processor (and its
+  // closed-over refs) happened to be built first (PAN-5339).
+  const conversationRefsCacheBust = useMemo(
+    () => Array.from(conversationRefs, ([key, ref]) => `${key}:${ref.routeKey}:${ref.isCurrent}`).sort().join('|'),
+    [conversationRefs],
+  );
   const remarkPlugins = useMemo(
-    () => [remarkGfm, [remarkBareFileTextLinks, { cwd }]] as ReactMarkdownRemarkPlugins,
-    [cwd],
+    () => [
+      remarkGfm,
+      [remarkConversationReferences, { refs: conversationRefs, _cacheBust: conversationRefsCacheBust }],
+      [remarkBareFileTextLinks, { cwd }],
+    ] as ReactMarkdownRemarkPlugins,
+    [cwd, conversationRefs, conversationRefsCacheBust],
   );
   const contextUseStreamdown = useContext(StreamdownRendererContext);
   const renderWithStreamdown = useStreamdown ?? contextUseStreamdown;
@@ -500,6 +548,13 @@ export const ChatMarkdown = memo(function ChatMarkdown({
             }
           >
             <StreamdownRenderer
+              // PAN-5339: Streamdown's own memo() comparator on this component
+              // ignores `components`/`remarkPlugins`/`rehypePlugins` entirely —
+              // it only compares `children` (the text) and a handful of other
+              // props — so when conversationRefs resolves without the text
+              // changing, React treats props as equal and never re-renders it.
+              // Keying on the refs signature forces a fresh mount instead.
+              key={conversationRefsCacheBust}
               mode={isStreaming ? 'streaming' : 'static'}
               remarkPlugins={remarkPlugins as StreamdownProps['remarkPlugins']}
               components={components as StreamdownProps['components']}
@@ -516,4 +571,22 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       </div>
     </ChatMarkdownErrorBoundary>
   );
+});
+
+/**
+ * PAN-5339 D4: inside a transcript, resolves `text`'s conversation-reference
+ * keys and passes the map down. Messages over LARGE_MESSAGE_CHARS skip
+ * resolution entirely — they already render as plain text (see the guard in
+ * `ChatMarkdownBody`), so there's nothing to link.
+ */
+function ChatMarkdownWithConversationRefs({ text, currentConversationName, ...rest }: ChatMarkdownProps & { currentConversationName: string }) {
+  const conversationRefs = useConversationReferences(text.length > LARGE_MESSAGE_CHARS ? '' : text, currentConversationName);
+  return <ChatMarkdownBody text={text} conversationRefs={conversationRefs} {...rest} />;
+}
+
+export const ChatMarkdown = memo(function ChatMarkdown(props: ChatMarkdownProps) {
+  const transcript = useTranscriptConversation();
+  return transcript
+    ? <ChatMarkdownWithConversationRefs {...props} currentConversationName={transcript.conversationName} />
+    : <ChatMarkdownBody {...props} conversationRefs={EMPTY_CONVERSATION_REFS} />;
 });

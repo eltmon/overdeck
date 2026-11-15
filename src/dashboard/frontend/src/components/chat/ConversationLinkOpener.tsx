@@ -5,21 +5,15 @@
  * opener to any conversation-reference link, regardless of which deck pane
  * rendered the transcript it's in. `null` outside the provider (e.g. a
  * pop-out window, `/m`, or the issue drawer) tells a link to fall back to a
- * plain new-tab open (FR-8).
+ * plain new-tab open (FR-8). Only this provider needs `useOpenConversation`
+ * — a link reads the opener through `ConversationLinkOpenerContext`
+ * directly (see that module's header for why).
  */
-import { createContext, useContext, type ReactNode } from 'react';
-import type { Conversation } from '../CommandDeck/ConversationList';
+import type { ReactNode } from 'react';
 import { useOpenConversation } from '../frame/deck/useOpenConversation';
-
-export type ConversationLinkOpener = (conversation: Conversation) => void;
-
-export const ConversationLinkOpenerContext = createContext<ConversationLinkOpener | null>(null);
+import { ConversationLinkOpenerContext } from './ConversationLinkOpenerContext';
 
 export function ConversationLinkOpenerProvider({ children }: { children: ReactNode }) {
   const open = useOpenConversation(null);
   return <ConversationLinkOpenerContext.Provider value={open}>{children}</ConversationLinkOpenerContext.Provider>;
-}
-
-export function useConversationLinkOpener(): ConversationLinkOpener | null {
-  return useContext(ConversationLinkOpenerContext);
 }

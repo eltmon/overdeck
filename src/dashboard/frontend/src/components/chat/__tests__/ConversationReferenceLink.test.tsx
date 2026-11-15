@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { ConversationReferenceLink } from '../ConversationReferenceLink';
-import { ConversationLinkOpenerContext, type ConversationLinkOpener } from '../ConversationLinkOpener';
+import { ConversationLinkOpenerContext, type ConversationLinkOpener } from '../ConversationLinkOpenerContext';
 import type { Conversation } from '../../CommandDeck/ConversationList';
 import type { ConversationRef } from '../../../lib/conversationReferences';
 

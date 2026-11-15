@@ -10,7 +10,7 @@
  */
 import type { MouseEvent, ReactNode } from 'react';
 import type { ConversationRef } from '../../lib/conversationReferences';
-import { useConversationLinkOpener } from './ConversationLinkOpener';
+import { useConversationLinkOpener } from './ConversationLinkOpenerContext';
 
 export function ConversationReferenceLink({ conversationRef, className, children }: {
   conversationRef: ConversationRef;
