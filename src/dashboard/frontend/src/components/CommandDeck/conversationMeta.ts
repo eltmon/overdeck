@@ -21,6 +21,16 @@ export function shortHarness(harness: string): string {
   return runtime ? getRuntimeBehavior(runtime).displayName : harness;
 }
 
+/**
+ * The harness's display label, or null for the default (Claude Code) — the
+ * one harness-name comparison UI call sites share (PAN-4562), so a second
+ * caller (e.g. the New conversation button's summary line, PAN-5335) reuses
+ * this instead of adding its own branch.
+ */
+export function nonDefaultHarnessLabel(harness: string): string | null {
+  return harness !== 'claude-code' ? shortHarness(harness) : null;
+}
+
 export type ConversationMetaTone = 'additions' | 'deletions' | 'muted';
 
 export interface ConversationMetaPart {
@@ -81,8 +91,9 @@ export function conversationMetaParts(conv: MetaConversation, now: Date): Conver
 
   const harness = conv.harness ?? 'claude-code';
   const harnessLabel = shortHarness(harness);
-  if (harness !== 'claude-code') {
-    parts.push({ key: 'harness', text: harnessLabel, title: `Harness: ${harnessLabel}` });
+  const nonDefaultLabel = nonDefaultHarnessLabel(harness);
+  if (nonDefaultLabel !== null) {
+    parts.push({ key: 'harness', text: nonDefaultLabel, title: `Harness: ${nonDefaultLabel}` });
   }
 
   if (conv.totalCost !== undefined && conv.totalCost > 0) {

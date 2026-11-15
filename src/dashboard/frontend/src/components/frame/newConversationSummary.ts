@@ -7,7 +7,7 @@
 import { getProviderForPickerModel, pickerEffortLevels, type Harness, type ModelGroup } from '../shared/ModelPicker';
 import { MODEL_EFFORT_SUPPORT } from '../chat/ModelPicker';
 import { SHORT_LABELS, type EffortLevel } from '../chat/EffortPicker';
-import { shortHarness } from '../CommandDeck/conversationMeta';
+import { nonDefaultHarnessLabel } from '../CommandDeck/conversationMeta';
 import { compactModelName } from '../../lib/model-names';
 
 export interface NewConversationSummary {
@@ -37,7 +37,7 @@ export function newConversationSummary(input: {
   const fullLabel = pickerModel?.label ?? compactModelName(model);
   const providerLabel = group?.label ?? provider ?? model;
   const shortName = pickerModel ? shortModelLabel(fullLabel) : compactModelName(model);
-  const harnessLabel = harness !== 'claude-code' ? shortHarness(harness) : null;
+  const harnessLabel = nonDefaultHarnessLabel(harness);
 
   // Same rule useCreateConversation uses to decide whether to send effort at
   // all — the line names exactly what quick create sends.
